@@ -20,9 +20,13 @@ with your next action.""",
             ],
         }
         return instruction
+    
+    def __init__(self, allow_chain_action: bool = False):
+        super().__init__()
+        self.allow_chain_action = allow_chain_action
 
     def register(self, environment):
-        from autopdb.envs import RepoEnv
+        from froggy.envs import RepoEnv
 
         if not isinstance(environment, RepoEnv):
             raise ValueError("The environment must be a RepoEnv instance.")
@@ -31,8 +35,14 @@ with your next action.""",
 
     def is_triggered(self, action):
         return action.startswith(self.action)
-
+    
     def use(self, action):
+        if self.allow_chain_action:
+            return self.use_with_chaining(action)
+        else:
+            return self.use_without_chaining()
+
+    def use_with_chaining(self, action):
         """Reasoning tokens are only to benefit the model, so we strip them and then pass the remainder of the action
         as a free next action.
         """
@@ -42,6 +52,9 @@ with your next action.""",
         if next_action_obs == f"Invalid action: {action}.":
             next_action_obs == f"You must provide a valid action after your reasoning. Found invalid action: {action}."
         return next_action_obs[0]
+    
+    def use_without_chaining(self):
+        return "Reasoning text acknowledged."
 
     def remove_reasoning(self, action):
         items = action.split("</reasoning>")
