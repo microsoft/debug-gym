@@ -240,7 +240,7 @@ class PDBTool(EnvironmentTool):
 
         return success, output
 
-    def breakpoint_modify(self, rewrite_head, rewrite_tail, new_code_length):
+    def breakpoint_modify(self, rewrite_file, rewrite_head, rewrite_tail, new_code_length):
         # handle breakpoints line number changes caused by rewriting
         # this is a wrapper that manages the self.breakpoints_state, which does not reset at each pseudo terminal start
         # self.breakpoints_state is a dict, the keys are "|||".join([file_path, str(line_number)]) and values are breakpoint_command
@@ -249,9 +249,13 @@ class PDBTool(EnvironmentTool):
         current_breakpoints_state_copy = copy.copy(
             self.environment.current_breakpoints_state
         )
+        if rewrite_file is None:
+            rewrite_file = self.environment.current_file
+        if rewrite_file.startswith(str(self.environment.working_dir)):
+            rewrite_file = rewrite_file[len(str(self.environment.working_dir)) + 1 :]
         for _key in self.environment.current_breakpoints_state.keys():
             _file_path, _line_number = _key.split("|||")
-            if _file_path != self.environment.current_file:
+            if _file_path != rewrite_file:
                 # the breakpoints are not in the current file, no need to modify
                 continue
             _line_number = int(_line_number)
