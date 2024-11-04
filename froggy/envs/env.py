@@ -221,7 +221,10 @@ class RepoEnv(TooledEnv):
 
     def load_current_file(self, filepath: str) -> bool:
         self.current_file = filepath
-        self.current_file_content = (self.working_dir / self.current_file).read_text()
+        self.current_file_content = self.load_file(filepath)
+
+    def load_file(self, filepath: str) -> str:
+        return (self.working_dir / filepath).read_text()
 
     def directory_tree(self, root: str = None, editable_only: bool = False):
         root = Path(root or self.path).absolute()
