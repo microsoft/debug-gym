@@ -242,6 +242,7 @@ class SubstitutionPatcher(CodePatcher):
             else:
                 raise ValueError("Invalid content format.")
         except:
+            self.rewrite_success = False
             return "Rewrite failed."
 
         message, success, new_code_length = self._rewrite_file(file_path, head, tail, new_code)
@@ -259,4 +260,6 @@ class SubstitutionPatcher(CodePatcher):
                 )  # converting head/tail back to 1-based index for breakpoint management
             self.rewrite_success = True
             return "Rewriting done."
+        
+        self.rewrite_success = False
         return "\n".join([message, "Rewrite failed."])
