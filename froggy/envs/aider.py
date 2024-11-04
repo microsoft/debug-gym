@@ -1,0 +1,106 @@
+import os
+import re
+import subprocess
+import tempfile
+from os.path import join as pjoin
+from pathlib import Path
+
+from froggy.envs.env import RepoEnv
+from froggy.utils import (
+    cleanup_pytest_output,
+    extract_max_score_from_pytest_output,
+    extract_reward_from_pytest_output,
+)
+
+
+class AiderBenchmarkEnv(RepoEnv):
+    REPO_URL = "https://github.com/exercism/python"
+    REPO_PATH = Path(pjoin(tempfile.gettempdir(), "exercism"))
+
+    @property
+    def instructions(self):
+        _instruction = {
+            "Problem description": self.current_sample["instructions"],
+            "Available tools to solve the problem": self.tool_instructions,
+            "Available commands": self.actions_str,
+        }
+        return _instruction
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.load_dataset()
+
+    def reset(self, *, seed=None, options={}):
+        self.current_sample = self.dataset[options["task_name"]]
+        directory = self.current_sample["base_directory"]
+        entrypoint = self.current_sample["entry_point"]
+
+        self.setup_workspace(directory, entrypoint=entrypoint)
+
+        obs, infos = super().reset()
+        infos["instructions"] = self.instructions
+        infos["last_run_obs"] = cleanup_pytest_output(infos["last_run_obs"])
+
+        self.max_score = extract_max_score_from_pytest_output(infos["last_run_obs"])
+        infos["max_score"] = self.max_score
+        infos["score"] = extract_reward_from_pytest_output(infos["last_run_obs"])
+
+        # By default, open the only modifiable file.
+        self.load_current_file(self.current_sample["filename"])
+        # an update the infos related to current code.
+        infos["current_code_with_line_number"] = self.current_code_with_line_number()
+        return infos["obs"], infos
+
+    def step(self, action: str):
+        obs, score, done, infos = super().step(action)
+        infos["last_run_obs"] = cleanup_pytest_output(infos["last_run_obs"])
+        infos["score"] = extract_reward_from_pytest_output(infos["last_run_obs"])
+        return obs, score, done, infos
+
+    def load_dataset(self):
+        if not os.path.exists(self.REPO_PATH):
+            subprocess.run(["git", "clone", self.REPO_URL, self.REPO_PATH], check=True)
+
+        practice_path = self.REPO_PATH / "exercises" / "practice"
+        directories = [d for d in practice_path.iterdir() if d.is_dir()]
+
+        self.dataset = {}
+        for directory in directories:
+            task_name = directory.name.replace("-", "_")
+
+            docs = directory / ".docs"
+            intro_md = docs / "introduction.md"
+            instr_md = docs / "instructions.md"
+            instr_more_md = docs / "instructions.append.md"
+            instructions = ""
+            instructions += intro_md.read_text() if intro_md.exists() else ""
+            instructions += instr_md.read_text() if instr_md.exists() else ""
+            instructions += instr_more_md.read_text() if instr_more_md.exists() else ""
+
+            # Add a default ignore file
+            with open(directory / ".pdbignore", "w") as f:
+                f.write(
+                    "\n".join(
+                        [
+                            ".DS_Store",
+                            "__pycache__/",
+                            ".approaches/",
+                            ".docs/",
+                            ".meta/",
+                            ".pytest_cache/",
+                            "*test*.py",
+                            "*.pyc",
+                            "*.md",
+                            ".pdbignore",
+                            "log/",
+                            "data/",
+                        ]
+                    )
+                )
+
+            self.dataset[task_name] = {
+                "base_directory": directory,
+                "entry_point": "python -m pytest -sv .",
+                "instructions": instructions,
+                "filename": task_name + ".py",
+            }

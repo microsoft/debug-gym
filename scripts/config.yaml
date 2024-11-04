@@ -1,0 +1,77 @@
+zero_shot:
+    # Environment configs
+    output_path: "output"
+    env_kwargs: {
+        "path": "data/pytorch",
+        "entrypoint": "python test.py",
+        "dir_tree_depth": 1,
+        "run_on_rewrite": True,
+        "auto_view_change": True,
+    }
+    tools: ["pdb", "view", "patcher:substitution"]
+    persistent_breakpoints: True  # in pdb tool
+
+    # LLM configs
+    llm_name: "llama-31-h100"
+    llm_temperature: [0.0]  # list of values between 0.0 and 1.0
+
+    # Agent configs
+    random_seed: 42
+    max_steps: 100
+    max_rewrite_steps: 10
+    memory_size: 20
+    use_conversational_prompt: True
+    save_patch: True
+    log_prompt_response_pairs: True
+
+cot:
+    # Environment configs
+    output_path: "output"
+    env_kwargs: {
+        "path": "data/pytorch",
+        "entrypoint": "python test.py",
+        "dir_tree_depth": 1,
+        "run_on_rewrite": True,
+        "auto_view_change": True,
+    }
+    tools: ["pdb", "view", "patcher:substitution"]
+    persistent_breakpoints: True  # in pdb tool
+
+    # LLM configs
+    llm_name: "llama-31-h100"
+    llm_temperature: [0.0, 0.0]  # 0.5 for CoT generation, 0.0 for answer generation
+
+    # Agent configs
+    random_seed: 42
+    max_steps: 100
+    max_rewrite_steps: 10
+    memory_size: 20
+    use_conversational_prompt: True
+    save_patch: True
+    log_prompt_response_pairs: True
+
+tadpole:
+    # Environment configs
+    output_path: "output"
+    env_kwargs: {
+        "path": "data/pytorch",
+        "entrypoint": "python test.py",
+        "dir_tree_depth": 1,
+        "run_on_rewrite": True,
+        "auto_view_change": True,
+    }
+    tools: ["pdb", "view", "patcher:substitution"]
+    persistent_breakpoints: True  # in pdb tool
+
+    # LLM configs
+    llm_name: "llama-31-h100"
+    llm_temperature: [0.0, 0.0]  # 0.5 for CoT generation, 0.0 for answer generation
+
+    # Agent configs
+    random_seed: 42
+    max_steps: 100
+    max_rewrite_steps: 10
+    memory_size: 20
+    use_conversational_prompt: True
+    save_patch: True
+    log_prompt_response_pairs: True

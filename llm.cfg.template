@@ -1,0 +1,10 @@
+{
+    "gpt-4o": {
+        "model": "gpt-4o-gs",
+        "endpoint": "[YOUR_ENDPOINT]",
+        "api_key": "[YOUR_API_KEY]",
+        "tags": ["gpt-4o", "azure openai", "GCR"],
+        "api_version": "2024-02-15-preview",
+        "context_limit": 128
+    }
+}

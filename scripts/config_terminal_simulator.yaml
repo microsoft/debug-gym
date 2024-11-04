@@ -1,0 +1,139 @@
+zero_shot:
+    # Environment configs
+    output_path: "output"
+    benchmark: "terminal_simulator"
+    problems: "all"  # list of problems, e.g., ["96005bfc-c9ca-4151-99eb-646ae8a202bd"], or "all"
+    env_kwargs: {
+        "bug_free_code_path": "data/terminal_simulator",
+        "buggy_code_path": "data/terminal_simulator/buggy/buggy_code_info_20241031-205241.json",
+        "dir_tree_depth": 2,
+        "run_on_rewrite": True,
+        "auto_view_change": True,
+    }
+    tools: ["pdb", "view", "patcher:substitution"]
+    persistent_breakpoints: True  # in pdb tool
+
+    # LLM configs
+    llm_name: "llama-31-h100"
+    llm_temperature: [0.5]  # list of values between 0.0 and 1.0
+
+    # Agent configs
+    random_seed: 42
+    max_steps: 100
+    max_rewrite_steps: 100
+    memory_size: 10
+    use_conversational_prompt: True
+    save_patch: True
+    log_prompt_response_pairs: True
+
+cot:
+    # Environment configs
+    output_path: "output"
+    benchmark: "terminal_simulator"
+    problems: "all"  # list of problems, e.g., ["96005bfc-c9ca-4151-99eb-646ae8a202bd"], or "all"
+    env_kwargs: {
+        "bug_free_code_path": "data/terminal_simulator",
+        "buggy_code_path": "data/terminal_simulator/buggy/buggy_code_info_20241031-205241.json",
+        "dir_tree_depth": 2,
+        "run_on_rewrite": True,
+        "auto_view_change": True,
+    }
+    tools: ["pdb", "view", "patcher:substitution"]
+    persistent_breakpoints: True  # in pdb tool
+
+    # LLM configs
+    llm_name: "llama-31-h100"
+    llm_temperature: [0.7, 0.3]  # 0.5 for CoT generation, 0.0 for answer generation
+
+    # Agent configs
+    random_seed: 42
+    max_steps: 100
+    max_rewrite_steps: 100
+    memory_size: 10
+    use_conversational_prompt: True
+    save_patch: True
+    log_prompt_response_pairs: True
+
+tadpole:
+    # Environment configs
+    output_path: "output"
+    benchmark: "terminal_simulator"
+    problems: "all"  # list of problems, e.g., ["96005bfc-c9ca-4151-99eb-646ae8a202bd"], or "all"
+    env_kwargs: {
+        "bug_free_code_path": "data/terminal_simulator",
+        "buggy_code_path": "data/terminal_simulator/buggy/buggy_code_info_20241031-205241.json",
+        "dir_tree_depth": 2,
+        "run_on_rewrite": True,
+        "auto_view_change": True,
+    }
+    tools: ["pdb", "view", "patcher:substitution"]
+    persistent_breakpoints: True  # in pdb tool
+
+    # LLM configs
+    llm_name: "llama-31-h100"
+    llm_temperature: [0.7, 0.3]  # 0.5 for CoT generation, 0.0 for answer generation
+
+    # Agent configs
+    random_seed: 42
+    max_steps: 100
+    max_rewrite_steps: 100
+    memory_size: 10
+    use_conversational_prompt: True
+    save_patch: True
+    log_prompt_response_pairs: True
+
+zero_shot_nopdb:
+    # Environment configs
+    output_path: "output"
+    benchmark: "terminal_simulator"
+    problems: "all"  # list of problems, e.g., ["96005bfc-c9ca-4151-99eb-646ae8a202bd"], or "all"
+    env_kwargs: {
+        "bug_free_code_path": "data/terminal_simulator",
+        "buggy_code_path": "data/terminal_simulator/buggy/buggy_code_info_20241031-205241.json",
+        "dir_tree_depth": 2,
+        "run_on_rewrite": True,
+        "auto_view_change": True,
+    }
+    tools: ["view", "patcher:substitution"]
+    persistent_breakpoints: True  # in pdb tool
+
+    # LLM configs
+    llm_name: "llama-31-h100"
+    llm_temperature: [0.5]  # list of values between 0.0 and 1.0
+
+    # Agent configs
+    random_seed: 42
+    max_steps: 100
+    max_rewrite_steps: 100
+    memory_size: 10
+    use_conversational_prompt: True
+    save_patch: True
+    log_prompt_response_pairs: True
+
+cot_nopdb:
+    # Environment configs
+    output_path: "output"
+    benchmark: "terminal_simulator"
+    problems: "all"  # list of problems, e.g., ["96005bfc-c9ca-4151-99eb-646ae8a202bd"], or "all"
+    env_kwargs: {
+        "bug_free_code_path": "data/terminal_simulator",
+        "buggy_code_path": "data/terminal_simulator/buggy/buggy_code_info_20241031-205241.json",
+        "dir_tree_depth": 2,
+        "run_on_rewrite": True,
+        "auto_view_change": True,
+    }
+    tools: ["view", "patcher:substitution"]
+    persistent_breakpoints: True  # in pdb tool
+
+    # LLM configs
+    llm_name: "llama-31-h100"
+    llm_temperature: [0.7, 0.3]  # 0.5 for CoT generation, 0.0 for answer generation
+
+    # Agent configs
+    random_seed: 42
+    max_steps: 100
+    max_rewrite_steps: 100
+    memory_size: 10
+    use_conversational_prompt: True
+    save_patch: True
+    log_prompt_response_pairs: True
