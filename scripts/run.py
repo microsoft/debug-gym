@@ -55,6 +55,10 @@ def main():
             env.add_tool(
                 PDBTool(persistent_breakpoints=config["persistent_breakpoints"])
             )
+        elif "reasoning" == tool:
+            from froggy.tools.reasoning import ReasoningTool
+
+            env.add_tool(ReasoningTool())
         elif tool.startswith("patcher"):
             from froggy.tools.patchers import CodePatcher
 
