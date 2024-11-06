@@ -1,6 +1,6 @@
 # Froggy
 
-![Froggy Logo](https://github.com/microsoft/Froggy/blob/main/media/froggy_logo_no_bg.png)
+<img src="https://github.com/microsoft/Froggy/blob/main/media/froggy_logo.png" width=50% height=50%>
 
 Froggy is an interactive debugging system for Python. This LLM-based agent can import tools such as `pdb` to interactively investigate the code and generate patches to fix it.
 
