@@ -2,7 +2,7 @@
 
 ![Froggy Logo](https://github.com/microsoft/Froggy/media/froggy_logo_no_bg.png)
 
-Froggy is an interactive debugging system for Python. An LLM-based debugging agent could import a set of tools such as pdb to investigate the code and generate fixing patches. 
+Froggy is an interactive debugging system for Python. This LLM-based agent can import tools such as `pdb` to interactively investigate the code and generate patches to fix it.
 
 ## Installation
 
@@ -11,17 +11,18 @@ Froggy is an interactive debugging system for Python. An LLM-based debugging age
     pip install -e .
 
 ### Set your API information in llm.cfg
+First, make a copy of the template,
 
     cp llm.cfg.template llm.cfg
 
-Then edit `llm.cfg` with your endpoint and API key information.
+Then, edit `llm.cfg` with your endpoint and API key information.
 
 
 ## System Design
 
-Our base environment, `RepoEnv`, is an interactive environment generally follows the [OpenAI Gym](https://github.com/openai/gym) paradigm. Once instantiated, an agent can use `env.reset()` to start an episode; and at ever interaction step, use `env.step(action)` to pass an action into the environment, which will return the subsequent new observation (e.g, error message, debugger stdout). 
+Our base environment, `RepoEnv`, is an interactive environment that follows the [Gymnasium](https://github.com/Farama-Foundation/Gymnasium) paradigm. Once the environment `env` instantiated, one can use `env.reset()` to start an episode and receives initial informations. Then, one can interact with the environment using `env.step(action)`, where `action` is one of the available tools (see below), doing so will return subsequent informations (e.g, error message, debugger stdout, etc.)
 
-One of the core designs of Froggy is the notion of tool using. Based on an agent's specific need, users can dynamically import tools, or develop customized tools and utilize them in the environment. Tools are modules that augment an agent's action space, observation space, or provide additonal functionalities to the agent. Below are the set of example tools we have implemented so far:
+One of the core designs of Froggy is the notion of tools. Users can dynamically import tools, or develop customized tools and utilize them in the environment. Tools are modules that augment an agent's action space, observation space, or provide additonal functionalities to the agent. Below are the set of tools we have implemented so far.
 
 | Tool name | Description |
 | :-: | :----- |
