@@ -59,7 +59,7 @@ We have the below LLM-based agents available:
 
 ### Run
 
-    python examples/run.py scripts/config_<benchmark name>.yaml --agent <agent name>
+    python scripts/run.py scripts/config_<benchmark name>.yaml --agent <agent name>
 
 Add `-v`, `--debug` to be verbose, or to enter debug mode.
 > [!WARNING]
@@ -71,7 +71,7 @@ Modify `scripts/config.yaml`, especially the `env_kwargs` to set the path and en
 
 As an example, we provide a buggy pytorch code repository in `data/pytorch`.
 
-    python examples/run.py scripts/config.yaml --agent <agent name>
+    python scripts/run.py scripts/config.yaml --agent <agent name>
 
 
 ### Overriding values in config
