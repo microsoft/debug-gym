@@ -1,6 +1,7 @@
 {
     "gpt-4o": {
         "model": "gpt-4o-gs",
+        "base_model": "gpt-4o",
         "endpoint": "[YOUR_ENDPOINT]",
         "api_key": "[YOUR_API_KEY]",
         "tags": ["gpt-4o", "azure openai", "GCR"],
