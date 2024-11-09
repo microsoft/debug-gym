@@ -17,6 +17,9 @@ First, make a copy of the template,
 
 Then, edit `llm.cfg` with your endpoint and API key information.
 
+> [!WARNING]
+> When using open-sourced LLMs, e.g., via vLLM, you need to correctly setup `HF_TOKEN` required by the tokenizer.
+
 
 ## System Design
 

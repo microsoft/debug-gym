@@ -131,7 +131,7 @@ class LLM:
             raise Exception(f"Model {self.model_name} not found in llm.cfg")
 
         self.config = LLM_CONFIGS[self.model_name]
-        self.token_counter = TokenCounter(self.config["model"])
+        self.token_counter = TokenCounter(self.config["tokenizer"])
         self.context_length = self.config["context_limit"] * 1000
         print(
             f"Using {self.model_name} with max context length of {self.context_length:,} tokens."
