@@ -1,6 +1,6 @@
 zero_shot:
     # Environment configs
-    output_path: "output"
+    output_path: "output_terminal_simulator"
     benchmark: "terminal_simulator"
     problems: "all"  # list of problems, e.g., ["96005bfc-c9ca-4151-99eb-646ae8a202bd"], or "all"
     env_kwargs: {
@@ -29,7 +29,7 @@ zero_shot:
 
 cot:
     # Environment configs
-    output_path: "output"
+    output_path: "output_terminal_simulator"
     benchmark: "terminal_simulator"
     problems: "all"  # list of problems, e.g., ["96005bfc-c9ca-4151-99eb-646ae8a202bd"], or "all"
     env_kwargs: {
@@ -58,7 +58,7 @@ cot:
 
 tadpole:
     # Environment configs
-    output_path: "output"
+    output_path: "output_terminal_simulator"
     benchmark: "terminal_simulator"
     problems: "all"  # list of problems, e.g., ["96005bfc-c9ca-4151-99eb-646ae8a202bd"], or "all"
     env_kwargs: {
@@ -87,7 +87,7 @@ tadpole:
 
 zero_shot_nopdb:
     # Environment configs
-    output_path: "output"
+    output_path: "output_terminal_simulator"
     benchmark: "terminal_simulator"
     problems: "all"  # list of problems, e.g., ["96005bfc-c9ca-4151-99eb-646ae8a202bd"], or "all"
     env_kwargs: {
@@ -116,7 +116,7 @@ zero_shot_nopdb:
 
 cot_nopdb:
     # Environment configs
-    output_path: "output"
+    output_path: "output_terminal_simulator"
     benchmark: "terminal_simulator"
     problems: "all"  # list of problems, e.g., ["96005bfc-c9ca-4151-99eb-646ae8a202bd"], or "all"
     env_kwargs: {

@@ -189,7 +189,6 @@ class RepoEnv(TooledEnv):
             "action": None,
             "done": self.done,
             "score": self.score,
-            "is_rewrite": False,
             "max_score": self.max_score,
             "instructions": self.instructions,
             "rewrite_counter": self.rewrite_counter,
@@ -294,7 +293,6 @@ class RepoEnv(TooledEnv):
     def step(self, action: str):
         # given action, return new obs, and update infos
         # the action space is composed of a few smaller action spaces
-        is_rewrite = False
         triggered_tools = self.get_triggered_tools(action)
         assert (
             len(triggered_tools) <= 1
@@ -310,7 +308,6 @@ class RepoEnv(TooledEnv):
 
             if isinstance(triggered_tool, CodePatcher):
                 if self.get_tool(triggered_tool.name).rewrite_success:
-                    is_rewrite = True
                     self.rewrite_counter += 1
                     if self.run_on_rewrite:
                         self.obs += "\nNew code has been run."
@@ -341,7 +338,6 @@ class RepoEnv(TooledEnv):
                 if self.has_tool("pdb")
                 else "No breakpoints are set."
             ),
-            "is_rewrite": is_rewrite,
             "action": action,
             "instructions": self.instructions,
             "score": self.score,
