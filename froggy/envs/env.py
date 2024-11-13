@@ -307,8 +307,8 @@ class RepoEnv(TooledEnv):
                 self.obs = f"Error while using tool {triggered_tool.name} with action: \n{action}"
 
             if isinstance(triggered_tool, CodePatcher):
+                self.rewrite_counter += 1
                 if self.get_tool(triggered_tool.name).rewrite_success:
-                    self.rewrite_counter += 1
                     if self.run_on_rewrite:
                         self.obs += "\nNew code has been run."
                         self.run()
