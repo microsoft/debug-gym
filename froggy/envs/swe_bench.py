@@ -35,7 +35,7 @@ class SWEBenchEnv(RepoEnv):
 
     def load_dataset(self):
         self.ds = load_hf_dataset(self.HF_SWE_BENCH_VERIFIED)["test"]
-        self.dataset = sorted(self.ds["instance_id"])
+        self.dataset = {item: "" for item in sorted(self.ds["instance_id"])}
 
     def reset(self, *, seed=None, options={}):
         self.instance_id = options["task_name"]

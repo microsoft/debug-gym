@@ -4,9 +4,10 @@ zero_shot:
     benchmark: "swebench"
     problems: "all"  # list of problems, e.g., ["astropy__astropy-12907"], or "all"
     env_kwargs: {
-        "dir_tree_depth": 1,
+        "dir_tree_depth": 5,
         "run_on_rewrite": True,
         "auto_view_change": True,
+        "run_timeout": 30,
     }
     tools: ["pdb", "view", "patcher:substitution", "listdir"]
     persistent_breakpoints: True  # in pdb tool
@@ -30,9 +31,10 @@ cot:
     benchmark: "swebench"
     problems: "all"  # list of problems, or "all"
     env_kwargs: {
-        "dir_tree_depth": 1,
+        "dir_tree_depth": 5,
         "run_on_rewrite": True,
         "auto_view_change": True,
+        "run_timeout": 30,
     }
     tools: ["pdb", "view", "patcher:substitution", "listdir"]
     persistent_breakpoints: True  # in pdb tool
@@ -56,9 +58,10 @@ tadpole:
     benchmark: "swebench"
     problems: "all"  # list of problems, or "all"
     env_kwargs: {
-        "dir_tree_depth": 1,
+        "dir_tree_depth": 5,
         "run_on_rewrite": True,
         "auto_view_change": True,
+        "run_timeout": 30,
     }
     tools: ["pdb", "view", "patcher:substitution", "listdir"]
     persistent_breakpoints: True  # in pdb tool

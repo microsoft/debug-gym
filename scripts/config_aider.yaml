@@ -7,6 +7,7 @@ zero_shot:
         "dir_tree_depth": 1,
         "run_on_rewrite": True,
         "auto_view_change": True,
+        "run_timeout": 10,
     }
     tools: ["pdb", "view", "patcher:substitution"]
     persistent_breakpoints: True  # in pdb tool
@@ -33,6 +34,7 @@ cot:
         "dir_tree_depth": 1,
         "run_on_rewrite": True,
         "auto_view_change": True,
+        "run_timeout": 10,
     }
     tools: ["pdb", "view", "patcher:substitution"]
     persistent_breakpoints: True  # in pdb tool
@@ -59,6 +61,7 @@ tadpole:
         "dir_tree_depth": 1,
         "run_on_rewrite": True,
         "auto_view_change": True,
+        "run_timeout": 10,
     }
     tools: ["pdb", "view", "patcher:substitution"]
     persistent_breakpoints: True  # in pdb tool
@@ -85,6 +88,7 @@ zero_shot_nopdb:
         "dir_tree_depth": 1,
         "run_on_rewrite": True,
         "auto_view_change": True,
+        "run_timeout": 10,
     }
     tools: ["view", "patcher:substitution"]
     persistent_breakpoints: True  # in pdb tool
@@ -111,6 +115,7 @@ cot_nopdb:
         "dir_tree_depth": 1,
         "run_on_rewrite": True,
         "auto_view_change": True,
+        "run_timeout": 10,
     }
     tools: ["view", "patcher:substitution"]
     persistent_breakpoints: True  # in pdb tool
