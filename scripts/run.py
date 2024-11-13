@@ -36,7 +36,8 @@ def main():
 
     # import tools to the environment
     for tool in config["tools"]:
-        match tool:
+        _tool_info = tool.split(":", 1)
+        match _tool_info[0]:
             case "view":
                 from froggy.tools.view import ViewTool
                 env.add_tool(ViewTool())
@@ -53,13 +54,12 @@ def main():
             case "reasoning":
                 from froggy.tools.reasoning import ReasoningTool
                 env.add_tool(ReasoningTool())
+            case "patcher":
+                from froggy.tools.patchers import CodePatcher
+                patcher_name = _tool_info[1]
+                env.add_tool(CodePatcher.get(patcher_name))
             case _:
-                if tool.startswith("patcher"):
-                    from froggy.tools.patchers import CodePatcher
-                    patcher_name = tool.split(":")[1]
-                    env.add_tool(CodePatcher.get(patcher_name))
-                else:
-                    raise ValueError(f"Unknown tool {tool}")
+                raise ValueError(f"Unknown tool {tool}")
 
     # instantiate agent
     match args.agent:
