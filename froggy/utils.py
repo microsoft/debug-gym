@@ -262,7 +262,7 @@ def cleanup_pytest_output(output):
 
 def extract_max_score_from_pytest_output(output):
     # ... collected 25 items
-    return int(re.search(r"collected (\d+) items?", output).group(1))
+    return max(int(re.search(r"collected (\d+) items?", output).group(1)), 1.0)
 
 
 def extract_reward_from_pytest_output(output):
