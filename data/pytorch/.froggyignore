@@ -1,5 +1,5 @@
 .DS_Store
 *test*.py
 *.md
-.pdbignore
+.froggyignore
 /log
