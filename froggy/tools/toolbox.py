@@ -25,13 +25,6 @@ class Toolbox:
         return decorator
 
     @classmethod
-    def load_tools(cls):
-        tools_dir = Path(__file__).parent
-        for tool_file in tools_dir.glob("*.py"):
-            if tool_file.stem not in ["__init__", "registry"]:
-                importlib.import_module(f"froggy.tools.{tool_file.stem}")
-
-    @classmethod
     def get_tool(cls, name: str, **kwargs) -> Any:
         base_name = name.split(':')[0]
         if base_name not in cls._tool_registry:

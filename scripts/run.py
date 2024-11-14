@@ -37,7 +37,6 @@ def main():
         # TODO: add SWEBench and Pytorch
         raise ValueError(f"Unknown benchmark {config['benchmark']}")
 
-    # Toolbox.load_tools()
     for tool in config["tools"]:
         kwargs = {}
         if tool == "pdb":
