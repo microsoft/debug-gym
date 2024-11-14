@@ -3,6 +3,7 @@ from os.path import join as pjoin
 
 from termcolor import colored
 
+from froggy.tools import Toolbox
 from froggy.utils import load_config
 
 
@@ -37,35 +38,12 @@ def main():
         raise ValueError(f"Unknown benchmark {config['benchmark']}")
 
     for tool in config["tools"]:
-        if "view" == tool:
-            from froggy.tools.view import ViewTool
-
-            env.add_tool(ViewTool())
-        elif "eval" == tool:
-            from froggy.tools.eval import EvalTool
-
-            env.add_tool(EvalTool())
-        elif "listdir" == tool:
-            from froggy.tools.listdir import ListdirTool
-
-            env.add_tool(ListdirTool())
-        elif "pdb" == tool:
-            from froggy.tools.pdb import PDBTool
-
-            env.add_tool(
-                PDBTool(persistent_breakpoints=config["persistent_breakpoints"])
-            )
-        elif "reasoning" == tool:
-            from froggy.tools.reasoning import ReasoningTool
-
-            env.add_tool(ReasoningTool())
-        elif tool.startswith("patcher"):
-            from froggy.tools.patchers import CodePatcher
-
-            patcher_name = tool.split(":")[1]
-            env.add_tool(CodePatcher.get(patcher_name))
-        else:
-            raise ValueError(f"Unknown tool {tool}")
+        kwargs = {}
+        if tool == "pdb":
+            kwargs["persistent_breakpoints"] = config["persistent_breakpoints"]
+        tool_instantiated = Toolbox.get_tool(tool, **kwargs)
+        print(f"Adding tool to toolbox: {tool_instantiated.__class__.__name__}")
+        env.add_tool(tool_instantiated)
 
     # instantiate agent
     if "zero_shot" == args.agent:

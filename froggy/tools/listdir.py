@@ -1,8 +1,10 @@
 from os.path import join as pjoin
 
-from froggy.tools import EnvironmentTool
+from froggy.tools.tool import EnvironmentTool
+from froggy.tools.toolbox import Toolbox
 
 
+@Toolbox.register()
 class ListdirTool(EnvironmentTool):
     name: str = "listdir"
     action: str = "```listdir"
