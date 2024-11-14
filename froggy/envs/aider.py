@@ -77,10 +77,18 @@ class AiderBenchmarkEnv(RepoEnv):
             instructions += instr_md.read_text() if instr_md.exists() else ""
             instructions += instr_more_md.read_text() if instr_more_md.exists() else ""
 
-            # Add a default ignore file
-            with open(directory / ".pdbignore", "w") as f:
-                f.write(
-                    "\n".join(
+            # Add an ignore file
+            self.make_froggyignore(directory, include_gitignore=True)
+
+            self.dataset[task_name] = {
+                "base_directory": directory,
+                "entry_point": "python -m pytest -sv .",
+                "instructions": instructions,
+                "filename": task_name + ".py",
+            }
+    
+    def make_froggyignore(self, directory: str, include_gitignore: bool = True):
+        froggyignore_contents = "\n".join(
                         [
                             ".DS_Store",
                             "__pycache__/",
@@ -91,16 +99,21 @@ class AiderBenchmarkEnv(RepoEnv):
                             "*test*.py",
                             "*.pyc",
                             "*.md",
-                            ".pdbignore",
+                            ".froggyignore",
                             "log/",
                             "data/",
                         ]
                     )
-                )
 
-            self.dataset[task_name] = {
-                "base_directory": directory,
-                "entry_point": "python -m pytest -sv .",
-                "instructions": instructions,
-                "filename": task_name + ".py",
-            }
+        if include_gitignore and ".gitignore" in os.listdir(directory):
+            with open(pjoin(directory, ".gitignore"), "r") as f:
+                gitignore_content = f.read()
+                froggyignore_contents += "\n"
+                froggyignore_contents += gitignore_content
+        
+        with open(directory / ".froggyignore", "w") as f:
+                f.write(froggyignore_contents)
+        
+
+
+
