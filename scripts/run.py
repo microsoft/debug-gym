@@ -3,6 +3,7 @@ from os.path import join as pjoin
 
 from termcolor import colored
 
+from froggy.tools import Toolbox
 from froggy.utils import load_config
 
 
@@ -20,63 +21,54 @@ def main():
         match config["benchmark"]:
             case "aider":
                 from froggy.envs import AiderBenchmarkEnv
+
                 env = AiderBenchmarkEnv(**config["env_kwargs"])
             case "swebench":
                 from froggy.envs import SWEBenchEnv
+
                 env = SWEBenchEnv(**config["env_kwargs"])
             case "terminal_simulator":
                 from froggy.envs import TerminalSimulatorEnv
+
                 env = TerminalSimulatorEnv(**config["env_kwargs"])
             case _:
                 raise ValueError(f"Unknown benchmark {config['benchmark']}")
     else:
         # custom repo
         from froggy.envs import RepoEnv
+
         env = RepoEnv(**config["env_kwargs"])
 
     # import tools to the environment
     for tool in config["tools"]:
-        _tool_info = tool.split(":", 1)
-        match _tool_info[0]:
-            case "view":
-                from froggy.tools.view import ViewTool
-                env.add_tool(ViewTool())
-            case "eval":
-                from froggy.tools.eval import EvalTool
-                env.add_tool(EvalTool())
-            case "listdir":
-                from froggy.tools.listdir import ListdirTool
-                env.add_tool(ListdirTool())
-            case "pdb":
-                from froggy.tools.pdb import PDBTool
-                env.add_tool(
-                    PDBTool(persistent_breakpoints=config["persistent_breakpoints"]))
-            case "reasoning":
-                from froggy.tools.reasoning import ReasoningTool
-                env.add_tool(ReasoningTool())
-            case "patcher":
-                from froggy.tools.patchers import CodePatcher
-                patcher_name = _tool_info[1]
-                env.add_tool(CodePatcher.get(patcher_name))
-            case _:
-                raise ValueError(f"Unknown tool {tool}")
+        kwargs = {}
+        if tool == "pdb":
+            kwargs["persistent_breakpoints"] = config["persistent_breakpoints"]
+        tool_instantiated = Toolbox.get_tool(tool, **kwargs)
+        print(f"Adding tool to toolbox: {tool_instantiated.__class__.__name__}")
+        env.add_tool(tool_instantiated)
 
     # instantiate agent
     match args.agent:
         case "zero_shot":
             from froggy.agents import AgentZeroShot
+
             agent = AgentZeroShot(config, env, verbose=args.verbose)
         case "cot":
             from froggy.agents import AgentCoT
+
             agent = AgentCoT(config, env, verbose=args.verbose)
         case "tadpole":
             from froggy.agents import AgentTadpole
+
             agent = AgentTadpole(config, env, verbose=args.verbose)
         case "zero_shot_nopdb":
             from froggy.agents import AgentZeroShot_NoPDB
+
             agent = AgentZeroShot_NoPDB(config, env, verbose=args.verbose)
         case "cot_nopdb":
             from froggy.agents import AgentCoT_NoPDB
+
             agent = AgentCoT_NoPDB(config, env, verbose=args.verbose)
         case _:
             raise ValueError(f"Unknown agent {args.agent}")
