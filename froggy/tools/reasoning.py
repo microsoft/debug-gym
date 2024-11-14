@@ -1,5 +1,6 @@
-from froggy.tools import EnvironmentTool
-from .toolbox import Toolbox
+from froggy.tools.tool import EnvironmentTool
+from froggy.tools.toolbox import Toolbox
+
 
 @Toolbox.register()
 class ReasoningTool(EnvironmentTool):
@@ -16,7 +17,7 @@ class ReasoningTool(EnvironmentTool):
             "examples": self.examples,
         }
         return instruction
-    
+
     @property
     def examples(self):
         if self.allow_chain_action:
@@ -30,16 +31,16 @@ class ReasoningTool(EnvironmentTool):
                 "<reasoning> There's a shape mismatch that corresponds to a matrix transpose, so I'll rewrite the function to account for the transpose. </reasoning>",
             ]
         return ex
-    
-    @property 
+
+    @property
     def description(self):
         if self.allow_chain_action:
-            desc = f"""You may explicitly reason about the current state and the best course of action before executing. You follow a particular reasoning style: 
+            desc = f"""You may explicitly reason about the current state and the best course of action before executing. You follow a particular reasoning style:
 You break down complex problems into smaller parts and reason through them step by step, arriving at the best next action before then executing it. You should follow your reasoning with your next action. """
         else:
-            desc = f"""You may explicitly reason about the current state and the best course of action. You follow a particular reasoning style: 
+            desc = f"""You may explicitly reason about the current state and the best course of action. You follow a particular reasoning style:
 You break down complex problems into smaller parts and reason through them step by step, arriving at the best next action(s). """
-        return desc 
+        return desc
 
     def __init__(self, allow_chain_action: bool = False):
         super().__init__()
@@ -55,7 +56,7 @@ You break down complex problems into smaller parts and reason through them step 
 
     def is_triggered(self, action):
         return action.startswith(self.action)
-    
+
     def use(self, action):
         if self.allow_chain_action:
             return self.use_with_chaining(action)
@@ -72,7 +73,7 @@ You break down complex problems into smaller parts and reason through them step 
         if next_action_obs == f"Invalid action: {action}.":
             next_action_obs == f"You must provide a valid action after your reasoning. Found invalid action: {action}."
         return f"Reasoning text acknowledged. {next_action_obs[0]}"
-    
+
     def use_without_chaining(self):
         return "Reasoning text acknowledged."
 

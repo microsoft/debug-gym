@@ -1,6 +1,7 @@
-from froggy.tools import EnvironmentTool
+from froggy.tools.tool import EnvironmentTool
+from froggy.tools.toolbox import Toolbox
 from froggy.utils import clean_code
-from .toolbox import Toolbox
+
 
 @Toolbox.register(name="patcher")
 class CodePatcher(EnvironmentTool):
@@ -163,14 +164,20 @@ class SubstitutionPatcher(CodePatcher):
         if file_path.startswith(str(self.environment.working_dir)):
             file_path = file_path[len(str(self.environment.working_dir)) + 1 :]
         if file_path not in self.environment.all_files:
-            return f"File {file_path} does not exist or is not in the current repository.", False, None
+            return (
+                f"File {file_path} does not exist or is not in the current repository.",
+                False,
+                None,
+            )
         if file_path not in self.environment.editable_files:
             return f"File {file_path} is not editable.", False, None
 
         success = True
         new_code = clean_code(new_code)  # str
         new_code_lines = new_code.split("\n")
-        new_code_length = len(new_code_lines)  # number of lines in the newly generated code
+        new_code_length = len(
+            new_code_lines
+        )  # number of lines in the newly generated code
         if head is None and tail is None:
             # no line number is provided, rewrite the whole code
             try:
@@ -189,8 +196,7 @@ class SubstitutionPatcher(CodePatcher):
                 full_code_lines = self.environment.load_file(file_path).split("\n")
                 full_code_lines[head : tail + 1] = new_code_lines  # list
                 self.environment.overwrite_file(
-                    filepath=file_path, 
-                    content="\n".join(full_code_lines)
+                    filepath=file_path, content="\n".join(full_code_lines)
                 )
                 if file_path == self.environment.current_file:
                     self.environment.load_current_file(file_path)
@@ -246,7 +252,9 @@ class SubstitutionPatcher(CodePatcher):
             self.rewrite_success = False
             return "Rewrite failed."
 
-        message, success, new_code_length = self._rewrite_file(file_path, head, tail, new_code)
+        message, success, new_code_length = self._rewrite_file(
+            file_path, head, tail, new_code
+        )
         if success is True:
             if (
                 hasattr(self.environment, "tools")
@@ -261,6 +269,6 @@ class SubstitutionPatcher(CodePatcher):
                 )  # converting head/tail back to 1-based index for breakpoint management
             self.rewrite_success = True
             return "Rewriting done."
-        
+
         self.rewrite_success = False
         return "\n".join([message, "Rewrite failed."])

@@ -1,5 +1,6 @@
-from froggy.tools import EnvironmentTool
-from .toolbox import Toolbox
+from froggy.tools.tool import EnvironmentTool
+from froggy.tools.toolbox import Toolbox
+
 
 @Toolbox.register()
 class EvalTool(EnvironmentTool):

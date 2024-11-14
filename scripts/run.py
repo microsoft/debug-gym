@@ -3,8 +3,8 @@ from os.path import join as pjoin
 
 from termcolor import colored
 
-from froggy.utils import load_config
 from froggy.tools import Toolbox
+from froggy.utils import load_config
 
 
 def main():
@@ -37,7 +37,7 @@ def main():
         # TODO: add SWEBench and Pytorch
         raise ValueError(f"Unknown benchmark {config['benchmark']}")
 
-    Toolbox.load_tools()
+    # Toolbox.load_tools()
     for tool in config["tools"]:
         kwargs = {}
         if tool == "pdb":
