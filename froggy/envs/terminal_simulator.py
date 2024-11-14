@@ -56,8 +56,8 @@ class TerminalSimulatorEnv(RepoEnv):
             self.bug_free_code_path
         ), f"Bug free code path {self.bug_free_code_path} does not exist."
         assert os.path.exists(
-            pjoin(self.bug_free_code_path, ".pdbignore")
-        ), f"Bug free code path {self.bug_free_code_path} does not contain .pdbignore file."
+            pjoin(self.bug_free_code_path, ".froggyignore")
+        ), f"Bug free code path {self.bug_free_code_path} does not contain .froggyignore file."
         assert os.path.exists(
             self.buggy_code_path
         ), f"Buggy code path {self.buggy_code_path} does not exist."

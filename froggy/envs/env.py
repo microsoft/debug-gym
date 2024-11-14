@@ -109,8 +109,8 @@ class RepoEnv(TooledEnv):
         )
 
         # get list of editable files
-        pdbignore = self.working_dir / ".pdbignore"  # By default look for .pdbignore.
-        self.is_readonly = make_is_readonly(pdbignore, patterns=readonly_patterns)
+        froggyignore = self.working_dir / ".froggyignore"  # By default look for .froggyignore.
+        self.is_readonly = make_is_readonly(froggyignore, patterns=readonly_patterns)
         self.editable_files = [
             p for p in self.all_files if not self.is_readonly(self.working_dir / p)
         ]

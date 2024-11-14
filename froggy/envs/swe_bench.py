@@ -1,4 +1,4 @@
-import re
+import os
 import subprocess
 import tempfile
 from ast import literal_eval
@@ -61,7 +61,7 @@ class SWEBenchEnv(RepoEnv):
             print("Patch applied successfully.")
 
         # Make the pdb ignore
-        self.make_pdbignore(local_repo_path=local_repo_path)
+        self.make_froggyignore(local_repo_path=local_repo_path)
 
         # For swebench, we must pass the fail_to_pass and pass_to_pass unit tests.
         entrypoint = "python -m pytest " + " ".join(fail_to_pass + pass_to_pass)
@@ -97,14 +97,19 @@ class SWEBenchEnv(RepoEnv):
 
         return local_repo_path
 
-    def make_pdbignore(self, local_repo_path):
-        # Add a default ignore file
-        with open(pjoin(local_repo_path, ".pdbignore"), "w") as f:
-            f.write(
-                "\n".join(
-                    [
-                        "*/tests/",
-                        ".pdbignore",
-                    ]
-                )
-            )
+    def make_froggyignore(self, local_repo_path, include_gitignore: bool = True):
+        # Add an ignore file
+        froggyignore_contents = "\n".join(
+            [
+                "*/tests/",
+                ".froggyignore",
+            ]
+        )
+        if include_gitignore and ".gitignore" in os.listdir(local_repo_path):
+            with open(pjoin(local_repo_path, ".gitignore"), "r") as f:
+                gitignore_content = f.read()
+                froggyignore_contents += "\n"
+                froggyignore_contents += gitignore_content
+        
+        with open(local_repo_path / ".froggyignore", "w") as f:
+                f.write(froggyignore_contents)
