@@ -20,7 +20,6 @@ class Toolbox:
 
             cls._tool_registry[name] = (subclass, config_cls)
             subclass.registered_name = name
-            print(f"Detected tool in toolbox: {subclass.__name__}")
             return subclass
 
         return decorator

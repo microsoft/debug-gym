@@ -43,6 +43,7 @@ def main():
         if tool == "pdb":
             kwargs["persistent_breakpoints"] = config["persistent_breakpoints"]
         tool_instantiated = Toolbox.get_tool(tool, **kwargs)
+        print(f"Adding tool to toolbox: {tool_instantiated.__class__.__name__}")
         env.add_tool(tool_instantiated)
 
     # instantiate agent
