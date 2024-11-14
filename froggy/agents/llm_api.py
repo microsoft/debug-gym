@@ -14,6 +14,8 @@ from tenacity import (
 )
 from termcolor import colored
 from transformers import AutoTokenizer
+from froggy.utils import trim_prompt_messages
+
 
 prompt_toolkit_available = False
 try:
@@ -172,34 +174,8 @@ class LLM:
 
         # Merge consecutive messages with same role.
         messages = merge_messages(messages)
-
-        # Trim message content to context length
-        message_length = [self.token_counter(
-            messages=[item]) for item in messages]
-        total_length = sum(message_length)
-        if total_length > self.context_length:
-            # Trim messages to fit in context length
-            # keep the first (system) message and last (user) message if possible
-            new_messages, new_length = [], 0
-            if messages[0]["role"] == "system":
-                new_messages.append(messages[0])
-                new_length = message_length[0]
-            new_messages.append(messages[-1])
-            new_length += message_length[-1]
-            if new_length > self.context_length:
-                # just keep the last message, remove the system message
-                new_messages = [messages[-1]]
-                new_length = message_length[-1]
-            else:
-                # adding back the messages in between
-                start = 1 if messages[0]["role"] == "system" else 0
-                for i in range(start, len(messages) - 1):
-                    if new_length + message_length[i] > self.context_length:
-                        break
-                    new_messages = new_messages[:-1] + \
-                        [messages[i]] + new_messages[-1:]
-                    new_length += message_length[i]
-            messages = new_messages
+        messages = trim_prompt_messages(
+            messages, self.context_length, self.token_counter)
 
         if self.verbose:
             # Message is a list of dictionaries with role and content keys.
