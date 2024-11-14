@@ -21,3 +21,9 @@ dependencies = {file = ["requirements.txt"]}
 
 [tool.setuptools.packages]
 find = {}
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-xdist",
+]
