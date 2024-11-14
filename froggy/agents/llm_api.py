@@ -174,7 +174,8 @@ class LLM:
         messages = merge_messages(messages)
 
         # Trim message content to context length
-        message_length = [self.token_counter([item]) for item in messages]
+        message_length = [self.token_counter(
+            messages=[item]) for item in messages]
         total_length = sum(message_length)
         if total_length > self.context_length:
             # Trim messages to fit in context length
