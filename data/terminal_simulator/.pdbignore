@@ -1,8 +1,0 @@
-.DS_Store
-*test*.py
-code/__init__.py
-code/some_random_code.py
-buggy/
-*.md
-.pdbignore
-/log
