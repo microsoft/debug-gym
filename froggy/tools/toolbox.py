@@ -1,19 +1,16 @@
-import importlib 
-from pathlib import Path
-from typing import Type, Dict, Optional, Any, Callable
+from typing import Any, Callable, Dict, Optional, Type
+
 
 class Toolbox:
     _tool_registry: Dict[str, Type] = {}
 
     @classmethod
-    def register(cls, name: str=None, config_cls: Optional[Any] = None) -> Callable:
+    def register(cls, name: str = None, config_cls: Optional[Any] = None) -> Callable:
         def decorator(subclass: Type) -> Type:
-            name_ = name or subclass.__name__.lower().replace('tool', '')
+            name_ = name or subclass.__name__.lower().replace("tool", "")
             if name_ in cls._tool_registry:
                 if subclass != cls._tool_registry[name_][0]:
-                    raise ValueError(
-                        f"Cannot register '{name_}' multiple times."
-                    )
+                    raise ValueError(f"Cannot register '{name_}' multiple times.")
                 return subclass
 
             cls._tool_registry[name_] = (subclass, config_cls)
@@ -24,13 +21,13 @@ class Toolbox:
 
     @classmethod
     def get_tool(cls, name: str, **kwargs) -> Any:
-        base_name = name.split(':')[0]
+        base_name = name.split(":")[0]
         if base_name not in cls._tool_registry:
             raise ValueError(f"Unknown tool {base_name}")
-            
+
         tool_cls, _ = cls._tool_registry[base_name]
-        
-        if ':' in name:
-            subtype = name.split(':')[1]
+
+        if ":" in name:
+            subtype = name.split(":")[1]
             return tool_cls.get(subtype)
         return tool_cls(**kwargs)
