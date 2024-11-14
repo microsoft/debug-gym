@@ -33,8 +33,7 @@ def show_line_number(code_string, code_path=None, breakpoints_state=None):
     code_line = code_string.split("\n")
 
     output = []
-    # e.g., 999 lines -> 4 digits
-    line_number_digit = len(str(len(code_line) + 1))
+    line_number_digit = len(str(len(code_line) + 1))  # e.g., 999 lines -> 4 digits
     # 1-4 digits: 4
     # 5-8 digits: 8...
     line_number_digit = (line_number_digit - 1) // 4 * 4 + 4
@@ -98,7 +97,7 @@ class HistoryTracker:
 
     def get(self):
         # return the history_steps latest steps
-        return self.memory[-self.history_steps:]
+        return self.memory[-self.history_steps :]
 
     def save(self, path):
         import json
@@ -129,8 +128,7 @@ class HistoryTracker:
             game_step = len(self.memory) - 1
         if game_step == 0:
             # initial state
-            json_out = {"step_id": 0, "action": None,
-                        "obs": self.memory[0]["obs"]}
+            json_out = {"step_id": 0, "action": None, "obs": self.memory[0]["obs"]}
             if include_prompt_response_pairs:
                 json_out["prompt_response_pairs"] = None
         else:
@@ -173,13 +171,11 @@ def _walk(path, depth: Optional[int]):
 def load_config():
     parser = argparse.ArgumentParser()
     parser.add_argument("config_file", help="path to config file")
-    parser.add_argument(
-        "--agent", help="zero_shot, cot, tadpole", default="zero_shot")
+    parser.add_argument("--agent", help="zero_shot, cot, tadpole", default="zero_shot")
     parser.add_argument(
         "--debug", action="store_true", help="Before sending action to the environment."
     )
-    parser.add_argument("-v", "--verbose",
-                        action="store_true", help="Verbose mode")
+    parser.add_argument("-v", "--verbose", action="store_true", help="Verbose mode")
     parser.add_argument(
         "-p",
         "--params",
@@ -307,7 +303,6 @@ def trim_prompt_messages(messages, context_length, token_counter):
         for i in range(start, len(messages) - 1):
             if new_length + message_length[i] > context_length:
                 break
-            new_messages = new_messages[:-1] + \
-                [messages[i]] + new_messages[-1:]
+            new_messages = new_messages[:-1] + [messages[i]] + new_messages[-1:]
             new_length += message_length[i]
     return new_messages
