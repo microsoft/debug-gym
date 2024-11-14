@@ -1,6 +1,7 @@
 from froggy.tools import EnvironmentTool
+from .toolbox import Toolbox
 
-
+@Toolbox.register()
 class EvalTool(EnvironmentTool):
     name: str = "eval"
     action: str = "```eval"

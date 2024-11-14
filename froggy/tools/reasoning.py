@@ -1,6 +1,7 @@
 from froggy.tools import EnvironmentTool
+from .toolbox import Toolbox
 
-
+@Toolbox.register()
 class ReasoningTool(EnvironmentTool):
     name: str = "reasoning"
     action: str = "<reasoning>"

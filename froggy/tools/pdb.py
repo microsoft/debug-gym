@@ -10,8 +10,9 @@ from typing import Optional
 
 from froggy.tools import EnvironmentTool
 from froggy.utils import TimeoutException, time_limit
+from .toolbox import Toolbox
 
-
+@Toolbox.register()
 class PDBTool(EnvironmentTool):
     name: str = "pdb"
     action: str = "```pdb"

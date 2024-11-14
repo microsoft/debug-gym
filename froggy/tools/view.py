@@ -3,8 +3,9 @@ from os.path import join as pjoin
 
 from froggy.tools import EnvironmentTool
 from froggy.utils import is_subdirectory
+from .toolbox import Toolbox
 
-
+@Toolbox.register()
 class ViewTool(EnvironmentTool):
     name: str = "view"
     action: str = "```view"
