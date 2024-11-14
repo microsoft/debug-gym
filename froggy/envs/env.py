@@ -12,7 +12,7 @@ from typing import Optional
 import numpy as np
 from termcolor import colored
 
-from froggy.tools.patchers import Patcher
+from froggy.tools.patchers import CodePatcher
 from froggy.tools.pdb import PDBTool
 from froggy.utils import _walk, make_is_readonly, show_line_number
 
@@ -308,7 +308,7 @@ class RepoEnv(TooledEnv):
             except:
                 self.obs = f"Error while using tool {triggered_tool.name} with action: \n{action}"
 
-            if isinstance(triggered_tool, Patcher):
+            if isinstance(triggered_tool, CodePatcher):
                 if self.get_tool(triggered_tool.name).rewrite_success:
                     is_rewrite = True
                     self.rewrite_counter += 1

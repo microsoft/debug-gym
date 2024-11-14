@@ -2,8 +2,8 @@ from froggy.tools import EnvironmentTool
 from froggy.utils import clean_code
 from .toolbox import Toolbox
 
-@Toolbox.register()
-class Patcher(EnvironmentTool):
+@Toolbox.register(name="patcher")
+class CodePatcher(EnvironmentTool):
     action = "```rewrite"
 
     def __init__(self):
@@ -22,7 +22,7 @@ class Patcher(EnvironmentTool):
             raise ValueError("Invalid patch type!")
 
 
-class UDiffPatcher(Patcher):
+class UDiffPatcher(CodePatcher):
     name = "udiff_patcher"
     description = "Creates patches of code given UDiff format."
     instructions = {
@@ -108,7 +108,7 @@ class UDiffPatcher(Patcher):
         return patched_lines
 
 
-class WholePatcher(Patcher):
+class WholePatcher(CodePatcher):
     name = "whole_patcher"
     description = "Rewrites the full code."
     instructions = {
@@ -136,7 +136,7 @@ class WholePatcher(Patcher):
         return "Rewrite failed."
 
 
-class SubstitutionPatcher(Patcher):
+class SubstitutionPatcher(CodePatcher):
     name = "substitution_patcher"
     description = "Creates patches of code given start and end lines."
     instructions = {

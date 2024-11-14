@@ -8,7 +8,7 @@ from termcolor import colored
 
 from froggy.agents.llm_api import instantiate_llm, postprocess_messages, print_messages
 from froggy.envs import AiderBenchmarkEnv
-from froggy.tools.patchers import Patcher
+from froggy.tools.patchers import CodePatcher
 from froggy.tools.pdb import PDBTool
 from froggy.utils import HistoryTracker
 
@@ -151,7 +151,7 @@ async def run(
     history = HistoryTracker(nb_steps)
 
     env = AiderBenchmarkEnv(output_dir=args.output)
-    env.add_tool(Patcher.get(args.patch_type))
+    env.add_tool(CodePatcher.get(args.patch_type))
     if args.llm_agent == "froggy":
         env.add_tool(PDBTool())
     env.seed(args.seed)
