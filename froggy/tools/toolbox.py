@@ -8,18 +8,16 @@ class Toolbox:
     @classmethod
     def register(cls, name: str=None, config_cls: Optional[Any] = None) -> Callable:
         def decorator(subclass: Type) -> Type:
-            nonlocal name
-            if name is None:
-                name = subclass.__name__.lower().replace('tool', '')
-            if name in cls._tool_registry:
-                if subclass != cls._tool_registry[name][0]:
+            name_ = name or subclass.__name__.lower().replace('tool', '')
+            if name_ in cls._tool_registry:
+                if subclass != cls._tool_registry[name_][0]:
                     raise ValueError(
-                        f"Cannot register '{name}' multiple times."
+                        f"Cannot register '{name_}' multiple times."
                     )
                 return subclass
 
-            cls._tool_registry[name] = (subclass, config_cls)
-            subclass.registered_name = name
+            cls._tool_registry[name_] = (subclass, config_cls)
+            subclass.registered_name = name_
             return subclass
 
         return decorator
