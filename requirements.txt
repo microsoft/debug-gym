@@ -8,3 +8,4 @@ termcolor
 pytest
 transformers
 tiktoken
+docker
