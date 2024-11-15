@@ -53,6 +53,9 @@ def test_trim_prompt_messages():
         messages = [{"role": "user", "content": "User message"}]
         trim_prompt_messages(messages, -1, token_counter)
 
+    messages = [{"role": "user", "content": "User message"}]
+    assert trim_prompt_messages(messages, 0, token_counter) == messages
+
     messages = [
         {"role": "system", "content": "System message"},
         {"role": "user", "content": "User message"},
