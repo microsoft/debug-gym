@@ -35,11 +35,19 @@ class SWEBenchEnv(RepoEnv):
 
     def load_dataset(self):
         self.ds = load_hf_dataset(self.HF_SWE_BENCH_VERIFIED)["test"]
-        self.dataset = {item: "" for item in sorted(self.ds["instance_id"])}
+        instance_id_list = self.ds["instance_id"]
+        self.dataset = {}
+        for instance_id in instance_id_list:
+            self.dataset[instance_id] = self.ds.filter(
+                lambda x: x["instance_id"] == instance_id
+            )[0]
 
     def reset(self, *, seed=None, options={}):
-        self.instance_id = options["task_name"]
-        self.ds_row = self.ds.filter(lambda x: x["instance_id"] == self.instance_id)[0]
+        assert "task_name" in options, "task_name must be provided in options"
+        assert (
+            options["task_name"] in self.dataset
+        ), f"task_name {options['task_name']} not found in dataset"
+        self.ds_row = self.dataset[options["task_name"]]
         repo_address = self.ds_row["repo"]
         base_commit = self.ds_row["base_commit"]
         test_patch = self.ds_row["test_patch"]
@@ -110,6 +118,6 @@ class SWEBenchEnv(RepoEnv):
                 gitignore_content = f.read()
                 froggyignore_contents += "\n"
                 froggyignore_contents += gitignore_content
-        
+
         with open(local_repo_path / ".froggyignore", "w") as f:
-                f.write(froggyignore_contents)
+            f.write(froggyignore_contents)
