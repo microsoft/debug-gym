@@ -1,6 +1,6 @@
 zero_shot:
     # Environment configs
-    output_path: "output"
+    output_path: "output_terminal_simulator"
     benchmark: "terminal_simulator"
     problems: "all"  # list of problems, e.g., ["96005bfc-c9ca-4151-99eb-646ae8a202bd"], or "all"
     env_kwargs: {
@@ -9,6 +9,7 @@ zero_shot:
         "dir_tree_depth": 2,
         "run_on_rewrite": True,
         "auto_view_change": True,
+        "run_timeout": 10,
     }
     tools: ["pdb", "view", "patcher:substitution"]
     persistent_breakpoints: True  # in pdb tool
@@ -28,7 +29,7 @@ zero_shot:
 
 cot:
     # Environment configs
-    output_path: "output"
+    output_path: "output_terminal_simulator"
     benchmark: "terminal_simulator"
     problems: "all"  # list of problems, e.g., ["96005bfc-c9ca-4151-99eb-646ae8a202bd"], or "all"
     env_kwargs: {
@@ -37,6 +38,7 @@ cot:
         "dir_tree_depth": 2,
         "run_on_rewrite": True,
         "auto_view_change": True,
+        "run_timeout": 10,
     }
     tools: ["pdb", "view", "patcher:substitution"]
     persistent_breakpoints: True  # in pdb tool
@@ -56,7 +58,7 @@ cot:
 
 tadpole:
     # Environment configs
-    output_path: "output"
+    output_path: "output_terminal_simulator"
     benchmark: "terminal_simulator"
     problems: "all"  # list of problems, e.g., ["96005bfc-c9ca-4151-99eb-646ae8a202bd"], or "all"
     env_kwargs: {
@@ -65,6 +67,7 @@ tadpole:
         "dir_tree_depth": 2,
         "run_on_rewrite": True,
         "auto_view_change": True,
+        "run_timeout": 10,
     }
     tools: ["pdb", "view", "patcher:substitution"]
     persistent_breakpoints: True  # in pdb tool
@@ -84,7 +87,7 @@ tadpole:
 
 zero_shot_nopdb:
     # Environment configs
-    output_path: "output"
+    output_path: "output_terminal_simulator"
     benchmark: "terminal_simulator"
     problems: "all"  # list of problems, e.g., ["96005bfc-c9ca-4151-99eb-646ae8a202bd"], or "all"
     env_kwargs: {
@@ -93,6 +96,7 @@ zero_shot_nopdb:
         "dir_tree_depth": 2,
         "run_on_rewrite": True,
         "auto_view_change": True,
+        "run_timeout": 10,
     }
     tools: ["view", "patcher:substitution"]
     persistent_breakpoints: True  # in pdb tool
@@ -112,7 +116,7 @@ zero_shot_nopdb:
 
 cot_nopdb:
     # Environment configs
-    output_path: "output"
+    output_path: "output_terminal_simulator"
     benchmark: "terminal_simulator"
     problems: "all"  # list of problems, e.g., ["96005bfc-c9ca-4151-99eb-646ae8a202bd"], or "all"
     env_kwargs: {
@@ -121,6 +125,7 @@ cot_nopdb:
         "dir_tree_depth": 2,
         "run_on_rewrite": True,
         "auto_view_change": True,
+        "run_timeout": 10,
     }
     tools: ["view", "patcher:substitution"]
     persistent_breakpoints: True  # in pdb tool

@@ -275,3 +275,58 @@ def extract_reward_from_pytest_output(output):
         return int(match.group(1))
 
     return 0
+
+
+def trim_prompt_messages(
+    messages: list[dict], context_length: int, token_counter: callable
+):
+    # Trim message content to context length
+    # messages: list of dict, each dict has keys "content" and "role"
+    # context_length: int, maximum number of tokens
+    # token_counter: function, count the number of tokens in a string
+    # messages should not be empty
+    assert len(messages) > 0, "messages should not be empty"
+    # all messages should be dictionaries with keys "content" and "role"
+    assert all(
+        isinstance(item, dict) and "content" in item and "role" in item
+        for item in messages
+    ), 'all messages should be dictionaries with keys "content" and "role"'
+    # the last message should be from the user
+    assert messages[-1]["role"] == "user", "the last message should be from the user"
+    # if two consecutive messages are from the same role, they should be merged
+    assert all(
+        messages[i]["role"] != messages[i + 1]["role"] for i in range(len(messages) - 1)
+    ), "if two consecutive messages are from the same role, they should be merged first"
+    # context_length should be non-negative
+    assert context_length >= 0, "context_length should be non-negative"
+
+    message_lengths = [token_counter(text=item["content"]) for item in messages]
+    total_length = sum(message_lengths)
+    if total_length <= context_length:
+        return messages
+
+    # keep the first (system) message and last (user) message if possible
+    new_messages, new_length = [], 0
+    if messages[0]["role"] == "system":
+        new_messages.append(messages[0])
+        new_length += message_lengths[0]
+
+    new_messages.append(messages[-1])
+    new_length += message_lengths[-1]
+    if new_length > context_length:
+        # just keep the last message, remove the system message
+        new_messages = [messages[-1]]
+        new_length = message_lengths[-1]
+    else:
+        # adding back the messages in between (from latest to earliest)
+        start = 1 if messages[0]["role"] == "system" else 0
+        for i in range(len(messages) - 2, start, -1):
+            if new_length + message_lengths[i] > context_length:
+                break
+            if start == 0:
+                new_messages = [messages[i]] + new_messages
+            else:
+                new_messages = new_messages[:1] + [messages[i]] + new_messages[1:]
+            new_length += message_lengths[i]
+
+    return new_messages

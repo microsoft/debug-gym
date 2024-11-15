@@ -14,6 +14,8 @@ from tenacity import (
 )
 from termcolor import colored
 from transformers import AutoTokenizer
+from froggy.utils import trim_prompt_messages
+
 
 prompt_toolkit_available = False
 try:
@@ -35,7 +37,8 @@ if os.path.exists(LLM_CONFIG_FILE):
     LLM_CONFIGS = json.load(open(LLM_CONFIG_FILE))
 else:
     raise Exception(
-        f"LLM config file {LLM_CONFIG_FILE} not found in current path nor was it set via environment variable 'LLM_CONFIG_FILE'."
+        f"LLM config file {
+            LLM_CONFIG_FILE} not found in current path nor was it set via environment variable 'LLM_CONFIG_FILE'."
     )
 
 
@@ -84,16 +87,6 @@ def merge_messages(messages):
     return messages_out
 
 
-def postprocess_messages(messages, context_length):
-    # Merge consecutive messages with same role.
-    messages = merge_messages(messages)
-
-    # Trim message content to context length
-    for i, m in enumerate(messages):
-        messages[i]["content"] = messages[i]["content"][-context_length:]
-    return messages
-
-
 class TokenCounter:
     def __init__(self, model: str = "gpt-4o"):
         self.model = model
@@ -114,7 +107,8 @@ class TokenCounter:
     def __call__(self, *, messages=None, text=None):
         nb_tokens = 0
         if messages is not None:
-            nb_tokens += sum(len(self.tokenize(msg["content"])) for msg in messages)
+            nb_tokens += sum(len(self.tokenize(msg["content"]))
+                             for msg in messages)
 
         if text is not None:
             nb_tokens += len(self.tokenize(text))
@@ -134,7 +128,8 @@ class LLM:
         self.token_counter = TokenCounter(self.config["tokenizer"])
         self.context_length = self.config["context_limit"] * 1000
         print(
-            f"Using {self.model_name} with max context length of {self.context_length:,} tokens."
+            f"Using {self.model_name} with max context length of {
+                self.context_length:,} tokens."
         )
 
         if "azure openai" in self.config.get("tags", []):
@@ -157,7 +152,8 @@ class LLM:
         stop=stop_after_attempt(100),
     )
     def query_model(self, messages, **kwargs):
-        kwargs["max_tokens"] = kwargs.get("max_tokens", self.config.get("max_tokens"))
+        kwargs["max_tokens"] = kwargs.get(
+            "max_tokens", self.config.get("max_tokens"))
 
         return (
             self.client.chat.completions.create(
@@ -178,10 +174,8 @@ class LLM:
 
         # Merge consecutive messages with same role.
         messages = merge_messages(messages)
-
-        # Trim message content to context length
-        for i, m in enumerate(messages):
-            messages[i]["content"] = messages[i]["content"][-self.context_length :]
+        messages = trim_prompt_messages(
+            messages, self.context_length, self.token_counter)
 
         if self.verbose:
             # Message is a list of dictionaries with role and content keys.
@@ -219,7 +213,8 @@ class AsyncLLM(LLM):
         stop=stop_after_attempt(100),
     )
     async def query_model(self, messages, **kwargs):
-        kwargs["max_tokens"] = kwargs.get("max_tokens", self.config.get("max_tokens"))
+        kwargs["max_tokens"] = kwargs.get(
+            "max_tokens", self.config.get("max_tokens"))
 
         return (
             (
@@ -274,7 +269,8 @@ class Human:
             )
         else:
             if available_commands:
-                print("Available actions: {}\n".format(info["available_commands"]))
+                print("Available actions: {}\n".format(
+                    info["available_commands"]))
 
             action = input("apdb> ")
 
