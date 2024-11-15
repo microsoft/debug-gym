@@ -6,7 +6,6 @@ from os.path import join as pjoin
 from pathlib import Path
 
 from datasets import load_dataset as load_hf_dataset
-from termcolor import colored
 
 from froggy.envs.env import RepoEnv
 from froggy.utils import (
@@ -35,12 +34,7 @@ class SWEBenchEnv(RepoEnv):
 
     def load_dataset(self):
         self.ds = load_hf_dataset(self.HF_SWE_BENCH_VERIFIED)["test"]
-        instance_id_list = self.ds["instance_id"]
-        self.dataset = {}
-        for instance_id in instance_id_list:
-            self.dataset[instance_id] = self.ds.filter(
-                lambda x: x["instance_id"] == instance_id
-            )[0]
+        self.dataset = {row["instance_id"]: row for row in self.ds.sort("instance_id")}
 
     def reset(self, *, seed=None, options={}):
         assert "task_name" in options, "task_name must be provided in options"

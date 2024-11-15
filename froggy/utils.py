@@ -277,32 +277,40 @@ def extract_reward_from_pytest_output(output):
     return 0
 
 
-def trim_prompt_messages(messages, context_length, token_counter):
+def trim_prompt_messages(
+    messages: list[dict], context_length: int, token_counter: callable
+):
     # Trim message content to context length
     # messages: list of dict, each dict has keys "content" and "role"
     # context_length: int, maximum number of tokens
     # token_counter: function, count the number of tokens in a string
-    message_length = [token_counter(text=item["content"]) for item in messages]
-    total_length = sum(message_length)
-    if total_length < context_length:
+    if context_length < 0:
+        raise ValueError("context_length must be non-negative")
+
+    message_lengths = [token_counter(text=item["content"]) for item in messages]
+    total_length = sum(message_lengths)
+    if total_length <= context_length:
         return messages
+
     # keep the first (system) message and last (user) message if possible
     new_messages, new_length = [], 0
     if messages[0]["role"] == "system":
         new_messages.append(messages[0])
-        new_length = message_length[0]
+        new_length += message_lengths[0]
+
     new_messages.append(messages[-1])
-    new_length += message_length[-1]
+    new_length += message_lengths[-1]
     if new_length > context_length:
         # just keep the last message, remove the system message
         new_messages = [messages[-1]]
-        new_length = message_length[-1]
+        new_length = message_lengths[-1]
     else:
         # adding back the messages in between
         start = 1 if messages[0]["role"] == "system" else 0
         for i in range(start, len(messages) - 1):
-            if new_length + message_length[i] > context_length:
+            if new_length + message_lengths[i] > context_length:
                 break
             new_messages = new_messages[:-1] + [messages[i]] + new_messages[-1:]
-            new_length += message_length[i]
+            new_length += message_lengths[i]
+
     return new_messages
