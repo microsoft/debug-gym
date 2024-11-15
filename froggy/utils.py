@@ -284,8 +284,21 @@ def trim_prompt_messages(
     # messages: list of dict, each dict has keys "content" and "role"
     # context_length: int, maximum number of tokens
     # token_counter: function, count the number of tokens in a string
-    if context_length < 0:
-        raise ValueError("context_length must be non-negative")
+    # messages should not be empty
+    assert len(messages) > 0, "messages should not be empty"
+    # all messages should be dictionaries with keys "content" and "role"
+    assert all(
+        isinstance(item, dict) and "content" in item and "role" in item
+        for item in messages
+    ), 'all messages should be dictionaries with keys "content" and "role"'
+    # the last message should be from the user
+    assert messages[-1]["role"] == "user", "the last message should be from the user"
+    # if two consecutive messages are from the same role, they should be merged
+    assert all(
+        messages[i]["role"] != messages[i + 1]["role"] for i in range(len(messages) - 1)
+    ), "if two consecutive messages are from the same role, they should be merged first"
+    # context_length should be non-negative
+    assert context_length >= 0, "context_length should be non-negative"
 
     message_lengths = [token_counter(text=item["content"]) for item in messages]
     total_length = sum(message_lengths)
