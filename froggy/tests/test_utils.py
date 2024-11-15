@@ -45,7 +45,7 @@ def test_trim_prompt_messages():
         messages = [
             {"role": "system", "content": "System message 1"},
             {"role": "system", "content": "System message 2"},
-            {"role": "assistant", "content": "Assistant message"},
+            {"role": "user", "content": "User message"},
         ]
         trim_prompt_messages(messages, 20, token_counter)
 

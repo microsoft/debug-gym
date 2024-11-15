@@ -318,12 +318,15 @@ def trim_prompt_messages(
         new_messages = [messages[-1]]
         new_length = message_lengths[-1]
     else:
-        # adding back the messages in between
+        # adding back the messages in between (from latest to earliest)
         start = 1 if messages[0]["role"] == "system" else 0
-        for i in range(start, len(messages) - 1):
+        for i in range(len(messages) - 2, start, -1):
             if new_length + message_lengths[i] > context_length:
                 break
-            new_messages = new_messages[:-1] + [messages[i]] + new_messages[-1:]
+            if start == 0:
+                new_messages = [messages[i]] + new_messages
+            else:
+                new_messages = new_messages[:1] + [messages[i]] + new_messages[1:]
             new_length += message_lengths[i]
 
     return new_messages
