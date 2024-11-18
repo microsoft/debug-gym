@@ -7,6 +7,7 @@ from froggy.utils import (
     TimeoutException,
     _walk,
     clean_code,
+    cleanup_pytest_output,
     extract_max_score_from_pytest_output,
     extract_reward_from_pytest_output,
     is_subdirectory,
@@ -217,6 +218,7 @@ def test_make_is_readonly():
             ".froggyignore",
             "log/",
             "data/",
+            "!data/unignore/*",
         ]
     )
 
@@ -242,6 +244,8 @@ def test_make_is_readonly():
     assert is_readonly(working_dir / "log/foo.py") is True
     assert is_readonly(working_dir / "source/fotesto.py") is True
     assert is_readonly(working_dir / ".meta/important.cc") is True
+    assert is_readonly(working_dir / "data/specific.py") is True
+    assert is_readonly(working_dir / "data/unignore/foo.py") is False
 
 
 def test_history_tracker():
@@ -571,3 +575,30 @@ def test_walk():
     path_list.sort()
     expected.sort()
     assert path_list == expected
+
+
+def test_cleanup_pytest_output():
+    message = "============================= test session starts ==============================\n===============================\n==============================\n=============================\n"
+    cleaned_message = cleanup_pytest_output(message)
+    expected = "============================= test session starts ==============================\n====\n====\n====\n"
+    assert cleaned_message == expected
+
+    message = "----------------------------- test session starts ------------------------------\n-------------------------------\n------------------------------\n-----------------------------\n"
+    cleaned_message = cleanup_pytest_output(message)
+    expected = "----------------------------- test session starts ------------------------------\n----\n----\n----\n"
+    assert cleaned_message == expected
+
+    message = "============================= test session starts ==============================\nplatform linux -- Python 3.12.3, pytest-8.3.3, pluggy-1.5.0 -- /datadrive/eric_work_space/venvs2024/be/bin/python\ncachedir: .pytest_cache\nrootdir: /tmp/RepoEnv-2lpnkhwv\nplugins: anyio-4.3.0\ncollecting ... collected 21 items\n\nphone_number_test.py::PhoneNumberTest::test_area_code FAILED\nphone_number_test.py::PhoneNumberTest::test_cleans_numbers_with_dots FAILED\nphone_number_test.py::PhoneNumberTest::test_cleans_numbers_with_multiple_spaces FAILED\nphone_number_test.py::PhoneNumberTest::test_cleans_the_number FAILED\nphone_number_test.py::PhoneNumberTest::test_invalid_if_area_code_starts_with_0 FAILED\nphone_number_test.py::PhoneNumberTest::test_invalid_if_area_code_starts_with_0_on_valid_11_digit_number FAILED\nphone_number_test.py::PhoneNumberTest::test_invalid_if_area_code_starts_with_1 FAILED\nphone_number_test.py::PhoneNumberTest::test_invalid_if_area_code_starts_with_1_on_valid_11_digit_number FAILED\nphone_number_test.py::PhoneNumberTest::test_invalid_if_exchange_code_starts_with_0 FAILED\nphone_number_test.py::PhoneNumberTest::test_invalid_if_exchange_code_starts_with_0_on_valid_11_digit_number FAILED\nphone_number_test.py::PhoneNumberTest::test_invalid_if_exchange_code_starts_with_1 FAILED\n"
+    cleaned_message = cleanup_pytest_output(message)
+    expected = "============================= test session starts ==============================\ncollecting ... collected 21 items\n\nphone_number_test.py::PhoneNumberTest::test_area_code FAILED\nphone_number_test.py::PhoneNumberTest::test_cleans_numbers_with_dots FAILED\nphone_number_test.py::PhoneNumberTest::test_cleans_numbers_with_multiple_spaces FAILED\nphone_number_test.py::PhoneNumberTest::test_cleans_the_number FAILED\nphone_number_test.py::PhoneNumberTest::test_invalid_if_area_code_starts_with_0 FAILED\nphone_number_test.py::PhoneNumberTest::test_invalid_if_area_code_starts_with_0_on_valid_11_digit_number FAILED\nphone_number_test.py::PhoneNumberTest::test_invalid_if_area_code_starts_with_1 FAILED\nphone_number_test.py::PhoneNumberTest::test_invalid_if_area_code_starts_with_1_on_valid_11_digit_number FAILED\nphone_number_test.py::PhoneNumberTest::test_invalid_if_exchange_code_starts_with_0 FAILED\nphone_number_test.py::PhoneNumberTest::test_invalid_if_exchange_code_starts_with_0_on_valid_11_digit_number FAILED\nphone_number_test.py::PhoneNumberTest::test_invalid_if_exchange_code_starts_with_1 FAILED\n"
+    assert cleaned_message == expected
+
+    message = "Ran 15 tests in 0.09s\nSomething else\n"
+    cleaned_message = cleanup_pytest_output(message)
+    expected = "\nSomething else\n"
+    assert cleaned_message == expected
+
+    message = "Ran 1 test in 12.25s\nSomething else\n"
+    cleaned_message = cleanup_pytest_output(message)
+    expected = "\nSomething else\n"
+    assert cleaned_message == expected

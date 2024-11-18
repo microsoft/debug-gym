@@ -236,7 +236,7 @@ def time_limit(seconds: Optional[int]):
 def cleanup_pytest_output(output):
     # Remove timing, root dir, and platform to avoid randomizing LLM's response.
     res = re.sub(
-        r"^Ran \d+ tests in \d+\.\d+s$",
+        r"^Ran \d+ tests? in \d+\.\d+s$",
         "",
         output,
         flags=re.MULTILINE,
