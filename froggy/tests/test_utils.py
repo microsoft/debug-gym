@@ -204,48 +204,51 @@ def test_make_is_readonly():
     ignore_file = working_dir / ".froggyignore"
     atexit.register(tempdir.cleanup)  # Make sure to cleanup that folder once done.
 
-    froggyignore_contents = "\n".join(
-        [
-            ".DS_Store",
-            "__pycache__/",
-            ".approaches/",
-            ".docs/",
-            ".meta/",
-            ".pytest_cache/",
-            "*test*.py",
-            "*.pyc",
-            "*.md",
-            ".froggyignore",
-            "log/",
-            "data/",
-            "!data/unignore/*",
-        ]
-    )
+    for with_negation in [False, True]:
+        froggyignore_contents = "\n".join(
+            [
+                ".DS_Store",
+                "__pycache__/",
+                ".approaches/",
+                ".docs/",
+                ".meta/",
+                ".pytest_cache/",
+                "*test*.py",
+                "*.pyc",
+                "*.md",
+                ".froggyignore",
+                "log/",
+                "data/",
+            ]
+        )
+        if with_negation is True:
+            froggyignore_contents += "\n!data/unignore/*"
+        with open(ignore_file, "w") as f:
+            f.write(froggyignore_contents)
+        is_readonly = make_is_readonly(ignore_file, patterns=["source/*.frog"])
 
-    with open(ignore_file, "w") as f:
-        f.write(froggyignore_contents)
-
-    is_readonly = make_is_readonly(ignore_file, patterns=["source/*.frog"])
-
-    assert is_readonly(working_dir / "foo.py") is False
-    assert is_readonly(working_dir / "source/source.py") is False
-    assert is_readonly(working_dir / "source/__init__.py") is False
-    assert is_readonly(working_dir / "source/main.frog") is True
-    assert is_readonly(working_dir / "utils/main.frog") is False
-    assert is_readonly(working_dir / ".DS_Store") is True
-    assert is_readonly(working_dir / "foo.pyc") is True
-    assert is_readonly(working_dir / "foo_test.py") is True
-    assert is_readonly(working_dir / "testy.py") is True
-    assert is_readonly(working_dir / "data/foo.py") is True
-    assert is_readonly(working_dir / "docs/source_code.py") is False
-    assert is_readonly(working_dir / ".docs/source_code.py") is True
-    assert is_readonly(working_dir / "this_is_code.md") is True
-    assert is_readonly(working_dir / ".froggyignore") is True
-    assert is_readonly(working_dir / "log/foo.py") is True
-    assert is_readonly(working_dir / "source/fotesto.py") is True
-    assert is_readonly(working_dir / ".meta/important.cc") is True
-    assert is_readonly(working_dir / "data/specific.py") is True
-    assert is_readonly(working_dir / "data/unignore/foo.py") is False
+        assert is_readonly(working_dir / "foo.py") is False
+        assert is_readonly(working_dir / "source/source.py") is False
+        assert is_readonly(working_dir / "source/__init__.py") is False
+        assert is_readonly(working_dir / "source/main.frog") is True
+        assert is_readonly(working_dir / "utils/main.frog") is False
+        assert is_readonly(working_dir / ".DS_Store") is True
+        assert is_readonly(working_dir / "foo.pyc") is True
+        assert is_readonly(working_dir / "foo_test.py") is True
+        assert is_readonly(working_dir / "testy.py") is True
+        assert is_readonly(working_dir / "data/foo.py") is True
+        assert is_readonly(working_dir / "docs/source_code.py") is False
+        assert is_readonly(working_dir / ".docs/source_code.py") is True
+        assert is_readonly(working_dir / "this_is_code.md") is True
+        assert is_readonly(working_dir / ".froggyignore") is True
+        assert is_readonly(working_dir / "log/foo.py") is True
+        assert is_readonly(working_dir / "source/fotesto.py") is True
+        assert is_readonly(working_dir / ".meta/important.cc") is True
+        assert is_readonly(working_dir / "data/specific.py") is True
+        if with_negation is True:
+            assert is_readonly(working_dir / "data/unignore/foo.py") is False
+        else:
+            assert is_readonly(working_dir / "data/unignore/foo.py") is True
 
 
 def test_history_tracker():
