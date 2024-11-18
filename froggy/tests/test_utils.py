@@ -200,9 +200,10 @@ def test_make_is_readonly():
     assert is_readonly(working_dir / "foo_test.py") is True
     assert is_readonly(working_dir / "testy.py") is True
     assert is_readonly(working_dir / "data/foo.py") is True
-    assert is_readonly(working_dir / "docs/source_code.py") is True
+    assert is_readonly(working_dir / "docs/source_code.py") is False
+    assert is_readonly(working_dir / ".docs/source_code.py") is True
     assert is_readonly(working_dir / "this_is_code.md") is True
     assert is_readonly(working_dir / ".froggyignore") is True
     assert is_readonly(working_dir / "log/foo.py") is True
     assert is_readonly(working_dir / "source/fotesto.py") is True
-    assert is_readonly(working_dir / "meta/important.cc") is True
+    assert is_readonly(working_dir / ".meta/important.cc") is True
