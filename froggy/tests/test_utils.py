@@ -1,6 +1,15 @@
+from unittest.mock import patch
+
 import pytest
 
-from froggy.utils import clean_code, trim_prompt_messages, show_line_number, make_is_readonly, HistoryTracker
+from froggy.utils import (
+    HistoryTracker,
+    clean_code,
+    load_config,
+    make_is_readonly,
+    show_line_number,
+    trim_prompt_messages,
+)
 
 
 @pytest.mark.parametrize(
@@ -128,7 +137,10 @@ def test_show_line_number():
 
     # multiple breakpoints
     code_path = "path/to/code.py"
-    breakpoints_state = {"path/to/code.py|||2": "b 2", "path/to/code.py|||3": "b 3, bar > 4"}
+    breakpoints_state = {
+        "path/to/code.py|||2": "b 2",
+        "path/to/code.py|||3": "b 3, bar > 4",
+    }
     code_string = f"def foo():\n"
     code_string += f"{s4}bar = 20\n"
     code_string += f"{s4}foobar = 42\n"
@@ -143,7 +155,7 @@ def test_show_line_number():
     assert show_line_number(code_string, code_path, breakpoints_state) == expected
 
     # 10000 lines, so line numbers will take 8 digits
-    code_string = f"def foo():\n" 
+    code_string = f"def foo():\n"
     for i in range(9997):
         code_string += f"{s4}print({i})\n"
     code_string += f"{s4}return 42\n"
@@ -156,37 +168,35 @@ def test_show_line_number():
 
 
 def test_make_is_readonly():
-    import os
+    import atexit
     import tempfile
     from pathlib import Path
-    import atexit
+
     # do the test in a tmp folder
     tempdir = tempfile.TemporaryDirectory(prefix="TestFroggyignore-")
     working_dir = Path(tempdir.name)
     ignore_file = working_dir / ".froggyignore"
-    atexit.register(
-        tempdir.cleanup
-    )  # Make sure to cleanup that folder once done.
+    atexit.register(tempdir.cleanup)  # Make sure to cleanup that folder once done.
 
     froggyignore_contents = "\n".join(
-                    [
-                        ".DS_Store",
-                        "__pycache__/",
-                        ".approaches/",
-                        ".docs/",
-                        ".meta/",
-                        ".pytest_cache/",
-                        "*test*.py",
-                        "*.pyc",
-                        "*.md",
-                        ".froggyignore",
-                        "log/",
-                        "data/",
-                    ]
-                )
-    
+        [
+            ".DS_Store",
+            "__pycache__/",
+            ".approaches/",
+            ".docs/",
+            ".meta/",
+            ".pytest_cache/",
+            "*test*.py",
+            "*.pyc",
+            "*.md",
+            ".froggyignore",
+            "log/",
+            "data/",
+        ]
+    )
+
     with open(ignore_file, "w") as f:
-            f.write(froggyignore_contents)
+        f.write(froggyignore_contents)
 
     is_readonly = make_is_readonly(ignore_file, patterns=["source/*.frog"])
 
@@ -217,7 +227,9 @@ def test_history_tracker():
     assert ht.get() == []
     assert ht.get_all() == []
     assert ht.score() == 0
-    assert ht.prompt_response_pairs == [[]]  # at 0-th step, there is no prompt-response pair
+    assert ht.prompt_response_pairs == [
+        []
+    ]  # at 0-th step, there is no prompt-response pair
 
     # json should return an empty dict
     assert ht.json() == {}
@@ -230,9 +242,13 @@ def test_history_tracker():
     ht.step({"obs": "obs5", "action": "action5", "score": 5})
     # push some prompt-response pairs
     ht.save_prompt_response_pairs([("prompt_2_1", "response_2_1")])
-    ht.save_prompt_response_pairs([("prompt_3_1", "response_3_1"), ("prompt_3_2", "response_3_2")])
+    ht.save_prompt_response_pairs(
+        [("prompt_3_1", "response_3_1"), ("prompt_3_2", "response_3_2")]
+    )
     ht.save_prompt_response_pairs([("prompt_4_1", "response_4_1")])
-    ht.save_prompt_response_pairs([("prompt_5_1", "response_5_1"), ("prompt_5_2", "response_5_2")])
+    ht.save_prompt_response_pairs(
+        [("prompt_5_1", "response_5_1"), ("prompt_5_2", "response_5_2")]
+    )
 
     # get_all should return all steps
     assert ht.get_all() == [
@@ -301,3 +317,68 @@ def test_history_tracker():
 
     # json should return an empty dict
     assert ht.json() == {}
+
+
+def test_load_config():
+    import atexit
+    import tempfile
+    from pathlib import Path
+
+    import yaml
+
+    # do the test in a tmp folder
+    tempdir = tempfile.TemporaryDirectory(prefix="TestLoadConfig-")
+    working_dir = Path(tempdir.name)
+    config_file = working_dir / "config.yaml"
+    atexit.register(tempdir.cleanup)  # Make sure to cleanup that folder once done.
+
+    config_contents = {}
+    config_contents["zero_shot"] = {
+        "random_seed": 42,
+        "max_steps": 100,
+        "llm_name": "gpt2",
+        "llm_temperature": [0.5],
+    }
+    config_contents["cot"] = {
+        "random_seed": 43,
+        "max_steps": 50,
+        "cot_style": "standard",
+        "llm_name": "gpt20",
+        "llm_temperature": [0.3, 0.5],
+    }
+
+    # write the config file into yaml
+    with open(config_file, "w") as f:
+        yaml.dump(config_contents, f)
+
+    # now test
+    with patch(
+        "sys.argv",
+        [
+            "config_file",
+            str(config_file),
+            "--agent",
+            "zero_shot",
+            "-p",
+            "zero_shot.random_seed=123",
+            "cot.llm_temperature=[0.8, 0.8]",
+            "-v",
+            "--debug",
+        ],
+    ):
+
+        _config, _args = load_config()
+    assert _args.agent == "zero_shot"
+    assert "zero_shot" in _config.keys()
+    assert "cot" in _config.keys()
+    assert _config["zero_shot"]["random_seed"] == 123
+    assert _config["zero_shot"]["max_steps"] == 100
+    assert _config["zero_shot"]["llm_name"] == "gpt2"
+    assert _config["zero_shot"]["llm_temperature"] == [0.5]
+    assert _config["cot"]["random_seed"] == 43
+    assert _config["cot"]["max_steps"] == 50
+    assert _config["cot"]["cot_style"] == "standard"
+    assert _config["cot"]["llm_name"] == "gpt20"
+    assert _config["cot"]["llm_temperature"] == [0.8, 0.8]
+    assert _args.debug is True
+    assert _args.verbose is True
