@@ -1,6 +1,6 @@
 import pytest
 
-from froggy.utils import clean_code, trim_prompt_messages, show_line_number
+from froggy.utils import clean_code, trim_prompt_messages, show_line_number, make_is_readonly
 
 
 @pytest.mark.parametrize(
@@ -153,3 +153,56 @@ def test_show_line_number():
     expected += f"{s2}{s4}9999 {s4}return 42\n"
     expected += f"{s2}   10000 "
     assert show_line_number(code_string) == expected
+
+
+def test_make_is_readonly():
+    import os
+    import tempfile
+    from pathlib import Path
+    import atexit
+    # do the test in a tmp folder
+    tempdir = tempfile.TemporaryDirectory(prefix="TestFroggyignore-")
+    working_dir = Path(tempdir.name)
+    ignore_file = working_dir / ".froggyignore"
+    atexit.register(
+        tempdir.cleanup
+    )  # Make sure to cleanup that folder once done.
+
+    froggyignore_contents = "\n".join(
+                    [
+                        ".DS_Store",
+                        "__pycache__/",
+                        ".approaches/",
+                        ".docs/",
+                        ".meta/",
+                        ".pytest_cache/",
+                        "*test*.py",
+                        "*.pyc",
+                        "*.md",
+                        ".froggyignore",
+                        "log/",
+                        "data/",
+                    ]
+                )
+    
+    with open(ignore_file, "w") as f:
+            f.write(froggyignore_contents)
+
+    is_readonly = make_is_readonly(ignore_file, patterns=["source/*.frog"])
+
+    assert is_readonly(working_dir / "foo.py") is False
+    assert is_readonly(working_dir / "source/source.py") is False
+    assert is_readonly(working_dir / "source/__init__.py") is False
+    assert is_readonly(working_dir / "source/main.frog") is True
+    assert is_readonly(working_dir / "utils/main.frog") is False
+    assert is_readonly(working_dir / ".DS_Store") is True
+    assert is_readonly(working_dir / "foo.pyc") is True
+    assert is_readonly(working_dir / "foo_test.py") is True
+    assert is_readonly(working_dir / "testy.py") is True
+    assert is_readonly(working_dir / "data/foo.py") is True
+    assert is_readonly(working_dir / "docs/source_code.py") is True
+    assert is_readonly(working_dir / "this_is_code.md") is True
+    assert is_readonly(working_dir / ".froggyignore") is True
+    assert is_readonly(working_dir / "log/foo.py") is True
+    assert is_readonly(working_dir / "source/fotesto.py") is True
+    assert is_readonly(working_dir / "meta/important.cc") is True
