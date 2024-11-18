@@ -18,13 +18,16 @@ class Terminal:
 
     def __init__(
         self,
-        working_dir: str = "/tmp/Froggy",
+        working_dir: str = None,
         setup_commands: list[str] = None,
         env_vars: dict[str, str] = None,
     ):
+        if working_dir is None:
+            working_dir = "/tmp/Froggy"
+            os.makedirs(working_dir, exist_ok=True)
         self._setup_commands = setup_commands if setup_commands else []
         self.env_vars = env_vars if env_vars else {}
-        # self.env_vars["NO_COLOR"] = "1"
+        self.env_vars["NO_COLOR"] = "1"  # Disable color output
         self.working_dir = working_dir
         self._master = None  # PTY master file descriptor
 
@@ -39,7 +42,7 @@ class Terminal:
         logger.debug(f"Running command in terminal: {command}\n")
         process = subprocess.Popen(
             command,
-            env=dict(os.environ, NO_COLOR="1"),
+            env=self.env_vars,
             cwd=working_dir or self.working_dir,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
@@ -61,9 +64,7 @@ class Terminal:
         """
         # TODO: include working_dir parameter to align with run()?
         if not self.has_pseudo_terminal():
-            raise ValueError(
-                "Interactive terminal not available. Please start the terminal first."
-            )
+            self.start_pseudo_terminal()
         return self.interact_with_pseudo_terminal(entrypoint, expected_output, timeout)
 
     @property
@@ -92,7 +93,7 @@ class Terminal:
         if self.has_pseudo_terminal():
             self.close_pseudo_terminal()
 
-        logger.debug("Starting PTY.")
+        logger.debug(f"Starting PTY with entrypoint: {self.default_entrypoint}\n")
         # _env = os.environ.copy()  # TODO: use self.env_vars
         # _env["NO_COLOR"] = "1"
 
@@ -114,8 +115,11 @@ class Terminal:
         os.close(slave)
         atexit.register(self.close_pseudo_terminal)
 
+        initial_output = ""
         commands = " && ".join(self.setup_commands)
-        initial_output = self.interact_with_pseudo_terminal(commands, timeout=timeout)
+        if commands:
+            initial_output = self.interact_with_pseudo_terminal(commands, timeout=timeout)
+
         logger.debug(f"Initial output from interactive terminal: {initial_output}\n")
 
         return initial_output
@@ -240,15 +244,6 @@ class DockerTerminal(Terminal):
         )
         success = status == 0
         return success, output.decode()
-
-    def run_interactive(
-        self, entrypoint: str, expected_output: str = "", timeout: int = 30
-    ):
-        if not self.has_pseudo_terminal():
-            raise ValueError(
-                "Interactive terminal not available. Please start the terminal first."
-            )
-        return self.interact_with_pseudo_terminal(entrypoint, expected_output, timeout)
 
     def clone(self) -> Terminal:
         terminal = self.__class__(
