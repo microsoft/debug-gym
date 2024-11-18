@@ -4,6 +4,8 @@ import pytest
 
 from froggy.utils import (
     HistoryTracker,
+    TimeoutException,
+    _walk,
     clean_code,
     extract_max_score_from_pytest_output,
     extract_reward_from_pytest_output,
@@ -12,6 +14,7 @@ from froggy.utils import (
     make_is_readonly,
     show_line_number,
     str2bool,
+    time_limit,
     trim_prompt_messages,
 )
 
@@ -106,6 +109,24 @@ def test_trim_prompt_messages():
         {"role": "user", "content": "User message 2"},
     ]
     assert trim_prompt_messages(messages, 35, token_counter) == expected
+
+    messages = [
+        {"role": "system", "content": "System message"},
+        {"role": "user", "content": "User message 1"},
+        {"role": "assistant", "content": "Assistant message 1"},
+        {"role": "user", "content": "User message 2"},
+        {"role": "assistant", "content": "Assistant message 2"},
+        {"role": "user", "content": "User message 3"},
+        {"role": "assistant", "content": "Assistant message 3"},
+        {"role": "user", "content": "User message 4"},
+    ]
+    expected = [
+        {"role": "system", "content": "System message"},
+        {"role": "user", "content": "User message 3"},
+        {"role": "assistant", "content": "Assistant message 3"},
+        {"role": "user", "content": "User message 4"},
+    ]
+    assert trim_prompt_messages(messages, 65, token_counter) == expected
 
 
 def test_show_line_number():
@@ -284,6 +305,14 @@ def test_history_tracker():
         "obs": "obs3",
     }
 
+    # output token_usage if it exists
+    assert ht.json(3) == {
+        "step_id": 3,
+        "action": "action4",
+        "obs": "obs4",
+        "token_usage": 12345,
+    }
+
     # json should return also the prompt-response pairs if include_prompt_response_pairs is True
     assert ht.json(2, include_prompt_response_pairs=True) == {
         "step_id": 2,
@@ -450,3 +479,95 @@ def test_extract_reward_from_pytest_output():
     message_0 = "============================= here are some random text ==============================="
 
     assert extract_reward_from_pytest_output(message_0) == 0
+
+
+def test_time_limit():
+    import time
+
+    with time_limit(3):
+        time.sleep(2)
+    assert True
+
+    with pytest.raises(TimeoutException, match="Timed out!"):
+        with time_limit(1):
+            time.sleep(2)
+
+    with time_limit(None):
+        time.sleep(0.2)
+    assert True
+
+
+def test_walk():
+    path = "data/terminal_simulator"
+
+    # depth 0
+    path_list = []
+    for p in _walk(path, 0):
+        path_list.append(p)
+    assert path_list == []
+
+    # depth 1
+    path_list = []
+    for p in _walk(path, 1):
+        path_list.append(p)
+    expected = [
+        "data/terminal_simulator/.froggyignore",
+        "data/terminal_simulator/buggy",
+        "data/terminal_simulator/code",
+        "data/terminal_simulator/README.md",
+        "data/terminal_simulator/test_part_1.py",
+        "data/terminal_simulator/test_part_2.py",
+        "data/terminal_simulator/test.py",
+    ]
+    # sort the list
+    path_list.sort()
+    expected.sort()
+    assert path_list == expected
+
+    # depth 2
+    path_list = []
+    for p in _walk(path, 2):
+        path_list.append(p)
+    expected = [
+        "data/terminal_simulator/.froggyignore",
+        "data/terminal_simulator/buggy",
+        "data/terminal_simulator/buggy/buggy_code_info_20241031-205241.json",
+        "data/terminal_simulator/code",
+        "data/terminal_simulator/code/__init__.py",
+        "data/terminal_simulator/code/base_simulator.py",
+        "data/terminal_simulator/code/run_terminal_simulator.py",
+        "data/terminal_simulator/code/some_random_code.py",
+        "data/terminal_simulator/code/terminal_simulator.py",
+        "data/terminal_simulator/README.md",
+        "data/terminal_simulator/test_part_1.py",
+        "data/terminal_simulator/test_part_2.py",
+        "data/terminal_simulator/test.py",
+    ]
+    # sort the list
+    path_list.sort()
+    expected.sort()
+    assert path_list == expected
+
+    # depth is None (max)
+    path_list = []
+    for p in _walk(path, None):
+        path_list.append(p)
+    expected = [
+        "data/terminal_simulator/.froggyignore",
+        "data/terminal_simulator/buggy",
+        "data/terminal_simulator/buggy/buggy_code_info_20241031-205241.json",
+        "data/terminal_simulator/code",
+        "data/terminal_simulator/code/__init__.py",
+        "data/terminal_simulator/code/base_simulator.py",
+        "data/terminal_simulator/code/run_terminal_simulator.py",
+        "data/terminal_simulator/code/some_random_code.py",
+        "data/terminal_simulator/code/terminal_simulator.py",
+        "data/terminal_simulator/README.md",
+        "data/terminal_simulator/test_part_1.py",
+        "data/terminal_simulator/test_part_2.py",
+        "data/terminal_simulator/test.py",
+    ]
+    # sort the list
+    path_list.sort()
+    expected.sort()
+    assert path_list == expected

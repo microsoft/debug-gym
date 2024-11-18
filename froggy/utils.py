@@ -102,18 +102,6 @@ class HistoryTracker:
         # return the history_steps latest steps
         return self.memory[-self.history_steps :]
 
-    def save(self, path):
-        import json
-
-        infos = []
-        for info in self.memory:
-            keys = [k for k in info.keys() if k != "history"]
-            info_ = {k: info[k] for k in keys}
-            infos.append(info_)
-
-        with open(path, "w") as f:
-            json.dump(infos, f)
-
     def get_all(self):
         return self.memory
 
