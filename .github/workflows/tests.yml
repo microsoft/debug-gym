@@ -32,5 +32,5 @@ jobs:
           pip install -e '.[dev]'
       - name: Test with pytest
         run: |
-          pytest -n 4 -vv
+          pytest -n 4 -vv --cov=.
           coverage report -m
