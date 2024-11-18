@@ -33,3 +33,4 @@ jobs:
       - name: Test with pytest
         run: |
           pytest -n 4 -vv
+          coverage report -m

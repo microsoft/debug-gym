@@ -8,3 +8,6 @@ termcolor
 pytest
 transformers
 tiktoken
+pytest
+pytest-xdist
+pytest-cov
