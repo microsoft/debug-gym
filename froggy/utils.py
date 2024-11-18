@@ -30,7 +30,9 @@ def show_line_number(code_string, code_path=None, breakpoints_state=None):
     # line numbers and code lines are separated by a tab
 
     assert code_string is not None, "code_string should not be None"
-    assert isinstance(code_string, str), f"code_string should be a string, but got {type(code_string)}"
+    assert isinstance(
+        code_string, str
+    ), f"code_string should be a string, but got {type(code_string)}"
     code_line = code_string.split("\n")
 
     output = []
@@ -263,7 +265,12 @@ def cleanup_pytest_output(output):
 
 def extract_max_score_from_pytest_output(output):
     # ... collected 25 items
-    return max(int(re.search(r"collected (\d+) items?", output).group(1)), 1.0)
+    # ... collected 1 item
+    match = re.search(r"collected (\d+) items?", output)
+    if match:
+        return max(int(match.group(1)), 1.0)
+    else:
+        raise ValueError("No test cases found in the pytest output.")
 
 
 def extract_reward_from_pytest_output(output):
