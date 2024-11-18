@@ -5,9 +5,11 @@ import pytest
 from froggy.utils import (
     HistoryTracker,
     clean_code,
+    is_subdirectory,
     load_config,
     make_is_readonly,
     show_line_number,
+    str2bool,
     trim_prompt_messages,
 )
 
@@ -382,3 +384,39 @@ def test_load_config():
     assert _config["cot"]["llm_temperature"] == [0.8, 0.8]
     assert _args.debug is True
     assert _args.verbose is True
+
+
+def test_str2bool():
+    assert str2bool("True") is True
+    assert str2bool("true") is True
+    assert str2bool("t") is True
+    assert str2bool("1") is True
+    assert str2bool("Yes") is True
+    assert str2bool("Y") is True
+    assert str2bool("False") is False
+    assert str2bool("false") is False
+    assert str2bool("f") is False
+    assert str2bool("0") is False
+    assert str2bool("No") is False
+    assert str2bool("N") is False
+    assert str2bool(True) is True
+    assert str2bool(False) is False
+    with pytest.raises(Exception, match="Boolean value expected."):
+        str2bool("Maybe")
+    with pytest.raises(Exception, match="Boolean value expected."):
+        str2bool("yeah")
+    with pytest.raises(Exception, match="Boolean value expected."):
+        str2bool("nah")
+
+
+def test_is_subdirectory():
+
+    assert is_subdirectory("/path/to/file", "/path/to") is True
+    assert is_subdirectory("/path/to/file", "/path/to/") is True
+    assert is_subdirectory("/path/to/file", "/path/to/file") is True
+    assert is_subdirectory("/path/to/file", "/path/too") is False
+    assert is_subdirectory("/path/to/file", "/path/too/file") is False
+    assert is_subdirectory("/some/random/file", "/path/to") is False
+    assert is_subdirectory("some/random/file", "/path/to") is True
+    assert is_subdirectory("file", "/path/to") is True
+    assert is_subdirectory("/path/file", "/path/to") is False
