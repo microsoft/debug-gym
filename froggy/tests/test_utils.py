@@ -1,6 +1,6 @@
 import pytest
 
-from froggy.utils import clean_code, trim_prompt_messages
+from froggy.utils import clean_code, trim_prompt_messages, show_line_number
 
 
 @pytest.mark.parametrize(
@@ -93,3 +93,63 @@ def test_trim_prompt_messages():
         {"role": "user", "content": "User message 2"},
     ]
     assert trim_prompt_messages(messages, 35, token_counter) == expected
+
+
+def test_show_line_number():
+    s4 = "    "
+    s2 = "  "
+
+    # code_string is empty
+    with pytest.raises(
+        Exception,
+        match="code_string should not be None",
+    ):
+        show_line_number(None)
+
+    # code_string is a list
+    code_string = ["def foo():", "    return 42"]
+    with pytest.raises(
+        Exception,
+        match=f"code_string should be a string, but got {type(code_string)}",
+    ):
+        show_line_number(code_string)
+
+    # no code_path, no breakpoints
+    code_string = f"def foo():\n{s4}return 42\n"
+    expected = f"{s2}   1 def foo():\n{s2}   2 {s4}return 42\n{s2}   3 "
+    assert show_line_number(code_string) == expected
+
+    # with code_path
+    code_path = "path/to/code.py"
+    breakpoints_state = {"path/to/code.py|||2": "b 2"}
+    code_string = f"def foo():\n{s4}return 42\n"
+    expected = f"{s2}   1 def foo():\nB    2 {s4}return 42\n{s2}   3 "
+    assert show_line_number(code_string, code_path, breakpoints_state) == expected
+
+    # multiple breakpoints
+    code_path = "path/to/code.py"
+    breakpoints_state = {"path/to/code.py|||2": "b 2", "path/to/code.py|||3": "b 3, bar > 4"}
+    code_string = f"def foo():\n"
+    code_string += f"{s4}bar = 20\n"
+    code_string += f"{s4}foobar = 42\n"
+    code_string += f"{s4}print('frog')\n"
+    code_string += f"{s4}return foobar\n"
+    expected = f"{s2}   1 def foo():\n"
+    expected += f"B    2 {s4}bar = 20\n"
+    expected += f"B    3 {s4}foobar = 42\n"
+    expected += f"{s2}   4 {s4}print('frog')\n"
+    expected += f"{s2}   5 {s4}return foobar\n"
+    expected += f"{s2}   6 "
+    assert show_line_number(code_string, code_path, breakpoints_state) == expected
+
+    # 10000 lines, so line numbers will take 8 digits
+    code_string = f"def foo():\n" 
+    for i in range(9997):
+        code_string += f"{s4}print({i})\n"
+    code_string += f"{s4}return 42\n"
+    expected = f"{s2}{s4}   1 def foo():\n"
+    for i in range(9997):
+        expected += "{}{:>8} {}print({})\n".format(s2, i + 2, s4, i)
+    expected += f"{s2}{s4}9999 {s4}return 42\n"
+    expected += f"{s2}   10000 "
+    assert show_line_number(code_string) == expected

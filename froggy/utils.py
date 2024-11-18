@@ -29,7 +29,8 @@ def show_line_number(code_string, code_path=None, breakpoints_state=None):
     # line numbers are 1-indexed
     # line numbers and code lines are separated by a tab
 
-    assert isinstance(code_string, str)
+    assert code_string is not None, "code_string should not be None"
+    assert isinstance(code_string, str), f"code_string should be a string, but got {type(code_string)}"
     code_line = code_string.split("\n")
 
     output = []
