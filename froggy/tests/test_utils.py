@@ -1,6 +1,6 @@
 import pytest
 
-from froggy.utils import clean_code, trim_prompt_messages, show_line_number, make_is_readonly
+from froggy.utils import clean_code, trim_prompt_messages, show_line_number, make_is_readonly, HistoryTracker
 
 
 @pytest.mark.parametrize(
@@ -207,3 +207,97 @@ def test_make_is_readonly():
     assert is_readonly(working_dir / "log/foo.py") is True
     assert is_readonly(working_dir / "source/fotesto.py") is True
     assert is_readonly(working_dir / ".meta/important.cc") is True
+
+
+def test_history_tracker():
+    ht = HistoryTracker(history_steps=3)
+
+    # should start empty
+    assert len(ht) == 0
+    assert ht.get() == []
+    assert ht.get_all() == []
+    assert ht.score() == 0
+    assert ht.prompt_response_pairs == [[]]  # at 0-th step, there is no prompt-response pair
+
+    # json should return an empty dict
+    assert ht.json() == {}
+
+    # push some steps
+    ht.step({"obs": "obs1", "action": None, "score": 1})
+    ht.step({"obs": "obs2", "action": "action2", "score": 2})
+    ht.step({"obs": "obs3", "action": "action3", "score": 3})
+    ht.step({"obs": "obs4", "action": "action4", "score": 4, "token_usage": 12345})
+    ht.step({"obs": "obs5", "action": "action5", "score": 5})
+    # push some prompt-response pairs
+    ht.save_prompt_response_pairs([("prompt_2_1", "response_2_1")])
+    ht.save_prompt_response_pairs([("prompt_3_1", "response_3_1"), ("prompt_3_2", "response_3_2")])
+    ht.save_prompt_response_pairs([("prompt_4_1", "response_4_1")])
+    ht.save_prompt_response_pairs([("prompt_5_1", "response_5_1"), ("prompt_5_2", "response_5_2")])
+
+    # get_all should return all steps
+    assert ht.get_all() == [
+        {"obs": "obs1", "action": None, "score": 1},
+        {"obs": "obs2", "action": "action2", "score": 2},
+        {"obs": "obs3", "action": "action3", "score": 3},
+        {"obs": "obs4", "action": "action4", "score": 4, "token_usage": 12345},
+        {"obs": "obs5", "action": "action5", "score": 5},
+    ]
+
+    # get should return the last 3 steps
+    assert ht.get() == [
+        {"obs": "obs3", "action": "action3", "score": 3},
+        {"obs": "obs4", "action": "action4", "score": 4, "token_usage": 12345},
+        {"obs": "obs5", "action": "action5", "score": 5},
+    ]
+
+    # json should return the last step by default
+    assert ht.json() == {
+        "step_id": 4,
+        "action": "action5",
+        "obs": "obs5",
+    }
+
+    # json should return the speficied step
+    assert ht.json(2) == {
+        "step_id": 2,
+        "action": "action3",
+        "obs": "obs3",
+    }
+
+    # json should return also the prompt-response pairs if include_prompt_response_pairs is True
+    assert ht.json(2, include_prompt_response_pairs=True) == {
+        "step_id": 2,
+        "action": "action3",
+        "obs": "obs3",
+        "prompt_response_pairs": {
+            "prompt_0": "prompt_3_1",
+            "response_0": "response_3_1",
+            "prompt_1": "prompt_3_2",
+            "response_1": "response_3_2",
+        },
+    }
+
+    # for 0-th step, prompt-response pairs should be None
+    assert ht.json(0, include_prompt_response_pairs=True) == {
+        "step_id": 0,
+        "action": None,
+        "obs": "obs1",
+        "prompt_response_pairs": None,
+    }
+
+    # score should return the sum of the scores
+    assert ht.score() == 15
+
+    # len should return the number of steps
+    assert len(ht) == 5
+
+    # should reset properly
+    ht.reset()
+    assert len(ht) == 0
+    assert ht.get() == []
+    assert ht.get_all() == []
+    assert ht.score() == 0
+    assert ht.prompt_response_pairs == [[]]
+
+    # json should return an empty dict
+    assert ht.json() == {}
