@@ -1,15 +1,9 @@
 import copy
-import errno
-import fcntl
-import os
-import pty
 import re
-import subprocess
-import time
-from typing import Optional
+import sys
 
+from froggy.envs.terminal import Terminal
 from froggy.tools import EnvironmentTool
-from froggy.utils import TimeoutException, time_limit
 
 
 class PDBTool(EnvironmentTool):
@@ -59,6 +53,7 @@ class PDBTool(EnvironmentTool):
         self.persistent_breakpoints = persistent_breakpoints
         self.auto_list = auto_list
         self.current_frame_file = None
+        self._terminal: Terminal = None
 
     def register(self, environment):
         from froggy.envs import RepoEnv
@@ -68,15 +63,55 @@ class PDBTool(EnvironmentTool):
 
         self.environment = environment
 
+    @property
+    def terminal(self) -> Terminal:
+        if self._terminal is None:
+            raise ValueError("Please provide a terminal to the PDB tool.")
+        return self._terminal
+
+    @terminal.setter
+    def terminal(self, terminal: Terminal):
+        self._terminal = terminal
+
+    def interact_with_pdb(self, command, expected_output="(Pdb)"):
+        return self.terminal.run_interactive(command, expected_output)
+
+    def close_pdb(self, command="q"):
+        return self.terminal.run_interactive(command, timeout=10)
+
+    def start_pdb(self, terminal: Terminal = None, pdb_cmd: str = None) -> str:
+        if terminal is not None:
+            self.terminal = terminal
+        if pdb_cmd is None:
+            entrypoint = " ".join(self.environment.entrypoint[1:])
+            pdb_cmd = f'python -m pdb {entrypoint}'
+
+        initial_output = self.interact_with_pdb(pdb_cmd, expected_output="(Pdb)")
+        if "The program finished and will be restarted" in initial_output:
+            self.close_pseudo_terminal()
+        else:
+            if self.persistent_breakpoints:
+                # restore consistent breakpoints
+                for _, _command in self.environment.current_breakpoints_state.items():
+                    self.interact_with_pdb(_command)
+                if len(self.environment.current_breakpoints_state) > 0:
+                    initial_output = "\n".join(
+                        [initial_output, "Breakpoints have been restored."]
+                    )
+        self.pdb_obs = initial_output
+        return initial_output
+
+    def restart_pdb(self) -> str:
+        """Restart the pdb session and restore the breakpoints."""
+        self.close_pdb()
+        return self.start_pdb()
+
     def is_triggered(self, action):
         # e.g. ```pdb b src/main.py:42```
         return action.startswith(self.action)
 
     def use(self, action):
         command = action.strip("`").split(" ", 1)[1].strip()
-        if not self.has_pseudo_terminal():
-            self.start_pseudo_terminal()
-
         _warning = ""
         splits = re.split("\n|;", command)
         if len(splits) > 1:
@@ -90,7 +125,7 @@ class PDBTool(EnvironmentTool):
         elif command in ["cl", "clear"]:
             # clear all breakpoints
             self.environment.current_breakpoints_state = {}
-            self.start_pseudo_terminal()
+            self.restart_pdb()
             success, output = True, "All breakpoints have been cleared."
         elif (
             command.split()[0] in ["b", "break", "cl", "clear"]
@@ -112,7 +147,8 @@ class PDBTool(EnvironmentTool):
         else:
             # other pdb commands, send directly
             try:
-                output = self.interact_with_pseudo_terminal(command)
+                output = self.interact_with_pdb(command)
+                self.pdb_obs = output
             except:  # TODO: catch specific exceptions
                 success = False
 
@@ -139,7 +175,8 @@ class PDBTool(EnvironmentTool):
             # Add the current frame information to the observation.
             if self.auto_list and command.split()[0] not in ["l", "list"]:
                 if '"""The pytest entry point."""' not in obs:
-                    obs += f" list .\n" + self.interact_with_pseudo_terminal("l .")
+                    # TODO: add output to self.pdb_obs?
+                    obs += f" list .\n" + self.interact_with_pdb("l .")
         else:
             obs = "\n".join([f"Invalid action: {action}", _warning, output])
 
@@ -209,7 +246,8 @@ class PDBTool(EnvironmentTool):
                 )
             else:
                 try:
-                    output = self.interact_with_pseudo_terminal(command)
+                    output = self.interact_with_pdb(command)
+                    self.pdb_obs = output
                     # when success, the output always repeats the command, we can remove it
                     output = output.strip()
                     if output.startswith(command):
@@ -227,7 +265,8 @@ class PDBTool(EnvironmentTool):
                 )
             else:
                 try:
-                    output = self.interact_with_pseudo_terminal(command)
+                    output = self.interact_with_pdb(command)
+                    self.pdb_obs = output
                     # when success, the output always repeats the command, we can remove it
                     output = output.strip()
                     if output.startswith(command):
@@ -290,128 +329,10 @@ class PDBTool(EnvironmentTool):
                     pass
         self.environment.current_breakpoints_state = current_breakpoints_state_copy
 
-    def set_fd_nonblocking(self):
-        flags = fcntl.fcntl(self.master, fcntl.F_GETFL)
-        fcntl.fcntl(self.master, fcntl.F_SETFL, flags | os.O_NONBLOCK)
-
-    def has_pseudo_terminal(self):
-        return self.master is not None
-
-    def start_pseudo_terminal(self):
-        if self.has_pseudo_terminal():
-            self.close_pseudo_terminal()
-
-        self.master, slave = pty.openpty()
-        self.set_fd_nonblocking()
-        debug_entrypoint = "python -m pdb".split() + self.environment.entrypoint[1:]
-        _env = os.environ.copy()
-        _env["NO_COLOR"] = "1"
-        process = subprocess.Popen(
-            debug_entrypoint,
-            env=_env,
-            cwd=self.environment.working_dir,
-            stdin=slave,
-            stdout=slave,
-            stderr=slave,
-            text=True,
-            close_fds=True,
-        )
-
-        # close slave, end in the parent process
-        os.close(slave)
-
-        # initial output from pdb
-        initial_output = self.read_pseudo_terminal_output()
-        if "The program finished and will be restarted" in initial_output:
-            self.close_pseudo_terminal()
-        else:
-            if self.persistent_breakpoints:
-                # restore consistent breakpoints
-                for _, _command in self.environment.current_breakpoints_state.items():
-                    self.interact_with_pseudo_terminal(_command)
-                if len(self.environment.current_breakpoints_state) > 0:
-                    initial_output = "\n".join(
-                        ["Breakpoints have been restored.", initial_output]
-                    )
-
-        if self.auto_list:
-            if '"""The pytest entry point."""' not in initial_output:
-                initial_output += "list .\n" + self.interact_with_pseudo_terminal("l .")
-
-        self.pdb_obs = initial_output
-        return initial_output
-
-    def close_pseudo_terminal(self):
-        if self.master is not None:
-            os.close(self.master)
-            self.master = None
-
-    def _read_pseudo_terminal_output(self):
-        """Read from the PTY master until "(Pdb)" is found."""
-        output = ""
-        while True:
-            try:
-                data = os.read(self.master, 1024).decode(
-                    "utf-8"
-                )  # [TODO] 1024? We might need more than that.
-                if data:
-                    output += data
-                    if "(Pdb)" in data:
-                        break
-
-            except BlockingIOError:
-                time.sleep(0.01)
-                continue
-
-            except OSError as e:
-                if e.errno == errno.EIO:
-                    # end of file
-                    break
-
-                if e.errno != errno.EAGAIN:
-                    raise
-
-        return output
-
-    def read_pseudo_terminal_output(self):
-        """wrapper of _read_pseudo_terminal_output that catches timeout."""
-        try:
-            with time_limit(self.environment.run_timeout):
-                return self._read_pseudo_terminal_output()
-        except TimeoutException as e:
-            return "Terminal output reading timeout."
-
-    def interact_with_pseudo_terminal(self, command):
-        # send command to pdb:
-        os.write(self.master, command.encode("utf-8") + b"\n")
-        # get output back:
-        output = self.read_pseudo_terminal_output()
-
-        # when success, the output always repeats the command, we can remove it
-        output = output.strip()
-        if output.startswith(command):
-            output = output[len(command) :].strip("\r\n")
-
-        if "The program finished and will be restarted" in output or command in [
-            "exit",
-            "quit",
-            "q",
-        ]:
-            self.close_pseudo_terminal()
-            restart_pseudo_terminal_output = self.start_pseudo_terminal()
-            output = "\n".join([output, restart_pseudo_terminal_output])
-
-        self.pdb_obs = output
-        return output
-
     def get_current_frame_file(self):
         """A free 'where' to obtain the current frame (line number), hidden from the agent."""
-        if not self.has_pseudo_terminal():
-            self.start_pseudo_terminal()
         command = "where"
-        os.write(self.master, command.encode("utf-8") + b"\n")
-        # get output back:
-        output = self.read_pseudo_terminal_output()
+        output = self.interact_with_pdb(command)
 
         # parse the output to get the current frame
         # example output:

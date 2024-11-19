@@ -15,5 +15,5 @@ class EnvironmentTool:
     def is_triggered(self, text):
         raise NotImplementedError("is_triggered method must be implemented.")
 
-    def use(self, action, environment):
+    def use(self, action):
         raise NotImplementedError("use method must be implemented.")

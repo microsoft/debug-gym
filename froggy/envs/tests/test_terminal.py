@@ -13,7 +13,7 @@ if_docker_running = pytest.mark.skipif(
 def test_terminal_init():
     terminal = Terminal()
     assert terminal.setup_commands == []
-    assert terminal.env_vars == {"NO_COLOR": "1", 'PS1': ''}
+    assert terminal.env_vars == {"NO_COLOR": "1", "PS1": ""}
     assert terminal.working_dir == "/tmp/Froggy"
 
 
@@ -46,9 +46,7 @@ def test_terminal_run_failure(tmp_path):
     entrypoint = ["ls", "non_existent_dir"]
     success, output = terminal.run(entrypoint, working_dir)
     assert success is False
-    assert output == (
-        "ls: cannot access 'non_existent_dir': No such file or directory"
-    )
+    assert output == ("ls: cannot access 'non_existent_dir': No such file or directory")
 
 
 def test_terminal_pseudo_terminal(tmp_path):
@@ -83,7 +81,7 @@ def test_terminal_pseudo_terminal(tmp_path):
 def test_docker_terminal_init():
     terminal = DockerTerminal()
     assert terminal.setup_commands == []
-    assert terminal.env_vars == {"NO_COLOR": "1", 'PS1': ''}
+    assert terminal.env_vars == {"NO_COLOR": "1", "PS1": ""}
     assert terminal.working_dir == "/"
     assert terminal.base_image == "ubuntu:latest"
     assert terminal.volumes == {}
@@ -107,7 +105,7 @@ def test_terminal_init_with_params(tmp_path):
     )
     assert terminal.working_dir == working_dir
     assert terminal.setup_commands == setup_commands
-    assert terminal.env_vars == env_vars | {"NO_COLOR": "1", 'PS1': ''}
+    assert terminal.env_vars == env_vars | {"NO_COLOR": "1", "PS1": ""}
     assert terminal.base_image == base_image
     assert terminal.volumes == volumes
     assert terminal.container.status == "created"
@@ -183,4 +181,3 @@ def test_docker_terminal_pseudo_terminal(tmp_path):
 
     terminal.close_pseudo_terminal()
     assert terminal.has_pseudo_terminal() is False
-

@@ -9,6 +9,7 @@ import string
 import subprocess
 import termios
 import time
+import sys
 
 import docker
 
@@ -31,11 +32,15 @@ class Terminal:
         # Clean up output by disabling terminal prompt and colors
         self.env_vars["NO_COLOR"] = "1"  # disable colors
         self.env_vars["PS1"] = ""  # disable prompt
-        # self.setup_commands.insert(0, 'export PS1=""')  # prompt
         self.working_dir = working_dir
         self._master = None  # PTY master file descriptor
 
-    def run(self, entrypoint, working_dir=None):
+    @property
+    def path_env(self):
+        # TODO: find a better way to set PATH
+        return {"PATH": f"{os.path.dirname(sys.executable)}:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"}
+
+    def run(self, entrypoint, working_dir=None, timeout=None):
         """Run a command in the terminal. Return command status and output."""
 
         command = [entrypoint] if isinstance(entrypoint, str) else entrypoint
@@ -46,15 +51,20 @@ class Terminal:
         logger.debug(f"Running command in terminal: {command}")
         process = subprocess.Popen(
             command,
-            env=self.env_vars,
+            env=self.env_vars | self.path_env,
             cwd=working_dir or self.working_dir,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
         )
-        stdout, stderr = process.communicate()
-        output = (stdout + stderr).strip("\r\n").strip("\n")
-        success = process.returncode == 0
+        try:
+            stdout, stderr = process.communicate(timeout=timeout)
+            output = (stdout + stderr).strip("\r\n").strip("\n")
+            success = process.returncode == 0
+        except subprocess.TimeoutExpired:
+            process.kill()
+            stdout, stderr = "", "Timeout expired."
+            success = False
         logger.debug(
             f"Output from terminal with status {process.returncode}: {output}"
         )
@@ -73,7 +83,9 @@ class Terminal:
 
     @property
     def default_entrypoint(self) -> list[str]:
-        # bash to not read any profile or initialization files
+        """Starts a new bash session exporting the current python executable as 'python'.
+        Flags --noprofile and --norc are used to avoid loading any bash profile or rc file,
+        which could interfere with the terminal setup (clean outputs)"""
         return ["/bin/bash", "--noprofile", "--norc"]
 
     def clone(self) -> "Terminal":
@@ -92,11 +104,6 @@ class Terminal:
 
         logger.debug(f"Starting PTY with entrypoint: {self.default_entrypoint}")
 
-        def _preexec():
-            # create a new session and set the controlling terminal
-            os.setsid()
-            fcntl.ioctl(0, termios.TIOCSCTTY, 0)
-
         self._master, slave = pty.openpty()
 
         # set_fd_nonblocking
@@ -110,14 +117,14 @@ class Terminal:
 
         process = subprocess.Popen(
             self.default_entrypoint,
-            env=self.env_vars,
+            env=self.env_vars | self.path_env,
             cwd=self.working_dir,
             stdin=slave,
             stdout=slave,
             stderr=slave,
             text=True,
             close_fds=True,
-            preexec_fn=_preexec,
+            start_new_session=True,
         )
 
         # close slave, end in the parent process
@@ -228,9 +235,14 @@ class DockerTerminal(Terminal):
 
     @property
     def default_entrypoint(self) -> list[str]:
+        """Expects the container to have bash installed and python executable available."""
         return f"docker exec -i {self.container.name} /bin/bash --noprofile --norc".split()
 
-    def run(self, entrypoint, working_dir=None):
+    @property
+    def path_env(self):
+        return {}
+
+    def run(self, entrypoint, working_dir=None, timeout=None):
         """Run a command in the terminal. Return command status and output."""
 
         command = [entrypoint] if isinstance(entrypoint, str) else entrypoint
@@ -240,6 +252,7 @@ class DockerTerminal(Terminal):
 
         command = " ".join(command)
 
+        # TODO: docker exec_run timeout?
         command = f'/bin/bash -c "{command}"'
         status, output = self.container.exec_run(
             command,

@@ -12,6 +12,7 @@ from typing import Optional
 import numpy as np
 from termcolor import colored
 
+from froggy.envs.terminal import Terminal
 from froggy.tools.patchers import CodePatcher
 from froggy.tools.pdb import PDBTool
 from froggy.utils import _walk, make_is_readonly, show_line_number
@@ -66,6 +67,7 @@ class RepoEnv(TooledEnv):
         run_timeout: Optional[int] = None,
         dir_tree_depth: Optional[int] = None,
         auto_view_change: bool = True,
+        terminal: Optional[Terminal] = None,
     ):
         """ """
         super().__init__()
@@ -76,6 +78,7 @@ class RepoEnv(TooledEnv):
         self.dir_tree_depth = dir_tree_depth
         self.auto_view_change = auto_view_change
         self.setup_workspace(path, entrypoint, readonly_patterns)
+        self.terminal = terminal or Terminal()
 
     def setup_workspace(
         self,
@@ -170,7 +173,7 @@ class RepoEnv(TooledEnv):
 
         self.obs = ""
         if self.has_tool("pdb"):
-            self.get_tool("pdb").start_pseudo_terminal()
+            self.get_tool("pdb").start_pdb(terminal=self.terminal.clone())
             self.dbg_obs = self.get_tool("pdb").pdb_obs
             self.obs += "Debugging terminal started:\n" f"{self.dbg_obs}\n"
 
@@ -197,23 +200,10 @@ class RepoEnv(TooledEnv):
         return self.obs, self.infos
 
     def run(self):
-        process = subprocess.Popen(
-            self.entrypoint,
-            env=dict(os.environ, NO_COLOR="1"),
-            cwd=self.working_dir,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
+        success, output = self.terminal.run(
+            self.entrypoint, self.working_dir, timeout=self.run_timeout
         )
-        try:
-            stdout, stderr = process.communicate(timeout=self.run_timeout)
-            success = process.returncode == 0
-        except subprocess.TimeoutExpired:
-            process.kill()
-            stdout, stderr = "", "Timeout expired."
-            success = False
-
-        self.last_run_obs = stdout + stderr
+        self.last_run_obs = output
         self.score = int(success)
         self.done = success
 
@@ -316,9 +306,8 @@ class RepoEnv(TooledEnv):
                         self.obs += "\nNew code has been run."
                         self.run()
                     if self.has_tool("pdb"):
-                        # Restart the pseudo terminal to take into account recent changes.
-                        self.get_tool("pdb").close_pseudo_terminal()
-                        self.get_tool("pdb").start_pseudo_terminal()
+                        # Restart pdb to take into account recent changes.
+                        self.get_tool("pdb").restart_pdb()
                         self.dbg_obs = self.get_tool("pdb").pdb_obs
                         self.obs += (
                             "\nDebugging terminal started:\n" f"{self.dbg_obs}\n"
