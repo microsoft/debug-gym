@@ -7,6 +7,7 @@ import pty
 import random
 import string
 import subprocess
+import termios
 import time
 
 import docker
@@ -25,9 +26,12 @@ class Terminal:
         if working_dir is None:
             working_dir = "/tmp/Froggy"
             os.makedirs(working_dir, exist_ok=True)
-        self._setup_commands = setup_commands if setup_commands else []
+        self.setup_commands = setup_commands if setup_commands else []
         self.env_vars = env_vars if env_vars else {}
-        self.env_vars["NO_COLOR"] = "1"  # Disable color output
+        # Clean up output by disabling terminal prompt and colors
+        self.env_vars["NO_COLOR"] = "1"  # disable colors
+        self.env_vars["PS1"] = ""  # disable prompt
+        # self.setup_commands.insert(0, 'export PS1=""')  # prompt
         self.working_dir = working_dir
         self._master = None  # PTY master file descriptor
 
@@ -39,7 +43,7 @@ class Terminal:
         if self.setup_commands:
             command = self.setup_commands + ["&&"] + entrypoint
 
-        logger.debug(f"Running command in terminal: {command}\n")
+        logger.debug(f"Running command in terminal: {command}")
         process = subprocess.Popen(
             command,
             env=self.env_vars,
@@ -49,10 +53,10 @@ class Terminal:
             text=True,
         )
         stdout, stderr = process.communicate()
-        output = stdout + stderr
+        output = (stdout + stderr).strip("\r\n").strip("\n")
         success = process.returncode == 0
         logger.debug(
-            f"Output from terminal with status {process.returncode}: {output}\n"
+            f"Output from terminal with status {process.returncode}: {output}"
         )
         return success, output
 
@@ -69,11 +73,8 @@ class Terminal:
 
     @property
     def default_entrypoint(self) -> list[str]:
-        return ["/bin/bash"]
-
-    @property
-    def setup_commands(self):
-        return self._setup_commands
+        # bash to not read any profile or initialization files
+        return ["/bin/bash", "--noprofile", "--norc"]
 
     def clone(self) -> "Terminal":
         return self.__class__(
@@ -82,10 +83,6 @@ class Terminal:
             env_vars=self.env_vars,
         )
 
-    def _set_fd_nonblocking(self):
-        flags = fcntl.fcntl(self._master, fcntl.F_GETFL)
-        fcntl.fcntl(self._master, fcntl.F_SETFL, flags | os.O_NONBLOCK)
-
     def has_pseudo_terminal(self):
         return self._master is not None
 
@@ -93,12 +90,23 @@ class Terminal:
         if self.has_pseudo_terminal():
             self.close_pseudo_terminal()
 
-        logger.debug(f"Starting PTY with entrypoint: {self.default_entrypoint}\n")
-        # _env = os.environ.copy()  # TODO: use self.env_vars
-        # _env["NO_COLOR"] = "1"
+        logger.debug(f"Starting PTY with entrypoint: {self.default_entrypoint}")
+
+        def _preexec():
+            # create a new session and set the controlling terminal
+            os.setsid()
+            fcntl.ioctl(0, termios.TIOCSCTTY, 0)
 
         self._master, slave = pty.openpty()
-        self._set_fd_nonblocking()
+
+        # set_fd_nonblocking
+        flags = fcntl.fcntl(self._master, fcntl.F_GETFL)
+        fcntl.fcntl(self._master, fcntl.F_SETFL, flags | os.O_NONBLOCK)
+
+        # Turn off ECHO on the slave side
+        attrs = termios.tcgetattr(slave)
+        attrs[3] = attrs[3] & ~termios.ECHO  # lflags
+        termios.tcsetattr(slave, termios.TCSANOW, attrs)
 
         process = subprocess.Popen(
             self.default_entrypoint,
@@ -109,6 +117,7 @@ class Terminal:
             stderr=slave,
             text=True,
             close_fds=True,
+            preexec_fn=_preexec,
         )
 
         # close slave, end in the parent process
@@ -120,7 +129,7 @@ class Terminal:
         if commands:
             initial_output = self.interact_with_pseudo_terminal(commands, timeout=timeout)
 
-        logger.debug(f"Initial output from interactive terminal: {initial_output}\n")
+        logger.debug(f"Initial output from interactive terminal: {initial_output}")
 
         return initial_output
 
@@ -173,19 +182,16 @@ class Terminal:
         if not isinstance(command, str):
             command = " ".join(command)
 
-        logger.debug(f"Sending command to interactive terminal: {command}\n")
+        logger.debug(f"Sending command to interactive terminal: {command}")
         os.write(self._master, command.encode("utf-8") + b"\n")
         # get output back:
         output = self.read_pseudo_terminal_output(
             expected_output=expected_output, timeout=timeout
         )
 
-        # when success, the output always repeats the command, we can remove it
-        output = output.strip()
-        if output.startswith(command):
-            output = output[len(command) :].strip("\r\n")
+        output = output.strip().strip("\r\n").strip("\n")
 
-        logger.debug(f"Output from interactive terminal: {output}\n")
+        logger.debug(f"Output from interactive terminal: {output}")
         return output
 
 
@@ -222,7 +228,7 @@ class DockerTerminal(Terminal):
 
     @property
     def default_entrypoint(self) -> list[str]:
-        return f"docker exec -i {self.container.name} /bin/bash".split()
+        return f"docker exec -i {self.container.name} /bin/bash --noprofile --norc".split()
 
     def run(self, entrypoint, working_dir=None):
         """Run a command in the terminal. Return command status and output."""
@@ -243,7 +249,7 @@ class DockerTerminal(Terminal):
             stderr=True,
         )
         success = status == 0
-        return success, output.decode()
+        return success, output.decode().strip("\r\n").strip("\n")
 
     def clone(self) -> Terminal:
         terminal = self.__class__(
