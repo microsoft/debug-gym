@@ -12,7 +12,7 @@ from typing import Optional
 import numpy as np
 from termcolor import colored
 
-from froggy.envs.terminal import Terminal
+from froggy.terminal import Terminal
 from froggy.tools.patchers import CodePatcher
 from froggy.tools.pdb import PDBTool
 from froggy.utils import _walk, make_is_readonly, show_line_number

@@ -3,7 +3,7 @@ from os.path import join as pjoin
 
 from termcolor import colored
 
-from froggy.tools import Toolbox
+from froggy.tools.toolbox import Toolbox
 from froggy.utils import load_config
 
 
@@ -35,7 +35,7 @@ def main():
                 raise ValueError(f"Unknown benchmark {config['benchmark']}")
     else:
         # custom repo
-        from froggy.envs import RepoEnv
+        from froggy.envs.env import RepoEnv
 
         env = RepoEnv(**config["env_kwargs"])
 

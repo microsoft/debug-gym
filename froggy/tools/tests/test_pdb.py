@@ -1,7 +1,7 @@
 import pytest
 
 from froggy.envs.env import RepoEnv
-from froggy.envs.terminal import DockerTerminal, Terminal
+from froggy.terminal import DockerTerminal, Terminal
 from froggy.tools.pdb import PDBTool
 
 

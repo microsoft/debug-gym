@@ -47,7 +47,7 @@ You break down complex problems into smaller parts and reason through them step 
         self.allow_chain_action = allow_chain_action
 
     def register(self, environment):
-        from froggy.envs import RepoEnv
+        from froggy.envs.env import RepoEnv
 
         if not isinstance(environment, RepoEnv):
             raise ValueError("The environment must be a RepoEnv instance.")

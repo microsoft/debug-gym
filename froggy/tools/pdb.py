@@ -1,8 +1,8 @@
 import copy
 import re
 
-from froggy.envs.terminal import Terminal
-from froggy.tools import EnvironmentTool
+from froggy.terminal import Terminal
+from froggy.tools.tool import EnvironmentTool
 from froggy.tools.toolbox import Toolbox
 
 
@@ -57,7 +57,7 @@ class PDBTool(EnvironmentTool):
         self._terminal: Terminal = None
 
     def register(self, environment):
-        from froggy.envs import RepoEnv
+        from froggy.envs.env import RepoEnv
 
         if not isinstance(environment, RepoEnv):
             raise ValueError("The environment must be a RepoEnv instance.")

@@ -59,12 +59,12 @@ class Terminal:
         )
         try:
             stdout, stderr = process.communicate(timeout=timeout)
-            output = (stdout + stderr).strip("\r\n").strip("\n")
             success = process.returncode == 0
         except subprocess.TimeoutExpired:
             process.kill()
             stdout, stderr = "", "Timeout expired."
             success = False
+        output = (stdout + stderr).strip("\r\n").strip("\n")
         logger.debug(
             f"Output from terminal with status {process.returncode}: {output}"
         )
