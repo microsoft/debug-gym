@@ -24,6 +24,7 @@ zero_shot:
     use_conversational_prompt: True
     save_patch: True
     log_prompt_response_pairs: True
+    reset_prompt_history_after_rewrite: True
 
 cot:
     # Environment configs
@@ -51,6 +52,7 @@ cot:
     use_conversational_prompt: True
     save_patch: True
     log_prompt_response_pairs: True
+    reset_prompt_history_after_rewrite: True
 
 tadpole:
     # Environment configs
@@ -78,6 +80,7 @@ tadpole:
     use_conversational_prompt: True
     save_patch: True
     log_prompt_response_pairs: True
+    reset_prompt_history_after_rewrite: True
 
 zero_shot_nopdb:
     # Environment configs
@@ -105,6 +108,7 @@ zero_shot_nopdb:
     use_conversational_prompt: True
     save_patch: True
     log_prompt_response_pairs: True
+    reset_prompt_history_after_rewrite: True
 
 cot_nopdb:
     # Environment configs
@@ -132,3 +136,4 @@ cot_nopdb:
     use_conversational_prompt: True
     save_patch: True
     log_prompt_response_pairs: True
+    reset_prompt_history_after_rewrite: True
