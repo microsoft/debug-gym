@@ -63,6 +63,18 @@ class TestRepoEnv(unittest.TestCase):
         mock_tempdir.assert_not_called()
         mock_copytree.assert_not_called()
         mock_atexit_register.assert_not_called()
+    
+    @patch('tempfile.TemporaryDirectory')
+    def test_cleanup_workspace(self, mock_tempdir):
+        mock_tempdir_instance = MagicMock()
+        mock_tempdir.return_value = mock_tempdir_instance
+
+        env = RepoEnv()
+        env.tempdir = mock_tempdir_instance
+
+        env.cleanup_workspace()
+
+        mock_tempdir_instance.cleanup.assert_called_once()
 
 if __name__ == '__main__':
     unittest.main()
