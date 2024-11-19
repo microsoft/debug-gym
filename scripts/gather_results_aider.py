@@ -26,19 +26,23 @@ def main():
     }
 
     for agent_name in agent_uuids:
-        log_path = pjoin("output", agent_uuids[agent_name])
+        log_path = pjoin("output_aider", agent_uuids[agent_name])
         _results = {}
         for problem_name in problem_list:
             log_file = pjoin(log_path, problem_name, "froggy.jsonl")
             if not os.path.exists(log_file):
                 continue
-            with open(log_file, "r") as f:
-                _log = json.load(f)
-            assert "success" in _log
-            _results[problem_name] = 1.0 if _log["success"] else 0.0
+            try:
+                with open(log_file, "r") as f:
+                    _log = json.load(f)
+                assert "success" in _log
+                _results[problem_name] = 1.0 if _log["success"] else 0.0
+            except:
+                _results[problem_name] = 0.0
+                print(colored(f"Error reading {log_file}", "red"))
 
         # print result statistics
-        success_rate = sum(_results.values()) / len(_results)
+        success_rate = sum(_results.values()) / len(_results) if len(_results) > 0 else 0.0
         print(
             colored(
                 f"{agent_name}: {success_rate:.2f} ({sum(_results.values())} out of {len(_results)})",

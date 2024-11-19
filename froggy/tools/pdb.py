@@ -1,11 +1,12 @@
 import copy
 import re
-import sys
 
 from froggy.envs.terminal import Terminal
 from froggy.tools import EnvironmentTool
+from froggy.tools.toolbox import Toolbox
 
 
+@Toolbox.register()
 class PDBTool(EnvironmentTool):
     name: str = "pdb"
     action: str = "```pdb"
@@ -279,7 +280,9 @@ class PDBTool(EnvironmentTool):
 
         return success, output
 
-    def breakpoint_modify(self, rewrite_file, rewrite_head, rewrite_tail, new_code_length):
+    def breakpoint_modify(
+        self, rewrite_file, rewrite_head, rewrite_tail, new_code_length
+    ):
         # handle breakpoints line number changes caused by rewriting
         # this is a wrapper that manages the self.breakpoints_state, which does not reset at each pseudo terminal start
         # self.breakpoints_state is a dict, the keys are "|||".join([file_path, str(line_number)]) and values are breakpoint_command

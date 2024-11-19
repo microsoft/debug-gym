@@ -1,12 +1,13 @@
 zero_shot:
     # Environment configs
-    output_path: "output"
+    output_path: "output_aider"
     benchmark: "aider"
     problems: "all"  # list of problems, e.g., ["wordy"], or "all"
     env_kwargs: {
         "dir_tree_depth": 1,
         "run_on_rewrite": True,
         "auto_view_change": True,
+        "run_timeout": 10,
     }
     tools: ["pdb", "view", "patcher:substitution"]
     persistent_breakpoints: True  # in pdb tool
@@ -26,13 +27,14 @@ zero_shot:
 
 cot:
     # Environment configs
-    output_path: "output"
+    output_path: "output_aider"
     benchmark: "aider"
     problems: "all"  # list of problems, or "all"
     env_kwargs: {
         "dir_tree_depth": 1,
         "run_on_rewrite": True,
         "auto_view_change": True,
+        "run_timeout": 10,
     }
     tools: ["pdb", "view", "patcher:substitution"]
     persistent_breakpoints: True  # in pdb tool
@@ -52,13 +54,14 @@ cot:
 
 tadpole:
     # Environment configs
-    output_path: "output"
+    output_path: "output_aider"
     benchmark: "aider"
     problems: "all"  # list of problems, or "all"
     env_kwargs: {
         "dir_tree_depth": 1,
         "run_on_rewrite": True,
         "auto_view_change": True,
+        "run_timeout": 10,
     }
     tools: ["pdb", "view", "patcher:substitution"]
     persistent_breakpoints: True  # in pdb tool
@@ -78,13 +81,14 @@ tadpole:
 
 zero_shot_nopdb:
     # Environment configs
-    output_path: "output"
+    output_path: "output_aider"
     benchmark: "aider"
     problems: "all"  # list of problems, e.g., ["wordy"], or "all"
     env_kwargs: {
         "dir_tree_depth": 1,
         "run_on_rewrite": True,
         "auto_view_change": True,
+        "run_timeout": 10,
     }
     tools: ["view", "patcher:substitution"]
     persistent_breakpoints: True  # in pdb tool
@@ -104,13 +108,14 @@ zero_shot_nopdb:
 
 cot_nopdb:
     # Environment configs
-    output_path: "output"
+    output_path: "output_aider"
     benchmark: "aider"
     problems: "all"  # list of problems, or "all"
     env_kwargs: {
         "dir_tree_depth": 1,
         "run_on_rewrite": True,
         "auto_view_change": True,
+        "run_timeout": 10,
     }
     tools: ["view", "patcher:substitution"]
     persistent_breakpoints: True  # in pdb tool
