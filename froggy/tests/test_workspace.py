@@ -3,8 +3,85 @@ import subprocess
 import unittest
 from unittest.mock import patch, MagicMock
 from pathlib import Path, PosixPath
-from froggy.envs import RepoEnv
+from froggy.envs import RepoEnv, TooledEnv
 from froggy.utils import load_config
+
+class TestTooledEnv(unittest.TestCase):
+    def setUp(self):
+        self.env = TooledEnv()
+
+    def test_add_tool(self):
+        tool = MagicMock()
+        tool.name = "tool1"
+        self.env.add_tool(tool)
+        self.assertIn("tool1", self.env.tools)
+        self.assertEqual(self.env.tools["tool1"], tool)
+
+    def test_add_tool_existing(self):
+        tool = MagicMock()
+        tool.name = "tool1"
+        self.env.add_tool(tool)
+        with self.assertRaises(ValueError):
+            self.env.add_tool(tool)
+
+    def test_has_tool(self):
+        tool = MagicMock()
+        tool.name = "tool1"
+        self.env.add_tool(tool)
+        self.assertTrue(self.env.has_tool("tool1"))
+        self.assertFalse(self.env.has_tool("tool2"))
+
+    def test_get_tool(self):
+        tool = MagicMock()
+        tool.name = "tool1"
+        self.env.add_tool(tool)
+        self.assertEqual(self.env.get_tool("tool1"), tool)
+
+    def test_get_triggered_tools(self):
+        tool1 = MagicMock()
+        tool1.name = "tool1"
+        tool1.is_triggered.return_value = True
+        tool2 = MagicMock()
+        tool2.name = "tool2"
+        tool2.is_triggered.return_value = False
+        self.env.add_tool(tool1)
+        self.env.add_tool(tool2)
+        triggered_tools = self.env.get_triggered_tools("action")
+        self.assertIn(tool1, triggered_tools)
+        self.assertNotIn(tool2, triggered_tools)
+
+    def test_actions(self):
+        tool1 = MagicMock()
+        tool1.name = "tool1"
+        tool1.action = "action1"
+        tool2 = MagicMock()
+        tool2.name = "tool2"
+        tool2.action = "action2"
+        self.env.add_tool(tool1)
+        self.env.add_tool(tool2)
+        self.assertEqual(self.env.actions, ["action1", "action2"])
+
+    def test_actions_str(self):
+        tool1 = MagicMock()
+        tool1.name = "tool1"
+        tool1.action = "action1"
+        tool2 = MagicMock()
+        tool2.name = "tool2"
+        tool2.action = "action2"
+        self.env.add_tool(tool1)
+        self.env.add_tool(tool2)
+        self.assertEqual(self.env.actions_str, "action1, action2")
+
+    def test_tool_instructions(self):
+        tool1 = MagicMock()
+        tool1.name = "tool1"
+        tool1.instructions = "instructions1"
+        tool2 = MagicMock()
+        tool2.name = "tool2"
+        tool2.instructions = "instructions2"
+        self.env.add_tool(tool1)
+        self.env.add_tool(tool2)
+        self.assertEqual(self.env.tool_instructions, {"tool1": "instructions1", "tool2": "instructions2"})
 
 class TestRepoEnv(unittest.TestCase):
     @patch('sys.argv', ['run.py', 'scripts/config.yaml', '--agent', 'cot', '--debug', '-v'])
