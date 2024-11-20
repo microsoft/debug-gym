@@ -136,6 +136,36 @@ class TestRepoEnv(unittest.TestCase):
         self.assertEqual(output, "outputerror")
         self.assertTrue(done)
         self.assertEqual(env.score, 1)
+  
+    @patch('froggy.utils.show_line_number')
+    def test_current_code_with_line_number(self, mock_show_line_number):
+        # Mock the return value of show_line_number
+        mock_show_line_number.return_value = "1    def foo():\n2        return 42"
+
+        # Create an instance of RepoEnv
+        env = RepoEnv(path='.')
+
+        # Set the current file and its content
+        env.current_file = 'file.py'
+        env.current_file_content = 'def foo():\n    return 42'
+
+        # Call the current_code_with_line_number method
+        result = env.current_code_with_line_number()
+
+        # Define the expected result
+        expected_result = {
+            "File name": 'file.py',
+            "Content": "\n     1 def foo():\n     2     return 42\n",
+            # "Note": "B indicates breakpoint before a certain line of code, this can be changed using pdb commands such as b, cl, etc."
+        }
+
+        # Assertions
+        self.assertEqual(result, expected_result)
+        # mock_show_line_number.assert_called_once_with(
+        #     env.current_file_content,
+        #     env.current_file,
+        #     env.current_breakpoints_state
+        # )
 
 if __name__ == '__main__':
     unittest.main()
