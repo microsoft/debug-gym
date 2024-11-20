@@ -434,6 +434,64 @@ class TestRepoEnv(unittest.TestCase):
         self.assertEqual(result, expected_result)
         # mock_walk.assert_called_once_with(Path('/path/to/repo').absolute(), None)
 
+    @patch.object(RepoEnv, 'restore')
+    @patch.object(RepoEnv, 'run')
+    @patch.object(RepoEnv, 'has_tool', return_value=False)
+    @patch.object(RepoEnv, 'get_tool')
+    @patch('os.scandir')
+    @patch('os.walk')
+    @patch('shutil.copytree')
+    @patch('tempfile.TemporaryDirectory')
+    def test_reset(self, mock_tempdir, mock_copytree, mock_os_walk, mock_scandir, mock_get_tool, mock_has_tool, mock_run, mock_restore):
+        # Mock the PDBTool
+        mock_pdb_tool = MagicMock()
+        mock_pdb_tool.start_pseudo_terminal.return_value = None
+        mock_pdb_tool.pdb_obs = "PDB started"
+        mock_get_tool.return_value = mock_pdb_tool
+
+        mock_tempdir.return_value.name = '/mock/tempdir'
+        
+        mock_scandir.return_value.__enter__.return_value = [
+            MagicMock(is_dir=lambda: False, path='/path/to/repo/file1.txt'),
+            MagicMock(is_dir=lambda: False, path='/path/to/repo/file2.txt')
+        ]
+
+        # Mock the return value of os.walk
+        mock_os_walk.return_value = [
+            ('/path/to/repo', ('subdir',), ('file1.py', 'file2.py')),
+            ('/path/to/repo/subdir', (), ('subfile1.txt',)),
+        ]
+
+        # Create an instance of RepoEnv
+        env = RepoEnv(path='/path/to/repo')
+
+        # Call the reset method
+        obs, infos = env.reset(seed=42)
+
+        # Assertions
+        mock_restore.assert_called_once()
+        mock_run.assert_called_once()
+        # mock_pdb_tool.start_pseudo_terminal.assert_called_once()
+        self.assertEqual(env.current_file, None)
+        self.assertEqual(env.current_file_content, None)
+        self.assertEqual(env.current_breakpoints_state, {})
+        self.assertEqual(env.rewrite_counter, 0)
+        # self.assertEqual(env.obs, "Debugging terminal started:\nPDB started\n")
+        self.assertIn("obs", infos)
+        self.assertIn("dbg_obs", infos)
+        self.assertIn("last_run_obs", infos)
+        self.assertIn("dir_tree", infos)
+        self.assertIn("editable_files", infos)
+        self.assertIn("current_breakpoints", infos)
+        self.assertIn("current_code_with_line_number", infos)
+        self.assertIn("action", infos)
+        self.assertIn("done", infos)
+        self.assertIn("score", infos)
+        self.assertIn("is_rewrite", infos)
+        self.assertIn("max_score", infos)
+        self.assertIn("instructions", infos)
+        self.assertIn("rewrite_counter", infos)
+        
 if __name__ == '__main__':
     unittest.main()
     
