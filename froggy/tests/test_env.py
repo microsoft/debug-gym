@@ -234,6 +234,22 @@ class TestRepoEnv(unittest.TestCase):
         mock_isdir.assert_any_call(Path('/path/to/repo/file2.txt'))
         mock_copy2.assert_any_call(Path('/path/to/repo/file1.txt'), Path(env.working_dir) / 'file1.txt')
         mock_copy2.assert_any_call(Path('/path/to/repo/file2.txt'), Path(env.working_dir) / 'file2.txt')
+   
+    @patch.object(RepoEnv, 'directory_tree')
+    def test_display_files(self, mock_directory_tree):
+        # Mock the return value of directory_tree
+        mock_directory_tree.return_value = "\n|-- file1.py\n|-- file2.py\n"
+
+        env = RepoEnv()
+        # Call the display_files method with editable_only=False
+        result = env.display_files(editable_only=False)
+
+        # Define the expected result
+        expected_result = "\nAll files:\n|-- file1.py\n|-- file2.py\n"
+
+        # Assertions
+        self.assertEqual(result, expected_result)
+        mock_directory_tree.assert_called_once_with(editable_only=False)
 
     @patch('subprocess.Popen')
     def test_run_success(self, mock_popen):
