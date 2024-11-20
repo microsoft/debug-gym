@@ -1,4 +1,5 @@
 import os
+import numpy as np
 import subprocess
 import unittest
 from unittest.mock import patch, MagicMock
@@ -9,6 +10,22 @@ from froggy.utils import load_config
 class TestTooledEnv(unittest.TestCase):
     def setUp(self):
         self.env = TooledEnv()
+
+    def test_seed(self):
+        seed_value = 42
+        self.env.seed(seed_value)
+        
+        # Check if the rng attribute is set to a numpy random state
+        self.assertIsInstance(self.env.rng, np.random.RandomState)
+        
+        # Check if the random state is initialized with the correct seed
+        expected_rng = np.random.RandomState(seed_value)
+
+        state1 = self.env.rng.get_state()
+        state2 = expected_rng.get_state()
+        self.assertEqual(state1[0], state2[0])  # Check the algorithm
+        np.testing.assert_array_equal(state1[1], state2[1])  # Check the state
+        self.assertEqual(state1[2:], state2[2:])  # Check the remaining elements
 
     def test_add_tool(self):
         tool = MagicMock()
