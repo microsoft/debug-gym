@@ -387,6 +387,52 @@ class TestRepoEnv(unittest.TestCase):
         self.assertIn("max_score", infos)
         self.assertIn("instructions", infos)
         self.assertIn("rewrite_counter", infos)
+   
+    @patch('froggy.utils._walk')
+    @patch('pathlib.Path.exists', return_value=True)
+    @patch('pathlib.Path.is_file', return_value=False)
+    @patch('os.scandir')
+    @patch('os.walk')
+    @patch('shutil.copytree')
+    @patch('tempfile.TemporaryDirectory')
+    def test_directory_tree(self, mock_tempdir, mock_copytree, mock_os_walk, mock_scandir, mock_is_file, mock_exists, mock_walk):
+        # Mock the return value of _walk
+        mock_walk.return_value = [
+            '/path/to/repo/file1.py',
+            '/path/to/repo/subdir',
+            '/path/to/repo/subdir/file2.py'
+        ]
+
+        mock_tempdir.return_value.name = '/mock/tempdir'
+        
+        mock_scandir.return_value.__enter__.return_value = [
+            MagicMock(is_dir=lambda: False, path='/path/to/repo/file1.txt'),
+            MagicMock(is_dir=lambda: False, path='/path/to/repo/file2.txt')
+        ]
+
+        # Mock the return value of os.walk
+        mock_os_walk.return_value = [
+            ('/path/to/repo', ('subdir',), ('file1.py', 'file2.py')),
+            ('/path/to/repo/subdir', (), ('subfile1.txt',)),
+        ]
+
+        # Create an instance of RepoEnv
+        env = RepoEnv(path='/path/to/repo')
+
+        # Call the directory_tree method
+        result = env.directory_tree()
+
+        # Define the expected result
+        expected_result = (
+           "\n\n"
+           "/mock/tempdir/\n  "
+           "|-- file1.txt\n  "
+           "|-- file2.txt\n\n"
+        )
+
+        # Assertions
+        self.assertEqual(result, expected_result)
+        # mock_walk.assert_called_once_with(Path('/path/to/repo').absolute(), None)
 
 if __name__ == '__main__':
     unittest.main()
