@@ -5,7 +5,6 @@ pyyaml
 rich
 gitignore_parser
 termcolor
-pytest
 transformers
 tiktoken
 docker

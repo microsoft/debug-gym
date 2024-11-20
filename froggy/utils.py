@@ -29,7 +29,10 @@ def show_line_number(code_string, code_path=None, breakpoints_state=None):
     # line numbers are 1-indexed
     # line numbers and code lines are separated by a tab
 
-    assert isinstance(code_string, str)
+    assert code_string is not None, "code_string should not be None"
+    assert isinstance(
+        code_string, str
+    ), f"code_string should be a string, but got {type(code_string)}"
     code_line = code_string.split("\n")
 
     output = []
@@ -98,18 +101,6 @@ class HistoryTracker:
     def get(self):
         # return the history_steps latest steps
         return self.memory[-self.history_steps :]
-
-    def save(self, path):
-        import json
-
-        infos = []
-        for info in self.memory:
-            keys = [k for k in info.keys() if k != "history"]
-            info_ = {k: info[k] for k in keys}
-            infos.append(info_)
-
-        with open(path, "w") as f:
-            json.dump(infos, f)
 
     def get_all(self):
         return self.memory
@@ -245,7 +236,7 @@ def time_limit(seconds: Optional[int]):
 def cleanup_pytest_output(output):
     # Remove timing, root dir, and platform to avoid randomizing LLM's response.
     res = re.sub(
-        r"^Ran \d+ tests in \d+\.\d+s$",
+        r"^Ran \d+ tests? in \d+\.\d+s$",
         "",
         output,
         flags=re.MULTILINE,
@@ -262,7 +253,12 @@ def cleanup_pytest_output(output):
 
 def extract_max_score_from_pytest_output(output):
     # ... collected 25 items
-    return max(int(re.search(r"collected (\d+) items?", output).group(1)), 1.0)
+    # ... collected 1 item
+    match = re.search(r"collected (\d+) items?", output)
+    if match:
+        return max(int(match.group(1)), 1.0)
+    else:
+        raise ValueError("No test cases found in the pytest output.")
 
 
 def extract_reward_from_pytest_output(output):
