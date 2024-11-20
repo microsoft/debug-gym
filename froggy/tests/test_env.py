@@ -3,7 +3,8 @@ import numpy as np
 import subprocess
 import unittest
 
-from unittest.mock import patch, MagicMock
+from os.path import join as pjoin
+from unittest.mock import patch, MagicMock, mock_open
 from pathlib import Path, PosixPath
 from froggy.envs import RepoEnv, TooledEnv
 
@@ -476,6 +477,81 @@ class TestRepoEnv(unittest.TestCase):
         self.assertIn("max_score", infos)
         self.assertIn("instructions", infos)
         self.assertIn("rewrite_counter", infos)
+
+    @patch('os.scandir')
+    @patch('os.walk')
+    @patch('shutil.copytree')
+    @patch('builtins.open', new_callable=mock_open)
+    def test_overwrite_file(self, mock_open, mock_copytree, mock_os_walk, mock_scandir):
+        # mock_walk.return_value = [
+        #     '/path/to/repo/file1.py',
+        #     '/path/to/repo/subdir',
+        #     '/path/to/repo/subdir/file2.py'
+        # ]
+
+        # mock_tempdir.return_value.name = '/mock/tempdir'
         
+        mock_scandir.return_value.__enter__.return_value = [
+            MagicMock(is_dir=lambda: False, path='/path/to/repo/file1.txt'),
+            MagicMock(is_dir=lambda: False, path='/path/to/repo/file2.txt')
+        ]
+
+        # Mock the return value of os.walk
+        mock_os_walk.return_value = [
+            ('/path/to/repo', ('subdir',), ('file1.py', 'file2.py')),
+            ('/path/to/repo/subdir', (), ('subfile1.txt',)),
+        ]
+        # Create an instance of RepoEnv
+        env = RepoEnv(path='/path/to/repo')
+
+        # Define the file path and content to be written
+        filepath = 'file.py'
+        content = 'print("Hello, World!")'
+
+        # Call the overwrite_file method
+        env.overwrite_file(filepath, content)
+
+        # Assertions
+        mock_open.assert_called_once_with(pjoin(env.working_dir, filepath), 'w')
+        mock_open().write.assert_called_once_with(content)
+
+
+    @patch('os.scandir')
+    @patch('os.walk')
+    @patch('shutil.copytree')
+    @patch('subprocess.run')
+    def test_patch(self, mock_subprocess_run, mock_copytree, mock_os_walk, mock_scandir):
+        # Mock the return value of subprocess.run
+        mock_result = MagicMock()
+        mock_result.stdout = "diff --git a/path/to/repo/file1.py b/path/to/repo/file1.py\n"
+        mock_subprocess_run.return_value = mock_result
+
+        mock_scandir.return_value.__enter__.return_value = [
+            MagicMock(is_dir=lambda: False, path='/path/to/repo/file1.txt'),
+            MagicMock(is_dir=lambda: False, path='/path/to/repo/file2.txt')
+        ]
+
+        # Mock the return value of os.walk
+        mock_os_walk.return_value = [
+            ('/path/to/repo', ('subdir',), ('file1.py', 'file2.py')),
+            ('/path/to/repo/subdir', (), ('subfile1.txt',)),
+        ]
+        # Create an instance of RepoEnv
+        env = RepoEnv(path='/path/to/repo')
+
+        # Call the patch property
+        result = env.patch
+
+        # Define the expected result
+        expected_result = "diff --git a/path/to/repo/file1.py b/path/to/repo/file1.py\n"
+
+        # Assertions
+        mock_subprocess_run.assert_called_once_with(
+            ["git", "diff", "--no-index", env.path, env.working_dir],
+            text=True,
+            capture_output=True
+        )
+        self.assertEqual(result, expected_result)
+
 if __name__ == '__main__':
     unittest.main()
