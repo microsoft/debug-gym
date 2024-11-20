@@ -279,6 +279,34 @@ class TestRepoEnv(unittest.TestCase):
         self.assertTrue(done)
         self.assertEqual(env.score, 1)
   
+    @patch('subprocess.Popen')
+    def test_run_timeout(self, mock_popen):
+        # Mock the Popen instance and its methods
+        mock_process = MagicMock()
+        mock_process.communicate.side_effect = subprocess.TimeoutExpired(cmd="cmd", timeout=10)
+        mock_popen.return_value = mock_process
+
+        # Create an instance of RepoEnv
+        env = RepoEnv(path='.')
+
+        # Call the run method
+        output, done = env.run()
+
+        # Assertions
+        mock_popen.assert_called_once_with(
+            env.entrypoint,
+            env=dict(os.environ, NO_COLOR="1"),
+            cwd=env.working_dir,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        mock_process.communicate.assert_called_once_with(timeout=env.run_timeout)
+        mock_process.kill.assert_called_once()
+        self.assertEqual(output, "Timeout expired.")
+        self.assertFalse(done)
+        self.assertEqual(env.score, 0)
+
     @patch('froggy.utils.show_line_number')
     def test_current_code_with_line_number(self, mock_show_line_number):
         # Mock the return value of show_line_number
