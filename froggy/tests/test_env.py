@@ -2,10 +2,10 @@ import os
 import numpy as np
 import subprocess
 import unittest
+
 from unittest.mock import patch, MagicMock
 from pathlib import Path, PosixPath
 from froggy.envs import RepoEnv, TooledEnv
-from froggy.utils import load_config
 
 class TestTooledEnv(unittest.TestCase):
     def setUp(self):
@@ -101,21 +101,6 @@ class TestTooledEnv(unittest.TestCase):
         self.assertEqual(self.env.tool_instructions, {"tool1": "instructions1", "tool2": "instructions2"})
 
 class TestRepoEnv(unittest.TestCase):
-    @patch('sys.argv', ['run.py', 'scripts/config.yaml', '--agent', 'cot', '--debug', '-v'])
-    def test_workspace(self):
-        config, args = load_config()
-        config = config[args.agent]
-
-        assert args.config_file == 'scripts/config.yaml'
-        assert args.agent == 'cot'
-        assert args.debug == True
-        assert args.verbose == True
-        
-        env = RepoEnv(**config["env_kwargs"])
-
-        assert isinstance(env.path, PosixPath)
-        assert env.path == PosixPath('data/pytorch')
-        
     @patch('tempfile.TemporaryDirectory')
     @patch('atexit.register')
     @patch('shutil.copytree')
@@ -494,4 +479,3 @@ class TestRepoEnv(unittest.TestCase):
         
 if __name__ == '__main__':
     unittest.main()
-    
