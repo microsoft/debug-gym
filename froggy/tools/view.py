@@ -1,10 +1,12 @@
 import os
 from os.path import join as pjoin
 
-from froggy.tools import EnvironmentTool
+from froggy.tools.tool import EnvironmentTool
+from froggy.tools.toolbox import Toolbox
 from froggy.utils import is_subdirectory
 
 
+@Toolbox.register()
 class ViewTool(EnvironmentTool):
     name: str = "view"
     action: str = "```view"

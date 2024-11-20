@@ -3,6 +3,7 @@ from os.path import join as pjoin
 
 from termcolor import colored
 
+from froggy.tools import Toolbox
 from froggy.utils import load_config
 
 
@@ -16,80 +17,61 @@ def main():
     config = config[args.agent]
 
     # create environment
-    if "benchmark" not in config:
+    if "benchmark" in config:
+        match config["benchmark"]:
+            case "aider":
+                from froggy.envs import AiderBenchmarkEnv
+
+                env = AiderBenchmarkEnv(**config["env_kwargs"])
+            case "swebench":
+                from froggy.envs import SWEBenchEnv
+
+                env = SWEBenchEnv(**config["env_kwargs"])
+            case "terminal_simulator":
+                from froggy.envs import TerminalSimulatorEnv
+
+                env = TerminalSimulatorEnv(**config["env_kwargs"])
+            case _:
+                raise ValueError(f"Unknown benchmark {config['benchmark']}")
+    else:
+        # custom repo
         from froggy.envs import RepoEnv
 
         env = RepoEnv(**config["env_kwargs"])
-    elif "aider" == config["benchmark"]:
-        from froggy.envs import AiderBenchmarkEnv
 
-        env = AiderBenchmarkEnv(**config["env_kwargs"])
-    elif "swebench" == config["benchmark"]:
-        from froggy.envs import SWEBenchEnv
-
-        env = SWEBenchEnv(**config["env_kwargs"])
-    elif "terminal_simulator" == config["benchmark"]:
-        from froggy.envs import TerminalSimulatorEnv
-
-        env = TerminalSimulatorEnv(**config["env_kwargs"])
-    else:
-        # TODO: add SWEBench and Pytorch
-        raise ValueError(f"Unknown benchmark {config['benchmark']}")
-
+    # import tools to the environment
     for tool in config["tools"]:
-        if "view" == tool:
-            from froggy.tools.view import ViewTool
-
-            env.add_tool(ViewTool())
-        elif "eval" == tool:
-            from froggy.tools.eval import EvalTool
-
-            env.add_tool(EvalTool())
-        elif "listdir" == tool:
-            from froggy.tools.listdir import ListdirTool
-
-            env.add_tool(ListdirTool())
-        elif "pdb" == tool:
-            from froggy.tools.pdb import PDBTool
-
-            env.add_tool(
-                PDBTool(persistent_breakpoints=config["persistent_breakpoints"])
-            )
-        elif "reasoning" == tool:
-            from froggy.tools.reasoning import ReasoningTool
-
-            env.add_tool(ReasoningTool())
-        elif tool.startswith("patcher"):
-            from froggy.tools.patchers import CodePatcher
-
-            patcher_name = tool.split(":")[1]
-            env.add_tool(CodePatcher.get(patcher_name))
-        else:
-            raise ValueError(f"Unknown tool {tool}")
+        kwargs = {}
+        if tool == "pdb":
+            kwargs["persistent_breakpoints"] = config["persistent_breakpoints"]
+        tool_instantiated = Toolbox.get_tool(tool, **kwargs)
+        print(f"Adding tool to toolbox: {tool_instantiated.__class__.__name__}")
+        env.add_tool(tool_instantiated)
 
     # instantiate agent
-    if "zero_shot" == args.agent:
-        from froggy.agents import AgentZeroShot
+    match args.agent:
+        case "zero_shot":
+            from froggy.agents import AgentZeroShot
 
-        agent = AgentZeroShot(config, env, verbose=args.verbose)
-    elif "cot" == args.agent:
-        from froggy.agents import AgentCoT
+            agent = AgentZeroShot(config, env, verbose=args.verbose)
+        case "cot":
+            from froggy.agents import AgentCoT
 
-        agent = AgentCoT(config, env, verbose=args.verbose)
-    elif "tadpole" == args.agent:
-        from froggy.agents import AgentTadpole
+            agent = AgentCoT(config, env, verbose=args.verbose)
+        case "tadpole":
+            from froggy.agents import AgentTadpole
 
-        agent = AgentTadpole(config, env, verbose=args.verbose)
-    elif "zero_shot_nopdb" == args.agent:
-        from froggy.agents import AgentZeroShot_NoPDB
+            agent = AgentTadpole(config, env, verbose=args.verbose)
+        case "zero_shot_nopdb":
+            from froggy.agents import AgentZeroShot_NoPDB
 
-        agent = AgentZeroShot_NoPDB(config, env, verbose=args.verbose)
-    elif "cot_nopdb" == args.agent:
-        from froggy.agents import AgentCoT_NoPDB
+            agent = AgentZeroShot_NoPDB(config, env, verbose=args.verbose)
+        case "cot_nopdb":
+            from froggy.agents import AgentCoT_NoPDB
 
-        agent = AgentCoT_NoPDB(config, env, verbose=args.verbose)
-    else:
-        raise ValueError(f"Unknown agent {args.agent}")
+            agent = AgentCoT_NoPDB(config, env, verbose=args.verbose)
+        case _:
+            raise ValueError(f"Unknown agent {args.agent}")
 
     if args.verbose:
         agent.llm.verbose = True
@@ -107,7 +89,8 @@ def main():
                 continue
             print(
                 colored(
-                    f"Running agent {agent.name} on {config["benchmark"]}.{problem}",
+                    f"Running agent {agent.name} on {
+                        config["benchmark"]}.{problem}",
                     "green",
                 )
             )

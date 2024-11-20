@@ -29,7 +29,10 @@ def show_line_number(code_string, code_path=None, breakpoints_state=None):
     # line numbers are 1-indexed
     # line numbers and code lines are separated by a tab
 
-    assert isinstance(code_string, str)
+    assert code_string is not None, "code_string should not be None"
+    assert isinstance(
+        code_string, str
+    ), f"code_string should be a string, but got {type(code_string)}"
     code_line = code_string.split("\n")
 
     output = []
@@ -98,18 +101,6 @@ class HistoryTracker:
     def get(self):
         # return the history_steps latest steps
         return self.memory[-self.history_steps :]
-
-    def save(self, path):
-        import json
-
-        infos = []
-        for info in self.memory:
-            keys = [k for k in info.keys() if k != "history"]
-            info_ = {k: info[k] for k in keys}
-            infos.append(info_)
-
-        with open(path, "w") as f:
-            json.dump(infos, f)
 
     def get_all(self):
         return self.memory
@@ -245,7 +236,7 @@ def time_limit(seconds: Optional[int]):
 def cleanup_pytest_output(output):
     # Remove timing, root dir, and platform to avoid randomizing LLM's response.
     res = re.sub(
-        r"^Ran \d+ tests in \d+\.\d+s$",
+        r"^Ran \d+ tests? in \d+\.\d+s$",
         "",
         output,
         flags=re.MULTILINE,
@@ -262,7 +253,12 @@ def cleanup_pytest_output(output):
 
 def extract_max_score_from_pytest_output(output):
     # ... collected 25 items
-    return max(int(re.search(r"collected (\d+) items?", output).group(1)), 1.0)
+    # ... collected 1 item
+    match = re.search(r"collected (\d+) items?", output)
+    if match:
+        return max(int(match.group(1)), 1.0)
+    else:
+        raise ValueError("No test cases found in the pytest output.")
 
 
 def extract_reward_from_pytest_output(output):
@@ -275,3 +271,58 @@ def extract_reward_from_pytest_output(output):
         return int(match.group(1))
 
     return 0
+
+
+def trim_prompt_messages(
+    messages: list[dict], context_length: int, token_counter: callable
+):
+    # Trim message content to context length
+    # messages: list of dict, each dict has keys "content" and "role"
+    # context_length: int, maximum number of tokens
+    # token_counter: function, count the number of tokens in a string
+    # messages should not be empty
+    assert len(messages) > 0, "messages should not be empty"
+    # all messages should be dictionaries with keys "content" and "role"
+    assert all(
+        isinstance(item, dict) and "content" in item and "role" in item
+        for item in messages
+    ), 'all messages should be dictionaries with keys "content" and "role"'
+    # the last message should be from the user
+    assert messages[-1]["role"] == "user", "the last message should be from the user"
+    # if two consecutive messages are from the same role, they should be merged
+    assert all(
+        messages[i]["role"] != messages[i + 1]["role"] for i in range(len(messages) - 1)
+    ), "if two consecutive messages are from the same role, they should be merged first"
+    # context_length should be non-negative
+    assert context_length >= 0, "context_length should be non-negative"
+
+    message_lengths = [token_counter(text=item["content"]) for item in messages]
+    total_length = sum(message_lengths)
+    if total_length <= context_length:
+        return messages
+
+    # keep the first (system) message and last (user) message if possible
+    new_messages, new_length = [], 0
+    if messages[0]["role"] == "system":
+        new_messages.append(messages[0])
+        new_length += message_lengths[0]
+
+    new_messages.append(messages[-1])
+    new_length += message_lengths[-1]
+    if new_length > context_length:
+        # just keep the last message, remove the system message
+        new_messages = [messages[-1]]
+        new_length = message_lengths[-1]
+    else:
+        # adding back the messages in between (from latest to earliest)
+        start = 1 if messages[0]["role"] == "system" else 0
+        for i in range(len(messages) - 2, start, -1):
+            if new_length + message_lengths[i] > context_length:
+                break
+            if start == 0:
+                new_messages = [messages[i]] + new_messages
+            else:
+                new_messages = new_messages[:1] + [messages[i]] + new_messages[1:]
+            new_length += message_lengths[i]
+
+    return new_messages

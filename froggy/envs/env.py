@@ -113,8 +113,8 @@ class RepoEnv(TooledEnv):
         )
 
         # get list of editable files
-        pdbignore = self.working_dir / ".pdbignore"  # By default look for .pdbignore.
-        self.is_readonly = make_is_readonly(pdbignore, patterns=readonly_patterns)
+        froggyignore = self.working_dir / ".froggyignore"  # By default look for .froggyignore.
+        self.is_readonly = make_is_readonly(froggyignore, patterns=readonly_patterns)
         self.editable_files = [
             p for p in self.all_files if not self.is_readonly(self.working_dir / p)
         ]
@@ -193,7 +193,6 @@ class RepoEnv(TooledEnv):
             "action": None,
             "done": self.done,
             "score": self.score,
-            "is_rewrite": False,
             "max_score": self.max_score,
             "instructions": self.instructions,
             "rewrite_counter": self.rewrite_counter,
@@ -298,7 +297,6 @@ class RepoEnv(TooledEnv):
     def step(self, action: str):
         # given action, return new obs, and update infos
         # the action space is composed of a few smaller action spaces
-        is_rewrite = False
         triggered_tools = self.get_triggered_tools(action)
         assert (
             len(triggered_tools) <= 1
@@ -313,9 +311,8 @@ class RepoEnv(TooledEnv):
                 self.obs = f"Error while using tool {triggered_tool.name} with action: \n{action}"
 
             if isinstance(triggered_tool, CodePatcher):
+                self.rewrite_counter += 1
                 if self.get_tool(triggered_tool.name).rewrite_success:
-                    is_rewrite = True
-                    self.rewrite_counter += 1
                     if self.run_on_rewrite:
                         self.obs += "\nNew code has been run."
                         self.run()
@@ -345,7 +342,6 @@ class RepoEnv(TooledEnv):
                 if self.has_tool("pdb")
                 else "No breakpoints are set."
             ),
-            "is_rewrite": is_rewrite,
             "action": action,
             "instructions": self.instructions,
             "score": self.score,
