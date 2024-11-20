@@ -76,6 +76,37 @@ class TestRepoEnv(unittest.TestCase):
 
         mock_tempdir_instance.cleanup.assert_called_once()
 
+    @patch('shutil.copy2')
+    @patch('os.path.isdir', return_value=False)
+    @patch('glob.glob', return_value=['/path/to/repo/file1.txt', '/path/to/repo/file2.txt'])
+    @patch('os.scandir')
+    @patch('os.walk')
+    @patch('shutil.copytree')
+    def test_restore(self, mock_copytree, mock_os_walk, mock_scandir, mock_glob, mock_isdir, mock_copy2):
+               # Mock the return value of os.scandir
+        mock_scandir.return_value.__enter__.return_value = [
+            MagicMock(is_dir=lambda: False, path='/path/to/repo/file1.txt'),
+            MagicMock(is_dir=lambda: False, path='/path/to/repo/file2.txt')
+        ]
+
+        # Mock the return value of os.walk
+        mock_os_walk.return_value = [
+            ('/path/to/repo', ('subdir',), ('file1.txt', 'file2.txt')),
+            ('/path/to/repo/subdir', (), ('subfile1.txt',)),
+        ]
+        # Create an instance of RepoEnv
+        env = RepoEnv(path='/path/to/repo')
+        
+        # Call the restore method
+        env.restore('/path/to/repo/file1.txt', '/path/to/repo/file2.txt')
+        
+        # Assertions
+        mock_glob.assert_not_called()  # Ensure glob is not called since filepaths are provided
+        mock_isdir.assert_any_call(Path('/path/to/repo/file1.txt'))
+        mock_isdir.assert_any_call(Path('/path/to/repo/file2.txt'))
+        mock_copy2.assert_any_call(Path('/path/to/repo/file1.txt'), Path(env.working_dir) / 'file1.txt')
+        mock_copy2.assert_any_call(Path('/path/to/repo/file2.txt'), Path(env.working_dir) / 'file2.txt')
+
 if __name__ == '__main__':
     unittest.main()
     
