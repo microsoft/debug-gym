@@ -337,6 +337,57 @@ class TestRepoEnv(unittest.TestCase):
         #     env.current_breakpoints_state
         # )
 
+    @patch.object(RepoEnv, 'get_triggered_tools')
+    @patch.object(RepoEnv, 'get_tool')
+    @patch.object(RepoEnv, 'has_tool', return_value=False)
+    @patch.object(RepoEnv, 'run')
+    @patch.object(RepoEnv, 'display_files')
+    @patch.object(RepoEnv, 'current_code_with_line_number')
+    def test_step(self, mock_current_code_with_line_number, mock_display_files, mock_run, mock_has_tool, mock_get_tool, mock_get_triggered_tools):
+        # Mock the PDBTool
+        mock_pdb_tool = MagicMock()
+        mock_pdb_tool.use.return_value = "PDB tool used"
+        mock_pdb_tool.rewrite_success = True
+        mock_pdb_tool.current_frame_file = "file.py"
+        mock_pdb_tool.pdb_obs = "PDB started"
+        mock_get_tool.return_value = None #mock_pdb_tool
+
+        # Mock the return values of display_files and current_code_with_line_number
+        mock_display_files.return_value = "file list"
+        mock_current_code_with_line_number.return_value = "code with line numbers"
+
+        # Create an instance of RepoEnv
+        env = RepoEnv(path='.')
+
+        # Mock the get_triggered_tools method to return the PDBTool
+        mock_get_triggered_tools.return_value = [mock_pdb_tool]
+
+        # Call the step method with an action
+        obs, score, done, infos = env.step("some action")
+
+        # Assertions
+        mock_get_triggered_tools.assert_called_once_with("some action")
+        mock_pdb_tool.use.assert_called_once_with("some action")
+        # mock_run.assert_called_once()
+        #mock_pdb_tool.start_pseudo_terminal.assert_called_once()
+        self.assertEqual(obs, "PDB tool used")
+        self.assertEqual(score, 0)
+        self.assertFalse(done)
+        self.assertIn("obs", infos)
+        self.assertIn("last_run_obs", infos)
+        self.assertIn("dbg_obs", infos)
+        self.assertIn("dir_tree", infos)
+        self.assertIn("editable_files", infos)
+        self.assertIn("current_breakpoints", infos)
+        self.assertIn("current_code_with_line_number", infos)
+        self.assertIn("action", infos)
+        self.assertIn("done", infos)
+        self.assertIn("score", infos)
+        self.assertIn("is_rewrite", infos)
+        self.assertIn("max_score", infos)
+        self.assertIn("instructions", infos)
+        self.assertIn("rewrite_counter", infos)
+
 if __name__ == '__main__':
     unittest.main()
     
