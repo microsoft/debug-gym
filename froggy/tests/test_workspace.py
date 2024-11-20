@@ -1,3 +1,5 @@
+import os
+import subprocess
 import unittest
 from unittest.mock import patch, MagicMock
 from pathlib import Path, PosixPath
@@ -106,6 +108,34 @@ class TestRepoEnv(unittest.TestCase):
         mock_isdir.assert_any_call(Path('/path/to/repo/file2.txt'))
         mock_copy2.assert_any_call(Path('/path/to/repo/file1.txt'), Path(env.working_dir) / 'file1.txt')
         mock_copy2.assert_any_call(Path('/path/to/repo/file2.txt'), Path(env.working_dir) / 'file2.txt')
+
+    @patch('subprocess.Popen')
+    def test_run_success(self, mock_popen):
+        # Mock the Popen instance and its methods
+        mock_process = MagicMock()
+        mock_process.communicate.return_value = ("output", "error")
+        mock_process.returncode = 0
+        mock_popen.return_value = mock_process
+
+        # Create an instance of RepoEnv
+        env = RepoEnv(path='.')
+
+        # Call the run method
+        output, done = env.run()
+
+        # Assertions
+        mock_popen.assert_called_once_with(
+            env.entrypoint,
+            env=dict(os.environ, NO_COLOR="1"),
+            cwd=env.working_dir,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        mock_process.communicate.assert_called_once_with(timeout=env.run_timeout)
+        self.assertEqual(output, "outputerror")
+        self.assertTrue(done)
+        self.assertEqual(env.score, 1)
 
 if __name__ == '__main__':
     unittest.main()
