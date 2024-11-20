@@ -171,6 +171,38 @@ class TestRepoEnv(unittest.TestCase):
         env.cleanup_workspace()
 
         mock_tempdir_instance.cleanup.assert_called_once()
+    
+    def test_instructions(self):
+        # Create mock tools
+        tool1 = MagicMock()
+        tool1.name = "tool1"
+        tool1.instructions = "instructions1"
+        tool1.action = "action1"
+
+        tool2 = MagicMock()
+        tool2.name = "tool2"
+        tool2.instructions = "instructions2"
+        tool2.action = "action2"
+
+        env = RepoEnv()
+        # Add tools to the environment
+        env.add_tool(tool1)
+        env.add_tool(tool2)
+
+        # Define the expected instructions
+        expected_instructions = {
+            "Available tools to solve the problem": {
+                "tool1": "instructions1",
+                "tool2": "instructions2"
+            },
+            "Available commands": "action1, action2"
+        }
+
+        # Get the instructions from the environment
+        instructions = env.instructions
+
+        # Assertions
+        self.assertEqual(instructions, expected_instructions)
 
     @patch('shutil.copy2')
     @patch('os.path.isdir', return_value=False)
