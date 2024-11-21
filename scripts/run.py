@@ -70,6 +70,10 @@ def main():
             from froggy.agents import AgentCoT_NoPDB
 
             agent = AgentCoT_NoPDB(config, env, verbose=args.verbose)
+        case "zero_shot_pdb_after_rewrites":
+            from froggy.agents import AgentZeroShot_PdbAfterRewrites
+
+            agent = AgentZeroShot_PdbAfterRewrites(config, env, verbose=args.verbose)
         case _:
             raise ValueError(f"Unknown agent {args.agent}")
 
