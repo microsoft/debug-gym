@@ -1,15 +1,18 @@
 import atexit
 import errno
 import fcntl
+import io
 import logging
 import os
 import pty
 import random
+import shlex
 import string
 import subprocess
+import sys
+import tarfile
 import termios
 import time
-import sys
 
 import docker
 
@@ -38,16 +41,25 @@ class Terminal:
     @property
     def path_env(self):
         # TODO: find a better way to set PATH
-        return {"PATH": f"{os.path.dirname(sys.executable)}:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"}
+        return {
+            "PATH": f"{os.path.dirname(sys.executable)}:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+        }
 
-    def run(self, entrypoint, working_dir=None, timeout=None):
-        """Run a command in the terminal. Return command status and output."""
-
-        command = [entrypoint] if isinstance(entrypoint, str) else entrypoint
-
+    def prepare_command(self, entrypoint: list[str]) -> list[str]:
+        """Prepares a shell command by combining setup commands and entrypoint commands.
+        Then wraps the command in a shell (self.default_entrypoint) call."""
         if self.setup_commands:
-            command = self.setup_commands + ["&&"] + entrypoint
+            entrypoint = " && ".join(self.setup_commands + entrypoint)
+        else:
+            entrypoint = " && ".join(entrypoint)
+        command = shlex.split(
+            f'{shlex.join(self.default_entrypoint)} -c "{entrypoint}"'
+        )
+        return command
 
+    def run(self, entrypoint: list[str], working_dir=None, timeout=None):
+        """Run a command in the terminal. Return command status and output."""
+        command = self.prepare_command(entrypoint)
         logger.debug(f"Running command in terminal: {command}")
         process = subprocess.Popen(
             command,
@@ -65,9 +77,7 @@ class Terminal:
             stdout, stderr = "", "Timeout expired."
             success = False
         output = (stdout + stderr).strip("\r\n").strip("\n")
-        logger.debug(
-            f"Output from terminal with status {process.returncode}: {output}"
-        )
+        logger.debug(f"Output from terminal with status {process.returncode}: {output}")
         return success, output
 
     def run_interactive(
@@ -86,7 +96,7 @@ class Terminal:
         """Starts a new bash session exporting the current python executable as 'python'.
         Flags --noprofile and --norc are used to avoid loading any bash profile or rc file,
         which could interfere with the terminal setup (clean outputs)"""
-        return ["/bin/bash", "--noprofile", "--norc"]
+        return shlex.split("/bin/bash --noprofile --norc")
 
     def clone(self) -> "Terminal":
         return self.__class__(
@@ -229,14 +239,18 @@ class DockerTerminal(Terminal):
         )
         self.base_image = base_image
         self.volumes = volumes if volumes else {}
-        self.container = None
         self.docker_client = docker.from_env()
-        self.setup_container()
+        self.host_uid = os.getuid()
+        self.host_gid = os.getgid()
+        self.patched_image = self.patch_base_image(base_image)
+        self.container = self.setup_container()
 
     @property
     def default_entrypoint(self) -> list[str]:
         """Expects the container to have bash installed and python executable available."""
-        return f"docker exec -i {self.container.name} /bin/bash --noprofile --norc".split()
+        return shlex.split(
+            f"docker exec -i {self.container.name} /bin/bash --noprofile --norc"
+        )
 
     @property
     def path_env(self):
@@ -274,35 +288,71 @@ class DockerTerminal(Terminal):
         )
         return terminal
 
-    def setup_container(self):
+    def setup_container(self) -> docker.models.containers.Container:
         # Create and start a container mounting volumes and setting environment variables
+
         suffix = "".join(random.choices(string.ascii_lowercase, k=8))
         container_name = f"froggy-container-{suffix}"
         logger.debug(
             f"Setting up container: {container_name} "
-            f"with base image: {self.base_image}"
+            f"with base image: {self.patched_image}"
         )
-        try:
-            self.docker_client.images.get(self.base_image)
-        except docker.errors.ImageNotFound:
-            logger.debug(f"Pulling base image: {self.base_image}")
-            self.docker_client.images.pull(self.base_image)
-
-        self.container = self.docker_client.containers.run(
-            image=self.base_image,
+        container = self.docker_client.containers.run(
+            image=self.patched_image,
             command="sleep infinity",  # Keep the container running
             working_dir=self.working_dir,
             volumes=self.volumes,
             environment=self.env_vars,
             name=container_name,
+            user=f"{self.host_uid}:{self.host_gid}",
             detach=True,
             auto_remove=True,
             remove=True,
         )
         atexit.register(self.clean_up)
         logger.debug("Container setup complete")
+        return container
 
     def clean_up(self):
         if self.container:
             logger.debug(f"Cleaning up container: {self.container.name}")
             self.container.stop()
+
+    def patch_base_image(self, base_image: str) -> str:
+        """Patch the base image creating a user and group with
+        the same UID and GID as the host. This allows the container
+        to write to the host filesystem with the same permissions.
+        Inside the container, the user has root privileges."""
+        try:
+            self.docker_client.images.get(base_image)
+        except docker.errors.ImageNotFound:
+            logger.debug(f"Pulling base image: {base_image}")
+            self.docker_client.images.pull(base_image)
+
+        dockerfile = f"""
+            FROM {base_image}
+            # Ensure a group with GID exists; create it if necessary
+            RUN if ! getent group 100 > /dev/null; then \\
+                groupadd -g {self.host_gid} froggy_group; \\
+                fi && \\
+                # Create the user with UID, assign to GID, and add to root group, -m to create home dir
+                useradd -m -u {self.host_uid} -g {self.host_gid} -G sudo froggy_user
+            """
+
+        image_tag = f"{base_image}-{self.host_uid}-{self.host_gid}"
+        try:
+            self.docker_client.images.get(image_tag)
+            logger.debug(f"Image {image_tag} already exists.")
+        except docker.errors.ImageNotFound:
+            logger.debug(f"Building image {image_tag}.")
+            dockerfile_bytes = dockerfile.encode("utf-8")
+            context = io.BytesIO()
+            with tarfile.open(fileobj=context, mode="w") as tar:
+                tarinfo = tarfile.TarInfo("Dockerfile")
+                tarinfo.size = len(dockerfile_bytes)
+                tar.addfile(tarinfo, io.BytesIO(dockerfile_bytes))
+            context.seek(0)
+            self.docker_client.images.build(
+                fileobj=context, custom_context=True, tag=image_tag, rm=True
+            )
+        return image_tag
