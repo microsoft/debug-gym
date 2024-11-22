@@ -76,6 +76,10 @@ class RepoEnv(TooledEnv):
         self.dir_tree_depth = dir_tree_depth
         self.auto_view_change = auto_view_change
         self.setup_workspace(path, entrypoint, readonly_patterns)
+        self.last_run_obs = None
+        self.score = 0
+        self.done = False
+        self.rewrite_counter = 0
 
     def setup_workspace(
         self,
