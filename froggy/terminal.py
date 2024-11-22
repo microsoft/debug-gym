@@ -94,7 +94,7 @@ class Terminal:
         return shlex.split("/bin/bash --noprofile --norc")
 
     def clone(self) -> "Terminal":
-        return self.__class__(
+        return Terminal(
             working_dir=self.working_dir,
             setup_commands=self.setup_commands,
             env_vars=self.env_vars,
@@ -283,7 +283,7 @@ class DockerTerminal(Terminal):
         return success, output.decode().strip("\r\n").strip("\n")
 
     def clone(self) -> "DockerTerminal":
-        terminal = self.__class__(
+        terminal = DockerTerminal(
             base_image=self.base_image,
             setup_commands=self.setup_commands,
             volumes=self.volumes,

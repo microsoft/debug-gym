@@ -200,7 +200,7 @@ class RepoEnv(TooledEnv):
 
     def run(self):
         success, output = self.terminal.run(
-            self.entrypoint, self.working_dir, timeout=self.run_timeout
+            self.entrypoint, timeout=self.run_timeout
         )
         self.last_run_obs = output
         self.score = int(success)
