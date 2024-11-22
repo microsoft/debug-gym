@@ -13,8 +13,15 @@ if_docker_running = pytest.mark.skipif(
 def test_terminal_init():
     terminal = Terminal()
     assert terminal.setup_commands == []
-    assert terminal.env_vars == {"NO_COLOR": "1", "PS1": ""}
+    assert terminal.env_vars["NO_COLOR"] == "1"
+    assert terminal.env_vars["PS1"] == ""
+    assert len(terminal.env_vars) > 2  # NO_COLOR, PS1 + os env vars
     assert terminal.working_dir.startswith("/tmp/Terminal-")
+
+
+def test_terminal_init_no_os_env_vars():
+    terminal = Terminal(include_os_env_vars=False)
+    assert terminal.env_vars == {"NO_COLOR": "1", "PS1": ""}
 
 
 def test_terminal_init_with_params(tmp_path):
@@ -24,7 +31,8 @@ def test_terminal_init_with_params(tmp_path):
     terminal = Terminal(working_dir, setup_commands, env_vars)
     assert terminal.working_dir == working_dir
     assert terminal.setup_commands == setup_commands
-    assert terminal.env_vars == env_vars | {"NO_COLOR": "1"}
+    assert terminal.env_vars["NO_COLOR"] == "1"
+    assert terminal.env_vars["ENV_VAR"] == "value"
     status, output = terminal.run(["pwd"])
     assert status
     assert output == f"Hello World\n{working_dir}"

@@ -27,6 +27,7 @@ class Terminal:
         working_dir: str = None,
         setup_commands: list[str] = None,
         env_vars: dict[str, str] = None,
+        include_os_env_vars: bool = True,
     ):
         if working_dir is None:
             temp_dir = tempfile.TemporaryDirectory(prefix="Terminal-")
@@ -34,18 +35,13 @@ class Terminal:
             working_dir = temp_dir.name
         self.setup_commands = setup_commands or []
         self.env_vars = env_vars or {}
+        if include_os_env_vars:
+            self.env_vars = self.env_vars | dict(os.environ)
         # Clean up output by disabling terminal prompt and colors
         self.env_vars["NO_COLOR"] = "1"  # disable colors
         self.env_vars["PS1"] = ""  # disable prompt
         self.working_dir = working_dir
         self._master = None  # PTY master file descriptor
-
-    @property
-    def path_env(self):
-        # TODO: find a better way to set PATH
-        return {
-            "PATH": f"{os.path.dirname(sys.executable)}:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-        }
 
     def prepare_command(self, entrypoint: list[str]) -> list[str]:
         """Prepares a shell command by combining setup commands and entrypoint commands.
@@ -65,7 +61,7 @@ class Terminal:
         logger.debug(f"Running command in terminal: {command}")
         process = subprocess.Popen(
             command,
-            env=self.env_vars | self.path_env,
+            env=self.env_vars,
             cwd=self.working_dir,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
@@ -128,7 +124,7 @@ class Terminal:
 
         process = subprocess.Popen(
             self.default_entrypoint,
-            env=self.env_vars | self.path_env,
+            env=self.env_vars,
             cwd=self.working_dir,
             stdin=slave,
             stdout=slave,
@@ -233,6 +229,7 @@ class DockerTerminal(Terminal):
         env_vars: dict[str, str] = None,
         base_image: str = "ubuntu:latest",
         volumes: dict[str, dict[str:str]] = None,
+        include_os_env_vars: bool = False,
         # TODO: dockerfile and/or docker-compose file?
     ):
         """
@@ -248,9 +245,10 @@ class DockerTerminal(Terminal):
             working_dir=working_dir,
             setup_commands=setup_commands,
             env_vars=env_vars,
+            include_os_env_vars=include_os_env_vars,
         )
         self.base_image = base_image
-        self.volumes = volumes if volumes else {}
+        self.volumes = volumes or {}
         self.docker_client = docker.from_env()
         self.host_uid = os.getuid()
         self.host_gid = os.getgid()
@@ -263,10 +261,6 @@ class DockerTerminal(Terminal):
         return shlex.split(
             f"docker exec -i {self.container.name} /bin/bash --noprofile --norc"
         )
-
-    @property
-    def path_env(self):
-        return {}
 
     def run(self, entrypoint: list[str], timeout=None) -> tuple[bool, str]:
         """Run a command in the terminal. Return command status and output."""
@@ -290,7 +284,7 @@ class DockerTerminal(Terminal):
         success = status == 0
         return success, output.decode().strip("\r\n").strip("\n")
 
-    def clone(self) -> Terminal:
+    def clone(self) -> "DockerTerminal":
         terminal = self.__class__(
             base_image=self.base_image,
             setup_commands=self.setup_commands,
