@@ -8,6 +8,7 @@ import numpy as np
 from termcolor import colored
 
 from froggy.agents.llm_api import instantiate_llm
+from froggy.agents.utils import HistoryTracker, _build_history_prompt
 from froggy.utils import unescape
 
 
@@ -23,77 +24,17 @@ class AgentBase:
         os.makedirs(self._output_path, exist_ok=True)
         print(colored(f"Output will be saved in {self._output_path}", "magenta"))
         self.set_seed(self.config["random_seed"])
+        self.history = HistoryTracker(self.config["memory_size"])
 
     def set_seed(self, seed):
         np.random.seed(seed)
 
-    def _build_history_conversation(self):
-        _history = self.history.get()
-        # Find the latest rewrite step
-        if (
-            len(_history) == 0
-            or self.config["reset_prompt_history_after_rewrite"] is False
-        ):
-            latest_rewrite_step = 0
-        else:
-            for i in range(len(_history)):
-                if _history[i]["rewrite_counter"] == _history[-1]["rewrite_counter"]:
-                    latest_rewrite_step = i
-                    break
-        _messages = []
-        for history_info in _history[latest_rewrite_step:]:
-            if history_info["action"] is not None:
-                _messages.append(
-                    {"role": "assistant", "content": f"{history_info["action"]}"}
-                )
-            _messages.append({"role": "user", "content": f"{history_info["obs"]}"})
-        return _messages
-
-    def _build_history_non_conversation(self):
-        _history = self.history.get()
-        # Find the latest rewrite step
-        if (
-            len(_history) == 0
-            or self.config["reset_prompt_history_after_rewrite"] is False
-        ):
-            latest_rewrite_step = 0
-        else:
-            for i in range(len(_history)):
-                if _history[i]["rewrite_counter"] == _history[-1]["rewrite_counter"]:
-                    latest_rewrite_step = i
-                    break
-        _history_prompt = []
-        for _i, history_info in enumerate(_history):
-            if _i < latest_rewrite_step:
-                continue
-            _m = {
-                "step": _i,
-                "command": (
-                    None if history_info["action"] is None else history_info["action"]
-                ),
-                "stdout": history_info["obs"],
-            }
-            _history_prompt.append(_m)
-        return _history_prompt
-
     def build_history_prompt(self):
-        messages = []
-        if self.config["use_conversational_prompt"] is True:
-            conversation_history = self._build_history_conversation()
-            messages.append(
-                {
-                    "role": "user",
-                    "content": f"History of command and terminal outputs (the last {(len(conversation_history) + 1) // 2} steps):",
-                }
-            )
-            messages.extend(conversation_history)
-        else:
-            history_prompt = self._build_history_non_conversation()
-            prompt = [
-                f"History of command and terminal outputs (the last {len(history_prompt)} steps):"
-            ]
-            prompt += ["\n" + unescape(json.dumps(history_prompt, indent=4)) + "\n"]
-            messages.append({"role": "user", "content": "\n".join(prompt)})
+        messages = _build_history_prompt(
+            self.history,
+            self.config["use_conversational_prompt"],
+            self.config["reset_prompt_history_after_rewrite"],
+        )
         return messages
 
     def build_system_prompt(self, info):

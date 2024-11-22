@@ -3,7 +3,7 @@ import json
 from tqdm import tqdm
 
 from froggy.agents import AgentBase
-from froggy.utils import HistoryTracker, unescape
+from froggy.utils import unescape
 
 
 class AgentCoT(AgentBase):
@@ -11,7 +11,6 @@ class AgentCoT(AgentBase):
 
     def __init__(self, config_dict, env, verbose=False, _uuid=None):
         super().__init__(config_dict, env, verbose, _uuid)
-        self.history = HistoryTracker(self.config["memory_size"])
 
     def build_cot_prompt(self):
         messages = []

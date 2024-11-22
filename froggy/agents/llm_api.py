@@ -14,8 +14,8 @@ from tenacity import (
 )
 from termcolor import colored
 from transformers import AutoTokenizer
-from froggy.utils import trim_prompt_messages
 
+from froggy.agents.utils import trim_prompt_messages
 
 prompt_toolkit_available = False
 try:
@@ -107,8 +107,7 @@ class TokenCounter:
     def __call__(self, *, messages=None, text=None):
         nb_tokens = 0
         if messages is not None:
-            nb_tokens += sum(len(self.tokenize(msg["content"]))
-                             for msg in messages)
+            nb_tokens += sum(len(self.tokenize(msg["content"])) for msg in messages)
 
         if text is not None:
             nb_tokens += len(self.tokenize(text))
@@ -152,8 +151,7 @@ class LLM:
         stop=stop_after_attempt(100),
     )
     def query_model(self, messages, **kwargs):
-        kwargs["max_tokens"] = kwargs.get(
-            "max_tokens", self.config.get("max_tokens"))
+        kwargs["max_tokens"] = kwargs.get("max_tokens", self.config.get("max_tokens"))
 
         return (
             self.client.chat.completions.create(
@@ -175,7 +173,8 @@ class LLM:
         # Merge consecutive messages with same role.
         messages = merge_messages(messages)
         messages = trim_prompt_messages(
-            messages, self.context_length, self.token_counter)
+            messages, self.context_length, self.token_counter
+        )
 
         if self.verbose:
             # Message is a list of dictionaries with role and content keys.
@@ -213,8 +212,7 @@ class AsyncLLM(LLM):
         stop=stop_after_attempt(100),
     )
     async def query_model(self, messages, **kwargs):
-        kwargs["max_tokens"] = kwargs.get(
-            "max_tokens", self.config.get("max_tokens"))
+        kwargs["max_tokens"] = kwargs.get("max_tokens", self.config.get("max_tokens"))
 
         return (
             (
@@ -269,8 +267,7 @@ class Human:
             )
         else:
             if available_commands:
-                print("Available actions: {}\n".format(
-                    info["available_commands"]))
+                print("Available actions: {}\n".format(info["available_commands"]))
 
             action = input("apdb> ")
 

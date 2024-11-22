@@ -3,7 +3,6 @@ import json
 from tqdm import tqdm
 
 from froggy.agents import AgentBase
-from froggy.utils import HistoryTracker
 
 
 class AgentTadpole(AgentBase):
@@ -18,7 +17,6 @@ class AgentTadpole(AgentBase):
 
     def __init__(self, config_dict, env, verbose=False, _uuid=None):
         super().__init__(config_dict, env, verbose, _uuid)
-        self.history = HistoryTracker(self.config["memory_size"])
         self.current_subgoal = None
 
     def build_task_decomposer_prompt(self):
