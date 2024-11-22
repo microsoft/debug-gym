@@ -30,8 +30,8 @@ class Terminal:
         if working_dir is None:
             working_dir = "/tmp/Froggy"
             os.makedirs(working_dir, exist_ok=True)
-        self.setup_commands = setup_commands if setup_commands else []
-        self.env_vars = env_vars if env_vars else {}
+        self.setup_commands = setup_commands or []
+        self.env_vars = env_vars or {}
         # Clean up output by disabling terminal prompt and colors
         self.env_vars["NO_COLOR"] = "1"  # disable colors
         self.env_vars["PS1"] = ""  # disable prompt
