@@ -14,7 +14,7 @@ def test_terminal_init():
     terminal = Terminal()
     assert terminal.setup_commands == []
     assert terminal.env_vars == {"NO_COLOR": "1", "PS1": ""}
-    assert terminal.working_dir == "/tmp/Froggy"
+    assert terminal.working_dir.startswith("/tmp/Terminal-")
 
 
 def test_terminal_init_with_params(tmp_path):
@@ -35,27 +35,37 @@ def test_terminal_init_with_params(tmp_path):
 
 def test_terminal_run(tmp_path):
     working_dir = str(tmp_path)
-    terminal = Terminal()
+    terminal = Terminal(working_dir=working_dir)
     entrypoint = ["echo 'Hello World'"]
-    success, output = terminal.run(entrypoint, working_dir)
+    success, output = terminal.run(entrypoint)
     assert success is True
     assert output == "Hello World"
+    assert terminal.working_dir == working_dir
+
+
+def test_terminal_run_tmp_working_dir(tmp_path):
+    terminal = Terminal()
+    entrypoint = ["echo 'Hello World'"]
+    success, output = terminal.run(entrypoint)
+    assert success is True
+    assert output == "Hello World"
+    assert terminal.working_dir.startswith("/tmp/Terminal-")
 
 
 def test_terminal_run_multiple_commands(tmp_path):
     working_dir = str(tmp_path)
-    terminal = Terminal()
+    terminal = Terminal(working_dir=working_dir)
     entrypoint = ["echo Hello", "echo World"]
-    success, output = terminal.run(entrypoint, working_dir)
+    success, output = terminal.run(entrypoint)
     assert success is True
     assert output == "Hello\nWorld"
 
 
 def test_terminal_run_failure(tmp_path):
     working_dir = str(tmp_path)
-    terminal = Terminal()
+    terminal = Terminal(working_dir=working_dir)
     entrypoint = ["ls non_existent_dir"]
-    success, output = terminal.run(entrypoint, working_dir)
+    success, output = terminal.run(entrypoint)
     assert success is False
     assert output == ("ls: cannot access 'non_existent_dir': No such file or directory")
 

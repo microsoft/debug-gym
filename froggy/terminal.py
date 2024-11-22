@@ -13,6 +13,7 @@ import sys
 import tarfile
 import termios
 import time
+import tempfile
 
 import docker
 
@@ -28,8 +29,9 @@ class Terminal:
         env_vars: dict[str, str] = None,
     ):
         if working_dir is None:
-            working_dir = "/tmp/Froggy"
-            os.makedirs(working_dir, exist_ok=True)
+            temp_dir = tempfile.TemporaryDirectory(prefix="Terminal-")
+            atexit.register(lambda: temp_dir.cleanup())
+            working_dir = temp_dir.name
         self.setup_commands = setup_commands or []
         self.env_vars = env_vars or {}
         # Clean up output by disabling terminal prompt and colors
@@ -57,14 +59,14 @@ class Terminal:
         )
         return command
 
-    def run(self, entrypoint: list[str], working_dir=None, timeout=None):
+    def run(self, entrypoint: list[str], timeout=None) -> tuple[bool, str]:
         """Run a command in the terminal. Return command status and output."""
         command = self.prepare_command(entrypoint)
         logger.debug(f"Running command in terminal: {command}")
         process = subprocess.Popen(
             command,
             env=self.env_vars | self.path_env,
-            cwd=working_dir or self.working_dir,
+            cwd=self.working_dir,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
@@ -81,12 +83,11 @@ class Terminal:
         return success, output
 
     def run_interactive(
-        self, entrypoint: str, expected_output: str = "", timeout: int = 30
+        self, entrypoint: list[str], expected_output: str = "", timeout: int = 30
     ):
         """Run a command in the interactive terminal and return the output.
         Requires a PTY. The terminal stays open after the command is executed.
         """
-        # TODO: include working_dir parameter to align with run()?
         if not self.has_pseudo_terminal():
             self.start_pseudo_terminal()
         return self.interact_with_pseudo_terminal(entrypoint, expected_output, timeout)
@@ -267,13 +268,13 @@ class DockerTerminal(Terminal):
     def path_env(self):
         return {}
 
-    def run(self, entrypoint, working_dir=None, timeout=None):
+    def run(self, entrypoint: list[str], timeout=None) -> tuple[bool, str]:
         """Run a command in the terminal. Return command status and output."""
 
         command = [entrypoint] if isinstance(entrypoint, str) else entrypoint
 
         if self.setup_commands:
-            command = self.setup_commands + ["&&"] + entrypoint
+            command = self.setup_commands + [" && "] + entrypoint
 
         command = " ".join(command)
 
@@ -281,7 +282,7 @@ class DockerTerminal(Terminal):
         command = f'/bin/bash -c "{command}"'
         status, output = self.container.exec_run(
             command,
-            workdir=working_dir or self.working_dir,
+            workdir=self.working_dir,
             environment=self.env_vars,
             stdout=True,
             stderr=True,
