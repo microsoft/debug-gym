@@ -25,25 +25,36 @@ def test_terminal_init_with_params(tmp_path):
     assert terminal.working_dir == working_dir
     assert terminal.setup_commands == setup_commands
     assert terminal.env_vars == env_vars | {"NO_COLOR": "1"}
-    output = terminal.run(["pwd"])
-    assert output == working_dir
-    output = terminal.run(["echo", "$ENV_VAR"])
-    assert output == "value"
+    status, output = terminal.run(["pwd"])
+    assert status
+    assert output == f"Hello World\n{working_dir}"
+    status, output = terminal.run(["echo $ENV_VAR"])
+    assert status
+    assert output == "Hello World\nvalue"
 
 
 def test_terminal_run(tmp_path):
     working_dir = str(tmp_path)
     terminal = Terminal()
-    entrypoint = ["echo", "Hello World"]
+    entrypoint = ["echo 'Hello World'"]
     success, output = terminal.run(entrypoint, working_dir)
     assert success is True
     assert output == "Hello World"
 
 
+def test_terminal_run_multiple_commands(tmp_path):
+    working_dir = str(tmp_path)
+    terminal = Terminal()
+    entrypoint = ["echo Hello", "echo World"]
+    success, output = terminal.run(entrypoint, working_dir)
+    assert success is True
+    assert output == "Hello\nWorld"
+
+
 def test_terminal_run_failure(tmp_path):
     working_dir = str(tmp_path)
     terminal = Terminal()
-    entrypoint = ["ls", "non_existent_dir"]
+    entrypoint = ["ls non_existent_dir"]
     success, output = terminal.run(entrypoint, working_dir)
     assert success is False
     assert output == ("ls: cannot access 'non_existent_dir': No such file or directory")
@@ -90,7 +101,7 @@ def test_docker_terminal_init():
 
 
 @if_docker_running
-def test_terminal_init_with_params(tmp_path):
+def test_docker_terminal_init_with_params(tmp_path):
     working_dir = str(tmp_path)
     setup_commands = ["mkdir new_dir"]
     env_vars = {"ENV_VAR": "value"}

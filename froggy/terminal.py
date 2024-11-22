@@ -108,7 +108,7 @@ class Terminal:
     def has_pseudo_terminal(self):
         return self._master is not None
 
-    def start_pseudo_terminal(self, timeout=120):
+    def start_pseudo_terminal(self, timeout=300, no_output_timeout=30):
         if self.has_pseudo_terminal():
             self.close_pseudo_terminal()
 
@@ -144,7 +144,9 @@ class Terminal:
         initial_output = ""
         commands = " && ".join(self.setup_commands)
         if commands:
-            initial_output = self.interact_with_pseudo_terminal(commands, timeout=timeout)
+            initial_output = self.interact_with_pseudo_terminal(
+                commands, timeout=timeout, no_output_timeout=no_output_timeout
+            )
 
         logger.debug(f"Initial output from interactive terminal: {initial_output}")
 
@@ -157,53 +159,62 @@ class Terminal:
             self._master = None
 
     def read_pseudo_terminal_output(
-        self, expected_output="", timeout=30, read_length=1024
-    ):
-        """Read from PTY until expected_output is found.
-        If no expected_output is provided, read for timeout seconds.
+        self,
+        expected_output: str = "",
+        timeout: int = 300,
+        no_output_timeout: int = 30,
+        read_length: int = 1024,
+    ) -> str:
+        """Read from PTY until expected_output is found, timeout is reached,
+        or no output change for no_output_timeout seconds.
         """
         output = ""
         start_time = time.time()
+        last_change_time = time.time()
         while True:
-            if not expected_output and time.time() - start_time > timeout:
+            if time.time() - start_time > timeout:
                 logger.debug("Timeout reached while reading from PTY.")
                 break
+            if time.time() - last_change_time > no_output_timeout:
+                logger.debug(f"No output change for {no_output_timeout} seconds.")
+                break
             try:
-                # [TODO] 1024? We might need more than that.
                 data = os.read(self._master, read_length).decode(
                     "utf-8", errors="ignore"
                 )
                 if data:
                     output += data
+                    last_change_time = time.time()
                     if expected_output and expected_output in output:
                         break
-
             except BlockingIOError:
                 time.sleep(0.1)
                 continue
-
             except OSError as e:
                 if e.errno == errno.EIO:
-                    # end of file
                     logger.debug("End of file reached while reading from PTY.")
                     break
-
                 if e.errno != errno.EAGAIN:
                     raise
-
         return output
 
     def interact_with_pseudo_terminal(
-        self, command: str, expected_output: str = "", timeout: int = 30
+        self,
+        command: str,
+        expected_output: str = "",
+        timeout: int = 300,
+        no_output_timeout: int = 30,
     ):
         if not isinstance(command, str):
             command = " ".join(command)
 
         logger.debug(f"Sending command to interactive terminal: {command}")
         os.write(self._master, command.encode("utf-8") + b"\n")
-        # get output back:
+
         output = self.read_pseudo_terminal_output(
-            expected_output=expected_output, timeout=timeout
+            expected_output=expected_output,
+            timeout=timeout,
+            no_output_timeout=no_output_timeout,
         )
 
         output = output.strip().strip("\r\n").strip("\n")
