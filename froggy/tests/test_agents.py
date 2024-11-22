@@ -323,9 +323,9 @@ def test_build_history_prompt():
     )
     expected = [f"History of command and terminal outputs (the last 3 steps):"]
     history_messages = [
-        {"step": 2, "command": "action3", "stdout": "obs3"},
-        {"step": 3, "command": "action4", "stdout": "obs4"},
-        {"step": 4, "command": "action5", "stdout": "obs5"},
+        {"step": 0, "command": "action3", "stdout": "obs3"},
+        {"step": 1, "command": "action4", "stdout": "obs4"},
+        {"step": 2, "command": "action5", "stdout": "obs5"},
     ]
     expected += ["\n" + unescape(json.dumps(history_messages, indent=4)) + "\n"]
     expected = [{"role": "user", "content": "\n".join(expected)}]
@@ -337,8 +337,8 @@ def test_build_history_prompt():
     )
     expected = [f"History of command and terminal outputs (the last 2 steps):"]
     history_messages = [
-        {"step": 3, "command": "action4", "stdout": "obs4"},
-        {"step": 4, "command": "action5", "stdout": "obs5"},
+        {"step": 0, "command": "action4", "stdout": "obs4"},
+        {"step": 1, "command": "action5", "stdout": "obs5"},
     ]
     expected += ["\n" + unescape(json.dumps(history_messages, indent=4)) + "\n"]
     expected = [{"role": "user", "content": "\n".join(expected)}]

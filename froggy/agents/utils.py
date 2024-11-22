@@ -1,6 +1,7 @@
 import argparse
 import copy
 import json
+import os
 
 import yaml
 
@@ -193,9 +194,8 @@ def _build_history_non_conversation(
                 latest_rewrite_step = i
                 break
     _history_prompt = []
+    _history = _history[latest_rewrite_step:]
     for _i, history_info in enumerate(_history):
-        if _i < latest_rewrite_step:
-            continue
         _m = {
             "step": _i,
             "command": (
