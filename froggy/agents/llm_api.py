@@ -35,11 +35,9 @@ LLM_CONFIG_FILE = os.environ.get("LLM_CONFIG_FILE", "llm.cfg")
 
 if os.path.exists(LLM_CONFIG_FILE):
     LLM_CONFIGS = json.load(open(LLM_CONFIG_FILE))
+    available_models = list(LLM_CONFIGS.keys()) + ["random", "human"]
 else:
-    raise Exception(
-        f"LLM config file {
-            LLM_CONFIG_FILE} not found in current path nor was it set via environment variable 'LLM_CONFIG_FILE'."
-    )
+    available_models = ["random", "human"]
 
 
 def is_rate_limit_error(exception):
@@ -303,6 +301,10 @@ class Random:
 
 
 def instantiate_llm(config, verbose=False, use_async=False):
+    assert (
+        config["llm_name"] in available_models
+    ), f"Model {config['llm_name']} is not available, please make sure the LLM config file is correctly set."
+
     if config["llm_name"] == "random":
         llm = Random(config["random_seed"], verbose)
     elif config["llm_name"] == "human":
