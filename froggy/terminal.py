@@ -9,11 +9,9 @@ import random
 import shlex
 import string
 import subprocess
-import sys
-import tarfile
+import tempfile
 import termios
 import time
-import tempfile
 
 import docker
 
@@ -351,14 +349,10 @@ class DockerTerminal(Terminal):
             logger.debug(f"Image {image_tag} already exists.")
         except docker.errors.ImageNotFound:
             logger.debug(f"Building image {image_tag}.")
-            dockerfile_bytes = dockerfile.encode("utf-8")
-            context = io.BytesIO()
-            with tarfile.open(fileobj=context, mode="w") as tar:
-                tarinfo = tarfile.TarInfo("Dockerfile")
-                tarinfo.size = len(dockerfile_bytes)
-                tar.addfile(tarinfo, io.BytesIO(dockerfile_bytes))
-            context.seek(0)
             self.docker_client.images.build(
-                fileobj=context, custom_context=True, tag=image_tag, rm=True
+                fileobj=io.BytesIO(dockerfile.encode("utf-8")),
+                tag=image_tag,
+                rm=True,
+                custom_context=False,
             )
         return image_tag
