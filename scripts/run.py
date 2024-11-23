@@ -8,7 +8,6 @@ from froggy.utils import load_config
 
 
 def main():
-
     config, args = load_config()
     available_agents = list(config.keys())
     assert (
