@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 import pytest
 
 from froggy.utils import (
@@ -8,6 +10,7 @@ from froggy.utils import (
     extract_max_score_from_pytest_output,
     extract_reward_from_pytest_output,
     is_subdirectory,
+    load_config,
     make_is_readonly,
     show_line_number,
     str2bool,
@@ -335,3 +338,68 @@ def test_cleanup_pytest_output():
     cleaned_message = cleanup_pytest_output(message)
     expected = "\nSomething else\n"
     assert cleaned_message == expected
+
+
+def test_load_config():
+    import atexit
+    import tempfile
+    from pathlib import Path
+
+    import yaml
+
+    # do the test in a tmp folder
+    tempdir = tempfile.TemporaryDirectory(prefix="TestLoadConfig-")
+    working_dir = Path(tempdir.name)
+    config_file = working_dir / "config.yaml"
+    atexit.register(tempdir.cleanup)  # Make sure to cleanup that folder once done.
+
+    config_contents = {}
+    config_contents["zero_shot"] = {
+        "random_seed": 42,
+        "max_steps": 100,
+        "llm_name": "gpt2",
+        "llm_temperature": [0.5],
+    }
+    config_contents["cot"] = {
+        "random_seed": 43,
+        "max_steps": 50,
+        "cot_style": "standard",
+        "llm_name": "gpt20",
+        "llm_temperature": [0.3, 0.5],
+    }
+
+    # write the config file into yaml
+    with open(config_file, "w") as f:
+        yaml.dump(config_contents, f)
+
+    # now test
+    with patch(
+        "sys.argv",
+        [
+            "config_file",
+            str(config_file),
+            "--agent",
+            "zero_shot",
+            "-p",
+            "zero_shot.random_seed=123",
+            "cot.llm_temperature=[0.8, 0.8]",
+            "-v",
+            "--debug",
+        ],
+    ):
+
+        _config, _args = load_config()
+    assert _args.agent == "zero_shot"
+    assert "zero_shot" in _config.keys()
+    assert "cot" in _config.keys()
+    assert _config["zero_shot"]["random_seed"] == 123
+    assert _config["zero_shot"]["max_steps"] == 100
+    assert _config["zero_shot"]["llm_name"] == "gpt2"
+    assert _config["zero_shot"]["llm_temperature"] == [0.5]
+    assert _config["cot"]["random_seed"] == 43
+    assert _config["cot"]["max_steps"] == 50
+    assert _config["cot"]["cot_style"] == "standard"
+    assert _config["cot"]["llm_name"] == "gpt20"
+    assert _config["cot"]["llm_temperature"] == [0.8, 0.8]
+    assert _args.debug is True
+    assert _args.verbose is True

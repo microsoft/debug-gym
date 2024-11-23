@@ -72,38 +72,6 @@ class HistoryTracker:
         return len(self.memory)
 
 
-def load_config():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("config_file", help="path to config file")
-    parser.add_argument("--agent", help="zero_shot, cot, tadpole", default="zero_shot")
-    parser.add_argument(
-        "--debug", action="store_true", help="Before sending action to the environment."
-    )
-    parser.add_argument("-v", "--verbose", action="store_true", help="Verbose mode")
-    parser.add_argument(
-        "-p",
-        "--params",
-        nargs="+",
-        metavar="my.setting=value",
-        default=[],
-        help="override params of the config file," " e.g. -p 'cot.random_seed=123'",
-    )
-    args = parser.parse_args()
-    assert os.path.exists(args.config_file), "Invalid config file"
-    with open(args.config_file) as reader:
-        config = yaml.safe_load(reader)
-    # Parse overriden params.
-    for param in args.params:
-        fqn_key, value = param.split("=")
-        entry_to_change = config
-        keys = fqn_key.split(".")
-        for k in keys[:-1]:
-            entry_to_change = entry_to_change[k]
-        entry_to_change[keys[-1]] = yaml.safe_load(value)
-    # print(config)
-    return config, args
-
-
 def trim_prompt_messages(
     messages: list[dict], context_length: int, token_counter: callable
 ):
@@ -159,7 +127,7 @@ def trim_prompt_messages(
     return new_messages
 
 
-def _build_history_conversation(
+def build_history_conversation(
     history: list[dict], reset_prompt_history_after_rewrite: bool = False
 ):
     _history = history.get()
@@ -181,7 +149,7 @@ def _build_history_conversation(
     return _messages
 
 
-def _build_history_non_conversation(
+def build_history_non_conversation(
     history: list[dict], reset_prompt_history_after_rewrite: bool = False
 ):
     _history = history.get()
@@ -207,14 +175,14 @@ def _build_history_non_conversation(
     return _history_prompt
 
 
-def _build_history_prompt(
+def build_history_prompt(
     history: list[dict],
     use_conversational_prompt: bool = True,
     reset_prompt_history_after_rewrite: bool = False,
 ):
     messages = []
     if use_conversational_prompt is True:
-        conversation_history = _build_history_conversation(
+        conversation_history = build_history_conversation(
             history, reset_prompt_history_after_rewrite
         )
         if len(conversation_history) == 0:
@@ -233,7 +201,7 @@ def _build_history_prompt(
             )
             messages.extend(conversation_history)
     else:
-        history_prompt = _build_history_non_conversation(
+        history_prompt = build_history_non_conversation(
             history, reset_prompt_history_after_rewrite
         )
         if len(history_prompt) == 0:

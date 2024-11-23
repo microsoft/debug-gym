@@ -1,3 +1,4 @@
+import argparse
 import codecs
 import os
 import re
@@ -5,6 +6,8 @@ import signal
 from contextlib import contextmanager
 from os.path import join as pjoin
 from typing import Optional
+
+import yaml
 
 
 def clean_code(code):
@@ -171,3 +174,36 @@ def extract_reward_from_pytest_output(output):
         return int(match.group(1))
 
     return 0
+
+
+def load_config():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("config_file", help="path to config file")
+    parser.add_argument("--agent", help="zero_shot, cot, tadpole", default="zero_shot")
+    parser.add_argument(
+        "--debug", action="store_true", help="Before sending action to the environment."
+    )
+    parser.add_argument("-v", "--verbose", action="store_true", help="Verbose mode")
+    parser.add_argument(
+        "-p",
+        "--params",
+        nargs="+",
+        metavar="my.setting=value",
+        default=[],
+        help="override params of the config file," " e.g. -p 'cot.random_seed=123'",
+    )
+    args = parser.parse_args()
+    assert os.path.exists(args.config_file), "Invalid config file"
+    with open(args.config_file) as reader:
+        config = yaml.safe_load(reader)
+
+    # Parse overriden params.
+    for param in args.params:
+        fqn_key, value = param.split("=")
+        entry_to_change = config
+        keys = fqn_key.split(".")
+        for k in keys[:-1]:
+            entry_to_change = entry_to_change[k]
+        entry_to_change[keys[-1]] = yaml.safe_load(value)
+
+    return config, args

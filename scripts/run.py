@@ -3,12 +3,11 @@ from os.path import join as pjoin
 
 from termcolor import colored
 
-from froggy.agents.utils import load_config
 from froggy.tools import Toolbox
+from froggy.utils import load_config
 
 
 def main():
-
     config, args = load_config()
     available_agents = list(config.keys())
     assert (

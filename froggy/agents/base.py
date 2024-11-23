@@ -8,7 +8,7 @@ import numpy as np
 from termcolor import colored
 
 from froggy.agents.llm_api import instantiate_llm
-from froggy.agents.utils import HistoryTracker, _build_history_prompt
+from froggy.agents.utils import HistoryTracker, build_history_prompt
 from froggy.utils import unescape
 
 
@@ -30,7 +30,7 @@ class AgentBase:
         np.random.seed(seed)
 
     def build_history_prompt(self):
-        messages = _build_history_prompt(
+        messages = build_history_prompt(
             self.history,
             self.config["use_conversational_prompt"],
             self.config["reset_prompt_history_after_rewrite"],
