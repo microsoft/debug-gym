@@ -164,4 +164,8 @@ zero_shot_pdb_after_rewrites:
     memory_size: 20
     use_conversational_prompt: True
     save_patch: True
+<<<<<<< HEAD
     log_prompt_response_pairs: True
+=======
+    log_prompt_response_pairs: True
+>>>>>>> 89c86b39ea75091f4f273236d7a9d2469dbff7f9
