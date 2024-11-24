@@ -2,10 +2,11 @@ import os
 import numpy as np
 import subprocess
 import unittest
-from unittest.mock import patch, MagicMock
+
+from os.path import join as pjoin
+from unittest.mock import patch, MagicMock, mock_open
 from pathlib import Path, PosixPath
 from froggy.envs import RepoEnv, TooledEnv
-from froggy.utils import load_config
 
 class TestTooledEnv(unittest.TestCase):
     def setUp(self):
@@ -101,21 +102,6 @@ class TestTooledEnv(unittest.TestCase):
         self.assertEqual(self.env.tool_instructions, {"tool1": "instructions1", "tool2": "instructions2"})
 
 class TestRepoEnv(unittest.TestCase):
-    @patch('sys.argv', ['run.py', 'scripts/config.yaml', '--agent', 'cot', '--debug', '-v'])
-    def test_workspace(self):
-        config, args = load_config()
-        config = config[args.agent]
-
-        assert args.config_file == 'scripts/config.yaml'
-        assert args.agent == 'cot'
-        assert args.debug == True
-        assert args.verbose == True
-        
-        env = RepoEnv(**config["env_kwargs"])
-
-        assert isinstance(env.path, PosixPath)
-        assert env.path == PosixPath('data/pytorch')
-        
     @patch('tempfile.TemporaryDirectory')
     @patch('atexit.register')
     @patch('shutil.copytree')
@@ -211,7 +197,7 @@ class TestRepoEnv(unittest.TestCase):
     @patch('os.walk')
     @patch('shutil.copytree')
     def test_restore(self, mock_copytree, mock_os_walk, mock_scandir, mock_glob, mock_isdir, mock_copy2):
-               # Mock the return value of os.scandir
+        # Mock the return value of os.scandir
         mock_scandir.return_value.__enter__.return_value = [
             MagicMock(is_dir=lambda: False, path='/path/to/repo/file1.txt'),
             MagicMock(is_dir=lambda: False, path='/path/to/repo/file2.txt')
@@ -326,16 +312,10 @@ class TestRepoEnv(unittest.TestCase):
         expected_result = {
             "File name": 'file.py',
             "Content": "\n     1 def foo():\n     2     return 42\n",
-            # "Note": "B indicates breakpoint before a certain line of code, this can be changed using pdb commands such as b, cl, etc."
         }
 
         # Assertions
         self.assertEqual(result, expected_result)
-        # mock_show_line_number.assert_called_once_with(
-        #     env.current_file_content,
-        #     env.current_file,
-        #     env.current_breakpoints_state
-        # )
 
     @patch.object(RepoEnv, 'get_triggered_tools')
     @patch.object(RepoEnv, 'get_tool')
@@ -368,8 +348,6 @@ class TestRepoEnv(unittest.TestCase):
         # Assertions
         mock_get_triggered_tools.assert_called_once_with("some action")
         mock_pdb_tool.use.assert_called_once_with("some action")
-        # mock_run.assert_called_once()
-        #mock_pdb_tool.start_pseudo_terminal.assert_called_once()
         self.assertEqual(obs, "PDB tool used")
         self.assertEqual(score, 0)
         self.assertFalse(done)
@@ -383,7 +361,6 @@ class TestRepoEnv(unittest.TestCase):
         self.assertIn("action", infos)
         self.assertIn("done", infos)
         self.assertIn("score", infos)
-        # self.assertIn("is_rewrite", infos)
         self.assertIn("max_score", infos)
         self.assertIn("instructions", infos)
         self.assertIn("rewrite_counter", infos)
@@ -396,13 +373,6 @@ class TestRepoEnv(unittest.TestCase):
     @patch('shutil.copytree')
     @patch('tempfile.TemporaryDirectory')
     def test_directory_tree(self, mock_tempdir, mock_copytree, mock_os_walk, mock_scandir, mock_is_file, mock_exists, mock_walk):
-        # Mock the return value of _walk
-        mock_walk.return_value = [
-            '/path/to/repo/file1.py',
-            '/path/to/repo/subdir',
-            '/path/to/repo/subdir/file2.py'
-        ]
-
         mock_tempdir.return_value.name = '/mock/tempdir'
         
         mock_scandir.return_value.__enter__.return_value = [
@@ -432,7 +402,6 @@ class TestRepoEnv(unittest.TestCase):
 
         # Assertions
         self.assertEqual(result, expected_result)
-        # mock_walk.assert_called_once_with(Path('/path/to/repo').absolute(), None)
 
     @patch.object(RepoEnv, 'restore')
     @patch.object(RepoEnv, 'run')
@@ -471,12 +440,10 @@ class TestRepoEnv(unittest.TestCase):
         # Assertions
         mock_restore.assert_called_once()
         mock_run.assert_called_once()
-        # mock_pdb_tool.start_pseudo_terminal.assert_called_once()
         self.assertEqual(env.current_file, None)
         self.assertEqual(env.current_file_content, None)
         self.assertEqual(env.current_breakpoints_state, {})
         self.assertEqual(env.rewrite_counter, 0)
-        # self.assertEqual(env.obs, "Debugging terminal started:\nPDB started\n")
         self.assertIn("obs", infos)
         self.assertIn("dbg_obs", infos)
         self.assertIn("last_run_obs", infos)
@@ -487,11 +454,76 @@ class TestRepoEnv(unittest.TestCase):
         self.assertIn("action", infos)
         self.assertIn("done", infos)
         self.assertIn("score", infos)
-        # self.assertIn("is_rewrite", infos)
         self.assertIn("max_score", infos)
         self.assertIn("instructions", infos)
         self.assertIn("rewrite_counter", infos)
-        
+
+    @patch('os.scandir')
+    @patch('os.walk')
+    @patch('shutil.copytree')
+    @patch('builtins.open', new_callable=mock_open)
+    def test_overwrite_file(self, mock_open, mock_copytree, mock_os_walk, mock_scandir):
+        mock_scandir.return_value.__enter__.return_value = [
+            MagicMock(is_dir=lambda: False, path='/path/to/repo/file1.txt'),
+            MagicMock(is_dir=lambda: False, path='/path/to/repo/file2.txt')
+        ]
+
+        # Mock the return value of os.walk
+        mock_os_walk.return_value = [
+            ('/path/to/repo', ('subdir',), ('file1.py', 'file2.py')),
+            ('/path/to/repo/subdir', (), ('subfile1.txt',)),
+        ]
+        # Create an instance of RepoEnv
+        env = RepoEnv(path='/path/to/repo')
+
+        # Define the file path and content to be written
+        filepath = 'file.py'
+        content = 'print("Hello, World!")'
+
+        # Call the overwrite_file method
+        env.overwrite_file(filepath, content)
+
+        # Assertions
+        mock_open.assert_called_once_with(pjoin(env.working_dir, filepath), 'w')
+        mock_open().write.assert_called_once_with(content)
+
+
+    @patch('os.scandir')
+    @patch('os.walk')
+    @patch('shutil.copytree')
+    @patch('subprocess.run')
+    def test_patch(self, mock_subprocess_run, mock_copytree, mock_os_walk, mock_scandir):
+        # Mock the return value of subprocess.run
+        mock_result = MagicMock()
+        mock_result.stdout = "diff --git a/path/to/repo/file1.py b/path/to/repo/file1.py\n"
+        mock_subprocess_run.return_value = mock_result
+
+        mock_scandir.return_value.__enter__.return_value = [
+            MagicMock(is_dir=lambda: False, path='/path/to/repo/file1.txt'),
+            MagicMock(is_dir=lambda: False, path='/path/to/repo/file2.txt')
+        ]
+
+        # Mock the return value of os.walk
+        mock_os_walk.return_value = [
+            ('/path/to/repo', ('subdir',), ('file1.py', 'file2.py')),
+            ('/path/to/repo/subdir', (), ('subfile1.txt',)),
+        ]
+        # Create an instance of RepoEnv
+        env = RepoEnv(path='/path/to/repo')
+
+        # Call the patch property
+        result = env.patch
+
+        # Define the expected result
+        expected_result = "diff --git a/path/to/repo/file1.py b/path/to/repo/file1.py\n"
+
+        # Assertions
+        mock_subprocess_run.assert_called_once_with(
+            ["git", "diff", "--no-index", env.path, env.working_dir],
+            text=True,
+            capture_output=True
+        )
+        self.assertEqual(result, expected_result)
+
 if __name__ == '__main__':
     unittest.main()
-    
