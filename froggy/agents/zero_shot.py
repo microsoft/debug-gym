@@ -228,15 +228,20 @@ class AgentZeroShot_PdbAfterRewrites(AgentZeroShot):
             if debug:
                 breakpoint()
 
-            if info["rewrite_counter"] >= self.config["n_rewrites_before_pdb"] - 1:
-                if pdb_tool.name not in self.env.tools:
-                    if answer.startswith("```rewrite"):
-                        self.env.add_tool(pdb_tool)
-
             _, _, done, info = self.env.step(answer)
             info["token_usage"] = [
                 token_usage
             ]  # in some other agents this is a list because of multi-step llm calls
+
+            # re-introduce pdb tool at the right time
+            if (
+                info["rewrite_counter"] >= self.config["n_rewrites_before_pdb"]
+                and pdb_tool.name not in self.env.tools
+            ):
+                self.env.add_tool(pdb_tool)
+                info["instructions"] = self.env.instructions
+                info["obs"] += "\nThe pdb tool has been added."
+
             self.history.step(info)
             self.history.save_prompt_response_pairs(
                 prompt_response_pairs=[(prompt, answer)]
