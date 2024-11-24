@@ -348,6 +348,7 @@ class TestRepoEnv(unittest.TestCase):
         # Assertions
         mock_get_triggered_tools.assert_called_once_with("some action")
         mock_pdb_tool.use.assert_called_once_with("some action")
+
         self.assertEqual(obs, "PDB tool used")
         self.assertEqual(score, 0)
         self.assertFalse(done)
