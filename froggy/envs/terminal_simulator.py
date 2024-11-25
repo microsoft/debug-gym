@@ -27,7 +27,9 @@ class TerminalSimulatorEnv(RepoEnv):
         self.tempdir = tempfile.TemporaryDirectory(prefix="TerminalSimulatorEnv-")
         self.tempdir_name = self.tempdir.name
 
-    def reset(self, *, seed=None, options={}):
+    def reset(self, *, seed=None, options: dict = None):
+        if options is None:
+            options = {}
         self.tempdir.cleanup()
         self.current_sample = self.dataset[options["task_name"]]
         shutil.copytree(self.bug_free_code_path, self.tempdir_name, dirs_exist_ok=True)

@@ -30,7 +30,9 @@ class AiderBenchmarkEnv(RepoEnv):
         super().__init__(**kwargs)
         self.load_dataset()
 
-    def reset(self, *, seed=None, options={}):
+    def reset(self, *, seed=None, options: dict = None):
+        if options is None:
+            options = {}
         self.current_sample = self.dataset[options["task_name"]]
         directory = self.current_sample["base_directory"]
         entrypoint = self.current_sample["entry_point"]
@@ -86,7 +88,7 @@ class AiderBenchmarkEnv(RepoEnv):
                 "instructions": instructions,
                 "filename": task_name + ".py",
             }
-    
+
     def make_froggyignore(self, directory: str, include_gitignore: bool = True):
         froggyignore_contents = "\n".join(
                         [
@@ -110,10 +112,10 @@ class AiderBenchmarkEnv(RepoEnv):
                 gitignore_content = f.read()
                 froggyignore_contents += "\n"
                 froggyignore_contents += gitignore_content
-        
+
         with open(directory / ".froggyignore", "w") as f:
                 f.write(froggyignore_contents)
-        
+
 
 
 

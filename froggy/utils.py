@@ -54,7 +54,9 @@ def show_line_number(code_string, code_path=None, breakpoints_state=None):
     return "\n".join(output)
 
 
-def make_is_readonly(full_path, base_dir=None, patterns: list[str] = []):
+def make_is_readonly(full_path, base_dir=None, patterns: list[str] = None):
+    if patterns is None:
+        patterns = []
     # Ref: gitignore_parser.parse_gitignore
     from gitignore_parser import _normalize_path, handle_negation, rule_from_pattern
 
@@ -90,7 +92,9 @@ class HistoryTracker:
     def step(self, new_info) -> None:
         self.memory.append(copy.copy(new_info))
 
-    def save_prompt_response_pairs(self, prompt_response_pairs=[]):
+    def save_prompt_response_pairs(self, prompt_response_pairs=None):
+        if prompt_response_pairs is None:
+            prompt_response_pairs = []
         _data = {}
         for i, pair in enumerate(prompt_response_pairs):
             _prompt, _response = pair
