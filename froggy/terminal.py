@@ -87,7 +87,7 @@ class Terminal:
         return success, output
 
     def run_interactive(
-        self, entrypoint: list[str], expected_output: str = "", timeout: int = 30
+        self, entrypoint: str, expected_output: str = "", timeout: int = 30
     ):
         """Run a command in the interactive terminal and return the output.
         Requires a PTY. The terminal stays open after the command is executed.
@@ -210,9 +210,6 @@ class Terminal:
         timeout: int = 300,
         no_output_timeout: int = 30,
     ):
-        if not isinstance(command, str):
-            command = " ".join(command)
-
         logger.debug(f"Sending command to interactive terminal: {command}")
         os.write(self._master, command.encode("utf-8") + b"\n")
 
