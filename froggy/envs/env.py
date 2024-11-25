@@ -125,11 +125,8 @@ class RepoEnv(TooledEnv):
         self.current_file = None
         self.current_file_content = None
         self.current_breakpoints_state = {}
-        if not hasattr(
-            self, "entrypoint"
-        ):  # TODO: entrypoint is currently an optional argument,
-            self.entrypoint = entrypoint.split()
-        assert self.entrypoint[0] == "python", "Only support python entrypoint for now."
+        assert entrypoint.split()[0] == "python", "Only support python entrypoint for now."
+        self.entrypoint = [entrypoint]
 
         # Set up the terminal working dir
         self.terminal.working_dir = str(self.working_dir)
