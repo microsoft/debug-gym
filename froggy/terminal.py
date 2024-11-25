@@ -232,7 +232,7 @@ class DockerTerminal(Terminal):
 
     def __init__(
         self,
-        working_dir: str = "/",
+        working_dir: str = None,
         setup_commands: list[str] = None,
         env_vars: dict[str, str] = None,
         base_image: str = "ubuntu:latest",
@@ -262,6 +262,18 @@ class DockerTerminal(Terminal):
         self.host_gid = os.getgid()
         self._patched_image = None
         self._container = None
+
+    @property
+    def working_dir(self):
+        """Lazy initialization of working_dir and volume."""
+        working_dir = super().working_dir
+        self.volumes[working_dir] = {"bind": working_dir, "mode": "rw"}
+        return working_dir
+
+    @working_dir.setter
+    def working_dir(self, value):
+        self._working_dir = value
+        self.volumes[self._working_dir] = {"bind": self._working_dir, "mode": "rw"}
 
     @property
     def patched_image(self):

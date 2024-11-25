@@ -111,9 +111,12 @@ def test_docker_terminal_init():
     terminal = DockerTerminal()
     assert terminal.setup_commands == []
     assert terminal.env_vars == {"NO_COLOR": "1", "PS1": ""}
-    assert terminal.working_dir == "/"
+    assert terminal.working_dir.startswith("/tmp/Terminal-")
     assert terminal.base_image == "ubuntu:latest"
-    assert terminal.volumes == {}
+    assert terminal.volumes[terminal.working_dir] == {
+        "bind": terminal.working_dir,
+        "mode": "rw",
+    }
     assert terminal.container is not None
     assert terminal.container.status == "created"
 
@@ -165,19 +168,29 @@ def test_docker_terminal_run(tmp_path):
 
 @if_docker_running
 def test_docker_terminal_read_only_volume(tmp_path):
-    with open(tmp_path / "test.txt", "w") as f:
-        f.write("test")
-
     working_dir = str(tmp_path)
-    volumes = {working_dir: {"bind": working_dir, "mode": "ro"}}
+    read_only_dir = tmp_path / "read_only"
+    read_only_dir.mkdir()
+    with open(read_only_dir / "test.txt", "w") as f:
+        f.write("test")
+    read_only_dir = str(read_only_dir)
+    volumes = {read_only_dir: {"bind": read_only_dir, "mode": "ro"}}
     docker_terminal = DockerTerminal(working_dir=working_dir, volumes=volumes)
-    success, ls_output = docker_terminal.run("ls")
+    volumes = {
+        working_dir: {"bind": working_dir, "mode": "rw"},
+        read_only_dir: {"bind": read_only_dir, "mode": "ro"},
+    }
+    success, ls_output = docker_terminal.run(f"ls {read_only_dir}")
     assert success is True
     assert ls_output.startswith("test.txt")
 
-    success, output = docker_terminal.run("touch test2.txt")
+    success, output = docker_terminal.run(f"touch {read_only_dir}/test2.txt")
     assert success is False
-    assert output == "touch: cannot touch 'test2.txt': Read-only file system"
+    assert output == f"touch: cannot touch '{read_only_dir}/test2.txt': Read-only file system"
+
+    success, output = docker_terminal.run(f"touch {working_dir}/test2.txt")
+    assert success is True
+    assert output == ""
 
 
 @if_docker_running
