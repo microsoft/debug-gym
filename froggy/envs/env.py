@@ -77,8 +77,8 @@ class RepoEnv(TooledEnv):
         self.run_timeout = run_timeout
         self.dir_tree_depth = dir_tree_depth
         self.auto_view_change = auto_view_change
-        self.setup_workspace(path, entrypoint, readonly_patterns)
         self.terminal = terminal or Terminal()
+        self.setup_workspace(path, entrypoint, readonly_patterns)
 
     def setup_workspace(
         self,
@@ -126,6 +126,9 @@ class RepoEnv(TooledEnv):
         ):  # TODO: entrypoint is currently an optional argument,
             self.entrypoint = entrypoint.split()
         assert self.entrypoint[0] == "python", "Only support python entrypoint for now."
+
+        # Set up the terminal working dir
+        self.terminal.working_dir = str(self.working_dir)
 
     def cleanup_workspace(self):
         self.tempdir.cleanup()

@@ -30,8 +30,8 @@ def setup_test_repo():
 
 def test_pdb_use(tmp_path, setup_test_repo):
     tests_path = str(setup_test_repo(tmp_path))
-    environment = RepoEnv(path=tests_path)
-    terminal = Terminal(working_dir=tests_path)
+    terminal = Terminal()
+    environment = RepoEnv(path=tests_path, terminal=terminal)
     pdb = PDBTool()
     pdb.register(environment)
     pdb.start_pdb(terminal)
@@ -50,13 +50,11 @@ def test_pdb_use(tmp_path, setup_test_repo):
 def test_pdb_use_docker_terminal(tmp_path, setup_test_repo):
     """Test PDBTool similar to test_pdb_use but using DockerTerminal"""
     tests_path = str(setup_test_repo(tmp_path))
-    environment = RepoEnv(path=tests_path)
     terminal = DockerTerminal(
-        working_dir=tests_path,
         base_image="python:3.12-slim",
         setup_commands=["pip install pytest"],
-        volumes={tests_path: {"bind": tests_path, "mode": "rw"}},
     )
+    environment = RepoEnv(path=tests_path, terminal=terminal)
     pdb = PDBTool()
     pdb.register(environment)
     pdb_cmd = f"python -m pdb -m pytest -sv ."

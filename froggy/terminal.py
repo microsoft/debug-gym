@@ -27,10 +27,6 @@ class Terminal:
         env_vars: dict[str, str] = None,
         include_os_env_vars: bool = True,
     ):
-        if working_dir is None:
-            temp_dir = tempfile.TemporaryDirectory(prefix="Terminal-")
-            atexit.register(lambda: temp_dir.cleanup())
-            working_dir = temp_dir.name
         self.setup_commands = setup_commands or []
         self.env_vars = env_vars or {}
         if include_os_env_vars:
@@ -38,8 +34,22 @@ class Terminal:
         # Clean up output by disabling terminal prompt and colors
         self.env_vars["NO_COLOR"] = "1"  # disable colors
         self.env_vars["PS1"] = ""  # disable prompt
-        self.working_dir = working_dir
+        self._working_dir = working_dir
         self._master = None  # PTY master file descriptor
+
+    @property
+    def working_dir(self):
+        """Lazy initialization of the working directory."""
+        if self._working_dir is None:
+            temp_dir = tempfile.TemporaryDirectory(prefix="Terminal-")
+            atexit.register(lambda: temp_dir.cleanup())
+            self._working_dir = temp_dir.name
+            logger.debug(f"Using temporary working directory: {self._working_dir}")
+        return self._working_dir
+
+    @working_dir.setter
+    def working_dir(self, value):
+        self._working_dir = value
 
     def prepare_command(self, entrypoint: list[str]) -> list[str]:
         """Prepares a shell command by combining setup commands and entrypoint commands.
@@ -250,8 +260,22 @@ class DockerTerminal(Terminal):
         self.docker_client = docker.from_env()
         self.host_uid = os.getuid()
         self.host_gid = os.getgid()
-        self.patched_image = self.patch_base_image(base_image)
-        self.container = self.setup_container()
+        self._patched_image = None
+        self._container = None
+
+    @property
+    def patched_image(self):
+        """Lazy initialization of the patched image."""
+        if self._patched_image is None:
+            self._patched_image = self.patch_base_image(self.base_image)
+        return self._patched_image
+
+    @property
+    def container(self):
+        """Lazy initialization of the container."""
+        if self._container is None:
+            self._container = self.setup_container()
+        return self._container
 
     @property
     def default_entrypoint(self) -> list[str]:
