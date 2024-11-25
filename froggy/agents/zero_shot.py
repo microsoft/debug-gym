@@ -84,7 +84,6 @@ class AgentZeroShot_NoPDB(AgentZeroShot):
 
     def __init__(self, config_dict, env, verbose=False, _uuid=None):
         super().__init__(config_dict, env, verbose, _uuid)
-        self.history = HistoryTracker(self.config["memory_size"])
 
     def build_system_prompt(self, info):
         system_prompt = {}
@@ -122,7 +121,6 @@ class AgentZeroShot_PdbAfterRewrites(AgentZeroShot):
 
     def __init__(self, config_dict, env, verbose=False, _uuid=None):
         super().__init__(config_dict, env, verbose, _uuid)
-        self.history = HistoryTracker(self.config["memory_size"])
 
     def run(self, task_name=None, debug=False):
 
@@ -189,4 +187,5 @@ class AgentZeroShot_PdbAfterRewrites(AgentZeroShot):
                     )
                 )
                 break
+
         return done
