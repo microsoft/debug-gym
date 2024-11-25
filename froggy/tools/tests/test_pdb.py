@@ -35,7 +35,9 @@ def test_pdb_use(tmp_path, setup_test_repo):
     environment = RepoEnv(path=tests_path, terminal=terminal)
     pdb = PDBTool()
     pdb.register(environment)
-    pdb.start_pdb(terminal)
+    initial_output = pdb.start_pdb(terminal)
+    assert """The pytest entry point.""" in initial_output
+    assert "(Pdb)" in initial_output
     output = pdb.use("pdb l")
     assert """The pytest entry point.""" in output
     assert "(Pdb)" in output

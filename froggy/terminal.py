@@ -64,7 +64,7 @@ class Terminal:
         return command
 
     def run(self, entrypoint: list[str], timeout=None) -> tuple[bool, str]:
-        """Run a command in the terminal. Return command status and output."""
+        """Run a list of commands in the terminal. Return command status and output."""
         command = self.prepare_command(entrypoint)
         logger.debug(f"Running command in terminal: {command}")
         process = subprocess.Popen(

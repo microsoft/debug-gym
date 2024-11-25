@@ -84,7 +84,8 @@ class PDBTool(EnvironmentTool):
         if terminal is not None:
             self.terminal = terminal
         if pdb_cmd is None:
-            entrypoint = " ".join(self.environment.entrypoint[1:])
+            # remove the first word, which is "python"
+            entrypoint = " ".join(self.environment.entrypoint.split()[1:])
             pdb_cmd = f'python -m pdb {entrypoint}'
 
         initial_output = self.interact_with_pdb(pdb_cmd, expected_output="(Pdb)")

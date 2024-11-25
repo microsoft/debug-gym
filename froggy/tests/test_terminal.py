@@ -80,7 +80,7 @@ def test_terminal_run_failure(tmp_path):
 
 def test_terminal_pseudo_terminal(tmp_path):
     working_dir = str(tmp_path)
-    command = ["echo", "Hello World"]
+    command = "echo Hello World"
     terminal = Terminal(working_dir=working_dir)
     assert terminal.has_pseudo_terminal() is False
 
@@ -89,10 +89,10 @@ def test_terminal_pseudo_terminal(tmp_path):
     output = terminal.run_interactive(command, timeout=1)
     assert output == "Hello World"
 
-    terminal.run_interactive(["export", "TEST_VAR='FooBar'"], timeout=1)
-    output = terminal.run_interactive(["pwd"], timeout=1)
+    terminal.run_interactive("export TEST_VAR='FooBar'", timeout=1)
+    output = terminal.run_interactive("pwd", timeout=1)
     assert output == working_dir
-    output = terminal.run_interactive(["echo", "$TEST_VAR"], timeout=1)
+    output = terminal.run_interactive("echo $TEST_VAR", timeout=1)
     assert output == "FooBar"
 
     terminal.close_pseudo_terminal()
@@ -198,7 +198,7 @@ def test_docker_terminal_pseudo_terminal(tmp_path):
     # same as test_terminal_pseudo_terminal but with DockerTerminal
     working_dir = str(tmp_path)
     volumes = {working_dir: {"bind": working_dir, "mode": "rw"}}
-    command = ["echo", "Hello World"]
+    command = "echo Hello World"
     terminal = DockerTerminal(working_dir=working_dir, volumes=volumes)
     assert terminal.has_pseudo_terminal() is False
 
@@ -207,10 +207,10 @@ def test_docker_terminal_pseudo_terminal(tmp_path):
     output = terminal.run_interactive(command, timeout=1)
     assert output == "Hello World"
 
-    terminal.run_interactive(["export", "TEST_VAR='FooBar'"], timeout=1)
-    output = terminal.run_interactive(["pwd"], timeout=1)
+    terminal.run_interactive("export TEST_VAR='FooBar'", timeout=1)
+    output = terminal.run_interactive("pwd", timeout=1)
     assert output == working_dir
-    output = terminal.run_interactive(["echo", "$TEST_VAR"], timeout=1)
+    output = terminal.run_interactive("echo $TEST_VAR", timeout=1)
     assert output == "FooBar"
 
     terminal.close_pseudo_terminal()

@@ -130,7 +130,7 @@ class RepoEnv(TooledEnv):
         self.current_file_content = None
         self.current_breakpoints_state = {}
         assert entrypoint.split()[0] == "python", "Only support python entrypoint for now."
-        self.entrypoint = [entrypoint]
+        self.entrypoint = entrypoint
 
         # Set up the terminal working dir
         self.terminal.working_dir = str(self.working_dir)
@@ -210,7 +210,7 @@ class RepoEnv(TooledEnv):
 
     def run(self):
         success, output = self.terminal.run(
-            self.entrypoint, timeout=self.run_timeout
+            [self.entrypoint], timeout=self.run_timeout
         )
         self.last_run_obs = output
         self.score = int(success)
