@@ -223,3 +223,15 @@ def test_docker_terminal_pseudo_terminal(tmp_path):
 
     terminal.close_pseudo_terminal()
     assert terminal.has_pseudo_terminal() is False
+
+
+@if_docker_running
+def test_docker_terminal_update_volumes_with_working_dir(tmp_path):
+    working_dir_a = str(tmp_path / "dir_a")
+    terminal = DockerTerminal(working_dir=working_dir_a)
+    assert terminal.working_dir == working_dir_a
+    assert terminal.volumes[working_dir_a] == {"bind": working_dir_a, "mode": "rw"}
+
+    working_dir_b = str(tmp_path / "dir_b")
+    terminal.working_dir = working_dir_b
+    assert terminal.volumes[working_dir_b] == {"bind": working_dir_b, "mode": "rw"}

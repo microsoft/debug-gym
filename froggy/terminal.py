@@ -266,12 +266,16 @@ class DockerTerminal(Terminal):
     @property
     def working_dir(self):
         """Lazy initialization of working_dir and volume."""
+        if self._working_dir is not None:
+            self.volumes.pop(self._working_dir, None)
         working_dir = super().working_dir
         self.volumes[working_dir] = {"bind": working_dir, "mode": "rw"}
         return working_dir
 
     @working_dir.setter
     def working_dir(self, value):
+        if self._working_dir is not None:
+            self.volumes.pop(self._working_dir, None)
         self._working_dir = value
         self.volumes[self._working_dir] = {"bind": self._working_dir, "mode": "rw"}
 
