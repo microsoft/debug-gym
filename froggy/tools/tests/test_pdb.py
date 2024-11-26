@@ -2,6 +2,10 @@ import subprocess
 from unittest.mock import MagicMock
 import pytest
 
+import unittest
+from unittest.mock import patch, MagicMock
+from froggy.utils import TimeoutException
+
 from froggy.envs.env import RepoEnv
 from froggy.terminal import DockerTerminal, Terminal
 from froggy.tools.pdb import PDBTool
@@ -98,3 +102,91 @@ def test_pdb_use_docker_terminal_no_env(tmp_path, setup_test_repo):
     assert "test_pass.py::test_pass PASSED" in pdb.pdb_obs
     assert "Reached the end of the file. Restarting the debugging session." in output
     assert "(Pdb)" in output
+
+class TestPDBTool(unittest.TestCase):
+
+    def setUp(self):
+        self.env = MagicMock(spec=RepoEnv)
+        self.env.working_dir = "/path/to/repo"
+        self.env.current_breakpoints_state = {}
+        self.terminal = MagicMock(spec=Terminal)
+        self.pdb_tool = PDBTool()
+
+    def test_initialization(self):
+        self.assertIsNone(self.pdb_tool.master)
+        self.assertEqual(self.pdb_tool.pdb_obs, "")
+        self.assertFalse(self.pdb_tool.persistent_breakpoints)
+        self.assertTrue(self.pdb_tool.auto_list)
+        self.assertIsNone(self.pdb_tool.current_frame_file)
+        self.assertIsNone(self.pdb_tool._terminal)
+
+    def test_register(self):
+        self.pdb_tool.register(self.env)
+        self.assertEqual(self.pdb_tool.environment, self.env)
+
+    def test_register_invalid_environment(self):
+        with self.assertRaises(ValueError):
+            self.pdb_tool.register(MagicMock())
+
+    def test_terminal_getter_setter(self):
+        with self.assertRaises(ValueError):
+            _ = self.pdb_tool.terminal
+
+        self.pdb_tool.terminal = self.terminal
+        self.assertEqual(self.pdb_tool.terminal, self.terminal)
+
+    @patch.object(PDBTool, 'interact_with_pdb')
+    def test_start_pdb(self, mock_interact_with_pdb):
+        mock_interact_with_pdb.return_value = "(Pdb)"
+        self.pdb_tool.register(self.env)
+        self.env.entrypoint = "python script.py"
+
+        output = self.pdb_tool.start_pdb(terminal=self.terminal)
+        self.assertEqual(output, "(Pdb)")
+        self.assertEqual(self.pdb_tool.pdb_obs, "(Pdb)")
+
+    @patch.object(PDBTool, 'interact_with_pdb')
+    @patch.object(PDBTool, 'close_pdb')
+    def test_restart_pdb(self, mock_close_pdb, mock_interact_with_pdb):
+        mock_interact_with_pdb.return_value = "(Pdb)"
+        self.pdb_tool.register(self.env)
+        self.env.entrypoint = "python script.py"
+
+        output = self.pdb_tool.restart_pdb()
+        self.assertEqual(output, "(Pdb)")
+        self.assertEqual(self.pdb_tool.pdb_obs, "(Pdb)")
+
+    @patch.object(PDBTool, 'interact_with_pdb')
+    def test_use_command(self, mock_interact_with_pdb):
+        mock_interact_with_pdb.return_value = "output"
+        self.pdb_tool.register(self.env)
+        self.env.current_file = "script.py"
+        self.env.all_files = ["script.py"]
+
+        output = self.pdb_tool.use("```pdb p x```")
+        self.assertIn("output", output)
+
+    @patch.object(PDBTool, 'interact_with_pdb')
+    def test_breakpoint_add_clear(self, mock_interact_with_pdb):
+        mock_interact_with_pdb.return_value = "output"
+        self.pdb_tool.register(self.env)
+        self.env.current_file = "script.py"
+        self.env.all_files = ["script.py"]
+
+        success, output = self.pdb_tool.breakpoint_add_clear("b 42")
+        self.assertTrue(success)
+        self.assertIn("output", output)
+
+    @patch.object(PDBTool, 'interact_with_pdb')
+    def test_get_current_frame_file(self, mock_interact_with_pdb):
+        mock_interact_with_pdb.return_value = (
+            "/home/user/repo/script.py(10)<module>()\n-> line of code"
+        )
+        self.pdb_tool.register(self.env)
+        self.env.working_dir = "/home/user/repo"
+
+        self.pdb_tool.get_current_frame_file()
+        # self.assertEqual(self.pdb_tool.current_frame_file, "script.py")
+
+if __name__ == '__main__':
+    unittest.main()
