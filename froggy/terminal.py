@@ -331,12 +331,8 @@ class DockerTerminal(Terminal):
 
     def setup_container(self) -> docker.models.containers.Container:
         # Create and start a container mounting volumes and setting environment variables
-
-        suffix = "".join(random.choices(string.ascii_lowercase, k=8))
-        container_name = f"froggy-container-{suffix}"
         logger.debug(
-            f"Setting up container: {container_name} "
-            f"with base image: {self.patched_image}"
+            f"Setting up container with base image: {self.patched_image}"
         )
         container = self.docker_client.containers.run(
             image=self.patched_image,
@@ -344,14 +340,16 @@ class DockerTerminal(Terminal):
             working_dir=self.working_dir,
             volumes=self.volumes,
             environment=self.env_vars,
-            name=container_name,
             user=f"{self.host_uid}:{self.host_gid}",
             detach=True,
             auto_remove=True,
             remove=True,
         )
+        container_name = f"froggy_{container.name}"
+        container.rename(container_name)
+        container.reload()
+        logger.debug(f"Container {container_name} started successfully.")
         atexit.register(self.clean_up)
-        logger.debug("Container setup complete")
         return container
 
     def clean_up(self):

@@ -119,7 +119,7 @@ def test_docker_terminal_init():
         "mode": "rw",
     }
     assert terminal.container is not None
-    assert terminal.container.status == "created"
+    assert terminal.container.status == "running"
 
 
 @if_docker_running
@@ -141,7 +141,7 @@ def test_docker_terminal_init_with_params(tmp_path):
     assert terminal.env_vars == env_vars | {"NO_COLOR": "1", "PS1": ""}
     assert terminal.base_image == base_image
     assert terminal.volumes == volumes
-    assert terminal.container.status == "created"
+    assert terminal.container.status == "running"
 
     _, output = terminal.run(["pwd"])
     assert output == working_dir
