@@ -372,12 +372,14 @@ class DockerTerminal(Terminal):
 
         dockerfile = f"""
             FROM {base_image}
-            # Ensure a group with GID exists; create it if necessary
-            RUN if ! getent group 100 > /dev/null; then \\
-                groupadd -g {self.host_gid} froggy_group; \\
-                fi && \\
-                # Create the user with UID, assign to GID, and add to root group, -m to create home dir
-                useradd -m -u {self.host_uid} -g {self.host_gid} -G sudo froggy_user
+            # Create group with GID if it does not exist
+            RUN if ! getent group {self.host_gid} > /dev/null; then \\
+            groupadd -g {self.host_gid} froggy_group; \\
+            fi && \\
+            # Create a user with UID if it does not exist
+            if ! id -u {self.host_uid} > /dev/null 2>&1; then \\
+                useradd -m -u {self.host_uid} -g {self.host_gid} -G sudo froggy_user; \\
+            fi
             """
 
         image_tag = f"{base_image}-{self.host_uid}-{self.host_gid}"
