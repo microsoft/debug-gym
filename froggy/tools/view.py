@@ -21,7 +21,7 @@ class ViewTool(EnvironmentTool):
     }
 
     def register(self, environment):
-        from froggy.envs import RepoEnv
+        from froggy.envs.env import RepoEnv
 
         if not isinstance(environment, RepoEnv):
             raise ValueError("The environment must be a RepoEnv instance.")

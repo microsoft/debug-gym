@@ -10,6 +10,10 @@ Froggy is an interactive debugging system for Python. This LLM-based agent can i
     conda activate froggy
     pip install -e .
 
+To install the development dependencies:
+
+    pip install -e '.[dev]'
+
 ### Set your API information in llm.cfg
 First, make a copy of the template,
 

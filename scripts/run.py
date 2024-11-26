@@ -3,8 +3,37 @@ from os.path import join as pjoin
 
 from termcolor import colored
 
-from froggy.tools import Toolbox
+from froggy.tools.toolbox import Toolbox
 from froggy.utils import load_config
+
+
+def select_terminal(terminal_config: None):
+    terminal_config = terminal_config or {"type": "local"}
+    terminal_type = terminal_config.pop("type")
+    match terminal_type:
+        case "docker":
+            from froggy.terminal import DockerTerminal as terminal_class
+        case "local":
+            from froggy.terminal import Terminal as terminal_class
+        case _:
+            raise ValueError(f"Unknown terminal {terminal_type}")
+
+    return terminal_class(**terminal_config)
+
+
+def select_env(env_type: str = None):
+    match env_type:
+        case None:
+            from froggy.envs.env import RepoEnv as env_class
+        case "aider":
+            from froggy.envs import AiderBenchmarkEnv as env_class
+        case "swebench":
+            from froggy.envs import SWEBenchEnv as env_class
+        case "terminal_simulator":
+            from froggy.envs import TerminalSimulatorEnv as env_class
+        case _:
+            raise ValueError(f"Unknown benchmark {env_type}")
+    return env_class
 
 
 def main():
@@ -15,28 +44,11 @@ def main():
     ), f"Invalid agent. Available agents: {available_agents}"
     config = config[args.agent]
 
-    # create environment
-    if "benchmark" in config:
-        match config["benchmark"]:
-            case "aider":
-                from froggy.envs import AiderBenchmarkEnv
+    terminal = select_terminal(config.get("terminal"))
 
-                env = AiderBenchmarkEnv(**config["env_kwargs"])
-            case "swebench":
-                from froggy.envs import SWEBenchEnv
+    env_class = select_env(config.get("benchmark"))
 
-                env = SWEBenchEnv(**config["env_kwargs"])
-            case "terminal_simulator":
-                from froggy.envs import TerminalSimulatorEnv
-
-                env = TerminalSimulatorEnv(**config["env_kwargs"])
-            case _:
-                raise ValueError(f"Unknown benchmark {config['benchmark']}")
-    else:
-        # custom repo
-        from froggy.envs import RepoEnv
-
-        env = RepoEnv(**config["env_kwargs"])
+    env = env_class(**config["env_kwargs"], terminal=terminal)
 
     # import tools to the environment
     for tool in config["tools"]:
@@ -69,6 +81,10 @@ def main():
             from froggy.agents import AgentCoT_NoPDB
 
             agent = AgentCoT_NoPDB(config, env, verbose=args.verbose)
+        case "zero_shot_pdb_after_rewrites":
+            from froggy.agents import AgentZeroShot_PdbAfterRewrites
+
+            agent = AgentZeroShot_PdbAfterRewrites(config, env, verbose=args.verbose)
         case _:
             raise ValueError(f"Unknown agent {args.agent}")
 
