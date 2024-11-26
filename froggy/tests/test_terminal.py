@@ -4,8 +4,9 @@ import pytest
 
 from froggy.terminal import DockerTerminal, Terminal
 
+
 if_docker_running = pytest.mark.skipif(
-    not subprocess.check_output("docker ps", shell=True),
+    not subprocess.check_output(["docker", "ps"]),
     reason="Docker not running",
 )
 
