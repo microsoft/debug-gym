@@ -53,7 +53,9 @@ def show_line_number(code_string, code_path=None, breakpoints_state=None):
     return "\n".join(output)
 
 
-def make_is_readonly(full_path, base_dir=None, patterns: list[str] = []):
+def make_is_readonly(full_path, base_dir=None, patterns: list[str] = None):
+    if patterns is None:
+        patterns = []
     # Ref: gitignore_parser.parse_gitignore
     from gitignore_parser import _normalize_path, handle_negation, rule_from_pattern
 
@@ -79,6 +81,7 @@ def make_is_readonly(full_path, base_dir=None, patterns: list[str] = []):
         # We have negation rules. We can't use a simple "any" to evaluate them.
         # Later rules override earlier rules.
         return lambda file_path: handle_negation(file_path, rules)
+
 
 
 def _walk(path, depth: Optional[int]):
@@ -161,7 +164,7 @@ def extract_max_score_from_pytest_output(output):
     if match:
         return max(int(match.group(1)), 1.0)
     else:
-        raise ValueError("No test cases found in the pytest output.")
+        raise ValueError("No test cases found in the pytest output.", output)
 
 
 def extract_reward_from_pytest_output(output):

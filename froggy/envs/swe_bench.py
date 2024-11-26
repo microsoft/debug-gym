@@ -36,7 +36,8 @@ class SWEBenchEnv(RepoEnv):
         self.ds = load_hf_dataset(self.HF_SWE_BENCH_VERIFIED)["test"]
         self.dataset = {row["instance_id"]: row for row in self.ds.sort("instance_id")}
 
-    def reset(self, *, seed=None, options={}):
+    def reset(self, *, seed=None, options: dict = None):
+        options = options or {}
         assert "task_name" in options, "task_name must be provided in options"
         assert (
             options["task_name"] in self.dataset

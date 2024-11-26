@@ -6,6 +6,8 @@ import unittest
 from os.path import join as pjoin
 from unittest.mock import patch, MagicMock, mock_open
 from pathlib import Path, PosixPath
+
+import pytest
 from froggy.envs import RepoEnv, TooledEnv
 
 class TestTooledEnv(unittest.TestCase):
@@ -15,10 +17,10 @@ class TestTooledEnv(unittest.TestCase):
     def test_seed(self):
         seed_value = 42
         self.env.seed(seed_value)
-        
+
         # Check if the rng attribute is set to a numpy random state
         self.assertIsInstance(self.env.rng, np.random.RandomState)
-        
+
         # Check if the random state is initialized with the correct seed
         expected_rng = np.random.RandomState(seed_value)
 
@@ -101,6 +103,8 @@ class TestTooledEnv(unittest.TestCase):
         self.env.add_tool(tool2)
         self.assertEqual(self.env.tool_instructions, {"tool1": "instructions1", "tool2": "instructions2"})
 
+
+@pytest.mark.usefixtures("tmp_path")
 class TestRepoEnv(unittest.TestCase):
     @patch('tempfile.TemporaryDirectory')
     @patch('atexit.register')
@@ -108,23 +112,23 @@ class TestRepoEnv(unittest.TestCase):
     def test_setup_workspace(self, mock_copytree, mock_atexit_register, mock_tempdir):
         # Mock the temporary directory
         mock_tempdir.return_value.name = '/mock/tempdir'
-        
+
         # Create an instance of RepoEnv
         repo_env = RepoEnv(run_timeout=10, dir_tree_depth=2, auto_view_change=True)
-        
+
         # Call setup_workspace
         repo_env.setup_workspace('/mock/path', 'python', ['readonly_pattern'])
-        
+
         # Assertions
         self.assertEqual(repo_env.path, Path('/mock/path'))
         self.assertEqual(repo_env.working_dir, Path('/mock/tempdir'))
-        
+
         # Check if the temporary directory was created
         mock_tempdir.assert_called_once_with(prefix='RepoEnv-')
-        
+
         # Check if atexit.register was called to cleanup the temporary directory
         mock_atexit_register.assert_called_once_with(repo_env.tempdir.cleanup)
-        
+
         # Check if shutil.copytree was called to copy the directory
         mock_copytree.assert_called_once_with(Path('/mock/path'), Path('/mock/tempdir'), dirs_exist_ok=True)
 
@@ -134,18 +138,18 @@ class TestRepoEnv(unittest.TestCase):
     def test_setup_workspace_with_none_path(self, mock_copytree, mock_atexit_register, mock_tempdir):
         # Create an instance of RepoEnv
         repo_env = RepoEnv(run_timeout=10, dir_tree_depth=2, auto_view_change=True)
-        
+
         # Call setup_workspace with None path
-        repo_env.setup_workspace(None)
-        
+        repo_env.setup_workspace(None, "/bin/bash")
+
         # Assertions
         self.assertIsNone(repo_env.path)
-        
+
         # Check that copytree and tempdir were not called
         mock_tempdir.assert_not_called()
         mock_copytree.assert_not_called()
         mock_atexit_register.assert_not_called()
-    
+
     @patch('tempfile.TemporaryDirectory')
     def test_cleanup_workspace(self, mock_tempdir):
         mock_tempdir_instance = MagicMock()
@@ -157,7 +161,7 @@ class TestRepoEnv(unittest.TestCase):
         env.cleanup_workspace()
 
         mock_tempdir_instance.cleanup.assert_called_once()
-    
+
     def test_instructions(self):
         # Create mock tools
         tool1 = MagicMock()
@@ -210,17 +214,17 @@ class TestRepoEnv(unittest.TestCase):
         ]
         # Create an instance of RepoEnv
         env = RepoEnv(path='/path/to/repo')
-        
+
         # Call the restore method
         env.restore('/path/to/repo/file1.txt', '/path/to/repo/file2.txt')
-        
+
         # Assertions
         mock_glob.assert_not_called()  # Ensure glob is not called since filepaths are provided
         mock_isdir.assert_any_call(Path('/path/to/repo/file1.txt'))
         mock_isdir.assert_any_call(Path('/path/to/repo/file2.txt'))
         mock_copy2.assert_any_call(Path('/path/to/repo/file1.txt'), Path(env.working_dir) / 'file1.txt')
         mock_copy2.assert_any_call(Path('/path/to/repo/file2.txt'), Path(env.working_dir) / 'file2.txt')
-   
+
     @patch.object(RepoEnv, 'directory_tree')
     def test_display_files(self, mock_directory_tree):
         # Mock the return value of directory_tree
@@ -236,62 +240,6 @@ class TestRepoEnv(unittest.TestCase):
         # Assertions
         self.assertEqual(result, expected_result)
         mock_directory_tree.assert_called_once_with(editable_only=False)
-
-    @patch('subprocess.Popen')
-    def test_run_success(self, mock_popen):
-        # Mock the Popen instance and its methods
-        mock_process = MagicMock()
-        mock_process.communicate.return_value = ("output", "error")
-        mock_process.returncode = 0
-        mock_popen.return_value = mock_process
-
-        # Create an instance of RepoEnv
-        env = RepoEnv(path='.')
-
-        # Call the run method
-        output, done = env.run()
-
-        # Assertions
-        mock_popen.assert_called_once_with(
-            env.entrypoint,
-            env=dict(os.environ, NO_COLOR="1"),
-            cwd=env.working_dir,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-        )
-        mock_process.communicate.assert_called_once_with(timeout=env.run_timeout)
-        self.assertEqual(output, "outputerror")
-        self.assertTrue(done)
-        self.assertEqual(env.score, 1)
-  
-    @patch('subprocess.Popen')
-    def test_run_timeout(self, mock_popen):
-        # Mock the Popen instance and its methods
-        mock_process = MagicMock()
-        mock_process.communicate.side_effect = subprocess.TimeoutExpired(cmd="cmd", timeout=10)
-        mock_popen.return_value = mock_process
-
-        # Create an instance of RepoEnv
-        env = RepoEnv(path='.')
-
-        # Call the run method
-        output, done = env.run()
-
-        # Assertions
-        mock_popen.assert_called_once_with(
-            env.entrypoint,
-            env=dict(os.environ, NO_COLOR="1"),
-            cwd=env.working_dir,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-        )
-        mock_process.communicate.assert_called_once_with(timeout=env.run_timeout)
-        mock_process.kill.assert_called_once()
-        self.assertEqual(output, "Timeout expired.")
-        self.assertFalse(done)
-        self.assertEqual(env.score, 0)
 
     @patch('froggy.utils.show_line_number')
     def test_current_code_with_line_number(self, mock_show_line_number):
@@ -365,7 +313,7 @@ class TestRepoEnv(unittest.TestCase):
         self.assertIn("max_score", infos)
         self.assertIn("instructions", infos)
         self.assertIn("rewrite_counter", infos)
-   
+
     @patch('froggy.utils._walk')
     @patch('pathlib.Path.exists', return_value=True)
     @patch('pathlib.Path.is_file', return_value=False)
@@ -375,7 +323,7 @@ class TestRepoEnv(unittest.TestCase):
     @patch('tempfile.TemporaryDirectory')
     def test_directory_tree(self, mock_tempdir, mock_copytree, mock_os_walk, mock_scandir, mock_is_file, mock_exists, mock_walk):
         mock_tempdir.return_value.name = '/mock/tempdir'
-        
+
         mock_scandir.return_value.__enter__.return_value = [
             MagicMock(is_dir=lambda: False, path='/path/to/repo/file1.txt'),
             MagicMock(is_dir=lambda: False, path='/path/to/repo/file2.txt')
@@ -420,7 +368,7 @@ class TestRepoEnv(unittest.TestCase):
         mock_get_tool.return_value = mock_pdb_tool
 
         mock_tempdir.return_value.name = '/mock/tempdir'
-        
+
         mock_scandir.return_value.__enter__.return_value = [
             MagicMock(is_dir=lambda: False, path='/path/to/repo/file1.txt'),
             MagicMock(is_dir=lambda: False, path='/path/to/repo/file2.txt')
@@ -525,6 +473,33 @@ class TestRepoEnv(unittest.TestCase):
             capture_output=True
         )
         self.assertEqual(result, expected_result)
+
+
+def test_run_success(tmp_path):
+    working_dir = str(tmp_path)
+    # create a dummy file
+    with open(tmp_path / "file.py", "w") as f:
+        f.write("print('Hello, World!')")
+    env = RepoEnv(path=working_dir, entrypoint="python file.py")
+    output, done = env.run()
+
+    assert output == "Hello, World!"
+    assert done
+    assert env.score == 1
+
+
+def test_run_timeout(tmp_path):
+    working_dir = str(tmp_path)
+    # runs for longer than the timeout
+    with open(tmp_path / "file.py", "w") as f:
+        f.write("import time; time.sleep(5)")
+    env = RepoEnv(path=working_dir, entrypoint="python file.py", run_timeout=1)
+    output, done = env.run()
+
+    assert output == "Timeout expired."
+    assert not done
+    assert env.score == 0
+
 
 if __name__ == '__main__':
     unittest.main()

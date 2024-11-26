@@ -12,6 +12,7 @@ from typing import Optional
 import numpy as np
 from termcolor import colored
 
+from froggy.terminal import Terminal
 from froggy.tools.patchers import CodePatcher
 from froggy.tools.pdb import PDBTool
 from froggy.utils import _walk, make_is_readonly, show_line_number
@@ -59,13 +60,14 @@ class RepoEnv(TooledEnv):
 
     def __init__(
         self,
-        path: Optional[str] = None,
+        path: str | None = None,
         entrypoint: str = "python -m pytest -sv .",
-        readonly_patterns: list[str] = [],
+        readonly_patterns: list[str] | None = None,
         run_on_rewrite: bool = True,
-        run_timeout: Optional[int] = None,
-        dir_tree_depth: Optional[int] = None,
+        run_timeout: int | None = None,
+        dir_tree_depth: int | None = None,
         auto_view_change: bool = True,
+        terminal: Terminal | None = None,
     ):
         """ """
         super().__init__()
@@ -75,6 +77,7 @@ class RepoEnv(TooledEnv):
         self.run_timeout = run_timeout
         self.dir_tree_depth = dir_tree_depth
         self.auto_view_change = auto_view_change
+        self.terminal = terminal or Terminal()
         self.setup_workspace(path, entrypoint, readonly_patterns)
         self.last_run_obs = None
         self.score = 0
@@ -84,9 +87,10 @@ class RepoEnv(TooledEnv):
     def setup_workspace(
         self,
         path: str,
-        entrypoint: Optional[str] = None,
-        readonly_patterns: list[str] = [],
+        entrypoint: str,
+        readonly_patterns: list[str] = None,
     ):
+        readonly_patterns = readonly_patterns or []
         if self.path:
             self.cleanup_workspace()
 
@@ -122,11 +126,11 @@ class RepoEnv(TooledEnv):
         self.current_file = None
         self.current_file_content = None
         self.current_breakpoints_state = {}
-        if not hasattr(
-            self, "entrypoint"
-        ):  # TODO: entrypoint is currently an optional argument,
-            self.entrypoint = entrypoint.split()
-        assert self.entrypoint[0] == "python", "Only support python entrypoint for now."
+        assert entrypoint.split()[0] == "python", "Only support python entrypoint for now."
+        self.entrypoint = entrypoint
+
+        # Set up the terminal working dir
+        self.terminal.working_dir = str(self.working_dir)
 
     def cleanup_workspace(self):
         self.tempdir.cleanup()
@@ -162,7 +166,8 @@ class RepoEnv(TooledEnv):
 
             shutil.copy2(self.path / filepath, self.working_dir / filepath)
 
-    def reset(self, *, seed=None, options={}):
+    def reset(self, *, seed=None, options: dict = None):
+        options = options or {}
         self.current_file = None
         self.current_file_content = None
         self.current_breakpoints_state = {}
@@ -174,7 +179,7 @@ class RepoEnv(TooledEnv):
 
         self.obs = ""
         if self.has_tool("pdb"):
-            self.get_tool("pdb").start_pseudo_terminal()
+            self.get_tool("pdb").start_pdb(terminal=self.terminal.clone())
             self.dbg_obs = self.get_tool("pdb").pdb_obs
             self.obs += "Debugging terminal started:\n" f"{self.dbg_obs}\n"
 
@@ -200,23 +205,10 @@ class RepoEnv(TooledEnv):
         return self.obs, self.infos
 
     def run(self):
-        process = subprocess.Popen(
-            self.entrypoint,
-            env=dict(os.environ, NO_COLOR="1"),
-            cwd=self.working_dir,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
+        success, output = self.terminal.run(
+            [self.entrypoint], timeout=self.run_timeout
         )
-        try:
-            stdout, stderr = process.communicate(timeout=self.run_timeout)
-            success = process.returncode == 0
-        except subprocess.TimeoutExpired:
-            process.kill()
-            stdout, stderr = "", "Timeout expired."
-            success = False
-
-        self.last_run_obs = stdout + stderr
+        self.last_run_obs = output
         self.score = int(success)
         self.done = success
 
@@ -317,9 +309,8 @@ class RepoEnv(TooledEnv):
                         self.obs += "\nNew code has been run."
                         self.run()
                     if self.has_tool("pdb"):
-                        # Restart the pseudo terminal to take into account recent changes.
-                        self.get_tool("pdb").close_pseudo_terminal()
-                        self.get_tool("pdb").start_pseudo_terminal()
+                        # Restart pdb to take into account recent changes.
+                        self.get_tool("pdb").restart_pdb()
                         self.dbg_obs = self.get_tool("pdb").pdb_obs
                         self.obs += (
                             "\nDebugging terminal started:\n" f"{self.dbg_obs}\n"

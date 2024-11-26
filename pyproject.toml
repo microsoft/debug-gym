@@ -26,4 +26,5 @@ find = {}
 dev = [
     "pytest",
     "pytest-xdist",
+    "pytest-cov",
 ]
