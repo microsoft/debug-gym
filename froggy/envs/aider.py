@@ -31,8 +31,7 @@ class AiderBenchmarkEnv(RepoEnv):
         self.load_dataset()
 
     def reset(self, *, seed=None, options: dict = None):
-        if options is None:
-            options = {}
+        options = options or {}
         self.current_sample = self.dataset[options["task_name"]]
         directory = self.current_sample["base_directory"]
         entrypoint = self.current_sample["entry_point"]

@@ -60,18 +60,16 @@ class RepoEnv(TooledEnv):
 
     def __init__(
         self,
-        path: Optional[str] = None,
+        path: str | None = None,
         entrypoint: str = "python -m pytest -sv .",
-        readonly_patterns: list[str] = None,
+        readonly_patterns: list[str] | None = None,
         run_on_rewrite: bool = True,
-        run_timeout: Optional[int] = None,
-        dir_tree_depth: Optional[int] = None,
+        run_timeout: int | None = None,
+        dir_tree_depth: int | None = None,
         auto_view_change: bool = True,
-        terminal: Optional[Terminal] = None,
+        terminal: Terminal | None = None,
     ):
         """ """
-        if readonly_patterns is None:
-            readonly_patterns = []
         super().__init__()
         self.path = None
         self.max_score = RepoEnv.DEFAULT_MAX_SCORE
@@ -92,8 +90,7 @@ class RepoEnv(TooledEnv):
         entrypoint: str,
         readonly_patterns: list[str] = None,
     ):
-        if readonly_patterns is None:
-            readonly_patterns = []
+        readonly_patterns = readonly_patterns or []
         if self.path:
             self.cleanup_workspace()
 
@@ -170,8 +167,7 @@ class RepoEnv(TooledEnv):
             shutil.copy2(self.path / filepath, self.working_dir / filepath)
 
     def reset(self, *, seed=None, options: dict = None):
-        if options is None:
-            options = {}
+        options = options or {}
         self.current_file = None
         self.current_file_content = None
         self.current_breakpoints_state = {}
