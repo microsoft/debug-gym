@@ -37,8 +37,7 @@ class SWEBenchEnv(RepoEnv):
         self.dataset = {row["instance_id"]: row for row in self.ds.sort("instance_id")}
 
     def reset(self, *, seed=None, options: dict = None):
-        if options is None:
-            options = {}
+        options = options or {}
         assert "task_name" in options, "task_name must be provided in options"
         assert (
             options["task_name"] in self.dataset
