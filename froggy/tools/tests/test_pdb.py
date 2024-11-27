@@ -107,10 +107,18 @@ class TestPDBTool(unittest.TestCase):
 
     def setUp(self):
         self.env = MagicMock(spec=RepoEnv)
+        self.environment = MagicMock()
+        self.environment.current_breakpoints_state = {
+            "file1.py|||10": "b file1.py:10",
+            "file1.py|||20": "b file1.py:20",
+            "file1.py|||30": "b file1.py:30",
+            "file2.py|||15": "b file2.py:15"
+        }
         self.env.working_dir = "/path/to/repo"
         self.env.current_breakpoints_state = {}
         self.terminal = MagicMock(spec=Terminal)
         self.pdb_tool = PDBTool()
+        self.pdb_tool.environment = self.environment
 
     def test_initialization(self):
         self.assertIsNone(self.pdb_tool.master)
@@ -176,6 +184,51 @@ class TestPDBTool(unittest.TestCase):
         success, output = self.pdb_tool.breakpoint_add_clear("b 42")
         self.assertTrue(success)
         self.assertIn("output", output)
+
+    @patch.object(PDBTool, 'interact_with_pdb')
+    def test_breakpoint_modify_remove(self, mock_interact_with_pdb):
+        # Test removing breakpoints within the rewritten code
+        self.pdb_tool.register(self.env)
+        self.pdb_tool.breakpoint_modify("file1.py", 15, 25, 5)
+        expected_state = {
+            "file1.py|||10": "b file1.py:10",
+            'file1.py|||20': 'b file1.py:20',
+            "file1.py|||30": "b file1.py:30",
+            "file2.py|||15": "b file2.py:15"
+        }
+        self.assertEqual(self.environment.current_breakpoints_state, expected_state)
+
+    @patch.object(PDBTool, 'interact_with_pdb')
+    def test_breakpoint_modify_move(self, mock_interact_with_pdb):
+        # Test moving breakpoints after the rewritten code
+        # self.pdb_tool.register(self.env)
+        self.pdb_tool.breakpoint_modify("file1.py", 5, 15, 10)
+        expected_state = {
+            "file2.py|||15": "b file2.py:15",
+            "file1.py|||19": "b file1.py:19",
+            "file1.py|||29": "b file1.py:29",
+        }
+        self.assertEqual(self.environment.current_breakpoints_state, expected_state)
+    
+    @patch.object(PDBTool, 'interact_with_pdb')
+    def test_breakpoint_modify_remove_all(self, mock_interact_with_pdb):
+        # Test removing all breakpoints in the file
+        self.pdb_tool.breakpoint_modify("file1.py", None, None, 0)
+        expected_state = {
+            "file2.py|||15": "b file2.py:15"
+        }
+        self.assertEqual(self.environment.current_breakpoints_state, expected_state)
+
+    @patch.object(PDBTool, 'interact_with_pdb')
+    def test_breakpoint_modify_no_change(self, mock_interact_with_pdb):
+        # Test no change for breakpoints before the rewritten code
+        self.pdb_tool.breakpoint_modify("file1.py", 25, 35, 5)
+        expected_state = {
+            "file1.py|||10": "b file1.py:10",
+            "file1.py|||20": "b file1.py:20",
+            "file2.py|||15": "b file2.py:15"
+        }
+        self.assertEqual(self.environment.current_breakpoints_state, expected_state)
 
     @patch.object(PDBTool, 'interact_with_pdb')
     def test_get_current_frame_file(self, mock_interact_with_pdb):
