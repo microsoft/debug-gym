@@ -16,11 +16,11 @@ from froggy.utils import (
 
 
 class SWEBenchEnv(RepoEnv):
-    HF_SWE_BENCH_VERIFIED = "princeton-nlp/SWE-bench_Verified"
-    SWE_BENCH_REPO_PATHS = Path(pjoin(tempfile.gettempdir(), "swe-bench"))
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+        self.dataset_id = "princeton-nlp/SWE-bench_Verified"
+        self.swe_bench_repo_paths = Path(pjoin(tempfile.gettempdir(), "swe-bench"))
         self.load_dataset()
 
     @property
@@ -33,7 +33,7 @@ class SWEBenchEnv(RepoEnv):
         return _instruction
 
     def load_dataset(self):
-        self.ds = load_hf_dataset(self.HF_SWE_BENCH_VERIFIED)["test"]
+        self.ds = load_hf_dataset(self.dataset_id)["test"]
         self.dataset = {row["instance_id"]: row for row in self.ds.sort("instance_id")}
 
     def reset(self, *, seed=None, options: dict = None):
@@ -89,7 +89,7 @@ class SWEBenchEnv(RepoEnv):
     def clone_repo(self, repo_address):
         org_name, repo_name = repo_address.split("/")
         repo_url = f"https://github.com/{repo_address.lstrip('/')}"
-        local_repo_path = self.SWE_BENCH_REPO_PATHS / repo_name
+        local_repo_path = self.swe_bench_repo_paths / repo_name
 
         # clone
         if not local_repo_path.exists():
@@ -109,7 +109,7 @@ class SWEBenchEnv(RepoEnv):
             ]
         )
         if include_gitignore and ".gitignore" in os.listdir(local_repo_path):
-            with open(pjoin(local_repo_path, ".gitignore"), "r") as f:
+            with open(local_repo_path / ".gitignore", "r") as f:
                 gitignore_content = f.read()
                 froggyignore_contents += "\n"
                 froggyignore_contents += gitignore_content
