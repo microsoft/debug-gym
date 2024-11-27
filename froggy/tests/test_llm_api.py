@@ -3,29 +3,18 @@ from openai import RateLimitError
 import unittest
 from io import StringIO
 from unittest.mock import patch, mock_open, MagicMock
-
+from froggy.agents.llm_api import (
+    is_rate_limit_error,
+    print_messages,
+    merge_messages,
+    TokenCounter,
+    LLM,
+    AsyncLLM,
+    Human,
+    Random,
+    instantiate_llm,
+)
 class TestLLMAPI(unittest.TestCase):
-
-    @patch('os.path.exists', return_value=True)
-    @patch('builtins.open', new_callable=mock_open, read_data='{"test-model": {"model": "test-model", "max_tokens": 100, "tokenizer": "gpt-4o", "context_limit": 4, "api_key": "test-api-key", "endpoint": "https://test-endpoint", "api_version": "v1", "tags": ["azure openai"]}}')
-    def setUp(self, mock_open, mock_exists):
-        # Import the module after applying the mocks
-        global is_rate_limit_error, print_messages, merge_messages, TokenCounter, LLM, AsyncLLM, Human, Random, instantiate_llm
-        from froggy.agents.llm_api import (
-            is_rate_limit_error,
-            print_messages,
-            merge_messages,
-            TokenCounter,
-            LLM,
-            AsyncLLM,
-            Human,
-            Random,
-            instantiate_llm,
-        )
-
-    def tearDown(self):
-        # Stop the patchers
-        patch.stopall
 
     def test_is_rate_limit_error(self):
         mock_response = MagicMock()
@@ -73,7 +62,9 @@ class TestLLMAPI(unittest.TestCase):
 
     @patch('tiktoken.encoding_for_model')
     @patch("openai.resources.chat.completions.Completions.create")
-    def test_llm(self, mock_openai, mock_encoding_for_model):
+    @patch('os.path.exists', return_value=True)
+    @patch('builtins.open', new_callable=mock_open, read_data='{"test-model": {"model": "test-model", "max_tokens": 100, "tokenizer": "gpt-4o", "context_limit": 4, "api_key": "test-api-key", "endpoint": "https://test-endpoint", "api_version": "v1", "tags": ["azure openai"]}}')
+    def test_llm(self, mock_open, mock_exists, mock_openai, mock_encoding_for_model):
         mock_encoding = MagicMock()
         mock_encoding.encode = lambda x: x.split()
         mock_encoding_for_model.return_value = mock_encoding
@@ -121,7 +112,9 @@ class TestLLMAPI(unittest.TestCase):
         assert "response" in token_usage
 
     @patch('tiktoken.encoding_for_model')
-    def test_instantiate_llm(self, mock_encoding_for_model):
+    @patch('os.path.exists', return_value=True)
+    @patch('builtins.open', new_callable=mock_open, read_data='{"test-model": {"model": "test-model", "max_tokens": 100, "tokenizer": "gpt-4o", "context_limit": 4, "api_key": "test-api-key", "endpoint": "https://test-endpoint", "api_version": "v1", "tags": ["azure openai"]}}')
+    def test_instantiate_llm(self, mock_open, mock_exists, mock_encoding_for_model):
         mock_encoding = MagicMock()
         mock_encoding.encode = lambda x: x.split()
         mock_encoding_for_model.return_value = mock_encoding

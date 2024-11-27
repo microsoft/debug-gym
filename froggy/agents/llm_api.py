@@ -32,13 +32,7 @@ except ImportError:
 logger = logging.getLogger("auto-debug")
 
 LLM_CONFIG_FILE = os.environ.get("LLM_CONFIG_FILE", "llm.cfg")
-
-if os.path.exists(LLM_CONFIG_FILE):
-    LLM_CONFIGS = json.load(open(LLM_CONFIG_FILE))
-    available_models = list(LLM_CONFIGS.keys()) + ["random", "human"]
-else:
-    available_models = ["random", "human"]
-
+available_models = ["random", "human"]
 
 def is_rate_limit_error(exception):
     # List of fully qualified names of RateLimitError exceptions from various libraries
@@ -117,6 +111,10 @@ class LLM:
     def __init__(self, model_name, verbose=False):
         self.model_name = model_name
         self.verbose = verbose
+
+        if os.path.exists(LLM_CONFIG_FILE):
+            LLM_CONFIGS = json.load(open(LLM_CONFIG_FILE))
+            available_models = list(LLM_CONFIGS.keys()) + ["random", "human"]
 
         if self.model_name not in LLM_CONFIGS:
             raise Exception(f"Model {self.model_name} not found in llm.cfg")
@@ -301,6 +299,9 @@ class Random:
 
 
 def instantiate_llm(config, verbose=False, use_async=False):
+    if os.path.exists(LLM_CONFIG_FILE):
+        LLM_CONFIGS = json.load(open(LLM_CONFIG_FILE))
+        available_models = list(LLM_CONFIGS.keys()) + ["random", "human"]
     assert (
         config["llm_name"] in available_models
     ), f"Model {config['llm_name']} is not available, please make sure the LLM config file is correctly set."
