@@ -185,6 +185,24 @@ class TestPDBTool(unittest.TestCase):
         self.assertTrue(success)
         self.assertIn("output", output)
 
+    @patch.object(PDBTool, 'interact_with_pdb', return_value="Breakpoint cleared")
+    def test_breakpoint_add_clear_clear_specific(self, mock_interact_with_pdb):
+        # Test clearing a specific breakpoint
+        # mock_interact_with_pdb.return_value = ""
+        # self.pdb_tool.register(self.env)
+        self.environment.current_file = "file1.py"
+        self.environment.all_files = ["file1.py", "file2.py"]
+
+        success, output = self.pdb_tool.breakpoint_add_clear("cl 20")
+        expected_state = {
+            "file1.py|||10": "b file1.py:10",
+            "file1.py|||30": "b file1.py:30",
+            "file2.py|||15": "b file2.py:15"
+        }
+        self.assertTrue(success)
+        self.assertEqual(output, "Breakpoint cleared")
+        self.assertEqual(self.environment.current_breakpoints_state, expected_state)
+
     @patch.object(PDBTool, 'interact_with_pdb')
     def test_breakpoint_modify_remove(self, mock_interact_with_pdb):
         # Test removing breakpoints within the rewritten code
