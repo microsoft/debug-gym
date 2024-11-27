@@ -6,13 +6,9 @@ from unittest.mock import patch, mock_open, MagicMock
 
 class TestLLMAPI(unittest.TestCase):
 
-    def setUp(self):
-        # Mock the os.path.exists to return True and mock the open function
-        self.patcher_exists = patch('os.path.exists', return_value=True)
-        self.patcher_open = patch('builtins.open', new_callable=mock_open, read_data='{"test-model": {"model": "test-model", "max_tokens": 100, "tokenizer": "gpt-4o", "context_limit": 4, "api_key": "test-api-key", "endpoint": "https://test-endpoint", "api_version": "v1", "tags": ["azure openai"]}}')
-        self.mock_exists = self.patcher_exists.start()
-        self.mock_open = self.patcher_open.start()
-
+    @patch('os.path.exists', return_value=True)
+    @patch('builtins.open', new_callable=mock_open, read_data='{"test-model": {"model": "test-model", "max_tokens": 100, "tokenizer": "gpt-4o", "context_limit": 4, "api_key": "test-api-key", "endpoint": "https://test-endpoint", "api_version": "v1", "tags": ["azure openai"]}}')
+    def setUp(self, mock_open, mock_exists):
         # Import the module after applying the mocks
         global is_rate_limit_error, print_messages, merge_messages, TokenCounter, LLM, AsyncLLM, Human, Random, instantiate_llm
         from froggy.agents.llm_api import (
@@ -29,8 +25,7 @@ class TestLLMAPI(unittest.TestCase):
 
     def tearDown(self):
         # Stop the patchers
-        self.patcher_exists.stop()
-        self.patcher_open.stop()
+        patch.stopall
 
     def test_is_rate_limit_error(self):
         mock_response = MagicMock()
