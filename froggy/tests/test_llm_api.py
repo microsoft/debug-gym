@@ -1,4 +1,5 @@
 import sys
+from openai import RateLimitError
 import unittest
 from io import StringIO
 from unittest.mock import patch, mock_open, MagicMock
@@ -31,14 +32,13 @@ class TestLLMAPI(unittest.TestCase):
         self.patcher_exists.stop()
         self.patcher_open.stop()
 
-# def test_is_rate_limit_error():
-#     class MockException:
-#         __module__ = "openai.error"
-#         __name__ = "RateLimitError"
-#         __class__ = type("MockExceptionClass", (object,), {"__module__": "openai.error", "__name__": "RateLimitError"})
-
-#     exception = MockException()
-#     assert is_rate_limit_error(exception) == True
+    def test_is_rate_limit_error(self):
+        mock_response = MagicMock()
+        mock_response.request = "example"
+        mock_response.body = {"error": "Rate limit exceeded"}
+        # Instantiate the RateLimitError with the mock response
+        exception = RateLimitError("Rate limit exceeded", response=mock_response, body=mock_response.body)    
+        assert is_rate_limit_error(exception) == True
 
     def test_print_messages(self):
         messages = [
@@ -76,46 +76,45 @@ class TestLLMAPI(unittest.TestCase):
         assert counter(messages=messages) > 0
         assert counter(text="Hello") > 0
 
-    # @patch('tiktoken.encoding_for_model')
-    # @patch("openai.resources.chat.completions.Completions.create")
-    # def test_llm(self, mock_openai, mock_encoding_for_model):
-    #     mock_encoding = MagicMock()
-    #     mock_encoding.encode = lambda x: x.split()
-    #     mock_encoding_for_model.return_value = mock_encoding
+    @patch('tiktoken.encoding_for_model')
+    @patch("openai.resources.chat.completions.Completions.create")
+    def test_llm(self, mock_openai, mock_encoding_for_model):
+        mock_encoding = MagicMock()
+        mock_encoding.encode = lambda x: x.split()
+        mock_encoding_for_model.return_value = mock_encoding
 
-    #     mock_response = MagicMock()
-    #     mock_response.choices = [MagicMock()]
-    #     mock_response.choices[0].message.content = "Response"
-    #     mock_openai.return_value = mock_response
+        mock_response = MagicMock()
+        mock_response.choices = [MagicMock()]
+        mock_response.choices[0].message.content = "Response"
+        mock_openai.return_value = mock_response
 
-    #     llm = LLM(model_name="test-model", verbose=False)
-    #     messages = [{"role": "user", "content": "Hello"}]
-    #     response, token_usage = llm(messages)
-    #     assert response == "Response"
-    #     assert "prompt" in token_usage
-    #     assert "response" in token_usage
+        llm = LLM(model_name="test-model", verbose=False)
+        messages = [{"role": "user", "content": "Hello"}]
+        response, token_usage = llm(messages)
+        assert response == "Response"
+        assert "prompt" in token_usage
+        assert "response" in token_usage
 
-    # @patch("llm_api.AsyncAzureOpenAI")
+    @patch("llm_api.AsyncAzureOpenAI")
     # @pytest.mark.asyncio
-    # async def test_async_llm(mock_async_openai):
-    #     mock_async_openai.return_value.chat.completions.create.return_value.choices[0].message.content = "Response"
-    #     llm = AsyncLLM(model_name="test_model", verbose=False)
-    #     messages = [{"role": "user", "content": "Hello"}]
-    #     response, token_usage = await llm(messages)
-    #     assert response == "Response"
-    #     assert "prompt" in token_usage
-    #     assert "response" in token_usage
+    async def test_async_llm(mock_async_openai):
+        mock_async_openai.return_value.chat.completions.create.return_value.choices[0].message.content = "Response"
+        llm = AsyncLLM(model_name="test_model", verbose=False)
+        messages = [{"role": "user", "content": "Hello"}]
+        response, token_usage = await llm(messages)
+        assert response == "Response"
+        assert "prompt" in token_usage
+        assert "response" in token_usage
 
-    # @patch("llm_api.prompt_toolkit_available", True)
-    # @patch("llm_api.prompt", return_value="User input")
-    # def test_human(mock_prompt):
-    #     human = Human()
-    #     messages = [{"role": "user", "content": "Hello"}]
-    #     info = {"available_commands": ["command1", "command2"]}
-    #     response, token_usage = human(messages, info)
-    #     assert response == "User input"
-    #     assert "prompt" in token_usage
-    #     assert "response" in token_usage
+    @patch('builtins.input', return_value="User input")
+    def test_human(self, mock_prompt):
+        human = Human()
+        messages = [{"role": "user", "content": "Hello"}]
+        info = {"available_commands": ["command1", "command2"]}
+        response, token_usage = human(messages, info)
+        assert response == "User input"
+        assert "prompt" in token_usage
+        assert "response" in token_usage
 
     def test_random(self):
         random_llm = Random(seed=42, verbose=False)
@@ -126,20 +125,20 @@ class TestLLMAPI(unittest.TestCase):
         assert "prompt" in token_usage
         assert "response" in token_usage
 
-    # @patch('tiktoken.encoding_for_model')
-    # def test_instantiate_llm(self, mock_encoding_for_model):
-    #     mock_encoding = MagicMock()
-    #     mock_encoding.encode = lambda x: x.split()
-    #     mock_encoding_for_model.return_value = mock_encoding
+    @patch('tiktoken.encoding_for_model')
+    def test_instantiate_llm(self, mock_encoding_for_model):
+        mock_encoding = MagicMock()
+        mock_encoding.encode = lambda x: x.split()
+        mock_encoding_for_model.return_value = mock_encoding
     
-    #     config = {"llm_name": "test-model"}
-    #     llm = instantiate_llm(config, verbose=False, use_async=False)
-    #     assert isinstance(llm, LLM)
+        config = {"llm_name": "test-model"}
+        llm = instantiate_llm(config, verbose=False, use_async=False)
+        assert isinstance(llm, LLM)
 
-    #     config = {"llm_name": "random", "random_seed": 42}
-    #     llm = instantiate_llm(config, verbose=False, use_async=False)
-    #     assert isinstance(llm, Random)
+        config = {"llm_name": "random", "random_seed": 42}
+        llm = instantiate_llm(config, verbose=False, use_async=False)
+        assert isinstance(llm, Random)
 
-    #     config = {"llm_name": "human"}
-    #     llm = instantiate_llm(config, verbose=False, use_async=False)
-    #     assert isinstance(llm, Human)
+        config = {"llm_name": "human"}
+        llm = instantiate_llm(config, verbose=False, use_async=False)
+        assert isinstance(llm, Human)
