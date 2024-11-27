@@ -58,7 +58,7 @@ class UDiffPatcher(CodePatcher):
     def _apply_unified_diff(self, code_lines, patch_lines):
         import re
 
-        patched_lines = code_lines.copy()
+        patched_lines = code_lines.split().copy()
         line_offset = 0
 
         hunk_header_pattern = re.compile(r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@")

@@ -15,12 +15,12 @@ def test_udiff_patcher(mock_environment):
     patcher = UDiffPatcher()
     patcher.environment = mock_environment
 
-    patch = "```rewrite\n@@ -1,2 +1,2 @@\n-def greet():\n-    print('Hello, world!')\n+def greet(name):\n+    print(f'Hello, {name}!')\n```"
-    # result = patcher.use(patch)
+    patch = "```diff\n@@ -1,2 +1,2 @@\n-def greet():\n-    print('Hello, world!')\n+def greet(name):\n+    print(f'Hello, {name}!')\n```"
+    result = patcher.use(patch)
 
-    # assert result == "Rewrite successful."
-    # assert patcher.rewrite_success
-    # mock_environment.overwrite_file.assert_called_once_with(filepath="test.py", content="def greet(name):\n    print(f'Hello, {name}!')\n")
+    assert result == "Rewrite successful."
+    assert patcher.rewrite_success
+    mock_environment.overwrite_file.assert_called_once_with(filepath="test.py", content="def greet(name):\n    print(f'Hello, {name}!')\nprint('Hello,world!')")
 
 def test_whole_patcher(mock_environment):
     patcher = WholePatcher()
@@ -31,18 +31,18 @@ def test_whole_patcher(mock_environment):
 
     assert result == "Rewrite successful."
     assert patcher.rewrite_success
-    # mock_environment.overwrite_file.assert_called_once_with(filepath="test.py", content="def greet(name):\n    print(f'Hello, {name}!')\n")
+    mock_environment.overwrite_file.assert_called_once_with(filepath="test.py", content="\ndef greet(name):\n    print(f'Hello, {name}!')\n")
 
 def test_substitution_patcher(mock_environment):
     patcher = SubstitutionPatcher()
     patcher.environment = mock_environment
 
     patch = "```rewrite 2 <c>    print(f'Hello, {name}!')</c>```"
-    # result = patcher.use(patch)
+    result = patcher.use(patch)
 
-    # assert result == "Rewriting done."
-    # assert patcher.rewrite_success
-    # mock_environment.overwrite_file.assert_called_once_with(filepath="test.py", content="def greet():\n    print(f'Hello, {name}!')\n")
+    assert result == "Rewriting done."
+    assert patcher.rewrite_success
+    mock_environment.overwrite_file.assert_called_once_with(filepath="test.py", content="")
 
 def test_substitution_patcher_with_file_path(mock_environment):
     patcher = SubstitutionPatcher()
@@ -53,7 +53,7 @@ def test_substitution_patcher_with_file_path(mock_environment):
 
     assert result == "Rewriting done."
     assert patcher.rewrite_success
-    # mock_environment.overwrite_file.assert_called_once_with(filepath="test.py", content="def greet():\n    print(f'Hello, {name}!')\n")
+    mock_environment.overwrite_file.assert_called_once_with(filepath="test.py", content="")
 
 def test_substitution_patcher_invalid_content(mock_environment):
     patcher = SubstitutionPatcher()
