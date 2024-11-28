@@ -69,7 +69,6 @@ class RepoEnv(TooledEnv):
         auto_view_change: bool = True,
         terminal: Terminal | None = None,
     ):
-        """ """
         super().__init__()
 
         self.path = None
@@ -80,7 +79,8 @@ class RepoEnv(TooledEnv):
         self.auto_view_change = auto_view_change
         self.terminal = terminal or Terminal()
         self.entrypoint = entrypoint
-        self.setup_workspace(path, entrypoint, readonly_patterns)
+
+        self.setup_workspace(path, readonly_patterns=readonly_patterns)
         self.last_run_obs = None
         self.score = 0
         self.done = False
@@ -89,7 +89,7 @@ class RepoEnv(TooledEnv):
     def setup_workspace(
         self,
         path: str,
-        entrypoint: str,
+        entrypoint: str = None,
         readonly_patterns: list[str] = None,
     ):
         readonly_patterns = readonly_patterns or []
@@ -124,7 +124,12 @@ class RepoEnv(TooledEnv):
         self.editable_files = [
             p for p in self.all_files if not self.is_readonly(self.working_dir / p)
         ]
-        assert entrypoint.split()[0] == "python", "Only support python entrypoint for now."
+
+        # override entrypoint as it might be task dependent
+        if entrypoint:
+            self.entrypoint = entrypoint
+
+        assert self.entrypoint.split()[0] == "python", "Only support python entrypoint for now."
 
         self.current_file = None
         self.current_file_content = None
@@ -135,7 +140,6 @@ class RepoEnv(TooledEnv):
 
     def cleanup_workspace(self):
         self.tempdir.cleanup()
-        # atexit.unregister(tempdir.cleanup)
 
     @property
     def instructions(self):
