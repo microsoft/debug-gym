@@ -83,7 +83,7 @@ class AiderBenchmarkEnv(RepoEnv):
 
             self.dataset[task_name] = {
                 "base_directory": directory,
-                "entry_point": "python -m pytest -sv .",
+                "entry_point": self.entrypoint,
                 "instructions": instructions,
                 "filename": task_name + ".py",
             }

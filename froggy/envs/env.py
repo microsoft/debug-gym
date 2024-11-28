@@ -71,6 +71,7 @@ class RepoEnv(TooledEnv):
     ):
         """ """
         super().__init__()
+
         self.path = None
         self.max_score = RepoEnv.DEFAULT_MAX_SCORE
         self.run_on_rewrite = run_on_rewrite
@@ -78,6 +79,7 @@ class RepoEnv(TooledEnv):
         self.dir_tree_depth = dir_tree_depth
         self.auto_view_change = auto_view_change
         self.terminal = terminal or Terminal()
+        self.entrypoint = entrypoint
         self.setup_workspace(path, entrypoint, readonly_patterns)
         self.last_run_obs = None
         self.score = 0
@@ -90,6 +92,8 @@ class RepoEnv(TooledEnv):
         entrypoint: str,
         readonly_patterns: list[str] = None,
     ):
+        assert entrypoint.split()[0] == "python", "Only support python entrypoint for now."
+
         readonly_patterns = readonly_patterns or []
         if self.path:
             self.cleanup_workspace()
@@ -126,8 +130,6 @@ class RepoEnv(TooledEnv):
         self.current_file = None
         self.current_file_content = None
         self.current_breakpoints_state = {}
-        assert entrypoint.split()[0] == "python", "Only support python entrypoint for now."
-        self.entrypoint = entrypoint
 
         # Set up the terminal working dir
         self.terminal.working_dir = str(self.working_dir)
