@@ -4,7 +4,6 @@ import pytest
 
 from froggy.terminal import DockerTerminal, Terminal
 
-
 if_docker_running = pytest.mark.skipif(
     not subprocess.check_output(["docker", "ps"]),
     reason="Docker not running",
@@ -155,16 +154,16 @@ def test_docker_terminal_run(tmp_path):
     working_dir = str(tmp_path)
     volumes = {working_dir: {"bind": working_dir, "mode": "rw"}}
     docker_terminal = DockerTerminal(working_dir=working_dir, volumes=volumes)
-    success, output = docker_terminal.run("export ENV_VAR=value && mkdir test && ls")
-    assert success is True
+    success, output = docker_terminal.run(["export ENV_VAR=value && mkdir test && ls"])
     assert output == "test"
+    assert success is True
 
-    success, output = docker_terminal.run("echo $ENV_VAR")
-    assert success is True
+    success, output = docker_terminal.run(["echo $ENV_VAR"])
     assert "value" not in output
-    success, output = docker_terminal.run("ls")
     assert success is True
+    success, output = docker_terminal.run(["ls"])
     assert "test" in output
+    assert success is True
 
 
 @if_docker_running
@@ -181,15 +180,18 @@ def test_docker_terminal_read_only_volume(tmp_path):
         working_dir: {"bind": working_dir, "mode": "rw"},
         read_only_dir: {"bind": read_only_dir, "mode": "ro"},
     }
-    success, ls_output = docker_terminal.run(f"ls {read_only_dir}")
+    success, ls_output = docker_terminal.run([f"ls {read_only_dir}"])
     assert success is True
     assert ls_output.startswith("test.txt")
 
-    success, output = docker_terminal.run(f"touch {read_only_dir}/test2.txt")
+    success, output = docker_terminal.run([f"touch {read_only_dir}/test2.txt"])
     assert success is False
-    assert output == f"touch: cannot touch '{read_only_dir}/test2.txt': Read-only file system"
+    assert (
+        output
+        == f"touch: cannot touch '{read_only_dir}/test2.txt': Read-only file system"
+    )
 
-    success, output = docker_terminal.run(f"touch {working_dir}/test2.txt")
+    success, output = docker_terminal.run([f"touch {working_dir}/test2.txt"])
     assert success is True
     assert output == ""
 
@@ -236,3 +238,19 @@ def test_docker_terminal_update_volumes_with_working_dir(tmp_path):
     working_dir_b = str(tmp_path / "dir_b")
     terminal.working_dir = working_dir_b
     assert terminal.volumes[working_dir_b] == {"bind": working_dir_b, "mode": "rw"}
+
+
+@pytest.mark.parametrize(
+    "terminal_cls",
+    [
+        Terminal,
+        pytest.param(DockerTerminal, marks=if_docker_running),
+    ],
+)
+def test_terminal_multiple_setup_commands(tmp_path, terminal_cls):
+    working_dir = str(tmp_path)
+    setup_commands = ["echo 'Hello'", "echo 'World'"]
+    terminal = terminal_cls(working_dir, setup_commands)
+    status, output = terminal.run(["pwd"])
+    assert status
+    assert output == f"Hello\nWorld\n{working_dir}"
