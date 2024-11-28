@@ -33,10 +33,10 @@ def test_terminal_init_with_params(tmp_path):
     assert terminal.setup_commands == setup_commands
     assert terminal.env_vars["NO_COLOR"] == "1"
     assert terminal.env_vars["ENV_VAR"] == "value"
-    status, output = terminal.run(["pwd"])
+    status, output = terminal.run("pwd")
     assert status
     assert output == f"Hello World\n{working_dir}"
-    status, output = terminal.run(["echo $ENV_VAR"])
+    status, output = terminal.run("echo $ENV_VAR")
     assert status
     assert output == "Hello World\nvalue"
 
@@ -44,7 +44,7 @@ def test_terminal_init_with_params(tmp_path):
 def test_terminal_run(tmp_path):
     working_dir = str(tmp_path)
     terminal = Terminal(working_dir=working_dir)
-    entrypoint = ["echo 'Hello World'"]
+    entrypoint = "echo 'Hello World'"
     success, output = terminal.run(entrypoint)
     assert success is True
     assert output == "Hello World"
@@ -53,18 +53,24 @@ def test_terminal_run(tmp_path):
 
 def test_terminal_run_tmp_working_dir(tmp_path):
     terminal = Terminal()
-    entrypoint = ["echo 'Hello World'"]
+    entrypoint = "echo 'Hello World'"
     success, output = terminal.run(entrypoint)
     assert success is True
     assert output == "Hello World"
     assert terminal.working_dir.startswith("/tmp/Terminal-")
 
 
-def test_terminal_run_multiple_commands(tmp_path):
+@pytest.mark.parametrize(
+    "command",
+    [
+        ["echo Hello", "echo World"],
+        "echo Hello && echo World",
+    ],
+)
+def test_terminal_run_multiple_commands(tmp_path, command):
     working_dir = str(tmp_path)
     terminal = Terminal(working_dir=working_dir)
-    entrypoint = ["echo Hello", "echo World"]
-    success, output = terminal.run(entrypoint)
+    success, output = terminal.run(command)
     assert success is True
     assert output == "Hello\nWorld"
 
@@ -72,7 +78,7 @@ def test_terminal_run_multiple_commands(tmp_path):
 def test_terminal_run_failure(tmp_path):
     working_dir = str(tmp_path)
     terminal = Terminal(working_dir=working_dir)
-    entrypoint = ["ls non_existent_dir"]
+    entrypoint = "ls non_existent_dir"
     success, output = terminal.run(entrypoint)
     assert success is False
     assert output == ("ls: cannot access 'non_existent_dir': No such file or directory")
@@ -142,26 +148,33 @@ def test_docker_terminal_init_with_params(tmp_path):
     assert terminal.volumes == volumes
     assert terminal.container.status == "running"
 
-    _, output = terminal.run(["pwd"])
+    _, output = terminal.run("pwd")
     assert output == working_dir
 
-    _, output = terminal.run(["ls", "-l"])
+    _, output = terminal.run("ls -l")
     assert "new_dir" in output
 
 
 @if_docker_running
-def test_docker_terminal_run(tmp_path):
+@pytest.mark.parametrize(
+    "command",
+    [
+        "export ENV_VAR=value && mkdir test && ls",
+        ["export ENV_VAR=value", "mkdir test", "ls"],
+    ],
+)
+def test_docker_terminal_run(tmp_path, command):
     working_dir = str(tmp_path)
     volumes = {working_dir: {"bind": working_dir, "mode": "rw"}}
     docker_terminal = DockerTerminal(working_dir=working_dir, volumes=volumes)
-    success, output = docker_terminal.run(["export ENV_VAR=value && mkdir test && ls"])
+    success, output = docker_terminal.run(command)
     assert output == "test"
     assert success is True
 
-    success, output = docker_terminal.run(["echo $ENV_VAR"])
+    success, output = docker_terminal.run("echo $ENV_VAR")
     assert "value" not in output
     assert success is True
-    success, output = docker_terminal.run(["ls"])
+    success, output = docker_terminal.run("ls")
     assert "test" in output
     assert success is True
 
@@ -180,18 +193,18 @@ def test_docker_terminal_read_only_volume(tmp_path):
         working_dir: {"bind": working_dir, "mode": "rw"},
         read_only_dir: {"bind": read_only_dir, "mode": "ro"},
     }
-    success, ls_output = docker_terminal.run([f"ls {read_only_dir}"])
+    success, ls_output = docker_terminal.run(f"ls {read_only_dir}")
     assert success is True
     assert ls_output.startswith("test.txt")
 
-    success, output = docker_terminal.run([f"touch {read_only_dir}/test2.txt"])
+    success, output = docker_terminal.run(f"touch {read_only_dir}/test2.txt")
     assert success is False
     assert (
         output
         == f"touch: cannot touch '{read_only_dir}/test2.txt': Read-only file system"
     )
 
-    success, output = docker_terminal.run([f"touch {working_dir}/test2.txt"])
+    success, output = docker_terminal.run(f"touch {working_dir}/test2.txt")
     assert success is True
     assert output == ""
 
@@ -251,6 +264,6 @@ def test_terminal_multiple_setup_commands(tmp_path, terminal_cls):
     working_dir = str(tmp_path)
     setup_commands = ["echo 'Hello'", "echo 'World'"]
     terminal = terminal_cls(working_dir, setup_commands)
-    status, output = terminal.run(["pwd"])
+    status, output = terminal.run("pwd")
     assert status
     assert output == f"Hello\nWorld\n{working_dir}"
