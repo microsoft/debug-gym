@@ -92,8 +92,6 @@ class RepoEnv(TooledEnv):
         entrypoint: str,
         readonly_patterns: list[str] = None,
     ):
-        assert entrypoint.split()[0] == "python", "Only support python entrypoint for now."
-
         readonly_patterns = readonly_patterns or []
         if self.path:
             self.cleanup_workspace()
@@ -126,6 +124,7 @@ class RepoEnv(TooledEnv):
         self.editable_files = [
             p for p in self.all_files if not self.is_readonly(self.working_dir / p)
         ]
+        assert entrypoint.split()[0] == "python", "Only support python entrypoint for now."
 
         self.current_file = None
         self.current_file_content = None
