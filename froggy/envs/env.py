@@ -16,6 +16,10 @@ from froggy.terminal import Terminal
 from froggy.tools.patchers import CodePatcher
 from froggy.tools.pdb import PDBTool
 from froggy.utils import _walk, make_is_readonly, show_line_number
+import logging
+
+
+logger = logging.getLogger("froggy")
 
 
 class TooledEnv:
@@ -108,7 +112,7 @@ class RepoEnv(TooledEnv):
             self.tempdir.cleanup
         )  # Make sure to cleanup that folder once done.
 
-        print(colored(f"Working directory: {self.working_dir}", "magenta"))
+        logger.debug(f"Working directory: {self.working_dir}")
         shutil.copytree(self.path, self.working_dir, dirs_exist_ok=True)
 
         # get list of all the files
