@@ -10,6 +10,10 @@ from termcolor import colored
 from froggy.agents.llm_api import instantiate_llm
 from froggy.agents.utils import HistoryTracker, build_history_prompt
 from froggy.utils import unescape
+import logging
+
+
+logger = logging.getLogger("froggy")
 
 
 class AgentBase:
@@ -21,8 +25,9 @@ class AgentBase:
         self.llm = instantiate_llm(self.config, verbose=verbose)
         self._uuid = str(uuid.uuid4()) if _uuid is None else _uuid
         self._output_path = pjoin(self.config["output_path"], self._uuid)
+
         os.makedirs(self._output_path, exist_ok=True)
-        print(colored(f"Output will be saved in {self._output_path}", "magenta"))
+
         self.set_seed(self.config["random_seed"])
         self.history = HistoryTracker(self.config["memory_size"])
 
@@ -92,7 +97,8 @@ class AgentBase:
         patch_path = pjoin(self._output_path, task_name, "froggy.patch")
         with open(patch_path, "w") as f:
             f.write(self.env.patch)
-        print(f"Patch saved in {pjoin(self._output_path, task_name, 'froggy.patch')}")
+
+        logger.debug(f"Patch saved in {pjoin(self._output_path, task_name, 'froggy.patch')}")
 
     def log(self, task_name="custom"):
         jsonl_output = {
@@ -111,4 +117,5 @@ class AgentBase:
         os.makedirs(pjoin(self._output_path, task_name), exist_ok=True)
         with open(pjoin(self._output_path, task_name, "froggy.jsonl"), "w") as f:
             json.dump(jsonl_output, f, indent=4)
-        print(f"Log saved in {pjoin(self._output_path, task_name, 'froggy.jsonl')}")
+
+        logger.debug(f"Log saved in {pjoin(self._output_path, task_name, 'froggy.jsonl')}")
