@@ -33,10 +33,9 @@ class AiderBenchmarkEnv(RepoEnv):
     def reset(self, *, seed=None, options: dict = None):
         options = options or {}
         self.current_sample = self.dataset[options["task_name"]]
-        directory = self.current_sample["base_directory"]
-        entrypoint = self.current_sample["entry_point"]
 
-        self.setup_workspace(directory, entrypoint=entrypoint)
+        directory = self.current_sample["base_directory"]
+        self.setup_workspace(directory)
 
         obs, infos = super().reset()
         infos["instructions"] = self.instructions
@@ -83,7 +82,6 @@ class AiderBenchmarkEnv(RepoEnv):
 
             self.dataset[task_name] = {
                 "base_directory": directory,
-                "entry_point": "python -m pytest -sv .",
                 "instructions": instructions,
                 "filename": task_name + ".py",
             }
