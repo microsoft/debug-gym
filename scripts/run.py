@@ -6,6 +6,8 @@ from termcolor import colored
 from rich.progress import Progress, BarColumn, TextColumn
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
+from tqdm import tqdm
+
 from froggy.tools.toolbox import Toolbox
 from froggy.utils import load_config
 import logging
@@ -50,7 +52,7 @@ def run_agent(args, problem, config):
         print(colored(f"Skipping {problem}, already done.", "yellow"))
         return
 
-    agent.run(task_name=problem, debug=args.debug)
+    done = agent.run(task_name=problem, debug=args.debug)
 
     # optionally apply patch
     if config["save_patch"]:
@@ -58,7 +60,7 @@ def run_agent(args, problem, config):
 
     # save log
     agent.log(task_name=problem)
-    return agent.env.done
+    return done
 
 
 def create_env(args, config):
@@ -141,16 +143,23 @@ def main():
 
         num_workers = 1 if args.verbose else int(os.environ.get('FROGGY_WORKERS', 1))
         tasks_done = 0
+        mean_perf = 0
 
+        pbar = tqdm(range(len(problem_list)))
         with ThreadPoolExecutor(num_workers) as executor:
             futures = [executor.submit(run_agent, args, problem, config) for problem in problem_list]
-            for result in as_completed(futures):
-                # raise exception
-                if result.exception():
-                    raise result.exception()
+            for future in as_completed(futures):
+                try:
+                    result = future.result()
+                except Exception as e:
+                    print(f"Task generated an exception: {e}")
+                    continue  # Skip to the next future if desired
+
                 mean_perf += result
                 tasks_done += 1
-                print(colored(f"Performance so far: {mean_perf / tasks_done:.2f}", "blue"))
+
+                pbar.set_description_str(f"Avg. Score so far: {mean_perf / tasks_done:.2f}")
+                pbar.update()
     else:
         # custom repo
         print(colored(f"Running agent {agent.name}", "green"))
