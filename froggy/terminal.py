@@ -5,9 +5,7 @@ import io
 import logging
 import os
 import pty
-import random
 import shlex
-import string
 import subprocess
 import tempfile
 import termios
@@ -26,6 +24,7 @@ class Terminal:
         setup_commands: list[str] = None,
         env_vars: dict[str, str] = None,
         include_os_env_vars: bool = True,
+        **kwargs,
     ):
         self.setup_commands = setup_commands or []
         self.env_vars = env_vars or {}
@@ -51,19 +50,20 @@ class Terminal:
     def working_dir(self, value):
         self._working_dir = value
 
-    def prepare_command(self, entrypoint: list[str]) -> list[str]:
+    def prepare_command(self, entrypoint: str | list[str]) -> list[str]:
         """Prepares a shell command by combining setup commands and entrypoint commands.
         Then wraps the command in a shell (self.default_entrypoint) call."""
+        if isinstance(entrypoint, str):
+            entrypoint = [entrypoint]
         if self.setup_commands:
-            entrypoint = " && ".join(self.setup_commands + entrypoint)
-        else:
-            entrypoint = " && ".join(entrypoint)
+            entrypoint = self.setup_commands + entrypoint
+        entrypoint = " && ".join(entrypoint)
         command = shlex.split(
             f'{shlex.join(self.default_entrypoint)} -c "{entrypoint}"'
         )
         return command
 
-    def run(self, entrypoint: list[str], timeout=None) -> tuple[bool, str]:
+    def run(self, entrypoint: str | list[str], timeout=None) -> tuple[bool, str]:
         """Run a list of commands in the terminal. Return command status and output."""
         command = self.prepare_command(entrypoint)
         logger.debug(f"Running command in terminal: {command}")
@@ -235,6 +235,7 @@ class DockerTerminal(Terminal):
         base_image: str = "ubuntu:latest",
         volumes: dict[str, dict[str:str]] = None,
         include_os_env_vars: bool = False,
+        **kwargs,
         # TODO: dockerfile and/or docker-compose file?
     ):
         """
@@ -297,18 +298,22 @@ class DockerTerminal(Terminal):
             f"docker exec -i {self.container.name} /bin/bash --noprofile --norc"
         )
 
-    def run(self, entrypoint: list[str], timeout=None) -> tuple[bool, str]:
-        """Run a command in the terminal. Return command status and output."""
-
-        command = [entrypoint] if isinstance(entrypoint, str) else entrypoint
-
+    def prepare_command(self, entrypoint: str | list[str]) -> list[str]:
+        """Prepares a shell command by combining setup commands and entrypoint commands.
+        Then wraps the command in a shell call."""
+        if isinstance(entrypoint, str):
+            entrypoint = [entrypoint]
         if self.setup_commands:
-            command = self.setup_commands + [" && "] + entrypoint
+            entrypoint = self.setup_commands + entrypoint
+        entrypoint = " && ".join(entrypoint)
+        command = shlex.split(f'/bin/bash -c "{entrypoint}"')
+        return command
 
-        command = " ".join(command)
+    def run(self, entrypoint: str | list[str], timeout=None) -> tuple[bool, str]:
+        """Run a command in the terminal. Return command status and output."""
+        command = self.prepare_command(entrypoint)
 
         # TODO: docker exec_run timeout?
-        command = f'/bin/bash -c "{command}"'
         status, output = self.container.exec_run(
             command,
             workdir=self.working_dir,
@@ -331,9 +336,7 @@ class DockerTerminal(Terminal):
 
     def setup_container(self) -> docker.models.containers.Container:
         # Create and start a container mounting volumes and setting environment variables
-        logger.debug(
-            f"Setting up container with base image: {self.patched_image}"
-        )
+        logger.debug(f"Setting up container with base image: {self.patched_image}")
         container = self.docker_client.containers.run(
             image=self.patched_image,
             command="sleep infinity",  # Keep the container running
