@@ -5,7 +5,7 @@ import random
 import sys
 
 import tiktoken
-from openai import AsyncAzureOpenAI, AzureOpenAI, OpenAI
+from openai import AsyncAzureOpenAI, AsyncOpenAI, AzureOpenAI, OpenAI
 from tenacity import (
     retry,
     retry_if_exception,
@@ -29,15 +29,9 @@ except ImportError:
     pass
 
 
-logger = logging.getLogger("auto-debug")
+logger = logging.getLogger("froggy")
 
 LLM_CONFIG_FILE = os.environ.get("LLM_CONFIG_FILE", "llm.cfg")
-
-if os.path.exists(LLM_CONFIG_FILE):
-    LLM_CONFIGS = json.load(open(LLM_CONFIG_FILE))
-    available_models = list(LLM_CONFIGS.keys()) + ["random", "human"]
-else:
-    available_models = ["random", "human"]
 
 
 def is_rate_limit_error(exception):
@@ -115,16 +109,20 @@ class TokenCounter:
 
 class LLM:
     def __init__(self, model_name, verbose=False):
+        if os.path.exists(LLM_CONFIG_FILE):
+            configs = json.load(open(LLM_CONFIG_FILE))
+            if model_name not in configs:
+                raise ValueError(f"Model {self.model_name} not found in llm.cfg")
+        else:
+            raise ValueError(f"Cannot find {LLM_CONFIG_FILE}.")
+
         self.model_name = model_name
+        self.config = configs[model_name]
         self.verbose = verbose
-
-        if self.model_name not in LLM_CONFIGS:
-            raise Exception(f"Model {self.model_name} not found in llm.cfg")
-
-        self.config = LLM_CONFIGS[self.model_name]
         self.token_counter = TokenCounter(self.config["tokenizer"])
         self.context_length = self.config["context_limit"] * 1000
-        print(
+
+        logger.debug(
             f"Using {self.model_name} with max context length of {
                 self.context_length:,} tokens."
         )
@@ -197,12 +195,19 @@ class AsyncLLM(LLM):
     def __init__(self, model_name, verbose=False):
         super().__init__(model_name, verbose)
 
-        self.client = AsyncAzureOpenAI(
-            api_key=self.config["api_key"],
-            azure_endpoint=self.config["endpoint"],
-            api_version=self.config["api_version"],
-            timeout=None,
-        )
+        if "azure openai" in self.config.get("tags", []):
+            self.client = AsyncAzureOpenAI(
+                api_key=self.config["api_key"],
+                azure_endpoint=self.config["endpoint"],
+                api_version=self.config["api_version"],
+                timeout=None,
+            )
+        else:
+            self.client = AsyncOpenAI(
+                api_key=self.config["api_key"],
+                base_url=self.config["endpoint"],
+                timeout=None,
+            )
 
     @retry(
         retry=retry_if_exception(is_rate_limit_error),
@@ -301,10 +306,6 @@ class Random:
 
 
 def instantiate_llm(config, verbose=False, use_async=False):
-    assert (
-        config["llm_name"] in available_models
-    ), f"Model {config['llm_name']} is not available, please make sure the LLM config file is correctly set."
-
     if config["llm_name"] == "random":
         llm = Random(config["random_seed"], verbose)
     elif config["llm_name"] == "human":
@@ -314,5 +315,4 @@ def instantiate_llm(config, verbose=False, use_async=False):
             llm = AsyncLLM(config["llm_name"], verbose=verbose)
         else:
             llm = LLM(config["llm_name"], verbose=verbose)
-
     return llm
