@@ -6,6 +6,7 @@ from froggy.agents.zero_shot import AgentZeroShot
 from froggy.agents.llm_api import LLM, merge_messages, print_messages
 from froggy.agents.utils import trim_prompt_messages
 from froggy.envs import AiderBenchmarkEnv
+from scripts.run import create_env
 import torch
 import tiktoken
 import os
@@ -14,47 +15,44 @@ from termcolor import colored
 import gc
 
 # os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:False"
-
-if torch.cuda.is_available():
-    print("GPU is available")
-else:
-    print("GPU is not available")
-
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
-# Aider configurations and env
-env = AiderBenchmarkEnv()
 config = {
-    "output_path": "/root",
-    "benchmark": "aider",
-    "problems": "all",  # list of problems, e.g., ["wordy"], or "all"
-    "env_kwargs": {
-        "dir_tree_depth": 1,
-        "run_on_rewrite": True,
-        "auto_view_change": True,
-        "run_timeout": 10,
-    },
-    "tools": ["pdb", "view", "patcher:substitution"],
-    "persistent_breakpoints": True,  # in pdb tool
+  "output_path": "/root",
+  "benchmark": "aider",
+  "problems": "all", # list of problems, e.g., ["wordy"], or "all"
+  "env_kwargs": {
+    "dir_tree_depth": 1,
+    "run_on_rewrite": True,
+    "auto_view_change": True,
+    "run_timeout": 10,
+  },
+  "tools": ["patcher:whole"],
+  "terminal": {
+    "type": "local",  # "docker" or "local"
+    "base_image": "python:3.12-slim",
+    "setup_commands": ["pip install pytest"]
+  },
+  "persistent_breakpoints": True,  # in pdb tool
 
-    # LLM configs
-    "llm_name": "random",
-    "llm_temperature": [0.0],  # list of values between 0.0 and 1.0
+  # LLM configs
+  "llm_name": "random",
+  "llm_temperature": [0.5], # list of values between 0.0 and 1.0
 
-    # Agent configs
-    "random_seed": 42,
-    "max_steps": 25,
-    "max_rewrite_steps": 10,
-    "memory_size": 20,
-    "use_conversational_prompt": True,
-    "save_patch": True,
-    "log_prompt_response_pairs": True,
-    "reset_prompt_history_after_rewrite": True
+  # Agent configs
+  "random_seed": 42,
+  "max_steps": 25,
+  "max_rewrite_steps": 10,
+  "memory_size": 20,
+  "use_conversational_prompt": True,
+  "save_patch": True,
+  "log_prompt_response_pairs": True,
+  "reset_prompt_history_after_rewrite": True
 }
 
 
-agent = AgentZeroShot(config, env)
-
+env = create_env(None, config)
+agent = AgentZeroShot(config, env, verbose=False)
 
 class TokenCounter:
     def __init__(self, model: str = "gpt-4o"):
@@ -179,7 +177,7 @@ class PPOLLM():
 
 # model_name = "Qwen/Qwen2.5-1.5B-Instruct"
 model_name = "Qwen/Qwen2.5-Coder-3B-Instruct"
-agent.llm = PPOLLM(model_name, verbose=False)
+agent.llm = PPOLLM(model_name, verbose=True)
 
 # Getting the problem list 
 problem_list = env.dataset.keys() 
