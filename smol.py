@@ -41,7 +41,7 @@ config = {
 
   # Agent configs
   "random_seed": 42,
-  "max_steps": 25,
+  "max_steps": 2,
   "max_rewrite_steps": 10,
   "memory_size": 20,
   "use_conversational_prompt": True,
@@ -90,7 +90,7 @@ class PPOLLM():
 
     config = PPOConfig(
         learning_rate = 1.41e-5,
-        batch_size = 25,
+        batch_size = 2,
         mini_batch_size = 1,
         # optimize_cuda_cache = True
     )
@@ -103,14 +103,13 @@ class PPOLLM():
       lora_dropout=0.1
     )
 
-    model = AutoModelForCausalLM.from_pretrained(model_name, torch_dtype=torch.bfloat16)
-    model = get_peft_model(model, peft_config)
-    model.print_trainable_parameters()
-    model.save_pretrained("/root/lora_model/") 
-    model = PeftModel.from_pretrained(model, "/root/lora_model/", is_trainable=False, torch_dtype=torch.bfloat16)
-    ppo_model = AutoModelForCausalLMWithValueHead.from_pretrained(model, torch_dtype=torch.bfloat16, is_trainable=True)
+    # model = AutoModelForCausalLM.from_pretrained(model_name, torch_dtype=torch.bfloat16)
+    # model = get_peft_model(model, peft_config)
+    # model.print_trainable_parameters()
+    # model.save_pretrained("/root/lora_model/") 
+    # model = PeftModel.from_pretrained(model, "/root/lora_model/", is_trainable=False, torch_dtype=torch.bfloat16)
+    ppo_model = AutoModelForCausalLMWithValueHead.from_pretrained(model_name, torch_dtype=torch.bfloat16, is_trainable=True)
 
-    # ppo_model = AutoModelForSeq2SeqLMWithValueHead.from_pretrained(model_name)
     self.tokenizer = AutoTokenizer.from_pretrained(model_name)
     self.tokenizer.pad_token = self.tokenizer.eos_token
 
@@ -130,7 +129,6 @@ class PPOLLM():
   
   def get_tensors(self):
      return self.query_tensors, self.response_tensors, self.rewards
-     clear_tensors
 
   def clear_tensors(self):
      self.query_tensors = []
@@ -153,7 +151,8 @@ class PPOLLM():
     generation_kwargs = {
         "do_sample": True,
         "eos_token_id": self.tokenizer.eos_token_id,
-        "max_new_tokens": 500
+        "max_new_tokens": 500,
+        "temperature": 0.5 
     }
 
     self.query_tensors.append(tokenized_messages)
@@ -176,17 +175,14 @@ class PPOLLM():
     return response, token_usage
 
 # model_name = "Qwen/Qwen2.5-1.5B-Instruct"
-model_name = "Qwen/Qwen2.5-Coder-3B-Instruct"
-agent.llm = PPOLLM(model_name, verbose=True)
+model_name = "Qwen/Qwen2.5-Coder-0.5B-Instruct"
+agent.llm = PPOLLM(model_name, verbose=False)
 
 # Getting the problem list 
 problem_list = env.dataset.keys() 
 
 for problem in problem_list:
 
-  if os.path.exists(pjoin(agent._output_path, problem, "froggy.jsonl")):
-    print(colored(f"Skipping {problem}, already done.", "yellow"))
-    continue
   print(
     colored(
         f"Running agent {agent.name} on {config['benchmark']}.{problem}",
@@ -196,6 +192,12 @@ for problem in problem_list:
   done = agent.run(task_name=problem)
 
   query_tensors, response_tensors, rewards = agent.llm.get_tensors()
+
+  if len(query_tensors) < 2:
+    diff = 2 - len(query_tensors)
+    query_tensors = [torch.tensor([0])] * diff + query_tensors
+    response_tensors = [torch.tensor([0])] * diff + response_tensors
+    rewards = [torch.tensor([0]).float()] * diff + rewards
 
   # for i in range(len(query_tensors)):
   #   print(query_tensors[i].shape, response_tensors[i].shape, "||||")
