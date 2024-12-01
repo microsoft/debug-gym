@@ -21,6 +21,7 @@ class SWEBenchEnv(RepoEnv):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+
         self.load_dataset()
 
     @property
@@ -67,8 +68,7 @@ class SWEBenchEnv(RepoEnv):
         self.make_froggyignore(local_repo_path=local_repo_path)
 
         # For swebench, we must pass the fail_to_pass and pass_to_pass unit tests.
-        entrypoint = "python -m pytest " + " ".join(fail_to_pass + pass_to_pass)
-        self.setup_workspace(local_repo_path, entrypoint)
+        self.setup_workspace(local_repo_path, entrypoint="python -m pytest " + " ".join(fail_to_pass + pass_to_pass))
 
         # Reset RepoEnv
         obs, infos = super().reset()

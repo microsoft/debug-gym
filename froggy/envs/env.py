@@ -16,6 +16,10 @@ from froggy.terminal import Terminal
 from froggy.tools.patchers import CodePatcher
 from froggy.tools.pdb import PDBTool
 from froggy.utils import _walk, make_is_readonly, show_line_number
+import logging
+
+
+logger = logging.getLogger("froggy")
 
 
 class TooledEnv:
@@ -69,8 +73,8 @@ class RepoEnv(TooledEnv):
         auto_view_change: bool = True,
         terminal: Terminal | None = None,
     ):
-        """ """
         super().__init__()
+
         self.path = None
         self.max_score = RepoEnv.DEFAULT_MAX_SCORE
         self.run_on_rewrite = run_on_rewrite
@@ -78,7 +82,9 @@ class RepoEnv(TooledEnv):
         self.dir_tree_depth = dir_tree_depth
         self.auto_view_change = auto_view_change
         self.terminal = terminal or Terminal()
-        self.setup_workspace(path, entrypoint, readonly_patterns)
+        self.entrypoint = entrypoint
+
+        self.setup_workspace(path, readonly_patterns=readonly_patterns)
         self.last_run_obs = None
         self.score = 0
         self.done = False
@@ -87,7 +93,7 @@ class RepoEnv(TooledEnv):
     def setup_workspace(
         self,
         path: str,
-        entrypoint: str,
+        entrypoint: str = None,
         readonly_patterns: list[str] = None,
     ):
         readonly_patterns = readonly_patterns or []
@@ -106,7 +112,7 @@ class RepoEnv(TooledEnv):
             self.tempdir.cleanup
         )  # Make sure to cleanup that folder once done.
 
-        print(colored(f"Working directory: {self.working_dir}", "magenta"))
+        logger.debug(f"Working directory: {self.working_dir}")
         shutil.copytree(self.path, self.working_dir, dirs_exist_ok=True)
 
         # get list of all the files
@@ -123,18 +129,21 @@ class RepoEnv(TooledEnv):
             p for p in self.all_files if not self.is_readonly(self.working_dir / p)
         ]
 
+        # override entrypoint as it might be task dependent
+        if entrypoint:
+            self.entrypoint = entrypoint
+
+        assert self.entrypoint.split()[0] == "python", "Only support python entrypoint for now."
+
         self.current_file = None
         self.current_file_content = None
         self.current_breakpoints_state = {}
-        assert entrypoint.split()[0] == "python", "Only support python entrypoint for now."
-        self.entrypoint = entrypoint
 
         # Set up the terminal working dir
         self.terminal.working_dir = str(self.working_dir)
 
     def cleanup_workspace(self):
         self.tempdir.cleanup()
-        # atexit.unregister(tempdir.cleanup)
 
     @property
     def instructions(self):
