@@ -18,13 +18,15 @@ from os.path import join as pjoin
 from termcolor import colored
 import gc
 import random
+import copy
 
 # os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:False"
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
 
-num_epochs = 10
+num_epochs = 1
 batch_size = 10
+
 config = {
     "output_path": "/root/outputs",
     "benchmark": "aider",
@@ -85,16 +87,21 @@ class TokenCounter:
         return nb_tokens
 
 
+def clean_model_name_for_tokenizer(model_name):
+    if model_name.startswith("/root"):
+        model_name = "-".join("/".join(model_name.split("/")[-2:]).split("-")[:-1])
+    return model_name
+
 class PPOLLM:
     def __init__(self, model_name, verbose=False):
 
         self.verbose = verbose
-        self.token_counter = TokenCounter(model_name)
 
         config = PPOConfig(
             learning_rate=1.41e-5,
             batch_size=batch_size,
             mini_batch_size=1,
+            seed=42
             # optimize_cuda_cache = True
         )
 
@@ -106,6 +113,7 @@ class PPOLLM:
             lora_dropout=0.1,
         )
 
+        # LoRA, commented out for now
         # model = AutoModelForCausalLM.from_pretrained(model_name, torch_dtype=torch.bfloat16)
         # model = get_peft_model(model, peft_config)
         # model.print_trainable_parameters()
@@ -115,7 +123,10 @@ class PPOLLM:
             model_name, torch_dtype=torch.bfloat16, is_trainable=True
         )
 
+        model_name = clean_model_name_for_tokenizer(model_name)
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
+        self.token_counter = TokenCounter(model_name)
+
         if self.tokenizer.pad_token is None:
             self.tokenizer.pad_token = self.tokenizer.eos_token
 
@@ -154,9 +165,11 @@ class PPOLLM:
 
         generation_kwargs = {
             "do_sample": True,
-            "eos_token_id": self.tokenizer.eos_token_id,
             "max_new_tokens": 500,
             "temperature": 0.5,
+            "min_length": -1,
+            "top_k": 0.0,
+            "top_p": 1.0,
         }
 
         self.query_tensors.append(tokenized_messages)
@@ -181,37 +194,54 @@ class PPOLLM:
 
         return response, token_usage
 
-def run_with_ppo(agent, env, num_epochs, batch_size):
+def write_to_file(file_path, data):
+    with open(file_path, 'w') as file:
+        for d in data:
+            file.write(f"{d}\n")
 
-    # Getting the problem list
-    problem_list = list(env.dataset.keys())
+def read_from_file(file_path):
+    with open(file_path, 'r') as file:
+        problems = file.read().splitlines()
+    return problems
+
+def run_with_ppo(agent, num_epochs, batch_size, problem_list):
+
+    problem_iter = iter(problem_list)
+    losses = []
     for epoch in range(num_epochs):
-        query_tensors, response_tensors, rewards = [], [], []
-        while len(query_tensors) < batch_size:
-            idx = random.randint(0, len(problem_list))
-            problem = problem_list[idx]
-            done = agent.run(task_name=problem)
-            query_tensors, response_tensors = agent.llm.get_tensors()
+        while True:
+            try:
+                query_tensors, response_tensors, rewards = [], [], []
+                while len(query_tensors) < batch_size:
+                    
+                    problem = next(problem_iter)
+                    done = agent.run(task_name=problem)
+                    query_tensors, response_tensors = agent.llm.get_tensors()
 
-            rewards += [torch.tensor([done]).float()] * (len(query_tensors) - len(rewards))
+                    rewards += [torch.tensor([done]).float()] * (len(query_tensors) - len(rewards))
 
-            torch.cuda.empty_cache()
-            gc.collect()
+                    # optionally apply patch
+                    if config["save_patch"]:
+                        agent.save_patch(task_name=problem)
+                    # save log
+                    agent.log(task_name=problem)
 
-        stats = agent.llm.ppo_trainer.step(query_tensors[:batch_size], response_tensors[:batch_size], rewards[:batch_size])
-        agent.llm.clear_tensors()
-        torch.cuda.empty_cache()
-        gc.collect()
+                torch.cuda.empty_cache()
+                gc.collect()
 
-        # optionally apply patch
-        if config["save_patch"]:
-            agent.save_patch(task_name=problem)
-        # save log
-        agent.log(task_name=problem)
+                stats = agent.llm.ppo_trainer.step(query_tensors[:batch_size], response_tensors[:batch_size], rewards[:batch_size])
+                losses.append((stats['ppo/loss/value'], stats['ppo/loss/total']))
+                print(stats['ppo/loss/value'], stats['ppo/loss/total'])
+                agent.llm.clear_tensors()
+                torch.cuda.empty_cache()
+                gc.collect()
 
-def run_without_ppo(agent, env):
+            except StopIteration:
+                break
+    return losses
 
-    problem_list = list(env.dataset.keys())
+def run_without_ppo(agent, problem_list):
+
     for problem in problem_list:
 
         print(
@@ -230,25 +260,50 @@ def run_without_ppo(agent, env):
 
 def main():
 
-    # Setup agent and environment
-    env = create_env(None, config)
-    agent = AgentZeroShot_NoPDB(config, env, verbose=False)
+    # /root/models/Qwen/Qwen2.5-Coder-0.5B-Instruct-PPO
 
-    # Specify HuggingFace model and hijack agent
-    model_name = "Qwen/Qwen2.5-Coder-1.5B-Instruct"
-    agent.llm = PPOLLM(model_name, verbose=False)
+    models = {
+        "q0.5": "Qwen/Qwen2.5-Coder-0.5B-Instruct",
+        "q1.5": "Qwen/Qwen2.5-Coder-1.5B-Instruct",
+        "q3": "Qwen/Qwen2.5-Coder-3B-Instruct",
+        "q7": "Qwen/Qwen2.5-Coder-7B-Instruct"
+    }
 
-    if len(sys.argv) > 1:
-        input = sys.argv[1]
+
+    # TODO: Fix/robustify argument parsing when time permits 
+    if len(sys.argv) > 2:
+
+        # Get command line arguments 
+        input, model_name = sys.argv[1], sys.argv[2]
+        try:
+            model_name = models[model_name]
+        except KeyError:
+            print("Model not found")
+
+        # Setup agent and environment
+        env = create_env(None, config)
+        agent = AgentZeroShot_NoPDB(config, env, verbose=False)
+
+        # Specify HuggingFace model and hijack agent
+        agent.llm = PPOLLM(model_name, verbose=False)
+
+        # Choose whether to use full dataset or 'easy' dataset based on flag
+        if "-easy" in sys.argv:
+            problem_list = read_from_file("/root/Froggy/easy_problems.txt")
+        else:
+            problem_list = list(env.dataset.keys())
+        
+        # Run with PPO training or without
         if input == "ppo":
-            run_with_ppo(agent, env, num_epochs, batch_size)
+            losses = run_with_ppo(agent, num_epochs, batch_size, problem_list)
+            agent.llm.ppo_trainer._save_pretrained(f"/root/models/{model_name}-PPO")
+            write_to_file(f"/root/models/{model_name}-PPO/losses.txt", losses)
         elif input == "baseline":
-            run_without_ppo(agent, env)
+            run_without_ppo(agent, problem_list)
         else:
             print("Unrecognized input.")
-
     else:
-        print("No input provided.")
+        print("Incomplete inputs provided.")
 
 if __name__ == "__main__":
     main()
