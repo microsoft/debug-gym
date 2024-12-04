@@ -1,3 +1,4 @@
+import argparse
 from pathlib import Path
 from trl import (
     PPOTrainer,
@@ -313,60 +314,54 @@ def run_without_ppo(agent, problem_list):
         # save log
         agent.log(task_name=problem)
 
+
 def main():
 
-    # /root/models/Qwen/Qwen2.5-Coder-0.5B-Instruct-PPO
+    parser = argparse.ArgumentParser()
+    parser.add_argument("method", choices=["ppo", "baseline"], help="Method to run: 'ppo' or 'baseline'")
+    parser.add_argument("model_name", choices=["q0.5", "q1.5", "q3", "q7"], help="Model name to use.")
+    parser.add_argument("--base_dir", default="/tmp", help="Base directory for outputs and models")
+    parser.add_argument("--easy", action="store_true", help="Use easy dataset")
+
+    args = parser.parse_args()
 
     models = {
         "q0.5": "Qwen/Qwen2.5-Coder-0.5B-Instruct",
         "q1.5": "Qwen/Qwen2.5-Coder-1.5B-Instruct",
         "q3": "Qwen/Qwen2.5-Coder-3B-Instruct",
-        "q7": "Qwen/Qwen2.5-Coder-7B-Instruct"
+        "q7": "Qwen/Qwen2.5-Coder-7B-Instruct",
     }
 
+    try:
+        model_name = models[args.model_name]
+    except KeyError:
+        print(f"Model not found. Choose from {models.keys()}")
+    base_dir = Path(args.base_dir)
+    config["output_path"] = str(base_dir / "outputs")
 
-    # TODO: Fix/robustify argument parsing when time permits
-    if len(sys.argv) > 2:
+    # Setup agent and environment
+    env = create_env(None, config)
+    agent = AgentZeroShot_NoPDB(config, env, verbose=False)
 
-        # Get command line arguments
-        method, model_name = sys.argv[1], sys.argv[2]
+    # Specify HuggingFace model and hijack agent
+    agent.llm = PPOLLM(model_name, verbose=False)
 
-        try:
-            base_dir = sys.argv[3]
-        except IndexError:
-            base_dir = "/tmp"
-        base_dir = Path(base_dir)
-        config["output_path"] = str(base_dir / "outputs")
-
-        try:
-            model_name = models[model_name]
-        except KeyError:
-            print("Model not found")
-
-        # Setup agent and environment
-        env = create_env(None, config)
-        agent = AgentZeroShot_NoPDB(config, env, verbose=False)
-
-        # Specify HuggingFace model and hijack agent
-        agent.llm = PPOLLM(model_name, verbose=False)
-
-        # Choose whether to use full dataset or 'easy' dataset based on flag
-        if "-easy" in sys.argv:
-            problem_list = read_from_file(str(base_dir / "Froggy/easy_problems.txt"))
-        else:
-            problem_list = list(env.dataset.keys())
-
-        # Run with PPO training or without
-        if method == "ppo":
-            losses = run_with_ppo(agent, num_epochs, batch_size, problem_list)
-            agent.llm.ppo_trainer._save_pretrained(str(base_dir / f"models/{model_name}-PPO"))
-            write_to_file(str(base_dir / f"models/{model_name}-PPO/losses.txt"), losses)
-        elif method == "baseline":
-            run_without_ppo(agent, problem_list)
-        else:
-            print("Unrecognized method.")
+    # Choose whether to use full dataset or 'easy' dataset based on flag
+    if args.easy:
+        problem_list = read_from_file(str(base_dir / "Froggy/easy_problems.txt"))
     else:
-        print("Incomplete parameters provided.")
+        problem_list = list(env.dataset.keys())
+
+    # Run with PPO training or without
+    if args.method == "ppo":
+        losses = run_with_ppo(agent, num_epochs, batch_size, problem_list)
+        agent.llm.ppo_trainer._save_pretrained(str(base_dir / f"models/{model_name}-PPO"))
+        write_to_file(str(base_dir / f"models/{model_name}-PPO/losses.txt"), losses)
+    elif args.method == "baseline":
+        run_without_ppo(agent, problem_list)
+    else:
+        print("Unrecognized method.")
+
 
 if __name__ == "__main__":
     main()
