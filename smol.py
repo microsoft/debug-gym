@@ -171,10 +171,10 @@ class PPOLLM:
             messages, add_generation_prompt=True, tokenize=False,
         )
 
-        response = self.vllm.generate(messages_chat)
+        response = self.vllm.generate(messages_chat)[0]
         token_usage = {
             "prompt": self.token_counter(messages=messages),  # or messages_chat?
-            "response": self.token_counter(text=response[0]),
+            "response": self.token_counter(text=response),
         }
         return response, token_usage
 
@@ -226,11 +226,31 @@ class PPOLLM:
 class VLLM:
 
     def __init__(self, model, tensor_parallel_size=1):
+        """Initialize VLLM object with the given model and tensor parallel size.
+        Usage:
+        vllm = VLLM(model, tensor_parallel_size)  # model_id or model_path and number of gpus
+        vllm.generate(prompts, **kwargs)          # check SamplingParams for kwargs
+        vllm.free_memory()                        # once you are done with the model
+        vllm.instantiate_llm(new_model)           # when you want to reload the model
+        vllm.generate(prompts, **kwargs)
+        """
         self.model = model
         self.tensor_parallel_size = tensor_parallel_size
+        self.llm = None
+
+    def instantiate_llm(self, model=None):
+        self.model = model or self.model
+        self.llm = LLM(
+            model=self.model,
+            tokenizer=self.model,
+            tensor_parallel_size=self.tensor_parallel_size,
+        )
 
     def generate(self, prompts, **kwargs):
         """Generate completions for the given prompts using VLLM"""
+
+        if self.llm is None:
+            self.instantiate_llm()
 
         # set kwargs default if not provided
         kwargs.setdefault("temperature", 0.5)
@@ -240,15 +260,8 @@ class VLLM:
 
         sampling_params = SamplingParams(**kwargs)
 
-        self.llm = LLM(
-            model=self.model,
-            tokenizer=self.model,
-            tensor_parallel_size=self.tensor_parallel_size,
-        )
-
         outputs = self.llm.generate(prompts, sampling_params)
         outputs = [o.outputs[0].text for o in outputs]
-        self.free_memory()
         return outputs
 
     def free_memory(self):
