@@ -32,5 +32,5 @@ jobs:
           pip install -e '.[dev]'
       - name: Test with pytest
         run: |
-          pytest -n 4 -vv --cov=.
+          pytest -n 4 -vv --cov=. --cov-fail-under=90
           coverage report -m
