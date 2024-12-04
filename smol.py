@@ -20,6 +20,15 @@ import gc
 import random
 import copy
 
+import contextlib
+import ray
+from vllm import LLM, SamplingParams
+from vllm.distributed.parallel_state import (
+    destroy_model_parallel,
+    destroy_distributed_environment,
+)
+
+
 # os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:False"
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -193,6 +202,48 @@ class PPOLLM:
         }
 
         return response, token_usage
+
+
+class VLLM:
+
+    def __init__(self, model, tensor_parallel_size=1):
+        self.model = model
+        self.tensor_parallel_size = tensor_parallel_size
+        self.llm = LLM(
+            model=self.model_name,
+            tokenizer=self.model_name,
+            tensor_parallel_size=self.tensor_parallel_size,
+        )
+
+
+    def vllm_generate(self, prompts, **kwargs):
+        """Generate completions for the given prompts using VLLM"""
+
+        # set kwargs default if not provided
+        kwargs.setdefault("temperature", 0.5)
+        kwargs.setdefault("top_p", 1.0)
+        kwargs.setdefault("top_k", -1)
+        kwargs.setdefault("max_tokens", 500)
+
+        sampling_params = SamplingParams(**kwargs)
+
+        outputs = self.llm.generate(prompts, sampling_params)
+        outputs = [o.outputs[0].text for o in outputs]
+        self.free_vllm_memory()
+        return outputs
+
+    def free_vllm_memory(self):
+        """Delete the llm object and free the memory"""
+        destroy_model_parallel()
+        destroy_distributed_environment()
+        del self.llm.llm_engine.model_executor
+        del self.llm
+        with contextlib.suppress(AssertionError):
+            torch.distributed.destroy_process_group()
+        gc.collect()
+        torch.cuda.empty_cache()
+        ray.shutdown()
+
 
 def write_to_file(file_path, data):
     with open(file_path, 'w') as file:
