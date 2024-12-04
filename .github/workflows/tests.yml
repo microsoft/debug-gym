@@ -31,9 +31,15 @@ jobs:
           pip install --upgrade pip
           pip install -e '.[dev]'
       - name: Test with pytest
+        id: pytest
         run: |
           pytest -n 4 -vv --cov=. --cov-fail-under=90
         continue-on-error: true
       - name: Generate coverage report
         run: |
           coverage report -m
+      - name: Check pytest result
+        if: steps.pytest.outputs.exit-code != '0'
+        run: |
+          echo "Tests failed or coverage threshold not met"
+          exit 1 
