@@ -1,3 +1,4 @@
+from pathlib import Path
 from trl import (
     PPOTrainer,
     PPOConfig,
@@ -37,7 +38,7 @@ num_epochs = 1
 batch_size = 10
 
 config = {
-    "output_path": "/root/outputs",
+    "output_path": "/tmp/outputs",
     "benchmark": "aider",
     "problems": "all",  # list of problems, e.g., ["wordy"], or "all"
     "env_kwargs": {
@@ -110,7 +111,7 @@ class PPOLLM:
             learning_rate=1.41e-5,
             batch_size=batch_size,
             mini_batch_size=1,
-            seed=42
+            seed=42,
             # optimize_cuda_cache = True
         )
 
@@ -264,7 +265,6 @@ def run_with_ppo(agent, num_epochs, batch_size, problem_list):
             try:
                 query_tensors, response_tensors, rewards = [], [], []
                 while len(query_tensors) < batch_size:
-                    
                     problem = next(problem_iter)
                     done = agent.run(task_name=problem)
                     query_tensors, response_tensors = agent.llm.get_tensors()
@@ -280,7 +280,11 @@ def run_with_ppo(agent, num_epochs, batch_size, problem_list):
                 torch.cuda.empty_cache()
                 gc.collect()
 
-                stats = agent.llm.ppo_trainer.step(query_tensors[:batch_size], response_tensors[:batch_size], rewards[:batch_size])
+                stats = agent.llm.ppo_trainer.step(
+                    query_tensors[:batch_size],
+                    response_tensors[:batch_size],
+                    rewards[:batch_size]
+                )
                 losses.append((stats['ppo/loss/value'], stats['ppo/loss/total']))
                 print(stats['ppo/loss/value'], stats['ppo/loss/total'])
                 agent.llm.clear_tensors()
@@ -321,11 +325,19 @@ def main():
     }
 
 
-    # TODO: Fix/robustify argument parsing when time permits 
+    # TODO: Fix/robustify argument parsing when time permits
     if len(sys.argv) > 2:
 
-        # Get command line arguments 
-        input, model_name = sys.argv[1], sys.argv[2]
+        # Get command line arguments
+        method, model_name = sys.argv[1], sys.argv[2]
+
+        try:
+            base_dir = sys.argv[3]
+        except IndexError:
+            base_dir = "/tmp"
+        base_dir = Path(base_dir)
+        config["output_path"] = str(base_dir / "outputs")
+
         try:
             model_name = models[model_name]
         except KeyError:
@@ -340,21 +352,21 @@ def main():
 
         # Choose whether to use full dataset or 'easy' dataset based on flag
         if "-easy" in sys.argv:
-            problem_list = read_from_file("/root/Froggy/easy_problems.txt")
+            problem_list = read_from_file(str(base_dir / "Froggy/easy_problems.txt"))
         else:
             problem_list = list(env.dataset.keys())
-        
+
         # Run with PPO training or without
-        if input == "ppo":
+        if method == "ppo":
             losses = run_with_ppo(agent, num_epochs, batch_size, problem_list)
-            agent.llm.ppo_trainer._save_pretrained(f"/root/models/{model_name}-PPO")
-            write_to_file(f"/root/models/{model_name}-PPO/losses.txt", losses)
-        elif input == "baseline":
+            agent.llm.ppo_trainer._save_pretrained(str(base_dir / f"models/{model_name}-PPO"))
+            write_to_file(str(base_dir / f"models/{model_name}-PPO/losses.txt"), losses)
+        elif method == "baseline":
             run_without_ppo(agent, problem_list)
         else:
-            print("Unrecognized input.")
+            print("Unrecognized method.")
     else:
-        print("Incomplete inputs provided.")
+        print("Incomplete parameters provided.")
 
 if __name__ == "__main__":
     main()
