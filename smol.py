@@ -103,10 +103,13 @@ def clean_model_name_for_tokenizer(model_name):
         model_name = "-".join("/".join(model_name.split("/")[-2:]).split("-")[:-1])
     return model_name
 
-class PPOLLM:
-    def __init__(self, model_name, verbose=False):
 
+class PPOLLM:
+    def __init__(self, model_name, verbose=False, vllm: "VLLM" = None):
+
+        self.model_name = model_name
         self.verbose = verbose
+        self.vllm = vllm
 
         config = PPOConfig(
             learning_rate=1.41e-5,
@@ -163,14 +166,28 @@ class PPOLLM:
         self.response_tensors = []
         self.rewards = []
 
-    def __call__(self, messages, *args, **kwargs):
+    def vllm_generate(self, messages):
+        messages_chat = self.tokenizer.apply_chat_template(
+            messages, add_generation_prompt=True, tokenize=False,
+        )
 
+        response = self.vllm.generate(messages_chat)
+        token_usage = {
+            "prompt": self.token_counter(messages=messages),  # or messages_chat?
+            "response": self.token_counter(text=response[0]),
+        }
+        return response, token_usage
+
+    def __call__(self, messages, *args, **kwargs):
         # Merge consecutive messages with same role.
         messages = merge_messages(messages)
         messages = trim_prompt_messages(messages, 32768, self.token_counter)
 
         if self.verbose:
             print_messages(messages)
+
+        if self.vllm:
+            return self.vllm_generate(messages)
 
         tokenized_messages = self.tokenize_messages(messages)
 
@@ -211,14 +228,8 @@ class VLLM:
     def __init__(self, model, tensor_parallel_size=1):
         self.model = model
         self.tensor_parallel_size = tensor_parallel_size
-        self.llm = LLM(
-            model=self.model_name,
-            tokenizer=self.model_name,
-            tensor_parallel_size=self.tensor_parallel_size,
-        )
 
-
-    def vllm_generate(self, prompts, **kwargs):
+    def generate(self, prompts, **kwargs):
         """Generate completions for the given prompts using VLLM"""
 
         # set kwargs default if not provided
@@ -229,12 +240,18 @@ class VLLM:
 
         sampling_params = SamplingParams(**kwargs)
 
+        self.llm = LLM(
+            model=self.model,
+            tokenizer=self.model,
+            tensor_parallel_size=self.tensor_parallel_size,
+        )
+
         outputs = self.llm.generate(prompts, sampling_params)
         outputs = [o.outputs[0].text for o in outputs]
-        self.free_vllm_memory()
+        self.free_memory()
         return outputs
 
-    def free_vllm_memory(self):
+    def free_memory(self):
         """Delete the llm object and free the memory"""
         destroy_model_parallel()
         destroy_distributed_environment()
@@ -321,7 +338,9 @@ def main():
     parser.add_argument("method", choices=["ppo", "baseline"], help="Method to run: 'ppo' or 'baseline'")
     parser.add_argument("model_name", choices=["q0.5", "q1.5", "q3", "q7"], help="Model name to use.")
     parser.add_argument("--base_dir", default="/tmp", help="Base directory for outputs and models")
-    parser.add_argument("--easy", action="store_true", help="Use easy dataset")
+    parser.add_argument("--problem_list", default=None, help="File containing list of problems to run")
+    parser.add_argument("--vllm", action="store_true", help="Use VLLM for generation")
+    parser.add_argument("--tensor_parallel_size", default=1, type=int, help="Tensor parallel size for VLLM")
 
     args = parser.parse_args()
 
@@ -343,12 +362,16 @@ def main():
     env = create_env(None, config)
     agent = AgentZeroShot_NoPDB(config, env, verbose=False)
 
+    vllm = None
+    if args.vllm:
+        vllm = VLLM(model_name, args.tensor_parallel_size)
+
     # Specify HuggingFace model and hijack agent
-    agent.llm = PPOLLM(model_name, verbose=False)
+    agent.llm = PPOLLM(model_name, verbose=False, vllm=vllm)
 
     # Choose whether to use full dataset or 'easy' dataset based on flag
-    if args.easy:
-        problem_list = read_from_file(str(base_dir / "Froggy/easy_problems.txt"))
+    if args.problem_list:
+        problem_list = read_from_file(args.problem_list)
     else:
         problem_list = list(env.dataset.keys())
 
@@ -365,3 +388,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+#  python smol.py ppo q1.5 --base_dir=/tmp --problem_list=easy_problems.txt --vllm --tensor_parallel_size=4
