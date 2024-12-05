@@ -249,6 +249,33 @@ class TestPDBTool(unittest.TestCase):
         self.assertEqual(self.environment.current_breakpoints_state, expected_state)
 
     @patch.object(PDBTool, 'interact_with_pdb')
+    def test_current_breakpoints_no_breakpoints(self, mock_interact_with_pdb):
+        # Set up the environment with no breakpoints
+        self.pdb_tool.environment.current_breakpoints_state = {}
+        
+        # Call the method
+        result = self.pdb_tool.current_breakpoints()
+        
+        # Assert the result
+        assert result == "No breakpoints are set."
+
+    @patch.object(PDBTool, 'interact_with_pdb')
+    def test_current_breakpoints_with_breakpoints(self, mock_interact_with_pdb):
+        # Set up the environment with some breakpoints
+        self.pdb_tool.environment.current_breakpoints_state = {
+            "file1.py|||10": "b file1.py:10",
+            "file2.py|||20": "b file2.py:20",
+            "file1.py|||15": "b file1.py:15",
+        }
+        
+        # Call the method
+        result = self.pdb_tool.current_breakpoints()
+        
+        # Assert the result
+        expected_result = "line 10 in file1.py\nline 15 in file1.py\nline 20 in file2.py"
+        assert result == expected_result
+
+    @patch.object(PDBTool, 'interact_with_pdb')
     def test_get_current_frame_file(self, mock_interact_with_pdb):
         mock_interact_with_pdb.return_value = (
             "/home/user/repo/script.py(10)<module>()\n-> line of code"

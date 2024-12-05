@@ -54,7 +54,6 @@ def test_load_dataset(mock_open, mock_exists, terminal_simulator_env):
     assert terminal_simulator_env.dataset["test_task"]["original path"] == ["path/to/file.py"]
     assert terminal_simulator_env.dataset["test_task"]["new code"] == ['print("buggy code")']
 
-# @patch('froggy.envs.RepoEnv.step', return_value=("obs", 5, True, {"last_run_obs": "Raw output"}))
 @patch('froggy.envs.RepoEnv.current_code_with_line_number', return_value="Current code")
 @patch('froggy.envs.RepoEnv.display_files', return_value="list of files")
 @patch('froggy.utils.cleanup_pytest_output', return_value="Cleaned output")

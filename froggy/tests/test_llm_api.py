@@ -1,8 +1,9 @@
 import sys
+import pytest
 from openai import RateLimitError
 import unittest
 from io import StringIO
-from unittest.mock import patch, mock_open, MagicMock
+from unittest.mock import patch, mock_open, MagicMock, AsyncMock
 from froggy.agents.llm_api import (
     is_rate_limit_error,
     print_messages,
@@ -15,6 +16,14 @@ from froggy.agents.llm_api import (
     instantiate_llm,
 )
 class TestLLMAPI(unittest.TestCase):
+
+    @pytest.fixture
+    def async_llm(self):
+        # Create an instance of AsyncLLM with a mock configuration
+        model_name = "test-model"
+        verbose = False
+        async_llm = AsyncLLM(model_name, verbose)
+        return async_llm
 
     def test_is_rate_limit_error(self):
         mock_response = MagicMock()
@@ -81,8 +90,8 @@ class TestLLMAPI(unittest.TestCase):
         assert "prompt" in token_usage
         assert "response" in token_usage
 
+    @pytest.mark.asyncio
     @patch("llm_api.AsyncAzureOpenAI")
-    # @pytest.mark.asyncio
     async def test_async_llm(mock_async_openai):
         mock_async_openai.return_value.chat.completions.create.return_value.choices[0].message.content = "Response"
         llm = AsyncLLM(model_name="test_model", verbose=False)
@@ -91,6 +100,32 @@ class TestLLMAPI(unittest.TestCase):
         assert response == "Response"
         assert "prompt" in token_usage
         assert "response" in token_usage
+
+    @pytest.mark.asyncio
+    @patch('llm_api.AsyncLLM.query_model', new_callable=AsyncMock)
+    @patch('llm_api.merge_messages', return_value=[{"role": "user", "content": "Test message"}])
+    @patch('llm_api.trim_prompt_messages', return_value=[{"role": "user", "content": "Test message"}])
+    async def test_async_llm_call(mock_trim, mock_merge, mock_query_model, async_llm):
+        # Set up the mock return value for query_model
+        mock_query_model.return_value = "Test response"
+
+        # Define the input messages
+        messages = [{"role": "user", "content": "Test message"}]
+
+        # Call the __call__ method
+        response, token_usage = await async_llm(messages)
+
+        # Assert the response and token usage
+        assert response == "Test response"
+        assert token_usage == {
+            "prompt": async_llm.token_counter(messages=messages),
+            "response": async_llm.token_counter(text="Test response"),
+        }
+
+        # Assert that the mock methods were called
+        mock_merge.assert_called_once_with(messages)
+        mock_trim.assert_called_once_with([{"role": "user", "content": "Test message"}], async_llm.context_length, async_llm.token_counter)
+        mock_query_model.assert_called_once_with([{"role": "user", "content": "Test message"}])
 
     @patch('builtins.input', return_value="User input")
     def test_human(self, mock_prompt):
