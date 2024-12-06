@@ -5,7 +5,7 @@ from froggy.tools.patchers import CodePatcher, UDiffPatcher, WholePatcher, Subst
 @pytest.fixture
 def mock_environment():
     env = MagicMock()
-    env.current_file_content = "def greet():\n    print('Hello, world!')\n"
+    env.current_file_content = "def greet():\n    print('Hello, world!')\n".splitlines()
     env.current_file = "test.py"
     env.all_files = ["test.py"]
     env.editable_files = ["test.py"]
@@ -20,7 +20,7 @@ def test_udiff_patcher(mock_environment):
 
     assert result == "Rewrite successful."
     assert patcher.rewrite_success
-    mock_environment.overwrite_file.assert_called_once_with(filepath="test.py", content="def greet(name):\n    print(f'Hello, {name}!')\nprint('Hello,world!')")
+    mock_environment.overwrite_file.assert_called_once_with(filepath="test.py", content="def greet(name):\n    print(f'Hello, {name}!')\n")
 
 def test_whole_patcher(mock_environment):
     patcher = WholePatcher()
