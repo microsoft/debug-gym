@@ -1,4 +1,5 @@
 import pytest
+from pathlib import Path
 from unittest.mock import patch, MagicMock, mock_open
 from froggy.envs import SWEBenchEnv
 from froggy.utils import cleanup_pytest_output, extract_max_score_from_pytest_output, extract_reward_from_pytest_output
@@ -70,5 +71,5 @@ def test_clone_repo(mock_exists, mock_run, swe_env):
 @patch('builtins.open', new_callable=mock_open)
 @patch('os.listdir', return_value=[".gitignore"])
 def test_make_froggyignore(mock_listdir, mock_open, swe_env):
-    swe_env.make_froggyignore("test_directory")
-    mock_open.assert_called_with("test_directory/.froggyignore", "w")
+    swe_env.make_froggyignore(Path("test_directory"))
+    mock_open.assert_called_with(Path("test_directory/.froggyignore"), "w")

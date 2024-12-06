@@ -110,5 +110,5 @@ class SWEBenchEnv(RepoEnv):
                 froggyignore_contents += "\n"
                 froggyignore_contents += gitignore_content
 
-        with open(local_repo_path + "/.froggyignore", "w") as f:
+        with open(local_repo_path / ".froggyignore", "w") as f:
             f.write(froggyignore_contents)

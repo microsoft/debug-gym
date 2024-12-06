@@ -106,7 +106,7 @@ class AiderBenchmarkEnv(RepoEnv):
                 froggyignore_contents += "\n"
                 froggyignore_contents += gitignore_content
 
-        with open(directory + "/.froggyignore", "w") as f:
+        with open(directory / ".froggyignore", "w") as f:
                 f.write(froggyignore_contents)
 
 
