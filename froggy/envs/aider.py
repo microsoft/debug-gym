@@ -6,11 +6,7 @@ from os.path import join as pjoin
 from pathlib import Path
 
 from froggy.envs.env import RepoEnv
-from froggy.utils import (
-    cleanup_pytest_output,
-    extract_max_score_from_pytest_output,
-    extract_reward_from_pytest_output,
-)
+import froggy.utils as utils
 
 
 class AiderBenchmarkEnv(RepoEnv):
@@ -39,11 +35,11 @@ class AiderBenchmarkEnv(RepoEnv):
 
         obs, infos = super().reset()
         infos["instructions"] = self.instructions
-        infos["last_run_obs"] = cleanup_pytest_output(infos["last_run_obs"])
+        infos["last_run_obs"] = utils.cleanup_pytest_output(infos["last_run_obs"])
 
-        self.max_score = extract_max_score_from_pytest_output(infos["last_run_obs"])
+        self.max_score = utils.extract_max_score_from_pytest_output(infos["last_run_obs"])
         infos["max_score"] = self.max_score
-        infos["score"] = extract_reward_from_pytest_output(infos["last_run_obs"])
+        infos["score"] = utils.extract_reward_from_pytest_output(infos["last_run_obs"])
 
         # By default, open the only modifiable file.
         self.load_current_file(self.current_sample["filename"])
@@ -53,8 +49,8 @@ class AiderBenchmarkEnv(RepoEnv):
 
     def step(self, action: str):
         obs, score, done, infos = super().step(action)
-        infos["last_run_obs"] = cleanup_pytest_output(infos["last_run_obs"])
-        infos["score"] = extract_reward_from_pytest_output(infos["last_run_obs"])
+        infos["last_run_obs"] = utils.cleanup_pytest_output(infos["last_run_obs"])
+        infos["score"] = utils.extract_reward_from_pytest_output(infos["last_run_obs"])
         return obs, score, done, infos
 
     def load_dataset(self):

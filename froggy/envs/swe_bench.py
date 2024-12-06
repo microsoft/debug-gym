@@ -5,14 +5,10 @@ from ast import literal_eval
 from os.path import join as pjoin
 from pathlib import Path
 
-from datasets import load_dataset as load_hf_dataset
+import datasets
 
 from froggy.envs.env import RepoEnv
-from froggy.utils import (
-    cleanup_pytest_output,
-    extract_max_score_from_pytest_output,
-    extract_reward_from_pytest_output,
-)
+import froggy.utils as utils
 
 
 class SWEBenchEnv(RepoEnv):
@@ -34,7 +30,7 @@ class SWEBenchEnv(RepoEnv):
         return _instruction
 
     def load_dataset(self):
-        self.ds = load_hf_dataset(self.HF_SWE_BENCH_VERIFIED)["test"]
+        self.ds = datasets.load_dataset(self.HF_SWE_BENCH_VERIFIED)["test"]
         self.dataset = {row["instance_id"]: row for row in self.ds.sort("instance_id")}
 
     def reset(self, *, seed=None, options: dict = None):
@@ -72,18 +68,18 @@ class SWEBenchEnv(RepoEnv):
 
         # Reset RepoEnv
         obs, infos = super().reset()
-        infos["last_run_obs"] = cleanup_pytest_output(infos["last_run_obs"])
+        infos["last_run_obs"] = utils.cleanup_pytest_output(infos["last_run_obs"])
 
-        self.max_score = extract_max_score_from_pytest_output(infos["last_run_obs"])
+        self.max_score = utils.extract_max_score_from_pytest_output(infos["last_run_obs"])
         infos["max_score"] = self.max_score
-        infos["score"] = extract_reward_from_pytest_output(infos["last_run_obs"])
+        infos["score"] = utils.extract_reward_from_pytest_output(infos["last_run_obs"])
 
         return infos["obs"], infos
 
     def step(self, action: str):
         obs, score, done, infos = super().step(action)
-        infos["last_run_obs"] = cleanup_pytest_output(infos["last_run_obs"])
-        infos["score"] = extract_reward_from_pytest_output(infos["last_run_obs"])
+        infos["last_run_obs"] = utils.cleanup_pytest_output(infos["last_run_obs"])
+        infos["score"] = utils.extract_reward_from_pytest_output(infos["last_run_obs"])
         return obs, score, done, infos
 
     def clone_repo(self, repo_address):
