@@ -306,7 +306,7 @@ class DockerTerminal(Terminal):
         if self.setup_commands:
             entrypoint = self.setup_commands + entrypoint
         entrypoint = " && ".join(entrypoint)
-        command = shlex.split(f'/bin/bash -c "{entrypoint}"')
+        command = ["/bin/bash", "-c", entrypoint]
         return command
 
     def run(self, entrypoint: str | list[str], timeout=None) -> tuple[bool, str]:
@@ -318,6 +318,7 @@ class DockerTerminal(Terminal):
             command,
             workdir=self.working_dir,
             environment=self.env_vars,
+            user=f"{self.host_uid}:{self.host_gid}",
             stdout=True,
             stderr=True,
         )

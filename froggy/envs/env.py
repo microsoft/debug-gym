@@ -117,7 +117,9 @@ class RepoEnv(TooledEnv):
         )
 
         # get list of editable files
-        froggyignore = self.working_dir / ".froggyignore"  # By default look for .froggyignore.
+        froggyignore = (
+            self.working_dir / ".froggyignore"
+        )  # By default look for .froggyignore.
         self.is_readonly = make_is_readonly(froggyignore, patterns=readonly_patterns)
         self.editable_files = [
             p for p in self.all_files if not self.is_readonly(self.working_dir / p)
@@ -126,8 +128,12 @@ class RepoEnv(TooledEnv):
         self.current_file = None
         self.current_file_content = None
         self.current_breakpoints_state = {}
-        assert entrypoint.split()[0] == "python", "Only support python entrypoint for now."
-        self.entrypoint = entrypoint
+        entrypoint_list = entrypoint.split()
+        if entrypoint_list[0] == "pytest":
+            entrypoint_list = ["python", "-m"] + entrypoint_list
+            entrypoint = entrypoint_list
+        assert entrypoint_list[0] == "python", "Only support python entrypoint for now."
+        self.entrypoint = " ".join(entrypoint_list)
 
         # Set up the terminal working dir
         self.terminal.working_dir = str(self.working_dir)
@@ -205,9 +211,7 @@ class RepoEnv(TooledEnv):
         return self.obs, self.infos
 
     def run(self):
-        success, output = self.terminal.run(
-            [self.entrypoint], timeout=self.run_timeout
-        )
+        success, output = self.terminal.run(self.entrypoint, timeout=self.run_timeout)
         self.last_run_obs = output
         self.score = int(success)
         self.done = success
