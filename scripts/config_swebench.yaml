@@ -2,7 +2,11 @@ zero_shot:
     # Environment configs
     output_path: "output_swe_bench"
     benchmark: "swebench"
-    problems: "all"  # list of problems, e.g., ["astropy__astropy-12907"], or "all"
+    # problems: "all"  # list of problems, e.g., ["astropy__astropy-12907"], or "all"
+    problems: ["astropy__astropy-14096"]
+    # problems: ["pallets__flask-5014"]  # requirements.txt
+    # problems: ["matplotlib__matplotlib-24026"]  # environment.yml  This one fails
+
     env_kwargs: {
         "dir_tree_depth": 1,
         "run_on_rewrite": True,
@@ -10,10 +14,14 @@ zero_shot:
         "run_timeout": 30,
     }
     tools: ["pdb", "view", "patcher:substitution", "listdir"]
+    terminal: {
+        type: "docker",  # "docker" or "local"
+        base_image: "python:3.12",
+    }
     persistent_breakpoints: True  # in pdb tool
 
     # LLM configs
-    llm_name: "llama-31-h100"
+    llm_name: "llama-33-h100"
     llm_temperature: [0.0]  # list of values between 0.0 and 1.0
 
     # Agent configs
