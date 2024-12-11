@@ -267,3 +267,16 @@ def test_terminal_multiple_setup_commands(tmp_path, terminal_cls):
     status, output = terminal.run("pwd")
     assert status
     assert output == f"Hello\nWorld\n{working_dir}"
+
+
+@if_docker_running
+def test_terminal_sudo_command(tmp_path):
+    working_dir = str(tmp_path)
+    terminal = DockerTerminal(working_dir=working_dir)
+    success, output = terminal.run("vim --version")
+    assert "vim: command not found" in output
+    success, output = terminal.run("sudo apt install -y vim")
+    assert success is True
+    success, output = terminal.run("vim --version")
+    assert success is True
+    assert "VIM - Vi IMproved" in output

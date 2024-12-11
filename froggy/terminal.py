@@ -374,14 +374,16 @@ class DockerTerminal(Terminal):
 
         dockerfile = f"""
             FROM {base_image}
+            # Install sudo
+            RUN apt-get update && apt-get install -y sudo
             # Create group with GID if it does not exist
             RUN if ! getent group {self.host_gid} > /dev/null; then \\
-            groupadd -g {self.host_gid} froggy_group; \\
-            fi && \\
-            # Create a user with UID if it does not exist
-            if ! id -u {self.host_uid} > /dev/null 2>&1; then \\
-                useradd -m -u {self.host_uid} -g {self.host_gid} -G sudo froggy_user; \\
+                groupadd -g {self.host_gid} froggy_group; \\
             fi
+            # Create a user with UID if it does not exist
+            RUN useradd -m -u {self.host_uid} -g {self.host_gid} -G sudo froggy_user
+            # Allow passwordless sudo for froggy_user
+            RUN echo 'froggy_user ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
             """
 
         image_tag = f"{base_image}-{self.host_uid}-{self.host_gid}"
