@@ -9,8 +9,8 @@ from froggy.utils import unescape
 class AgentZeroShot(AgentBase):
     name: str = "zero shot"
 
-    def __init__(self, config_dict, env, verbose=False, _uuid=None):
-        super().__init__(config_dict, env, verbose, _uuid)
+    def __init__(self, config_dict, env, verbose=False):
+        super().__init__(config_dict, env, verbose)
 
     def build_question_prompt(self):
         messages = []
@@ -82,8 +82,8 @@ class AgentZeroShot(AgentBase):
 class AgentZeroShot_NoPDB(AgentZeroShot):
     name: str = "zero shot no pdb"
 
-    def __init__(self, config_dict, env, verbose=False, _uuid=None):
-        super().__init__(config_dict, env, verbose, _uuid)
+    def __init__(self, config_dict, env, verbose=False):
+        super().__init__(config_dict, env, verbose)
 
     def build_system_prompt(self, info):
         system_prompt = {}
@@ -119,8 +119,8 @@ class AgentZeroShot_NoPDB(AgentZeroShot):
 class AgentZeroShot_PdbAfterRewrites(AgentZeroShot):
     name: str = "zero shot pdb after rewrites"
 
-    def __init__(self, config_dict, env, verbose=False, _uuid=None):
-        super().__init__(config_dict, env, verbose, _uuid)
+    def __init__(self, config_dict, env, verbose=False):
+        super().__init__(config_dict, env, verbose)
 
     def run(self, task_name=None, debug=False):
         # remove the pdb tool from the environment

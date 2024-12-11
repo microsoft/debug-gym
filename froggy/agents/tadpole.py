@@ -15,8 +15,8 @@ class AgentTadpole(AgentBase):
 
     name: str = "tadpole"
 
-    def __init__(self, config_dict, env, verbose=False, _uuid=None):
-        super().__init__(config_dict, env, verbose, _uuid)
+    def __init__(self, config_dict, env, verbose=False):
+        super().__init__(config_dict, env, verbose)
         self.current_subgoal = None
 
     def build_task_decomposer_prompt(self):

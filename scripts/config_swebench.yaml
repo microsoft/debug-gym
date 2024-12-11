@@ -1,6 +1,7 @@
 zero_shot:
     # Environment configs
     output_path: "output_swe_bench"
+    uuid: null  # if not provided, a new uuid will be generated
     benchmark: "swebench"
     problems: "all"  # list of problems, e.g., ["astropy__astropy-12907"], or "all"
     env_kwargs: {
@@ -29,6 +30,7 @@ zero_shot:
 cot:
     # Environment configs
     output_path: "output_swe_bench"
+    uuid: null  # if not provided, a new uuid will be generated
     benchmark: "swebench"
     problems: "all"  # list of problems, or "all"
     env_kwargs: {
@@ -57,6 +59,7 @@ cot:
 tadpole:
     # Environment configs
     output_path: "output_swe_bench"
+    uuid: null  # if not provided, a new uuid will be generated
     benchmark: "swebench"
     problems: "all"  # list of problems, or "all"
     env_kwargs: {

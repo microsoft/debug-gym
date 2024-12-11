@@ -3,18 +3,19 @@ import json
 from tqdm import tqdm
 
 from froggy.agents import AgentBase
-from froggy.utils import unescape
 from froggy.agents.utils import (
     HistoryTracker,
     build_history_prompt,
     trim_prompt_messages,
 )
+from froggy.utils import unescape
+
 
 class AgentCoT(AgentBase):
     name: str = "cot"
 
-    def __init__(self, config_dict, env, verbose=False, _uuid=None):
-        super().__init__(config_dict, env, verbose, _uuid)
+    def __init__(self, config_dict, env, verbose=False):
+        super().__init__(config_dict, env, verbose)
 
     def build_cot_prompt(self):
         messages = []
@@ -134,8 +135,8 @@ class AgentCoT(AgentBase):
 class AgentCoT_NoPDB(AgentCoT):
     name: str = "cot no pdb"
 
-    def __init__(self, config_dict, env, verbose=False, _uuid=None):
-        super().__init__(config_dict, env, verbose, _uuid)
+    def __init__(self, config_dict, env, verbose=False):
+        super().__init__(config_dict, env, verbose)
         self.history = HistoryTracker(self.config["memory_size"])
 
     def build_system_prompt(self, info):

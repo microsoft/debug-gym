@@ -1,6 +1,7 @@
 zero_shot:
     # Environment configs
     output_path: "output"
+    uuid: null  # if not provided, a new uuid will be generated
     env_kwargs: {
         "path": "data/pytorch",
         "entrypoint": "python test.py",
@@ -29,6 +30,7 @@ zero_shot:
 cot:
     # Environment configs
     output_path: "output"
+    uuid: null  # if not provided, a new uuid will be generated
     env_kwargs: {
         "path": "data/pytorch",
         "entrypoint": "python test.py",
@@ -57,6 +59,7 @@ cot:
 tadpole:
     # Environment configs
     output_path: "output"
+    uuid: null  # if not provided, a new uuid will be generated
     env_kwargs: {
         "path": "data/pytorch",
         "entrypoint": "python test.py",

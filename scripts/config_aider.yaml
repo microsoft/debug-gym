@@ -1,6 +1,7 @@
 zero_shot:
     # Environment configs
     output_path: "output_aider"
+    uuid: null  # if not provided, a new uuid will be generated
     benchmark: "aider"
     problems: "all"  # list of problems, e.g., ["wordy"], or "all"
     env_kwargs: {
@@ -34,6 +35,7 @@ zero_shot:
 cot:
     # Environment configs
     output_path: "output_aider"
+    uuid: null  # if not provided, a new uuid will be generated
     benchmark: "aider"
     problems: "all"  # list of problems, or "all"
     env_kwargs: {
@@ -62,6 +64,7 @@ cot:
 tadpole:
     # Environment configs
     output_path: "output_aider"
+    uuid: null  # if not provided, a new uuid will be generated
     benchmark: "aider"
     problems: "all"  # list of problems, or "all"
     env_kwargs: {
@@ -90,6 +93,7 @@ tadpole:
 zero_shot_nopdb:
     # Environment configs
     output_path: "output_aider"
+    uuid: null  # if not provided, a new uuid will be generated
     benchmark: "aider"
     problems: "all"  # list of problems, e.g., ["wordy"], or "all"
     env_kwargs: {
@@ -118,6 +122,7 @@ zero_shot_nopdb:
 cot_nopdb:
     # Environment configs
     output_path: "output_aider"
+    uuid: null  # if not provided, a new uuid will be generated
     benchmark: "aider"
     problems: "all"  # list of problems, or "all"
     env_kwargs: {
@@ -146,6 +151,7 @@ cot_nopdb:
 zero_shot_pdb_after_rewrites:
     # Environment configs
     output_path: "output_aider"
+    uuid: null  # if not provided, a new uuid will be generated
     benchmark: "aider"
     problems: "all"  # list of problems, e.g., ["wordy"], or "all"
     env_kwargs: {

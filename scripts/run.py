@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import os
+import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from os.path import join as pjoin
 
@@ -128,6 +129,12 @@ def main():
     ), f"Invalid agent. Available agents: {available_agents}"
 
     config = config[args.agent]
+    if config["uuid"] is None:
+        experiment_uuid = str(uuid.uuid4())
+        config["uuid"] = experiment_uuid
+    else:
+        experiment_uuid = config["uuid"]
+    print(colored(f"Experiment UUID: {experiment_uuid}", "green"))
 
     # run agent, loop over the tasks
     if "benchmark" in config and "problems" in config:
@@ -165,7 +172,7 @@ def main():
     else:
         # custom repo
         print(colored(f"Running agent {agent.name}", "green"))
-        agent = create_agent(args, config)
+        agent = create_agent(args, config, experiment_uuid)
         agent.run(debug=args.debug)
         # optionally apply patch
         if config["save_patch"]:
