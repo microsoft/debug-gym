@@ -172,7 +172,7 @@ def main():
     else:
         # custom repo
         print(colored(f"Running agent {agent.name}", "green"))
-        agent = create_agent(args, config, experiment_uuid)
+        agent = create_agent(args, config)
         agent.run(debug=args.debug)
         # optionally apply patch
         if config["save_patch"]:

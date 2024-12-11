@@ -1,12 +1,18 @@
 import unittest
-from unittest.mock import patch, mock_open, MagicMock
+from unittest.mock import MagicMock, mock_open, patch
+
 from froggy.agents.tadpole import AgentTadpole
+
 
 class TestAgentTadpole(unittest.TestCase):
 
-    @patch('tiktoken.encoding_for_model')
-    @patch('os.path.exists', return_value=True)
-    @patch('builtins.open', new_callable=mock_open, read_data='{"test-model": {"model": "test-model", "max_tokens": 100, "tokenizer": "gpt-4o", "context_limit": 4, "api_key": "test-api-key", "endpoint": "https://test-endpoint", "api_version": "v1", "tags": ["azure openai"]}}')
+    @patch("tiktoken.encoding_for_model")
+    @patch("os.path.exists", return_value=True)
+    @patch(
+        "builtins.open",
+        new_callable=mock_open,
+        read_data='{"test-model": {"model": "test-model", "max_tokens": 100, "tokenizer": "gpt-4o", "context_limit": 4, "api_key": "test-api-key", "endpoint": "https://test-endpoint", "api_version": "v1", "tags": ["azure openai"]}}',
+    )
     def setUp(self, mock_open, mock_exists, mock_encoding_for_model):
         self.config_dict = {
             "llm_name": "test-model",
@@ -17,7 +23,8 @@ class TestAgentTadpole(unittest.TestCase):
             "reset_prompt_history_after_rewrite": False,
             "memory_size": 10,
             "output_path": "",
-            "random_seed": 42
+            "uuid": None,
+            "random_seed": 42,
         }
         self.env = MagicMock()
         self.llm = MagicMock()
@@ -29,7 +36,10 @@ class TestAgentTadpole(unittest.TestCase):
     def test_build_task_decomposer_prompt(self):
         messages = self.agent.build_task_decomposer_prompt()
         self.assertEqual(len(messages), 1)
-        self.assertIn("Let's identify the current subgoal based on the information we have.", messages[0]["content"])
+        self.assertIn(
+            "Let's identify the current subgoal based on the information we have.",
+            messages[0]["content"],
+        )
 
     def test_build_prompt_step_1(self):
         info = {
@@ -38,7 +48,7 @@ class TestAgentTadpole(unittest.TestCase):
             "editable_files": "Test editable files",
             "current_code_with_line_number": "Test code",
             "current_breakpoints": "Test breakpoints",
-            "last_run_obs": "Test last run obs"
+            "last_run_obs": "Test last run obs",
         }
         messages = self.agent.build_prompt_step_1(info)
         self.assertGreater(len(messages), 0)
@@ -47,7 +57,10 @@ class TestAgentTadpole(unittest.TestCase):
         self.agent.current_subgoal = "Test subgoal"
         messages = self.agent.build_question_prompt()
         self.assertEqual(len(messages), 1)
-        self.assertIn("Based on the information above, what is the best next command?", messages[0]["content"])
+        self.assertIn(
+            "Based on the information above, what is the best next command?",
+            messages[0]["content"],
+        )
 
     def test_build_prompt_step_2(self):
         info = {
@@ -56,36 +69,49 @@ class TestAgentTadpole(unittest.TestCase):
             "editable_files": "Test editable files",
             "current_code_with_line_number": "Test code",
             "current_breakpoints": "Test breakpoints",
-            "last_run_obs": "Test last run obs"
+            "last_run_obs": "Test last run obs",
         }
         self.agent.current_subgoal = "Test subgoal"
         response = "Test response"
         messages = self.agent.build_prompt_step_2(info)
         self.assertGreater(len(messages), 0)
 
-    @patch('froggy.agents.tadpole.tqdm', MagicMock())
+    @patch("froggy.agents.tadpole.tqdm", MagicMock())
     def test_run(self):
-        self.env.reset.return_value = (None, {
-            "done": False,  "score": 0, "max_score": 10,
-            "instructions": "Test instructions",
-            "dir_tree": "Test dir tree",
-            "editable_files": "Test editable files",
-            "current_code_with_line_number": "Test code",
-            "current_breakpoints": "Test breakpoints",
-            "last_run_obs": "Test last run obs"
-        })
-        self.env.step.return_value = (None, None, True, {
-            "done": True,  "score": 10, "max_score": 10,
-            "instructions": "Test instructions",
-            "dir_tree": "Test dir tree",
-            "editable_files": "Test editable files",
-            "current_code_with_line_number": "Test code",
-            "current_breakpoints": "Test breakpoints",
-            "last_run_obs": "Test last run obs"
-        })
+        self.env.reset.return_value = (
+            None,
+            {
+                "done": False,
+                "score": 0,
+                "max_score": 10,
+                "instructions": "Test instructions",
+                "dir_tree": "Test dir tree",
+                "editable_files": "Test editable files",
+                "current_code_with_line_number": "Test code",
+                "current_breakpoints": "Test breakpoints",
+                "last_run_obs": "Test last run obs",
+            },
+        )
+        self.env.step.return_value = (
+            None,
+            None,
+            True,
+            {
+                "done": True,
+                "score": 10,
+                "max_score": 10,
+                "instructions": "Test instructions",
+                "dir_tree": "Test dir tree",
+                "editable_files": "Test editable files",
+                "current_code_with_line_number": "Test code",
+                "current_breakpoints": "Test breakpoints",
+                "last_run_obs": "Test last run obs",
+            },
+        )
         self.llm.return_value = ("Expected answer", "Expected token usage")
         result = self.agent.run(task_name="test_task", debug=False)
         self.assertTrue(result)
+
 
 if __name__ == "__main__":
     unittest.main()
