@@ -24,6 +24,9 @@ Then, edit `llm.cfg` with your endpoint and API key information.
 > [!WARNING]
 > When using open-sourced LLMs, e.g., via vLLM, you need to correctly setup `HF_TOKEN` required by the tokenizer.
 
+### Docker
+Because Froggy can interact with terminal, we strongly recommend to run Froggy inside docker container to keep your system safe (be default). That being said, Froggy can be specified to use your local terminal in config file. To use docker, you need to setup docker in your system first. 
+
 
 ## System Design
 
