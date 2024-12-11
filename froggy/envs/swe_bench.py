@@ -157,12 +157,12 @@ class SWEBenchEnv(RepoEnv):
 
     def setup_terminal(self):
         # TODO: set base_image and conda_env per task
+        self.run_pre_install()
         self.setup_base_image()
         self.run_install()
         self.run_post_install()
 
     def setup_base_image(self):
-        self.run_pre_install()
         self.prepare_eval_commands()
 
         self.conda_env = self.create_conda_env()
