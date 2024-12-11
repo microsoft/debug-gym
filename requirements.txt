@@ -8,3 +8,4 @@ termcolor
 transformers
 tiktoken
 docker
+swebench>=2.0.0
