@@ -288,6 +288,8 @@ class SWEBenchEnv(RepoEnv):
                         f"conda env create --file {tmp_environment_file}"
                     )
                     self.run_command_with_raise(f"rm {tmp_environment_file}")
+                    self.terminal.setup_commands.append(f"conda activate {env_name}")
+                    print("Installed packages from environment.yml")
             else:
                 self.run_command_with_raise(
                     f"conda create --name {env_name} python={python} -y"
