@@ -265,6 +265,10 @@ class DockerTerminal(Terminal):
         signal.signal(signal.SIGTERM, self.signal_handler)
         signal.signal(signal.SIGINT, self.signal_handler)
 
+    def __del__(self):
+        logger.debug(f"Object destroyed, cleanup container.")
+        self.clean_up()
+
     @property
     def working_dir(self):
         """Lazy initialization of working_dir and volume."""
