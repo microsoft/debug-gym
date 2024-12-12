@@ -1,9 +1,11 @@
 import os
+from unittest import mock
 from unittest.mock import MagicMock, patch
 
 import pytest
 
 from froggy.envs import SWEBenchEnv
+from froggy.envs.env import RepoEnv
 from froggy.envs.swe_bench import SWEBenchEnv
 
 
@@ -102,38 +104,6 @@ def test_instructions(swe_env):
 
 
 @patch(
-    "froggy.envs.RepoEnv.reset",
-    return_value=(
-        "obs",
-        {"obs": "obs", "max_score": 10, "score": 5, "last_run_obs": "Raw output"},
-    ),
-)
-@patch("froggy.envs.SWEBenchEnv.setup_workspace")
-@patch("froggy.envs.SWEBenchEnv.make_froggyignore")
-@patch("froggy.utils.cleanup_pytest_output", return_value="Cleaned output")
-@patch("froggy.utils.extract_max_score_from_pytest_output", return_value=10)
-@patch("froggy.utils.extract_reward_from_pytest_output", return_value=5)
-@patch("datasets.load_dataset")
-@patch("subprocess.run")
-def test_reset(
-    mock_run,
-    mock_load_dataset,
-    mock_extract_reward,
-    mock_extract_max_score,
-    mock_cleanup,
-    mock_make_froggyignore,
-    mock_setup_workspace,
-    mock_env,
-    swe_env,
-):
-    options = {"task_name": "test_task"}
-    obs, infos = swe_env.reset(options=options)
-    assert infos["last_run_obs"] == "Cleaned output"
-    assert infos["max_score"] == 10
-    assert infos["score"] == 5
-
-
-@patch(
     "froggy.envs.RepoEnv.step",
     return_value=("obs", 5, True, {"last_run_obs": "Raw output"}),
 )
@@ -143,3 +113,26 @@ def test_step(mock_extract_reward, mock_cleanup, repo_env, swe_env):
     obs, score, done, infos = swe_env.step("action")
     assert infos["last_run_obs"] == "Cleaned output"
     assert infos["score"] == 5
+
+
+def test_reset(tmp_path):
+    working_dir = str(tmp_path)
+    swe_env = SWEBenchEnv(path=working_dir)
+    task_name = "astropy__astropy-14096"
+    obs = "Some observation"
+    last_run_obs = "collected 10 items. 5 passed, 5 failed"
+    info = {"obs": obs, "last_run_obs": last_run_obs}
+    with (
+        mock.patch.object(SWEBenchEnv, "setup_local_repo"),
+        mock.patch.object(SWEBenchEnv, "setup_terminal"),
+        mock.patch.object(RepoEnv, "reset", return_value=(obs, info)),
+    ):
+        reset_obs, reset_infos = swe_env.reset(options={"task_name": task_name})
+
+    assert reset_obs == obs
+    assert reset_infos == {
+        "obs": obs,
+        "last_run_obs": last_run_obs,
+        "max_score": 10,
+        "score": 5,
+    }
