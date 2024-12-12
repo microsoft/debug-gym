@@ -280,3 +280,10 @@ def test_terminal_sudo_command(tmp_path):
     success, output = terminal.run("vim --version")
     assert success is True
     assert "VIM - Vi IMproved" in output
+
+@if_docker_running
+def test_terminal_cleanup(tmp_path):
+    working_dir = str(tmp_path)
+    terminal = DockerTerminal(working_dir=working_dir)
+    terminal.clean_up()
+    assert terminal._container is None

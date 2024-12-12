@@ -370,10 +370,13 @@ class DockerTerminal(Terminal):
         sys.exit(0)
 
     def clean_up(self):
+        """Clean up the Docker container."""
         if self.container:
-            logger.debug(f"Cleaning up container: {self.container.name}")
-            self.container.stop()
-            self.container.remove()
+            try:
+                self.container.stop()
+            except docker.errors.NotFound:
+                logger.warning("Container {self.container.name} not found. It might have already been removed.")
+            self._container = None
 
     def patch_base_image(self, base_image: str) -> str:
         """Patch the base image creating a user and group with
