@@ -32,5 +32,4 @@ jobs:
           pip install -e '.[dev]'
       - name: Test with pytest
         run: |
-          pytest -n 4 -vv --cov=.
-          coverage report -m
+          pytest -n 4 -vv --cov=. --cov-report=term-missing --cov-fail-under=90

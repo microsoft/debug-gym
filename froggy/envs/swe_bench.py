@@ -5,16 +5,12 @@ from ast import literal_eval
 from os.path import join as pjoin
 from pathlib import Path
 
-from datasets import load_dataset as load_hf_dataset
+import datasets
 from swebench.harness.constants import MAP_REPO_VERSION_TO_SPECS
 from swebench.harness.utils import get_environment_yml, get_requirements
 
+import froggy.utils as utils
 from froggy.envs.env import RepoEnv
-from froggy.utils import (
-    cleanup_pytest_output,
-    extract_max_score_from_pytest_output,
-    extract_reward_from_pytest_output,
-)
 
 
 class SWEBenchEnv(RepoEnv):
@@ -27,10 +23,12 @@ class SWEBenchEnv(RepoEnv):
         **kwargs,
     ):
         super().__init__(**kwargs)
+
         self.dataset_id = dataset_id
         self.split = split
         self.swe_bench_base_image = base_image
         self.swe_bench_repo_paths = Path(pjoin(tempfile.gettempdir(), "swe-bench"))
+
         self.load_dataset()
         self.setup_commands = []
         # # atexit.register(self.cleanup)  # cleanup the containers and images
@@ -45,7 +43,7 @@ class SWEBenchEnv(RepoEnv):
         return _instruction
 
     def load_dataset(self):
-        self.ds = load_hf_dataset(self.dataset_id)["test"]
+        self.ds = datasets.load_dataset(self.dataset_id)["test"]
         self.dataset = {row["instance_id"]: row for row in self.ds.sort("instance_id")}
 
     def setup_local_repo(self):
@@ -100,18 +98,20 @@ class SWEBenchEnv(RepoEnv):
 
         # Reset RepoEnv
         obs, infos = super().reset()
-        infos["last_run_obs"] = cleanup_pytest_output(infos["last_run_obs"])
+        infos["last_run_obs"] = utils.cleanup_pytest_output(infos["last_run_obs"])
 
-        self.max_score = extract_max_score_from_pytest_output(infos["last_run_obs"])
+        self.max_score = utils.extract_max_score_from_pytest_output(
+            infos["last_run_obs"]
+        )
         infos["max_score"] = self.max_score
-        infos["score"] = extract_reward_from_pytest_output(infos["last_run_obs"])
+        infos["score"] = utils.extract_reward_from_pytest_output(infos["last_run_obs"])
 
         return infos["obs"], infos
 
     def step(self, action: str):
         obs, score, done, infos = super().step(action)
-        infos["last_run_obs"] = cleanup_pytest_output(infos["last_run_obs"])
-        infos["score"] = extract_reward_from_pytest_output(infos["last_run_obs"])
+        infos["last_run_obs"] = utils.cleanup_pytest_output(infos["last_run_obs"])
+        infos["score"] = utils.extract_reward_from_pytest_output(infos["last_run_obs"])
         return obs, score, done, infos
 
     def clone_repo(self, repo_address):
