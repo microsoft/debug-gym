@@ -19,8 +19,8 @@ zero_shot:
     persistent_breakpoints: True  # in pdb tool
 
     # LLM configs
-    llm_name: "llama-31-h100"
-    llm_temperature: [0.0]  # list of values between 0.0 and 1.0
+    llm_name: "gpt-4o-shared"
+    llm_temperature: [0.5]  # list of values between 0.0 and 1.0
 
     # Agent configs
     random_seed: 42
@@ -53,8 +53,8 @@ cot:
     persistent_breakpoints: True  # in pdb tool
 
     # LLM configs
-    llm_name: "llama-31-h100"
-    llm_temperature: [0.0]  # 0.5 for CoT generation, 0.0 for answer generation
+    llm_name: "gpt-4o-shared"
+    llm_temperature: [0.5]
 
     # Agent configs
     random_seed: 42
@@ -87,8 +87,8 @@ tadpole:
     persistent_breakpoints: True  # in pdb tool
 
     # LLM configs
-    llm_name: "llama-31-h100"
-    llm_temperature: [0.0, 0.0]  # 0.5 for CoT generation, 0.0 for answer generation
+    llm_name: "gpt-4o-shared"
+    llm_temperature: [0.5, 0.3]  # 0.5 for CoT generation, 0.3 for answer generation
 
     # Agent configs
     random_seed: 42
@@ -121,8 +121,8 @@ zero_shot_nopdb:
     persistent_breakpoints: True  # in pdb tool
 
     # LLM configs
-    llm_name: "llama-31-h100"
-    llm_temperature: [0.0]  # list of values between 0.0 and 1.0
+    llm_name: "gpt-4o-shared"
+    llm_temperature: [0.5]  # list of values between 0.0 and 1.0
 
     # Agent configs
     random_seed: 42
@@ -155,8 +155,8 @@ cot_nopdb:
     persistent_breakpoints: True  # in pdb tool
 
     # LLM configs
-    llm_name: "llama-31-h100"
-    llm_temperature: [0.0]  # 0.5 for CoT generation, 0.0 for answer generation
+    llm_name: "gpt-4o-shared"
+    llm_temperature: [0.5]
 
     # Agent configs
     random_seed: 42
@@ -190,8 +190,8 @@ zero_shot_pdb_after_rewrites:
     persistent_breakpoints: True  # in pdb tool
 
     # LLM configs
-    llm_name: "llama-31-h100"
-    llm_temperature: [0.0]  # list of values between 0.0 and 1.0
+    llm_name: "gpt-4o-shared"
+    llm_temperature: [0.5]  # list of values between 0.0 and 1.0
 
     # Agent configs
     random_seed: 42
