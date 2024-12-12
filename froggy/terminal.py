@@ -1,9 +1,11 @@
+import signal
 import atexit
 import errno
 import fcntl
 import io
 import logging
 import os
+import sys
 import pty
 import shlex
 import subprocess
@@ -260,6 +262,8 @@ class DockerTerminal(Terminal):
         self.host_gid = os.getgid()
         self._patched_image = None
         self._container = None
+        signal.signal(signal.SIGTERM, self.signal_handler)
+        signal.signal(signal.SIGINT, self.signal_handler)
 
     @property
     def working_dir(self):
@@ -356,10 +360,16 @@ class DockerTerminal(Terminal):
         atexit.register(self.clean_up)
         return container
 
+    def signal_handler(self, signum, frame):
+        logger.debug(f"Signal {signum} received, cleaning up container.")
+        self.clean_up()
+        sys.exit(0)
+
     def clean_up(self):
         if self.container:
             logger.debug(f"Cleaning up container: {self.container.name}")
             self.container.stop()
+            self.container.remove()
 
     def patch_base_image(self, base_image: str) -> str:
         """Patch the base image creating a user and group with
