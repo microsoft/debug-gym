@@ -1,5 +1,5 @@
 import subprocess
-
+import docker
 import pytest
 
 from froggy.terminal import DockerTerminal, Terminal
@@ -8,7 +8,6 @@ if_docker_running = pytest.mark.skipif(
     not subprocess.check_output(["docker", "ps"]),
     reason="Docker not running",
 )
-
 
 def test_terminal_init():
     terminal = Terminal()
@@ -285,5 +284,10 @@ def test_terminal_sudo_command(tmp_path):
 def test_terminal_cleanup(tmp_path):
     working_dir = str(tmp_path)
     terminal = DockerTerminal(working_dir=working_dir)
+    container_name = terminal.container.name
     terminal.clean_up()
     assert terminal._container is None
+    client = docker.from_env()
+    containers = client.containers.list(all=True)
+    for container in containers:
+        assert container.name != container_name
