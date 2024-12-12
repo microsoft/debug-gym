@@ -3,11 +3,7 @@ import json
 from tqdm import tqdm
 
 from froggy.agents import AgentBase
-from froggy.agents.utils import (
-    HistoryTracker,
-    build_history_prompt,
-    trim_prompt_messages,
-)
+from froggy.agents.utils import HistoryTracker
 from froggy.utils import unescape
 
 
