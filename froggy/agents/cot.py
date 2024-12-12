@@ -101,7 +101,7 @@ class AgentCoT(AgentBase):
             ]  # in some other agents this is a list because of multi-step llm calls
             self.history.step(info)
             self.history.save_prompt_response_pairs(
-                prompt_response_pairs=[(prompt, answer)]
+                prompt_response_pairs=[(prompt, llm_output, answer)]
             )
 
             pbar.update()

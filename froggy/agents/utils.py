@@ -19,9 +19,18 @@ class HistoryTracker:
     def save_prompt_response_pairs(self, prompt_response_pairs=[]):
         _data = {}
         for i, pair in enumerate(prompt_response_pairs):
-            _prompt, _response = pair
+            if len(pair) == 2:
+                _prompt, _command = pair
+                _response = None
+            elif len(pair) == 3:
+                _prompt, _response, _command = pair
+            else:
+                raise ValueError(
+                    f"Each prompt-response pair should have 2 or 3 elements, but got {len(pair)}"
+                )
             _data[f"prompt_{i}"] = _prompt
             _data[f"response_{i}"] = _response
+            _data[f"command_{i}"] = _command
         self.prompt_response_pairs.append(_data)
 
     def get(self):
