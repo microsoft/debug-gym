@@ -8,63 +8,44 @@ from froggy.utils import unescape
 
 
 class AgentCoT(AgentBase):
+    # Prompt style is inspired by https://medium.com/@ickman/instruct-making-llms-do-anything-you-want-ff4259d4b91
     name: str = "cot"
 
     def __init__(self, config_dict, env, verbose=False):
         super().__init__(config_dict, env, verbose)
+        self.command_special_tokens = ["<NEXT_COMMAND>", "</NEXT_COMMAND>"]
 
     def build_cot_prompt(self):
         messages = []
         cot_prompt = [
             "Based on the instruction, the current code, the last execution output, and the history information, continue your debugging process. "
         ]
-        cot_prompt += ["Let's think step by step using the following questions: "]
+        cot_prompt += ["Let's think step by step: "]
         cot_prompt += [
-            "1. What information did we get from the last execution output? "
+            "Step 1. What information did we get from the last execution output? "
         ]
         cot_prompt += [
-            "2. What did we decide to investigate based on the last execution output? "
+            "Step 2. What did we decide to investigate based on the last execution output? "
         ]
-        cot_prompt += ["3. What did we find so far from the investigation? "]
-        cot_prompt += ["4. What is remaining unclear about the code? "]
+        cot_prompt += ["Step 3. What did we find so far from the investigation? "]
+        cot_prompt += ["Step 4. What is remaining unclear about the code? "]
         cot_prompt += [
-            "5. What is our plan to investigate the remaining unclear part? "
+            "Step 5. What is our plan to investigate the remaining unclear part? "
+        ]
+        cot_prompt += [
+            f"Step 6. Concretely, what is the next command to execute? For this step, put your answer inside special tokens {self.command_special_tokens[0]} and {self.command_special_tokens[1]}. make sure the answer is a single command, nothing else. "
+        ]
+        cot_prompt += [
+            "Now, state each step above and show your work for performing that step. "
         ]
 
         messages.append({"role": "user", "content": "\n".join(cot_prompt)})
         return messages
 
-    def build_prompt_step_1(self, info):
+    def build_prompt(self, info):
         messages = self.build_system_prompt(info)
         messages.extend(self.build_history_prompt())
         messages.extend(self.build_cot_prompt())
-        return messages
-
-    def fill_in_cot_response(self, response):
-        if self.config["use_conversational_prompt"] is True:
-            return [{"role": "assistant", "content": response}]
-        else:
-            return [
-                {"role": "user", "content": "\n".join(["Your response: ", response])}
-            ]
-
-    def build_question_prompt(self):
-        messages = []
-        question_prompt = [
-            "Based on our retrospective above, what is the best next command?"
-        ]
-        question_prompt += [
-            "Output a single command, nothing else. Do not repeat your previous commands unless they can provide more information. "
-        ]
-        messages.append({"role": "user", "content": "\n".join(question_prompt)})
-        return messages
-
-    def build_prompt_step_2(self, info, response):
-        messages = self.build_system_prompt(info)
-        messages.extend(self.build_history_prompt())
-        messages.extend(self.build_cot_prompt())
-        messages.extend(self.fill_in_cot_response(response))
-        messages.extend(self.build_question_prompt())
         return messages
 
     def run(self, task_name=None, debug=False):
@@ -91,30 +72,36 @@ class AgentCoT(AgentBase):
                     info["score"]
                 )
             )
-            prompt_response_pairs = []
-            token_usage_list = []
 
-            for _reasoning_step in range(2):
-                if _reasoning_step == 0:
-                    prompt = self.build_prompt_step_1(info)
-                else:
-                    prompt = self.build_prompt_step_2(info, answer)
-                answer, token_usage = self.llm(
-                    prompt,
-                    info,
-                    temperature=self.config["llm_temperature"][_reasoning_step],
+            prompt = self.build_prompt(info)
+            llm_output, token_usage = self.llm(
+                prompt,
+                info,
+                temperature=self.config["llm_temperature"][0],
+            )
+            # parse the answer to get the command
+            if (
+                self.command_special_tokens[0] in llm_output
+                and self.command_special_tokens[1] in llm_output
+            ):
+                answer = (
+                    llm_output.split(self.command_special_tokens[0])[1]
+                    .split(self.command_special_tokens[1])[0]
+                    .strip()
                 )
-                prompt_response_pairs.append((prompt, answer))
-                token_usage_list.append(token_usage)
+            else:
+                answer = llm_output  # if the special tokens are not used, just use the entire output as the answer
 
-                if debug:
-                    breakpoint()
+            if debug:
+                breakpoint()
 
             _, _, done, info = self.env.step(answer)
-            info["token_usage"] = token_usage_list
+            info["token_usage"] = [
+                token_usage
+            ]  # in some other agents this is a list because of multi-step llm calls
             self.history.step(info)
             self.history.save_prompt_response_pairs(
-                prompt_response_pairs=prompt_response_pairs
+                prompt_response_pairs=[(prompt, answer)]
             )
 
             pbar.update()
@@ -160,14 +147,20 @@ class AgentCoT_NoPDB(AgentCoT):
         cot_prompt = [
             "Based on the instruction, the current code, the last execution output, and the history information, continue your debugging process. "
         ]
-        cot_prompt += ["Let's think step by step using the following questions: "]
+        cot_prompt += ["Let's think step by step: "]
         cot_prompt += [
-            "1. What information did we get from the last execution output? "
+            "Step 1. What information did we get from the last execution output? "
         ]
         cot_prompt += [
-            "2. Which lines of the code might have caused the errors in the last execution output? "
+            "Step 2. Which lines of the code might have caused the errors in the last execution output? "
         ]
-        cot_prompt += ["3. How should we fix the errors in the code? "]
+        cot_prompt += ["Step 3. How should we fix the errors in the code? "]
+        cot_prompt += [
+            f"Step 4. Concretely, what is the next command to execute? For this step, put your answer inside special tokens {self.command_special_tokens[0]} and {self.command_special_tokens[1]}. make sure the answer is a single command, nothing else. "
+        ]
+        cot_prompt += [
+            "Now, state each step above and show your work for performing that step. "
+        ]
 
         messages.append({"role": "user", "content": "\n".join(cot_prompt)})
         return messages

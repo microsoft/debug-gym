@@ -54,7 +54,7 @@ cot:
 
     # LLM configs
     llm_name: "llama-31-h100"
-    llm_temperature: [0.0, 0.0]  # 0.5 for CoT generation, 0.0 for answer generation
+    llm_temperature: [0.0]  # 0.5 for CoT generation, 0.0 for answer generation
 
     # Agent configs
     random_seed: 42
@@ -156,7 +156,7 @@ cot_nopdb:
 
     # LLM configs
     llm_name: "llama-31-h100"
-    llm_temperature: [0.0, 0.0]  # 0.5 for CoT generation, 0.0 for answer generation
+    llm_temperature: [0.0]  # 0.5 for CoT generation, 0.0 for answer generation
 
     # Agent configs
     random_seed: 42
