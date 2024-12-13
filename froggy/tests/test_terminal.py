@@ -1,4 +1,5 @@
 import subprocess
+
 import docker
 import pytest
 
@@ -8,6 +9,7 @@ if_docker_running = pytest.mark.skipif(
     not subprocess.check_output(["docker", "ps"]),
     reason="Docker not running",
 )
+
 
 def test_terminal_init():
     terminal = Terminal()
@@ -280,6 +282,7 @@ def test_terminal_sudo_command(tmp_path):
     assert success is True
     assert "VIM - Vi IMproved" in output
 
+
 @if_docker_running
 def test_terminal_cleanup(tmp_path):
     working_dir = str(tmp_path)
@@ -288,6 +291,5 @@ def test_terminal_cleanup(tmp_path):
     terminal.clean_up()
     assert terminal._container is None
     client = docker.from_env()
-    containers = client.containers.list(all=True)
-    for container in containers:
-        assert container.name != container_name
+    containers = client.containers.list(all=True, ignore_removed=True)
+    assert container_name not in [c.name for c in containers]
