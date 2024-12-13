@@ -178,3 +178,60 @@ def test_run_command_with_raise(tmp_path):
     # don't break if sudo is already there
     status, output = swe_env.run_command_with_raise("sudo apt-get update")
     assert status
+
+
+@if_docker_running
+def test_install_conda(tmp_path):
+    working_dir = str(tmp_path)
+    terminal = DockerTerminal(working_dir=working_dir)
+    swe_env = SWEBenchEnv(path=working_dir, terminal=terminal)
+    info_cmd = "source ~/miniconda3/bin/activate || true && conda info"
+    with pytest.raises(ValueError, match=".*conda: command not found"):
+        _, output = swe_env.run_command_with_raise(info_cmd)
+        assert not status
+
+    status, output = swe_env.install_conda()
+
+    assert status
+    assert "installation finished." in output
+    status, output = swe_env.run_command_with_raise(info_cmd)
+    assert status
+    assert "active environment : base" in output in output
+
+
+@pytest.fixture
+def install_configs_mock():
+    install_configs = {
+        "python": "3.12",
+        "test_cmd": "pytest --help",
+        "pre_install": ["apt-get help", "apt-get install -y vim"],
+        "eval_commands": ["export TEST_VAR='FooBar'", "echo $TEST_VAR"],
+        "install": "python3 -m pip install pytest==8.3.3",
+        "post_install": ["echo 'Post install'"],
+        "packages": ["pytest"],
+        "pip_packages": ["pytest"],
+        "no_use_env": False,
+    }
+    return install_configs
+
+
+@if_docker_running
+def test_run_pre_intall(tmp_path, install_configs_mock):
+    working_dir = str(tmp_path)
+    terminal = DockerTerminal(working_dir=working_dir)
+    swe_env = SWEBenchEnv(path=working_dir, terminal=terminal)
+    swe_env.install_configs = install_configs_mock
+    swe_env.run_pre_install()
+    _, output = swe_env.run_command_with_raise("vim --help")
+    assert "VIM - Vi IMproved" in output
+
+
+@if_docker_running
+def test_run_install(tmp_path, install_configs_mock):
+    working_dir = str(tmp_path)
+    terminal = DockerTerminal(working_dir=working_dir, base_image="python:3.12-slim")
+    swe_env = SWEBenchEnv(path=working_dir, terminal=terminal)
+    swe_env.install_configs = install_configs_mock
+    swe_env.run_install()
+    _, output = swe_env.run_command_with_raise("python -m pytest --version")
+    assert "pytest 8.3.3" in output
