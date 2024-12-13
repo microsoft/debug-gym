@@ -146,12 +146,13 @@ class SWEBenchEnv(RepoEnv):
             f.write(froggyignore_contents)
 
     def run_command_with_raise(self, command):
-        if "apt-get" in command:
-            command = command.replace("apt-get", "sudo apt-get")
+        command = command.replace("apt-get", "sudo apt-get").replace(
+            "sudo sudo", "sudo"
+        )
         print(f"Running command: {command}")
         status, output = self.terminal.run(command)
         if not status:
-            raise ValueError(f"Failed to run command: {command}", output)
+            raise ValueError(f"Failed to run command: {command} ", output)
         print(f"{output}\n\n")
         return status, output
 
@@ -230,7 +231,7 @@ class SWEBenchEnv(RepoEnv):
         return conda_env_exists
 
     def repo_name(self, repo):
-        return repo.replace("/", "__").replace(" ", "-").replace("'", "")
+        return repo.replace("/", "__").replace(" ", "--").replace("'", "")
 
     def create_conda_env(self):
         # try to activate conda environment without failing if activation fails

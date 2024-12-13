@@ -1,4 +1,5 @@
 import os
+import subprocess
 from unittest import mock
 from unittest.mock import MagicMock, patch
 
@@ -7,6 +8,12 @@ import pytest
 from froggy.envs import SWEBenchEnv
 from froggy.envs.env import RepoEnv
 from froggy.envs.swe_bench import SWEBenchEnv
+from froggy.terminal import DockerTerminal
+
+if_docker_running = pytest.mark.skipif(
+    not subprocess.check_output(["docker", "ps"]),
+    reason="Docker not running",
+)
 
 
 def test_load_dataset(tmp_path):
@@ -136,3 +143,38 @@ def test_reset(tmp_path):
         "max_score": 10,
         "score": 5,
     }
+
+
+def test_repo_name(tmp_path):
+    working_dir = str(tmp_path)
+    swe_env = SWEBenchEnv(path=working_dir)
+    repo = "test_org/test_repo"
+    expected_repo_name = "test_org__test_repo"
+    assert swe_env.repo_name(repo) == expected_repo_name
+
+    repo_with_spaces = "test org/test repo"
+    expected_repo_name_with_spaces = "test--org__test--repo"
+    assert swe_env.repo_name(repo_with_spaces) == expected_repo_name_with_spaces
+
+    repo_with_apostrophe = "test'org/test'repo"
+    expected_repo_name_with_apostrophe = "testorg__testrepo"
+    assert swe_env.repo_name(repo_with_apostrophe) == expected_repo_name_with_apostrophe
+
+
+@if_docker_running
+def test_run_command_with_raise(tmp_path):
+    working_dir = str(tmp_path)
+    terminal = DockerTerminal(working_dir=working_dir)
+    swe_env = SWEBenchEnv(path=working_dir, terminal=terminal)
+    status, output = swe_env.run_command_with_raise("echo 'Hello World'")
+    assert output == "Hello World"
+    with pytest.raises(
+        ValueError, match="Failed to run command: cat /non_existent_file"
+    ):
+        swe_env.run_command_with_raise("cat /non_existent_file")
+    # add sudo if apt-get in command
+    status, output = swe_env.run_command_with_raise("apt-get update")
+    assert status
+    # don't break if sudo is already there
+    status, output = swe_env.run_command_with_raise("sudo apt-get update")
+    assert status
