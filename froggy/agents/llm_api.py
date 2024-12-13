@@ -31,7 +31,16 @@ except ImportError:
 
 logger = logging.getLogger("froggy")
 
-LLM_CONFIG_FILE = os.environ.get("LLM_CONFIG_FILE", "llm.cfg")
+
+def load_llm_config(config_file_path=None):
+    if config_file_path is None:
+        config_file_path = os.environ.get("LLM_CONFIG_FILE", "llm.cfg")
+    try:
+        llm_config = json.load(open(config_file_path))
+    except FileNotFoundError:
+        raise FileNotFoundError(f"Cannot find llm config file: {config_file_path}")
+    return llm_config
+
 
 def is_rate_limit_error(exception):
     # List of fully qualified names of RateLimitError exceptions from various libraries
@@ -108,25 +117,13 @@ class TokenCounter:
 
 class LLM:
     def __init__(self, model_name, verbose=False):
-        if os.path.exists(LLM_CONFIG_FILE):
-            configs = json.load(open(LLM_CONFIG_FILE))
-            if model_name not in configs:
-                raise ValueError(f"Model {self.model_name} not found in llm.cfg")
-        else:
-            raise ValueError(f"Cannot find {LLM_CONFIG_FILE}.")
+        configs = load_llm_config()
+        if model_name not in configs:
+            raise ValueError(f"Model {model_name} not found in llm.cfg")
 
         self.model_name = model_name
         self.config = configs[model_name]
         self.verbose = verbose
-
-        if os.path.exists(LLM_CONFIG_FILE):
-            LLM_CONFIGS = json.load(open(LLM_CONFIG_FILE))
-            available_models = list(LLM_CONFIGS.keys()) + ["random", "human"]
-
-        if self.model_name not in LLM_CONFIGS:
-            raise Exception(f"Model {self.model_name} not found in llm.cfg")
-
-        self.config = LLM_CONFIGS[self.model_name]
         self.token_counter = TokenCounter(self.config["tokenizer"])
         self.context_length = self.config["context_limit"] * 1000
 
@@ -314,13 +311,13 @@ class Random:
 
 
 def instantiate_llm(config, verbose=False, use_async=False):
-    if os.path.exists(LLM_CONFIG_FILE):
-        LLM_CONFIGS = json.load(open(LLM_CONFIG_FILE))
-        available_models = list(LLM_CONFIGS.keys()) + ["random", "human"]
-    assert (
-        config["llm_name"] in available_models
-    ), f"Model {config['llm_name']} is not available, please make sure the LLM config file is correctly set."
-
+    llm_config = load_llm_config()
+    available_models = list(llm_config.keys()) + ["random", "human"]
+    if config["llm_name"] not in available_models:
+        raise ValueError(
+            f"Model {config['llm_name']} is not available, "
+            "please make sure the LLM config file is correctly set."
+        )
     if config["llm_name"] == "random":
         llm = Random(config["random_seed"], verbose)
     elif config["llm_name"] == "human":
