@@ -202,13 +202,13 @@ def test_install_conda(tmp_path):
 @pytest.fixture
 def install_configs_mock():
     install_configs = {
-        "python": "3.12",
+        "python": "3.12.8",
         "test_cmd": "pytest --help",
         "pre_install": ["apt-get help", "apt-get install -y vim"],
-        "eval_commands": ["export TEST_VAR='FooBar'", "echo $TEST_VAR"],
+        "eval_commands": ["export TEST_VAR='Test Var'", "echo $TEST_VAR"],
         "install": "python3 -m pip install pytest==8.3.3",
-        "post_install": ["echo 'Post install'"],
-        "packages": ["pytest"],
+        "post_install": ["echo 'Test file' > test.txt", "cat test.txt"],
+        "packages": "pytest==8.3.3 requests==2.32.3",
         "pip_packages": ["pytest"],
         "no_use_env": False,
     }
@@ -235,3 +235,54 @@ def test_run_install(tmp_path, install_configs_mock):
     swe_env.run_install()
     _, output = swe_env.run_command_with_raise("python -m pytest --version")
     assert "pytest 8.3.3" in output
+
+
+@if_docker_running
+def test_run_post_install(tmp_path, install_configs_mock):
+    working_dir = str(tmp_path)
+    terminal = DockerTerminal(working_dir=working_dir)
+    swe_env = SWEBenchEnv(path=working_dir, terminal=terminal)
+    swe_env.install_configs = install_configs_mock
+    swe_env.run_post_install()
+    _, output = swe_env.run_command_with_raise("cat test.txt")
+    assert output == "Test file"
+
+
+@if_docker_running
+def test_create_conda_environment(tmp_path, install_configs_mock):
+    working_dir = str(tmp_path)
+    terminal = DockerTerminal(working_dir=working_dir)
+    swe_env = SWEBenchEnv(path=working_dir, terminal=terminal)
+    swe_env.install_configs = install_configs_mock
+    swe_env.repo = "test/repo"
+    swe_env.version = "2.0"
+    swe_env.create_conda_env()
+    status, output = swe_env.run_command_with_raise("echo $CONDA_DEFAULT_ENV")
+    assert status
+    assert output == "test__repo__2.0"
+    status, output = swe_env.run_command_with_raise("pip freeze")
+    assert status
+    assert "pytest" in output
+    assert "requests" in output
+
+
+@if_docker_running
+def test_create_conda_environment_from_requirements(tmp_path, install_configs_mock):
+    install_configs_mock["packages"] = "requirements.txt"
+    working_dir = str(tmp_path)
+    terminal = DockerTerminal(working_dir=working_dir)
+    swe_env = SWEBenchEnv(path=working_dir, terminal=terminal)
+    swe_env.install_configs = install_configs_mock
+    swe_env.repo = "test/repo"
+    swe_env.version = "2.0"
+    swe_env.ds_row = {}
+    requirements = "pytest==8.3.3\nrequests==2.32.3"
+    with patch("froggy.envs.swe_bench.get_requirements", return_value=requirements):
+        swe_env.create_conda_env()
+    status, output = swe_env.run_command_with_raise("echo $CONDA_DEFAULT_ENV")
+    assert status
+    assert output == "test__repo__2.0"
+    status, output = swe_env.run_command_with_raise("pip freeze")
+    assert status
+    assert "pytest" in output
+    assert "requests" in output

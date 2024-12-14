@@ -233,6 +233,12 @@ class SWEBenchEnv(RepoEnv):
     def repo_name(self, repo):
         return repo.replace("/", "__").replace(" ", "--").replace("'", "")
 
+    def _create_conda_env(self, cmd, env_name):
+        print(f"Creating conda environment {env_name}")
+        self.run_command_with_raise(cmd)
+        self.terminal.setup_commands.append(f"conda activate {env_name}")
+        print("Created conda environment")
+
     def create_conda_env(self):
         # try to activate conda environment without failing if activation fails
         self.terminal.setup_commands += ["source ~/miniconda3/bin/activate || true"]
@@ -246,12 +252,10 @@ class SWEBenchEnv(RepoEnv):
             packages = self.install_configs.get("packages", "")
             pip_packages = self.install_configs.get("pip_packages")
             if packages == "requirements.txt":
-                # Create conda environment
-                self.run_command_with_raise(
-                    f"conda create -n {env_name} python={python} -y"
+                self._create_conda_env(
+                    f"conda create -n {env_name} python={python} -y",
+                    env_name,
                 )
-                self.terminal.setup_commands.append(f"conda activate {env_name}")
-                print("Created conda environment")
                 requirements = get_requirements(self.ds_row)
                 tmp_requirements_file = (
                     Path(self.terminal.working_dir) / "tmp_froggy_requirements.txt"
@@ -264,8 +268,8 @@ class SWEBenchEnv(RepoEnv):
             elif packages == "environment.yml":
                 content_env_yml = get_environment_yml(self.ds_row, env_name)
                 no_use_env = self.install_configs.get("no_use_env")
-                if not no_use_env:
-                    content_env_yml += f"\n  - python={python}\n"
+                # if not no_use_env:
+                #     content_env_yml += f"\n  - python={python}\n"
                 tmp_environment_file = (
                     Path(self.terminal.working_dir) / "tmp_froggy_environment.yml"
                 )
@@ -273,30 +277,25 @@ class SWEBenchEnv(RepoEnv):
                     f.write(content_env_yml)
 
                 if no_use_env:
-                    self.run_command_with_raise(
-                        f"conda create -c conda-forge -n {env_name} python={python} -y"
+                    self._create_conda_env(
+                        f"conda create -c conda-forge -n {env_name} python={python} -y",
+                        env_name,
                     )
-                    self.terminal.setup_commands.append(f"conda activate {env_name}")
-                    print("Created conda environment")
-
                     self.run_command_with_raise(
                         f"conda env update -f {tmp_environment_file}"
                     )
                     print("Installed packages from environment.yml")
                 else:
-                    # Create environment + install packages
-                    self.run_command_with_raise(
-                        f"conda env create --file {tmp_environment_file}"
+                    self._create_conda_env(
+                        f"conda env create -n {env_name} --file {tmp_environment_file}",
+                        env_name,
                     )
                     self.run_command_with_raise(f"rm {tmp_environment_file}")
-                    self.terminal.setup_commands.append(f"conda activate {env_name}")
-                    print("Installed packages from environment.yml")
             else:
-                self.run_command_with_raise(
-                    f"conda create --name {env_name} python={python} -y"
+                self._create_conda_env(
+                    f"conda create --n {env_name} python={python} -y",
+                    env_name,
                 ),
-                print(f"Created conda environment {env_name} with python {python}")
-                self.terminal.setup_commands.append(f"conda activate {env_name}")
                 if packages.strip():
                     self.run_command_with_raise(f"conda install {packages} -y")
                     print("Installed conda packages")
