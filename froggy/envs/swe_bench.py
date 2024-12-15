@@ -28,7 +28,8 @@ class SWEBenchEnv(RepoEnv):
         self.dataset_id = dataset_id
         self.split = split
         self.swe_bench_base_image = base_image
-        self.swe_bench_repo_paths = Path(pjoin(tempfile.gettempdir(), "swe-bench"))
+        self.swe_bench_repo_paths = Path.home() / ".cache/froggy/swe-bench"
+        self.swe_bench_repo_paths.mkdir(parents=True, exist_ok=True)
 
         self.load_dataset()
         self.setup_commands = []
