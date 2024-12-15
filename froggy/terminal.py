@@ -65,7 +65,9 @@ class Terminal:
         )
         return command
 
-    def run(self, entrypoint: str | list[str], timeout=None) -> tuple[bool, str]:
+    def run(
+        self, entrypoint: str | list[str], timeout: int = None, raises: bool = False
+    ) -> tuple[bool, str]:
         """Run a list of commands in the terminal. Return command status and output."""
         command = self.prepare_command(entrypoint)
         logger.debug(f"Running command in terminal: {command}")
@@ -84,6 +86,12 @@ class Terminal:
             process.kill()
             stdout, stderr = "", "Timeout expired."
             success = False
+
+        if raises and not success:
+            # Command includes the entrypoint + setup commands
+            logger.debugr(f"Failed to run command: {command} {output}")
+            raise ValueError(f"Failed to run command: {entrypoint} ", output)
+
         output = (stdout + stderr).strip("\r\n").strip("\n")
         logger.debug(f"Output from terminal with status {process.returncode}: {output}")
         return success, output
@@ -317,7 +325,9 @@ class DockerTerminal(Terminal):
         command = ["/bin/bash", "-c", entrypoint]
         return command
 
-    def run(self, entrypoint: str | list[str], timeout=None) -> tuple[bool, str]:
+    def run(
+        self, entrypoint: str | list[str], timeout: int = None, raises: bool = False
+    ) -> tuple[bool, str]:
         """Run a command in the terminal. Return command status and output."""
         command = self.prepare_command(entrypoint)
 
@@ -331,6 +341,12 @@ class DockerTerminal(Terminal):
             stderr=True,
         )
         success = status == 0
+
+        if raises and not success:
+            # Command includes the entrypoint + setup commands
+            logger.debug(f"Failed to run command: {command} {output}")
+            raise ValueError(f"Failed to run command: {entrypoint} ", output)
+
         return success, output.decode().strip("\r\n").strip("\n")
 
     def clone(self) -> "DockerTerminal":

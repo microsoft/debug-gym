@@ -1,3 +1,4 @@
+import logging
 import os
 import re
 import subprocess
@@ -12,6 +13,8 @@ from swebench.harness.utils import get_environment_yml, get_requirements
 
 import froggy.utils as utils
 from froggy.envs.env import RepoEnv
+
+logger = logging.getLogger("froggy")
 
 
 class SWEBenchEnv(RepoEnv):
@@ -33,7 +36,7 @@ class SWEBenchEnv(RepoEnv):
 
         self.load_dataset()
         self.setup_commands = []
-        # # atexit.register(self.cleanup)  # cleanup the containers and images
+        # atexit.register(self.cleanup)  # cleanup the containers and images
 
     @property
     def instructions(self):
@@ -63,13 +66,13 @@ class SWEBenchEnv(RepoEnv):
         # Checkout to base commit
         command = f"git -C {local_repo_path} checkout {base_commit} -f"
         subprocess.run(command.split(), check=True)
-        print(f"Checked out to {base_commit}")
+        logger.info(f"Checked out to {base_commit}")
 
         # Apply test patch
         if test_patch != "":
             command = f"git -C {local_repo_path} apply -"
             subprocess.run(command.split(), input=test_patch, text=True, check=True)
-            print("Patch applied successfully.")
+            logger.info("Patch applied successfully.")
 
         # Make the pdb ignore
         self.make_froggyignore(local_repo_path=local_repo_path)
@@ -123,10 +126,10 @@ class SWEBenchEnv(RepoEnv):
 
         # clone
         if not local_repo_path.exists():
-            print(f"Cloning {repo_url} into {local_repo_path}")
+            logger.info(f"Cloning {repo_url} into {local_repo_path}")
             subprocess.run(["git", "clone", repo_url, local_repo_path], check=True)
         else:
-            print(f"Repo {repo_url} already cloned at {local_repo_path}")
+            logger.info(f"Repo {repo_url} already cloned at {local_repo_path}")
 
         return local_repo_path
 
@@ -151,11 +154,7 @@ class SWEBenchEnv(RepoEnv):
         command = command.replace("apt-get", "sudo apt-get").replace(
             "sudo sudo", "sudo"
         )
-        print(f"Running command: {command}")
-        status, output = self.terminal.run(command)
-        if not status:
-            raise ValueError(f"Failed to run command: {command} ", output)
-        print(f"{output}\n\n")
+        status, output = self.terminal.run(command, raises=True)
         return status, output
 
     def setup_terminal(self):
@@ -185,7 +184,7 @@ class SWEBenchEnv(RepoEnv):
     def run_pre_install(self):
         pre_install_cmds = self.install_configs.get("pre_install")
         if pre_install_cmds:
-            print("Running pre-install commands...")
+            logger.info("Running pre-install commands...")
             for pre_install_cmd in pre_install_cmds:
                 self.run_command_with_raise(pre_install_cmd)
 
@@ -197,16 +196,16 @@ class SWEBenchEnv(RepoEnv):
     def run_install(self):
         install_cmd = self.install_configs.get("install", "")
         if install_cmd:
+            logger.info("Running install commands...")
             install_cmd = install_cmd.replace("--verbose", "").replace("-v", "").strip()
             self.run_command_with_raise(install_cmd)
 
     def run_post_install(self):
         post_install_cmds = self.install_configs.get("post_install", [])
         if post_install_cmds:
-            print("Running post-install commands...")
+            logger.info("Running post-install commands...")
             for post_install_cmd in post_install_cmds:
                 self.run_command_with_raise(post_install_cmd)
-            print("Ran post-install commands")
 
     def get_configs(self, repo, version):
         return MAP_REPO_VERSION_TO_SPECS[repo][version]
@@ -236,10 +235,9 @@ class SWEBenchEnv(RepoEnv):
         return repo.replace("/", "__").replace(" ", "--").replace("'", "")
 
     def _create_conda_env(self, cmd, env_name):
-        print(f"Creating conda environment {env_name}")
+        logger.info(f"Creating conda environment {env_name}")
         self.run_command_with_raise(cmd)
         self.terminal.setup_commands.append(f"conda activate {env_name}")
-        print("Created conda environment")
 
     def create_conda_env(self):
         # try to activate conda environment without failing if activation fails
@@ -249,14 +247,17 @@ class SWEBenchEnv(RepoEnv):
         repo_name = self.repo_name(self.repo)
         env_name = f"{repo_name}__{self.version}"
 
-        if not self.conda_environment_exists(env_name):
-            print(f"{env_name} conda env not found, creating...")
+        if self.conda_environment_exists(env_name):
+            logger.info("Conda env `{env_name}` already exists, activating...")
+            self.terminal.setup_commands.append(f"conda activate {env_name}")
+        else:
+            logger.info(f"Conda env `{env_name}` not found, creating...")
             packages = self.install_configs.get("packages", "")
             pip_packages = self.install_configs.get("pip_packages")
             if packages == "requirements.txt":
+                logger.info("Installing from requirements.txt")
                 self._create_conda_env(
-                    f"conda create -n {env_name} python={python} -y",
-                    env_name,
+                    f"conda create -n {env_name} python={python} -y", env_name
                 )
                 requirements = get_requirements(self.ds_row)
                 tmp_requirements_file = (
@@ -265,9 +266,9 @@ class SWEBenchEnv(RepoEnv):
                 with open(tmp_requirements_file, "w") as f:
                     f.write(requirements)
                 self.run_command_with_raise(f"pip install -r {tmp_requirements_file}")
-                print("Installed requirements from requirements.txt")
                 self.run_command_with_raise(f"rm {tmp_requirements_file}")
             elif packages == "environment.yml":
+                logger.info("Installing from environment.yml")
                 content_env_yml = get_environment_yml(self.ds_row, env_name)
                 no_use_env = self.install_configs.get("no_use_env")
                 if no_use_env:
@@ -295,18 +296,12 @@ class SWEBenchEnv(RepoEnv):
                         env_name,
                     )
                 self.run_command_with_raise(f"rm {tmp_environment_file}")
-                print("Installed packages from environment.yml")
             else:
                 self._create_conda_env(
-                    f"conda create -n {env_name} python={python} -y",
-                    env_name,
+                    f"conda create -n {env_name} python={python} -y", env_name
                 ),
                 if packages.strip():
                     self.run_command_with_raise(f"conda install {packages} -y")
-                    print("Installed conda packages")
             if pip_packages:
                 self.run_command_with_raise(f"pip install {' '.join(pip_packages)}")
-                print("Installed extra pip dependencies")
-        else:
-            self.terminal.setup_commands.append(f"conda activate {env_name}")
         return env_name
