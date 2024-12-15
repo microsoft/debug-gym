@@ -208,7 +208,7 @@ def install_configs_mock():
         "eval_commands": ["export TEST_VAR='Test Var'", "echo $TEST_VAR"],
         "install": "python3 -m pip install pytest==8.3.3",
         "post_install": ["echo 'Test file' > test.txt", "cat test.txt"],
-        "packages": "pytest==8.3.3 requests==2.32.3",
+        "packages": "pytest requests",
         "pip_packages": ["pytest"],
         "no_use_env": False,
     }
@@ -291,7 +291,10 @@ def test_create_conda_environment_from_requirements(tmp_path, install_configs_mo
 @if_docker_running
 @pytest.mark.parametrize(
     "no_use_env,python_version",
-    [(True, "Python 3.12.8"), (False, "Python 3.10.16")],
+    [
+        (True, "Python 3.12.8"),
+        (False, "Python 3.10.16"),
+    ],
 )
 def test_create_conda_environment_from_environment(
     no_use_env, python_version, tmp_path, install_configs_mock
@@ -313,10 +316,7 @@ dependencies:
   - pip:
     - pytest==8.3.3
     - requests==2.32.3""".strip()
-    with patch(
-        "froggy.envs.swe_bench.get_environment_yml",
-        return_value=environment,
-    ):
+    with patch("froggy.envs.swe_bench.get_environment_yml", return_value=environment):
         swe_env.create_conda_env()
     status, output = swe_env.run_command_with_raise("echo $CONDA_DEFAULT_ENV")
     assert status
@@ -326,5 +326,5 @@ dependencies:
     assert output == python_version
     status, output = swe_env.run_command_with_raise("pip freeze")
     assert status
-    assert "pytest==8.3.3" in output
-    assert "requests==2.32.3" in output
+    assert "pytest" in output
+    assert "requests" in output

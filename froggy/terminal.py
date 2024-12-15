@@ -1,14 +1,14 @@
-import signal
 import atexit
 import errno
 import fcntl
 import io
 import logging
 import os
-import sys
 import pty
 import shlex
+import signal
 import subprocess
+import sys
 import tempfile
 import termios
 import time
@@ -375,7 +375,10 @@ class DockerTerminal(Terminal):
             try:
                 self.container.stop()
             except docker.errors.NotFound:
-                logger.warning("Container {self.container.name} not found. It might have already been removed.")
+                logger.debug(
+                    f"Container {self.container.name} not found. "
+                    "It might have already been removed."
+                )
             self._container = None
 
     def patch_base_image(self, base_image: str) -> str:

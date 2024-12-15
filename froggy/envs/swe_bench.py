@@ -1,4 +1,5 @@
 import os
+import re
 import subprocess
 import tempfile
 from ast import literal_eval
@@ -268,8 +269,11 @@ class SWEBenchEnv(RepoEnv):
             elif packages == "environment.yml":
                 content_env_yml = get_environment_yml(self.ds_row, env_name)
                 no_use_env = self.install_configs.get("no_use_env")
-                # if not no_use_env:
-                #     content_env_yml += f"\n  - python={python}\n"
+                if no_use_env:
+                    pattern = r"(python=)([^\s]+)"
+                    content_env_yml = re.sub(
+                        pattern, f"python={python}", content_env_yml
+                    )
                 tmp_environment_file = (
                     Path(self.terminal.working_dir) / "tmp_froggy_environment.yml"
                 )
@@ -282,18 +286,18 @@ class SWEBenchEnv(RepoEnv):
                         env_name,
                     )
                     self.run_command_with_raise(
-                        f"conda env update -f {tmp_environment_file}"
+                        f"conda env update -n {env_name} -f {tmp_environment_file}"
                     )
-                    print("Installed packages from environment.yml")
                 else:
                     self._create_conda_env(
-                        f"conda env create -n {env_name} --file {tmp_environment_file}",
+                        f"conda env create -n {env_name} -f {tmp_environment_file} -y",
                         env_name,
                     )
-                    self.run_command_with_raise(f"rm {tmp_environment_file}")
+                self.run_command_with_raise(f"rm {tmp_environment_file}")
+                print("Installed packages from environment.yml")
             else:
                 self._create_conda_env(
-                    f"conda create --n {env_name} python={python} -y",
+                    f"conda create -n {env_name} python={python} -y",
                     env_name,
                 ),
                 if packages.strip():

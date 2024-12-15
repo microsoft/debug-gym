@@ -8,10 +8,8 @@ import tempfile
 from glob import glob
 from os.path import join as pjoin
 from pathlib import Path
-from typing import Optional
 
 import numpy as np
-from termcolor import colored
 
 from froggy.terminal import Terminal
 from froggy.tools.patchers import CodePatcher
