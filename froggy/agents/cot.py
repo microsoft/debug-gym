@@ -33,7 +33,7 @@ class AgentCoT(AgentBase):
             "Step 5. What is our plan to investigate the remaining unclear part? "
         ]
         cot_prompt += [
-            f"Step 6. Concretely, what is the next command to execute? For this step, put your answer inside special tokens {self.command_special_tokens[0]} and {self.command_special_tokens[1]}. Make sure to follow the commands' syntax such as ``` delimiters. Make sure the answer is a single command, nothing else. Do not repeat your previous commands unless they can provide more information. "
+            f"Step 6. Concretely, what is the next command to execute? For this step, put your answer inside special tokens {self.command_special_tokens[0]} and {self.command_special_tokens[1]}. Make sure to follow the commands' syntax such as ``` delimiters. Make sure the answer is a single command, nothing else. Do not repeat your previous commands if they resulted in error messages. "
         ]
         cot_prompt += [
             "Now, state each step above and show your work for performing that step. "
@@ -156,7 +156,7 @@ class AgentCoT_NoPDB(AgentCoT):
         ]
         cot_prompt += ["Step 3. How should we fix the errors in the code? "]
         cot_prompt += [
-            f"Step 4. Concretely, what is the next command to execute? For this step, put your answer inside special tokens {self.command_special_tokens[0]} and {self.command_special_tokens[1]}. Make sure to follow the commands' syntax such as ``` delimiters. Make sure the answer is a single command, nothing else. Do not repeat your previous commands unless they can provide more information. "
+            f"Step 4. Concretely, what is the next command to execute? For this step, put your answer inside special tokens {self.command_special_tokens[0]} and {self.command_special_tokens[1]}. Make sure to follow the commands' syntax such as ``` delimiters. Make sure the answer is a single command, nothing else. Do not repeat your previous commands if they resulted in error messages. "
         ]
         cot_prompt += [
             "Now, state each step above and show your work for performing that step. "
