@@ -1,4 +1,5 @@
 import subprocess
+import time
 
 import docker
 import pytest
@@ -290,6 +291,7 @@ def test_terminal_cleanup(tmp_path):
     container_name = terminal.container.name
     terminal.clean_up()
     assert terminal._container is None
+    time.sleep(10)  # give docker some time to remove the container
     client = docker.from_env()
     containers = client.containers.list(all=True, ignore_removed=True)
     assert container_name not in [c.name for c in containers]
