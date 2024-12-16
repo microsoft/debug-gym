@@ -382,7 +382,7 @@ def test_setup_local_repo(tmp_path):
     assert f"HEAD detached at {swe_env.ds_row["base_commit"][:8]}" in git_commit
 
     git_diff = subprocess.run(
-        f"git -C /tmp/RepoEnv-c7qyjs0t diff".split(),
+        f"git -C {swe_env.working_dir} diff".split(),
         stdout=subprocess.PIPE,
         text=True,
     ).stdout
