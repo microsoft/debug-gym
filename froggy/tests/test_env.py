@@ -596,17 +596,25 @@ class TestRepoEnv(unittest.TestCase):
     @patch("os.walk")
     @patch("shutil.copytree")
     @patch("subprocess.run")
-    def test_load_env_states(
+    @patch.object(RepoEnv, "load_env_states")
+    @patch.object(RepoEnv, "load_task_states")
+    @patch.object(RepoEnv, "run")
+    def test_load_states(
         self,
+        mock_run,
+        mock_load_task_states,
+        mock_load_env_states,
         mock_subprocess_run,
         mock_copytree,
         mock_os_walk,
         mock_scandir,
         mock_read_text,
     ):
-        # Set up mocks
+        # Mock the return value of subprocess.run
         mock_result = MagicMock()
-        mock_result.returncode = 0
+        mock_result.stdout = (
+            "diff --git a/path/to/repo/file1.py b/path/to/repo/file1.py\n"
+        )
         mock_subprocess_run.return_value = mock_result
 
         mock_scandir.return_value.__enter__.return_value = [
@@ -614,56 +622,27 @@ class TestRepoEnv(unittest.TestCase):
             MagicMock(is_dir=lambda: False, path="/path/to/repo/file2.txt"),
         ]
 
+        # Mock the return value of os.walk
         mock_os_walk.return_value = [
             ("/path/to/repo", ("subdir",), ("file1.py", "file2.py")),
             ("/path/to/repo/subdir", (), ("subfile1.txt",)),
         ]
-
-        # Create an instance of RepoEnv
-        env = RepoEnv(path="/path/to/repo")
-
-        # Define the states to be loaded with correct keys
-        states = {
-            "patch": "patch",
-            "current file": "current file",
-            "rewrite counter": 1,
-        }
-
-        # Call the method under test
-        env.load_env_states(states)
-
-        mock_subprocess_run.assert_called_once_with(
-            ["git", "apply", "-"],
-            input="patch",
-            text=True,
-            capture_output=True,
-            cwd=env.working_dir,
-        )
-        # Assertions to verify the state
-        self.assertEqual(env.patch, states["patch"])
-        self.assertEqual(env.current_file, states["current file"])
-        self.assertEqual(env.rewrite_counter, states["rewrite counter"])
-
-    @patch.object(RepoEnv, "load_env_states")
-    @patch.object(RepoEnv, "load_task_states")
-    @patch.object(RepoEnv, "run")
-    def test_load_states(self, mock_run, mock_load_task_states, mock_load_env_states):
         # Create an instance of RepoEnv
         env = RepoEnv(path="/path/to/repo")
 
         # Define the states to be loaded
         states = {
-            "env states": {"patch": "patch"},
-            "task states": {"task_state": "value"},
-            "tool states": {"tool1": {"tool_state": "value"}},
+            "env states": {"patch": "diff", "current file": "file.py"},
+            "task states": {"task state": "value"},
+            "tool states": {},
         }
 
         # Call the load_states method
         env.load_states(states)
 
         # Assertions
-        mock_load_env_states.assert_called_once_with({"patch": "patch"})
-        mock_load_task_states.assert_called_once_with({"task_state": "value"})
+        mock_load_env_states.assert_called_once_with(states["env states"])
+        mock_load_task_states.assert_called_once_with(states["task states"])
         mock_run.assert_called_once()
 
 

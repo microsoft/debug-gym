@@ -198,9 +198,8 @@ class RepoEnv(TooledEnv):
         self.current_file = states["current file"]
         self.current_file_content = self.load_file(self.current_file)
         self.rewrite_counter = states["rewrite counter"]
-        # cleanup the working directory, copy the original code back
-        self.tempdir.cleanup()
-        shutil.copytree(self.path, self.working_dir, dirs_exist_ok=True)
+        # restore the original code back to the working directory
+        self.restore()
         # apply patch to get the modified code
         patch = states["patch"]
         patch = patch.replace(str(self.path), str(self.working_dir))
