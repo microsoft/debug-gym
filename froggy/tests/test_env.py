@@ -107,6 +107,40 @@ class TestTooledEnv(unittest.TestCase):
             {"tool1": "instructions1", "tool2": "instructions2"},
         )
 
+    def test_states(self):
+        self.env.env_states = {"env_state1": "value1"}
+        self.env.task_states = {"task_state1": "value2"}
+        tool1 = MagicMock()
+        tool1.name = "tool1"
+        tool1.states = {"tool_state1": "value3"}
+        tool2 = MagicMock()
+        tool2.name = "tool2"
+        tool2.states = {"tool_state2": "value4"}
+        self.env.add_tool(tool1)
+        self.env.add_tool(tool2)
+        self.assertEqual(
+            self.env.states,
+            {
+                "env states": {"env_state1": "value1"},
+                "task states": {"task_state1": "value2"},
+                "tool states": {
+                    "tool1": {"tool_state1": "value3"},
+                    "tool2": {"tool_state2": "value4"},
+                },
+            },
+        )
+        self.assertEqual(
+            self.env.save_states(),
+            {
+                "env states": {"env_state1": "value1"},
+                "task states": {"task_state1": "value2"},
+                "tool states": {
+                    "tool1": {"tool_state1": "value3"},
+                    "tool2": {"tool_state2": "value4"},
+                },
+            },
+        )
+
 
 @pytest.mark.usefixtures("tmp_path")
 class TestRepoEnv(unittest.TestCase):
@@ -521,6 +555,98 @@ class TestRepoEnv(unittest.TestCase):
             capture_output=True,
         )
         self.assertEqual(result, expected_result)
+
+    def test_env_states(self):
+        # Create an instance of RepoEnv
+        env = RepoEnv(path="/path/to/repo")
+
+        # Set the attributes
+        env.patch = "patch"
+        env.current_file = "current_file"
+        env.rewrite_counter = 1
+
+        # Call the env_states property
+        result = env.env_states
+
+        # Define the expected result
+        expected_result = {
+            "patch": "patch",
+            "current file": "current_file",
+            "rewrite counter": 1,
+        }
+
+        # Assertions
+        self.assertEqual(result, expected_result)
+
+    @patch("os.scandir")
+    @patch("os.walk")
+    @patch("shutil.copytree")
+    @patch("subprocess.run")
+    def test_load_env_states(
+        self, mock_subprocess_run, mock_copytree, mock_os_walk, mock_scandir
+    ):
+        # load_env_states cleans up the working directory, copies the original code back, and applies the patch
+        # Then it sets the current file, current file content, and rewrite counter
+
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+        mock_subprocess_run.return_value = mock_result
+
+        mock_scandir.return_value.__enter__.return_value = [
+            MagicMock(is_dir=lambda: False, path="/path/to/repo/file1.txt"),
+            MagicMock(is_dir=lambda: False, path="/path/to/repo/file2.txt"),
+        ]
+
+        # Mock the return value of os.walk
+        mock_os_walk.return_value = [
+            ("/path/to/repo", ("subdir",), ("file1.py", "file2.py")),
+            ("/path/to/repo/subdir", (), ("subfile1.txt",)),
+        ]
+        # Create an instance of RepoEnv
+        env = RepoEnv(path="/path/to/repo")
+
+        # Define the states to be loaded
+        states = {
+            "patch": "patch",
+            "current file": "current_file",
+            "rewrite counter": 1,
+        }
+
+        # Call the load_env_states method
+        env.load_env_states(states)
+
+        # Assertions
+        self.assertEqual(env.current_file, "current_file")
+        self.assertEqual(env.rewrite_counter, 1)
+        mock_subprocess_run.assert_called_once_with(
+            ["git", "apply", "-"],
+            input="patch",
+            text=True,
+            capture_output=True,
+            cwd=env.working_dir,
+        )
+
+    @patch.object(RepoEnv, "load_env_states")
+    @patch.object(RepoEnv, "load_task_states")
+    @patch.object(RepoEnv, "run")
+    def test_load_states(self, mock_run, mock_load_task_states, mock_load_env_states):
+        # Create an instance of RepoEnv
+        env = RepoEnv(path="/path/to/repo")
+
+        # Define the states to be loaded
+        states = {
+            "env states": {"patch": "patch"},
+            "task states": {"task_state": "value"},
+            "tool states": {"tool1": {"tool_state": "value"}},
+        }
+
+        # Call the load_states method
+        env.load_states(states)
+
+        # Assertions
+        mock_load_env_states.assert_called_once_with({"patch": "patch"})
+        mock_load_task_states.assert_called_once_with({"task_state": "value"})
+        mock_run.assert_called_once()
 
 
 def test_run_success(tmp_path):
