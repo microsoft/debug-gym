@@ -307,6 +307,56 @@ class TestPDBTool(unittest.TestCase):
         self.pdb_tool.get_current_frame_file()
         # self.assertEqual(self.pdb_tool.current_frame_file, "script.py")
 
+    def test_states(self):
+        self.pdb_tool.breakpoints_state = {
+            "file1.py|||10": "b file1.py:10",
+            "file2.py|||20": "b file2.py:20",
+        }
+        self.pdb_tool.current_frame_file = "script.py"
+        states = self.pdb_tool.states
+        self.assertEqual(
+            states,
+            {
+                "breakpoints": {
+                    "file1.py|||10": "b file1.py:10",
+                    "file2.py|||20": "b file2.py:20",
+                },
+                "frame file": "script.py",
+            },
+        )
+
+    def test_load_states(self):
+        states = {
+            "breakpoints": {
+                "file1.py|||10": "b file1.py:10",
+                "file2.py|||20": "b file2.py:20",
+                "file2.py|||27": "b file2.py:27",
+            },
+            "frame file": "script2.py",
+        }
+        self.pdb_tool.load_states(states)
+        self.assertEqual(
+            self.pdb_tool.breakpoints_state,
+            {
+                "file1.py|||10": "b file1.py:10",
+                "file2.py|||20": "b file2.py:20",
+                "file2.py|||27": "b file2.py:27",
+            },
+        )
+        self.assertEqual(self.pdb_tool.current_frame_file, "script2.py")
+
+    def test_reset(self):
+        self.pdb_tool.breakpoints_state = {
+            "file1.py|||10": "b file1.py:10",
+            "file2.py|||20": "b file2.py:20",
+        }
+        self.pdb_tool.pdb_obs = "some output"
+        self.pdb_tool.current_frame_file = "script.py"
+        self.pdb_tool.reset()
+        self.assertEqual(self.pdb_tool.pdb_obs, "")
+        self.assertEqual(self.pdb_tool.breakpoints_state, {})
+        self.assertIsNone(self.pdb_tool.current_frame_file)
+
 
 if __name__ == "__main__":
     unittest.main()
