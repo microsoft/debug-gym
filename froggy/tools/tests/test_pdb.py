@@ -208,8 +208,7 @@ class TestPDBTool(unittest.TestCase):
         self.pdb_tool.breakpoint_modify("file1.py", 15, 25, 5)
         expected_state = {
             "file1.py|||10": "b file1.py:10",
-            "file1.py|||20": "b file1.py:20",
-            "file1.py|||30": "b file1.py:30",
+            "file1.py|||24": "b file1.py:24",
             "file2.py|||15": "b file2.py:15",
         }
         self.assertEqual(self.pdb_tool.breakpoints_state, expected_state)

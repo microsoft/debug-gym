@@ -125,13 +125,13 @@ def test_history_tracker():
     ht.step({"obs": "obs4", "action": "action4", "score": 4, "token_usage": 12345})
     ht.step({"obs": "obs5", "action": "action5", "score": 5})
     # push some prompt-response pairs
-    ht.save_prompt_response_pairs([("prompt_2_1", "response_2_1")])
+    ht.save_prompt_response_pairs([("prompt_2_1", "command_2_1")])
     ht.save_prompt_response_pairs(
-        [("prompt_3_1", "response_3_1"), ("prompt_3_2", "response_3_2")]
+        [("prompt_3_1", "response_3_1", "command_3_1"), ("prompt_3_2", "command_3_2")]
     )
-    ht.save_prompt_response_pairs([("prompt_4_1", "response_4_1")])
+    ht.save_prompt_response_pairs([("prompt_4_1", "command_4_1")])
     ht.save_prompt_response_pairs(
-        [("prompt_5_1", "response_5_1"), ("prompt_5_2", "response_5_2")]
+        [("prompt_5_1", "command_5_1"), ("prompt_5_2", "command_5_2")]
     )
 
     # get_all should return all steps
@@ -180,8 +180,10 @@ def test_history_tracker():
         "prompt_response_pairs": {
             "prompt_0": "prompt_3_1",
             "response_0": "response_3_1",
+            "command_0": "command_3_1",
             "prompt_1": "prompt_3_2",
-            "response_1": "response_3_2",
+            "response_1": None,
+            "command_1": "command_3_2",
         },
     }
 

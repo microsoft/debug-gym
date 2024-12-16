@@ -27,7 +27,7 @@ class TestAgentCoT(unittest.TestCase):
             "llm_name": "test-model",
             "max_steps": 10,
             "max_rewrite_steps": 5,
-            "llm_temperature": [0.5, 0.7],
+            "llm_temperature": [0.5],
             "use_conversational_prompt": True,
             "reset_prompt_history_after_rewrite": False,
             "memory_size": 10,
@@ -46,11 +46,11 @@ class TestAgentCoT(unittest.TestCase):
         messages = self.agent.build_cot_prompt()
         self.assertEqual(len(messages), 1)
         self.assertIn(
-            "Let's think step by step using the following questions:",
+            "Let's think step by step:",
             messages[0]["content"],
         )
 
-    def test_build_prompt_step_1(self):
+    def test_build_prompt(self):
         info = {
             "instructions": "Test instructions",
             "dir_tree": "Test dir tree",
@@ -59,31 +59,7 @@ class TestAgentCoT(unittest.TestCase):
             "current_breakpoints": "Test breakpoints",
             "last_run_obs": "Test last run obs",
         }
-        messages = self.agent.build_prompt_step_1(info)
-        self.assertGreater(len(messages), 0)
-
-    def test_fill_in_cot_response(self):
-        response = "Test response"
-        messages = self.agent.fill_in_cot_response(response)
-        self.assertEqual(len(messages), 1)
-        self.assertIn("assistant", messages[0]["role"])
-
-    def test_build_question_prompt(self):
-        messages = self.agent.build_question_prompt()
-        self.assertEqual(len(messages), 1)
-        self.assertIn("what is the best next command?", messages[0]["content"])
-
-    def test_build_prompt_step_2(self):
-        info = {
-            "instructions": "Test instructions",
-            "dir_tree": "Test dir tree",
-            "editable_files": "Test editable files",
-            "current_code_with_line_number": "Test code",
-            "current_breakpoints": "Test breakpoints",
-            "last_run_obs": "Test last run obs",
-        }
-        response = "Test response"
-        messages = self.agent.build_prompt_step_2(info, response)
+        messages = self.agent.build_prompt(info)
         self.assertGreater(len(messages), 0)
 
     @patch("froggy.agents.cot.tqdm", MagicMock())
@@ -171,7 +147,7 @@ class TestAgentCoT_NoPDB(unittest.TestCase):
         messages = self.agent.build_cot_prompt()
         self.assertEqual(len(messages), 1)
         self.assertIn(
-            "Let's think step by step using the following questions:",
+            "Let's think step by step:",
             messages[0]["content"],
         )
 
