@@ -48,7 +48,6 @@ class UDiffPatcher(CodePatcher):
             )
             self.environment.load_current_file(self.environment.current_file)
             # TODO: to support breakpoint management
-            self.environment.current_breakpoints_state = {}
             self.rewrite_success = True
             return "Rewrite successful."
 
@@ -129,7 +128,6 @@ class WholePatcher(CodePatcher):
             )
             self.environment.load_current_file(self.environment.current_file)
             # TODO: to support breakpoint management
-            self.environment.current_breakpoints_state = {}
             self.rewrite_success = True
             return "Rewrite successful."
 

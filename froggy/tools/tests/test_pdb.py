@@ -1,15 +1,13 @@
 import subprocess
-from unittest.mock import MagicMock
-import pytest
-
 import unittest
-from unittest.mock import patch, MagicMock
-from froggy.utils import TimeoutException
+from unittest.mock import MagicMock, patch
+
+import pytest
 
 from froggy.envs.env import RepoEnv
 from froggy.terminal import DockerTerminal, Terminal
 from froggy.tools.pdb import PDBTool
-
+from froggy.utils import TimeoutException
 
 if_docker_running = pytest.mark.skipif(
     not subprocess.check_output(["docker", "ps"]),
@@ -103,22 +101,22 @@ def test_pdb_use_docker_terminal_no_env(tmp_path, setup_test_repo):
     assert "Reached the end of the file. Restarting the debugging session." in output
     assert "(Pdb)" in output
 
+
 class TestPDBTool(unittest.TestCase):
 
     def setUp(self):
         self.env = MagicMock(spec=RepoEnv)
         self.environment = MagicMock()
-        self.environment.current_breakpoints_state = {
-            "file1.py|||10": "b file1.py:10",
-            "file1.py|||20": "b file1.py:20",
-            "file1.py|||30": "b file1.py:30",
-            "file2.py|||15": "b file2.py:15"
-        }
         self.env.working_dir = "/path/to/repo"
-        self.env.current_breakpoints_state = {}
         self.terminal = MagicMock(spec=Terminal)
         self.pdb_tool = PDBTool()
         self.pdb_tool.environment = self.environment
+        self.pdb_tool.breakpoints_state = {
+            "file1.py|||10": "b file1.py:10",
+            "file1.py|||20": "b file1.py:20",
+            "file1.py|||30": "b file1.py:30",
+            "file2.py|||15": "b file2.py:15",
+        }
 
     def test_initialization(self):
         self.assertIsNone(self.pdb_tool.master)
@@ -143,7 +141,7 @@ class TestPDBTool(unittest.TestCase):
         self.pdb_tool.terminal = self.terminal
         self.assertEqual(self.pdb_tool.terminal, self.terminal)
 
-    @patch.object(PDBTool, 'interact_with_pdb')
+    @patch.object(PDBTool, "interact_with_pdb")
     def test_start_pdb(self, mock_interact_with_pdb):
         mock_interact_with_pdb.return_value = "(Pdb)"
         self.pdb_tool.register(self.env)
@@ -153,8 +151,8 @@ class TestPDBTool(unittest.TestCase):
         self.assertEqual(output, "(Pdb)")
         self.assertEqual(self.pdb_tool.pdb_obs, "(Pdb)")
 
-    @patch.object(PDBTool, 'interact_with_pdb')
-    @patch.object(PDBTool, 'close_pdb')
+    @patch.object(PDBTool, "interact_with_pdb")
+    @patch.object(PDBTool, "close_pdb")
     def test_restart_pdb(self, mock_close_pdb, mock_interact_with_pdb):
         mock_interact_with_pdb.return_value = "(Pdb)"
         self.pdb_tool.register(self.env)
@@ -164,7 +162,7 @@ class TestPDBTool(unittest.TestCase):
         self.assertEqual(output, "(Pdb)")
         self.assertEqual(self.pdb_tool.pdb_obs, "(Pdb)")
 
-    @patch.object(PDBTool, 'interact_with_pdb')
+    @patch.object(PDBTool, "interact_with_pdb")
     def test_use_command(self, mock_interact_with_pdb):
         mock_interact_with_pdb.return_value = "output"
         self.pdb_tool.register(self.env)
@@ -174,7 +172,7 @@ class TestPDBTool(unittest.TestCase):
         output = self.pdb_tool.use("```pdb p x```")
         self.assertIn("output", output)
 
-    @patch.object(PDBTool, 'interact_with_pdb')
+    @patch.object(PDBTool, "interact_with_pdb")
     def test_breakpoint_add_clear(self, mock_interact_with_pdb):
         mock_interact_with_pdb.return_value = "output"
         self.pdb_tool.register(self.env)
@@ -185,7 +183,7 @@ class TestPDBTool(unittest.TestCase):
         self.assertTrue(success)
         self.assertIn("output", output)
 
-    @patch.object(PDBTool, 'interact_with_pdb', return_value="Breakpoint cleared")
+    @patch.object(PDBTool, "interact_with_pdb", return_value="Breakpoint cleared")
     def test_breakpoint_add_clear_clear_specific(self, mock_interact_with_pdb):
         # Test clearing a specific breakpoint
         # mock_interact_with_pdb.return_value = ""
@@ -197,26 +195,26 @@ class TestPDBTool(unittest.TestCase):
         expected_state = {
             "file1.py|||10": "b file1.py:10",
             "file1.py|||30": "b file1.py:30",
-            "file2.py|||15": "b file2.py:15"
+            "file2.py|||15": "b file2.py:15",
         }
         self.assertTrue(success)
         self.assertEqual(output, "Breakpoint cleared")
-        self.assertEqual(self.environment.current_breakpoints_state, expected_state)
+        self.assertEqual(self.pdb_tool.breakpoints_state, expected_state)
 
-    @patch.object(PDBTool, 'interact_with_pdb')
+    @patch.object(PDBTool, "interact_with_pdb")
     def test_breakpoint_modify_remove(self, mock_interact_with_pdb):
         # Test removing breakpoints within the rewritten code
         self.pdb_tool.register(self.env)
         self.pdb_tool.breakpoint_modify("file1.py", 15, 25, 5)
         expected_state = {
             "file1.py|||10": "b file1.py:10",
-            'file1.py|||20': 'b file1.py:20',
+            "file1.py|||20": "b file1.py:20",
             "file1.py|||30": "b file1.py:30",
-            "file2.py|||15": "b file2.py:15"
+            "file2.py|||15": "b file2.py:15",
         }
-        self.assertEqual(self.environment.current_breakpoints_state, expected_state)
+        self.assertEqual(self.pdb_tool.breakpoints_state, expected_state)
 
-    @patch.object(PDBTool, 'interact_with_pdb')
+    @patch.object(PDBTool, "interact_with_pdb")
     def test_breakpoint_modify_move(self, mock_interact_with_pdb):
         # Test moving breakpoints after the rewritten code
         # self.pdb_tool.register(self.env)
@@ -226,56 +224,56 @@ class TestPDBTool(unittest.TestCase):
             "file1.py|||19": "b file1.py:19",
             "file1.py|||29": "b file1.py:29",
         }
-        self.assertEqual(self.environment.current_breakpoints_state, expected_state)
-    
-    @patch.object(PDBTool, 'interact_with_pdb')
+        self.assertEqual(self.pdb_tool.breakpoints_state, expected_state)
+
+    @patch.object(PDBTool, "interact_with_pdb")
     def test_breakpoint_modify_remove_all(self, mock_interact_with_pdb):
         # Test removing all breakpoints in the file
         self.pdb_tool.breakpoint_modify("file1.py", None, None, 0)
-        expected_state = {
-            "file2.py|||15": "b file2.py:15"
-        }
-        self.assertEqual(self.environment.current_breakpoints_state, expected_state)
+        expected_state = {"file2.py|||15": "b file2.py:15"}
+        self.assertEqual(self.pdb_tool.breakpoints_state, expected_state)
 
-    @patch.object(PDBTool, 'interact_with_pdb')
+    @patch.object(PDBTool, "interact_with_pdb")
     def test_breakpoint_modify_no_change(self, mock_interact_with_pdb):
         # Test no change for breakpoints before the rewritten code
         self.pdb_tool.breakpoint_modify("file1.py", 25, 35, 5)
         expected_state = {
             "file1.py|||10": "b file1.py:10",
             "file1.py|||20": "b file1.py:20",
-            "file2.py|||15": "b file2.py:15"
+            "file2.py|||15": "b file2.py:15",
         }
-        self.assertEqual(self.environment.current_breakpoints_state, expected_state)
+        self.assertEqual(self.pdb_tool.breakpoints_state, expected_state)
 
-    @patch.object(PDBTool, 'interact_with_pdb')
+    @patch.object(PDBTool, "interact_with_pdb")
     def test_current_breakpoints_no_breakpoints(self, mock_interact_with_pdb):
         # Set up the environment with no breakpoints
-        self.pdb_tool.environment.current_breakpoints_state = {}
-        
+        self.pdb_tool.breakpoints_state = {}
+
         # Call the method
         result = self.pdb_tool.current_breakpoints()
-        
+
         # Assert the result
         assert result == "No breakpoints are set."
 
-    @patch.object(PDBTool, 'interact_with_pdb')
+    @patch.object(PDBTool, "interact_with_pdb")
     def test_current_breakpoints_with_breakpoints(self, mock_interact_with_pdb):
         # Set up the environment with some breakpoints
-        self.pdb_tool.environment.current_breakpoints_state = {
+        self.pdb_tool.breakpoints_state = {
             "file1.py|||10": "b file1.py:10",
             "file2.py|||20": "b file2.py:20",
             "file1.py|||15": "b file1.py:15",
         }
-        
+
         # Call the method
         result = self.pdb_tool.current_breakpoints()
-        
+
         # Assert the result
-        expected_result = "line 10 in file1.py\nline 15 in file1.py\nline 20 in file2.py"
+        expected_result = (
+            "line 10 in file1.py\nline 15 in file1.py\nline 20 in file2.py"
+        )
         assert result == expected_result
 
-    @patch.object(PDBTool, 'interact_with_pdb')
+    @patch.object(PDBTool, "interact_with_pdb")
     def test_get_current_frame_file(self, mock_interact_with_pdb):
         mock_interact_with_pdb.return_value = (
             "/home/user/repo/script.py(10)<module>()\n-> line of code"
@@ -286,5 +284,6 @@ class TestPDBTool(unittest.TestCase):
         self.pdb_tool.get_current_frame_file()
         # self.assertEqual(self.pdb_tool.current_frame_file, "script.py")
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     unittest.main()
