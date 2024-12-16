@@ -90,14 +90,16 @@ class SWEBenchEnv(RepoEnv):
         # TODO: one workspace per task?
         self.setup_workspace(local_repo_path, entrypoint)
 
-    def reset(self, *, seed=None, options: dict | None = None):
-        options = options or {}
-        self.task_name = options["task_name"]
+    def setup_task_info(self, task_name):
+        self.task_name = task_name
         self.ds_row = self.dataset[self.task_name]
         self.repo = self.ds_row["repo"]
         self.version = self.ds_row["version"]
         self.install_configs = self.get_configs(self.repo, self.version)
 
+    def reset(self, *, seed=None, options: dict | None = None):
+        options = options or {}
+        self.setup_task_info(options["task_name"])
         self.setup_local_repo()
         self.setup_terminal()
 

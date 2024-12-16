@@ -328,3 +328,65 @@ dependencies:
     assert status
     assert "pytest" in output
     assert "requests" in output
+
+
+def test_load_dataset(tmp_path):
+    working_dir = str(tmp_path)
+    swe_env = SWEBenchEnv(path=working_dir)
+    swe_env.load_dataset()
+    assert swe_env.dataset_id == "princeton-nlp/SWE-bench_Verified"
+    task_name = "astropy__astropy-14096"
+    assert task_name in swe_env.dataset.keys()
+    assert list(swe_env.dataset[task_name].keys()) == [
+        "repo",
+        "instance_id",
+        "base_commit",
+        "patch",
+        "test_patch",
+        "problem_statement",
+        "hints_text",
+        "created_at",
+        "version",
+        "FAIL_TO_PASS",
+        "PASS_TO_PASS",
+        "environment_setup_commit",
+    ]
+
+
+def test_setup_task_info(tmp_path):
+    working_dir = str(tmp_path)
+    swe_env = SWEBenchEnv(path=working_dir)
+    task_name = "astropy__astropy-14096"
+    swe_env.load_dataset()
+    swe_env.setup_task_info(task_name)
+    assert swe_env.task_name == task_name
+    assert swe_env.ds_row["repo"] == "astropy/astropy"
+    assert swe_env.ds_row["version"] == "5.1"
+    assert isinstance(swe_env.ds_row, dict)
+    assert isinstance(swe_env.install_configs, dict)
+
+
+@if_docker_running
+def test_setup_local_repo(tmp_path):
+    working_dir = str(tmp_path)
+    task_name = "astropy__astropy-14096"
+    swe_env = SWEBenchEnv(path=working_dir)
+    swe_env.load_dataset()
+    swe_env.setup_task_info(task_name)
+    swe_env.setup_local_repo()
+    git_commit = subprocess.run(
+        f"git -C {swe_env.working_dir} status".split(),
+        stdout=subprocess.PIPE,
+        text=True,
+    ).stdout
+    assert f"HEAD detached at {swe_env.ds_row["base_commit"][:8]}" in git_commit
+
+    git_diff = subprocess.run(
+        f"git -C /tmp/RepoEnv-c7qyjs0t diff".split(),
+        stdout=subprocess.PIPE,
+        text=True,
+    ).stdout
+    git_diff = [l for l in git_diff.split("\n") if not l.startswith("index ")]
+    assert git_diff == swe_env.ds_row["test_patch"].split("\n")
+
+    assert ".froggyignore" in os.listdir(swe_env.working_dir)
