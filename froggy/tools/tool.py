@@ -14,3 +14,8 @@ class EnvironmentTool:
 
     def use(self, action, environment):
         raise NotImplementedError("use method must be implemented.")
+
+    @property
+    def states(self):
+        # this is a placeholder, should be overridden by subclasses
+        return {}

@@ -1,5 +1,6 @@
 import atexit
 import glob
+import logging
 import os
 import shutil
 import subprocess
@@ -16,8 +17,6 @@ from froggy.terminal import Terminal
 from froggy.tools.patchers import CodePatcher
 from froggy.tools.pdb import PDBTool
 from froggy.utils import _walk, make_is_readonly, show_line_number
-import logging
-
 
 logger = logging.getLogger("froggy")
 
@@ -33,6 +32,28 @@ class TooledEnv:
     @property
     def actions_str(self):
         return ", ".join([item.strip("`") for item in self.actions])
+
+    @property
+    def task_states(self):
+        # task specific states
+        return {}
+
+    @property
+    def env_states(self):
+        # env specific states, e.g., patch (code), current file, etc.
+        # this is a placeholder, should be overridden by subclasses
+        return {}
+
+    @property
+    def states(self):
+        # The states of the environment, plus the task-specific states and the union of the tool states.
+        # This is for extracting the states into a dictionary that can reproduce the current environment.
+        # The dictionary can later on be used to initialize a new environment with the same states.
+        return {
+            "env states": self.env_states,
+            "task states": self.task_states,
+            "tool states": {name: tool.states for name, tool in self.tools.items()},
+        }
 
     def seed(self, seed):
         self.rng = np.random.RandomState(seed)
@@ -123,7 +144,9 @@ class RepoEnv(TooledEnv):
         )
 
         # get list of editable files
-        froggyignore = self.working_dir / ".froggyignore"  # By default look for .froggyignore.
+        froggyignore = (
+            self.working_dir / ".froggyignore"
+        )  # By default look for .froggyignore.
         self.is_readonly = make_is_readonly(froggyignore, patterns=readonly_patterns)
         self.editable_files = [
             p for p in self.all_files if not self.is_readonly(self.working_dir / p)
@@ -133,11 +156,14 @@ class RepoEnv(TooledEnv):
         if entrypoint:
             self.entrypoint = entrypoint
 
-        assert self.entrypoint.split()[0] == "python", "Only support python entrypoint for now."
+        assert (
+            self.entrypoint.split()[0] == "python"
+        ), "Only support python entrypoint for now."
 
         self.current_file = None
         self.current_file_content = None
-        self.current_breakpoints_state = {}
+        for tool in self.tools.values():
+            tool.reset()
 
         # Set up the terminal working dir
         self.terminal.working_dir = str(self.working_dir)
@@ -175,12 +201,22 @@ class RepoEnv(TooledEnv):
 
             shutil.copy2(self.path / filepath, self.working_dir / filepath)
 
+    @property
+    def env_states(self):
+        _env_states = {
+            "patch": self.patch,
+            "current file": self.current_file,
+            "rewrite counter": self.rewrite_counter,
+        }
+        return _env_states
+
     def reset(self, *, seed=None, options: dict = None):
         options = options or {}
         self.current_file = None
         self.current_file_content = None
-        self.current_breakpoints_state = {}
         self.rewrite_counter = 0
+        for tool in self.tools.values():
+            tool.reset()
         self.restore()
 
         # Run the initial code. This will set self.last_run_obs, self.done and self.score.
@@ -214,9 +250,7 @@ class RepoEnv(TooledEnv):
         return self.obs, self.infos
 
     def run(self):
-        success, output = self.terminal.run(
-            [self.entrypoint], timeout=self.run_timeout
-        )
+        success, output = self.terminal.run([self.entrypoint], timeout=self.run_timeout)
         self.last_run_obs = output
         self.score = int(success)
         self.done = success
@@ -273,7 +307,11 @@ class RepoEnv(TooledEnv):
             + show_line_number(
                 self.current_file_content,
                 self.current_file,
-                self.current_breakpoints_state,
+                (
+                    self.tools["pdb"].current_breakpoints_state
+                    if self.has_tool("pdb")
+                    else {}
+                ),
             )
             + "\n",
         }

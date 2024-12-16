@@ -50,11 +50,10 @@ class PDBTool(EnvironmentTool):
     ):
         super().__init__()
         self.master = None
-        self.pdb_obs = ""
         self.persistent_breakpoints = persistent_breakpoints
         self.auto_list = auto_list
-        self.current_frame_file = None
         self._terminal: Terminal = None
+        self.reset()
 
     def register(self, environment):
         from froggy.envs.env import RepoEnv
@@ -74,6 +73,19 @@ class PDBTool(EnvironmentTool):
     def terminal(self, terminal: Terminal):
         self._terminal = terminal
 
+    @property
+    def states(self):
+        _states = {
+            "breakpoints": self.breakpoints_state,
+            "frame file": self.current_frame_file,
+        }
+        return _states
+
+    def reset(self):
+        self.pdb_obs = ""
+        self.breakpoints_state = {}
+        self.current_frame_file = None
+
     def interact_with_pdb(self, command, expected_output="(Pdb)"):
         return self.terminal.run_interactive(command, expected_output)
 
@@ -86,7 +98,7 @@ class PDBTool(EnvironmentTool):
         if pdb_cmd is None:
             # remove the first word, which is "python"
             entrypoint = " ".join(self.environment.entrypoint.split()[1:])
-            pdb_cmd = f'python -m pdb {entrypoint}'
+            pdb_cmd = f"python -m pdb {entrypoint}"
 
         initial_output = self.interact_with_pdb(pdb_cmd, expected_output="(Pdb)")
         if "The program finished and will be restarted" in initial_output:
@@ -94,9 +106,9 @@ class PDBTool(EnvironmentTool):
         else:
             if self.persistent_breakpoints:
                 # restore consistent breakpoints
-                for _, _command in self.environment.current_breakpoints_state.items():
+                for _, _command in self.breakpoints_state.items():
                     self.interact_with_pdb(_command)
-                if len(self.environment.current_breakpoints_state) > 0:
+                if len(self.breakpoints_state) > 0:
                     initial_output = "\n".join(
                         [initial_output, "Breakpoints have been restored."]
                     )
@@ -126,7 +138,7 @@ class PDBTool(EnvironmentTool):
             success, output = True, self.current_breakpoints()
         elif command in ["cl", "clear"]:
             # clear all breakpoints
-            self.environment.current_breakpoints_state = {}
+            self.breakpoints_state = {}
             self.restart_pdb()
             success, output = True, "All breakpoints have been cleared."
         elif (
@@ -187,12 +199,12 @@ class PDBTool(EnvironmentTool):
         return obs
 
     def current_breakpoints(self):
-        if len(self.environment.current_breakpoints_state) == 0:
+        if len(self.breakpoints_state) == 0:
             return "No breakpoints are set."
         else:
             # print the breakpoints sorted by file names and line number
             breakpoints = []
-            for _key in self.environment.current_breakpoints_state.keys():
+            for _key in self.breakpoints_state.keys():
                 _file_path, _line_number = _key.split("|||")
                 _line_number = int(_line_number)
                 breakpoints.append([_file_path, _line_number])
@@ -240,7 +252,7 @@ class PDBTool(EnvironmentTool):
         command = f"{which_file}:{joined_args}".strip()
         if _action_type in ["b", "break"]:
             command = "b " + command
-            if _key in self.environment.current_breakpoints_state.keys():
+            if _key in self.breakpoints_state.keys():
                 # breakpoint already exists
                 return (
                     True,
@@ -254,12 +266,12 @@ class PDBTool(EnvironmentTool):
                     output = output.strip()
                     if output.startswith(command):
                         output = output[len(command) :].strip()
-                    self.environment.current_breakpoints_state[_key] = command
+                    self.breakpoints_state[_key] = command
                 except:
                     success = False
         elif _action_type in ["cl", "clear"]:
             command = "cl " + command
-            if _key not in self.environment.current_breakpoints_state.keys():
+            if _key not in self.breakpoints_state.keys():
                 # breakpoint does not exist
                 return (
                     True,
@@ -273,7 +285,7 @@ class PDBTool(EnvironmentTool):
                     output = output.strip()
                     if output.startswith(command):
                         output = output[len(command) :].strip()
-                    del self.environment.current_breakpoints_state[_key]
+                    del self.breakpoints_state[_key]
                 except:
                     success = False
         else:
@@ -287,16 +299,14 @@ class PDBTool(EnvironmentTool):
         # handle breakpoints line number changes caused by rewriting
         # this is a wrapper that manages the self.breakpoints_state, which does not reset at each pseudo terminal start
         # self.breakpoints_state is a dict, the keys are "|||".join([file_path, str(line_number)]) and values are breakpoint_command
-        if len(self.environment.current_breakpoints_state) == 0:
+        if len(self.breakpoints_state) == 0:
             return
-        current_breakpoints_state_copy = copy.copy(
-            self.environment.current_breakpoints_state
-        )
+        current_breakpoints_state_copy = copy.copy(self.breakpoints_state)
         if rewrite_file is None:
             rewrite_file = self.environment.current_file
         if rewrite_file.startswith(str(self.environment.working_dir)):
             rewrite_file = rewrite_file[len(str(self.environment.working_dir)) + 1 :]
-        for _key in self.environment.current_breakpoints_state.keys():
+        for _key in self.breakpoints_state.keys():
             _file_path, _line_number = _key.split("|||")
             if _file_path != rewrite_file:
                 # the breakpoints are not in the current file, no need to modify
@@ -318,9 +328,7 @@ class PDBTool(EnvironmentTool):
                         - (rewrite_tail - rewrite_head + 1)
                     )
                     new_key = "|||".join([_file_path, str(new_line_number)])
-                    _new_value = self.environment.current_breakpoints_state[_key].split(
-                        ":"
-                    )
+                    _new_value = self.breakpoints_state[_key].split(":")
                     _new_value[1] = " ".join(
                         [str(new_line_number), " ".join(_new_value[1].split()[1:])]
                     )
@@ -331,7 +339,7 @@ class PDBTool(EnvironmentTool):
                 # if a breakpoint was set before the rewritten code, we don't need to do anything
                 else:
                     pass
-        self.environment.current_breakpoints_state = current_breakpoints_state_copy
+        self.breakpoints_state = current_breakpoints_state_copy
 
     def get_current_frame_file(self):
         """A free 'where' to obtain the current frame (line number), hidden from the agent."""
