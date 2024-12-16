@@ -5,6 +5,7 @@ class EnvironmentTool:
 
     def __init__(self):
         self.environment = None
+        self._states = {}
 
     def register(self, environment):
         self.environment = environment
@@ -18,7 +19,7 @@ class EnvironmentTool:
     @property
     def states(self):
         # this is a placeholder, should be overridden by subclasses
-        return {}
+        return self._states
 
     def load_states(self, states):
         pass

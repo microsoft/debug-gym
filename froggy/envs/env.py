@@ -25,6 +25,8 @@ logger = logging.getLogger("froggy")
 class TooledEnv:
     def __init__(self):
         self.tools = {}
+        self._env_states = {}
+        self._task_states = {}
 
     @property
     def actions(self):
@@ -37,13 +39,13 @@ class TooledEnv:
     @property
     def task_states(self):
         # task specific states
-        return {}
+        return self._task_states
 
     @property
     def env_states(self):
         # env specific states, e.g., patch (code), current file, etc.
         # this is a placeholder, should be overridden by subclasses
-        return {}
+        return self._env_states
 
     @property
     def states(self):

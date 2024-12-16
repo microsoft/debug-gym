@@ -108,8 +108,9 @@ class TestTooledEnv(unittest.TestCase):
         )
 
     def test_states(self):
-        self.env.env_states = {"env_state1": "value1"}
-        self.env.task_states = {"task_state1": "value2"}
+
+        self.env._env_states = {"env_state1": "value1"}
+        self.env._task_states = {"task_state1": "value2"}
         tool1 = MagicMock()
         tool1.name = "tool1"
         tool1.states = {"tool_state1": "value3"}
@@ -556,42 +557,10 @@ class TestRepoEnv(unittest.TestCase):
         )
         self.assertEqual(result, expected_result)
 
-    def test_env_states(self):
-        # Create an instance of RepoEnv
-        env = RepoEnv(path="/path/to/repo")
-
-        # Set the attributes
-        env.patch = "patch"
-        env.current_file = "current_file"
-        env.rewrite_counter = 1
-
-        # Call the env_states property
-        result = env.env_states
-
-        # Define the expected result
-        expected_result = {
-            "patch": "patch",
-            "current file": "current_file",
-            "rewrite counter": 1,
-        }
-
-        # Assertions
-        self.assertEqual(result, expected_result)
-
     @patch("os.scandir")
     @patch("os.walk")
     @patch("shutil.copytree")
-    @patch("subprocess.run")
-    def test_load_env_states(
-        self, mock_subprocess_run, mock_copytree, mock_os_walk, mock_scandir
-    ):
-        # load_env_states cleans up the working directory, copies the original code back, and applies the patch
-        # Then it sets the current file, current file content, and rewrite counter
-
-        mock_result = MagicMock()
-        mock_result.returncode = 0
-        mock_subprocess_run.return_value = mock_result
-
+    def test_env_states(self, mock_copytree, mock_os_walk, mock_scandir):
         mock_scandir.return_value.__enter__.return_value = [
             MagicMock(is_dir=lambda: False, path="/path/to/repo/file1.txt"),
             MagicMock(is_dir=lambda: False, path="/path/to/repo/file2.txt"),
@@ -605,19 +574,64 @@ class TestRepoEnv(unittest.TestCase):
         # Create an instance of RepoEnv
         env = RepoEnv(path="/path/to/repo")
 
-        # Define the states to be loaded
-        states = {
-            "patch": "patch",
-            "current file": "current_file",
+        # Set the current file and rewrite counter
+        env.current_file = "file.py"
+        env.rewrite_counter = 1
+
+        # Call the env_states property
+        result = env.env_states
+
+        # Define the expected result
+        expected_result = {
+            "patch": env.patch,
+            "current file": "file.py",
             "rewrite counter": 1,
         }
 
-        # Call the load_env_states method
+        # Assertions
+        self.assertEqual(result, expected_result)
+
+    @patch("pathlib.Path.read_text", return_value="file content")
+    @patch("os.scandir")
+    @patch("os.walk")
+    @patch("shutil.copytree")
+    @patch("subprocess.run")
+    def test_load_env_states(
+        self,
+        mock_subprocess_run,
+        mock_copytree,
+        mock_os_walk,
+        mock_scandir,
+        mock_read_text,
+    ):
+        # Set up mocks
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+        mock_subprocess_run.return_value = mock_result
+
+        mock_scandir.return_value.__enter__.return_value = [
+            MagicMock(is_dir=lambda: False, path="/path/to/repo/file1.txt"),
+            MagicMock(is_dir=lambda: False, path="/path/to/repo/file2.txt"),
+        ]
+
+        mock_os_walk.return_value = [
+            ("/path/to/repo", ("subdir",), ("file1.py", "file2.py")),
+            ("/path/to/repo/subdir", (), ("subfile1.txt",)),
+        ]
+
+        # Create an instance of RepoEnv
+        env = RepoEnv(path="/path/to/repo")
+
+        # Define the states to be loaded with correct keys
+        states = {
+            "patch": "patch",
+            "current file": "current file",
+            "rewrite counter": 1,
+        }
+
+        # Call the method under test
         env.load_env_states(states)
 
-        # Assertions
-        self.assertEqual(env.current_file, "current_file")
-        self.assertEqual(env.rewrite_counter, 1)
         mock_subprocess_run.assert_called_once_with(
             ["git", "apply", "-"],
             input="patch",
@@ -625,6 +639,10 @@ class TestRepoEnv(unittest.TestCase):
             capture_output=True,
             cwd=env.working_dir,
         )
+        # Assertions to verify the state
+        self.assertEqual(env.patch, states["patch"])
+        self.assertEqual(env.current_file, states["current file"])
+        self.assertEqual(env.rewrite_counter, states["rewrite counter"])
 
     @patch.object(RepoEnv, "load_env_states")
     @patch.object(RepoEnv, "load_task_states")
