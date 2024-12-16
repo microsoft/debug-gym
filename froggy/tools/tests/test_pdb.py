@@ -126,6 +126,30 @@ class TestPDBTool(unittest.TestCase):
         self.assertIsNone(self.pdb_tool.current_frame_file)
         self.assertIsNone(self.pdb_tool._terminal)
 
+    def test_reset(self):
+        _pdb_tool = PDBTool()
+        _pdb_tool.breakpoints_state = {
+            "file1.py|||10": "b file1.py:10",
+            "file1.py|||20": "b file1.py:20",
+            "file1.py|||30": "b file1.py:30",
+            "file2.py|||15": "b file2.py:15",
+        }
+        _pdb_tool.pdb_obs = "some output"
+        self.assertEqual(
+            _pdb_tool.breakpoints_state,
+            {
+                "file1.py|||10": "b file1.py:10",
+                "file1.py|||20": "b file1.py:20",
+                "file1.py|||30": "b file1.py:30",
+                "file2.py|||15": "b file2.py:15",
+            },
+        )
+        self.assertEqual(_pdb_tool.pdb_obs, "some output")
+        _pdb_tool.reset()
+        self.assertEqual(_pdb_tool.pdb_obs, "")
+        self.assertEqual(_pdb_tool.breakpoints_state, {})
+        self.assertIsNone(_pdb_tool.current_frame_file)
+
     def test_register(self):
         self.pdb_tool.register(self.env)
         self.assertEqual(self.pdb_tool.environment, self.env)
