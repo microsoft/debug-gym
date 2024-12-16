@@ -19,3 +19,6 @@ class EnvironmentTool:
     def states(self):
         # this is a placeholder, should be overridden by subclasses
         return {}
+
+    def load_states(self, states):
+        pass

@@ -1,4 +1,5 @@
 import atexit
+import copy
 import glob
 import logging
 import os
@@ -54,6 +55,16 @@ class TooledEnv:
             "task states": self.task_states,
             "tool states": {name: tool.states for name, tool in self.tools.items()},
         }
+
+    def save_states(self):
+        return copy.deepcopy(self.states)
+
+    def load_states(self, states):
+        # Should be overridden by subclasses.
+        raise NotImplementedError
+
+    def load_task_states(self, states):
+        pass
 
     def seed(self, seed):
         self.rng = np.random.RandomState(seed)
@@ -178,6 +189,46 @@ class RepoEnv(TooledEnv):
             "Available commands": self.actions_str,
         }
         return _instruction
+
+    def load_env_states(self, states):
+        assert isinstance(states, dict)
+        assert states.keys() == {"patch", "current file", "rewrite counter"}
+        self.current_file = states["current file"]
+        self.current_file_content = self.load_file(self.current_file)
+        self.rewrite_counter = states["rewrite counter"]
+        # cleanup the working directory, copy the original code back
+        self.tempdir.cleanup()
+        shutil.copytree(self.path, self.working_dir, dirs_exist_ok=True)
+        # apply patch to get the modified code
+        patch = states["patch"]
+        patch = patch.replace(str(self.path), str(self.working_dir))
+        if patch:
+            command = ["git", "apply", "-"]
+            result = subprocess.run(
+                command,
+                input=patch,
+                text=True,
+                capture_output=True,
+                cwd=self.working_dir,
+            )
+            if result.returncode != 0:
+                raise RuntimeError(
+                    f"Failed to apply patch:\n{patch}\nError: {result.stderr}"
+                )
+
+    def load_states(self, states):
+        # This will load the states dictionary into the environment.
+        # After loading, the environment should be in the same state as when the states were saved.
+        # Once loaded, a free eval should be performed to obtain infos such as last_run_obs.
+        assert isinstance(states, dict)
+        assert states.keys() == {"env states", "task states", "tool states"}
+        self.load_env_states(states["env states"])
+        self.load_task_states(states["task states"])
+        assert states["tool states"].keys() == self.tools.keys()
+        for name, tool in self.tools.items():
+            tool.load_states(states["tool states"][name])
+        # Run the restored code. This will set self.last_run_obs, self.done and self.score.
+        self.run()
 
     def display_files(self, editable_only: bool = False):
         msg_prefix = "\nEditable" if editable_only else "\nAll"

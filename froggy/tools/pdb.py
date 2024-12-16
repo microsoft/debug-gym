@@ -81,6 +81,12 @@ class PDBTool(EnvironmentTool):
         }
         return _states
 
+    def load_states(self, states):
+        assert isinstance(states, dict)
+        assert "breakpoints" in states and "frame file" in states
+        self.breakpoints_state = states["breakpoints"]
+        self.current_frame_file = states["frame file"]
+
     def reset(self):
         self.pdb_obs = ""
         self.breakpoints_state = {}
