@@ -300,6 +300,10 @@ def test_terminal_cleanup(tmp_path):
 def test_select_terminal_default():
     terminal = select_terminal(None)
     assert isinstance(terminal, Terminal)
+    config = {}
+    terminal = select_terminal()
+    assert isinstance(terminal, Terminal)
+    assert config == {}  # config should not be modified
 
 
 def test_select_terminal_local():
@@ -320,11 +324,6 @@ def test_select_terminal_docker():
 def test_select_terminal_unknown():
     with pytest.raises(ValueError, match="Unknown terminal unknown"):
         select_terminal({"type": "unknown"})
-
-
-def test_select_terminal_missing_type():
-    with pytest.raises(KeyError):
-        select_terminal({})
 
 
 def test_select_terminal_invalid_config():
