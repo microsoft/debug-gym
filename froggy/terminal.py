@@ -408,6 +408,7 @@ class DockerTerminal(Terminal):
             logger.debug(f"Pulling base image: {base_image}")
             self.docker_client.images.pull(base_image)
 
+        patch_version = "v1"
         dockerfile = f"""
             FROM {base_image}
             # Install sudo
@@ -422,7 +423,7 @@ class DockerTerminal(Terminal):
             RUN echo 'froggy_user ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
             """
 
-        image_tag = f"{base_image}-{self.host_uid}-{self.host_gid}"
+        image_tag = f"{base_image}-{self.host_uid}-{self.host_gid}-{patch_version}"
         try:
             self.docker_client.images.get(image_tag)
             logger.debug(f"Image {image_tag} already exists.")
