@@ -435,3 +435,17 @@ class DockerTerminal(Terminal):
                 custom_context=False,
             )
         return image_tag
+
+
+def select_terminal(terminal_config: dict | None = None) -> Terminal:
+    terminal_config = terminal_config or {"type": "local"}
+    terminal_type = terminal_config["type"]
+    match terminal_type:
+        case "docker":
+            from froggy.terminal import DockerTerminal as terminal_class
+        case "local":
+            from froggy.terminal import Terminal as terminal_class
+        case _:
+            raise ValueError(f"Unknown terminal {terminal_type}")
+
+    return terminal_class(**terminal_config)

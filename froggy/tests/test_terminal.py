@@ -4,7 +4,7 @@ import time
 import docker
 import pytest
 
-from froggy.terminal import DockerTerminal, Terminal
+from froggy.terminal import DockerTerminal, Terminal, select_terminal
 
 if_docker_running = pytest.mark.skipif(
     not subprocess.check_output(["docker", "ps"]),
@@ -295,3 +295,38 @@ def test_terminal_cleanup(tmp_path):
     client = docker.from_env()
     containers = client.containers.list(all=True, ignore_removed=True)
     assert container_name not in [c.name for c in containers]
+
+
+def test_select_terminal_default():
+    terminal = select_terminal(None)
+    assert isinstance(terminal, Terminal)
+
+
+def test_select_terminal_local():
+    config = {"type": "local"}
+    terminal = select_terminal(config)
+    assert isinstance(terminal, Terminal)
+    assert config == {"type": "local"}  # config should not be modified
+
+
+@if_docker_running
+def test_select_terminal_docker():
+    config = {"type": "docker"}
+    terminal = select_terminal(config)
+    assert isinstance(terminal, DockerTerminal)
+    assert config == {"type": "docker"}  # config should not be modified
+
+
+def test_select_terminal_unknown():
+    with pytest.raises(ValueError, match="Unknown terminal unknown"):
+        select_terminal({"type": "unknown"})
+
+
+def test_select_terminal_missing_type():
+    with pytest.raises(KeyError):
+        select_terminal({})
+
+
+def test_select_terminal_invalid_config():
+    with pytest.raises(TypeError):
+        select_terminal("not a dict")
