@@ -155,6 +155,7 @@ async def test_async_llm(llm_config_mock, completion_mock):
 
 
 @patch("builtins.input", return_value="User input")
+@patch("prompt_toolkit.prompt", lambda *args: "User input")
 def test_human(mock_prompt):
     human = Human()
     messages = [{"role": "user", "content": "Hello"}]
