@@ -176,6 +176,7 @@ logs/
 *.cfg
 
 /data
+output_*/
 
 vscode/out
 vscode/node_modules
