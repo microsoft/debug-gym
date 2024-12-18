@@ -9,3 +9,4 @@ transformers
 tiktoken
 docker
 swebench>=2.0.0
+prompt_toolkit
