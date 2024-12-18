@@ -67,7 +67,7 @@ def test_make_froggyignore(tmp_path):
     assert froggyignore == "*/tests/\n.froggyignore"
 
 
-def test_mak_froggyignore_include_gitignore(tmp_path):
+def test_make_froggyignore_include_gitignore(tmp_path):
     working_dir = str(tmp_path)
     swe_env = SWEBenchEnv(path=working_dir)
     task_name = "astropy__astropy-14096"
