@@ -187,6 +187,7 @@ def load_config():
         "--debug", action="store_true", help="Before sending action to the environment."
     )
     parser.add_argument("-v", "--verbose", action="store_true", help="Verbose mode")
+    parser.add_argument("-vv", "--very-verbose", action="store_true", help="Set logging level to DEBUG")
     parser.add_argument(
         "-p",
         "--params",

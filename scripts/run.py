@@ -104,11 +104,16 @@ def create_agent(args, config):
 
     if args.verbose:
         agent.llm.verbose = True
+
     return agent
 
 
 def main():
     config, args = load_config()
+    if args.very_verbose:
+        args.verbose = True
+        logger.setLevel(logging.DEBUG)
+
     available_agents = list(config.keys())
     assert (
         args.agent in available_agents
@@ -140,7 +145,11 @@ def main():
                 try:
                     result = future.result()
                 except Exception as e:
-                    print(f"Task generated an exception: {e}")
+                    logger.warning(f"Task Error: {e!r}. Run with --verbose for more information.")
+                    logger.debug(f"Task generated an exception: {e!r}", exc_info=True)
+                    if args.debug:
+                        raise e
+
                     continue  # Skip to the next future if desired
 
                 mean_perf += result
