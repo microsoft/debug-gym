@@ -154,9 +154,9 @@ async def test_async_llm(llm_config_mock, completion_mock):
     assert token_usage == {"prompt": 1, "response": 4}
 
 
-@patch("builtins.input", return_value="User input")
-@patch("prompt_toolkit.prompt", lambda *args: "User input")
-def test_human(mock_prompt):
+@patch("builtins.input", lambda *args, **kwargs: "User input")
+@patch("froggy.agents.llm_api.prompt", lambda *args, **kwargs: "User input")
+def test_human():
     human = Human()
     messages = [{"role": "user", "content": "Hello"}]
     info = {"available_commands": ["command1", "command2"]}
