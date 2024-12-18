@@ -270,8 +270,6 @@ class DockerTerminal(Terminal):
         self.host_gid = os.getgid()
         self._patched_image = None
         self._container = None
-        signal.signal(signal.SIGTERM, self.signal_handler)
-        signal.signal(signal.SIGINT, self.signal_handler)
 
     def __del__(self):
         logger.debug(f"Object destroyed, cleanup container.")
@@ -379,11 +377,6 @@ class DockerTerminal(Terminal):
         logger.debug(f"Container {container_name} started successfully.")
         atexit.register(self.clean_up)
         return container
-
-    def signal_handler(self, signum, frame):
-        logger.debug(f"Signal {signum} received, cleaning up container.")
-        self.clean_up()
-        sys.exit(0)
 
     def clean_up(self):
         """Clean up the Docker container."""

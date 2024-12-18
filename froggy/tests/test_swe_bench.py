@@ -43,10 +43,16 @@ def test_clone_repo(tmp_path):
     task_name = "astropy__astropy-14096"
     row = swe_env.dataset[task_name]
     repo_address = row["repo"]
-    local_repo_path = swe_env.clone_repo(repo_address)
-    repo_content = os.listdir(local_repo_path)
-    assert "astropy" in repo_content
+    org_name, repo_name = repo_address.split("/")
+    local_repo_path = swe_env.swe_bench_repo_paths / repo_name
 
+    if not local_repo_path.exists():
+        with patch("subprocess.run") as mock_run:
+            local_repo_path = swe_env.clone_repo(repo_address)
+            mock_run.assert_called_once_with(["git", "clone", f"https://github.com/{repo_address.lstrip('/')}", local_repo_path], check=True)
+    else:
+        repo_content = os.listdir(local_repo_path)
+        assert "astropy" in repo_content
 
 def test_make_froggyignore(tmp_path):
     working_dir = str(tmp_path)
