@@ -27,7 +27,6 @@ class AgentZeroShot(AgentBase):
         return messages
 
     def run(self, task_name=None, debug=False):
-
         self.history.reset()
         _, info = self.env.reset(options={"task_name": task_name})
         self.history.step(info)
@@ -38,9 +37,10 @@ class AgentZeroShot(AgentBase):
 
         done = False
         highscore = info["score"]
+
         pbar = tqdm(
             total=self.config["max_steps"],
-            desc=f"Debugging inside {self.env.working_dir}",
+            desc=f"Debugging inside {self.env.working_dir} - Task: {task_name}",
             leave=True,
         )
         if self.config["tools_api"]:
@@ -201,7 +201,6 @@ class AgentZeroShot_PdbAfterRewrites(AgentZeroShot):
         super().__init__(config_dict, env, verbose, _uuid)
 
     def run(self, task_name=None, debug=False):
-
         # remove the pdb tool from the environment
         assert "pdb" in self.env.tools, "pdb not found in env tools"
         pdb_tool = self.env.tools.pop("pdb")
@@ -222,7 +221,6 @@ class AgentZeroShot_PdbAfterRewrites(AgentZeroShot):
             leave=True,
         )
         for step in range(self.config["max_steps"]):
-
             highscore = max(highscore, info["score"])
             pbar.set_postfix_str(
                 f"Score: {info['score']}/{info['max_score']} ({info['score']/info['max_score']:.1%}) [Best: {highscore}]".format(
