@@ -1,12 +1,6 @@
-{"subfolder_name_baseline": ["input uuid here", 
-            "input uuid here", 
-            "input uuid here", 
-            "input uuid here", 
-            "input uuid here" ],
+{"subfolder_name_baseline": ["36d5cef9-26ac-49b6-844e-aa20a450586a", 
+            ],
 
-"subfolder_name_agent":  ["input uuid here", 
-            "input uuid here", 
-            "input uuid here", 
-            "input uuid here", 
-            "input uuid here" ],
+"subfolder_name_agent":  ["36d5cef9-26ac-49b6-844e-aa20a450586a", 
+            ],
 "output_fig_path": "./fig/final.png"}

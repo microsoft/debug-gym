@@ -2,7 +2,7 @@ zero_shot:
     # Environment configs
     output_path: "output_aider"
     benchmark: "aider"
-    problems: "all"  # list of problems, e.g., ["wordy"], or "all"
+    problems: ["hello_world"]  # list of problems, e.g., ["wordy"], or "all"
     env_kwargs: {
         "dir_tree_depth": 1,
         "run_on_rewrite": True,
@@ -18,7 +18,7 @@ zero_shot:
     persistent_breakpoints: True  # in pdb tool
 
     # LLM configs
-    llm_name: "llama-31-h100"
+    llm_name: "gpt-4o"
     llm_temperature: [0.0]  # list of values between 0.0 and 1.0
 
     # Agent configs
@@ -30,6 +30,7 @@ zero_shot:
     save_patch: True
     log_prompt_response_pairs: True
     reset_prompt_history_after_rewrite: True
+    tools_api: True
 
 cot:
     # Environment configs
@@ -46,7 +47,7 @@ cot:
     persistent_breakpoints: True  # in pdb tool
 
     # LLM configs
-    llm_name: "llama-31-h100"
+    llm_name: "gpt-4o"
     llm_temperature: [0.0, 0.0]  # 0.5 for CoT generation, 0.0 for answer generation
 
     # Agent configs
@@ -74,7 +75,7 @@ tadpole:
     persistent_breakpoints: True  # in pdb tool
 
     # LLM configs
-    llm_name: "llama-31-h100"
+    llm_name: "gpt-4o"
     llm_temperature: [0.0, 0.0]  # 0.5 for CoT generation, 0.0 for answer generation
 
     # Agent configs
@@ -102,7 +103,7 @@ zero_shot_nopdb:
     persistent_breakpoints: True  # in pdb tool
 
     # LLM configs
-    llm_name: "llama-31-h100"
+    llm_name: "gpt-4o"
     llm_temperature: [0.0]  # list of values between 0.0 and 1.0
 
     # Agent configs
@@ -130,7 +131,7 @@ cot_nopdb:
     persistent_breakpoints: True  # in pdb tool
 
     # LLM configs
-    llm_name: "llama-31-h100"
+    llm_name: "gpt-4o"
     llm_temperature: [0.0, 0.0]  # 0.5 for CoT generation, 0.0 for answer generation
 
     # Agent configs
@@ -159,7 +160,7 @@ zero_shot_pdb_after_rewrites:
     persistent_breakpoints: True  # in pdb tool
 
     # LLM configs
-    llm_name: "llama-31-h100"
+    llm_name: "gpt-4o"
     llm_temperature: [0.0]  # list of values between 0.0 and 1.0
 
     # Agent configs

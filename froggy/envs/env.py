@@ -288,6 +288,83 @@ class RepoEnv(TooledEnv):
         with open(pjoin(self.working_dir, filepath), "w") as f:
             f.write(content)
 
+    def tools_for_api(self):
+        api_tools = [
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "PDBTool",
+                        "description": "Send a command to the PDB terminal. The command should be a valid PDB command. The commands recognized by the debugger are listed below. Most commands can be abbreviated to one or two letters as indicated; e.g. h(elp) means that either h or help can be used to enter the help command (but not he or hel, nor H or Help or HELP). Arguments to commands must be separated by whitespace (spaces or tabs). Optional arguments are enclosed in square brackets ([]) in the command syntax; the square brackets must not be typed. Alternatives in the command syntax are separated by a vertical bar (|).",
+                        "strict": True,
+                        "parameters": {
+                            "type": "object",
+                            "required": [
+                            "pdb_command"
+                            ],
+                            "properties": {
+                            "pdb_command": {
+                                "type": "string",
+                                "description": "pdb"
+                            }
+                            },
+                        "additionalProperties": False
+                        }
+                    },
+                },
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "ViewTool",
+                        "description": "View a given file and set as current.",
+                        "strict": True,
+                        "parameters": {
+                            "type": "object",
+                            "required": [
+                            "path_to_file"
+                            ],
+                            "properties": {
+                            "path_to_file": {
+                                "type": "string",
+                                "description": "Specify a file path to navigate to. The file path should be relative to the root directory of the repository."
+                            }
+                            },
+                        "additionalProperties": False
+                        }
+                    },
+                },
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "SubstitutionPatcher",
+                        "description": "Creates patches of code given start and end lines.",
+                        "parameters": {
+                            "type": "object",
+                            "required": [
+                                "new_code"
+                            ],
+                            "properties": {
+                                "file_path": {
+                                    "type": "string",
+                                    "description": "file_path.py that needs rewrite"
+                                },
+                                "head_tail": {
+                                    "type": "string",
+                                    "description": "Head line and tail line numbers with head:tail template. Line numbers are 1-based. Example is 10:20."
+                                },
+                                "new_code": {
+                                    "type": "string",
+                                    "description": "The new code should be valid python code include proper indentation (can be determined from context), the special tokens <c> and </c> are used to wrap the new code. Example is <c>print('hola')</c>"
+
+                                }
+                            },
+                        "additionalProperties": False
+                        }
+                    },
+                }
+
+            ]
+        return api_tools
+
     @property
     def patch(self):
         command = ["git", "diff", "--no-index", self.path, self.working_dir]

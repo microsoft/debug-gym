@@ -64,6 +64,8 @@ def print_messages(messages):
             print(colored(f"{m['content']}\n", "green"))
         elif m["role"] == "system":
             print(colored(f"{m['content']}\n", "yellow"))
+        elif m["role"] == "tool":
+            print(colored(f"{m['tool_calls']}\n"), "black")
         else:
             raise ValueError(f"Unknown role: {m['content']}")
 
@@ -179,18 +181,31 @@ class LLM:
         wait=wait_random_exponential(multiplier=1, max=40),
         stop=stop_after_attempt(100),
     )
-    def query_model(self, messages, **kwargs):
+    def query_model(self, messages, tools=None, **kwargs):
         kwargs["max_tokens"] = kwargs.get("max_tokens", self.config.get("max_tokens"))
 
-        return (
-            self.client.chat.completions.create(
-                model=self.config["model"],
-                messages=messages,
-                **kwargs,
+        if tools is None:
+            return (
+                self.client.chat.completions.create(
+                    model=self.config["model"],
+                    messages=messages,
+                    **kwargs,
+                )
+                .choices[0]
+                .message.content
             )
-            .choices[0]
-            .message.content
-        )
+        else:
+            return (
+                self.client.chat.completions.create(
+                    model=self.config["model"],
+                    messages=messages,
+                    tools=tools,
+                    **kwargs,
+                )
+                .choices[0]
+                .message
+            )
+
 
     def __call__(self, messages, *args, **kwargs):
         if not self.config.get("system_prompt_support", True):
@@ -209,17 +224,22 @@ class LLM:
             # Message is a list of dictionaries with role and content keys.
             # Color each role differently.
             print_messages(messages)
-
         response = self.query_model(messages, **kwargs)
-        response = response.strip()
+        if not kwargs["tools"] is None:
+            token_usage = {
+                "prompt": 0,
+                "response": 0
+            }
+        else:
+            response = response.strip()
 
-        if self.verbose:
-            print(colored(response, "green"))
+            if self.verbose:
+                print(colored(response, "green"))
 
-        token_usage = {
-            "prompt": self.token_counter(messages=messages),
-            "response": self.token_counter(text=response),
-        }
+            token_usage = {
+                "prompt": self.token_counter(messages=messages),
+                "response": self.token_counter(text=response),
+            }
 
         return response, token_usage
 

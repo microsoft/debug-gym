@@ -86,8 +86,7 @@ def create_agent(args, config):
     match args.agent:
         case "zero_shot":
             from froggy.agents import AgentZeroShot
-
-            agent = AgentZeroShot(config, env, verbose=args.verbose)
+            agent = AgentZeroShot(config, env, verbose=args.verbose, _uuid=args.uuid)
         case "cot":
             from froggy.agents import AgentCoT
 
@@ -135,6 +134,7 @@ def main():
     if "benchmark" in config and "problems" in config:
         if "all" == config["problems"]:
             problem_list = env.dataset.keys()  # all tasks
+            print(problem_list)
         else:
             assert isinstance(config["problems"], list)
             problem_list = config["problems"]
