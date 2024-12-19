@@ -2,7 +2,7 @@ zero_shot:
     # Environment configs
     output_path: "output_aider"
     benchmark: "aider"
-    problems: ["hello_world"]  # list of problems, e.g., ["wordy"], or "all"
+    problems: "all"  # list of problems, e.g., ["wordy"], or "all"
     env_kwargs: {
         "dir_tree_depth": 1,
         "run_on_rewrite": True,

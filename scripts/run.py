@@ -16,6 +16,7 @@ logger = logging.getLogger("froggy")
 
 def select_terminal(terminal_config: None):
     terminal_config = terminal_config or {"type": "local"}
+    #terminal_type = terminal_config.pop("type")
     terminal_type = terminal_config["type"]
     match terminal_type:
         case "docker":
