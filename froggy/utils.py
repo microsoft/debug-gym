@@ -183,6 +183,7 @@ def load_config():
     parser = argparse.ArgumentParser()
     parser.add_argument("config_file", help="path to config file")
     parser.add_argument("--agent", help="zero_shot, cot, tadpole", default="zero_shot")
+    parser.add_argument("--uuid", help="uuid for agent", default=None)
     parser.add_argument(
         "--debug", action="store_true", help="Before sending action to the environment."
     )

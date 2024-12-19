@@ -87,7 +87,7 @@ def trim_prompt_messages(
         for item in messages
     ), 'all messages should be dictionaries with keys "content" and "role"'
     # the last message should be from the user
-    assert messages[-1]["role"] == "user", "the last message should be from the user"
+    assert messages[-1]["role"] in ["user", "tool"], "the last message should be from the user or tool"
     # if two consecutive messages are from the same role, they should be merged
     assert all(
         messages[i]["role"] != messages[i + 1]["role"] for i in range(len(messages) - 1)

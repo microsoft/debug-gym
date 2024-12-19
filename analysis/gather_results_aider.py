@@ -18,13 +18,12 @@ def main():
 
     problem_list = env.dataset.keys()  # all tasks
     agent_uuids = {
-        "zero_shot": "input uuid here",  # uuid correspond to a folder in the output directory
-        "cot": "input uuid here",
-        "tadpole": "input uuid here",
-        "zero_shot_nopdb": "input uuid here",
-        "cot_nopdb": "input uuid here",
+        "zero_shot": "36d5cef9-26ac-49b6-844e-aa20a450586a",
+        "cot": "0c54d558-ec05-48f5-b791-d5e97013eaeb",
+        "tadpole": "540ee2c7-ca01-47de-9501-a75e5a5c443a",
+        "zero_shot_nopdb": "7a0f0fee-14c8-4f60-a444-6b4c6c2318c0",
+        "cot_nopdb": "ba5a8cab-9b5c-4408-9093-b0e84279a702",
     }
-
     for agent_name in agent_uuids:
         log_path = pjoin("output_aider", agent_uuids[agent_name])
         _results = {}

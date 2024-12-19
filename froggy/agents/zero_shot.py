@@ -43,6 +43,12 @@ class AgentZeroShot(AgentBase):
             desc=f"Debugging inside {self.env.working_dir}",
             leave=True,
         )
+        if self.config["tools_api"]:
+            tools = self.env.tools_for_api()
+        else:
+            tools = None
+
+        update_finish = False
         for step in range(self.config["max_steps"]):
             highscore = max(highscore, info["score"])
             pbar.set_postfix_str(
@@ -53,22 +59,94 @@ class AgentZeroShot(AgentBase):
 
             prompt = self.build_prompt(info)
             answer, token_usage = self.llm(
-                prompt, info, temperature=self.config["llm_temperature"][0]
-            )
+                    prompt, info, temperature=self.config["llm_temperature"][0], tools=tools
+                )
+            
+            if tools is None:
+                tool_calls = False
+            else:
+                tool_calls = answer.tool_calls
+                answer = answer.content
 
+            while tool_calls:
+                # Parse argument from the tool api call for environment input
+                prompt = self.build_prompt(info)
+                tool_call_id = tool_calls[0].id
+                tool_function_name = tool_calls[0].function.name
+                if tool_function_name == "PDBTool":
+                    tool_query_string = json.loads(tool_calls[0].function.arguments)['pdb_command']
+                    env_input = "```pdb "+str(tool_query_string)+"```"
+                elif tool_function_name == "ViewTool":
+                    tool_query_string = json.loads(tool_calls[0].function.arguments)['path_to_file']
+                    env_input = "```view "+str(tool_query_string)+"```"
+                elif tool_function_name == "SubstitutionPatcher":
+                    arguments_list = json.loads(tool_calls[0].function.arguments)
+                    env_input = "```rewrite "
+                    if 'file_path' in arguments_list.keys():
+                        env_input += (" " + arguments_list['file_path'])
+                    if 'head_tail' in arguments_list.keys():
+                        env_input += (" " + arguments_list['head_tail'])
+                    env_input += (" " + arguments_list['new_code']+"```")
+                _, _, done, info = self.env.step(env_input)
+
+                info["token_usage"] = [
+                    token_usage
+                ]  # in some other agents this is a list because of multi-step llm calls
+
+                self.history.step(info)
+                self.history.save_prompt_response_pairs(
+                    prompt_response_pairs=[(prompt, env_input)]
+                )
+
+                step += 1
+                pbar.update()
+                
+                if step>=(self.config["max_steps"]-1):
+                    update_finish = True
+                    break
+
+                tool_call = [{"role":"assistant", 
+                             "content": None,
+                                 "tool_calls": [
+                                     {
+                                        "id": tool_call_id,
+                                        "type": "function",
+                                        "function": {
+                                            "arguments": tool_calls[0].function.arguments,
+                                            "name": tool_function_name
+                                        },
+                                     }
+                                 ]
+                                 },
+                            {"role": "tool", 
+                                 "tool_call_id": tool_call_id,
+                                 "name": tool_function_name,
+                                 "content": info["obs"]
+                                 }]
+                
+                prompt = prompt + tool_call
+
+                answer, token_usage = self.llm(
+                    prompt, info, temperature=self.config["llm_temperature"][0], tools=tools
+                )
+                tool_calls = answer.tool_calls
+                answer = answer.content
+                
             if debug:
                 breakpoint()
+            
+            if not update_finish:
+                _, _, done, info = self.env.step(answer)
+                
+                info["token_usage"] = [
+                    token_usage
+                ]  # in some other agents this is a list because of multi-step llm calls
+                self.history.step(info)
+                self.history.save_prompt_response_pairs(
+                    prompt_response_pairs=[(prompt, answer)]
+                )
 
-            _, _, done, info = self.env.step(answer)
-            info["token_usage"] = [
-                token_usage
-            ]  # in some other agents this is a list because of multi-step llm calls
-            self.history.step(info)
-            self.history.save_prompt_response_pairs(
-                prompt_response_pairs=[(prompt, answer)]
-            )
-
-            pbar.update()
+                pbar.update()
             if done or info["rewrite_counter"] >= self.config["max_rewrite_steps"]:
                 pbar.set_postfix_str(
                     f"Score: {info['score']}/{info['max_score']} ({info['score']/info['max_score']:.1%})".format(
