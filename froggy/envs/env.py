@@ -360,7 +360,7 @@ class RepoEnv(TooledEnv):
                 self.current_file_content,
                 self.current_file,
                 (
-                    self.tools["pdb"].current_breakpoints_state
+                    self.tools["pdb"].current_breakpoints()
                     if self.has_tool("pdb")
                     else {}
                 ),
