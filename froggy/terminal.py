@@ -271,9 +271,9 @@ class DockerTerminal(Terminal):
         self._patched_image = None
         self._container = None
 
-    def __del__(self):
-        logger.debug(f"Object destroyed, cleanup container.")
-        self.clean_up()
+    # def __del__(self):
+    #     logger.debug(f"Object destroyed, cleanup container.")
+    #     self.clean_up()
 
     @property
     def working_dir(self):
@@ -281,7 +281,8 @@ class DockerTerminal(Terminal):
         if self._working_dir is not None:
             self.volumes.pop(self._working_dir, None)
         working_dir = super().working_dir
-        self.volumes[working_dir] = {"bind": working_dir, "mode": "rw"}
+        #self.volumes[working_dir] = {"bind": working_dir, "mode": "rw"}
+        self.volumes[working_dir] = {"bind": "/tmp/code", "mode": "rw"}
         return working_dir
 
     @working_dir.setter
@@ -289,7 +290,8 @@ class DockerTerminal(Terminal):
         if self._working_dir is not None:
             self.volumes.pop(self._working_dir, None)
         self._working_dir = value
-        self.volumes[self._working_dir] = {"bind": self._working_dir, "mode": "rw"}
+        # self.volumes[self._working_dir] = {"bind": self._working_dir, "mode": "rw"}
+        self.volumes[self._working_dir] = {"bind": "/tmp/code", "mode": "rw"}
 
     @property
     def patched_image(self):
@@ -332,7 +334,8 @@ class DockerTerminal(Terminal):
         # TODO: docker exec_run timeout?
         status, output = self.container.exec_run(
             command,
-            workdir=self.working_dir,
+            # workdir=self.working_dir,
+            workdir="/tmp/code",
             environment=self.env_vars,
             user=f"{self.host_uid}:{self.host_gid}",
             stdout=True,
@@ -382,7 +385,7 @@ class DockerTerminal(Terminal):
         """Clean up the Docker container."""
         if self.container:
             try:
-                self.container.stop()
+                self.container.stop(timeout=1)
             except docker.errors.NotFound:
                 logger.debug(
                     f"Container {self.container.name} not found. "

@@ -223,6 +223,7 @@ class RepoEnv(TooledEnv):
 
     def run(self):
         success, output = self.terminal.run(self.entrypoint, timeout=self.run_timeout)
+        from ipdb import set_trace; set_trace()
         self.last_run_obs = output
         self.score = int(success)
         self.done = success
