@@ -121,11 +121,10 @@ def main():
 
     config = config[args.agent]
 
-    env = create_env(args, config)
-
     # run agent, loop over the tasks
     if "benchmark" in config and "problems" in config:
         if "all" == config["problems"]:
+            env = create_env(args, config)
             problem_list = env.dataset.keys()  # all tasks
         else:
             assert isinstance(config["problems"], list)

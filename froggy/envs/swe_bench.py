@@ -1,6 +1,8 @@
+import io
 import logging
 import os
 import re
+import shutil
 import subprocess
 import tempfile
 from ast import literal_eval
@@ -8,8 +10,10 @@ from os.path import join as pjoin
 from pathlib import Path
 
 import datasets
+import docker
 from swebench.harness.constants import MAP_REPO_VERSION_TO_SPECS
 from swebench.harness.utils import get_environment_yml, get_requirements
+from tqdm import tqdm
 
 import froggy.utils as utils
 from froggy.envs.env import RepoEnv
@@ -51,6 +55,12 @@ class SWEBenchEnv(RepoEnv):
         self.ds = datasets.load_dataset(self.dataset_id)["test"]
         self.dataset = {row["instance_id"]: row for row in self.ds.sort("instance_id")}
 
+        # To avoid concurrency issues, we will clone all the repos in the dataset.
+        logger.info("Cloning all repos needed for SWE-Bench...")
+        repos = {task["repo"] for task in self.dataset.values()}
+        for repo in tqdm(repos, desc="Cloning repos needed for SWE-Bench"):
+            self.clone_repo(repo_address=repo)
+
     def setup_local_repo(self):
         repo_address = self.ds_row["repo"]
         base_commit = self.ds_row["base_commit"]
@@ -59,23 +69,31 @@ class SWEBenchEnv(RepoEnv):
         fail_to_pass = literal_eval(self.ds_row["FAIL_TO_PASS"])
         pass_to_pass = literal_eval(self.ds_row["PASS_TO_PASS"])
 
-        # Clone repository
+        # Clone repository (should already be cloned)
+        assert (self.swe_bench_repo_paths / repo_address.split("/")[1]).exists()
         local_repo_path = self.clone_repo(repo_address=repo_address)
+        local_branch_path = local_repo_path.parent / self.ds_row["instance_id"]
 
-        # TODO: create a unique workspace per task
-        # Checkout to base commit
-        command = f"git -C {local_repo_path} checkout {base_commit} -f"
-        subprocess.run(command.split(), check=True)
-        logger.info(f"Checked out to {base_commit}")
+        if not local_branch_path.exists():
+            # Duplicate the repo to avoid changing the current branch.
+            logger.info(f"Copying {local_repo_path} to {local_branch_path}")
+            shutil.copytree(local_repo_path, local_branch_path)
 
-        # Apply test patch
-        if test_patch != "":
-            command = f"git -C {local_repo_path} apply -"
-            subprocess.run(command.split(), input=test_patch, text=True, check=True)
-            logger.info("Patch applied successfully.")
+            # Checkout to base commit.
+            command = f"git -C {local_branch_path} checkout {base_commit} -f"
+            logger.info(f"Checking out to {base_commit}")
+            subprocess.run(command.split(), check=True)
 
-        # Make the pdb ignore
-        self.make_froggyignore(local_repo_path=local_repo_path)
+            # Apply test patch
+            if test_patch != "":
+                command = f"git -C {local_branch_path} apply -"
+                subprocess.run(command.split(), input=test_patch, text=True, check=True)
+                logger.info("Patch applied successfully.")
+
+            # Make the pdb ignore
+            self.make_froggyignore(local_repo_path=local_branch_path)
+        else:
+            logger.info(f"Local checked out branch {local_branch_path} already exists.")
 
         entrypoint = self.install_configs["test_cmd"]
         # # TODO: Find another way to extract inline env vars from entrypoint. Move to env_vars instead of setup_commands
@@ -87,8 +105,84 @@ class SWEBenchEnv(RepoEnv):
         # # For swebench, we must pass the fail_to_pass and pass_to_pass unit tests.
         # entrypoint = "python -m pytest " + " ".join(fail_to_pass + pass_to_pass)
 
-        # TODO: one workspace per task?
-        self.setup_workspace(local_repo_path, entrypoint)
+        self.setup_workspace(local_branch_path, entrypoint)
+
+    def setup_docker_image(self):
+        base_image = "python:3.12"
+        docker_client = docker.from_env()
+
+        repo_address = self.ds_row["repo"]
+        base_commit = self.ds_row["base_commit"]
+        test_patch = self.ds_row["test_patch"]
+        # TODO: use fail_to_pass and pass_to_pass
+        fail_to_pass = literal_eval(self.ds_row["FAIL_TO_PASS"])
+        pass_to_pass = literal_eval(self.ds_row["PASS_TO_PASS"])
+
+        # Clone repository
+        #local_repo_path = self.clone_repo(repo_address=repo_address)
+        org_name, repo_name = repo_address.split("/")
+        repo_url = f"https://github.com/{repo_address.lstrip('/')}"
+        #local_repo_path = self.swe_bench_repo_paths / repo_name
+        local_repo_path = "/code"
+
+        # # Checkout to base commit
+        # command = f"git -C {local_repo_path} checkout {base_commit} -f"
+        # subprocess.run(command.split(), check=True)
+        # logger.info(f"Checked out to {base_commit}")
+
+        dockerfile = f"""
+            FROM {base_image}
+            # Clone task repo
+            RUN git clone {repo_url} {local_repo_path}
+            # Checkout to base commit
+            RUN git -C {local_repo_path} checkout {base_commit} -f
+            """
+
+        # Apply test patch
+        if test_patch != "":
+            dockerfile += f"""
+            # Apply test patch
+            RUN git -C {local_repo_path} apply {test_patch}
+            """
+            # command = f"git -C {local_repo_path} apply -"
+            # subprocess.run(command.split(), input=test_patch, text=True, check=True)
+            # logger.info("Patch applied successfully.")
+
+        image_tag = f"{base_image}-{self.ds_row['instance_id']}"
+        try:
+            self.docker_client.images.get(image_tag)
+            logger.debug(f"Image {image_tag} already exists.")
+        except docker.errors.ImageNotFound:
+            logger.debug(f"Building image {image_tag}.")
+            self.docker_client.images.build(
+                fileobj=io.BytesIO(dockerfile.encode("utf-8")),
+                tag=image_tag,
+                rm=True,
+                custom_context=False,
+            )
+
+        self.terminal.base_image = image_tag
+        self.setup_terminal()
+        return self.terminal.patched_image
+
+        # # Start the container.
+        # #return image_tag
+
+        # # Make the pdb ignore
+        # self.make_froggyignore(local_repo_path=local_repo_path)
+
+        # entrypoint = self.install_configs["test_cmd"]
+        # # # TODO: Find another way to extract inline env vars from entrypoint. Move to env_vars instead of setup_commands
+        # if entrypoint.startswith("PYTHONWARNINGS"):
+        #     export, remaining = entrypoint.split(" ", 1)
+        #     self.setup_commands.append(f"export {export}")
+        #     entrypoint = remaining
+
+        # # # For swebench, we must pass the fail_to_pass and pass_to_pass unit tests.
+        # # entrypoint = "python -m pytest " + " ".join(fail_to_pass + pass_to_pass)
+
+        # # TODO: one workspace per task?
+        # self.setup_workspace(local_repo_path, entrypoint)
 
     def setup_task_info(self, task_name):
         self.task_name = task_name
@@ -101,6 +195,8 @@ class SWEBenchEnv(RepoEnv):
         options = options or {}
         self.setup_task_info(options["task_name"])
         self.setup_local_repo()
+
+        from ipdb import set_trace; set_trace()
         self.setup_terminal()
 
         # Reset RepoEnv
@@ -160,11 +256,27 @@ class SWEBenchEnv(RepoEnv):
         return status, output
 
     def setup_terminal(self):
-        # TODO: set base_image and conda_env per task
-        self.run_pre_install()
-        self.setup_base_image()
-        self.run_install()
-        self.run_post_install()
+        host_uid = os.getuid()
+        host_gid = os.getgid()
+        cached_image = f"{self.ds_row['instance_id']}-{host_uid}-{host_gid}"
+
+        try:
+            docker_client = docker.from_env()
+            docker_client.images.get(cached_image)
+            logger.debug(f"Used cached image: {cached_image}.")
+            self.terminal._patched_image = cached_image
+            self.setup_base_image()
+            #self.terminal.container = self.terminal.setup_container()
+
+        except docker.errors.ImageNotFound:
+            logger.debug(f"Building cached image {cached_image}.")
+            # TODO: set base_image and conda_env per task
+            self.run_pre_install()
+            self.setup_base_image()
+            self.run_install()
+            self.run_post_install()
+            # Commit the container to a new image with the same name
+            self.terminal.container.commit(cached_image)
 
     def setup_base_image(self):
         self.prepare_eval_commands()

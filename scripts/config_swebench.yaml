@@ -26,8 +26,8 @@ zero_shot:
 
     # Agent configs
     random_seed: 42
-    max_steps: 100
-    max_rewrite_steps: 10
+    max_steps: 0
+    max_rewrite_steps: 0
     memory_size: 20
     use_conversational_prompt: True
     save_patch: True

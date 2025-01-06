@@ -271,9 +271,9 @@ class DockerTerminal(Terminal):
         self._patched_image = None
         self._container = None
 
-    def __del__(self):
-        logger.debug(f"Object destroyed, cleanup container.")
-        self.clean_up()
+    # def __del__(self):
+    #     logger.debug(f"Object destroyed, cleanup container.")
+    #     self.clean_up()
 
     @property
     def working_dir(self):
