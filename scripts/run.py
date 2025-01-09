@@ -18,8 +18,8 @@ logger = logging.getLogger('froggy')
 
 def select_terminal(terminal_config: None):
     terminal_config = terminal_config or {"type": "local"}
-    #terminal_type = terminal_config.pop("type")
-    terminal_type = terminal_config["type"]
+    terminal_type = terminal_config.pop("type")
+    
     match terminal_type:
         case "docker":
             from froggy.terminal import DockerTerminal as terminal_class
@@ -137,7 +137,6 @@ def main():
     if "benchmark" in config and "problems" in config:
         if "all" == config["problems"]:
             problem_list = env.dataset.keys()  # all tasks
-            print(problem_list)
         else:
             assert isinstance(config["problems"], list)
             problem_list = config["problems"]
