@@ -43,7 +43,7 @@ class AgentZeroShot(AgentBase):
             desc=f"Debugging inside {self.env.working_dir} - Task: {task_name}",
             leave=True,
         )
-        if self.config["tools_api"]:
+        if self.config.get("tools_api"):
             tools = self.env.tools_for_api()
         else:
             tools = None

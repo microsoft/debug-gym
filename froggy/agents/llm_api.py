@@ -202,7 +202,7 @@ class LLM:
         response = self.query_model(messages, **kwargs)
         tool_calls = False
 
-        if not kwargs["tools"] is None:
+        if not kwargs.get("tools") is None:
             if response.tool_calls:
                 tool_calls = response.tool_calls
                 tool_function_name = tool_calls[0].function.name
