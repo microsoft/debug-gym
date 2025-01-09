@@ -262,6 +262,7 @@ class LLM:
                     "prompt": self.token_counter(messages=messages),
                     "response": self.token_counter(text=response),
                 }
+                response = (response, None)
         else:
             response = response.strip()
 
