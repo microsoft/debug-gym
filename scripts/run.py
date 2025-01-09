@@ -137,7 +137,6 @@ def main():
     if "benchmark" in config and "problems" in config:
         if "all" == config["problems"]:
             problem_list = env.dataset.keys()  # all tasks
-            print(problem_list)
         else:
             assert isinstance(config["problems"], list)
             problem_list = config["problems"]

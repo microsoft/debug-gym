@@ -101,7 +101,7 @@ class TokenCounter:
         nb_tokens = 0
         if messages is not None:
             for msg in messages:
-                if (msg["content"] is not None) and (msg["role"] in ["user", "assistant", "system"]):
+                if (msg["content"] is not None) and (msg.get("role") in ["user", "assistant", "system"]):
                         nb_tokens += len(self.tokenize(msg["content"])) 
         if text is not None:
             nb_tokens += len(self.tokenize(text))
