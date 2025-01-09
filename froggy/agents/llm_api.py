@@ -101,13 +101,13 @@ class TokenCounter:
     def __call__(self, *, messages=None, text=None):
         nb_tokens = 0
         if messages is not None:
-            nb_tokens += sum(len(self.tokenize(msg["content"])) for msg in messages)
-
+            for msg in messages:
+                if (msg["content"] is not None) and (msg["role"] in ["user", "assistant", "system"]):
+                        nb_tokens += len(self.tokenize(msg["content"])) 
         if text is not None:
             nb_tokens += len(self.tokenize(text))
 
         return nb_tokens
-
 
 class LLM:
     def __init__(self, model_name, verbose=False):
@@ -225,11 +225,43 @@ class LLM:
             # Color each role differently.
             print_messages(messages)
         response = self.query_model(messages, **kwargs)
+        tool_calls = False
+
         if not kwargs["tools"] is None:
-            token_usage = {
-                "prompt": 0,
-                "response": 0
-            }
+            if response.tool_calls:
+                tool_calls = response.tool_calls
+                tool_function_name = tool_calls[0].function.name
+                if tool_function_name == "PDBTool":
+                    tool_query_string = json.loads(tool_calls[0].function.arguments)['pdb_command']
+                    response = "```pdb "+str(tool_query_string)+"```"
+                elif tool_function_name == "ViewTool":
+                    tool_query_string = json.loads(tool_calls[0].function.arguments)['path_to_file']
+                    response = "```view "+str(tool_query_string)+"```"
+                elif tool_function_name == "SubstitutionPatcher":
+                    arguments_list = json.loads(tool_calls[0].function.arguments)
+                    response = "```rewrite "
+                    if 'file_path' in arguments_list.keys():
+                        response += (" " + arguments_list['file_path'])
+                    if 'head_tail' in arguments_list.keys():
+                        response += (" " + arguments_list['head_tail'])
+                    response += (" " + arguments_list['new_code']+"```")
+
+                token_usage = {
+                    "prompt": self.token_counter(messages=messages),
+                    "response": self.token_counter(text=response),
+                }
+                response = (response, tool_calls)
+
+            else:
+                response = response.content.strip()
+
+                if self.verbose:
+                    print(colored(response, "green"))
+
+                token_usage = {
+                    "prompt": self.token_counter(messages=messages),
+                    "response": self.token_counter(text=response),
+                }
         else:
             response = response.strip()
 

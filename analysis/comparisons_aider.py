@@ -152,7 +152,7 @@ def task_write(txt_file, task):
         with open(txt_file, 'a') as f_append: 
             f_append.write(f"{task}\n")  
         
-def compare_task_summary(base_summary, agent_summary, baseline_name, agent_name, output_name_path):
+def compare_task_summary(base_summary, agent_summary, agent_name, output_name_path):
     count_analysis = {"reduce # rewrite": 0, "same # rewrite":0, "increase # rewrite": 0, "success both": 0, "baseline-success froggy-fail": 0, "baseline-fail froggy-success": 0, "failed both": 0}
     tool_analysis = {"reduce rewrite # pdb": 0, "reduce rewrite # view": 0, "task_reduce": 0, "baseline-fail froggy-success # pdb": 0, "baseline-fail froggy-success # view": 0, "task_baseline-fail froggy-success": 0}
     
@@ -275,7 +275,7 @@ def main():
             baseline = parse_jsonl_files(root_folder, baseline_name)
             agent = parse_jsonl_files(root_folder, agent_name)
 
-            count_analysis, tool_analysis, pdb_analysis = compare_task_summary(baseline, agent, baseline_name, agent_name, output_name_path)
+            count_analysis, tool_analysis, pdb_analysis = compare_task_summary(baseline, agent, agent_name, output_name_path)
             total_count_analysis[agent_name] = count_analysis
             total_tool_analysis[agent_name] = tool_analysis
             total_pdb_analysis[agent_name] = pdb_analysis
@@ -306,12 +306,12 @@ def main():
                     3: 'lightgreen'}
 
     create_analysis_plots([final_count, final_tool, final_pdb_analysis["pdb_action_sum_rewrite"], final_pdb_analysis["pdb_action_sum_success"]], 
-            ['Success analysis', 'Tool Analysis', 'PDB Commands Usage Analysis (Reduce Cases)','PDB Commands Usage Analysis (Pdb needed Cases)'],
+            ['Pass/Fail analysis', 'Tool Analysis', 'PDB Commands Usage Analysis (Reduce # of Rewrite Cases)','PDB Commands Usage Analysis (Pass Tasks w PDB Cases)'],
             ['Number of tasks','Average Number of Uses','Average Number of Uses','Average Number of Uses'],
             [count_colors, tool_colors, {'all': 'lightcoral'}, {'all': 'lightgreen'}],
             './analysis/results/'+output_name_path+'.png')
     create_analysis_plots([final_count, final_pdb_analysis["pdb_action_sum_rewrite"], final_pdb_analysis["pdb_action_sum_trial"],  final_pdb_analysis["pdb_action_sum_fail"], final_pdb_analysis["pdb_action_sum_success"], final_pdb_analysis["pdb_action_sum_difficult"]],
-            ['Success analysis', 'PDB Commands Usage Analysis (Rewrite Cases)', 'PDB Commands Usage Analysis (Trial Cases)', 'PDB Commands Usage Analysis (Fail Cases)', 'PDB Commands Usage Analysis (Success Cases)', 'PDB Commands Usage Analysis (Difficult Cases)'],
+            ['Pass/Fail analysis', 'PDB Commands Usage Analysis (Rewrite Cases)', 'PDB Commands Usage Analysis (Trial Cases)', 'PDB Commands Usage Analysis (Fail Cases)', 'PDB Commands Usage Analysis (Success Cases)', 'PDB Commands Usage Analysis (Difficult Cases)'],
             ['Number of tasks','Average Number of Uses','Average Number of Uses','Average Number of Uses','Average Number of Uses','Average Number of Uses'],
             [count_colors, {'all': 'lightcoral'}, {'all': 'coral'},  {'all': 'lightblue'}, {'all': 'lightgreen'}, {'all': 'blue'}],
             './analysis/results/'+output_name_path+'_pdb.png')
