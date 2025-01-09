@@ -1,6 +1,12 @@
-{"subfolder_name_baseline": ["aa3baf71-dcdc-4d5c-9b41-8e689d6ef263"
-            ],
+{"subfolder_name_baseline": ["input uuid here", 
+            "input uuid here", 
+            "input uuid here", 
+            "input uuid here", 
+            "input uuid here" ],
 
-"subfolder_name_agent":  ["14ecc5fc-09d1-4761-ba40-1f1638be50c5"
-            ],
-"output_name_path": "single_inst_api"}
+"subfolder_name_agent":  ["input uuid here", 
+            "input uuid here", 
+            "input uuid here", 
+            "input uuid here", 
+            "input uuid here" ],
+"output_name_path": "final"}
