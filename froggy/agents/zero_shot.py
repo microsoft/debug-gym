@@ -89,7 +89,10 @@ class AgentZeroShot(AgentBase):
             
             if not tools is None:
                 answer, tool_calls = answer
-                tool_using = True
+                if tool_calls is None:
+                    tool_using = False
+                else:
+                    tool_using = True
                 
             if debug:
                 breakpoint()
