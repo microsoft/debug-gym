@@ -15,20 +15,13 @@ def main():
         run_on_rewrite=True,
         auto_view_change=True,
     )
-    """
+    problem_list = env.dataset.keys()  # all tasks
+    agent_uuids = {
         "zero_shot": "input uuid here",  # uuid correspond to a folder in the output directory
         "cot": "input uuid here",
         "tadpole": "input uuid here",
         "zero_shot_nopdb": "input uuid here",
         "cot_nopdb": "input uuid here",
-    """
-    problem_list = env.dataset.keys()  # all tasks
-    agent_uuids = {
-        "zero_shot": "aa3baf71-dcdc-4d5c-9b41-8e689d6ef263",  # uuid correspond to a folder in the output directory
-        "cot": "14ecc5fc-09d1-4761-ba40-1f1638be50c5",
-        "tadpole": "36d5cef9-26ac-49b6-844e-aa20a450586a",
-        "zero_shot_nopdb": "7a0f0fee-14c8-4f60-a444-6b4c6c2318c0",
-        "cot_nopdb": "540ee2c7-ca01-47de-9501-a75e5a5c443a",
     }
     for agent_name in agent_uuids:
         log_path = pjoin("output_aider", agent_uuids[agent_name])
