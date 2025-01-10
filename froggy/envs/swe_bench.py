@@ -63,12 +63,12 @@ class SWEBenchEnv(RepoEnv):
         for repo in repos:
             self.clone_repo(repo_address=repo)
 
-        from swebench.harness.utils import load_swebench_dataset
-        from swebench.harness.test_spec import make_test_spec
-        from swebench.harness.docker_build import build_env_images
-        swebench_instances = load_swebench_dataset(name="MariusHobbhahn/swe-bench-verified-mini")
-        docker_client = docker.from_env()
-        build_env_images(docker_client, swebench_instances, force_rebuild=False, max_workers=24)
+        # from swebench.harness.utils import load_swebench_dataset
+        # from swebench.harness.test_spec import make_test_spec
+        # from swebench.harness.docker_build import build_env_images
+        # swebench_instances = load_swebench_dataset(name="MariusHobbhahn/swe-bench-verified-mini")
+        # docker_client = docker.from_env()
+        # build_env_images(docker_client, swebench_instances, force_rebuild=False, max_workers=24)
 
     def setup_local_repo(self):
         repo_address = self.ds_row["repo"]
