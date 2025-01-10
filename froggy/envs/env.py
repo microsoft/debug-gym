@@ -16,7 +16,7 @@ from froggy.tools.patchers import CodePatcher
 from froggy.tools.pdb import PDBTool
 from froggy.utils import _walk, make_is_readonly, show_line_number
 
-logger = logging.getLogger("froggy")
+# logger = logging.getLogger("froggy")
 
 
 class TooledEnv:
@@ -69,6 +69,7 @@ class RepoEnv(TooledEnv):
         dir_tree_depth: int | None = None,
         auto_view_change: bool = True,
         terminal: Terminal | None = None,
+        logger=logging.getLogger("froggy"),
     ):
         super().__init__()
 
@@ -80,6 +81,7 @@ class RepoEnv(TooledEnv):
         self.auto_view_change = auto_view_change
         self.terminal = terminal or Terminal()
         self.entrypoint = entrypoint
+        self.logger = logger
 
         self.setup_workspace(
             path=path,
@@ -113,7 +115,7 @@ class RepoEnv(TooledEnv):
             self.tempdir.cleanup
         )  # Make sure to cleanup that folder once done.
 
-        logger.debug(f"Working directory: {self.working_dir}")
+        self.logger.debug(f"Working directory: {self.working_dir}")
         shutil.copytree(self.path, self.working_dir, dirs_exist_ok=True)
 
         # get list of all the files
@@ -144,7 +146,7 @@ class RepoEnv(TooledEnv):
         if entrypoint_list[0] == "pytest":
             entrypoint_list = ["python", "-m"] + entrypoint_list
             entrypoint = entrypoint_list
-        assert entrypoint_list[0] == "python", "Only support python entrypoint for now."
+        #assert entrypoint_list[0] == "python", "Only support python entrypoint for now."
         self.entrypoint = " ".join(entrypoint_list)
 
         # Set up the terminal working dir
@@ -223,7 +225,6 @@ class RepoEnv(TooledEnv):
 
     def run(self):
         success, output = self.terminal.run(self.entrypoint, timeout=self.run_timeout)
-        from ipdb import set_trace; set_trace()
         self.last_run_obs = output
         self.score = int(success)
         self.done = success

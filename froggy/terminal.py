@@ -15,7 +15,7 @@ import time
 
 import docker
 
-logger = logging.getLogger("froggy")
+#logger = logging.getLogger("froggy")
 
 
 class Terminal:
@@ -26,6 +26,7 @@ class Terminal:
         setup_commands: list[str] = None,
         env_vars: dict[str, str] = None,
         include_os_env_vars: bool = True,
+        logger=logging.getLogger("froggy"),
         **kwargs,
     ):
         self.setup_commands = setup_commands or []
@@ -37,6 +38,7 @@ class Terminal:
         self.env_vars["PS1"] = ""  # disable prompt
         self._working_dir = working_dir
         self._master = None  # PTY master file descriptor
+        self.logger = logger
 
     @property
     def working_dir(self):
@@ -45,7 +47,7 @@ class Terminal:
             temp_dir = tempfile.TemporaryDirectory(prefix="Terminal-")
             atexit.register(lambda: temp_dir.cleanup())
             self._working_dir = temp_dir.name
-            logger.debug(f"Using temporary working directory: {self._working_dir}")
+            self.logger.debug(f"Using temporary working directory: {self._working_dir}")
         return self._working_dir
 
     @working_dir.setter
@@ -70,7 +72,7 @@ class Terminal:
     ) -> tuple[bool, str]:
         """Run a list of commands in the terminal. Return command status and output."""
         command = self.prepare_command(entrypoint)
-        logger.debug(f"Running command in terminal: {command}")
+        self.logger.debug(f"Running command in terminal: {command}")
         process = subprocess.Popen(
             command,
             env=self.env_vars,
@@ -89,11 +91,11 @@ class Terminal:
 
         if raises and not success:
             # Command includes the entrypoint + setup commands
-            logger.debugr(f"Failed to run command: {command} {output}")
+            self.logger.debug(f"Failed to run command: {command} {output}")
             raise ValueError(f"Failed to run command: {entrypoint} ", output)
 
         output = (stdout + stderr).strip("\r\n").strip("\n")
-        logger.debug(f"Output from terminal with status {process.returncode}: {output}")
+        self.logger.debug(f"Output from terminal with status {process.returncode}: {output}")
         return success, output
 
     def run_interactive(
@@ -127,7 +129,7 @@ class Terminal:
         if self.has_pseudo_terminal():
             self.close_pseudo_terminal()
 
-        logger.debug(f"Starting PTY with entrypoint: {self.default_entrypoint}")
+        self.logger.debug(f"Starting PTY with entrypoint: {self.default_entrypoint}")
 
         self._master, slave = pty.openpty()
 
@@ -163,13 +165,13 @@ class Terminal:
                 commands, timeout=timeout, no_output_timeout=no_output_timeout
             )
 
-        logger.debug(f"Initial output from interactive terminal: {initial_output}")
+        self.logger.debug(f"Initial output from interactive terminal: {initial_output}")
 
         return initial_output
 
     def close_pseudo_terminal(self):
         if self._master is not None:
-            logger.debug("Closing PTY.")
+            self.logger.debug("Closing PTY.")
             os.close(self._master)
             self._master = None
 
@@ -188,10 +190,10 @@ class Terminal:
         last_change_time = time.time()
         while True:
             if time.time() - start_time > timeout:
-                logger.debug("Timeout reached while reading from PTY.")
+                self.logger.debug("Timeout reached while reading from PTY.")
                 break
             if time.time() - last_change_time > no_output_timeout:
-                logger.debug(f"No output change for {no_output_timeout} seconds.")
+                self.logger.debug(f"No output change for {no_output_timeout} seconds.")
                 break
             try:
                 data = os.read(self._master, read_length).decode(
@@ -207,7 +209,7 @@ class Terminal:
                 continue
             except OSError as e:
                 if e.errno == errno.EIO:
-                    logger.debug("End of file reached while reading from PTY.")
+                    self.logger.debug("End of file reached while reading from PTY.")
                     break
                 if e.errno != errno.EAGAIN:
                     raise
@@ -220,7 +222,7 @@ class Terminal:
         timeout: int = 300,
         no_output_timeout: int = 30,
     ):
-        logger.debug(f"Sending command to interactive terminal: {command}")
+        self.logger.debug(f"Sending command to interactive terminal: {command}")
         os.write(self._master, command.encode("utf-8") + b"\n")
 
         output = self.read_pseudo_terminal_output(
@@ -231,7 +233,7 @@ class Terminal:
 
         output = output.strip().strip("\r\n").strip("\n")
 
-        logger.debug(f"Output from interactive terminal: {output}")
+        self.logger.debug(f"Output from interactive terminal: {output}")
         return output
 
 
@@ -262,6 +264,7 @@ class DockerTerminal(Terminal):
             setup_commands=setup_commands,
             env_vars=env_vars,
             include_os_env_vars=include_os_env_vars,
+            **kwargs,
         )
         self.base_image = base_image
         self.volumes = volumes or {}
@@ -272,7 +275,7 @@ class DockerTerminal(Terminal):
         self._container = None
 
     # def __del__(self):
-    #     logger.debug(f"Object destroyed, cleanup container.")
+    #     self.logger.debug(f"Object destroyed, cleanup container.")
     #     self.clean_up()
 
     @property
@@ -345,7 +348,7 @@ class DockerTerminal(Terminal):
 
         if raises and not success:
             # Command includes the entrypoint + setup commands
-            logger.debug(f"Failed to run command: {command} {output}")
+            self.logger.debug(f"Failed to run command: {command} {output}")
             raise ValueError(f"Failed to run command: {entrypoint} ", output)
 
         return success, output.decode().strip("\r\n").strip("\n")
@@ -362,7 +365,7 @@ class DockerTerminal(Terminal):
 
     def setup_container(self) -> docker.models.containers.Container:
         # Create and start a container mounting volumes and setting environment variables
-        logger.debug(f"Setting up container with base image: {self.patched_image}")
+        self.logger.debug(f"Setting up container with base image: {self.patched_image}")
         container = self.docker_client.containers.run(
             image=self.patched_image,
             command="sleep infinity",  # Keep the container running
@@ -377,7 +380,7 @@ class DockerTerminal(Terminal):
         container_name = f"froggy_{container.name}"
         container.rename(container_name)
         container.reload()
-        logger.debug(f"Container {container_name} started successfully.")
+        self.logger.debug(f"Container {container_name} started successfully.")
         atexit.register(self.clean_up)
         return container
 
@@ -387,7 +390,7 @@ class DockerTerminal(Terminal):
             try:
                 self.container.stop(timeout=1)
             except docker.errors.NotFound:
-                logger.debug(
+                self.logger.debug(
                     f"Container {self.container.name} not found. "
                     "It might have already been removed."
                 )
@@ -401,7 +404,7 @@ class DockerTerminal(Terminal):
         try:
             self.docker_client.images.get(base_image)
         except docker.errors.ImageNotFound:
-            logger.debug(f"Pulling base image: {base_image}")
+            self.logger.debug(f"Pulling base image: {base_image}")
             self.docker_client.images.pull(base_image)
 
         patch_version = "v1"
@@ -422,9 +425,9 @@ class DockerTerminal(Terminal):
         image_tag = f"{base_image}-{self.host_uid}-{self.host_gid}-{patch_version}"
         try:
             self.docker_client.images.get(image_tag)
-            logger.debug(f"Image {image_tag} already exists.")
+            self.logger.debug(f"Image {image_tag} already exists.")
         except docker.errors.ImageNotFound:
-            logger.debug(f"Building image {image_tag}.")
+            self.logger.debug(f"Building image {image_tag}.")
             self.docker_client.images.build(
                 fileobj=io.BytesIO(dockerfile.encode("utf-8")),
                 tag=image_tag,
@@ -434,7 +437,7 @@ class DockerTerminal(Terminal):
         return image_tag
 
 
-def select_terminal(terminal_config: dict | None = None) -> Terminal:
+def select_terminal(terminal_config: dict | None = None, logger=logging.getLogger("froggy")) -> Terminal:
     terminal_config = terminal_config or {"type": "local"}
     terminal_type = terminal_config["type"]
     match terminal_type:
@@ -445,4 +448,4 @@ def select_terminal(terminal_config: dict | None = None) -> Terminal:
         case _:
             raise ValueError(f"Unknown terminal {terminal_type}")
 
-    return terminal_class(**terminal_config)
+    return terminal_class(**terminal_config, logger=logger)

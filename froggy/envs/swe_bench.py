@@ -18,7 +18,7 @@ from tqdm import tqdm
 import froggy.utils as utils
 from froggy.envs.env import RepoEnv
 
-logger = logging.getLogger("froggy")
+#logger = logging.getLogger("froggy")
 
 
 class SWEBenchEnv(RepoEnv):
@@ -56,10 +56,19 @@ class SWEBenchEnv(RepoEnv):
         self.dataset = {row["instance_id"]: row for row in self.ds.sort("instance_id")}
 
         # To avoid concurrency issues, we will clone all the repos in the dataset.
-        logger.info("Cloning all repos needed for SWE-Bench...")
+        self.logger.debug("Cloning all repos needed for SWE-Bench...")
+        # TODO check if missing a repository
         repos = {task["repo"] for task in self.dataset.values()}
-        for repo in tqdm(repos, desc="Cloning repos needed for SWE-Bench"):
+        #for repo in tqdm(repos, desc="Cloning repos needed for SWE-Bench"):
+        for repo in repos:
             self.clone_repo(repo_address=repo)
+
+        from swebench.harness.utils import load_swebench_dataset
+        from swebench.harness.test_spec import make_test_spec
+        from swebench.harness.docker_build import build_env_images
+        swebench_instances = load_swebench_dataset(name="MariusHobbhahn/swe-bench-verified-mini")
+        docker_client = docker.from_env()
+        build_env_images(docker_client, swebench_instances, force_rebuild=False, max_workers=24)
 
     def setup_local_repo(self):
         repo_address = self.ds_row["repo"]
@@ -76,34 +85,32 @@ class SWEBenchEnv(RepoEnv):
 
         if not local_branch_path.exists():
             # Duplicate the repo to avoid changing the current branch.
-            logger.info(f"Copying {local_repo_path} to {local_branch_path}")
+            self.logger.info(f"Copying {local_repo_path} to {local_branch_path}")
             shutil.copytree(local_repo_path, local_branch_path)
 
             # Checkout to base commit.
             command = f"git -C {local_branch_path} checkout {base_commit} -f"
-            logger.info(f"Checking out to {base_commit}")
+            self.logger.info(f"Checking out to {base_commit}")
             subprocess.run(command.split(), check=True)
 
             # Apply test patch
             if test_patch != "":
                 command = f"git -C {local_branch_path} apply -"
                 subprocess.run(command.split(), input=test_patch, text=True, check=True)
-                logger.info("Patch applied successfully.")
+                self.logger.info("Patch applied successfully.")
 
             # Make the pdb ignore
             self.make_froggyignore(local_repo_path=local_branch_path)
         else:
-            logger.info(f"Local checked out branch {local_branch_path} already exists.")
+            self.logger.debug(f"Local checked out branch {local_branch_path} already exists.")
 
-        entrypoint = self.install_configs["test_cmd"]
+        # For swebench, we must pass the fail_to_pass and pass_to_pass unit tests.
+        entrypoint = self.install_configs["test_cmd"] + " " + " ".join(fail_to_pass) # + pass_to_pass)
         # # TODO: Find another way to extract inline env vars from entrypoint. Move to env_vars instead of setup_commands
         if entrypoint.startswith("PYTHONWARNINGS"):
             export, remaining = entrypoint.split(" ", 1)
             self.setup_commands.append(f"export {export}")
             entrypoint = remaining
-
-        # # For swebench, we must pass the fail_to_pass and pass_to_pass unit tests.
-        # entrypoint = "python -m pytest " + " ".join(fail_to_pass + pass_to_pass)
 
         self.setup_workspace(local_branch_path, entrypoint)
         return local_branch_path, entrypoint
@@ -116,9 +123,9 @@ class SWEBenchEnv(RepoEnv):
         repo_address = self.ds_row["repo"]
         base_commit = self.ds_row["base_commit"]
         test_patch = self.ds_row["test_patch"]
-        # TODO: use fail_to_pass and pass_to_pass
-        fail_to_pass = literal_eval(self.ds_row["FAIL_TO_PASS"])
-        pass_to_pass = literal_eval(self.ds_row["PASS_TO_PASS"])
+
+        build_image_dir = Path.home() / f".cache/froggy/swe-bench/build_images/{self.ds_row['instance_id']}"
+        os.makedirs(build_image_dir, exist_ok=True)
 
         dockerfile = f"""
             FROM {base_image}
@@ -155,23 +162,34 @@ class SWEBenchEnv(RepoEnv):
             """
 
         # Apply test patch
+        if test_patch != "":
+            with open(build_image_dir / "test_patch.diff", "w") as f:
+                f.write(test_patch)
+
+            dockerfile += f"""
+            # Apply test patch
+            COPY test_patch.diff /tmp/test_patch.diff
+            RUN git apply /tmp/test_patch.diff
+            """
+
         # if test_patch != "":
         #     dockerfile += f"""
         #     # Apply test patch
-        #     RUN <<EOT git apply\n{test_patch}EOT
+        #     RUN git apply -v - <<'EOT'\n{test_patch}EOT
         #     """
-        if test_patch != "":
-            dockerfile += f"""
-            # Apply test patch
-            RUN echo '{test_patch.replace("\n", "\\n\\\n")}' > /tmp/test.patch
-            RUN git apply /tmp/test.patch
-            """
+        # if test_patch != "":
+        #     dockerfile += f"""
+        #     # Apply test patch
+        #     RUN echo '{test_patch.replace("\n", "\\n\\\n")}' > /tmp/patch.diff
+        #     RUN git apply /tmp/patch.diff
+        #     """
 
         # Run pre-install commands
         dockerfile += f"""
             # Run pre-install commands
             """
         for pre_install_cmd in self.install_configs.get("pre_install", []):
+            pre_install_cmd = pre_install_cmd.replace("apt-get", "sudo apt-get").replace("sudo sudo", "sudo")
             dockerfile += f"RUN {pre_install_cmd}\n"
 
         # """Add eval_cmd to be executed every time the terminal is called"""
@@ -188,6 +206,8 @@ class SWEBenchEnv(RepoEnv):
             RUN rm ~/miniconda3/miniconda.sh
 
             ENV PATH="/home/froggy_user/miniconda3/bin:$PATH"
+            RUN conda init --all
+            RUN conda config --append channels conda-forge
             """
 
         # Create conda environment
@@ -198,7 +218,7 @@ class SWEBenchEnv(RepoEnv):
         packages = self.install_configs.get("packages", "")
         pip_packages = self.install_configs.get("pip_packages")
         if packages == "requirements.txt":
-            logger.info("Installing from requirements.txt")
+            self.logger.info("Installing from requirements.txt")
 
             dockerfile += f"""
                 # Install from requirements.txt"
@@ -235,11 +255,7 @@ class SWEBenchEnv(RepoEnv):
         else:
             dockerfile += f"""
                 # Create conda env and install packages"
-                RUN conda create -n {env_name} python={python} -y
-                """
-            if packages.strip():
-                dockerfile += f"""
-                RUN conda install {packages} -y
+                RUN conda create -n {env_name} python={python} {packages} -y
                 """
 
         dockerfile += f"""
@@ -262,6 +278,7 @@ class SWEBenchEnv(RepoEnv):
             """
         install_cmd = self.install_configs.get("install", "")
         if install_cmd:
+            install_cmd = install_cmd.replace("apt-get", "sudo apt-get").replace("sudo sudo", "sudo")
             dockerfile += f"""
             RUN {install_cmd.replace("--verbose", "").replace("-v", "").strip()}
             """
@@ -271,6 +288,7 @@ class SWEBenchEnv(RepoEnv):
             # Run post-install commands
             """
         for post_install_cmd in self.install_configs.get("post_install", []):
+            post_install_cmd = post_install_cmd.replace("apt-get", "sudo apt-get").replace("sudo sudo", "sudo")
             dockerfile += f"""
             RUN {post_install_cmd}
             """
@@ -280,23 +298,42 @@ class SWEBenchEnv(RepoEnv):
             RUN cp -r {local_repo_path} {local_repo_path_backup}
             """
 
-        logger.debug(f"{dockerfile}")
+        self.logger.debug(f"{dockerfile}")
 
         docker_client = docker.from_env()
-        image_tag = f"{self.ds_row['instance_id']}-{host_uid}-{host_gid}"
+        image_name = f"{self.ds_row['instance_id']}-{host_uid}-{host_gid}"
         try:
-            docker_client.images.get(image_tag)
-            logger.info(f"Image {image_tag} already exists.")
-        except docker.errors.ImageNotFound:
-            logger.info(f"Building image {image_tag}...")
-            docker_client.images.build(
-                fileobj=io.BytesIO(dockerfile.encode("utf-8")),
-                tag=image_tag,
-                rm=True,
-                custom_context=False,
-            )
+            docker_client.images.get(image_name)
+            self.logger.info(f"Image {image_name} already exists.")
 
-        return image_tag
+        except docker.errors.ImageNotFound:
+            # Save dockerfile to local cache
+            self.logger.info(f"Saving Dockerfile to {build_image_dir}")
+            with open(build_image_dir / "Dockerfile", "w") as f:
+                f.write(dockerfile)
+
+            try:
+                self.logger.info(f"Building image {image_name}...")
+                _, build_log = docker_client.images.build(
+                    path=str(build_image_dir),
+                    tag=image_name,
+                    rm=True,
+                    forcerm=True,
+                )
+                with open(build_image_dir / "build.log", "w") as f:
+                    f.write("".join([chunk["stream"] for chunk in build_log if "stream" in chunk]))
+
+                self.logger.info(f"Image built successfully: {image_name}")
+
+            except docker.errors.BuildError as e:
+                build_log = e.build_log
+                with open(build_image_dir / "build.log", "w") as f:
+                    f.write("".join([chunk["stream"] for chunk in build_log if "stream" in chunk]))
+                self.logger.error(f"docker.errors.BuildError during {image_name}: {e}")
+                self.logger.error(f"Check build log {build_image_dir / "build.log"}")
+                raise e
+
+        return image_name
 
     def setup_task_info(self, task_name):
         self.task_name = task_name
@@ -308,8 +345,17 @@ class SWEBenchEnv(RepoEnv):
     def reset(self, *, seed=None, options: dict | None = None):
         options = options or {}
         self.setup_task_info(options["task_name"])
-        local_branch_path, entrypoint = self.setup_local_repo()
+        self.setup_local_repo()
         self.terminal._patched_image = self.setup_docker_image()
+
+        # from swebench.harness.utils import load_swebench_dataset
+        # from swebench.harness.test_spec import make_test_spec, TestSpec
+        # from swebench.harness.docker_build import build_instance_image, build_env_images
+        # swebench_instances = load_swebench_dataset(name="MariusHobbhahn/swe-bench-verified-mini", instance_ids=[options["task_name"]])
+        # spec = make_test_spec(swebench_instances[0])
+        # docker_client = docker.from_env()
+        # build_env_images(docker_client, swebench_instances, force_rebuild=False, max_workers=24)
+        # build_instance_image(spec, docker_client, logger=None, nocache=False)
 
         # Start the terminal
         self.terminal.container
@@ -318,10 +364,6 @@ class SWEBenchEnv(RepoEnv):
         success, output1 = self.terminal.run("rm -rf /tmp/code/*")
         # Copy the initial code to the working directory.
         success, output2 = self.terminal.run("cp -r /tmp/initial_code/* /tmp/code/")
-
-        #self.setup_workspace(local_branch_path, entrypoint)
-        from ipdb import set_trace; set_trace()
-        #self.setup_terminal()
 
         # Reset RepoEnv
         obs, infos = super().reset()
@@ -348,10 +390,8 @@ class SWEBenchEnv(RepoEnv):
 
         # clone
         if not local_repo_path.exists():
-            logger.info(f"Cloning {repo_url} into {local_repo_path}")
+            self.logger.info(f"Cloning {repo_url} into {local_repo_path}")
             subprocess.run(["git", "clone", repo_url, local_repo_path], check=True)
-        else:
-            logger.info(f"Repo {repo_url} already cloned at {local_repo_path}")
 
         return local_repo_path
 
@@ -387,7 +427,7 @@ class SWEBenchEnv(RepoEnv):
         try:
             docker_client = docker.from_env()
             docker_client.images.get(cached_image)
-            logger.debug(f"Used cached image: {cached_image}.")
+            self.logger.debug(f"Used cached image: {cached_image}.")
             self.terminal._patched_image = cached_image
             self.setup_base_image()
             self.run_install()
@@ -395,7 +435,7 @@ class SWEBenchEnv(RepoEnv):
             #self.terminal.container = self.terminal.setup_container()
 
         except docker.errors.ImageNotFound:
-            logger.debug(f"Building cached image {cached_image}.")
+            self.logger.debug(f"Building cached image {cached_image}.")
             # TODO: set base_image and conda_env per task
             self.run_pre_install()
             self.setup_base_image()
@@ -424,7 +464,7 @@ class SWEBenchEnv(RepoEnv):
     def run_pre_install(self):
         pre_install_cmds = self.install_configs.get("pre_install")
         if pre_install_cmds:
-            logger.info("Running pre-install commands...")
+            self.logger.info("Running pre-install commands...")
             for pre_install_cmd in pre_install_cmds:
                 self.run_command_with_raise(pre_install_cmd)
 
@@ -436,14 +476,14 @@ class SWEBenchEnv(RepoEnv):
     def run_install(self):
         install_cmd = self.install_configs.get("install", "")
         if install_cmd:
-            logger.info("Running install commands...")
+            self.logger.info("Running install commands...")
             install_cmd = install_cmd.replace("--verbose", "").replace("-v", "").strip()
             self.run_command_with_raise(install_cmd)
 
     def run_post_install(self):
         post_install_cmds = self.install_configs.get("post_install", [])
         if post_install_cmds:
-            logger.info("Running post-install commands...")
+            self.logger.info("Running post-install commands...")
             for post_install_cmd in post_install_cmds:
                 self.run_command_with_raise(post_install_cmd)
 
@@ -475,7 +515,7 @@ class SWEBenchEnv(RepoEnv):
         return repo.replace("/", "__").replace(" ", "--").replace("'", "")
 
     def _create_conda_env(self, cmd, env_name):
-        logger.info(f"Creating conda environment {env_name}")
+        self.logger.info(f"Creating conda environment {env_name}")
         self.run_command_with_raise(cmd)
         self.terminal.setup_commands.append(f"conda activate {env_name}")
 
@@ -488,14 +528,14 @@ class SWEBenchEnv(RepoEnv):
         env_name = f"{repo_name}__{self.version}"
 
         if self.conda_environment_exists(env_name):
-            logger.info(f"Conda env `{env_name}` already exists, activating...")
+            self.logger.info(f"Conda env `{env_name}` already exists, activating...")
             self.terminal.setup_commands.append(f"conda activate {env_name}")
         else:
-            logger.info(f"Conda env `{env_name}` not found, creating...")
+            self.logger.info(f"Conda env `{env_name}` not found, creating...")
             packages = self.install_configs.get("packages", "")
             pip_packages = self.install_configs.get("pip_packages")
             if packages == "requirements.txt":
-                logger.info("Installing from requirements.txt")
+                self.logger.info("Installing from requirements.txt")
                 self._create_conda_env(
                     f"conda create -n {env_name} python={python} -y", env_name
                 )
@@ -508,7 +548,7 @@ class SWEBenchEnv(RepoEnv):
                 self.run_command_with_raise(f"pip install -r {tmp_requirements_file}")
                 self.run_command_with_raise(f"rm {tmp_requirements_file}")
             elif packages == "environment.yml":
-                logger.info("Installing from environment.yml")
+                self.logger.info("Installing from environment.yml")
                 content_env_yml = get_environment_yml(self.ds_row, env_name)
                 no_use_env = self.install_configs.get("no_use_env")
                 if no_use_env:

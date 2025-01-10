@@ -13,8 +13,8 @@ from froggy.agents.utils import (
 class AgentCoT(AgentBase):
     name: str = "cot"
 
-    def __init__(self, config_dict, env, verbose=False, _uuid=None):
-        super().__init__(config_dict, env, verbose, _uuid)
+    def __init__(self, config_dict, env, verbose=False, _uuid=None, **kwargs):
+        super().__init__(config_dict, env, verbose, _uuid, **kwargs)
 
     def build_cot_prompt(self):
         messages = []
@@ -134,8 +134,8 @@ class AgentCoT(AgentBase):
 class AgentCoT_NoPDB(AgentCoT):
     name: str = "cot no pdb"
 
-    def __init__(self, config_dict, env, verbose=False, _uuid=None):
-        super().__init__(config_dict, env, verbose, _uuid)
+    def __init__(self, config_dict, env, verbose=False, _uuid=None, **kwargs):
+        super().__init__(config_dict, env, verbose, _uuid, **kwargs)
         self.history = HistoryTracker(self.config["memory_size"])
 
     def build_system_prompt(self, info):
