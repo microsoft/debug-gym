@@ -12,6 +12,7 @@ from pathlib import Path
 import datasets
 import docker
 from swebench.harness.constants import MAP_REPO_VERSION_TO_SPECS
+from swebench.harness.test_spec import replace_uninstallable_packages_requirements_txt
 from swebench.harness.utils import get_environment_yml, get_requirements
 from tqdm import tqdm
 
@@ -106,7 +107,14 @@ class SWEBenchEnv(RepoEnv):
                 f"Local checked out branch {local_branch_path} already exists."
             )
 
-        # For swebench, we must pass the fail_to_pass and pass_to_pass unit tests.
+        # Depending on the SWE-Bench task instance, we need to patch fail_to_pass and pass_to_pass.
+        if "django" in self.ds_row["instance_id"]:
+            # test_zero_ip_addr (admin_scripts.tests.ManageRunserver) -> admin_scripts.tests.ManageRunserver.test_zero_ip_addr
+            # Make regex to perform the replacement
+            fail_to_pass = [
+                re.sub(r"(.*) \((.*)\)", r"\2.\1", test) for test in fail_to_pass
+            ]
+
         entrypoint = (
             self.install_configs["test_cmd"] + " " + " ".join(fail_to_pass)
         )  # + pass_to_pass)
@@ -133,6 +141,9 @@ class SWEBenchEnv(RepoEnv):
             / f".cache/froggy/swe-bench/build_images/{self.ds_row['instance_id']}"
         )
         os.makedirs(build_image_dir, exist_ok=True)
+
+        # if (build_image_dir / "completed").exists():
+        #     raise Exception("Image already built.")
 
         dockerfile = f"""
             FROM {base_image}
@@ -227,16 +238,20 @@ class SWEBenchEnv(RepoEnv):
         packages = self.install_configs.get("packages", "")
         pip_packages = self.install_configs.get("pip_packages")
         if packages == "requirements.txt":
-            self.logger.info("Installing from requirements.txt")
-
             dockerfile += f"""
                 # Install from requirements.txt"
                 RUN conda create -n {env_name} python={python} -y
                 """
 
             requirements = get_requirements(self.ds_row)
+            reqs = replace_uninstallable_packages_requirements_txt(requirements)
+            with open(build_image_dir / "requirements.txt", "w") as f:
+                f.write(reqs)
+
             dockerfile += f"""
-                RUN pip install {' '.join(requirements.split('\n'))}
+                SHELL ["/home/froggy_user/miniconda3/bin/conda", "run", "--no-capture-output", "-n", "{env_name}", "/bin/bash", "-c"]
+                COPY requirements.txt /tmp/requirements.txt
+                RUN python -m pip install -r /tmp/requirements.txt
                 """
 
         elif packages == "environment.yml":
@@ -360,6 +375,10 @@ class SWEBenchEnv(RepoEnv):
                 self.logger.error(f"Check build log {build_image_dir / "build.log"}")
                 raise e
 
+        # Save completion marker file.
+        (build_image_dir / "completed").touch()
+        # raise Exception("Image built successfully.")
+
         return image_name
 
     def setup_task_info(self, task_name):
@@ -376,7 +395,8 @@ class SWEBenchEnv(RepoEnv):
         self.terminal._patched_image = self.setup_docker_image()
 
         # from swebench.harness.utils import load_swebench_dataset
-        # from swebench.harness.test_spec import make_test_spec, TestSpec
+        # from swebench.harness.test_spec i
+        # port make_test_spec, TestSpec
         # from swebench.harness.docker_build import build_instance_image, build_env_images
         # swebench_instances = load_swebench_dataset(name="MariusHobbhahn/swe-bench-verified-mini", instance_ids=[options["task_name"]])
         # spec = make_test_spec(swebench_instances[0])
@@ -388,19 +408,31 @@ class SWEBenchEnv(RepoEnv):
         self.terminal.container
 
         # Delete the content in the working directory.
-        success, output1 = self.terminal.run("rm -rf /tmp/code/*")
+        # success, output1 = self.terminal.run("rm -rf /tmp/code/*")
+        success, output1 = self.terminal.run(f"rm -rf {self.working_dir / '*'}")
         # Copy the initial code to the working directory.
-        success, output2 = self.terminal.run("cp -r /tmp/initial_code/* /tmp/code/")
+        # success, output2 = self.terminal.run("cp -r /tmp/initial_code/* /tmp/code/")
+        success, output2 = self.terminal.run(f"cp -r /tmp/code/* {self.working_dir}")
+        self.run_install()
+        self.run_post_install()
 
         # Reset RepoEnv
         obs, infos = super().reset()
+        # TODO: probably needed cleanup specific to each SWE-Bench repo.
         infos["last_run_obs"] = utils.cleanup_pytest_output(infos["last_run_obs"])
 
-        self.max_score = utils.extract_max_score_from_pytest_output(
-            infos["last_run_obs"]
-        )
+        self.max_score = len(self.ds_row["FAIL_TO_PASS"])
         infos["max_score"] = self.max_score
-        infos["score"] = utils.extract_reward_from_pytest_output(infos["last_run_obs"])
+
+        from swebench.harness.constants import TestStatus
+        from swebench.harness.log_parsers import MAP_REPO_TO_PARSER
+
+        test_status_map = MAP_REPO_TO_PARSER[self.repo](infos["last_run_obs"])
+        infos["score"] = sum(
+            1
+            for test in test_status_map
+            if test_status_map[test] == TestStatus.PASSED.value
+        )
 
         return infos["obs"], infos
 

@@ -11,9 +11,9 @@ from tqdm import tqdm
 
 from froggy.terminal import select_terminal
 from froggy.tools.toolbox import Toolbox
-from froggy.utils import TaskLogger, load_config
+from froggy.utils import load_config, setup_logger
 
-logger = logging.getLogger("froggy")
+# logger = logging.getLogger("froggy")
 
 
 def select_env(env_type: str = None):
@@ -37,7 +37,9 @@ def run_agent_wrapper(payload):
 
 
 def run_agent(args, problem, config):
-    task_logger = TaskLogger(logger, {"task": problem})
+    task_logger = setup_logger(
+        problem, log_dir=config["output_path"], verbose=args.verbose
+    )
     try:
         agent = create_agent(args, config, logger=task_logger)
 
@@ -54,10 +56,12 @@ def run_agent(args, problem, config):
         # save log
         agent.log(task_name=problem)
     except Exception as e:
-        logger.warning(
+        task_logger.warning(
             f"Task Error: {problem} - {e!r}. Run with --verbose for more information."
         )
-        logger.debug(f"Task {problem} generated an exception: {e!r}", exc_info=True)
+        task_logger.debug(
+            f"Task {problem} generated an exception: {e!r}", exc_info=True
+        )
         raise e
 
     return done
@@ -119,11 +123,11 @@ def create_agent(args, config, logger):
 
 
 def main():
-    logger.setLevel(logging.DEBUG)
     config, args = load_config()
     if args.very_verbose:
         args.verbose = True
-        logger.setLevel(logging.DEBUG)
+
+    logger = setup_logger("froggy", verbose=args.verbose)
 
     available_agents = list(config.keys())
     assert (
@@ -172,7 +176,8 @@ def main():
             ]
             for future in as_completed(futures):
                 try:
-                    result = future.result()
+                    raise Exception("test")
+                    # result = future.result()
                 except asyncio.CancelledError:
                     logger.warning("Task cancelled.")
                     break

@@ -2,6 +2,7 @@ import argparse
 import codecs
 import logging
 import os
+from pathlib import Path
 import re
 import signal
 from contextlib import contextmanager
@@ -216,3 +217,26 @@ def load_config():
 class TaskLogger(logging.LoggerAdapter):
     def process(self, msg, kwargs):
         return f"[Task-{self.extra['task']}] {msg}", kwargs
+
+
+def setup_logger(name: str, log_dir: str|None = None, verbose: bool = False):
+    logger = logging.getLogger(name)
+
+    console = logging.StreamHandler()
+    formatter = logging.Formatter('🐸 [%(name)-12s]: %(levelname)-8s %(message)s')
+    console.setFormatter(formatter)
+    console.setLevel(logging.DEBUG if verbose else logging.INFO)
+    logger.addHandler(console)
+
+    if log_dir:
+        log_dir = Path(log_dir)
+        log_dir.mkdir(parents=True, exist_ok=True)
+
+        fh = logging.FileHandler(log_dir / f"{name}.log", mode="w")
+        formatter = logging.Formatter("%(asctime)s %(levelname)-8s %(message)s")
+        fh.setFormatter(formatter)
+        fh.setLevel(logging.DEBUG)
+        logger.addHandler(fh)
+
+    logger.propagate = False  # Prevent the log messages from being propagated to the root logger
+    return logger
