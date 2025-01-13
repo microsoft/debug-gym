@@ -168,8 +168,7 @@ def main():
             ]
             for future in as_completed(futures):
                 try:
-                    raise Exception("test")
-                    #result = future.result()
+                    result = future.result()
                 except asyncio.CancelledError:
                     logger.warning("Task cancelled.")
                     break
