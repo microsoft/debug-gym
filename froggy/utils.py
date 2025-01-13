@@ -1,5 +1,6 @@
 import argparse
 import codecs
+import logging
 import os
 import re
 import signal
@@ -81,7 +82,6 @@ def make_is_readonly(full_path, base_dir=None, patterns: list[str] = None):
         # We have negation rules. We can't use a simple "any" to evaluate them.
         # Later rules override earlier rules.
         return lambda file_path: handle_negation(file_path, rules)
-
 
 
 def _walk(path, depth: Optional[int]):
@@ -211,3 +211,8 @@ def load_config():
         entry_to_change[keys[-1]] = yaml.safe_load(value)
 
     return config, args
+
+
+class TaskLogger(logging.LoggerAdapter):
+    def process(self, msg, kwargs):
+        return f"[Task-{self.extra['task']}] {msg}", kwargs
