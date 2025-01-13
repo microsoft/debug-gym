@@ -120,6 +120,7 @@ class Terminal:
             working_dir=self.working_dir,
             setup_commands=self.setup_commands,
             env_vars=self.env_vars,
+            logger=self.logger
         )
 
     def has_pseudo_terminal(self):
@@ -284,8 +285,8 @@ class DockerTerminal(Terminal):
         if self._working_dir is not None:
             self.volumes.pop(self._working_dir, None)
         working_dir = super().working_dir
-        #self.volumes[working_dir] = {"bind": working_dir, "mode": "rw"}
-        self.volumes[working_dir] = {"bind": "/tmp/code", "mode": "rw"}
+        self.volumes[working_dir] = {"bind": working_dir, "mode": "rw"}
+        # self.volumes[working_dir] = {"bind": "/tmp/code", "mode": "rw"}
         return working_dir
 
     @working_dir.setter
@@ -293,8 +294,8 @@ class DockerTerminal(Terminal):
         if self._working_dir is not None:
             self.volumes.pop(self._working_dir, None)
         self._working_dir = value
-        # self.volumes[self._working_dir] = {"bind": self._working_dir, "mode": "rw"}
-        self.volumes[self._working_dir] = {"bind": "/tmp/code", "mode": "rw"}
+        self.volumes[self._working_dir] = {"bind": self._working_dir, "mode": "rw"}
+        # self.volumes[self._working_dir] = {"bind": "/tmp/code", "mode": "rw"}
 
     @property
     def patched_image(self):
@@ -337,8 +338,8 @@ class DockerTerminal(Terminal):
         # TODO: docker exec_run timeout?
         status, output = self.container.exec_run(
             command,
-            # workdir=self.working_dir,
-            workdir="/tmp/code",
+            workdir=self.working_dir,
+            # workdir="/tmp/code",
             environment=self.env_vars,
             user=f"{self.host_uid}:{self.host_gid}",
             stdout=True,
@@ -351,6 +352,7 @@ class DockerTerminal(Terminal):
             self.logger.debug(f"Failed to run command: {command} {output}")
             raise ValueError(f"Failed to run command: {entrypoint} ", output)
 
+        self.logger.debug(f"Output from terminal with status {status}: {output}")
         return success, output.decode().strip("\r\n").strip("\n")
 
     def clone(self) -> "DockerTerminal":
@@ -360,6 +362,7 @@ class DockerTerminal(Terminal):
             volumes=self.volumes,
             env_vars=self.env_vars,
             working_dir=self.working_dir,
+            logger=self.logger,
         )
         return terminal
 

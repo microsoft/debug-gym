@@ -172,18 +172,18 @@ class RepoEnv(TooledEnv):
         msg += self.directory_tree(editable_only=editable_only)
         return msg
 
-    def restore(self, *filepaths):
-        filepaths = filepaths or glob(
-            f"{self.path}/**",
-            root_dir=self.path,
-            recursive=True,
-        )
-        relative_filepaths = [os.path.relpath(f, self.path) for f in filepaths]
-        for filepath in relative_filepaths:
-            if os.path.isdir(self.path / filepath):
-                continue
+    # def restore(self, *filepaths):
+    #     filepaths = filepaths or glob(
+    #         f"{self.path}/**",
+    #         root_dir=self.path,
+    #         recursive=True,
+    #     )
+    #     relative_filepaths = [os.path.relpath(f, self.path) for f in filepaths]
+    #     for filepath in relative_filepaths:
+    #         if os.path.isdir(self.path / filepath):
+    #             continue
 
-            shutil.copy2(self.path / filepath, self.working_dir / filepath)
+    #         shutil.copy2(self.path / filepath, self.working_dir / filepath)
 
     def reset(self, *, seed=None, options: dict = None):
         options = options or {}
@@ -191,7 +191,8 @@ class RepoEnv(TooledEnv):
         self.current_file_content = None
         self.current_breakpoints_state = {}
         self.rewrite_counter = 0
-        self.restore()
+        # self.restore()
+        self.setup_workspace(self.path)
 
         # Run the initial code. This will set self.last_run_obs, self.done and self.score.
         self.run()
