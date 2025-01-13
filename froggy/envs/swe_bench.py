@@ -133,8 +133,8 @@ class SWEBenchEnv(RepoEnv):
         build_image_dir = Path.home() / f".cache/froggy/swe-bench/build_images/{self.ds_row['instance_id']}"
         os.makedirs(build_image_dir, exist_ok=True)
 
-        if (build_image_dir / "completed").exists():
-            raise Exception("Image already built.")
+        # if (build_image_dir / "completed").exists():
+        #     raise Exception("Image already built.")
 
         dockerfile = f"""
             FROM {base_image}
@@ -315,40 +315,40 @@ class SWEBenchEnv(RepoEnv):
 
         docker_client = docker.from_env()
         image_name = f"{self.ds_row['instance_id']}-{host_uid}-{host_gid}"
-        # try:
-        docker_client.images.get(image_name)
-        self.logger.info(f"Image {image_name} already exists.")
+        try:
+            docker_client.images.get(image_name)
+            self.logger.info(f"Image {image_name} already exists.")
 
-        # except docker.errors.ImageNotFound:
-        #     # Save dockerfile to local cache
-        #     self.logger.info(f"Saving Dockerfile to {build_image_dir}")
-        #     with open(build_image_dir / "Dockerfile", "w") as f:
-        #         f.write(dockerfile)
+        except docker.errors.ImageNotFound:
+            # Save dockerfile to local cache
+            self.logger.info(f"Saving Dockerfile to {build_image_dir}")
+            with open(build_image_dir / "Dockerfile", "w") as f:
+                f.write(dockerfile)
 
-        #     try:
-        #         self.logger.info(f"Building image {image_name}...")
-        #         _, build_log = docker_client.images.build(
-        #             path=str(build_image_dir),
-        #             tag=image_name,
-        #             rm=True,
-        #             forcerm=True,
-        #         )
-        #         with open(build_image_dir / "build.log", "w") as f:
-        #             f.write("".join([chunk["stream"] for chunk in build_log if "stream" in chunk]))
+            try:
+                self.logger.info(f"Building image {image_name}...")
+                _, build_log = docker_client.images.build(
+                    path=str(build_image_dir),
+                    tag=image_name,
+                    rm=True,
+                    forcerm=True,
+                )
+                with open(build_image_dir / "build.log", "w") as f:
+                    f.write("".join([chunk["stream"] for chunk in build_log if "stream" in chunk]))
 
-        #         self.logger.info(f"Image built successfully: {image_name}")
+                self.logger.info(f"Image built successfully: {image_name}")
 
-        #     except docker.errors.BuildError as e:
-        #         build_log = e.build_log
-        #         with open(build_image_dir / "build.log", "w") as f:
-        #             f.write("".join([chunk["stream"] for chunk in build_log if "stream" in chunk]))
-        #         self.logger.error(f"docker.errors.BuildError during {image_name}: {e}")
-        #         self.logger.error(f"Check build log {build_image_dir / "build.log"}")
-        #         raise e
+            except docker.errors.BuildError as e:
+                build_log = e.build_log
+                with open(build_image_dir / "build.log", "w") as f:
+                    f.write("".join([chunk["stream"] for chunk in build_log if "stream" in chunk]))
+                self.logger.error(f"docker.errors.BuildError during {image_name}: {e}")
+                self.logger.error(f"Check build log {build_image_dir / "build.log"}")
+                raise e
 
         # Save completion marker file.
         (build_image_dir / "completed").touch()
-        raise Exception("Image built successfully.")
+        # raise Exception("Image built successfully.")
 
         return image_name
 
