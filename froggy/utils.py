@@ -221,6 +221,7 @@ class TaskLogger(logging.LoggerAdapter):
 
 def setup_logger(name: str, log_dir: str|None = None, verbose: bool = False):
     logger = logging.getLogger(name)
+    logger.setLevel(logging.DEBUG)
 
     console = logging.StreamHandler()
     formatter = logging.Formatter('🐸 [%(name)-12s]: %(levelname)-8s %(message)s')

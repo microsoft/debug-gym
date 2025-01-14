@@ -133,9 +133,6 @@ class SWEBenchEnv(RepoEnv):
         build_image_dir = Path.home() / f".cache/froggy/swe-bench/build_images/{self.ds_row['instance_id']}"
         os.makedirs(build_image_dir, exist_ok=True)
 
-        # if (build_image_dir / "completed").exists():
-        #     raise Exception("Image already built.")
-
         dockerfile = f"""
             FROM {base_image}
             # Install sudo
@@ -181,24 +178,14 @@ class SWEBenchEnv(RepoEnv):
             RUN git apply /tmp/test_patch.diff
             """
 
-        # if test_patch != "":
-        #     dockerfile += f"""
-        #     # Apply test patch
-        #     RUN git apply -v - <<'EOT'\n{test_patch}EOT
-        #     """
-        # if test_patch != "":
-        #     dockerfile += f"""
-        #     # Apply test patch
-        #     RUN echo '{test_patch.replace("\n", "\\n\\\n")}' > /tmp/patch.diff
-        #     RUN git apply /tmp/patch.diff
-        #     """
-
         # Run pre-install commands
         dockerfile += f"""
             # Run pre-install commands
             """
         for pre_install_cmd in self.install_configs.get("pre_install", []):
-            pre_install_cmd = pre_install_cmd.replace("apt-get", "sudo apt-get").replace("sudo sudo", "sudo")
+            pre_install_cmd = pre_install_cmd.replace("apt-get", "sudo apt-get")
+            pre_install_cmd = pre_install_cmd.replace("echo", "sudo echo")
+            pre_install_cmd = pre_install_cmd.replace("sudo sudo", "sudo")
             dockerfile += f"RUN {pre_install_cmd}\n"
 
         # """Add eval_cmd to be executed every time the terminal is called"""
@@ -253,16 +240,23 @@ class SWEBenchEnv(RepoEnv):
                     pattern, f"python={python}", content_env_yml
                 )
 
+            with open(build_image_dir / "environment.yml", "w") as f:
+                f.write(content_env_yml)
+
             if no_use_env:
                 dockerfile += f"""
                     # Create conda env from conda-forge and update from environment.yml"
-                    RUN conda create -c conda-forge -n {env_name} python={python} -y"
-                    RUN conda env update -n {env_name} {' '.join(content_env_yml.split('\n'))}
+                    RUN conda create -c conda-forge -n {env_name} python={python} -y
+                    COPY environment.yml /tmp/environment.yml
+                    RUN conda env update -n {env_name} -f /tmp/environment.yml
                     """
             else:
                 dockerfile += f"""
                     # Create conda env with environment.yml"
-                    RUN conda env create -n {env_name} {' '.join(content_env_yml.split('\n'))}
+                    COPY environment.yml /tmp/environment.yml
+                    RUN conda env create -n {env_name} -f /tmp/environment.yml
+                    SHELL ["/home/froggy_user/miniconda3/bin/conda", "run", "--no-capture-output", "-n", "{env_name}", "/bin/bash", "-c"]
+                    RUN conda install python={python} -y
                     """
 
         else:
@@ -444,48 +438,6 @@ class SWEBenchEnv(RepoEnv):
         status, output = self.terminal.run(command, raises=True)
         return status, output
 
-    def setup_terminal(self):
-        host_uid = os.getuid()
-        host_gid = os.getgid()
-        cached_image = f"{self.ds_row['instance_id']}-{host_uid}-{host_gid}"
-
-        try:
-            docker_client = docker.from_env()
-            docker_client.images.get(cached_image)
-            self.logger.debug(f"Used cached image: {cached_image}.")
-            self.terminal._patched_image = cached_image
-            self.setup_base_image()
-            self.run_install()
-            self.run_post_install()
-            #self.terminal.container = self.terminal.setup_container()
-
-        except docker.errors.ImageNotFound:
-            self.logger.debug(f"Building cached image {cached_image}.")
-            # TODO: set base_image and conda_env per task
-            self.run_pre_install()
-            self.setup_base_image()
-            self.run_install()
-            self.run_post_install()
-            # Commit the container to a new image with the same name
-            self.terminal.container.commit(cached_image)
-
-    def setup_base_image(self):
-        self.prepare_eval_commands()
-
-        self.conda_env = self.create_conda_env()
-
-        entrypoint = self.install_configs["test_cmd"]
-
-        # TODO: Find another way to extract inline env vars from entrypoint. Move to env_vars instead of setup_commands
-        if entrypoint.startswith("PYTHONWARNINGS"):
-            export, remaining = entrypoint.split(" ", 1)
-            self.setup_commands.append(f"export {export}")
-            entrypoint = remaining
-
-        # Commit the container to a new image with the same name
-        # self.terminal.container.commit(repository=container_name)
-        # return self.conda_env
-
     def run_pre_install(self):
         pre_install_cmds = self.install_configs.get("pre_install")
         if pre_install_cmds:
@@ -515,98 +467,5 @@ class SWEBenchEnv(RepoEnv):
     def get_configs(self, repo, version):
         return MAP_REPO_VERSION_TO_SPECS[repo][version]
 
-    def install_conda(self):
-        install_commands = (
-            "sudo apt update && sudo apt install -y wget git && "
-            "mkdir -p ~/miniconda3 && "
-            "wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O ~/miniconda3/miniconda.sh && "
-            "bash ~/miniconda3/miniconda.sh -b -u -p ~/miniconda3 && "
-            "rm ~/miniconda3/miniconda.sh && "
-            "source ~/miniconda3/bin/activate"
-        )
-        return self.run_command_with_raise(install_commands)
-
-    def conda_environment_exists(self, env_name):
-        conda_env_exists = False
-        command = f"conda env list | grep {env_name}"
-        status, output = self.terminal.run(command)
-        if env_name in output:
-            conda_env_exists = True
-        elif "conda: command not found" in output:
-            self.install_conda()
-        return conda_env_exists
-
     def repo_name(self, repo):
         return repo.replace("/", "__").replace(" ", "--").replace("'", "")
-
-    def _create_conda_env(self, cmd, env_name):
-        self.logger.info(f"Creating conda environment {env_name}")
-        self.run_command_with_raise(cmd)
-        self.terminal.setup_commands.append(f"conda activate {env_name}")
-
-    def create_conda_env(self):
-        # try to activate conda environment without failing if activation fails
-        self.terminal.setup_commands += ["source ~/miniconda3/bin/activate || true"]
-        # Create environment if does not exist yet
-        python = self.install_configs["python"]
-        repo_name = self.repo_name(self.repo)
-        env_name = f"{repo_name}__{self.version}"
-
-        if self.conda_environment_exists(env_name):
-            self.logger.info(f"Conda env `{env_name}` already exists, activating...")
-            self.terminal.setup_commands.append(f"conda activate {env_name}")
-        else:
-            self.logger.info(f"Conda env `{env_name}` not found, creating...")
-            packages = self.install_configs.get("packages", "")
-            pip_packages = self.install_configs.get("pip_packages")
-            if packages == "requirements.txt":
-                self.logger.info("Installing from requirements.txt")
-                self._create_conda_env(
-                    f"conda create -n {env_name} python={python} -y", env_name
-                )
-                requirements = get_requirements(self.ds_row)
-                tmp_requirements_file = (
-                    Path(self.terminal.working_dir) / "tmp_froggy_requirements.txt"
-                )
-                with open(tmp_requirements_file, "w") as f:
-                    f.write(requirements)
-                self.run_command_with_raise(f"pip install -r {tmp_requirements_file}")
-                self.run_command_with_raise(f"rm {tmp_requirements_file}")
-            elif packages == "environment.yml":
-                self.logger.info("Installing from environment.yml")
-                content_env_yml = get_environment_yml(self.ds_row, env_name)
-                no_use_env = self.install_configs.get("no_use_env")
-                if no_use_env:
-                    pattern = r"(python=)([^\s]+)"
-                    content_env_yml = re.sub(
-                        pattern, f"python={python}", content_env_yml
-                    )
-                tmp_environment_file = (
-                    Path(self.terminal.working_dir) / "tmp_froggy_environment.yml"
-                )
-                with open(tmp_environment_file, "w") as f:
-                    f.write(content_env_yml)
-
-                if no_use_env:
-                    self._create_conda_env(
-                        f"conda create -c conda-forge -n {env_name} python={python} -y",
-                        env_name,
-                    )
-                    self.run_command_with_raise(
-                        f"conda env update -n {env_name} -f {tmp_environment_file}"
-                    )
-                else:
-                    self._create_conda_env(
-                        f"conda env create -n {env_name} -f {tmp_environment_file} -y",
-                        env_name,
-                    )
-                self.run_command_with_raise(f"rm {tmp_environment_file}")
-            else:
-                self._create_conda_env(
-                    f"conda create -n {env_name} python={python} -y", env_name
-                ),
-                if packages.strip():
-                    self.run_command_with_raise(f"conda install {packages} -y")
-            if pip_packages:
-                self.run_command_with_raise(f"pip install {' '.join(pip_packages)}")
-        return env_name

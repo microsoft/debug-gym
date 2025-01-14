@@ -35,7 +35,7 @@ def run_agent_wrapper(payload):
     return run_agent(args, problem, config)
 
 def run_agent(args, problem, config):
-    task_logger = setup_logger(problem, log_dir=config['output_path'], verbose=args.verbose)
+    task_logger = setup_logger(problem, log_dir=config['output_path'], verbose=args.very_verbose)
     try:
         agent = create_agent(args, config, logger=task_logger)
 
@@ -119,7 +119,7 @@ def main():
     if args.very_verbose:
         args.verbose = True
 
-    logger = setup_logger("froggy", verbose=args.verbose)
+    logger = setup_logger("froggy", verbose=args.very_verbose)
 
     available_agents = list(config.keys())
     assert (
@@ -137,7 +137,7 @@ def main():
             assert isinstance(config["problems"], list)
             problem_list = config["problems"]
 
-        num_workers = 1 if args.verbose else int(os.environ.get("FROGGY_WORKERS", 1))
+        num_workers = int(os.environ.get("FROGGY_WORKERS", 1)) # 1 if args.verbose else int(os.environ.get("FROGGY_WORKERS", 1))
         tasks_done = 0
         mean_perf = 0
 
