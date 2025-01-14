@@ -192,9 +192,8 @@ class SWEBenchEnv(RepoEnv):
             # Run pre-install commands
             """
         for pre_install_cmd in self.install_configs.get("pre_install", []):
-            pre_install_cmd = pre_install_cmd.replace("apt-get", "sudo apt-get")
-            pre_install_cmd = pre_install_cmd.replace("echo", "sudo echo")
-            pre_install_cmd = pre_install_cmd.replace("sudo sudo", "sudo")
+            if "apt-get" in pre_install_cmd or "echo" in pre_install_cmd:
+                pre_install_cmd = f'sudo /bin/bash -c "{pre_install_cmd}"'
             dockerfile += f"RUN {pre_install_cmd}\n"
 
         # """Add eval_cmd to be executed every time the terminal is called"""
