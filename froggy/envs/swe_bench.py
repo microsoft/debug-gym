@@ -192,7 +192,9 @@ class SWEBenchEnv(RepoEnv):
             # Run pre-install commands
             """
         for pre_install_cmd in self.install_configs.get("pre_install", []):
-            if "apt-get" in pre_install_cmd or "echo" in pre_install_cmd:
+            if any(
+                [cmd in pre_install_cmd for cmd in ["apt-get", "echo", "locale-gen"]]
+            ):
                 pre_install_cmd = f'sudo /bin/bash -c "{pre_install_cmd}"'
             dockerfile += f"RUN {pre_install_cmd}\n"
 
