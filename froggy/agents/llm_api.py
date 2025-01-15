@@ -150,7 +150,7 @@ class LLM:
     def _get_azure_oai_kwargs(self):
         """
         Returns a dictionary of keyword arguments required for connecting to Azure OpenAI.
-        This will either use anAPI key or AzureCliCredential (az login).
+        This will either use an API key or AzureCliCredential (az login).
 
         Raises ValueError: If neither an API key nor a scope is provided in the configuration.
         """
