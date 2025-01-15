@@ -68,7 +68,10 @@ class Terminal:
         return command
 
     def run(
-        self, entrypoint: str | list[str], timeout: int = None, raises: bool = False,
+        self,
+        entrypoint: str | list[str],
+        timeout: int = None,
+        raises: bool = False,
     ) -> tuple[bool, str]:
         """Run a list of commands in the terminal. Return command status and output."""
         command = self.prepare_command(entrypoint)
@@ -317,7 +320,7 @@ class DockerTerminal(Terminal):
     def default_entrypoint(self) -> list[str]:
         """Expects the container to have bash installed and python executable available."""
         return shlex.split(
-            f"docker exec -i {self.container.name} /bin/bash --noprofile --norc"
+            f"docker exec -i --user {self.host_uid}:{self.host_gid} {self.container.name} /bin/bash --noprofile --norc"
         )
 
     def prepare_command(self, entrypoint: str | list[str]) -> list[str]:
@@ -332,7 +335,11 @@ class DockerTerminal(Terminal):
         return command
 
     def run(
-        self, entrypoint: str | list[str], timeout: int = None, raises: bool = False, user: str = None
+        self,
+        entrypoint: str | list[str],
+        timeout: int = None,
+        raises: bool = False,
+        user: str = None,
     ) -> tuple[bool, str]:
         """Run a command in the terminal. Return command status and output."""
         command = self.prepare_command(entrypoint)
