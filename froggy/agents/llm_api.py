@@ -136,12 +136,24 @@ class LLM:
         )
 
         if "azure openai" in self.config.get("tags", []):
-            self.client = AzureOpenAI(
-                api_key=self.config["api_key"],
-                azure_endpoint=self.config["endpoint"],
-                api_version=self.config["api_version"],
-                timeout=None,
-            )
+            api_key = self.config.get("api_key")
+            scope = self.config.get("scope")
+            kwargs = {
+                "azure_endpoint": self.config["endpoint"],
+                "api_version": self.config["api_version"],
+                "timeout": None,
+            }
+            if api_key:  # api key
+                kwargs["api_key"] = api_key
+            elif scope:  # az login
+                from azure.identity import AzureCliCredential, get_bearer_token_provider
+
+                credential = get_bearer_token_provider(AzureCliCredential(), scope)
+                kwargs["azure_ad_token_provider"] = credential
+            else:
+                raise ValueError("No api_key or scope provided for AzureOpenAI.")
+
+            self.client = AzureOpenAI(**kwargs)
         else:
             self.client = OpenAI(
                 api_key=self.config["api_key"],
