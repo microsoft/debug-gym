@@ -64,12 +64,11 @@ class SWEBenchEnv(RepoEnv):
         for repo in repos:
             self.clone_repo(repo_address=repo)
 
-        # from swebench.harness.utils import load_swebench_dataset
-        # from swebench.harness.test_spec import make_test_spec
-        # from swebench.harness.docker_build import build_env_images
-        # swebench_instances = load_swebench_dataset(name="MariusHobbhahn/swe-bench-verified-mini")
-        # docker_client = docker.from_env()
-        # build_env_images(docker_client, swebench_instances, force_rebuild=False, max_workers=24)
+        from swebench.harness.utils import load_swebench_dataset
+        from swebench.harness.docker_build import build_env_images
+        swebench_instances = load_swebench_dataset(name=self.dataset_id)
+        docker_client = docker.from_env()
+        build_env_images(docker_client, swebench_instances, force_rebuild=False, max_workers=24)
 
     def setup_local_repo(self):
         repo_address = self.ds_row["repo"]
@@ -385,27 +384,39 @@ class SWEBenchEnv(RepoEnv):
         options = options or {}
         self.setup_task_info(options["task_name"])
         self.setup_local_repo()
-        self.terminal._patched_image = self.setup_docker_image()
+        #self.terminal._patched_image = self.setup_docker_image()
 
-        # from swebench.harness.utils import load_swebench_dataset
-        # from swebench.harness.test_spec i
-        # port make_test_spec, TestSpec
-        # from swebench.harness.docker_build import build_instance_image, build_env_images
-        # swebench_instances = load_swebench_dataset(name="MariusHobbhahn/swe-bench-verified-mini", instance_ids=[options["task_name"]])
-        # spec = make_test_spec(swebench_instances[0])
-        # docker_client = docker.from_env()
-        # build_env_images(docker_client, swebench_instances, force_rebuild=False, max_workers=24)
-        # build_instance_image(spec, docker_client, logger=None, nocache=False)
+        from swebench.harness.utils import load_swebench_dataset
+        from swebench.harness.test_spec import make_test_spec, TestSpec
+        from swebench.harness.docker_build import build_instance_image, build_env_images
+        #swebench_instances = load_swebench_dataset(name=self.dataset_id, instance_ids=[options["task_name"]])
+
+        spec = make_test_spec(self.ds_row)
+        docker_client = docker.from_env()
+        #build_env_images(docker_client, [spec], force_rebuild=False, max_workers=24)
+        build_instance_image(spec, docker_client, logger=None, nocache=False)
 
         # Start the terminal
+        self.terminal._patched_image = spec.instance_image_key
         self.terminal.container
+
+        # Create new group (if needed) and user.
+        uid = os.getuid()
+        group_id = os.getgid()
+        success, output1 = self.terminal.run(f"groupadd -g {group_id} froggy_group", user="root")
+        success, output2 = self.terminal.run(f"useradd -m -u {uid} -g {group_id} -G sudo froggy_user", user="root")
 
         # Delete the content in the working directory.
         # success, output1 = self.terminal.run("rm -rf /tmp/code/*")
-        success, output1 = self.terminal.run(f"rm -rf {self.working_dir / '*'}")
+        success, output3 = self.terminal.run(f"rm -rf {self.working_dir / '*'}")
         # Copy the initial code to the working directory.
         # success, output2 = self.terminal.run("cp -r /tmp/initial_code/* /tmp/code/")
-        success, output2 = self.terminal.run(f"cp -r /tmp/code/* {self.working_dir}")
+        # success, output2 = self.terminal.run(f"cp -r /tmp/code/* {self.working_dir}")
+        success, output4 = self.terminal.run(f"cp -r /testbed/. {self.working_dir}")
+
+        self.terminal.setup_commands.append("source /opt/miniconda3/bin/activate || true")
+        self.terminal.setup_commands.append(f"conda activate testbed")
+
         self.run_install()
         self.run_post_install()
 

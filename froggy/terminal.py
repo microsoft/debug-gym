@@ -68,7 +68,7 @@ class Terminal:
         return command
 
     def run(
-        self, entrypoint: str | list[str], timeout: int = None, raises: bool = False
+        self, entrypoint: str | list[str], timeout: int = None, raises: bool = False,
     ) -> tuple[bool, str]:
         """Run a list of commands in the terminal. Return command status and output."""
         command = self.prepare_command(entrypoint)
@@ -332,7 +332,7 @@ class DockerTerminal(Terminal):
         return command
 
     def run(
-        self, entrypoint: str | list[str], timeout: int = None, raises: bool = False
+        self, entrypoint: str | list[str], timeout: int = None, raises: bool = False, user: str = None
     ) -> tuple[bool, str]:
         """Run a command in the terminal. Return command status and output."""
         command = self.prepare_command(entrypoint)
@@ -343,7 +343,7 @@ class DockerTerminal(Terminal):
             workdir=self.working_dir,
             # workdir="/tmp/code",
             environment=self.env_vars,
-            user=f"{self.host_uid}:{self.host_gid}",
+            user=f"{self.host_uid}:{self.host_gid}" if user is None else user,
             stdout=True,
             stderr=True,
         )

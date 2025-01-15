@@ -2,8 +2,8 @@ zero_shot:
     # Environment configs
     output_path: "output_swe_bench"
     benchmark: "swebench"
-    # problems: "all"  # list of problems, e.g., ["astropy__astropy-12907"], or "all"
-    problems: ["astropy__astropy-14096"]
+    problems: "all"  # list of problems, e.g., ["astropy__astropy-12907"], or "all"
+    # problems: ["astropy__astropy-14096"]
     # problems: [
     #     # "astropy__astropy-7336",
     #     # "django__django-16145",
@@ -16,10 +16,10 @@ zero_shot:
     #     # "pydata__xarray-4356"
     #     # "sphinx-doc__sphinx-10435",
     # ]
-    problems: [
-        "django__django-7530",
-        "django__django-10097",
-    ]
+    # problems: [
+    #     "django__django-7530",
+    #     "django__django-10097",
+    # ]
     # problems: ["pallets__flask-5014"]  # requirements.txt
     # problems: ["matplotlib__matplotlib-24026"]  # environment.yml  This one fails
 
