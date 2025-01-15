@@ -33,6 +33,7 @@ logger = logging.getLogger("froggy")
 
 LLM_CONFIG_FILE = os.environ.get("LLM_CONFIG_FILE", "llm.cfg")
 
+
 def is_rate_limit_error(exception):
     # List of fully qualified names of RateLimitError exceptions from various libraries
     rate_limit_errors = [
@@ -136,18 +137,42 @@ class LLM:
         )
 
         if "azure openai" in self.config.get("tags", []):
-            self.client = AzureOpenAI(
-                api_key=self.config["api_key"],
-                azure_endpoint=self.config["endpoint"],
-                api_version=self.config["api_version"],
-                timeout=None,
-            )
+            kwargs = self._get_azure_oai_kwargs()
+
+            self.client = AzureOpenAI(**kwargs)
         else:
             self.client = OpenAI(
                 api_key=self.config["api_key"],
                 base_url=self.config["endpoint"],
                 timeout=None,
             )
+
+    def _get_azure_oai_kwargs(self):
+        """
+        Returns a dictionary of keyword arguments required for connecting to Azure OpenAI.
+        This will either use an API key or AzureCliCredential (az login).
+
+        Raises ValueError: If neither an API key nor a scope is provided in the configuration.
+        """
+        api_key = self.config.get("api_key")
+        scope = self.config.get("scope")
+        kwargs = {
+            "azure_endpoint": self.config["endpoint"],
+            "api_version": self.config["api_version"],
+            "timeout": None,
+        }
+        if api_key:  # api key
+            kwargs["api_key"] = api_key
+        elif scope:  # az login
+            from azure.identity import AzureCliCredential, get_bearer_token_provider
+
+            credential = get_bearer_token_provider(AzureCliCredential(), scope)
+            kwargs["azure_ad_token_provider"] = credential
+        else:
+            raise ValueError(
+                "Invalid LLM configuration. Please provide an `api_key or `scope` in the configuration."
+            )
+        return kwargs
 
     @retry(
         retry=retry_if_exception(is_rate_limit_error),
@@ -204,12 +229,8 @@ class AsyncLLM(LLM):
         super().__init__(model_name, verbose)
 
         if "azure openai" in self.config.get("tags", []):
-            self.client = AsyncAzureOpenAI(
-                api_key=self.config["api_key"],
-                azure_endpoint=self.config["endpoint"],
-                api_version=self.config["api_version"],
-                timeout=None,
-            )
+            kwargs = self._get_azure_oai_kwargs()
+            self.client = AsyncAzureOpenAI(**kwargs)
         else:
             self.client = AsyncOpenAI(
                 api_key=self.config["api_key"],
