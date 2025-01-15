@@ -4,7 +4,8 @@ zero_shot:
     _uuid: "debug"
     benchmark: "swebench"
     # problems: "all"  # list of problems, e.g., ["astropy__astropy-12907"], or "all"
-    problems: ["astropy__astropy-14096"]
+    # problems: ["astropy__astropy-14096"]
+    problems: ["astropy__astropy-14309"]
     # problems: [
     #     "astropy__astropy-7336",
     #     "django__django-16145",
