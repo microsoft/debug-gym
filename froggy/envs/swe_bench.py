@@ -13,13 +13,12 @@ import datasets
 import docker
 from swebench.harness.constants import MAP_REPO_VERSION_TO_SPECS
 from swebench.harness.test_spec import replace_uninstallable_packages_requirements_txt
-from swebench.harness.utils import get_environment_yml, get_requirements
-from tqdm import tqdm
+from swebench.harness.utils import get_environment_yml, get_requirements, load_swebench_dataset
+from swebench.harness.test_spec import make_test_spec
+from swebench.harness.docker_build import build_instance_image, build_env_images
 
 import froggy.utils as utils
 from froggy.envs.env import RepoEnv
-
-# logger = logging.getLogger("froggy")
 
 
 class SWEBenchEnv(RepoEnv):
@@ -41,7 +40,6 @@ class SWEBenchEnv(RepoEnv):
 
         self.load_dataset()
         self.setup_commands = []
-        # atexit.register(self.cleanup)  # cleanup the containers and images
 
     @property
     def instructions(self):
@@ -64,11 +62,9 @@ class SWEBenchEnv(RepoEnv):
         for repo in repos:
             self.clone_repo(repo_address=repo)
 
-        from swebench.harness.utils import load_swebench_dataset
-        from swebench.harness.docker_build import build_env_images
+        self.logger.debug("Building Docker env-level images for SWE-Bench...")
         swebench_instances = load_swebench_dataset(name=self.dataset_id)
-        docker_client = docker.from_env()
-        build_env_images(docker_client, swebench_instances, force_rebuild=False, max_workers=24)
+        build_env_images(docker.from_env(), swebench_instances, force_rebuild=False, max_workers=24)
 
     def setup_local_repo(self):
         repo_address = self.ds_row["repo"]
@@ -126,253 +122,6 @@ class SWEBenchEnv(RepoEnv):
         self.setup_workspace(local_branch_path, entrypoint)
         return local_branch_path, entrypoint
 
-    def setup_docker_image(self):
-        base_image = "python:3.12"
-        host_uid = os.getuid()
-        host_gid = os.getgid()
-
-        repo_address = self.ds_row["repo"]
-        base_commit = self.ds_row["base_commit"]
-        test_patch = self.ds_row["test_patch"]
-
-        build_image_dir = (
-            Path.home()
-            / f".cache/froggy/swe-bench/build_images/{self.ds_row['instance_id']}"
-        )
-        os.makedirs(build_image_dir, exist_ok=True)
-
-        dockerfile = f"""
-            FROM {base_image}
-            # Install sudo
-            RUN apt-get update && apt-get install -y sudo
-            # Create group with GID if it does not exist
-            RUN if ! getent group {host_gid} > /dev/null; then \\
-                groupadd -g {host_gid} froggy_group; \\
-            fi
-            # Create a user with UID if it does not exist
-            RUN useradd -m -u {host_uid} -g {host_gid} -G sudo froggy_user
-            # Allow passwordless sudo for froggy_user
-            RUN echo 'froggy_user ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
-
-            USER froggy_user
-            RUN mkdir /tmp/code
-            """
-
-        # Clone repository
-        # local_repo_path = self.clone_repo(repo_address=repo_address)
-        org_name, repo_name = repo_address.split("/")
-        repo_url = f"https://github.com/{repo_address.lstrip('/')}"
-        # local_repo_path = self.swe_bench_repo_paths / repo_name
-        local_repo_path = "/tmp/code"
-        local_repo_path_backup = "/tmp/initial_code"
-
-        dockerfile += f"""
-            WORKDIR {local_repo_path}
-
-            # Clone task repo
-            RUN git clone {repo_url} {local_repo_path}
-            # Checkout to base commit
-            RUN git checkout {base_commit} -f
-            """
-
-        # Apply test patch
-        if test_patch != "":
-            with open(build_image_dir / "test_patch.diff", "w") as f:
-                f.write(test_patch)
-
-            dockerfile += f"""
-            # Apply test patch
-            COPY test_patch.diff /tmp/test_patch.diff
-            RUN git apply /tmp/test_patch.diff
-            """
-
-        # Run pre-install commands
-        dockerfile += f"""
-            # Run pre-install commands
-            """
-        for pre_install_cmd in self.install_configs.get("pre_install", []):
-            if any(
-                [cmd in pre_install_cmd for cmd in ["apt-get", "echo", "locale-gen"]]
-            ):
-                pre_install_cmd = f'sudo /bin/bash -c "{pre_install_cmd}"'
-            dockerfile += f"RUN {pre_install_cmd}\n"
-
-        # """Add eval_cmd to be executed every time the terminal is called"""
-        # for eval_cmd in self.install_configs.get("eval_commands", []):
-        #     self.setup_commands.append(eval_cmd)
-
-        # Install conda
-        dockerfile += """
-            # Install conda
-            RUN sudo apt update && sudo apt install -y wget git
-            RUN mkdir -p ~/miniconda3
-            RUN wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O ~/miniconda3/miniconda.sh
-            RUN bash ~/miniconda3/miniconda.sh -b -u -p ~/miniconda3
-            RUN rm ~/miniconda3/miniconda.sh
-
-            ENV PATH="/home/froggy_user/miniconda3/bin:$PATH"
-            RUN conda init --all
-            RUN conda config --append channels conda-forge
-            """
-
-        # Create conda environment
-        python = self.install_configs["python"]
-        repo_name = self.repo_name(self.repo)
-        env_name = f"{repo_name}__{self.version}"
-
-        packages = self.install_configs.get("packages", "")
-        pip_packages = self.install_configs.get("pip_packages")
-        if packages == "requirements.txt":
-            dockerfile += f"""
-                # Install from requirements.txt"
-                RUN conda create -n {env_name} python={python} -y
-                """
-
-            requirements = get_requirements(self.ds_row)
-            reqs = replace_uninstallable_packages_requirements_txt(requirements)
-            with open(build_image_dir / "requirements.txt", "w") as f:
-                f.write(reqs)
-
-            dockerfile += f"""
-                SHELL ["/home/froggy_user/miniconda3/bin/conda", "run", "--no-capture-output", "-n", "{env_name}", "/bin/bash", "-c"]
-                COPY requirements.txt /tmp/requirements.txt
-                RUN python -m pip install -r /tmp/requirements.txt
-                """
-
-        elif packages == "environment.yml":
-
-            content_env_yml = get_environment_yml(self.ds_row, env_name)
-            no_use_env = self.install_configs.get("no_use_env")
-            if no_use_env:
-                pattern = r"(python=)([^\s]+)"
-                content_env_yml = re.sub(pattern, f"python={python}", content_env_yml)
-
-            with open(build_image_dir / "environment.yml", "w") as f:
-                f.write(content_env_yml)
-
-            if no_use_env:
-                dockerfile += f"""
-                    # Create conda env from conda-forge and update from environment.yml"
-                    RUN conda create -c conda-forge -n {env_name} python={python} -y
-                    COPY environment.yml /tmp/environment.yml
-                    RUN conda env update -n {env_name} -f /tmp/environment.yml
-                    """
-            else:
-                dockerfile += f"""
-                    # Create conda env with environment.yml"
-                    COPY environment.yml /tmp/environment.yml
-                    RUN conda env create -n {env_name} -f /tmp/environment.yml
-                    SHELL ["/home/froggy_user/miniconda3/bin/conda", "run", "--no-capture-output", "-n", "{env_name}", "/bin/bash", "-c"]
-                    RUN conda install python={python} -y
-                    """
-
-        else:
-            dockerfile += f"""
-                # Create conda env and install packages"
-                RUN conda create -n {env_name} python={python} {packages} -y
-                """
-
-        dockerfile += f"""
-            # Setting the default shell to load the conda environment.
-            SHELL ["/home/froggy_user/miniconda3/bin/conda", "run", "--no-capture-output", "-n", "{env_name}", "/bin/bash", "-c"]
-            """
-
-        if pip_packages:
-            dockerfile += f"""
-                # Pip install dependencies"
-                RUN pip install {' '.join(pip_packages)}
-                """
-
-        self.terminal.setup_commands.append("source ~/miniconda3/bin/activate || true")
-        self.terminal.setup_commands.append(f"conda activate {env_name}")
-
-        # Run install commands
-        dockerfile += f"""
-            # Run install commands
-            """
-        install_cmd = self.install_configs.get("install", "")
-        if install_cmd:
-            install_cmd = install_cmd.replace("apt-get", "sudo apt-get").replace(
-                "sudo sudo", "sudo"
-            )
-            dockerfile += f"""
-            RUN {install_cmd.replace("--verbose", "").replace("-v", "").strip()}
-            """
-
-        # Run post-install commands
-        dockerfile += f"""
-            # Run post-install commands
-            """
-        for post_install_cmd in self.install_configs.get("post_install", []):
-            post_install_cmd = post_install_cmd.replace(
-                "apt-get", "sudo apt-get"
-            ).replace("sudo sudo", "sudo")
-            dockerfile += f"""
-            RUN {post_install_cmd}
-            """
-
-        dockerfile += f"""
-            # Make a backup of the initial code.
-            RUN cp -r {local_repo_path} {local_repo_path_backup}
-            """
-
-        self.logger.debug(f"{dockerfile}")
-
-        docker_client = docker.from_env()
-        image_name = f"{self.ds_row['instance_id']}-{host_uid}-{host_gid}"
-        try:
-            docker_client.images.get(image_name)
-            self.logger.info(f"Image {image_name} already exists.")
-
-        except docker.errors.ImageNotFound:
-            # Save dockerfile to local cache
-            self.logger.info(f"Saving Dockerfile to {build_image_dir}")
-            with open(build_image_dir / "Dockerfile", "w") as f:
-                f.write(dockerfile)
-
-            try:
-                self.logger.info(f"Building image {image_name}...")
-                _, build_log = docker_client.images.build(
-                    path=str(build_image_dir),
-                    tag=image_name,
-                    rm=True,
-                    forcerm=True,
-                )
-                with open(build_image_dir / "build.log", "w") as f:
-                    f.write(
-                        "".join(
-                            [
-                                chunk["stream"]
-                                for chunk in build_log
-                                if "stream" in chunk
-                            ]
-                        )
-                    )
-
-                self.logger.info(f"Image built successfully: {image_name}")
-
-            except docker.errors.BuildError as e:
-                build_log = e.build_log
-                with open(build_image_dir / "build.log", "w") as f:
-                    f.write(
-                        "".join(
-                            [
-                                chunk["stream"]
-                                for chunk in build_log
-                                if "stream" in chunk
-                            ]
-                        )
-                    )
-                self.logger.error(f"docker.errors.BuildError during {image_name}: {e}")
-                self.logger.error(f"Check build log {build_image_dir / "build.log"}")
-                raise e
-
-        # Save completion marker file.
-        (build_image_dir / "completed").touch()
-        # raise Exception("Image built successfully.")
-
-        return image_name
-
     def setup_task_info(self, task_name):
         self.task_name = task_name
         self.ds_row = self.dataset[self.task_name]
@@ -384,16 +133,9 @@ class SWEBenchEnv(RepoEnv):
         options = options or {}
         self.setup_task_info(options["task_name"])
         self.setup_local_repo()
-        #self.terminal._patched_image = self.setup_docker_image()
-
-        from swebench.harness.utils import load_swebench_dataset
-        from swebench.harness.test_spec import make_test_spec, TestSpec
-        from swebench.harness.docker_build import build_instance_image, build_env_images
-        #swebench_instances = load_swebench_dataset(name=self.dataset_id, instance_ids=[options["task_name"]])
 
         spec = make_test_spec(self.ds_row)
         docker_client = docker.from_env()
-        #build_env_images(docker_client, [spec], force_rebuild=False, max_workers=24)
         build_instance_image(spec, docker_client, logger=None, nocache=False)
 
         # Start the terminal
@@ -407,15 +149,13 @@ class SWEBenchEnv(RepoEnv):
         success, output2 = self.terminal.run(f"useradd -m -u {uid} -g {group_id} -G sudo froggy_user", user="root")
 
         # Delete the content in the working directory.
-        # success, output1 = self.terminal.run("rm -rf /tmp/code/*")
         success, output3 = self.terminal.run(f"rm -rf {self.working_dir / '*'}")
         # Copy the initial code to the working directory.
-        # success, output2 = self.terminal.run("cp -r /tmp/initial_code/* /tmp/code/")
-        # success, output2 = self.terminal.run(f"cp -r /tmp/code/* {self.working_dir}")
         success, output4 = self.terminal.run(f"cp -r /testbed/. {self.working_dir}")
 
-        self.terminal.setup_commands.append("source /opt/miniconda3/bin/activate || true")
+        self.terminal.setup_commands.append("source /opt/miniconda3/bin/activate")
         self.terminal.setup_commands.append(f"conda activate testbed")
+        self.terminal.setup_commands.append(f"echo testbed activated")
 
         self.run_install()
         self.run_post_install()

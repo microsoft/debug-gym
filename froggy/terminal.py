@@ -182,7 +182,7 @@ class Terminal:
         self,
         expected_output: str = "",
         timeout: int = 300,
-        no_output_timeout: int = 30,
+        no_output_timeout: int = 60,
         read_length: int = 1024,
     ) -> str:
         """Read from PTY until expected_output is found, timeout is reached,
