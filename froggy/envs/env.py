@@ -144,6 +144,8 @@ class RepoEnv(TooledEnv):
             self.entrypoint = entrypoint
 
         entrypoint_list = entrypoint.split()
+
+
         if entrypoint_list[0] == "pytest":
             entrypoint_list = ["python", "-m"] + entrypoint_list
             entrypoint = entrypoint_list

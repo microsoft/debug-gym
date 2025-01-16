@@ -23,6 +23,7 @@ class AgentBase:
         self.config = config_dict
         self.env = env
         self.llm = instantiate_llm(self.config, verbose=verbose)
+        _uuid = self.config.get("uuid", _uuid)
         self._uuid = str(uuid.uuid4()) if _uuid is None else _uuid
         self._output_path = pjoin(self.config["output_path"], self._uuid)
         self.logger = logger

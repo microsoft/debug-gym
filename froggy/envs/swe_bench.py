@@ -139,7 +139,8 @@ class SWEBenchEnv(RepoEnv):
         build_instance_image(spec, docker_client, logger=None, nocache=False)
 
         # Start the terminal
-        self.terminal._patched_image = spec.instance_image_key
+        #self.terminal._patched_image = spec.instance_image_key
+        self.terminal.base_image = spec.instance_image_key
         self.terminal.container
 
         # Create new group (if needed) and user.

@@ -277,12 +277,8 @@ class DockerTerminal(Terminal):
         self.docker_client = docker.from_env()
         self.host_uid = os.getuid()
         self.host_gid = os.getgid()
-        self._patched_image = None
+        # self._patched_image = None
         self._container = None
-
-    # def __del__(self):
-    #     self.logger.debug(f"Object destroyed, cleanup container.")
-    #     self.clean_up()
 
     @property
     def working_dir(self):
@@ -302,12 +298,12 @@ class DockerTerminal(Terminal):
         self.volumes[self._working_dir] = {"bind": self._working_dir, "mode": "rw"}
         # self.volumes[self._working_dir] = {"bind": "/tmp/code", "mode": "rw"}
 
-    @property
-    def patched_image(self):
-        """Lazy initialization of the patched image."""
-        if self._patched_image is None:
-            self._patched_image = self.patch_base_image(self.base_image)
-        return self._patched_image
+    # @property
+    # def patched_image(self):
+    #     """Lazy initialization of the patched image."""
+    #     if self._patched_image is None:
+    #         self._patched_image = self.patch_base_image(self.base_image)
+    #     return self._patched_image
 
     @property
     def container(self):
@@ -344,6 +340,8 @@ class DockerTerminal(Terminal):
         """Run a command in the terminal. Return command status and output."""
         command = self.prepare_command(entrypoint)
 
+        self.logger.debug(f"Exec run: {command}")
+
         # TODO: docker exec_run timeout?
         status, output = self.container.exec_run(
             command,
@@ -377,9 +375,11 @@ class DockerTerminal(Terminal):
 
     def setup_container(self) -> docker.models.containers.Container:
         # Create and start a container mounting volumes and setting environment variables
-        self.logger.debug(f"Setting up container with base image: {self.patched_image}")
+        # self.logger.debug(f"Setting up container with base image: {self.patched_image}")
+        self.logger.debug(f"Setting up container with base image: {self.base_image}")
         container = self.docker_client.containers.run(
-            image=self.patched_image,
+            # image=self.patched_image,
+            image=self.base_image,
             command="sleep infinity",  # Keep the container running
             working_dir=self.working_dir,
             volumes=self.volumes,
@@ -408,45 +408,45 @@ class DockerTerminal(Terminal):
                 )
             self._container = None
 
-    def patch_base_image(self, base_image: str) -> str:
-        """Patch the base image creating a user and group with
-        the same UID and GID as the host. This allows the container
-        to write to the host filesystem with the same permissions.
-        Inside the container, the user has root privileges."""
-        try:
-            self.docker_client.images.get(base_image)
-        except docker.errors.ImageNotFound:
-            self.logger.debug(f"Pulling base image: {base_image}")
-            self.docker_client.images.pull(base_image)
+    # def patch_base_image(self, base_image: str) -> str:
+    #     """Patch the base image creating a user and group with
+    #     the same UID and GID as the host. This allows the container
+    #     to write to the host filesystem with the same permissions.
+    #     Inside the container, the user has root privileges."""
+    #     try:
+    #         self.docker_client.images.get(base_image)
+    #     except docker.errors.ImageNotFound:
+    #         self.logger.debug(f"Pulling base image: {base_image}")
+    #         self.docker_client.images.pull(base_image)
 
-        patch_version = "v1"
-        dockerfile = f"""
-            FROM {base_image}
-            # Install sudo
-            RUN apt-get update && apt-get install -y sudo
-            # Create group with GID if it does not exist
-            RUN if ! getent group {self.host_gid} > /dev/null; then \\
-                groupadd -g {self.host_gid} froggy_group; \\
-            fi
-            # Create a user with UID if it does not exist
-            RUN useradd -m -u {self.host_uid} -g {self.host_gid} -G sudo froggy_user
-            # Allow passwordless sudo for froggy_user
-            RUN echo 'froggy_user ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
-            """
+    #     patch_version = "v1"
+    #     dockerfile = f"""
+    #         FROM {base_image}
+    #         # Install sudo
+    #         RUN apt-get update && apt-get install -y sudo
+    #         # Create group with GID if it does not exist
+    #         RUN if ! getent group {self.host_gid} > /dev/null; then \\
+    #             groupadd -g {self.host_gid} froggy_group; \\
+    #         fi
+    #         # Create a user with UID if it does not exist
+    #         RUN useradd -m -u {self.host_uid} -g {self.host_gid} -G sudo froggy_user
+    #         # Allow passwordless sudo for froggy_user
+    #         RUN echo 'froggy_user ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
+    #         """
 
-        image_tag = f"{base_image}-{self.host_uid}-{self.host_gid}-{patch_version}"
-        try:
-            self.docker_client.images.get(image_tag)
-            self.logger.debug(f"Image {image_tag} already exists.")
-        except docker.errors.ImageNotFound:
-            self.logger.debug(f"Building image {image_tag}.")
-            self.docker_client.images.build(
-                fileobj=io.BytesIO(dockerfile.encode("utf-8")),
-                tag=image_tag,
-                rm=True,
-                custom_context=False,
-            )
-        return image_tag
+    #     image_tag = f"{base_image}-{self.host_uid}-{self.host_gid}-{patch_version}"
+    #     try:
+    #         self.docker_client.images.get(image_tag)
+    #         self.logger.debug(f"Image {image_tag} already exists.")
+    #     except docker.errors.ImageNotFound:
+    #         self.logger.debug(f"Building image {image_tag}.")
+    #         self.docker_client.images.build(
+    #             fileobj=io.BytesIO(dockerfile.encode("utf-8")),
+    #             tag=image_tag,
+    #             rm=True,
+    #             custom_context=False,
+    #         )
+    #     return image_tag
 
 
 def select_terminal(
