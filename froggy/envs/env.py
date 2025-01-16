@@ -145,11 +145,11 @@ class RepoEnv(TooledEnv):
 
         entrypoint_list = entrypoint.split()
 
-
-        if entrypoint_list[0] == "pytest":
-            entrypoint_list = ["python", "-m"] + entrypoint_list
+        if entrypoint_list[0] != "python":
+            entrypoint_list[0] = f"$(which {entrypoint_list[0]})"
+            entrypoint_list = ["python"] + entrypoint_list
             entrypoint = entrypoint_list
-        # assert entrypoint_list[0] == "python", "Only support python entrypoint for now."
+
         self.entrypoint = " ".join(entrypoint_list)
 
         # Set up the terminal working dir
