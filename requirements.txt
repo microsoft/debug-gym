@@ -6,6 +6,7 @@ pyyaml
 rich
 gitignore_parser
 termcolor
+matplotlib
 transformers
 tiktoken
 docker

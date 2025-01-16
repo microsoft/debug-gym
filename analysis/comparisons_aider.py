@@ -258,10 +258,13 @@ def main():
     if os.path.isfile(jsonl_folder_name):
         with open(jsonl_folder_name, 'r') as file:
             folder = json.load(file)
-            subfolder_name_baseline = folder["subfolder_name_baseline"]
-            subfolder_name_agent = folder["subfolder_name_agent"]
+            subfolder_name_baseline = folder["baseline"]
+            subfolder_name_agent = folder["agent"]
             output_name_path = folder["output_name_path"]
-
+    # Create results folder if it doesn't exist
+    results_folder = './analysis/results'
+    if not os.path.exists(results_folder):
+        os.makedirs(results_folder)
     # Call the function to parse the jsonl files
     average_count_analysis = {}
     average_tool_analysis = {}

@@ -1,6 +1,9 @@
-{"subfolder_name_baseline": ["input uuid here",
+{"baseline": ["input uuid here",
+            ],
+"agent":  ["input uuid here",
             ],
 
-"subfolder_name_agent":  ["input uuid here",
-            ],
+"input agent name1 here": ["input uuid here",], 
+"input agent name2 here": ["input uuid here",],
+
 "output_name_path": "final"}
