@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import os
+from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from multiprocessing import Pool
 from os.path import join as pjoin
@@ -42,7 +43,9 @@ def run_agent(args, problem, config):
     )
     try:
         agent = create_agent(args, config, logger=task_logger)
+        previous_run = Path(agent._output_path) / problem / "froggy.jsonl"
 
+        if not args.force and os.path.exists(previous_run):
         if os.path.exists(pjoin(agent._output_path, problem, "froggy.jsonl")):
             print(colored(f"Skipping {problem}, already done.", "yellow"))
             return

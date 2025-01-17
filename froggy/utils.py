@@ -2,11 +2,11 @@ import argparse
 import codecs
 import logging
 import os
-from pathlib import Path
 import re
 import signal
 from contextlib import contextmanager
 from os.path import join as pjoin
+from pathlib import Path
 from typing import Optional
 
 import yaml
@@ -188,7 +188,14 @@ def load_config():
         "--debug", action="store_true", help="Before sending action to the environment."
     )
     parser.add_argument("-v", "--verbose", action="store_true", help="Verbose mode")
-    parser.add_argument("-vv", "--very-verbose", action="store_true", help="Set logging level to DEBUG")
+    parser.add_argument(
+        "-vv", "--very-verbose", action="store_true", help="Set logging level to DEBUG"
+    )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Force running problems even if they are already done.",
+    )
     parser.add_argument(
         "-p",
         "--params",
@@ -219,12 +226,12 @@ class TaskLogger(logging.LoggerAdapter):
         return f"[Task-{self.extra['task']}] {msg}", kwargs
 
 
-def setup_logger(name: str, log_dir: str|None = None, verbose: bool = False):
+def setup_logger(name: str, log_dir: str | None = None, verbose: bool = False):
     logger = logging.getLogger(name)
     logger.setLevel(logging.DEBUG)
 
     console = logging.StreamHandler()
-    formatter = logging.Formatter('🐸 [%(name)-12s]: %(levelname)-8s %(message)s')
+    formatter = logging.Formatter("🐸 [%(name)-12s]: %(levelname)-8s %(message)s")
     console.setFormatter(formatter)
     console.setLevel(logging.DEBUG if verbose else logging.INFO)
     logger.addHandler(console)
@@ -240,5 +247,6 @@ def setup_logger(name: str, log_dir: str|None = None, verbose: bool = False):
         fh.setLevel(logging.DEBUG)
         logger.addHandler(fh)
 
-    logger.propagate = False  # Prevent the log messages from being propagated to the root logger
+    # Prevent the log messages from being propagated to the root logger
+    logger.propagate = False
     return logger
