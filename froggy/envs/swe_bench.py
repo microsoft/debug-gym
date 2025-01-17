@@ -88,7 +88,7 @@ class SWEBenchEnv(RepoEnv):
         if not local_branch_path.exists():
             # Duplicate the repo to avoid changing the current branch.
             self.logger.info(f"Copying {local_repo_path} to {local_branch_path}")
-            shutil.copytree(local_repo_path, local_branch_path)
+            shutil.copytree(local_repo_path, local_branch_path, symlinks=True)
 
             # Checkout to base commit.
             command = f"git -C {local_branch_path} checkout {base_commit} -f"
@@ -196,12 +196,6 @@ class SWEBenchEnv(RepoEnv):
             for test in test_status_map
             if test_status_map[test] == TestStatus.PASSED.value
         )
-
-        # TODO: ====> testing purposes <====
-        self.logger.info(f"Current score: {infos['score']}/{infos['max_score']}")
-        if infos["score"] != infos["max_score"]:
-            from ipdb import set_trace; set_trace()
-        # TODO: ============================
 
         return obs, score, done, infos
 

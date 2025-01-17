@@ -117,7 +117,7 @@ class RepoEnv(TooledEnv):
         )  # Make sure to cleanup that folder once done.
 
         self.logger.debug(f"Working directory: {self.working_dir}")
-        shutil.copytree(self.path, self.working_dir, dirs_exist_ok=True)
+        shutil.copytree(self.path, self.working_dir, dirs_exist_ok=True, symlinks=True)
 
         # get list of all the files
         self.all_files = sorted(

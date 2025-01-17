@@ -233,7 +233,8 @@ def setup_logger(name: str, log_dir: str|None = None, verbose: bool = False):
         log_dir = Path(log_dir)
         log_dir.mkdir(parents=True, exist_ok=True)
 
-        fh = logging.FileHandler(log_dir / f"{name}.log", mode="w")
+        logger.log_file = log_dir / f"{name}.log"
+        fh = logging.FileHandler(logger.log_file, mode="w")
         formatter = logging.Formatter("%(asctime)s %(levelname)-8s %(message)s")
         fh.setFormatter(formatter)
         fh.setLevel(logging.DEBUG)

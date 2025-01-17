@@ -4,21 +4,20 @@ solution:
     output_path: "output_swe_bench"
     uuid: "debug"
     benchmark: "swebench"
-    problems: "all"  # list of problems, e.g., ["astropy__astropy-12907"], or "all"
-    # problems: ["astropy__astropy-7336"]
-    # problems: ["astropy__astropy-14309"]
-    # problems: [
-    #     "astropy__astropy-7336",
-    #     "django__django-16145",
-    #     "matplotlib__matplotlib-20859",
-    #     "mwaskom__seaborn-3187",
-    #     "psf__requests-1766",
-    #     "scikit-learn__scikit-learn-13496",
-    #     "pytest-dev__pytest-7205",
-    #     "pylint-dev__pylint-6903",
-    #     "pydata__xarray-4356",
-    #     "sphinx-doc__sphinx-10435",
-    # ]
+    # problems: "all"  # list of problems, e.g., ["astropy__astropy-12907"], or "all"
+    # problems: ["psf__requests-1766"]
+    problems: [
+        "astropy__astropy-7336",
+        "django__django-16145",
+        "matplotlib__matplotlib-20859",
+        "mwaskom__seaborn-3187",
+        "psf__requests-1766",
+        "scikit-learn__scikit-learn-13496",
+        "pytest-dev__pytest-7205",
+        "pylint-dev__pylint-6903",
+        "pydata__xarray-4356",
+        "sphinx-doc__sphinx-10435",
+    ]
     # problems: [
     #     "django__django-7530",
     #     "django__django-10097",
@@ -50,7 +49,7 @@ solution:
     memory_size: 20
     use_conversational_prompt: True
     save_patch: False
-    log_prompt_response_pairs: True
+    log_prompt_response_pairs: False
     reset_prompt_history_after_rewrite: True
 
 zero_shot:

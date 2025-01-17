@@ -40,20 +40,29 @@ def run_agent(args, problem, config):
     task_logger = setup_logger(
         problem, log_dir=config["output_path"], verbose=args.very_verbose
     )
-    agent = create_agent(args, config, logger=task_logger)
+    try:
+        agent = create_agent(args, config, logger=task_logger)
 
-    if os.path.exists(pjoin(agent._output_path, problem, "froggy.jsonl")):
-        print(colored(f"Skipping {problem}, already done.", "yellow"))
-        return
+        if os.path.exists(pjoin(agent._output_path, problem, "froggy.jsonl")):
+            print(colored(f"Skipping {problem}, already done.", "yellow"))
+            return
 
-    done = agent.run(task_name=problem, debug=args.debug)
+        done = agent.run(task_name=problem, debug=args.debug)
 
-    # optionally apply patch
-    if config["save_patch"]:
-        agent.save_patch(task_name=problem)
+        # optionally apply patch
+        if config["save_patch"]:
+            agent.save_patch(task_name=problem)
 
-    # save log
-    agent.log(task_name=problem)
+        # save log
+        agent.log(task_name=problem)
+    except Exception as e:
+        task_logger.warning(
+            f"Task Error: {problem} - {e!r}. Run with --very-verbose or check {task_logger.log_file} for more information."
+        )
+        task_logger.debug(
+            f"Task {problem} generated an exception: {e!r}", exc_info=True
+        )
+        raise e
 
     return done
 
@@ -151,19 +160,7 @@ def main():
                 for problem in problem_list
             ]
             for future in as_completed(futures):
-                try:
-                    result = future.result()
-                except Exception as e:
-                    logger.warning(
-                        f"Task Error: {e!r}. Run with --verbose for more information."
-                    )
-                    logger.debug(f"Task HERE generated an exception: {e!r}", exc_info=True)
-                    if args.debug:
-                        executor.shutdown(wait=False)
-                        raise e
-
-                    continue  # Skip to the next future if desired
-
+                result = future.result()
                 mean_perf += result
                 tasks_done += 1
 
