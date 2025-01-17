@@ -1,12 +1,8 @@
-import asyncio
-import logging
+import json
 import os
-from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from multiprocessing import Pool
-from os.path import join as pjoin
+from pathlib import Path
 
-from rich.progress import BarColumn, Progress, TextColumn
 from termcolor import colored
 from tqdm import tqdm
 
@@ -46,11 +42,12 @@ def run_agent(args, problem, config):
         previous_run = Path(agent._output_path) / problem / "froggy.jsonl"
 
         if not args.force and os.path.exists(previous_run):
-        if os.path.exists(pjoin(agent._output_path, problem, "froggy.jsonl")):
+            with open(previous_run) as reader:
+                success = json.load(reader)["success"]
             print(colored(f"Skipping {problem}, already done.", "yellow"))
-            return
+            return success
 
-        done = agent.run(task_name=problem, debug=args.debug)
+        success = agent.run(task_name=problem, debug=args.debug)
 
         # optionally apply patch
         if config["save_patch"]:
@@ -67,7 +64,7 @@ def run_agent(args, problem, config):
         )
         raise e
 
-    return done
+    return success
 
 
 def create_env(args, config, logger):
