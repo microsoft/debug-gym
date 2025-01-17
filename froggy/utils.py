@@ -192,9 +192,14 @@ def load_config():
         "-vv", "--very-verbose", action="store_true", help="Set logging level to DEBUG"
     )
     parser.add_argument(
-        "--force",
+        "--force-all",
         action="store_true",
-        help="Force running problems even if they are already done.",
+        help="Force running all problems even if they are already done.",
+    )
+    parser.add_argument(
+        "--force-failed",
+        action="store_true",
+        help="Force running only problems that have failed.",
     )
     parser.add_argument(
         "-p",

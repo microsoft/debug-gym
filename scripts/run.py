@@ -10,8 +10,6 @@ from froggy.terminal import select_terminal
 from froggy.tools.toolbox import Toolbox
 from froggy.utils import load_config, setup_logger
 
-# logger = logging.getLogger("froggy")
-
 
 def select_env(env_type: str = None):
     match env_type:
@@ -28,11 +26,6 @@ def select_env(env_type: str = None):
     return env_class
 
 
-def run_agent_wrapper(payload):
-    args, problem, config = payload
-    return run_agent(args, problem, config)
-
-
 def run_agent(args, problem, config):
     task_logger = setup_logger(
         problem, log_dir=config["output_path"], verbose=args.very_verbose
@@ -41,12 +34,17 @@ def run_agent(args, problem, config):
         agent = create_agent(args, config, logger=task_logger)
         previous_run = Path(agent._output_path) / problem / "froggy.jsonl"
 
-        if not args.force and os.path.exists(previous_run):
+        if not args.force_all and os.path.exists(previous_run):
+            task_logger.debug(f"Previous run found: {previous_run}")
             with open(previous_run) as reader:
                 success = json.load(reader)["success"]
-            print(colored(f"Skipping {problem}, already done.", "yellow"))
-            return success
 
+            task_logger.debug(f"Previous run success: {success}")
+            if not args.force_failed or success:
+                task_logger.info(f"Skipping {problem}, already done.")
+                return success
+
+        agent.env = create_env(args, config, task_logger)
         success = agent.run(task_name=problem, debug=args.debug)
 
         # optionally apply patch
@@ -86,11 +84,9 @@ def create_env(args, config, logger):
 
 
 def create_agent(args, config, logger):
-    env = create_env(args, config, logger)
-
     agent_config = dict(
         config_dict=config,
-        env=env,
+        env=None,  # Will be set once after we determine if we skip the task.
         verbose=args.verbose,
         logger=logger,
     )
@@ -172,6 +168,7 @@ def main():
         # custom repo
         print(colored(f"Running agent {agent.name}", "green"))
         agent = create_agent(args, config)
+        agent.env = create_env(args, config)
         agent.run(debug=args.debug)
 
         # optionally apply patch

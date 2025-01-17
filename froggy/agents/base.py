@@ -110,6 +110,8 @@ class AgentBase:
             "uuid": self._uuid,
             "success": self.env.done,
             "log": [],
+            "agent_type": self.__class__.__name__,
+            "logger": str(self.logger.log_file),
         }
         for step_id in range(len(self.history)):
             step_json = self.history.json(
