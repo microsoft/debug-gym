@@ -11,11 +11,14 @@ from pathlib import Path
 
 import datasets
 import docker
+
+from swebench.harness.constants import TestStatus
+from swebench.harness.log_parsers import MAP_REPO_TO_PARSER
 from swebench.harness.constants import MAP_REPO_VERSION_TO_SPECS
-from swebench.harness.test_spec import replace_uninstallable_packages_requirements_txt
-from swebench.harness.utils import get_environment_yml, get_requirements, load_swebench_dataset
+from swebench.harness.utils import load_swebench_dataset
 from swebench.harness.test_spec import make_test_spec
-from swebench.harness.docker_build import build_instance_image, build_env_images
+from swebench.harness.docker_build import build_instance_image, build_env_images, get_env_configs_to_build
+from tqdm import tqdm
 
 import froggy.utils as utils
 from froggy.envs.env import RepoEnv
@@ -35,7 +38,7 @@ class SWEBenchEnv(RepoEnv):
         self.dataset_id = dataset_id
         self.split = split
         self.swe_bench_base_image = base_image
-        self.swe_bench_repo_paths = Path.home() / ".cache/froggy/swe-bench"
+        self.swe_bench_repo_paths = Path.joinpath(Path.home(), ".cache", "froggy", "swe-bench")
         self.swe_bench_repo_paths.mkdir(parents=True, exist_ok=True)
 
         self.load_dataset()
@@ -55,24 +58,27 @@ class SWEBenchEnv(RepoEnv):
         self.dataset = {row["instance_id"]: row for row in self.ds.sort("instance_id")}
 
         # To avoid concurrency issues, we will clone all the repos in the dataset.
-        self.logger.debug("Cloning all repos needed for SWE-Bench...")
-        # TODO check if missing a repository
-        repos = {task["repo"] for task in self.dataset.values()}
-        # for repo in tqdm(repos, desc="Cloning repos needed for SWE-Bench"):
-        for repo in repos:
-            self.clone_repo(repo_address=repo)
+        repos = sorted({task["repo"] for task in self.dataset.values()})
+        repo_names = [repo.split("/")[1] for repo in repos]
+        missing_repos = [repo for repo in repo_names if not Path.exists(self.swe_bench_repo_paths / repo)]
+        if missing_repos:
+            self.logger.debug("Cloning all repos needed for SWE-Bench...")
+            for repo in tqdm(repos, desc="Cloning repos needed for SWE-Bench"):
+                self.clone_repo(repo_address=repo)
 
-        self.logger.debug("Building Docker env-level images for SWE-Bench...")
         swebench_instances = load_swebench_dataset(name=self.dataset_id)
-        build_env_images(docker.from_env(), swebench_instances, force_rebuild=False, max_workers=24)
+        docker_client = docker.from_env()
+        if get_env_configs_to_build(docker_client, swebench_instances):
+            self.logger.debug("Building Docker env-level images for SWE-Bench...")
+            build_env_images(docker.from_env(), swebench_instances, force_rebuild=False, max_workers=24)
 
     def setup_local_repo(self):
         repo_address = self.ds_row["repo"]
         base_commit = self.ds_row["base_commit"]
         test_patch = self.ds_row["test_patch"]
         # TODO: use fail_to_pass and pass_to_pass
-        fail_to_pass = literal_eval(self.ds_row["FAIL_TO_PASS"])
-        pass_to_pass = literal_eval(self.ds_row["PASS_TO_PASS"])
+        self.fail_to_pass = literal_eval(self.ds_row["FAIL_TO_PASS"])
+        self.pass_to_pass = literal_eval(self.ds_row["PASS_TO_PASS"])
 
         # Clone repository (should already be cloned)
         assert (self.swe_bench_repo_paths / repo_address.split("/")[1]).exists()
@@ -106,12 +112,12 @@ class SWEBenchEnv(RepoEnv):
         if "django" in self.ds_row["instance_id"]:
             # test_zero_ip_addr (admin_scripts.tests.ManageRunserver) -> admin_scripts.tests.ManageRunserver.test_zero_ip_addr
             # Make regex to perform the replacement
-            fail_to_pass = [
-                re.sub(r"(.*) \((.*)\)", r"\2.\1", test) for test in fail_to_pass
+            self.fail_to_pass = [
+                re.sub(r"(.*) \((.*)\)", r"\2.\1", test) for test in self.fail_to_pass
             ]
 
         entrypoint = (
-            self.install_configs["test_cmd"] + " " + " ".join(fail_to_pass)
+            self.install_configs["test_cmd"] + " " + " ".join(self.fail_to_pass)
         )  # + pass_to_pass)
         # # TODO: Find another way to extract inline env vars from entrypoint. Move to env_vars instead of setup_commands
         if entrypoint.startswith("PYTHONWARNINGS"):
@@ -128,6 +134,7 @@ class SWEBenchEnv(RepoEnv):
         self.repo = self.ds_row["repo"]
         self.version = self.ds_row["version"]
         self.install_configs = self.get_configs(self.repo, self.version)
+        self.gold_patch = self.ds_row["patch"]
 
     def reset(self, *, seed=None, options: dict | None = None):
         options = options or {}
@@ -139,20 +146,19 @@ class SWEBenchEnv(RepoEnv):
         build_instance_image(spec, docker_client, logger=None, nocache=False)
 
         # Start the terminal
-        #self.terminal._patched_image = spec.instance_image_key
         self.terminal.base_image = spec.instance_image_key
         self.terminal.container
 
         # Create new group (if needed) and user.
         uid = os.getuid()
         group_id = os.getgid()
-        success, output1 = self.terminal.run(f"groupadd -g {group_id} froggy_group", user="root")
-        success, output2 = self.terminal.run(f"useradd -m -u {uid} -g {group_id} -G sudo froggy_user", user="root")
+        self.terminal.run(f"groupadd -g {group_id} froggy_group", user="root")
+        self.terminal.run(f"useradd -m -u {uid} -g {group_id} -G sudo froggy_user", user="root")
 
         # Delete the content in the working directory.
-        success, output3 = self.terminal.run(f"rm -rf {self.working_dir / '*'}")
+        self.terminal.run(f"rm -rf {self.working_dir / '*'}")
         # Copy the initial code to the working directory.
-        success, output4 = self.terminal.run(f"cp -r /testbed/. {self.working_dir}")
+        self.terminal.run(f"cp -r /testbed/. {self.working_dir}")
 
         self.terminal.setup_commands.append("source /opt/miniconda3/bin/activate")
         self.terminal.setup_commands.append(f"conda activate testbed")
@@ -164,13 +170,10 @@ class SWEBenchEnv(RepoEnv):
         # Reset RepoEnv
         obs, infos = super().reset()
         # TODO: probably needed cleanup specific to each SWE-Bench repo.
-        infos["last_run_obs"] = utils.cleanup_pytest_output(infos["last_run_obs"])
+        # infos["last_run_obs"] = utils.cleanup_pytest_output(infos["last_run_obs"])
 
-        self.max_score = len(self.ds_row["FAIL_TO_PASS"])
+        self.max_score = len(self.fail_to_pass) #+ len(self.pass_to_pass)
         infos["max_score"] = self.max_score
-
-        from swebench.harness.constants import TestStatus
-        from swebench.harness.log_parsers import MAP_REPO_TO_PARSER
 
         test_status_map = MAP_REPO_TO_PARSER[self.repo](infos["last_run_obs"])
         infos["score"] = sum(
@@ -183,8 +186,23 @@ class SWEBenchEnv(RepoEnv):
 
     def step(self, action: str):
         obs, score, done, infos = super().step(action)
-        infos["last_run_obs"] = utils.cleanup_pytest_output(infos["last_run_obs"])
-        infos["score"] = utils.extract_reward_from_pytest_output(infos["last_run_obs"])
+
+        # TODO: probably needed cleanup specific to each SWE-Bench repo.
+        # infos["last_run_obs"] = utils.cleanup_pytest_output(infos["last_run_obs"])
+        #infos["score"] = utils.extract_reward_from_pytest_output(infos["last_run_obs"])
+        test_status_map = MAP_REPO_TO_PARSER[self.repo](infos["last_run_obs"])
+        infos["score"] = sum(
+            1
+            for test in test_status_map
+            if test_status_map[test] == TestStatus.PASSED.value
+        )
+
+        # TODO: ====> testing purposes <====
+        self.logger.info(f"Current score: {infos['score']}/{infos['max_score']}")
+        if infos["score"] != infos["max_score"]:
+            from ipdb import set_trace; set_trace()
+        # TODO: ============================
+
         return obs, score, done, infos
 
     def clone_repo(self, repo_address):
@@ -223,12 +241,12 @@ class SWEBenchEnv(RepoEnv):
         status, output = self.terminal.run(command, raises=True)
         return status, output
 
-    def run_pre_install(self):
-        pre_install_cmds = self.install_configs.get("pre_install")
-        if pre_install_cmds:
-            self.logger.info("Running pre-install commands...")
-            for pre_install_cmd in pre_install_cmds:
-                self.run_command_with_raise(pre_install_cmd)
+    # def run_pre_install(self):
+    #     pre_install_cmds = self.install_configs.get("pre_install")
+    #     if pre_install_cmds:
+    #         self.logger.info("Running pre-install commands...")
+    #         for pre_install_cmd in pre_install_cmds:
+    #             self.run_command_with_raise(pre_install_cmd)
 
     def prepare_eval_commands(self):
         """Add eval_cmd to be executed every time the terminal is called"""

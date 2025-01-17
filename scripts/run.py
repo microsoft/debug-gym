@@ -40,29 +40,20 @@ def run_agent(args, problem, config):
     task_logger = setup_logger(
         problem, log_dir=config["output_path"], verbose=args.very_verbose
     )
-    try:
-        agent = create_agent(args, config, logger=task_logger)
+    agent = create_agent(args, config, logger=task_logger)
 
-        if os.path.exists(pjoin(agent._output_path, problem, "froggy.jsonl")):
-            print(colored(f"Skipping {problem}, already done.", "yellow"))
-            return
+    if os.path.exists(pjoin(agent._output_path, problem, "froggy.jsonl")):
+        print(colored(f"Skipping {problem}, already done.", "yellow"))
+        return
 
-        done = agent.run(task_name=problem, debug=args.debug)
+    done = agent.run(task_name=problem, debug=args.debug)
 
-        # optionally apply patch
-        if config["save_patch"]:
-            agent.save_patch(task_name=problem)
+    # optionally apply patch
+    if config["save_patch"]:
+        agent.save_patch(task_name=problem)
 
-        # save log
-        agent.log(task_name=problem)
-    except Exception as e:
-        task_logger.warning(
-            f"Task Error: {problem} - {e!r}. Run with --verbose for more information."
-        )
-        task_logger.debug(
-            f"Task {problem} generated an exception: {e!r}", exc_info=True
-        )
-        raise e
+    # save log
+    agent.log(task_name=problem)
 
     return done
 
@@ -97,6 +88,8 @@ def create_agent(args, config, logger):
 
     # instantiate agent
     match args.agent:
+        case "solution":
+            from froggy.agents import AgentSolution as agent_class
         case "zero_shot":
             from froggy.agents import AgentZeroShot as agent_class
         case "cot":
@@ -151,25 +144,6 @@ def main():
         tasks_done = 0
         mean_perf = 0
 
-        # with Pool(num_workers) as pool:
-        #     results = []
-        #     jobs = ((args, problem, config) for problem in problem_list)
-        #     for result in tqdm(pool.map(run_agent_wrapper, jobs), total=len(problem_list)):
-        #         try:
-        #             if result is not None:
-        #                 mean_perf += result
-        #                 tasks_done += 1
-
-        #             # pbar.set_description_str(
-        #             #     f"Avg. Score so far: {mean_perf / tasks_done:.2f}"
-        #             # )
-        #             #pbar.update()
-        #         except Exception as e:
-        #             logger.warning(f"Task Error: {e!r}. Run with --verbose for more information.")
-        #             logger.debug(f"Task generated an exception: {e!r}", exc_info=True)
-        #             if args.debug:
-        #                 raise e
-
         pbar = tqdm(range(len(problem_list)))
         with ThreadPoolExecutor(num_workers) as executor:
             futures = [
@@ -179,18 +153,13 @@ def main():
             for future in as_completed(futures):
                 try:
                     result = future.result()
-                except asyncio.CancelledError:
-                    logger.warning("Task cancelled.")
-                    break
-                except KeyboardInterrupt:
-                    logger.warning("Task interrupted by user.")
-                    break
                 except Exception as e:
                     logger.warning(
                         f"Task Error: {e!r}. Run with --verbose for more information."
                     )
-                    logger.debug(f"Task generated an exception: {e!r}", exc_info=True)
+                    logger.debug(f"Task HERE generated an exception: {e!r}", exc_info=True)
                     if args.debug:
+                        executor.shutdown(wait=False)
                         raise e
 
                     continue  # Skip to the next future if desired
@@ -207,9 +176,11 @@ def main():
         print(colored(f"Running agent {agent.name}", "green"))
         agent = create_agent(args, config)
         agent.run(debug=args.debug)
+
         # optionally apply patch
         if config["save_patch"]:
             agent.save_patch()
+
         # save log
         agent.log()
 

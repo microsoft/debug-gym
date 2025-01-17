@@ -6,6 +6,7 @@ from os.path import join as pjoin
 
 import numpy as np
 from termcolor import colored
+from tqdm import tqdm
 
 from froggy.agents.llm_api import instantiate_llm
 from froggy.agents.utils import HistoryTracker, build_history_prompt
@@ -121,3 +122,56 @@ class AgentBase:
             json.dump(jsonl_output, f, indent=4)
 
         self.logger.debug(f"Log saved in {pjoin(self._output_path, task_name, 'froggy.jsonl')}")
+
+class AgentSolution(AgentBase):
+    name: str = "solution"
+
+    def __init__(self, config_dict, env, verbose=False, _uuid=None, **kwargs):
+        super().__init__(config_dict, env, verbose, _uuid, **kwargs)
+
+    def run(self, task_name=None, debug=False):
+        self.history.reset()
+        _, info = self.env.reset(options={"task_name": task_name})
+        self.history.step(info)
+
+        if info["done"] is True:
+            return True
+
+        done = False
+        highscore = info["score"]
+
+        pbar = tqdm(
+            total=self.config["max_steps"],
+            desc=f"Debugging inside {self.env.working_dir} - Task: {task_name}",
+            leave=True,
+        )
+        for step in range(self.config["max_steps"]):
+            highscore = max(highscore, info["score"])
+            pbar.set_postfix_str(
+                f"Score: {info['score']}/{info['max_score']} ({info['score']/info['max_score']:.1%}) [Best: {highscore}]".format(
+                    info["score"]
+                )
+            )
+
+            self.logger.info(f"Applying gold patch to {self.env.working_dir}.")
+            command = f"git -C {self.env.working_dir} apply -"
+            subprocess.run(command.split(), input=self.env.gold_patch, text=True, check=True)
+            self.logger.info("Patch applied successfully.")
+
+            if debug:
+                breakpoint()
+
+            _, _, done, info = self.env.step("```eval```")
+            info["token_usage"] = [0]
+            self.history.step(info)
+
+            pbar.update()
+            if done or info["rewrite_counter"] >= self.config["max_rewrite_steps"]:
+                pbar.set_postfix_str(
+                    f"Score: {info['score']}/{info['max_score']} ({info['score']/info['max_score']:.1%})".format(
+                        info["score"]
+                    )
+                )
+                break
+
+        return done
