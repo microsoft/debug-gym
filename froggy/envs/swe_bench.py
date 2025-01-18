@@ -11,13 +11,15 @@ from pathlib import Path
 
 import datasets
 import docker
-
-from swebench.harness.constants import TestStatus
+from swebench.harness.constants import MAP_REPO_VERSION_TO_SPECS, TestStatus
+from swebench.harness.docker_build import (
+    build_env_images,
+    build_instance_image,
+    get_env_configs_to_build,
+)
 from swebench.harness.log_parsers import MAP_REPO_TO_PARSER
-from swebench.harness.constants import MAP_REPO_VERSION_TO_SPECS
-from swebench.harness.utils import load_swebench_dataset
 from swebench.harness.test_spec import make_test_spec
-from swebench.harness.docker_build import build_instance_image, build_env_images, get_env_configs_to_build
+from swebench.harness.utils import load_swebench_dataset
 from tqdm import tqdm
 
 import froggy.utils as utils
@@ -38,7 +40,9 @@ class SWEBenchEnv(RepoEnv):
         self.dataset_id = dataset_id
         self.split = split
         self.swe_bench_base_image = base_image
-        self.swe_bench_repo_paths = Path.joinpath(Path.home(), ".cache", "froggy", "swe-bench")
+        self.swe_bench_repo_paths = Path.joinpath(
+            Path.home(), ".cache", "froggy", "swe-bench"
+        )
         self.swe_bench_repo_paths.mkdir(parents=True, exist_ok=True)
 
         self.load_dataset()
@@ -60,7 +64,11 @@ class SWEBenchEnv(RepoEnv):
         # To avoid concurrency issues, we will clone all the repos in the dataset.
         repos = sorted({task["repo"] for task in self.dataset.values()})
         repo_names = [repo.split("/")[1] for repo in repos]
-        missing_repos = [repo for repo in repo_names if not Path.exists(self.swe_bench_repo_paths / repo)]
+        missing_repos = [
+            repo
+            for repo in repo_names
+            if not Path.exists(self.swe_bench_repo_paths / repo)
+        ]
         if missing_repos:
             self.logger.debug("Cloning all repos needed for SWE-Bench...")
             for repo in tqdm(repos, desc="Cloning repos needed for SWE-Bench"):
@@ -70,7 +78,12 @@ class SWEBenchEnv(RepoEnv):
         docker_client = docker.from_env()
         if get_env_configs_to_build(docker_client, swebench_instances):
             self.logger.debug("Building Docker env-level images for SWE-Bench...")
-            build_env_images(docker.from_env(), swebench_instances, force_rebuild=False, max_workers=24)
+            build_env_images(
+                docker.from_env(),
+                swebench_instances,
+                force_rebuild=False,
+                max_workers=24,
+            )
 
     def setup_local_repo(self):
         repo_address = self.ds_row["repo"]
@@ -115,6 +128,9 @@ class SWEBenchEnv(RepoEnv):
             self.fail_to_pass = [
                 re.sub(r"(.*) \((.*)\)", r"\2.\1", test) for test in self.fail_to_pass
             ]
+        elif "sympy" in self.ds_row["instance_id"]:
+            # run tests matching the given keyword expressions (fail_to_pass)
+            self.install_configs["test_cmd"] += " -k"
 
         entrypoint = (
             self.install_configs["test_cmd"] + " " + " ".join(self.fail_to_pass)
@@ -153,7 +169,9 @@ class SWEBenchEnv(RepoEnv):
         uid = os.getuid()
         group_id = os.getgid()
         self.terminal.run(f"groupadd -g {group_id} froggy_group", user="root")
-        self.terminal.run(f"useradd -m -u {uid} -g {group_id} -G sudo froggy_user", user="root")
+        self.terminal.run(
+            f"useradd -m -u {uid} -g {group_id} -G sudo froggy_user", user="root"
+        )
 
         # Delete the content in the working directory.
         self.terminal.run(f"rm -rf {self.working_dir / '*'}")
@@ -172,7 +190,7 @@ class SWEBenchEnv(RepoEnv):
         # TODO: probably needed cleanup specific to each SWE-Bench repo.
         # infos["last_run_obs"] = utils.cleanup_pytest_output(infos["last_run_obs"])
 
-        self.max_score = len(self.fail_to_pass) #+ len(self.pass_to_pass)
+        self.max_score = len(self.fail_to_pass)  # + len(self.pass_to_pass)
         infos["max_score"] = self.max_score
 
         test_status_map = MAP_REPO_TO_PARSER[self.repo](infos["last_run_obs"])
@@ -189,7 +207,7 @@ class SWEBenchEnv(RepoEnv):
 
         # TODO: probably needed cleanup specific to each SWE-Bench repo.
         # infos["last_run_obs"] = utils.cleanup_pytest_output(infos["last_run_obs"])
-        #infos["score"] = utils.extract_reward_from_pytest_output(infos["last_run_obs"])
+        # infos["score"] = utils.extract_reward_from_pytest_output(infos["last_run_obs"])
         test_status_map = MAP_REPO_TO_PARSER[self.repo](infos["last_run_obs"])
         infos["score"] = sum(
             1
