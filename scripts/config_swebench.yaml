@@ -5,7 +5,7 @@ solution:
     uuid: "debug"
     benchmark: "swebench"
     # problems: "all"  # list of problems, e.g., ["astropy__astropy-12907"], or "all"
-    # problems: ["psf__requests-1766"]
+    # problems: ["sphinx-doc__sphinx-10435"]
     problems: [
         "astropy__astropy-7336",
         "django__django-16145",

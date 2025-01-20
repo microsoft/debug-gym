@@ -165,6 +165,8 @@ class SWEBenchEnv(RepoEnv):
         self.terminal.base_image = spec.instance_image_key
         self.terminal.container
 
+        self.logger.info(f"Configuring docker container: {self.terminal.container}")
+
         # Create new group (if needed) and user.
         uid = os.getuid()
         group_id = os.getgid()
@@ -172,6 +174,10 @@ class SWEBenchEnv(RepoEnv):
         self.terminal.run(
             f"useradd -m -u {uid} -g {group_id} -G sudo froggy_user", user="root"
         )
+        # Allow for the user to pip install in the env. TODO: This is still slow.
+        #self.terminal.run(f"chmod -R o+rwX /opt/miniconda3/envs/testbed", user="root")
+        self.terminal.run(f"chmod -R o+rwX /opt/miniconda3/envs/testbed/bin", user="root")
+        self.terminal.run(f"chmod -R o+rwX /opt/miniconda3/envs/testbed/lib/python*/site-packages", user="root")
 
         # Delete the content in the working directory.
         self.terminal.run(f"rm -rf {self.working_dir / '*'}")
@@ -268,14 +274,14 @@ class SWEBenchEnv(RepoEnv):
     def run_install(self):
         install_cmd = self.install_configs.get("install", "")
         if install_cmd:
-            self.logger.info("Running install commands...")
+            self.logger.debug("Running install commands...")
             install_cmd = install_cmd.replace("--verbose", "").replace("-v", "").strip()
             self.run_command_with_raise(install_cmd)
 
     def run_post_install(self):
         post_install_cmds = self.install_configs.get("post_install", [])
         if post_install_cmds:
-            self.logger.info("Running post-install commands...")
+            self.logger.debug("Running post-install commands...")
             for post_install_cmd in post_install_cmds:
                 self.run_command_with_raise(post_install_cmd)
 
