@@ -1,5 +1,6 @@
 datasets
 openai
+azure-identity
 tenacity
 pyyaml
 rich
