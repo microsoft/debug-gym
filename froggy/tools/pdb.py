@@ -1,7 +1,7 @@
 import copy
 import re
 
-from froggy.terminal import Terminal, ShellSession
+from froggy.terminal import ShellSession
 from froggy.tools.tool import EnvironmentTool
 from froggy.tools.toolbox import Toolbox
 
@@ -65,7 +65,9 @@ class PDBTool(EnvironmentTool):
         self.environment = environment
 
     def interact_with_pdb(self, command, expected_output="(Pdb)"):
-        return self._session.run(command, expected_output)
+        return self._session.run(
+            command, expected_output, timeout=300, no_output_timeout=300
+        )
 
     def close_pdb(self, command="q"):
         return self._session.run(command, timeout=10)
@@ -79,9 +81,9 @@ class PDBTool(EnvironmentTool):
         if pdb_cmd is None:
             # remove the first word, which is "python"
             entrypoint = " ".join(self.environment.debug_entrypoint.split()[1:])
-            pdb_cmd = f'python -m pdb {entrypoint}'
+            pdb_cmd = f"python -m pdb {entrypoint}"
 
-        initial_output = self.interact_with_pdb(pdb_cmd, expected_output="(Pdb)")
+        initial_output = self.interact_with_pdb(pdb_cmd)
         if "The program finished and will be restarted" in initial_output:
             self.close_pdb()
         else:
