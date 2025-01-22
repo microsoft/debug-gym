@@ -184,6 +184,7 @@ class RepoEnv(TooledEnv):
         relative_filepaths = [os.path.relpath(f, self.path) for f in filepaths]
         for filepath in relative_filepaths:
             if os.path.isdir(self.path / filepath):
+                os.makedirs(self.working_dir / filepath, exist_ok=True)
                 continue
 
             shutil.copy2(self.path / filepath, self.working_dir / filepath)

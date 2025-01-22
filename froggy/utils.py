@@ -231,7 +231,7 @@ class TaskLogger(logging.LoggerAdapter):
         return f"[Task-{self.extra['task']}] {msg}", kwargs
 
 
-def setup_logger(name: str, log_dir: str | None = None, verbose: bool = False):
+def setup_logger(name: str, log_dir: str | None = None, verbose: bool = False, mode="a"):
     logger = logging.getLogger(name)
     logger.setLevel(logging.DEBUG)
 
@@ -246,7 +246,7 @@ def setup_logger(name: str, log_dir: str | None = None, verbose: bool = False):
         log_dir.mkdir(parents=True, exist_ok=True)
 
         logger.log_file = log_dir / f"{name}.log"
-        fh = logging.FileHandler(logger.log_file, mode="w")
+        fh = logging.FileHandler(logger.log_file, mode=mode)
         formatter = logging.Formatter("%(asctime)s %(levelname)-8s %(message)s")
         fh.setFormatter(formatter)
         fh.setLevel(logging.DEBUG)

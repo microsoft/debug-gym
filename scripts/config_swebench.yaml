@@ -6,7 +6,7 @@ solution:
     benchmark: "swebench"
     problems: "all"  # list of problems, e.g., ["astropy__astropy-12907"], or "all"
     # problems: [
-    #     "sympy__sympy-22456",
+    #     "sphinx-doc__sphinx-10673",
     # ]
     # problems: [
     #     "astropy__astropy-7336",

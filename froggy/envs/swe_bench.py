@@ -18,7 +18,7 @@ from swebench.harness.docker_build import (
     get_env_configs_to_build,
 )
 from swebench.harness.log_parsers import MAP_REPO_TO_PARSER
-from swebench.harness.test_spec import make_test_spec
+from swebench.harness.test_spec import make_test_spec, get_test_directives
 from swebench.harness.utils import load_swebench_dataset
 from tqdm import tqdm
 
@@ -132,9 +132,7 @@ class SWEBenchEnv(RepoEnv):
             # run tests matching the given keyword expressions (fail_to_pass)
             self.install_configs["test_cmd"] += " -k"
 
-        entrypoint = (
-            self.install_configs["test_cmd"] + " " + " ".join(self.fail_to_pass)
-        )  # + pass_to_pass)
+        entrypoint = " ".join([self.install_configs["test_cmd"], *get_test_directives(self.ds_row)])
         # # TODO: Find another way to extract inline env vars from entrypoint. Move to env_vars instead of setup_commands
         if entrypoint.startswith("PYTHONWARNINGS"):
             export, remaining = entrypoint.split(" ", 1)
@@ -152,10 +150,6 @@ class SWEBenchEnv(RepoEnv):
         self.version = self.ds_row["version"]
         self.install_configs = self.get_configs(self.repo, self.version)
         self.gold_patch = self.ds_row["patch"]
-
-    # def restore(self, file_path):
-    #     self.terminal.run(f"rm -rf {self.working_dir / '*'}")
-    #     self.terminal.run(f"cp -r /testbed/. {self.working_dir}")
 
     def reset(self, *, seed=None, options: dict | None = None):
         options = options or {}
@@ -184,6 +178,7 @@ class SWEBenchEnv(RepoEnv):
         self.terminal.run(f"chmod -R o+rwX /opt/miniconda3/envs/testbed/bin", user="root")
         self.terminal.run(f"chmod o+rwX /opt/miniconda3/envs/testbed/lib/python*/site-packages", user="root")
         self.terminal.run(f"chmod o+rwX /opt/miniconda3/envs/testbed/lib/python*/site-packages/*", user="root")
+        self.terminal.run(f"chmod -R o+rwX /opt/miniconda3/envs/testbed/lib/python*/site-packages/{self.repo_name}*", user="root")
 
         # Delete the content in the working directory.
         self.terminal.run(f"rm -rf {self.working_dir / '*'}")
@@ -207,8 +202,8 @@ class SWEBenchEnv(RepoEnv):
         test_status_map = MAP_REPO_TO_PARSER[self.repo](infos["last_run_obs"])
         infos["score"] = sum(
             1
-            for test in test_status_map
-            if test_status_map[test] == TestStatus.PASSED.value
+            for test in self.fail_to_pass
+            if test_status_map.get(test, TestStatus.SKIPPED) == TestStatus.PASSED.value
         )
 
         return infos["obs"], infos
@@ -222,8 +217,8 @@ class SWEBenchEnv(RepoEnv):
         test_status_map = MAP_REPO_TO_PARSER[self.repo](infos["last_run_obs"])
         infos["score"] = sum(
             1
-            for test in test_status_map
-            if test_status_map[test] == TestStatus.PASSED.value
+            for test in self.fail_to_pass
+            if test_status_map.get(test, TestStatus.SKIPPED) == TestStatus.PASSED.value
         )
 
         return obs, score, done, infos

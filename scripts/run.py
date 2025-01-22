@@ -1,14 +1,25 @@
 import json
 import os
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 from termcolor import colored
-from tqdm import tqdm
+from rich.console import Group
+from rich.panel import Panel
+from rich.live import Live
+from rich.progress import (
+    BarColumn,
+    Progress,
+    SpinnerColumn,
+    TextColumn,
+    TimeElapsedColumn,
+)
 
 from froggy.terminal import select_terminal
 from froggy.tools.toolbox import Toolbox
 from froggy.utils import load_config, setup_logger
+
 
 
 def select_env(env_type: str = None):
@@ -26,13 +37,16 @@ def select_env(env_type: str = None):
     return env_class
 
 
-def run_agent(args, problem, config):
+def run_agent(args, problem, config, current_app_progress: Progress):
+    # add progress bar for steps of this app, and run the steps
+    current_task_id = current_app_progress.add_task(f"Running task {problem}")
+    # app_steps_task_id = app_steps_progress.add_task("", total=len(step_times), name=problem)
+
     task_logger = setup_logger(
-        problem, log_dir=config["output_path"], verbose=args.very_verbose
+        problem, log_dir=config["output_path"], verbose=args.very_verbose, mode="w" if args.force_all else "a"
     )
     try:
-        agent = create_agent(args, config, logger=task_logger)
-        previous_run = Path(agent._output_path) / problem / "froggy.jsonl"
+        previous_run = Path(config["output_path"]) / config["uuid"] / problem / "froggy.jsonl"
 
         if not args.force_all and os.path.exists(previous_run):
             task_logger.debug(f"Previous run found: {previous_run}")
@@ -42,8 +56,12 @@ def run_agent(args, problem, config):
             task_logger.debug(f"Previous run success: {success}")
             if not args.force_failed or success:
                 task_logger.info(f"Skipping {problem}, already done.")
+                current_app_progress.stop_task(current_task_id)
+                current_app_progress.update(current_task_id, description=f"[bold gray]Task {problem} skipped!")
+                current_app_progress.remove_task(current_task_id)
                 return success
 
+        agent = create_agent(args, config, logger=task_logger)
         agent.env = create_env(args, config, task_logger)
         success = agent.run(task_name=problem, debug=args.debug)
 
@@ -64,8 +82,13 @@ def run_agent(args, problem, config):
             breakpoint()
             raise e
 
-        return False
+        success = False
 
+    # stop and hide steps progress bar for this specific app
+    # app_steps_progress.update(app_steps_task_id, visible=False)
+    current_app_progress.stop_task(current_task_id)
+    current_app_progress.update(current_task_id, description=f"[bold green]Task {problem} completed!")
+    current_app_progress.remove_task(current_task_id)
     return success
 
 
@@ -153,21 +176,63 @@ def main():
         tasks_done = 0
         mean_perf = 0
 
-        pbar = tqdm(range(len(problem_list)))
-        with ThreadPoolExecutor(num_workers) as executor:
-            futures = [
-                executor.submit(run_agent, args, problem, config)
-                for problem in problem_list
-            ]
-            for future in as_completed(futures):
-                result = future.result()
-                mean_perf += result
-                tasks_done += 1
+        # progress bar for current app showing only elapsed time,
+        # which will stay visible when app is installed
+        current_app_progress = Progress(
+            TimeElapsedColumn(),
+            TextColumn("{task.description}"),
+        )
 
-                pbar.set_description_str(
-                    f"Avg. Score so far: {mean_perf / tasks_done:.2f}"
-                )
-                pbar.update()
+        # progress bars for single app steps (will be hidden when step is done)
+        step_progress = Progress(
+            TextColumn("  "),
+            TimeElapsedColumn(),
+            TextColumn("[bold purple]{task.fields[action]}"),
+            SpinnerColumn("simpleDots"),
+        )
+        # progress bar for current app (progress in steps)
+        app_steps_progress = Progress(
+            TextColumn(
+                "[bold blue]Progress for app {task.fields[name]}: {task.percentage:.0f}%"
+            ),
+            BarColumn(),
+            TextColumn("({task.completed} of {task.total} steps done)"),
+        )
+        # overall progress bar
+        overall_progress = Progress(
+            TimeElapsedColumn(), BarColumn(), TextColumn("{task.description}")
+        )
+        # group of progress bars;
+        # some are always visible, others will disappear when progress is complete
+        progress_group = Group(
+            Panel(Group(current_app_progress, step_progress, app_steps_progress), title="Workers"),
+            overall_progress,
+        )
+
+        overall_task_id = overall_progress.add_task("", total=len(problem_list))
+
+        # use own live instance as context manager with group of progress bars,
+        # which allows for running multiple different progress bars in parallel,
+        # and dynamically showing/hiding them
+        with Live(progress_group):
+            with ThreadPoolExecutor(num_workers) as executor:
+                futures = [
+                    executor.submit(run_agent, args, problem, config, current_app_progress)
+                    for problem in problem_list
+                ]
+                for future in as_completed(futures):
+                    result = future.result()
+                    mean_perf += result
+                    tasks_done += 1
+
+                    # update message on overall progress bar
+                    top_descr = "[bold #AAAAAA](%d out of %d tasks done)" % (tasks_done, len(problem_list))
+                    overall_progress.update(overall_task_id, description=top_descr, advance=1)
+
+            # final update for message on overall progress bar
+            overall_progress.update(
+                overall_task_id, description=f"[bold green]{mean_perf}/{tasks_done} success!"
+            )
     else:
         # custom repo
         print(colored(f"Running agent {agent.name}", "green"))

@@ -24,7 +24,7 @@ def main(args):
             result = {
                 "success": data["success"],
                 "uuid": data["uuid"],
-                "agent_type": data.get("agent_type", "solution"),
+                "agent_type": data["agent_type"],
                 "problem": data["problem"],
             }
             results.append(result)
