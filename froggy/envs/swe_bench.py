@@ -17,8 +17,9 @@ from swebench.harness.docker_build import (
     build_instance_image,
     get_env_configs_to_build,
 )
+from swebench.harness.utils import get_test_directives
 from swebench.harness.log_parsers import MAP_REPO_TO_PARSER
-from swebench.harness.test_spec import make_test_spec, get_test_directives
+from swebench.harness.test_spec import make_test_spec
 from swebench.harness.utils import load_swebench_dataset
 from tqdm import tqdm
 
@@ -121,25 +122,50 @@ class SWEBenchEnv(RepoEnv):
                 f"Local checked out branch {local_branch_path} already exists."
             )
 
-        # Depending on the SWE-Bench task instance, we need to patch fail_to_pass and pass_to_pass.
-        if "django" in self.ds_row["instance_id"]:
-            # test_zero_ip_addr (admin_scripts.tests.ManageRunserver) -> admin_scripts.tests.ManageRunserver.test_zero_ip_addr
-            # Make regex to perform the replacement
-            self.fail_to_pass = [
-                re.sub(r"(.*) \((.*)\)", r"\2.\1", test) for test in self.fail_to_pass
-            ]
-        elif "sympy" in self.ds_row["instance_id"]:
-            # run tests matching the given keyword expressions (fail_to_pass)
-            self.install_configs["test_cmd"] += " -k"
+        test_directives = get_test_directives(self.ds_row)
+        entrypoint = " ".join([self.install_configs["test_cmd"], *test_directives])
 
-        entrypoint = " ".join([self.install_configs["test_cmd"], *get_test_directives(self.ds_row)])
-        # # TODO: Find another way to extract inline env vars from entrypoint. Move to env_vars instead of setup_commands
-        if entrypoint.startswith("PYTHONWARNINGS"):
-            export, remaining = entrypoint.split(" ", 1)
-            self.setup_commands.append(f"export {export}")
-            entrypoint = remaining
+        debug_entrypoint = None
+        if "sympy" in self.ds_row["instance_id"]:
+            # use pytest instead of sympy bin/test so pdb can be used
+            self.install_configs["install"] += " && python -m pip install pytest"
+            expression = " ".join(test_directives)
+            debug_entrypoint = f'python -m pytest -s {expression}'
 
-        self.setup_workspace(local_branch_path, entrypoint)
+            if entrypoint.startswith("PYTHONWARNINGS"):
+                export, remaining = entrypoint.split(" ", 1)
+                self.setup_commands.append(f"export {export}")
+                entrypoint = remaining
+
+        # # Depending on the SWE-Bench task instance, we need to patch fail_to_pass and pass_to_pass.
+        # if "django" in self.ds_row["instance_id"]:
+        #     # test_zero_ip_addr (admin_scripts.tests.ManageRunserver) -> admin_scripts.tests.ManageRunserver.test_zero_ip_addr
+        #     # Make regex to perform the replacement
+        #     self.fail_to_pass = [
+        #         re.sub(r"(.*) \((.*)\)", r"\2.\1", test) for test in self.fail_to_pass
+        #     ]
+        # elif "sympy" in self.ds_row["instance_id"]:
+        #     # use pytest instead of sympy bin/test so pdb can be used
+        #     # self.install_configs["test_cmd"] = "pytest -s -k"
+        #     self.install_configs["install"] += " && python -m pip install pytest"
+        #     expression = " or ".join(test_directives)
+        #     debug_entrypoint = f'python -m pytest -s -k "{expression}"'
+
+        # entrypoint = " ".join([self.install_configs["test_cmd"], *test_directives])
+
+        # if "sympy" in self.ds_row["instance_id"]:
+        #     entrypoint = f"{self.install_configs["test_cmd"]} -k {" ".join(test_directives)}"
+        #     if entrypoint.startswith("PYTHONWARNINGS"):
+        #         export, remaining = entrypoint.split(" ", 1)
+        #         self.setup_commands.append(f"export {export}")
+        #         entrypoint = remaining
+
+        self.setup_workspace(
+            path=local_branch_path,
+            entrypoint=entrypoint,
+            debug_entrypoint=debug_entrypoint,
+        )
+
         return local_branch_path, entrypoint
 
     def setup_task_info(self, task_name):

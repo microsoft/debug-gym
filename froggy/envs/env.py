@@ -63,6 +63,7 @@ class RepoEnv(TooledEnv):
         self,
         path: str | None = None,
         entrypoint: str = "python -m pytest -sv .",
+        debug_entrypoint: str | None = None,
         readonly_patterns: list[str] | None = None,
         run_on_rewrite: bool = True,
         run_timeout: int | None = None,
@@ -80,12 +81,14 @@ class RepoEnv(TooledEnv):
         self.dir_tree_depth = dir_tree_depth
         self.auto_view_change = auto_view_change
         self.terminal = terminal or Terminal()
-        self.entrypoint = entrypoint
+        self.entrypoint = None  # set in setup_workspace
+        self.debug_entrypoint = None  # set in setup_workspace
         self.logger = logger
 
         self.setup_workspace(
             path=path,
             entrypoint=entrypoint,
+            debug_entrypoint=debug_entrypoint,
             readonly_patterns=readonly_patterns,
         )
         self.last_run_obs = None
@@ -96,8 +99,9 @@ class RepoEnv(TooledEnv):
     def setup_workspace(
         self,
         path: str,
-        entrypoint: str = None,
-        readonly_patterns: list[str] = None,
+        entrypoint: str | None = None,
+        debug_entrypoint: str | None = None,
+        readonly_patterns: list[str] | None = None,
     ):
         readonly_patterns = readonly_patterns or []
         if self.path:
@@ -141,8 +145,16 @@ class RepoEnv(TooledEnv):
 
         # override entrypoint as it might be task dependent
         if entrypoint:
-            self.entrypoint = entrypoint
+            entrypoint = entrypoint or ""
+            debug_entrypoint = debug_entrypoint or entrypoint
+            self.entrypoint = self._prepare_entrypoint(entrypoint)
+            self.debug_entrypoint = self._prepare_entrypoint(debug_entrypoint)
 
+        # Set up the terminal working dir
+        self.terminal.working_dir = str(self.working_dir)
+
+    @staticmethod
+    def _prepare_entrypoint(entrypoint):
         entrypoint_list = entrypoint.split()
 
         if entrypoint_list[0] != "python":
@@ -150,10 +162,8 @@ class RepoEnv(TooledEnv):
             entrypoint_list = ["python"] + entrypoint_list
             entrypoint = entrypoint_list
 
-        self.entrypoint = " ".join(entrypoint_list)
-
-        # Set up the terminal working dir
-        self.terminal.working_dir = str(self.working_dir)
+        entrypoint = " ".join(entrypoint_list)
+        return entrypoint
 
     def cleanup_workspace(self):
         self.tempdir.cleanup()

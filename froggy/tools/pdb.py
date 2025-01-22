@@ -78,7 +78,7 @@ class PDBTool(EnvironmentTool):
         self._session = self.environment.terminal.start_shell_session()
         if pdb_cmd is None:
             # remove the first word, which is "python"
-            entrypoint = " ".join(self.environment.entrypoint.split()[1:])
+            entrypoint = " ".join(self.environment.debug_entrypoint.split()[1:])
             pdb_cmd = f'python -m pdb {entrypoint}'
 
         initial_output = self.interact_with_pdb(pdb_cmd, expected_output="(Pdb)")
