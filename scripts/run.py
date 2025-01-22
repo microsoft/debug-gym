@@ -60,7 +60,11 @@ def run_agent(args, problem, config):
         task_logger.debug(
             f"Task {problem} generated an exception: {e!r}", exc_info=True
         )
-        raise e
+        if args.debug:
+            breakpoint()
+            raise e
+
+        return False
 
     return success
 

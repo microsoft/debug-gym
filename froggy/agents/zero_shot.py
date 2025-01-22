@@ -169,7 +169,7 @@ class AgentZeroShot_PdbAfterRewrites(AgentZeroShot):
                 and pdb_tool.name not in self.env.tools
             ):
                 self.env.add_tool(pdb_tool)
-                self.env.tools["pdb"].terminal = self.env.terminal.clone()
+                self.env.tools["pdb"].terminal = self.env.terminal.clone()  # TODO: check if this is necessary
                 info["instructions"] = self.env.instructions
                 info["obs"] += "\nThe pdb tool has been added."
 

@@ -201,7 +201,7 @@ class RepoEnv(TooledEnv):
 
         self.obs = ""
         if self.has_tool("pdb"):
-            self.get_tool("pdb").start_pdb(terminal=self.terminal.clone())
+            self.get_tool("pdb").start_pdb()
             self.dbg_obs = self.get_tool("pdb").pdb_obs
             self.obs += "Debugging terminal started:\n" f"{self.dbg_obs}\n"
 

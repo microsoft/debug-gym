@@ -32,6 +32,9 @@ def main(args):
             if args.verbose:
                 # Print agent_type, uuid, and problem colored by success, and path to the log.
                 color = "green" if result["success"] else "red"
+                if args.show_failed_only and result["success"]:
+                    continue
+
                 print(colored(f"{result['agent_type']} {result['uuid']} {result['problem']}", color), f"\t({log_file})")
 
 
@@ -71,6 +74,7 @@ def parse_args():
     parser.add_argument("path", type=Path, help="Folder where to find the logs.")
     parser.add_argument("--agents", nargs="+", help="Agent UUID(s) for which to collect the logs. Default: all agent found in `path`.")
     parser.add_argument("--ignore-missing", action="store_true", help="Ignore missing experiments")
+    parser.add_argument("--show-failed-only", action="store_true", help="Only print out failed experiments")
     parser.add_argument("-v", "--verbose", action="store_true", help="Verbose mode")
     return parser.parse_args()
 

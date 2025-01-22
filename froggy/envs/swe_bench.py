@@ -148,9 +148,14 @@ class SWEBenchEnv(RepoEnv):
         self.task_name = task_name
         self.ds_row = self.dataset[self.task_name]
         self.repo = self.ds_row["repo"]
+        self.repo_name = self.repo.split("/")[1]
         self.version = self.ds_row["version"]
         self.install_configs = self.get_configs(self.repo, self.version)
         self.gold_patch = self.ds_row["patch"]
+
+    # def restore(self, file_path):
+    #     self.terminal.run(f"rm -rf {self.working_dir / '*'}")
+    #     self.terminal.run(f"cp -r /testbed/. {self.working_dir}")
 
     def reset(self, *, seed=None, options: dict | None = None):
         options = options or {}
@@ -177,7 +182,8 @@ class SWEBenchEnv(RepoEnv):
         # Allow for the user to pip install in the env. TODO: This is still slow.
         #self.terminal.run(f"chmod -R o+rwX /opt/miniconda3/envs/testbed", user="root")
         self.terminal.run(f"chmod -R o+rwX /opt/miniconda3/envs/testbed/bin", user="root")
-        self.terminal.run(f"chmod -R o+rwX /opt/miniconda3/envs/testbed/lib/python*/site-packages", user="root")
+        self.terminal.run(f"chmod o+rwX /opt/miniconda3/envs/testbed/lib/python*/site-packages", user="root")
+        self.terminal.run(f"chmod o+rwX /opt/miniconda3/envs/testbed/lib/python*/site-packages/*", user="root")
 
         # Delete the content in the working directory.
         self.terminal.run(f"rm -rf {self.working_dir / '*'}")
@@ -186,7 +192,6 @@ class SWEBenchEnv(RepoEnv):
 
         self.terminal.setup_commands.append("source /opt/miniconda3/bin/activate")
         self.terminal.setup_commands.append(f"conda activate testbed")
-        self.terminal.setup_commands.append(f"echo testbed activated")
 
         self.run_install()
         self.run_post_install()
