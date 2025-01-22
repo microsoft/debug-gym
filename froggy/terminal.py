@@ -81,7 +81,7 @@ class ShellSession:
         no_output_timeout: int = 30,
     ):
         """Run a command in the Shell session and return the output."""
-        self.logger.debug(f"Sending command to {self}: {command}")
+        self.logger.debug(f"Sending command to {self}:\n{command}")
         os.write(self.filedescriptor, command.encode("utf-8") + b"\n")
 
         output = self.read(
@@ -181,7 +181,7 @@ class Terminal:
 
         output = (stdout + stderr).strip("\r\n").strip("\n")
         self.logger.debug(
-            f"Output from terminal with status {process.returncode}: {output}"
+            f"Output from terminal with status {process.returncode}:\n{output.decode()}"
         )
         return success, output
 
@@ -248,12 +248,11 @@ class Terminal:
         initial_output = ""
         commands = " && ".join(self.setup_commands)
         if commands:
-            # initial_output = self.interact_with_pseudo_terminal(
-            #     commands, timeout=timeout, no_output_timeout=no_output_timeout
-            # )
-            initial_output = session.run(commands, timeout=timeout, no_output_timeout=no_output_timeout)
+            initial_output = session.run(
+                commands, timeout=timeout, no_output_timeout=no_output_timeout
+            )
 
-        self.logger.debug(f"Initial output from {session}: {initial_output}")
+        self.logger.debug(f"Initial output from {session}:\n{initial_output}")
 
         return session
 
@@ -412,7 +411,7 @@ class DockerTerminal(Terminal):
         """Run a command in the terminal. Return command status and output."""
         command = self.prepare_command(entrypoint)
 
-        self.logger.debug(f"Exec run: {command}")
+        self.logger.debug(f"Exec run:\n{command}")
 
         # TODO: docker exec_run timeout?
         status, output = self.container.exec_run(
@@ -430,7 +429,7 @@ class DockerTerminal(Terminal):
             self.logger.debug(f"Failed to run command: {command} {output}")
             raise ValueError(f"Failed to run command: {entrypoint} ", output)
 
-        self.logger.debug(f"Output from terminal with status {status}: {output}")
+        self.logger.debug(f"Output from terminal with status {status}:\n{output.decode()}")
         return success, output.decode().strip("\r\n").strip("\n")
 
     # def clone(self) -> "DockerTerminal":
