@@ -1,12 +1,10 @@
 import atexit
 import errno
 import fcntl
-import io
 import logging
 import os
 import pty
 import shlex
-import signal
 import subprocess
 import sys
 import tempfile
@@ -16,8 +14,11 @@ import uuid
 
 import docker
 
+
 class ShellSession:
-    def __init__(self, filedescriptor, session_id=None, logger=logging.getLogger("froggy")):
+    def __init__(
+        self, filedescriptor, session_id=None, logger=logging.getLogger("froggy")
+    ):
         self.filedescriptor = filedescriptor
         self.session_id = session_id or str(uuid.uuid4())
         self.logger = logger
@@ -92,7 +93,7 @@ class ShellSession:
 
         output = output.strip().strip("\r\n").strip("\n")
 
-        self.logger.debug(f"Output from {self}: {output}")
+        self.logger.debug(f"Output from {self}:\n{output}")
         return output
 
     def __str__(self):
@@ -185,16 +186,6 @@ class Terminal:
         )
         return success, output
 
-    # def run_interactive(
-    #     self, entrypoint: str, expected_output: str = "", timeout: int = 30
-    # ):
-    #     """Run a command in the interactive terminal and return the output.
-    #     Requires a PTY. The terminal stays open after the command is executed.
-    #     """
-    #     if not self.has_pseudo_terminal():
-    #         self.start_pseudo_terminal()
-    #     return self.interact_with_pseudo_terminal(entrypoint, expected_output, timeout)
-
     @property
     def default_entrypoint(self) -> list[str]:
         """Starts a new bash session exporting the current python executable as 'python'.
@@ -202,19 +193,10 @@ class Terminal:
         which could interfere with the terminal setup (clean outputs)"""
         return shlex.split("/bin/bash --noprofile --norc")
 
-    # def clone(self) -> "Terminal":
-    #     return Terminal(
-    #         working_dir=self.working_dir,
-    #         setup_commands=self.setup_commands,
-    #         env_vars=self.env_vars,
-    #         logger=self.logger,
-    #     )
-
-    # def has_pseudo_terminal(self):
-    #     return self._master is not None
-
     def start_shell_session(self, timeout=30, no_output_timeout=0.1):
-        self.logger.debug(f"Starting ShellSession with entrypoint: {self.default_entrypoint}")
+        self.logger.debug(
+            f"Starting ShellSession with entrypoint:\n{self.default_entrypoint}"
+        )
 
         master, slave = pty.openpty()
 
@@ -241,7 +223,7 @@ class Terminal:
 
         # close slave, end in the parent process
         os.close(slave)
-        #atexit.register(self.close_pseudo_terminal)
+        # atexit.register(self.close_pseudo_terminal)
         session = ShellSession(master, logger=self.logger)
         self.sessions.append(session)
 
@@ -255,73 +237,6 @@ class Terminal:
         self.logger.debug(f"Initial output from {session}:\n{initial_output}")
 
         return session
-
-    # def close_pseudo_terminal(self):
-    #     if self._master is not None:
-    #         self.logger.debug("Closing PTY.")
-    #         os.close(self._master)
-    #         self._master = None
-
-    # def read_pseudo_terminal_output(
-    #     self,
-    #     expected_output: str = "",
-    #     timeout: int = 300,
-    #     no_output_timeout: int = 60,
-    #     read_length: int = 1024,
-    # ) -> str:
-    #     """Read from PTY until expected_output is found, timeout is reached,
-    #     or no output change for no_output_timeout seconds.
-    #     """
-    #     output = ""
-    #     start_time = time.time()
-    #     last_change_time = time.time()
-    #     while True:
-    #         if time.time() - start_time > timeout:
-    #             self.logger.debug("Timeout reached while reading from PTY.")
-    #             break
-    #         if time.time() - last_change_time > no_output_timeout:
-    #             self.logger.debug(f"No output change for {no_output_timeout} seconds.")
-    #             break
-    #         try:
-    #             data = os.read(self._master, read_length).decode(
-    #                 "utf-8", errors="ignore"
-    #             )
-    #             if data:
-    #                 output += data
-    #                 last_change_time = time.time()
-    #                 if expected_output and expected_output in output:
-    #                     break
-    #         except BlockingIOError:
-    #             time.sleep(0.1)
-    #             continue
-    #         except OSError as e:
-    #             if e.errno == errno.EIO:
-    #                 self.logger.debug("End of file reached while reading from PTY.")
-    #                 break
-    #             if e.errno != errno.EAGAIN:
-    #                 raise
-    #     return output
-
-    # def interact_with_pseudo_terminal(
-    #     self,
-    #     command: str,
-    #     expected_output: str = "",
-    #     timeout: int = 300,
-    #     no_output_timeout: int = 30,
-    # ):
-    #     self.logger.debug(f"Sending command to interactive terminal: {command}")
-    #     os.write(self._master, command.encode("utf-8") + b"\n")
-
-    #     output = self.read_pseudo_terminal_output(
-    #         expected_output=expected_output,
-    #         timeout=timeout,
-    #         no_output_timeout=no_output_timeout,
-    #     )
-
-    #     output = output.strip().strip("\r\n").strip("\n")
-
-    #     self.logger.debug(f"Output from interactive terminal: {output}")
-    #     return output
 
 
 class DockerTerminal(Terminal):
@@ -429,19 +344,10 @@ class DockerTerminal(Terminal):
             self.logger.debug(f"Failed to run command: {command} {output}")
             raise ValueError(f"Failed to run command: {entrypoint} ", output)
 
-        self.logger.debug(f"Output from terminal with status {status}:\n{output.decode()}")
+        self.logger.debug(
+            f"Output from terminal with status {status}:\n{output.decode()}"
+        )
         return success, output.decode().strip("\r\n").strip("\n")
-
-    # def clone(self) -> "DockerTerminal":
-    #     terminal = DockerTerminal(
-    #         base_image=self.base_image,
-    #         setup_commands=self.setup_commands,
-    #         volumes=self.volumes,
-    #         env_vars=self.env_vars,
-    #         working_dir=self.working_dir,
-    #         logger=self.logger,
-    #     )
-    #     return terminal
 
     def setup_container(self) -> docker.models.containers.Container:
         # Create and start a container mounting volumes and setting environment variables

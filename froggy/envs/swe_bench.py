@@ -17,10 +17,9 @@ from swebench.harness.docker_build import (
     build_instance_image,
     get_env_configs_to_build,
 )
-from swebench.harness.utils import get_test_directives
 from swebench.harness.log_parsers import MAP_REPO_TO_PARSER
 from swebench.harness.test_spec import make_test_spec
-from swebench.harness.utils import load_swebench_dataset
+from swebench.harness.utils import get_test_directives, load_swebench_dataset
 from tqdm import tqdm
 
 import froggy.utils as utils
@@ -130,35 +129,12 @@ class SWEBenchEnv(RepoEnv):
             # use pytest instead of sympy bin/test so pdb can be used
             self.install_configs["install"] += " && python -m pip install pytest"
             expression = " ".join(test_directives)
-            debug_entrypoint = f'python -m pytest -s {expression}'
+            debug_entrypoint = f"python -m pytest -s {expression}"
 
             if entrypoint.startswith("PYTHONWARNINGS"):
                 export, remaining = entrypoint.split(" ", 1)
                 self.setup_commands.append(f"export {export}")
                 entrypoint = remaining
-
-        # # Depending on the SWE-Bench task instance, we need to patch fail_to_pass and pass_to_pass.
-        # if "django" in self.ds_row["instance_id"]:
-        #     # test_zero_ip_addr (admin_scripts.tests.ManageRunserver) -> admin_scripts.tests.ManageRunserver.test_zero_ip_addr
-        #     # Make regex to perform the replacement
-        #     self.fail_to_pass = [
-        #         re.sub(r"(.*) \((.*)\)", r"\2.\1", test) for test in self.fail_to_pass
-        #     ]
-        # elif "sympy" in self.ds_row["instance_id"]:
-        #     # use pytest instead of sympy bin/test so pdb can be used
-        #     # self.install_configs["test_cmd"] = "pytest -s -k"
-        #     self.install_configs["install"] += " && python -m pip install pytest"
-        #     expression = " or ".join(test_directives)
-        #     debug_entrypoint = f'python -m pytest -s -k "{expression}"'
-
-        # entrypoint = " ".join([self.install_configs["test_cmd"], *test_directives])
-
-        # if "sympy" in self.ds_row["instance_id"]:
-        #     entrypoint = f"{self.install_configs["test_cmd"]} -k {" ".join(test_directives)}"
-        #     if entrypoint.startswith("PYTHONWARNINGS"):
-        #         export, remaining = entrypoint.split(" ", 1)
-        #         self.setup_commands.append(f"export {export}")
-        #         entrypoint = remaining
 
         self.setup_workspace(
             path=local_branch_path,
@@ -188,7 +164,6 @@ class SWEBenchEnv(RepoEnv):
 
         # Start the terminal
         self.terminal.base_image = spec.instance_image_key
-        self.terminal.container
 
         self.logger.info(f"Configuring docker container: {self.terminal.container}")
 
@@ -200,11 +175,22 @@ class SWEBenchEnv(RepoEnv):
             f"useradd -m -u {uid} -g {group_id} -G sudo froggy_user", user="root"
         )
         # Allow for the user to pip install in the env. TODO: This is still slow.
-        #self.terminal.run(f"chmod -R o+rwX /opt/miniconda3/envs/testbed", user="root")
-        self.terminal.run(f"chmod -R o+rwX /opt/miniconda3/envs/testbed/bin", user="root")
-        self.terminal.run(f"chmod o+rwX /opt/miniconda3/envs/testbed/lib/python*/site-packages", user="root")
-        self.terminal.run(f"chmod o+rwX /opt/miniconda3/envs/testbed/lib/python*/site-packages/*", user="root")
-        self.terminal.run(f"chmod -R o+rwX /opt/miniconda3/envs/testbed/lib/python*/site-packages/{self.repo_name}*", user="root")
+        # self.terminal.run(f"chmod -R o+rwX /opt/miniconda3/envs/testbed", user="root")
+        self.terminal.run(
+            f"chmod -R o+rwX /opt/miniconda3/envs/testbed/bin", user="root"
+        )
+        self.terminal.run(
+            f"chmod o+rwX /opt/miniconda3/envs/testbed/lib/python*/site-packages",
+            user="root",
+        )
+        self.terminal.run(
+            f"chmod o+rwX /opt/miniconda3/envs/testbed/lib/python*/site-packages/*",
+            user="root",
+        )
+        self.terminal.run(
+            f"chmod -R o+rwX /opt/miniconda3/envs/testbed/lib/python*/site-packages/{self.repo_name}*",
+            user="root",
+        )
 
         # Delete the content in the working directory.
         self.terminal.run(f"rm -rf {self.working_dir / '*'}")
