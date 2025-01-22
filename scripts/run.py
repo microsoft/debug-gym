@@ -210,6 +210,8 @@ def main():
         )
 
         overall_task_id = overall_progress.add_task("", total=len(problem_list))
+        top_descr = "[bold #AAAAAA](%d out of %d tasks done)" % (tasks_done, len(problem_list))
+        overall_progress.update(overall_task_id, description=top_descr, advance=0)
 
         # use own live instance as context manager with group of progress bars,
         # which allows for running multiple different progress bars in parallel,
