@@ -1,19 +1,12 @@
 import json
 import os
-import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 from rich.console import Group
 from rich.live import Live
 from rich.panel import Panel
-from rich.progress import (
-    BarColumn,
-    Progress,
-    SpinnerColumn,
-    TextColumn,
-    TimeElapsedColumn,
-)
+from rich.progress import BarColumn, Progress, TextColumn, TimeElapsedColumn
 from termcolor import colored
 
 from froggy.terminal import select_terminal
@@ -41,7 +34,6 @@ def run_agent(args, problem, config, current_app_progress: Progress):
     current_task_id = current_app_progress.add_task(
         f"\\[{problem}]:", log="Starting task..."
     )
-    # app_steps_task_id = app_steps_progress.add_task("", total=len(step_times), name=problem)
 
     task_logger = setup_logger(
         problem,
@@ -97,8 +89,6 @@ def run_agent(args, problem, config, current_app_progress: Progress):
 
         success = False
 
-    # stop and hide steps progress bar for this specific app
-    # app_steps_progress.update(app_steps_task_id, visible=False)
     current_app_progress.stop_task(current_task_id)
     current_app_progress.update(
         current_task_id,
@@ -188,49 +178,26 @@ def main():
             assert isinstance(config["problems"], list)
             problem_list = config["problems"]
 
-        num_workers = int(
-            os.environ.get("FROGGY_WORKERS", 1)
-        )  # 1 if args.verbose else int(os.environ.get("FROGGY_WORKERS", 1))
+        num_workers = int(os.environ.get("FROGGY_WORKERS", 1))
         tasks_done = 0
         mean_perf = 0
 
-        # progress bar for current app showing only elapsed time,
-        # which will stay visible when app is installed
-        current_app_progress = Progress(
+        # progress bar for current task(s)
+        task_progress = Progress(
             TimeElapsedColumn(),
             TextColumn("{task.description}"),
             TextColumn("{task.fields[log]}"),
         )
 
-        # progress bars for single app steps (will be hidden when step is done)
-        step_progress = Progress(
-            TextColumn("  "),
-            TimeElapsedColumn(),
-            TextColumn("[bold purple]{task.fields[action]}"),
-            SpinnerColumn("simpleDots"),
-        )
-        # progress bar for current app (progress in steps)
-        app_steps_progress = Progress(
-            TextColumn(
-                "[bold blue]Progress for app {task.fields[name]}: {task.percentage:.0f}%"
-            ),
-            BarColumn(),
-            TextColumn("({task.completed} of {task.total} steps done)"),
-        )
-        # overall progress bar
         overall_progress = Progress(
             TextColumn("🐸"),
             TimeElapsedColumn(),
             BarColumn(),
             TextColumn("{task.description}"),
         )
-        # group of progress bars;
-        # some are always visible, others will disappear when progress is complete
+
         progress_group = Group(
-            Panel(
-                Group(current_app_progress, step_progress, app_steps_progress),
-                title="Workers",
-            ),
+            Panel(task_progress, title="Workers"),
             overall_progress,
         )
 
@@ -247,9 +214,7 @@ def main():
         with Live(progress_group, auto_refresh=(not args.debug)) as live:
             with ThreadPoolExecutor(num_workers) as executor:
                 futures = [
-                    executor.submit(
-                        run_agent, args, problem, config, current_app_progress
-                    )
+                    executor.submit(run_agent, args, problem, config, task_progress)
                     for problem in problem_list
                 ]
                 for future in as_completed(futures):
@@ -266,7 +231,7 @@ def main():
             # final update for message on overall progress bar
             overall_progress.update(
                 overall_task_id,
-                description=f"🐸 [bold green]{mean_perf}/{tasks_done} success!",
+                description=f"[bold green]{mean_perf}/{tasks_done} success!",
             )
     else:
         # custom repo

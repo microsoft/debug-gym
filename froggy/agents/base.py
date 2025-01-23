@@ -13,8 +13,6 @@ from froggy.agents.llm_api import instantiate_llm
 from froggy.agents.utils import HistoryTracker, build_history_prompt
 from froggy.utils import unescape
 
-# logger = logging.getLogger("froggy")
-
 
 class AgentBase:
     name: str = "base"

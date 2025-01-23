@@ -16,8 +16,6 @@ from froggy.tools.patchers import CodePatcher
 from froggy.tools.pdb import PDBTool
 from froggy.utils import _walk, make_is_readonly, show_line_number
 
-# logger = logging.getLogger("froggy")
-
 
 class TooledEnv:
     def __init__(self):
