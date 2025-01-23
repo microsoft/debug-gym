@@ -326,7 +326,7 @@ class DockerTerminal(Terminal):
         """Run a command in the terminal. Return command status and output."""
         command = self.prepare_command(entrypoint)
 
-        self.logger.debug(f"Exec run:\n{command}")
+        self.logger.debug(f"Exec run: {command}")
 
         # TODO: docker exec_run timeout?
         status, output = self.container.exec_run(

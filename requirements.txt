@@ -9,5 +9,5 @@ termcolor
 transformers
 tiktoken
 docker
-swebench>=2.0.0
+swebench==2.1.7
 prompt_toolkit

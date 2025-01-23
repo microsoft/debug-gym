@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import subprocess
 import uuid
@@ -11,16 +12,21 @@ from tqdm import tqdm
 from froggy.agents.llm_api import instantiate_llm
 from froggy.agents.utils import HistoryTracker, build_history_prompt
 from froggy.utils import unescape
-import logging
 
-
-#logger = logging.getLogger("froggy")
+# logger = logging.getLogger("froggy")
 
 
 class AgentBase:
     name: str = "base"
 
-    def __init__(self, config_dict, env, verbose=False, _uuid=None, logger=logging.getLogger("froggy")):
+    def __init__(
+        self,
+        config_dict,
+        env,
+        verbose=False,
+        _uuid=None,
+        logger=logging.getLogger("froggy"),
+    ):
         self.config = config_dict
         self.env = env
         self.llm = instantiate_llm(self.config, verbose=verbose)
@@ -101,7 +107,9 @@ class AgentBase:
         with open(patch_path, "w") as f:
             f.write(self.env.patch)
 
-        self.logger.debug(f"Patch saved in {pjoin(self._output_path, task_name, 'froggy.patch')}")
+        self.logger.debug(
+            f"Patch saved in {pjoin(self._output_path, task_name, 'froggy.patch')}"
+        )
 
     def log(self, task_name="custom"):
         jsonl_output = {
@@ -123,7 +131,10 @@ class AgentBase:
         with open(pjoin(self._output_path, task_name, "froggy.jsonl"), "w") as f:
             json.dump(jsonl_output, f, indent=4)
 
-        self.logger.debug(f"Log saved in {pjoin(self._output_path, task_name, 'froggy.jsonl')}")
+        self.logger.debug(
+            f"Log saved in {pjoin(self._output_path, task_name, 'froggy.jsonl')}"
+        )
+
 
 class AgentSolution(AgentBase):
     name: str = "solution"
@@ -146,6 +157,7 @@ class AgentSolution(AgentBase):
             total=self.config["max_steps"],
             desc=f"Debugging inside {self.env.working_dir} - Task: {task_name}",
             leave=True,
+            file=open(os.devnull, "w"),
         )
         for step in range(self.config["max_steps"]):
             highscore = max(highscore, info["score"])
@@ -154,10 +166,13 @@ class AgentSolution(AgentBase):
                     info["score"]
                 )
             )
+            self.logger.info(str(pbar))
 
             self.logger.info(f"Applying gold patch to {self.env.working_dir}.")
             command = f"git -C {self.env.working_dir} apply -"
-            subprocess.run(command.split(), input=self.env.gold_patch, text=True, check=True)
+            subprocess.run(
+                command.split(), input=self.env.gold_patch, text=True, check=True
+            )
             self.logger.info("Patch applied successfully.")
 
             if debug:
@@ -168,12 +183,14 @@ class AgentSolution(AgentBase):
             self.history.step(info)
 
             pbar.update()
+            self.logger.info(str(pbar))
             if done or info["rewrite_counter"] >= self.config["max_rewrite_steps"]:
                 pbar.set_postfix_str(
                     f"Score: {info['score']}/{info['max_score']} ({info['score']/info['max_score']:.1%})".format(
                         info["score"]
                     )
                 )
+                self.logger.info(str(pbar))
                 break
 
         return done

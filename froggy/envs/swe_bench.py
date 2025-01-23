@@ -220,40 +220,50 @@ class SWEBenchEnv(RepoEnv):
         self.max_score = len(self.fail_to_pass)
         infos["max_score"] = self.max_score
 
-        test_status_map = MAP_REPO_TO_PARSER[self.repo](infos["last_run_obs"])
-        self.logger.debug(f"fail_to_pass: {self.fail_to_pass}")
-        self.logger.debug(f"Test status map: {test_status_map}")
-        infos["score"] = sum(
-            1
-            for test in self.fail_to_pass
-            if test_status_map.get(test, TestStatus.SKIPPED) == TestStatus.PASSED.value
-        )
+        # TODO: probably needed cleanup specific to each SWE-Bench repo.
+        # infos["last_run_obs"] = utils.cleanup_pytest_output(infos["last_run_obs"])
+        self.score = self._extract_score(infos["last_run_obs"])
+        self.done = self.score == self.max_score
+        infos["score"] = self.score
+        infos["done"] = self.done
+        assert not self.done, "Tests should be failing before debugging."
 
         return infos["obs"], infos
+
+    def _extract_score(self, obs):
+        # TODO: probably needed cleanup specific to each SWE-Bench repo.
+        # infos["last_run_obs"] = utils.cleanup_pytest_output(infos["last_run_obs"])
+        # infos["score"] = utils.extract_reward_from_pytest_output(infos["last_run_obs"])
+        test_status_map = MAP_REPO_TO_PARSER[self.repo](obs)
+        self.logger.debug(f"fail_to_pass: {self.fail_to_pass}")
+        self.logger.debug(f"Test status map: {test_status_map}")
+        score = sum(
+            1
+            for test in self.fail_to_pass
+            # Assume silent success for now as done in SWE-Bench grading.py
+            if test_status_map.get(test, TestStatus.PASSED.value)
+            == TestStatus.PASSED.value
+        )
+        assert score <= self.max_score
+        return score
 
     def step(self, action: str):
         obs, score, done, infos = super().step(action)
 
         # TODO: probably needed cleanup specific to each SWE-Bench repo.
         # infos["last_run_obs"] = utils.cleanup_pytest_output(infos["last_run_obs"])
-        # infos["score"] = utils.extract_reward_from_pytest_output(infos["last_run_obs"])
-        test_status_map = MAP_REPO_TO_PARSER[self.repo](infos["last_run_obs"])
-        self.logger.debug(f"fail_to_pass: {self.fail_to_pass}")
-        self.logger.debug(f"Test status map: {test_status_map}")
-        infos["score"] = sum(
-            1
-            for test in self.fail_to_pass
-            if test_status_map.get(test, TestStatus.SKIPPED) == TestStatus.PASSED.value
-        )
+        self.score = self._extract_score(infos["last_run_obs"])
+        self.done = self.score == self.max_score
+        infos["score"] = self.score
+        infos["done"] = self.done
 
-        return obs, score, done, infos
+        return obs, self.score, self.done, infos
 
     def clone_repo(self, repo_address):
         org_name, repo_name = repo_address.split("/")
         repo_url = f"https://github.com/{repo_address.lstrip('/')}"
         local_repo_path = self.swe_bench_repo_paths / repo_name
 
-        # clone
         if not local_repo_path.exists():
             self.logger.info(f"Cloning {repo_url} into {local_repo_path}")
             subprocess.run(["git", "clone", repo_url, local_repo_path], check=True)
@@ -283,13 +293,6 @@ class SWEBenchEnv(RepoEnv):
         )
         status, output = self.terminal.run(command, raises=True)
         return status, output
-
-    # def run_pre_install(self):
-    #     pre_install_cmds = self.install_configs.get("pre_install")
-    #     if pre_install_cmds:
-    #         self.logger.info("Running pre-install commands...")
-    #         for pre_install_cmd in pre_install_cmds:
-    #             self.run_command_with_raise(pre_install_cmd)
 
     def prepare_eval_commands(self):
         """Add eval_cmd to be executed every time the terminal is called"""

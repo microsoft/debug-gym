@@ -200,6 +200,7 @@ class RepoEnv(TooledEnv):
             shutil.copy2(self.path / filepath, self.working_dir / filepath)
 
     def reset(self, *, seed=None, options: dict = None):
+        self.logger.info(f"Resetting environment")
         options = options or {}
         self.current_file = None
         self.current_file_content = None
@@ -208,6 +209,7 @@ class RepoEnv(TooledEnv):
         self.restore()
 
         # Run the initial code. This will set self.last_run_obs, self.done and self.score.
+        self.logger.info(f"Running initial evaluation")
         self.run()
 
         self.obs = ""

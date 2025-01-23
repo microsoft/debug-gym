@@ -7,26 +7,14 @@ solution:
     benchmark: "swebench"
     problems: "all"  # list of problems, e.g., ["astropy__astropy-12907"], or "all"
     # problems: [
-    #     "pydata__xarray-3993",
+    #     "django__django-10914",
+    #     "sphinx-doc__sphinx-7686",
+    #     "sphinx-doc__sphinx-8273",
+    #     "sphinx-doc__sphinx-8474",
+    #     "sphinx-doc__sphinx-8506",
+    #     "sphinx-doc__sphinx-8713",
+    #     "sphinx-doc__sphinx-8721",
     # ]
-    # problems: [
-    #     "astropy__astropy-7336",
-    #     "django__django-16145",
-    #     "matplotlib__matplotlib-20859",
-    #     "mwaskom__seaborn-3187",
-    #     "psf__requests-1766",
-    #     "scikit-learn__scikit-learn-13496",
-    #     "pytest-dev__pytest-7205",
-    #     "pylint-dev__pylint-6903",
-    #     "pydata__xarray-4356",
-    #     "sphinx-doc__sphinx-10435",
-    # ]
-    # problems: [
-    #     "django__django-7530",
-    #     "django__django-10097",
-    # ]
-    # problems: ["pallets__flask-5014"]  # requirements.txt
-    # problems: ["matplotlib__matplotlib-24026"]  # environment.yml  This one fails
 
     env_kwargs: {
         "dir_tree_depth": 1,
@@ -34,7 +22,7 @@ solution:
         "auto_view_change": True,
         "run_timeout": 30,
         "dataset_id": "princeton-nlp/SWE-bench_Verified",
-        #"dataset_id": "princeton-nlp/SWE-bench_Lite",
+        # "dataset_id": "princeton-nlp/SWE-bench_Lite",
     }
     tools: ["pdb", "view", "patcher:substitution", "listdir", "eval"]
     terminal: {

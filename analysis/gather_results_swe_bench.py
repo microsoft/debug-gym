@@ -3,8 +3,8 @@ import os
 from glob import glob
 from os.path import join as pjoin
 from pathlib import Path
-import pandas as pd
 
+import pandas as pd
 from termcolor import colored
 
 from froggy.envs import SWEBenchEnv
@@ -16,7 +16,7 @@ def main(args):
 
     # Use pandas to read the logs
     results = []
-    for log_file in log_files:
+    for log_file in sorted(log_files):
         try:
             with open(log_file, "r") as f:
                 data = json.load(f)
@@ -35,8 +35,13 @@ def main(args):
                 if args.show_failed_only and result["success"]:
                     continue
 
-                print(colored(f"{result['agent_type']} {result['uuid']} {result['problem']}", color), f"\t({log_file})")
-
+                print(
+                    colored(
+                        f"{result['agent_type']} {result['uuid']} {result['problem']}",
+                        color,
+                    ),
+                    f"\t({log_file})",
+                )
 
         except Exception as e:
             print(colored(f"Error reading {log_file}. ({e!r})", "red"))
@@ -64,7 +69,9 @@ def main(args):
         total = len(group) if args.ignore_missing else len(problem_list)
         nb_successes = group["success"].sum()
         success_rate = nb_successes / total
-        print(colored(f"{agent_type}: {success_rate:.2%} ({nb_successes} out of {total})"))
+        print(
+            colored(f"{agent_type}: {success_rate:.2%} ({nb_successes} out of {total})")
+        )
 
 
 def parse_args():
@@ -72,9 +79,19 @@ def parse_args():
 
     parser = argparse.ArgumentParser()
     parser.add_argument("path", type=Path, help="Folder where to find the logs.")
-    parser.add_argument("--agents", nargs="+", help="Agent UUID(s) for which to collect the logs. Default: all agent found in `path`.")
-    parser.add_argument("--ignore-missing", action="store_true", help="Ignore missing experiments")
-    parser.add_argument("--show-failed-only", action="store_true", help="Only print out failed experiments")
+    parser.add_argument(
+        "--agents",
+        nargs="+",
+        help="Agent UUID(s) for which to collect the logs. Default: all agent found in `path`.",
+    )
+    parser.add_argument(
+        "--ignore-missing", action="store_true", help="Ignore missing experiments"
+    )
+    parser.add_argument(
+        "--show-failed-only",
+        action="store_true",
+        help="Only print out failed experiments",
+    )
     parser.add_argument("-v", "--verbose", action="store_true", help="Verbose mode")
     return parser.parse_args()
 

@@ -4,10 +4,9 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
-from termcolor import colored
 from rich.console import Group
-from rich.panel import Panel
 from rich.live import Live
+from rich.panel import Panel
 from rich.progress import (
     BarColumn,
     Progress,
@@ -15,11 +14,11 @@ from rich.progress import (
     TextColumn,
     TimeElapsedColumn,
 )
+from termcolor import colored
 
 from froggy.terminal import select_terminal
 from froggy.tools.toolbox import Toolbox
 from froggy.utils import load_config, setup_logger
-
 
 
 def select_env(env_type: str = None):
@@ -39,15 +38,23 @@ def select_env(env_type: str = None):
 
 def run_agent(args, problem, config, current_app_progress: Progress):
     # add progress bar for steps of this app, and run the steps
-    current_task_id = current_app_progress.add_task(f"Running task {problem}", fields={"log": ""})
+    current_task_id = current_app_progress.add_task(
+        f"\\[{problem}]:", log="Starting task..."
+    )
     # app_steps_task_id = app_steps_progress.add_task("", total=len(step_times), name=problem)
 
     task_logger = setup_logger(
-        problem, log_dir=config["output_path"], verbose=args.very_verbose, mode="w" if args.force_all else "a",
-        progress=current_app_progress, task_id=current_task_id
+        problem,
+        log_dir=config["output_path"],
+        verbose=args.very_verbose,
+        mode="w" if args.force_all else "a",
+        progress=current_app_progress,
+        task_id=current_task_id,
     )
     try:
-        previous_run = Path(config["output_path"]) / config["uuid"] / problem / "froggy.jsonl"
+        previous_run = (
+            Path(config["output_path"]) / config["uuid"] / problem / "froggy.jsonl"
+        )
 
         if not args.force_all and os.path.exists(previous_run):
             task_logger.debug(f"Previous run found: {previous_run}")
@@ -58,7 +65,12 @@ def run_agent(args, problem, config, current_app_progress: Progress):
             if not args.force_failed or success:
                 task_logger.info(f"Skipping {problem}, already done.")
                 current_app_progress.stop_task(current_task_id)
-                current_app_progress.update(current_task_id, description=f"[bold gray]Task {problem} skipped!")
+                current_app_progress.update(
+                    current_task_id,
+                    completed=True,
+                    description=f"[bold gray]\\[{problem}]:",
+                    log="[bold gray]Skipped!",
+                )
                 current_app_progress.remove_task(current_task_id)
                 return success
 
@@ -88,7 +100,12 @@ def run_agent(args, problem, config, current_app_progress: Progress):
     # stop and hide steps progress bar for this specific app
     # app_steps_progress.update(app_steps_task_id, visible=False)
     current_app_progress.stop_task(current_task_id)
-    current_app_progress.update(current_task_id, description=f"[bold green]Task {problem} completed!")
+    current_app_progress.update(
+        current_task_id,
+        completed=True,
+        description=f"[bold green]\\[{problem}]:",
+        log="[bold green]Completed!",
+    )
     current_app_progress.remove_task(current_task_id)
     return success
 
@@ -202,17 +219,26 @@ def main():
         )
         # overall progress bar
         overall_progress = Progress(
-            TextColumn("🐸"), TimeElapsedColumn(), BarColumn(), TextColumn("{task.description}")
+            TextColumn("🐸"),
+            TimeElapsedColumn(),
+            BarColumn(),
+            TextColumn("{task.description}"),
         )
         # group of progress bars;
         # some are always visible, others will disappear when progress is complete
         progress_group = Group(
-            Panel(Group(current_app_progress, step_progress, app_steps_progress), title="Workers"),
+            Panel(
+                Group(current_app_progress, step_progress, app_steps_progress),
+                title="Workers",
+            ),
             overall_progress,
         )
 
         overall_task_id = overall_progress.add_task("", total=len(problem_list))
-        top_descr = "[bold #AAAAAA](%d out of %d tasks done)" % (tasks_done, len(problem_list))
+        top_descr = "[bold #AAAAAA](%d out of %d tasks done)" % (
+            tasks_done,
+            len(problem_list),
+        )
         overall_progress.update(overall_task_id, description=top_descr, advance=0)
 
         # use own live instance as context manager with group of progress bars,
@@ -221,7 +247,9 @@ def main():
         with Live(progress_group, auto_refresh=(not args.debug)) as live:
             with ThreadPoolExecutor(num_workers) as executor:
                 futures = [
-                    executor.submit(run_agent, args, problem, config, current_app_progress)
+                    executor.submit(
+                        run_agent, args, problem, config, current_app_progress
+                    )
                     for problem in problem_list
                 ]
                 for future in as_completed(futures):
@@ -230,12 +258,15 @@ def main():
                     tasks_done += 1
 
                     # update message on overall progress bar
-                    top_descr = f"[bold #AAAAAA]({tasks_done} out of {len(problem_list)} tasks done - [bold green] {mean_perf} [bold #AAAAAA] are successful)"
-                    overall_progress.update(overall_task_id, description=top_descr, advance=1)
+                    top_descr = f"[bold #AAAAAA]({tasks_done} out of {len(problem_list)} tasks done - [bold green]{mean_perf}[bold #AAAAAA] are successful)"
+                    overall_progress.update(
+                        overall_task_id, description=top_descr, advance=1
+                    )
 
             # final update for message on overall progress bar
             overall_progress.update(
-                overall_task_id, description=f"🐸 [bold green]{mean_perf}/{tasks_done} success!"
+                overall_task_id,
+                description=f"🐸 [bold green]{mean_perf}/{tasks_done} success!",
             )
     else:
         # custom repo
