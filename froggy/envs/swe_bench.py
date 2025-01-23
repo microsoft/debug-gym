@@ -124,7 +124,9 @@ class SWEBenchEnv(RepoEnv):
         test_directives = get_test_directives(self.ds_row)
         entrypoint = " ".join([self.install_configs["test_cmd"], *test_directives])
 
-        debug_entrypoint = None
+        # --capture=no from pytest, allows for debugging with pdb
+        debug_entrypoint = entrypoint.replace("pytest", "pytest -s")
+
         if "sympy" in self.ds_row["instance_id"]:
             # use pytest instead of sympy bin/test so pdb can be used
             self.install_configs["install"] += " && python -m pip install pytest"
