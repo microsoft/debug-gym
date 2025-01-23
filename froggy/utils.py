@@ -231,15 +231,31 @@ class TaskLogger(logging.LoggerAdapter):
         return f"[Task-{self.extra['task']}] {msg}", kwargs
 
 
-def setup_logger(name: str, log_dir: str | None = None, verbose: bool = False, mode="a"):
+def setup_logger(name: str, log_dir: str | None = None, verbose: bool = False, mode="a", progress=None, task_id=None):
     logger = logging.getLogger(name)
     logger.setLevel(logging.DEBUG)
 
-    console = logging.StreamHandler()
-    formatter = logging.Formatter("🐸 [%(name)-12s]: %(levelname)-8s %(message)s")
-    console.setFormatter(formatter)
-    console.setLevel(logging.DEBUG if verbose else logging.INFO)
-    logger.addHandler(console)
+    if progress and task_id:
+        # from rich.progress import Progress
+        # progress = Progress()
+        # progress.add_task("", total=100, task_id=task_id, description=f"Task {name}")
+        # progress.start()
+
+        class ProgressHandler(logging.Handler):
+            def emit(self, record):
+                progress.update(task_id, log=record.getMessage())
+
+        ph = ProgressHandler()
+        ph.setLevel(logging.DEBUG if verbose else logging.INFO)
+        ph.setFormatter(formatter)
+        logger.addHandler(ph)
+
+    else:
+        console = logging.StreamHandler()
+        formatter = logging.Formatter("🐸 [%(name)-12s]: %(levelname)-8s %(message)s")
+        console.setFormatter(formatter)
+        console.setLevel(logging.DEBUG if verbose else logging.INFO)
+        logger.addHandler(console)
 
     if log_dir:
         log_dir = Path(log_dir)

@@ -2,11 +2,12 @@
 solution:
     # Environment configs
     output_path: "output_swe_bench"
+    # output_path: "output_swe_bench_lite"
     uuid: "debug"
     benchmark: "swebench"
     problems: "all"  # list of problems, e.g., ["astropy__astropy-12907"], or "all"
     # problems: [
-    #     "sphinx-doc__sphinx-10673",
+    #     "pydata__xarray-3993",
     # ]
     # problems: [
     #     "astropy__astropy-7336",
@@ -32,6 +33,8 @@ solution:
         "run_on_rewrite": True,
         "auto_view_change": True,
         "run_timeout": 30,
+        "dataset_id": "princeton-nlp/SWE-bench_Verified",
+        #"dataset_id": "princeton-nlp/SWE-bench_Lite",
     }
     tools: ["pdb", "view", "patcher:substitution", "listdir", "eval"]
     terminal: {

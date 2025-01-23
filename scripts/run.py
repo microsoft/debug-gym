@@ -39,11 +39,12 @@ def select_env(env_type: str = None):
 
 def run_agent(args, problem, config, current_app_progress: Progress):
     # add progress bar for steps of this app, and run the steps
-    current_task_id = current_app_progress.add_task(f"Running task {problem}")
+    current_task_id = current_app_progress.add_task(f"Running task {problem}", fields={"log": ""})
     # app_steps_task_id = app_steps_progress.add_task("", total=len(step_times), name=problem)
 
     task_logger = setup_logger(
-        problem, log_dir=config["output_path"], verbose=args.very_verbose, mode="w" if args.force_all else "a"
+        problem, log_dir=config["output_path"], verbose=args.very_verbose, mode="w" if args.force_all else "a",
+        progress=current_app_progress, task_id=current_task_id
     )
     try:
         previous_run = Path(config["output_path"]) / config["uuid"] / problem / "froggy.jsonl"
@@ -181,6 +182,7 @@ def main():
         current_app_progress = Progress(
             TimeElapsedColumn(),
             TextColumn("{task.description}"),
+            TextColumn("{task.fields[log]}"),
         )
 
         # progress bars for single app steps (will be hidden when step is done)
@@ -200,7 +202,7 @@ def main():
         )
         # overall progress bar
         overall_progress = Progress(
-            TimeElapsedColumn(), BarColumn(), TextColumn("{task.description}")
+            TextColumn("🐸"), TimeElapsedColumn(), BarColumn(), TextColumn("{task.description}")
         )
         # group of progress bars;
         # some are always visible, others will disappear when progress is complete
@@ -216,7 +218,7 @@ def main():
         # use own live instance as context manager with group of progress bars,
         # which allows for running multiple different progress bars in parallel,
         # and dynamically showing/hiding them
-        with Live(progress_group):
+        with Live(progress_group, auto_refresh=(not args.debug)) as live:
             with ThreadPoolExecutor(num_workers) as executor:
                 futures = [
                     executor.submit(run_agent, args, problem, config, current_app_progress)
@@ -228,12 +230,12 @@ def main():
                     tasks_done += 1
 
                     # update message on overall progress bar
-                    top_descr = "[bold #AAAAAA](%d out of %d tasks done)" % (tasks_done, len(problem_list))
+                    top_descr = f"[bold #AAAAAA]({tasks_done} out of {len(problem_list)} tasks done - [bold green] {mean_perf} [bold #AAAAAA] are successful)"
                     overall_progress.update(overall_task_id, description=top_descr, advance=1)
 
             # final update for message on overall progress bar
             overall_progress.update(
-                overall_task_id, description=f"[bold green]{mean_perf}/{tasks_done} success!"
+                overall_task_id, description=f"🐸 [bold green]{mean_perf}/{tasks_done} success!"
             )
     else:
         # custom repo

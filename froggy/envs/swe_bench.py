@@ -25,6 +25,7 @@ class SWEBenchEnv(RepoEnv):
     def __init__(
         self,
         dataset_id: str = "princeton-nlp/SWE-bench_Verified",
+        # dataset_id: str = "princeton-nlp/SWE-bench_lite",
         split: str = "test",
         base_image: str = "python:3.12",
         **kwargs,
@@ -195,6 +196,10 @@ class SWEBenchEnv(RepoEnv):
             f"chmod -R o+rwX /opt/miniconda3/envs/testbed/lib/python*/site-packages/{self.repo_name}*",
             user="root",
         )
+        self.terminal.run(
+            f"chmod -R o+rwX /opt/miniconda3/envs/testbed/lib/python*/site-packages/{self.repo_name.title()}*",
+            user="root",
+        )
 
         # Delete the content in the working directory.
         self.terminal.run(f"rm -rf {self.working_dir / '*'}")
@@ -212,10 +217,12 @@ class SWEBenchEnv(RepoEnv):
         # TODO: probably needed cleanup specific to each SWE-Bench repo.
         # infos["last_run_obs"] = utils.cleanup_pytest_output(infos["last_run_obs"])
 
-        self.max_score = len(self.fail_to_pass)  # + len(self.pass_to_pass)
+        self.max_score = len(self.fail_to_pass)
         infos["max_score"] = self.max_score
 
         test_status_map = MAP_REPO_TO_PARSER[self.repo](infos["last_run_obs"])
+        self.logger.debug(f"fail_to_pass: {self.fail_to_pass}")
+        self.logger.debug(f"Test status map: {test_status_map}")
         infos["score"] = sum(
             1
             for test in self.fail_to_pass
@@ -231,6 +238,8 @@ class SWEBenchEnv(RepoEnv):
         # infos["last_run_obs"] = utils.cleanup_pytest_output(infos["last_run_obs"])
         # infos["score"] = utils.extract_reward_from_pytest_output(infos["last_run_obs"])
         test_status_map = MAP_REPO_TO_PARSER[self.repo](infos["last_run_obs"])
+        self.logger.debug(f"fail_to_pass: {self.fail_to_pass}")
+        self.logger.debug(f"Test status map: {test_status_map}")
         infos["score"] = sum(
             1
             for test in self.fail_to_pass
