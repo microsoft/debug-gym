@@ -1,12 +1,7 @@
-import io
-import logging
 import os
-import re
 import shutil
 import subprocess
-import tempfile
 from ast import literal_eval
-from os.path import join as pjoin
 from pathlib import Path
 
 import datasets
@@ -22,7 +17,6 @@ from swebench.harness.test_spec import make_test_spec
 from swebench.harness.utils import get_test_directives, load_swebench_dataset
 from tqdm import tqdm
 
-import froggy.utils as utils
 from froggy.envs.env import RepoEnv
 
 
@@ -76,10 +70,18 @@ class SWEBenchEnv(RepoEnv):
 
         swebench_instances = load_swebench_dataset(name=self.dataset_id)
         docker_client = docker.from_env()
-        if get_env_configs_to_build(docker_client, swebench_instances):
+
+        try:
+            env_configs_to_build = get_env_configs_to_build(
+                docker_client, swebench_instances
+            )
+        except docker.errors.ImageNotFound:
+            env_configs_to_build = True
+
+        if env_configs_to_build:
             self.logger.debug("Building Docker env-level images for SWE-Bench...")
             build_env_images(
-                docker.from_env(),
+                docker_client,
                 swebench_instances,
                 force_rebuild=False,
                 max_workers=24,
