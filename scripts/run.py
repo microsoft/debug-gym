@@ -1,24 +1,22 @@
 import asyncio
+import logging
 import os
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from os.path import join as pjoin
 
+from rich.progress import BarColumn, Progress, TextColumn
 from termcolor import colored
-from rich.progress import Progress, BarColumn, TextColumn
-from concurrent.futures import ThreadPoolExecutor, as_completed
-
 from tqdm import tqdm
 
 from froggy.tools.toolbox import Toolbox
 from froggy.utils import load_config
-import logging
 
-
-logger = logging.getLogger('froggy')
+logger = logging.getLogger("froggy")
 
 
 def select_terminal(terminal_config: None):
     terminal_config = terminal_config or {"type": "local"}
-    terminal_type = terminal_config.pop("type")
+    terminal_type = terminal_config["type"]
     match terminal_type:
         case "docker":
             from froggy.terminal import DockerTerminal as terminal_class
@@ -141,13 +139,16 @@ def main():
             assert isinstance(config["problems"], list)
             problem_list = config["problems"]
 
-        num_workers = 1 if args.verbose else int(os.environ.get('FROGGY_WORKERS', 1))
+        num_workers = 1 if args.verbose else int(os.environ.get("FROGGY_WORKERS", 1))
         tasks_done = 0
         mean_perf = 0
 
         pbar = tqdm(range(len(problem_list)))
         with ThreadPoolExecutor(num_workers) as executor:
-            futures = [executor.submit(run_agent, args, problem, config) for problem in problem_list]
+            futures = [
+                executor.submit(run_agent, args, problem, config)
+                for problem in problem_list
+            ]
             for future in as_completed(futures):
                 try:
                     result = future.result()
@@ -158,7 +159,9 @@ def main():
                 mean_perf += result
                 tasks_done += 1
 
-                pbar.set_description_str(f"Avg. Score so far: {mean_perf / tasks_done:.2f}")
+                pbar.set_description_str(
+                    f"Avg. Score so far: {mean_perf / tasks_done:.2f}"
+                )
                 pbar.update()
     else:
         # custom repo
