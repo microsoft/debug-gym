@@ -182,7 +182,7 @@ class Terminal:
 
         output = (stdout + stderr).strip("\r\n").strip("\n")
         self.logger.debug(
-            f"Output from terminal with status {process.returncode}:\n{output.decode()}"
+            f"Output from terminal with status {process.returncode}:\n{output}"
         )
         return success, output
 

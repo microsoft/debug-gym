@@ -21,13 +21,13 @@ class AgentBase:
         self,
         config_dict,
         env,
-        verbose=False,
         _uuid=None,
-        logger=logging.getLogger("froggy"),
+        logger=None,
     ):
         self.config = config_dict
         self.env = env
-        self.llm = instantiate_llm(self.config, verbose=verbose)
+        self.logger = logger or logging.getLogger("froggy")
+        self.llm = instantiate_llm(self.config, logger=self.logger)
         _uuid = self.config.get("uuid", _uuid)
         self._uuid = str(uuid.uuid4()) if _uuid is None else _uuid
         self._output_path = pjoin(self.config["output_path"], self._uuid)
@@ -137,8 +137,8 @@ class AgentBase:
 class AgentSolution(AgentBase):
     name: str = "solution"
 
-    def __init__(self, config_dict, env, verbose=False, _uuid=None, **kwargs):
-        super().__init__(config_dict, env, verbose, _uuid, **kwargs)
+    def __init__(self, config_dict, env, _uuid=None, **kwargs):
+        super().__init__(config_dict, env, _uuid, **kwargs)
 
     def run(self, task_name=None, debug=False):
         self.history.reset()

@@ -7,6 +7,7 @@ from rich.console import Group
 from rich.live import Live
 from rich.panel import Panel
 from rich.progress import BarColumn, Progress, TextColumn, TimeElapsedColumn
+from rich.table import Column
 from termcolor import colored
 
 from froggy.terminal import select_terminal
@@ -29,7 +30,7 @@ def select_env(env_type: str = None):
     return env_class
 
 
-def run_agent(args, problem, config, current_app_progress: Progress):
+def run_agent(args, problem, config, current_app_progress: Progress, live):
     # add progress bar for steps of this app, and run the steps
     current_task_id = current_app_progress.add_task(
         f"\\[{problem}]:", log="Starting task..."
@@ -43,6 +44,7 @@ def run_agent(args, problem, config, current_app_progress: Progress):
         progress=current_app_progress,
         task_id=current_task_id,
     )
+    task_logger.live = live
     try:
         previous_run = (
             Path(config["output_path"]) / config["uuid"] / problem / "froggy.jsonl"
@@ -122,7 +124,6 @@ def create_agent(args, config, logger):
     agent_config = dict(
         config_dict=config,
         env=None,  # Will be set once after we determine if we skip the task.
-        verbose=args.verbose,
         logger=logger,
     )
 
@@ -186,7 +187,9 @@ def main():
         task_progress = Progress(
             TimeElapsedColumn(),
             TextColumn("{task.description}"),
-            TextColumn("{task.fields[log]}"),
+            TextColumn(
+                "{task.fields[log]}"
+            ),  # , table_column=Column(no_wrap=True, width=80)),
         )
 
         overall_progress = Progress(
@@ -208,13 +211,31 @@ def main():
         )
         overall_progress.update(overall_task_id, description=top_descr, advance=0)
 
+        # from rich.console import Console
+        # from rich.layout import Layout
+        # Console(st)
+        # layout = Layout()
+        # layout.split_row(
+        #     Layout(name="top"),
+        #     Layout(progress_group, name="bottom"),
+        # )
+
         # use own live instance as context manager with group of progress bars,
         # which allows for running multiple different progress bars in parallel,
         # and dynamically showing/hiding them
-        with Live(progress_group, auto_refresh=(not args.debug)) as live:
+        import sys
+
+        # Redirect stdout and stderr to avoid printing progress bars to stdout
+        # sys.stdout = open(os.devnull, "w")
+        # sys.stderr = open(os.devnull, "w")
+
+        with Live(progress_group) as live:
+
             with ThreadPoolExecutor(num_workers) as executor:
                 futures = [
-                    executor.submit(run_agent, args, problem, config, task_progress)
+                    executor.submit(
+                        run_agent, args, problem, config, task_progress, live
+                    )
                     for problem in problem_list
                 ]
                 for future in as_completed(futures):

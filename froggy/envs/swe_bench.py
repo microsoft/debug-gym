@@ -124,8 +124,8 @@ class SWEBenchEnv(RepoEnv):
                 f"Local checked out branch {local_branch_path} already exists."
             )
 
-        test_directives = get_test_directives(self.ds_row)
-        entrypoint = " ".join([self.install_configs["test_cmd"], *test_directives])
+        self.test_directives = get_test_directives(self.ds_row)
+        entrypoint = " ".join([self.install_configs["test_cmd"], *self.test_directives])
 
         # --capture=no from pytest, allows for debugging with pdb
         debug_entrypoint = entrypoint.replace("pytest", "pytest -s")
@@ -133,7 +133,7 @@ class SWEBenchEnv(RepoEnv):
         if "sympy" in self.ds_row["instance_id"]:
             # use pytest instead of sympy bin/test so pdb can be used
             self.install_configs["install"] += " && python -m pip install pytest"
-            expression = " ".join(test_directives)
+            expression = " ".join(self.test_directives)
             debug_entrypoint = f"python -m pytest -s {expression}"
 
             if entrypoint.startswith("PYTHONWARNINGS"):
@@ -235,7 +235,9 @@ class SWEBenchEnv(RepoEnv):
             check=True,
         )
 
-        self.make_froggyignore(local_repo_path=self.working_dir)
+        self.make_froggyignore(
+            local_repo_path=self.working_dir, additionnal_contents=self.test_directives
+        )
 
         self.terminal.run(f"git config user.name 'SWE-Bench'")
         self.terminal.run(f"git config user.email '<>'")
@@ -300,13 +302,20 @@ class SWEBenchEnv(RepoEnv):
 
         return local_repo_path
 
-    def make_froggyignore(self, local_repo_path, include_gitignore: bool = True):
+    def make_froggyignore(
+        self, local_repo_path, include_gitignore: bool = True, additionnal_contents=[]
+    ):
         # Add an ignore file
         froggyignore_contents = "\n".join(
             [
                 "*/tests/",
                 ".froggyignore",
+                ".pytest_cache/",
+                "*test*.py",
+                "*.pyc",
+                "*.md",
             ]
+            + additionnal_contents
         )
         if include_gitignore and ".gitignore" in os.listdir(local_repo_path):
             with open(local_repo_path / ".gitignore", "r") as f:

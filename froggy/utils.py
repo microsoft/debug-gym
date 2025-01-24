@@ -4,6 +4,7 @@ import logging
 import os
 import re
 import signal
+import sys
 from contextlib import contextmanager
 from os.path import join as pjoin
 from pathlib import Path
@@ -246,13 +247,13 @@ def setup_logger(
 
         class ProgressHandler(logging.Handler):
             def emit(self, record):
-                message = self.format(record)
+                message = self.format(record).replace("\n", "\\n")
                 # Truncate the message to 200 characters
-                message = (
-                    message[:100] + "..." + message[-100:]
-                    if len(message) > 200
-                    else message
-                )
+                # message = (
+                #     message[:100] + "..." + message[-100:]
+                #     if len(message) > 200
+                #     else message
+                # )
                 progress.update(task_id, log=message)
 
         ph = ProgressHandler()

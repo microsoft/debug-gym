@@ -42,7 +42,6 @@ def load_llm_config(config_file_path=None):
     return llm_config
 
 
-
 def is_rate_limit_error(exception):
     # List of fully qualified names of RateLimitError exceptions from various libraries
     rate_limit_errors = [
@@ -65,14 +64,14 @@ def is_rate_limit_error(exception):
     return exception_full_name in rate_limit_errors
 
 
-def print_messages(messages):
+def print_messages(messages, logger):
     for m in messages:
         if m["role"] == "user":
-            print(colored(f"{m['content']}\n", "cyan"))
+            logger.debug(colored(f"{m['content']}\n", "cyan"))
         elif m["role"] == "assistant":
-            print(colored(f"{m['content']}\n", "green"))
+            logger.debug(colored(f"{m['content']}\n", "green"))
         elif m["role"] == "system":
-            print(colored(f"{m['content']}\n", "yellow"))
+            logger.debug(colored(f"{m['content']}\n", "yellow"))
         else:
             raise ValueError(f"Unknown role: {m['content']}")
 
@@ -117,7 +116,7 @@ class TokenCounter:
 
 
 class LLM:
-    def __init__(self, model_name, verbose=False):
+    def __init__(self, model_name, logger=None, verbose=False):
         configs = load_llm_config()
         if model_name not in configs:
             raise ValueError(f"Model {model_name} not found in llm.cfg")
@@ -125,6 +124,7 @@ class LLM:
         self.model_name = model_name
         self.config = configs[model_name]
         self.verbose = verbose
+        self.logger = logger or logging.getLogger("froggy")
         self.token_counter = TokenCounter(self.config["tokenizer"])
         self.context_length = self.config["context_limit"] * 1000
 
@@ -202,16 +202,14 @@ class LLM:
             messages, self.context_length, self.token_counter
         )
 
-        if self.verbose:
-            # Message is a list of dictionaries with role and content keys.
-            # Color each role differently.
-            print_messages(messages)
+        # Message is a list of dictionaries with role and content keys.
+        # Color each role differently.
+        print_messages(messages, self.logger)
 
         response = self.query_model(messages, **kwargs)
         response = response.strip()
 
-        if self.verbose:
-            print(colored(response, "green"))
+        self.logger.debug(colored(response, "green"))
 
         token_usage = {
             "prompt": self.token_counter(messages=messages),
@@ -309,19 +307,16 @@ class Human:
 
 
 class Random:
-    def __init__(self, seed, verbose=False):
+    def __init__(self, seed, logger=None):
         self.seed = seed
-        self.verbose = verbose
+        self.logger = logger or logging.getLogger("froggy")
         self.rng = random.Random(seed)
 
     def __call__(self, messages, info, *args, **kwargs):
-        if self.verbose:
-            print_messages(messages)
+        print_messages(messages, self.logger)
 
         action = self.rng.choice(info.get("available_commands", ["noop"]))
-
-        if self.verbose:
-            print(colored(action, "green"))
+        self.logger.debug(colored(action, "green"))
 
         token_usage = {
             "prompt": len("\n".join([msg["content"] for msg in messages])),
@@ -331,7 +326,7 @@ class Random:
         return action, token_usage
 
 
-def instantiate_llm(config, verbose=False, use_async=False):
+def instantiate_llm(config, logger=None, use_async=False):
     llm_config = load_llm_config()
     available_models = list(llm_config.keys()) + ["random", "human"]
     if config["llm_name"] not in available_models:
@@ -340,12 +335,12 @@ def instantiate_llm(config, verbose=False, use_async=False):
             "please make sure the LLM config file is correctly set."
         )
     if config["llm_name"] == "random":
-        llm = Random(config["random_seed"], verbose)
+        llm = Random(config["random_seed"], logger=logger)
     elif config["llm_name"] == "human":
         llm = Human()
     else:
         if use_async:
-            llm = AsyncLLM(config["llm_name"], verbose=verbose)
+            llm = AsyncLLM(config["llm_name"], logger=logger)
         else:
-            llm = LLM(config["llm_name"], verbose=verbose)
+            llm = LLM(config["llm_name"], logger=logger)
     return llm

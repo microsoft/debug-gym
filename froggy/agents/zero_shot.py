@@ -9,8 +9,8 @@ from froggy.utils import unescape
 class AgentZeroShot(AgentBase):
     name: str = "zero shot"
 
-    def __init__(self, config_dict, env, verbose=False, _uuid=None, **kwargs):
-        super().__init__(config_dict, env, verbose, _uuid, **kwargs)
+    def __init__(self, config_dict, env, **kwargs):
+        super().__init__(config_dict, env, **kwargs)
 
     def build_question_prompt(self):
         messages = []
@@ -82,8 +82,8 @@ class AgentZeroShot(AgentBase):
 class AgentZeroShot_NoPDB(AgentZeroShot):
     name: str = "zero shot no pdb"
 
-    def __init__(self, config_dict, env, verbose=False, _uuid=None, **kwargs):
-        super().__init__(config_dict, env, verbose, _uuid, **kwargs)
+    def __init__(self, config_dict, env, **kwargs):
+        super().__init__(config_dict, env, **kwargs)
 
     def build_system_prompt(self, info):
         system_prompt = {}
@@ -169,7 +169,9 @@ class AgentZeroShot_PdbAfterRewrites(AgentZeroShot):
                 and pdb_tool.name not in self.env.tools
             ):
                 self.env.add_tool(pdb_tool)
-                self.env.tools["pdb"].terminal = self.env.terminal.clone()  # TODO: check if this is necessary
+                self.env.tools["pdb"].terminal = (
+                    self.env.terminal.clone()
+                )  # TODO: check if this is necessary
                 info["instructions"] = self.env.instructions
                 info["obs"] += "\nThe pdb tool has been added."
 
