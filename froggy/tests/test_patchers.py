@@ -1,6 +1,14 @@
-import pytest
 from unittest.mock import MagicMock, patch
-from froggy.tools.patchers import CodePatcher, UDiffPatcher, WholePatcher, SubstitutionPatcher
+
+import pytest
+
+from froggy.tools.patchers import (
+    CodePatcher,
+    SubstitutionPatcher,
+    UDiffPatcher,
+    WholePatcher,
+)
+
 
 @pytest.fixture
 def mock_environment():
@@ -11,6 +19,7 @@ def mock_environment():
     env.editable_files = ["test.py"]
     return env
 
+
 def test_udiff_patcher(mock_environment):
     patcher = UDiffPatcher()
     patcher.environment = mock_environment
@@ -20,7 +29,10 @@ def test_udiff_patcher(mock_environment):
 
     assert result == "Rewrite successful."
     assert patcher.rewrite_success
-    mock_environment.overwrite_file.assert_called_once_with(filepath="test.py", content="def greet(name):\n    print(f'Hello, {name}!')\n")
+    mock_environment.overwrite_file.assert_called_once_with(
+        filepath="test.py", content="def greet(name):\n    print(f'Hello, {name}!')\n"
+    )
+
 
 def test_whole_patcher(mock_environment):
     patcher = WholePatcher()
@@ -31,7 +43,10 @@ def test_whole_patcher(mock_environment):
 
     assert result == "Rewrite successful."
     assert patcher.rewrite_success
-    mock_environment.overwrite_file.assert_called_once_with(filepath="test.py", content="\ndef greet(name):\n    print(f'Hello, {name}!')\n")
+    mock_environment.overwrite_file.assert_called_once_with(
+        filepath="test.py", content="\ndef greet(name):\n    print(f'Hello, {name}!')\n"
+    )
+
 
 def test_substitution_patcher(mock_environment):
     patcher = SubstitutionPatcher()
@@ -42,7 +57,10 @@ def test_substitution_patcher(mock_environment):
 
     assert result == "Rewriting done."
     assert patcher.rewrite_success
-    mock_environment.overwrite_file.assert_called_once_with(filepath="test.py", content="")
+    mock_environment.overwrite_file.assert_called_once_with(
+        filepath="test.py", content=""
+    )
+
 
 def test_substitution_patcher_with_file_path(mock_environment):
     patcher = SubstitutionPatcher()
@@ -53,7 +71,10 @@ def test_substitution_patcher_with_file_path(mock_environment):
 
     assert result == "Rewriting done."
     assert patcher.rewrite_success
-    mock_environment.overwrite_file.assert_called_once_with(filepath="test.py", content="")
+    mock_environment.overwrite_file.assert_called_once_with(
+        filepath="test.py", content=""
+    )
+
 
 def test_substitution_patcher_invalid_content(mock_environment):
     patcher = SubstitutionPatcher()
@@ -62,8 +83,9 @@ def test_substitution_patcher_invalid_content(mock_environment):
     patch = "```rewrite invalid content```"
     result = patcher.use(patch)
 
-    assert result == "Rewrite failed."
+    assert result == "SyntaxError: invalid syntax.\nRewrite failed."
     assert not patcher.rewrite_success
+
 
 def test_substitution_patcher_invalid_file(mock_environment):
     patcher = SubstitutionPatcher()
@@ -73,8 +95,37 @@ def test_substitution_patcher_invalid_file(mock_environment):
     patch = "```rewrite test.py 2 <c>    print(f'Hello, {name}!')</c>```"
     result = patcher.use(patch)
 
-    assert result == "File test.py does not exist or is not in the current repository.\nRewrite failed."
+    assert (
+        result
+        == "File test.py does not exist or is not in the current repository.\nRewrite failed."
+    )
     assert not patcher.rewrite_success
 
-if __name__ == '__main__':
+
+def test_substitution_patcher_invalid_line_number(mock_environment):
+    patcher = SubstitutionPatcher()
+    patcher.environment = mock_environment
+
+    patch = "```rewrite test.py 0 <c>    print(f'Hello, {name}!')</c>```"
+    result = patcher.use(patch)
+
+    assert result == "Invalid line number, line numbers are 1-based.\nRewrite failed."
+    assert not patcher.rewrite_success
+
+
+def test_substitution_patcher_invalid_line_number_2(mock_environment):
+    patcher = SubstitutionPatcher()
+    patcher.environment = mock_environment
+
+    patch = "```rewrite test.py 12:4 <c>    print(f'Hello, {name}!')</c>```"
+    result = patcher.use(patch)
+
+    assert (
+        result
+        == "Invalid line number range, head should be less than or equal to tail.\nRewrite failed."
+    )
+    assert not patcher.rewrite_success
+
+
+if __name__ == "__main__":
     pytest.main()
