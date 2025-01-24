@@ -192,9 +192,13 @@ class SubstitutionPatcher(CodePatcher):
                 # only head is provided (rewrite that line)
                 tail = head
             try:
-                # rewrite the code
                 full_code_lines = self.environment.load_file(file_path).split("\n")
-                full_code_lines[head : tail + 1] = new_code_lines  # list
+                if head >= len(full_code_lines):
+                    # if head exceeds the number of lines in the file, append the new code to the end of the file
+                    full_code_lines.extend(new_code_lines)
+                else:
+                    # rewrite the code
+                    full_code_lines[head : tail + 1] = new_code_lines  # list
                 self.environment.overwrite_file(
                     filepath=file_path, content="\n".join(full_code_lines)
                 )
@@ -209,23 +213,35 @@ class SubstitutionPatcher(CodePatcher):
         # only line number is provided
         line_numbers = line_number_string.split(":")
         line_numbers = [item.strip() for item in line_numbers]
-        assert len(line_numbers) in [1, 2], "Invalid line number format."
+        if len(line_numbers) not in [1, 2]:
+            return "Invalid line number format.", None, None
         if len(line_numbers) == 1:
+            if int(line_numbers[0]) <= 0:
+                return "Invalid line number, line numbers are 1-based.", None, None
             # only head is provided (rewrite that line)
             head = int(line_numbers[0]) - 1  # 1-based to 0-based
             tail = head
         else:
             # len(line_numbers) == 2:
             # both head and tail are provided
+            if int(line_numbers[0]) <= 0 or int(line_numbers[1]) <= 0:
+                return "Invalid line number, line numbers are 1-based.", None, None
+            if int(line_numbers[0]) > int(line_numbers[1]):
+                return (
+                    "Invalid line number range, head should be less than or equal to tail.",
+                    None,
+                    None,
+                )
             head = int(line_numbers[0]) - 1  # 1-based to 0-based
             tail = int(line_numbers[1]) - 1  # 1-based to 0-based
-        return head, tail
+        return "", head, tail
 
     def use(self, patch):
         content = patch.split(self.action)[1].split("```")[0].strip()
         # parse content to get file_path, head, tail, and new_code
         # code/utils.py 4:6 <c>        print('buongiorno')</c>
         file_path, head, tail = None, None, None
+        message = ""
         try:
             new_code = content.split("<c>", 1)[1].split("</c>", 1)[0]
             content = content.split("<c>", 1)[0].strip()
@@ -238,19 +254,21 @@ class SubstitutionPatcher(CodePatcher):
                 # either file path or line number is provided
                 if content_list[0][0].isnumeric():
                     # only line number is provided
-                    head, tail = self.parse_line_numbers(content_list[0])
+                    message, head, tail = self.parse_line_numbers(content_list[0])
                 else:
                     # only file path is provided
                     file_path = content_list[0]
             elif len(content_list) == 2:
                 # both file path and line number are provided
                 file_path = content_list[0]
-                head, tail = self.parse_line_numbers(content_list[1])
+                message, head, tail = self.parse_line_numbers(content_list[1])
             else:
-                raise ValueError("Invalid content format.")
+                message = "SyntaxError: invalid syntax."
         except:
+            message = "SyntaxError: invalid syntax."
+        if "" != message:
             self.rewrite_success = False
-            return "Rewrite failed."
+            return "\n".join([message, "Rewrite failed."])
 
         message, success, new_code_length = self._rewrite_file(
             file_path, head, tail, new_code
