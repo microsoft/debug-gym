@@ -158,7 +158,17 @@ class SWEBenchEnv(RepoEnv):
         self.install_configs = self.get_configs(self.repo, self.version)
         self.gold_patch = self.ds_row["patch"]
 
+    @property
+    def patch(self):
+        command = "git diff"
+        result = subprocess.run(
+            command.split(), cwd=self.working_dir, text=True, capture_output=True
+        )
+        patch = result.stdout.replace(str(self.working_dir), str(self.path))
+        return patch
+
     def reset(self, *, seed=None, options: dict | None = None):
+        # TODO: support reset current task, i.e. no options provided.
         options = options or {}
         self.setup_task_info(options["task_name"])
         self.setup_local_repo()
@@ -203,6 +213,7 @@ class SWEBenchEnv(RepoEnv):
 
         # Delete the content in the working directory.
         self.terminal.run(f"rm -rf {self.working_dir / '*'}")
+        self.terminal.run(f"rm -rf {self.working_dir / '.*'}")
         # Copy the initial code to the working directory.
         self.terminal.run(f"cp -r /testbed/. {self.working_dir}")
 
@@ -212,8 +223,27 @@ class SWEBenchEnv(RepoEnv):
         self.run_install()
         self.run_post_install()
 
+        # Apply test patch
+        command = f"git apply -"
+        subprocess.run(
+            command.split(),
+            cwd=self.working_dir,
+            input=self.ds_row["test_patch"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            check=True,
+        )
+
+        self.make_froggyignore(local_repo_path=self.working_dir)
+
+        self.terminal.run(f"git config user.name 'SWE-Bench'")
+        self.terminal.run(f"git config user.email '<>'")
+        self.terminal.run(f"git add .froggyignore")
+        self.terminal.run(f"git commit -am 'Applied test patch'")
+
         # Reset RepoEnv
-        obs, infos = super().reset()
+        obs, infos = super().reset(options=options, restore_code=False)
         # TODO: probably needed cleanup specific to each SWE-Bench repo.
         # infos["last_run_obs"] = utils.cleanup_pytest_output(infos["last_run_obs"])
 

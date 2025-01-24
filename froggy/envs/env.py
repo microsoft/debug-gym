@@ -197,14 +197,16 @@ class RepoEnv(TooledEnv):
 
             shutil.copy2(self.path / filepath, self.working_dir / filepath)
 
-    def reset(self, *, seed=None, options: dict = None):
+    def reset(self, *, seed=None, options: dict = None, restore_code=True):
         self.logger.info(f"Resetting environment")
         options = options or {}
         self.current_file = None
         self.current_file_content = None
         self.current_breakpoints_state = {}
         self.rewrite_counter = 0
-        self.restore()
+
+        if restore_code:
+            self.restore()
 
         # Run the initial code. This will set self.last_run_obs, self.done and self.score.
         self.logger.info(f"Running initial evaluation")
