@@ -192,6 +192,7 @@ def main():
             ),  # , table_column=Column(no_wrap=True, width=80)),
         )
 
+        tasks_succeeded = []
         overall_progress = Progress(
             TextColumn("🐸"),
             TimeElapsedColumn(),
@@ -232,19 +233,26 @@ def main():
         with Live(progress_group) as live:
 
             with ThreadPoolExecutor(num_workers) as executor:
-                futures = [
+                futures = {
                     executor.submit(
                         run_agent, args, problem, config, task_progress, live
-                    )
+                    ): problem
                     for problem in problem_list
-                ]
+                }
                 for future in as_completed(futures):
-                    result = future.result()
-                    mean_perf += result
+                    problem = futures[future]
+                    success = future.result()
+                    mean_perf += success
                     tasks_done += 1
 
+                    if success:
+                        tasks_succeeded.append(problem)
+
                     # update message on overall progress bar
-                    top_descr = f"[bold #AAAAAA]({tasks_done} out of {len(problem_list)} tasks done - [bold green]{mean_perf}[bold #AAAAAA] are successful)"
+                    top_descr = (
+                        f"[bold #AAAAAA]({tasks_done} out of {len(problem_list)} tasks "
+                        f"done - [bold green]{mean_perf}[bold #AAAAAA] are successful)"
+                    )
                     overall_progress.update(
                         overall_task_id, description=top_descr, advance=1
                     )
@@ -254,6 +262,8 @@ def main():
                 overall_task_id,
                 description=f"[bold green]{mean_perf}/{tasks_done} success!",
             )
+
+        logger.info(f"Tasks that succeeded: {tasks_succeeded}")
     else:
         # custom repo
         print(colored(f"Running agent {agent.name}", "green"))
