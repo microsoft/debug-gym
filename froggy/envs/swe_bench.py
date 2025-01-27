@@ -127,16 +127,13 @@ class SWEBenchEnv(RepoEnv):
         self.test_directives = get_test_directives(self.ds_row)
         entrypoint = " ".join([self.install_configs["test_cmd"], *self.test_directives])
 
-        # --capture=no from pytest, allows for debugging with pdb
-        debug_entrypoint = entrypoint.replace("pytest", "pytest -s")
-
         if (
             "sphinx" in self.ds_row["instance_id"]
             or "sympy" in self.ds_row["instance_id"]
         ):
             # use pytest instead of `sympy bin/test` and `sphinx tox` so pdb breakpoints work
             expression = " ".join(self.test_directives)
-            debug_entrypoint = f"python -m pytest -s {expression}"
+            debug_entrypoint = f"python -m pytest {expression}"
             # Install pytest if not already installed
             self.install_configs["install"] += " && python -m pip install pytest"
 
@@ -145,6 +142,9 @@ class SWEBenchEnv(RepoEnv):
                 export, remaining = entrypoint.split(" ", 1)
                 self.setup_commands.append(f"export {export}")
                 entrypoint = remaining
+
+        # --capture=no from pytest, allows for debugging with pdb
+        debug_entrypoint = entrypoint.replace("pytest", "pytest -s")
 
         self.setup_workspace(
             path=local_branch_path,
