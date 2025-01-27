@@ -130,13 +130,18 @@ class SWEBenchEnv(RepoEnv):
         # --capture=no from pytest, allows for debugging with pdb
         debug_entrypoint = entrypoint.replace("pytest", "pytest -s")
 
-        if "sympy" in self.ds_row["instance_id"]:
-            # use pytest instead of sympy bin/test so pdb can be used
-            self.install_configs["install"] += " && python -m pip install pytest"
+        if (
+            "sphinx" in self.ds_row["instance_id"]
+            or "sympy" in self.ds_row["instance_id"]
+        ):
+            # use pytest instead of `sympy bin/test` and `sphinx tox` so pdb breakpoints work
             expression = " ".join(self.test_directives)
             debug_entrypoint = f"python -m pytest -s {expression}"
+            # Install pytest if not already installed
+            self.install_configs["install"] += " && python -m pip install pytest"
 
             if entrypoint.startswith("PYTHONWARNINGS"):
+                # Move PYTHONWARNINGS from the entrypoint to the setup commands
                 export, remaining = entrypoint.split(" ", 1)
                 self.setup_commands.append(f"export {export}")
                 entrypoint = remaining
