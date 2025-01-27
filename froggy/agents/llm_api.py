@@ -116,19 +116,18 @@ class TokenCounter:
 
 
 class LLM:
-    def __init__(self, model_name, logger=None, verbose=False):
+    def __init__(self, model_name, logger=None):
         configs = load_llm_config()
         if model_name not in configs:
             raise ValueError(f"Model {model_name} not found in llm.cfg")
 
         self.model_name = model_name
         self.config = configs[model_name]
-        self.verbose = verbose
         self.logger = logger or logging.getLogger("froggy")
         self.token_counter = TokenCounter(self.config["tokenizer"])
         self.context_length = self.config["context_limit"] * 1000
 
-        logger.debug(
+        self.logger.debug(
             f"Using {self.model_name} with max context length of {
                 self.context_length:,} tokens."
         )
@@ -220,8 +219,8 @@ class LLM:
 
 
 class AsyncLLM(LLM):
-    def __init__(self, model_name, verbose=False):
-        super().__init__(model_name, verbose)
+    def __init__(self, model_name, logger=None):
+        super().__init__(model_name, logger)
 
         if "azure openai" in self.config.get("tags", []):
             kwargs = self._get_azure_oai_kwargs()
@@ -272,14 +271,15 @@ class AsyncLLM(LLM):
 
 
 class Human:
-    def __init__(self):
+    def __init__(self, logger=None):
         self._history = None
+        self.logger = logger or logging.getLogger("froggy")
         if prompt_toolkit_available:
             self._history = InMemoryHistory()
 
     def __call__(self, messages, info, *args, **kwargs):
         # Color each role differently.
-        print_messages(messages)
+        print_messages(messages, self.logger)
         available_commands = info.get("available_commands", [])
 
         if prompt_toolkit_available:
@@ -337,7 +337,7 @@ def instantiate_llm(config, logger=None, use_async=False):
     if config["llm_name"] == "random":
         llm = Random(config["random_seed"], logger=logger)
     elif config["llm_name"] == "human":
-        llm = Human()
+        llm = Human(logger=logger)
     else:
         if use_async:
             llm = AsyncLLM(config["llm_name"], logger=logger)

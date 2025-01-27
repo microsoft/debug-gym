@@ -1,6 +1,5 @@
 import json
-import sys
-from io import StringIO
+import logging
 from unittest.mock import AsyncMock, MagicMock, mock_open, patch
 
 import pytest
@@ -21,11 +20,26 @@ from froggy.agents.llm_api import (
 
 
 @pytest.fixture
-def async_llm():
+def logger_mock():
+    logger = logging.getLogger("test_logger")
+    logger.setLevel(logging.DEBUG)
+    logs = []
+
+    class ListHandler(logging.Handler):
+        def emit(self, record):
+            logs.append(record.getMessage())
+
+    handler = ListHandler()
+    logger.addHandler(handler)
+    logger._log_history = logs
+    return logger
+
+
+@pytest.fixture
+def async_llm(logger_mock):
     # Create an instance of AsyncLLM with a mock configuration
     model_name = "test-model"
-    verbose = False
-    async_llm = AsyncLLM(model_name, verbose)
+    async_llm = AsyncLLM(model_name, logger=logger_mock)
     return async_llm
 
 
@@ -40,20 +54,14 @@ def test_is_rate_limit_error():
     assert is_rate_limit_error(exception) == True
 
 
-def test_print_messages():
+def test_print_messages(logger_mock):
     messages = [
         {"role": "user", "content": "Hello"},
         {"role": "assistant", "content": "Hi"},
         {"role": "system", "content": "System message"},
     ]
-    captured_output = StringIO()
-    sys.stdout = captured_output
-    print_messages(messages)
-    sys.stdout = sys.__stdout__
-    captured = captured_output.getvalue()
-    assert "Hello" in captured
-    assert "Hi" in captured
-    assert "System message" in captured
+    print_messages(messages, logger_mock)
+    assert logger_mock._log_history == ["Hello\n", "Hi\n", "System message\n"]
 
 
 def test_merge_messages():
@@ -87,7 +95,7 @@ def test_token_counter(mock_encoding_for_model):
     new_callable=mock_open,
     read_data='{"test-model": {"model": "test-model", "max_tokens": 100, "tokenizer": "gpt-4o", "context_limit": 4, "api_key": "test-api-key", "endpoint": "https://test-endpoint", "api_version": "v1", "tags": ["azure openai"]}}',
 )
-def test_llm(mock_open, mock_exists, mock_openai, mock_encoding_for_model):
+def test_llm(mock_open, mock_exists, mock_openai, mock_encoding_for_model, logger_mock):
     mock_encoding = MagicMock()
     mock_encoding.encode = lambda x: x.split()
     mock_encoding_for_model.return_value = mock_encoding
@@ -97,7 +105,7 @@ def test_llm(mock_open, mock_exists, mock_openai, mock_encoding_for_model):
     mock_response.choices[0].message.content = "Response"
     mock_openai.return_value = mock_response
 
-    llm = LLM(model_name="test-model", verbose=False)
+    llm = LLM(model_name="test-model", logger=logger_mock)
     messages = [{"role": "user", "content": "Hello"}]
     response, token_usage = llm(messages)
     assert response == "Response"
@@ -145,8 +153,8 @@ def completion_mock():
 
 
 @pytest.mark.asyncio
-async def test_async_llm(llm_config_mock, completion_mock):
-    llm = AsyncLLM(model_name="test_model", verbose=False)
+async def test_async_llm(llm_config_mock, completion_mock, logger_mock):
+    llm = AsyncLLM(model_name="test_model", logger=logger_mock)
     llm.client.chat.completions.create = completion_mock
     messages = [{"role": "user", "content": "Hello"}]
     response, token_usage = await llm(messages)
@@ -166,8 +174,8 @@ def test_human():
     assert "response" in token_usage
 
 
-def test_random():
-    random_llm = Random(seed=42, verbose=False)
+def test_random(logger_mock):
+    random_llm = Random(seed=42, logger=logger_mock)
     messages = [{"role": "user", "content": "Hello"}]
     info = {"available_commands": ["command1", "command2"]}
     response, token_usage = random_llm(messages, info)
@@ -183,19 +191,19 @@ def test_random():
     new_callable=mock_open,
     read_data='{"test-model": {"model": "test-model", "max_tokens": 100, "tokenizer": "gpt-4o", "context_limit": 4, "api_key": "test-api-key", "endpoint": "https://test-endpoint", "api_version": "v1", "tags": ["azure openai"]}}',
 )
-def test_instantiate_llm(mock_open, mock_exists, mock_encoding_for_model):
+def test_instantiate_llm(mock_open, mock_exists, mock_encoding_for_model, logger_mock):
     mock_encoding = MagicMock()
     mock_encoding.encode = lambda x: x.split()
     mock_encoding_for_model.return_value = mock_encoding
 
     config = {"llm_name": "test-model"}
-    llm = instantiate_llm(config, verbose=False, use_async=False)
+    llm = instantiate_llm(config, logger=logger_mock, use_async=False)
     assert isinstance(llm, LLM)
 
     config = {"llm_name": "random", "random_seed": 42}
-    llm = instantiate_llm(config, verbose=False, use_async=False)
+    llm = instantiate_llm(config, logger=logger_mock, use_async=False)
     assert isinstance(llm, Random)
 
     config = {"llm_name": "human"}
-    llm = instantiate_llm(config, verbose=False, use_async=False)
+    llm = instantiate_llm(config, logger=logger_mock, use_async=False)
     assert isinstance(llm, Human)
