@@ -22,7 +22,7 @@ class TestAgentZeroShot(unittest.TestCase):
         self.env = MagicMock()
         self.llm = MagicMock()
         self.history = MagicMock()
-        self.agent = AgentZeroShot(self.config_dict, self.env, verbose=False)
+        self.agent = AgentZeroShot(self.config_dict, self.env)
         self.agent.llm = self.llm
         self.agent.history = self.history
 
@@ -80,7 +80,7 @@ class TestAgentZeroShot_NoPDB(unittest.TestCase):
         self.env = MagicMock()
         self.llm = MagicMock()
         self.history = MagicMock()
-        self.agent = AgentZeroShot_NoPDB(self.config_dict, self.env, verbose=False)
+        self.agent = AgentZeroShot_NoPDB(self.config_dict, self.env)
         self.agent.llm = self.llm
         self.agent.history = self.history
 
@@ -123,7 +123,7 @@ class TestAgentZeroShot_PdbAfterRewrites(unittest.TestCase):
         self.env = MagicMock()
         self.llm = MagicMock()
         self.history = MagicMock()
-        self.agent = AgentZeroShot_PdbAfterRewrites(self.config_dict, self.env, verbose=False)
+        self.agent = AgentZeroShot_PdbAfterRewrites(self.config_dict, self.env)
         self.agent.llm = self.llm
         self.agent.history = self.history
 

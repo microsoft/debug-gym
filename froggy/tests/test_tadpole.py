@@ -22,7 +22,7 @@ class TestAgentTadpole(unittest.TestCase):
         self.env = MagicMock()
         self.llm = MagicMock()
         self.history = MagicMock()
-        self.agent = AgentTadpole(self.config_dict, self.env, verbose=False)
+        self.agent = AgentTadpole(self.config_dict, self.env)
         self.agent.llm = self.llm
         self.agent.history = self.history
 

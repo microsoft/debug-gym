@@ -16,7 +16,7 @@ class TestAgentCoT(unittest.TestCase):
         mock_encoding = MagicMock()
         mock_encoding.encode = lambda x: x.split()
         mock_encoding_for_model.return_value = mock_encoding
-    
+
         self.config_dict = {
             "llm_name": "test-model",
             "max_steps": 10,
@@ -31,7 +31,7 @@ class TestAgentCoT(unittest.TestCase):
         self.env = MagicMock()
         self.llm = MagicMock()
         self.history = MagicMock()
-        self.agent = AgentCoT(self.config_dict, self.env, verbose=False)
+        self.agent = AgentCoT(self.config_dict, self.env)
         self.agent.llm = self.llm
         self.agent.history = self.history
 
@@ -122,7 +122,7 @@ class TestAgentCoT_NoPDB(unittest.TestCase):
         self.env = MagicMock()
         self.llm = MagicMock()
         self.history = MagicMock()
-        self.agent = AgentCoT_NoPDB(self.config_dict, self.env, verbose=False)
+        self.agent = AgentCoT_NoPDB(self.config_dict, self.env)
         self.agent.llm = self.llm
         self.agent.history = self.history
 

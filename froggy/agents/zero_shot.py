@@ -125,8 +125,8 @@ class AgentZeroShot_NoPDB(AgentZeroShot):
 class AgentZeroShot_PdbAfterRewrites(AgentZeroShot):
     name: str = "zero shot pdb after rewrites"
 
-    def __init__(self, config_dict, env, verbose=False, _uuid=None, **kwargs):
-        super().__init__(config_dict, env, verbose, _uuid, **kwargs)
+    def __init__(self, config_dict, env, _uuid=None, **kwargs):
+        super().__init__(config_dict, env, _uuid, **kwargs)
 
     def run(self, task_name=None, debug=False):
         # remove the pdb tool from the environment
