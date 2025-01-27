@@ -243,6 +243,7 @@ class SWEBenchEnv(RepoEnv):
         self.make_froggyignore(
             local_repo_path=self.working_dir, additionnal_contents=self.test_directives
         )
+        self._index_files()
 
         self.terminal.run(f"git config user.name 'SWE-Bench'")
         self.terminal.run(f"git config user.email '<>'")
@@ -277,9 +278,9 @@ class SWEBenchEnv(RepoEnv):
         score = sum(
             1
             for test in self.fail_to_pass
-            # Assume silent success for now as done in SWE-Bench grading.py
-            if test_status_map.get(test, TestStatus.PASSED.value)
-            == TestStatus.PASSED.value
+            # *Do not* assume silent success for now as done in SWE-Bench grading.py
+            if test_status_map.get(test, TestStatus.ERROR.value)
+            in (TestStatus.PASSED.value, TestStatus.XFAIL.value)
         )
         assert score <= self.max_score
         return score
@@ -313,12 +314,13 @@ class SWEBenchEnv(RepoEnv):
         # Add an ignore file
         froggyignore_contents = "\n".join(
             [
-                "*/tests/",
+                "**/tests/",
                 ".froggyignore",
                 ".pytest_cache/",
                 "*test*.py",
                 "*.pyc",
                 "*.md",
+                ".*",
             ]
             + additionnal_contents
         )

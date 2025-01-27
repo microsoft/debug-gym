@@ -1,4 +1,5 @@
 import json
+import os
 
 from tqdm import tqdm
 
@@ -42,6 +43,7 @@ class AgentZeroShot(AgentBase):
             total=self.config["max_steps"],
             desc=f"Debugging inside {self.env.working_dir} - Task: {task_name}",
             leave=True,
+            file=open(os.devnull, "w"),
         )
         for step in range(self.config["max_steps"]):
             highscore = max(highscore, info["score"])
@@ -50,11 +52,13 @@ class AgentZeroShot(AgentBase):
                     info["score"]
                 )
             )
+            self.logger.info(str(pbar))
 
             prompt = self.build_prompt(info)
             answer, token_usage = self.llm(
                 prompt, info, temperature=self.config["llm_temperature"][0]
             )
+            self.logger.info(answer)
 
             if debug:
                 breakpoint()
@@ -69,12 +73,14 @@ class AgentZeroShot(AgentBase):
             )
 
             pbar.update()
+            self.logger.info(str(pbar))
             if done or info["rewrite_counter"] >= self.config["max_rewrite_steps"]:
                 pbar.set_postfix_str(
                     f"Score: {info['score']}/{info['max_score']} ({info['score']/info['max_score']:.1%})".format(
                         info["score"]
                     )
                 )
+                self.logger.info(str(pbar))
                 break
         return done
 

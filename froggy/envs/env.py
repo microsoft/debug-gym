@@ -121,6 +121,23 @@ class RepoEnv(TooledEnv):
         self.logger.debug(f"Working directory: {self.working_dir}")
         shutil.copytree(self.path, self.working_dir, dirs_exist_ok=True, symlinks=True)
 
+        self._index_files(readonly_patterns)
+
+        self.current_file = None
+        self.current_file_content = None
+        self.current_breakpoints_state = {}
+
+        # override entrypoint as it might be task dependent
+        if entrypoint:
+            entrypoint = entrypoint or ""
+            debug_entrypoint = debug_entrypoint or entrypoint
+            self.entrypoint = self._prepare_entrypoint(entrypoint)
+            self.debug_entrypoint = self._prepare_entrypoint(debug_entrypoint)
+
+        # Set up the terminal working dir
+        self.terminal.working_dir = str(self.working_dir)
+
+    def _index_files(self, readonly_patterns: list[str] | None = None):
         # get list of all the files
         self.all_files = sorted(
             os.path.relpath(pjoin(path, name), self.working_dir)
@@ -136,20 +153,6 @@ class RepoEnv(TooledEnv):
         self.editable_files = [
             p for p in self.all_files if not self.is_readonly(self.working_dir / p)
         ]
-
-        self.current_file = None
-        self.current_file_content = None
-        self.current_breakpoints_state = {}
-
-        # override entrypoint as it might be task dependent
-        if entrypoint:
-            entrypoint = entrypoint or ""
-            debug_entrypoint = debug_entrypoint or entrypoint
-            self.entrypoint = self._prepare_entrypoint(entrypoint)
-            self.debug_entrypoint = self._prepare_entrypoint(debug_entrypoint)
-
-        # Set up the terminal working dir
-        self.terminal.working_dir = str(self.working_dir)
 
     @staticmethod
     def _prepare_entrypoint(entrypoint):

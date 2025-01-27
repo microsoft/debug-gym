@@ -15,6 +15,10 @@ from froggy.tools.toolbox import Toolbox
 from froggy.utils import load_config, setup_logger
 
 
+class BreakTaskLoop(Exception):
+    pass
+
+
 def select_env(env_type: str = None):
     match env_type:
         case None:
@@ -31,6 +35,7 @@ def select_env(env_type: str = None):
 
 
 def run_agent(args, problem, config, current_app_progress: Progress, live):
+    exp_path = Path(config["output_path"]) / config["uuid"] / problem
     # add progress bar for steps of this app, and run the steps
     current_task_id = current_app_progress.add_task(
         f"\\[{problem}]:", log="Starting task..."
@@ -38,7 +43,7 @@ def run_agent(args, problem, config, current_app_progress: Progress, live):
 
     task_logger = setup_logger(
         problem,
-        log_dir=config["output_path"],
+        log_dir=exp_path,
         verbose=args.very_verbose,
         mode="w" if args.force_all else "a",
         progress=current_app_progress,
@@ -46,10 +51,7 @@ def run_agent(args, problem, config, current_app_progress: Progress, live):
     )
     task_logger.live = live
     try:
-        previous_run = (
-            Path(config["output_path"]) / config["uuid"] / problem / "froggy.jsonl"
-        )
-
+        previous_run = exp_path / "froggy.jsonl"
         if not args.force_all and os.path.exists(previous_run):
             task_logger.debug(f"Previous run found: {previous_run}")
             with open(previous_run) as reader:
@@ -78,6 +80,9 @@ def run_agent(args, problem, config, current_app_progress: Progress, live):
 
         # save log
         agent.log(task_name=problem)
+    except KeyboardInterrupt:
+        raise BreakTaskLoop
+
     except Exception as e:
         task_logger.warning(
             f"Task Error: {problem} - {e!r}. Run with --very-verbose or check {task_logger.log_file} for more information."
@@ -86,7 +91,6 @@ def run_agent(args, problem, config, current_app_progress: Progress, live):
             f"Task {problem} generated an exception: {e!r}", exc_info=True
         )
         if args.debug:
-            breakpoint()
             raise e
 
         success = False
@@ -231,6 +235,8 @@ def main():
         # sys.stderr = open(os.devnull, "w")
 
         with Live(progress_group) as live:
+            if args.debug:
+                live.stop()
 
             with ThreadPoolExecutor(num_workers) as executor:
                 futures = {
@@ -240,22 +246,32 @@ def main():
                     for problem in problem_list
                 }
                 for future in as_completed(futures):
-                    problem = futures[future]
-                    success = future.result()
-                    mean_perf += success
-                    tasks_done += 1
+                    if future.cancelled():
+                        continue
+                    try:
+                        problem = futures[future]
+                        success = future.result()
+                        mean_perf += success
+                        tasks_done += 1
 
-                    if success:
-                        tasks_succeeded.append(problem)
+                        if success:
+                            tasks_succeeded.append(problem)
 
-                    # update message on overall progress bar
-                    top_descr = (
-                        f"[bold #AAAAAA]({tasks_done} out of {len(problem_list)} tasks "
-                        f"done - [bold green]{mean_perf}[bold #AAAAAA] are successful)"
-                    )
-                    overall_progress.update(
-                        overall_task_id, description=top_descr, advance=1
-                    )
+                        # update message on overall progress bar
+                        top_descr = (
+                            f"[bold #AAAAAA]({tasks_done} out of {len(problem_list)} tasks "
+                            f"done - [bold green]{mean_perf}[bold #AAAAAA] are successful)"
+                        )
+                        overall_progress.update(
+                            overall_task_id, description=top_descr, advance=1
+                        )
+                    except (KeyboardInterrupt, BreakTaskLoop):
+                        live.stop()
+                        executor.shutdown(wait=False, cancel_futures=True)
+                    except Exception as e:
+                        live.stop()
+                        executor.shutdown(wait=False, cancel_futures=True)
+                        raise e
 
             # final update for message on overall progress bar
             overall_progress.update(
