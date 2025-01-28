@@ -4,12 +4,54 @@ import time
 import docker
 import pytest
 
-from froggy.terminal import DockerTerminal, Terminal, select_terminal
+from froggy.terminal import DockerTerminal, ShellSession, Terminal, select_terminal
 
 if_docker_running = pytest.mark.skipif(
     not subprocess.check_output(["docker", "ps"]),
     reason="Docker not running",
 )
+
+
+def test_shell_session_run(tmp_path):
+    working_dir = str(tmp_path)
+    entrypoint = ["/bin/bash", "--noprofile", "--norc"]
+    env_vars = {
+        "NO_COLOR": "1",  # disable colors
+        "PS1": "",  # disable prompt
+    }
+    env_vars_1 = {"TEST_VAR": "TestVar"}
+    env_vars_1.update(env_vars)
+    session_1 = ShellSession(
+        session_id=1,
+        entrypoint=entrypoint,
+        working_dir=working_dir,
+        env_vars=env_vars_1,
+    )
+    session_2 = ShellSession(
+        session_id=2,
+        entrypoint=entrypoint,
+        working_dir=working_dir,
+        env_vars=env_vars,
+    )
+
+    assert session_1.entrypoint == entrypoint
+    assert session_2.entrypoint == entrypoint
+
+    assert session_1.working_dir == working_dir
+    assert session_2.working_dir == working_dir
+
+    assert session_1.env_vars == env_vars_1
+    assert session_2.env_vars == env_vars
+
+    output = session_1.run("echo Hello World", timeout=1)
+    assert output == "Hello World"
+
+    session_2.run("export TEST_VAR='FooBar'", timeout=1)
+    output = session_2.run("echo $TEST_VAR", timeout=1)
+    assert output == "FooBar"
+
+    output = session_1.run("echo $TEST_VAR", timeout=1)
+    assert output == "TestVar"
 
 
 def test_terminal_init():
