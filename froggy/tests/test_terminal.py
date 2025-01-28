@@ -77,10 +77,10 @@ def test_terminal_init_with_params(tmp_path):
     assert terminal.setup_commands == setup_commands
     assert terminal.env_vars["NO_COLOR"] == "1"
     assert terminal.env_vars["ENV_VAR"] == "value"
-    status, output = terminal.run("pwd")
+    status, output = terminal.run("pwd", timeout=1)
     assert status
     assert output == f"Hello World\n{working_dir}"
-    status, output = terminal.run("echo $ENV_VAR")
+    status, output = terminal.run("echo $ENV_VAR", timeout=1)
     assert status
     assert output == "Hello World\nvalue"
 
@@ -89,7 +89,7 @@ def test_terminal_run(tmp_path):
     working_dir = str(tmp_path)
     terminal = Terminal(working_dir=working_dir)
     entrypoint = "echo 'Hello World'"
-    success, output = terminal.run(entrypoint)
+    success, output = terminal.run(entrypoint, timeout=1)
     assert success is True
     assert output == "Hello World"
     assert terminal.working_dir == working_dir
@@ -98,7 +98,7 @@ def test_terminal_run(tmp_path):
 def test_terminal_run_tmp_working_dir(tmp_path):
     terminal = Terminal()
     entrypoint = "echo 'Hello World'"
-    success, output = terminal.run(entrypoint)
+    success, output = terminal.run(entrypoint, timeout=1)
     assert success is True
     assert output == "Hello World"
     assert terminal.working_dir.startswith("/tmp/Terminal-")
@@ -114,7 +114,7 @@ def test_terminal_run_tmp_working_dir(tmp_path):
 def test_terminal_run_multiple_commands(tmp_path, command):
     working_dir = str(tmp_path)
     terminal = Terminal(working_dir=working_dir)
-    success, output = terminal.run(command)
+    success, output = terminal.run(command, timeout=1)
     assert success is True
     assert output == "Hello\nWorld"
 
@@ -123,37 +123,30 @@ def test_terminal_run_failure(tmp_path):
     working_dir = str(tmp_path)
     terminal = Terminal(working_dir=working_dir)
     entrypoint = "ls non_existent_dir"
-    success, output = terminal.run(entrypoint)
+    success, output = terminal.run(entrypoint, timeout=1)
     assert success is False
     assert output == ("ls: cannot access 'non_existent_dir': No such file or directory")
 
 
-def test_terminal_pseudo_terminal(tmp_path):
+def test_terminal_session(tmp_path):
     working_dir = str(tmp_path)
     command = "echo Hello World"
     terminal = Terminal(working_dir=working_dir)
-    assert terminal.has_pseudo_terminal() is False
+    assert not terminal.sessions
 
-    terminal.start_pseudo_terminal(timeout=1)
-    assert terminal.has_pseudo_terminal() is True
-    output = terminal.run_interactive(command, timeout=1)
+    session = terminal.start_shell_session(timeout=1)
+    assert len(terminal.sessions) == 1
+    output = session.run(command, timeout=1)
     assert output == "Hello World"
 
-    terminal.run_interactive("export TEST_VAR='FooBar'", timeout=1)
-    output = terminal.run_interactive("pwd", timeout=1)
+    session.run("export TEST_VAR='FooBar'", timeout=1)
+    output = session.run("pwd", timeout=1)
     assert output == working_dir
-    output = terminal.run_interactive("echo $TEST_VAR", timeout=1)
+    output = session.run("echo $TEST_VAR", timeout=1)
     assert output == "FooBar"
 
-    terminal.close_pseudo_terminal()
-
-    # starts the pseudo terminal automatically
-    output = terminal.run_interactive(command, timeout=1)
-    assert terminal.has_pseudo_terminal() is True
-    assert output == "Hello World"
-
-    terminal.close_pseudo_terminal()
-    assert terminal.has_pseudo_terminal() is False
+    terminal.close_shell_session(session)
+    assert not terminal.sessions
 
 
 @if_docker_running
@@ -192,10 +185,10 @@ def test_docker_terminal_init_with_params(tmp_path):
     assert terminal.volumes == volumes
     assert terminal.container.status == "running"
 
-    _, output = terminal.run("pwd")
+    _, output = terminal.run("pwd", timeout=1)
     assert output == working_dir
 
-    _, output = terminal.run("ls -l")
+    _, output = terminal.run("ls -l", timeout=1)
     assert "new_dir" in output
 
 
@@ -211,14 +204,14 @@ def test_docker_terminal_run(tmp_path, command):
     working_dir = str(tmp_path)
     volumes = {working_dir: {"bind": working_dir, "mode": "rw"}}
     docker_terminal = DockerTerminal(working_dir=working_dir, volumes=volumes)
-    success, output = docker_terminal.run(command)
+    success, output = docker_terminal.run(command, timeout=1)
     assert output == "test"
     assert success is True
 
-    success, output = docker_terminal.run("echo $ENV_VAR")
+    success, output = docker_terminal.run("echo $ENV_VAR", timeout=1)
     assert "value" not in output
     assert success is True
-    success, output = docker_terminal.run("ls")
+    success, output = docker_terminal.run("ls", timeout=1)
     assert "test" in output
     assert success is True
 
@@ -237,52 +230,44 @@ def test_docker_terminal_read_only_volume(tmp_path):
         working_dir: {"bind": working_dir, "mode": "rw"},
         read_only_dir: {"bind": read_only_dir, "mode": "ro"},
     }
-    success, ls_output = docker_terminal.run(f"ls {read_only_dir}")
+    success, ls_output = docker_terminal.run(f"ls {read_only_dir}", timeout=1)
     assert success is True
     assert ls_output.startswith("test.txt")
 
-    success, output = docker_terminal.run(f"touch {read_only_dir}/test2.txt")
+    success, output = docker_terminal.run(f"touch {read_only_dir}/test2.txt", timeout=1)
     assert success is False
     assert (
         output
         == f"touch: cannot touch '{read_only_dir}/test2.txt': Read-only file system"
     )
 
-    success, output = docker_terminal.run(f"touch {working_dir}/test2.txt")
+    success, output = docker_terminal.run(f"touch {working_dir}/test2.txt", timeout=1)
     assert success is True
     assert output == ""
 
 
 @if_docker_running
-def test_docker_terminal_pseudo_terminal(tmp_path):
-    # same as test_terminal_pseudo_terminal but with DockerTerminal
+def test_docker_terminal_session(tmp_path):
+    # same as test_terminal_session but with DockerTerminal
     working_dir = str(tmp_path)
     volumes = {working_dir: {"bind": working_dir, "mode": "rw"}}
     command = "echo Hello World"
     terminal = DockerTerminal(working_dir=working_dir, volumes=volumes)
-    assert terminal.has_pseudo_terminal() is False
+    assert not terminal.sessions
 
-    terminal.start_pseudo_terminal(timeout=1)
-    assert terminal.has_pseudo_terminal() is True
-    output = terminal.run_interactive(command, timeout=1)
+    session = terminal.start_shell_session(timeout=1)
+    assert len(terminal.sessions) == 1
+    output = session.run(command, timeout=1)
     assert output == "Hello World"
 
-    terminal.run_interactive("export TEST_VAR='FooBar'", timeout=1)
-    output = terminal.run_interactive("pwd", timeout=1)
+    session.run("export TEST_VAR='FooBar'", timeout=1)
+    output = session.run("pwd", timeout=1)
     assert output == working_dir
-    output = terminal.run_interactive("echo $TEST_VAR", timeout=1)
+    output = session.run("echo $TEST_VAR", timeout=1)
     assert output == "FooBar"
 
-    terminal.close_pseudo_terminal()
-    assert terminal.has_pseudo_terminal() is False
-
-    # starts the pseudo terminal automatically
-    output = terminal.run_interactive(command, timeout=1)
-    assert terminal.has_pseudo_terminal() is True
-    assert output == "Hello World"
-
-    terminal.close_pseudo_terminal()
-    assert terminal.has_pseudo_terminal() is False
+    terminal.close_shell_session(session)
+    assert not terminal.sessions
 
 
 @if_docker_running
@@ -308,7 +293,7 @@ def test_terminal_multiple_setup_commands(tmp_path, terminal_cls):
     working_dir = str(tmp_path)
     setup_commands = ["echo 'Hello'", "echo 'World'"]
     terminal = terminal_cls(working_dir, setup_commands)
-    status, output = terminal.run("pwd")
+    status, output = terminal.run("pwd", timeout=1)
     assert status
     assert output == f"Hello\nWorld\n{working_dir}"
 
@@ -316,12 +301,15 @@ def test_terminal_multiple_setup_commands(tmp_path, terminal_cls):
 @if_docker_running
 def test_terminal_sudo_command(tmp_path):
     working_dir = str(tmp_path)
-    terminal = DockerTerminal(working_dir=working_dir)
-    success, output = terminal.run("vim --version")
+    terminal = DockerTerminal(working_dir=working_dir, map_host_uid_gid=False)
+    success, output = terminal.run("vim --version", timeout=1)
     assert "vim: command not found" in output
-    success, output = terminal.run("sudo apt install -y vim")
+    assert success is False
+    success, output = terminal.run(
+        "apt update && apt install -y sudo && sudo apt install -y vim"
+    )
     assert success is True
-    success, output = terminal.run("vim --version")
+    success, output = terminal.run("vim --version", timeout=1)
     assert success is True
     assert "VIM - Vi IMproved" in output
 
