@@ -9,9 +9,6 @@ from froggy.utils import unescape
 class AgentZeroShot(AgentBase):
     name: str = "zero shot"
 
-    def __init__(self, config_dict, env, verbose=False, _uuid=None):
-        super().__init__(config_dict, env, verbose, _uuid)
-
     def build_question_prompt(self):
         messages = []
         question = "Based on the instruction, the current code, the last execution output, and the history information, "
@@ -38,14 +35,20 @@ class AgentZeroShot(AgentBase):
         done = False
         highscore = info["score"]
 
-        pbar = tqdm(
-            total=self.config["max_steps"],
-            desc=f"Debugging inside {self.env.working_dir} - Task: {task_name}",
-            leave=True,
-        )
+        # pbar = tqdm(
+        #     total=self.config["max_steps"],
+        #     desc=f"Debugging inside {self.env.working_dir} - Task: {task_name}",
+        #     leave=True,
+        # )
+        self.logger.progress.update(self.logger.task_id, total=self.config["max_steps"])
         for step in range(self.config["max_steps"]):
             highscore = max(highscore, info["score"])
-            pbar.set_postfix_str(
+            # pbar.set_postfix_str(
+            #     f"Score: {info['score']}/{info['max_score']} ({info['score']/info['max_score']:.1%}) [Best: {highscore}]".format(
+            #         info["score"]
+            #     )
+            # )
+            self.logger.info(
                 f"Score: {info['score']}/{info['max_score']} ({info['score']/info['max_score']:.1%}) [Best: {highscore}]".format(
                     info["score"]
                 )
@@ -68,9 +71,15 @@ class AgentZeroShot(AgentBase):
                 prompt_response_pairs=[(prompt, answer)]
             )
 
-            pbar.update()
+            # pbar.update()
+            self.logger.progress.update(self.logger.task_id, advance=1)
             if done or info["rewrite_counter"] >= self.config["max_rewrite_steps"]:
-                pbar.set_postfix_str(
+                # pbar.set_postfix_str(
+                #     f"Score: {info['score']}/{info['max_score']} ({info['score']/info['max_score']:.1%})".format(
+                #         info["score"]
+                #     )
+                # )
+                self.logger.info(
                     f"Score: {info['score']}/{info['max_score']} ({info['score']/info['max_score']:.1%})".format(
                         info["score"]
                     )
@@ -81,9 +90,6 @@ class AgentZeroShot(AgentBase):
 
 class AgentZeroShot_NoPDB(AgentZeroShot):
     name: str = "zero shot no pdb"
-
-    def __init__(self, config_dict, env, verbose=False, _uuid=None):
-        super().__init__(config_dict, env, verbose, _uuid)
 
     def build_system_prompt(self, info):
         system_prompt = {}
@@ -118,9 +124,6 @@ class AgentZeroShot_NoPDB(AgentZeroShot):
 
 class AgentZeroShot_PdbAfterRewrites(AgentZeroShot):
     name: str = "zero shot pdb after rewrites"
-
-    def __init__(self, config_dict, env, verbose=False, _uuid=None):
-        super().__init__(config_dict, env, verbose, _uuid)
 
     def run(self, task_name=None, debug=False):
         # remove the pdb tool from the environment

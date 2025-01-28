@@ -14,9 +14,6 @@ from froggy.utils import unescape
 class AgentCoT(AgentBase):
     name: str = "cot"
 
-    def __init__(self, config_dict, env, verbose=False, _uuid=None):
-        super().__init__(config_dict, env, verbose, _uuid)
-
     def build_cot_prompt(self):
         messages = []
         cot_prompt = [
@@ -134,10 +131,6 @@ class AgentCoT(AgentBase):
 
 class AgentCoT_NoPDB(AgentCoT):
     name: str = "cot no pdb"
-
-    def __init__(self, config_dict, env, verbose=False, _uuid=None):
-        super().__init__(config_dict, env, verbose, _uuid)
-        self.history = HistoryTracker(self.config["memory_size"])
 
     def build_system_prompt(self, info):
         system_prompt = {}

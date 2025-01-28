@@ -1,10 +1,12 @@
 import argparse
 import codecs
+import logging
 import os
 import re
 import signal
 from contextlib import contextmanager
 from os.path import join as pjoin
+from pathlib import Path
 from typing import Optional
 
 import yaml
@@ -187,6 +189,19 @@ def load_config():
     )
     parser.add_argument("-v", "--verbose", action="store_true", help="Verbose mode")
     parser.add_argument(
+        "-vv", "--very-verbose", action="store_true", help="Set logging level to DEBUG"
+    )
+    parser.add_argument(
+        "--force-all",
+        action="store_true",
+        help="Force running all problems even if they are already done.",
+    )
+    parser.add_argument(
+        "--force-failed",
+        action="store_true",
+        help="Force running only problems that have failed.",
+    )
+    parser.add_argument(
         "-p",
         "--params",
         nargs="+",
@@ -209,3 +224,55 @@ def load_config():
         entry_to_change[keys[-1]] = yaml.safe_load(value)
 
     return config, args
+
+
+def setup_logger(
+    name: str,
+    log_dir: str | None = None,
+    verbose: bool = False,
+    mode="a",
+    progress=None,
+    task_id=None,
+):
+    logger = logging.getLogger(name)
+    logger.setLevel(logging.DEBUG)
+    logger.progress = progress
+    logger.task_id = task_id
+
+    if progress is not None and task_id is not None:
+
+        class ProgressHandler(logging.Handler):
+            def emit(self, record):
+                # Strip color codes from the log message
+                message = re.sub(r"\x1b\[[0-9;]*m", "", self.format(record))
+                message = message.replace("\n", "\\n").replace("\r", "\\r")
+                # Truncate message to 80 characters
+                message = message[:80] + "..." if len(message) > 80 else message
+                progress.update(task_id, log=message)
+
+        ph = ProgressHandler()
+        ph.setLevel(logging.DEBUG if verbose else logging.INFO)
+        formatter = logging.Formatter("%(levelname)-8s %(message)s")
+        ph.setFormatter(formatter)
+        logger.addHandler(ph)
+
+    console = logging.StreamHandler()
+    formatter = logging.Formatter("🐸 [%(name)-12s]: %(levelname)-8s %(message)s")
+    console.setFormatter(formatter)
+    console.setLevel(logging.DEBUG if verbose else logging.INFO)
+    logger.addHandler(console)
+
+    if log_dir:
+        log_dir = Path(log_dir)
+        log_dir.mkdir(parents=True, exist_ok=True)
+
+        logger.log_file = log_dir / f"{name}.log"
+        fh = logging.FileHandler(logger.log_file, mode=mode)
+        formatter = logging.Formatter("%(asctime)s %(levelname)-8s %(message)s")
+        fh.setFormatter(formatter)
+        fh.setLevel(logging.DEBUG)
+        logger.addHandler(fh)
+
+    # Prevent the log messages from being propagated to the root logger
+    logger.propagate = False
+    return logger
