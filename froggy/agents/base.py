@@ -6,11 +6,10 @@ import uuid
 from os.path import join as pjoin
 
 import numpy as np
-from termcolor import colored
-from tqdm import tqdm
 
 from froggy.agents.llm_api import instantiate_llm
 from froggy.agents.utils import HistoryTracker, build_history_prompt
+from froggy.envs.env import RepoEnv
 from froggy.utils import unescape
 
 
@@ -19,19 +18,16 @@ class AgentBase:
 
     def __init__(
         self,
-        config_dict,
-        env,
-        _uuid=None,
-        logger=None,
+        config: dict,
+        env: RepoEnv,
+        logger: logging.Logger | None = None,
     ):
-        self.config = config_dict
+        self.config = config
         self.env = env
         self.logger = logger or logging.getLogger("froggy")
         self.llm = instantiate_llm(self.config, logger=self.logger)
-        _uuid = self.config.get("uuid", _uuid)
-        self._uuid = str(uuid.uuid4()) if _uuid is None else _uuid
+        self._uuid = self.config.get("uuid", str(uuid.uuid4()))
         self._output_path = pjoin(self.config["output_path"], self._uuid)
-        self.logger = logger
 
         os.makedirs(self._output_path, exist_ok=True)
 

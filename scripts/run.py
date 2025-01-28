@@ -1,5 +1,7 @@
 import json
+import logging
 import os
+import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
@@ -34,19 +36,18 @@ def select_env(env_type: str = None):
     return env_class
 
 
-def run_agent(args, problem, config, current_app_progress: Progress, live):
+def run_agent(args, problem, config, task_progress: Progress, live):
+    config["uuid"] = config.get("uuid", str(uuid.uuid4()))
     exp_path = Path(config["output_path"]) / config["uuid"] / problem
     # add progress bar for steps of this app, and run the steps
-    current_task_id = current_app_progress.add_task(
-        f"\\[{problem}]:", log="Starting task..."
-    )
+    current_task_id = task_progress.add_task(f"\\[{problem}]:", log="Starting task...")
 
     task_logger = setup_logger(
         problem,
         log_dir=exp_path,
         verbose=args.very_verbose,
         mode="w" if args.force_all else "a",
-        progress=current_app_progress,
+        progress=task_progress,
         task_id=current_task_id,
     )
     task_logger.live = live
@@ -60,18 +61,18 @@ def run_agent(args, problem, config, current_app_progress: Progress, live):
             task_logger.debug(f"Previous run success: {success}")
             if not args.force_failed or success:
                 task_logger.info(f"Skipping {problem}, already done.")
-                current_app_progress.stop_task(current_task_id)
-                current_app_progress.update(
+                task_progress.stop_task(current_task_id)
+                task_progress.update(
                     current_task_id,
                     completed=True,
                     description=f"[bold gray]\\[{problem}]:",
                     log="[bold gray]Skipped!",
                 )
-                current_app_progress.remove_task(current_task_id)
+                task_progress.remove_task(current_task_id)
                 return success
 
-        agent = create_agent(args, config, logger=task_logger)
-        agent.env = create_env(args, config, task_logger)
+        env = create_env(args, config, task_logger)
+        agent = create_agent(args.agent, config=config, env=env, logger=task_logger)
         success = agent.run(task_name=problem, debug=args.debug)
 
         # optionally apply patch
@@ -95,18 +96,18 @@ def run_agent(args, problem, config, current_app_progress: Progress, live):
 
         success = False
 
-    current_app_progress.stop_task(current_task_id)
-    current_app_progress.update(
+    task_progress.stop_task(current_task_id)
+    task_progress.update(
         current_task_id,
         completed=True,
         description=f"[bold green]\\[{problem}]:",
         log="[bold green]Completed!",
     )
-    current_app_progress.remove_task(current_task_id)
+    task_progress.remove_task(current_task_id)
     return success
 
 
-def create_env(args, config, logger):
+def create_env(args, config: dict, logger: logging.Logger):
     terminal = select_terminal(config.get("terminal"), logger)
     env_class = select_env(config.get("benchmark"))
     env = env_class(**config["env_kwargs"], terminal=terminal, logger=logger)
@@ -121,20 +122,12 @@ def create_env(args, config, logger):
         tool_instantiated = Toolbox.get_tool(tool, **kwargs)
         env.add_tool(tool_instantiated)
         logger.debug(f"Adding tool to toolbox: {tool_instantiated.__class__.__name__}")
+
     return env
 
 
-def create_agent(args, config, logger):
-    agent_config = dict(
-        config_dict=config,
-        env=None,  # Will be set once after we determine if we skip the task.
-        logger=logger,
-    )
-
-    # instantiate agent
-    match args.agent:
-        case "solution":
-            from froggy.agents import AgentSolution as agent_class
+def create_agent(agent_type, **kwargs):
+    match agent_type:
         case "zero_shot":
             from froggy.agents import AgentZeroShot as agent_class
         case "cot":
@@ -150,12 +143,9 @@ def create_agent(args, config, logger):
         case "zero_shot_nopdb_whole":
             from froggy.agents import AgentZeroShot_NoPDB as agent_class
         case _:
-            raise ValueError(f"Unknown agent {args.agent}")
+            raise ValueError(f"Unknown agent {agent_type}")
 
-    agent = agent_class(**agent_config)
-
-    if args.verbose:
-        agent.llm.verbose = True
+    agent = agent_class(**kwargs)
 
     return agent
 
@@ -190,10 +180,11 @@ def main():
         # progress bar for current task(s)
         task_progress = Progress(
             TimeElapsedColumn(),
+            BarColumn(bar_width=10),
             TextColumn("{task.description}"),
             TextColumn(
-                "{task.fields[log]}"
-            ),  # , table_column=Column(no_wrap=True, width=80)),
+                "{task.fields[log]}", table_column=Column(no_wrap=True)  # , width=80)
+            ),
         )
 
         tasks_succeeded = []
@@ -216,27 +207,9 @@ def main():
         )
         overall_progress.update(overall_task_id, description=top_descr, advance=0)
 
-        # from rich.console import Console
-        # from rich.layout import Layout
-        # Console(st)
-        # layout = Layout()
-        # layout.split_row(
-        #     Layout(name="top"),
-        #     Layout(progress_group, name="bottom"),
-        # )
-
-        # use own live instance as context manager with group of progress bars,
-        # which allows for running multiple different progress bars in parallel,
-        # and dynamically showing/hiding them
-        import sys
-
-        # Redirect stdout and stderr to avoid printing progress bars to stdout
-        # sys.stdout = open(os.devnull, "w")
-        # sys.stderr = open(os.devnull, "w")
-
-        with Live(progress_group) as live:
+        with Live(progress_group, refresh_per_second=20) as live:
             if args.debug:
-                live.stop()
+                live.stop()  # Because it interferes with pdb.
 
             with ThreadPoolExecutor(num_workers) as executor:
                 futures = {
@@ -283,8 +256,8 @@ def main():
     else:
         # custom repo
         print(colored(f"Running agent {agent.name}", "green"))
-        agent = create_agent(args, config)
-        agent.env = create_env(args, config)
+        env = create_env(args, config)
+        agent = create_agent(args, config=config, env=env, logger=logger)
         agent.run(debug=args.debug)
 
         # optionally apply patch

@@ -32,7 +32,7 @@ except ImportError:
 logger = logging.getLogger("froggy")
 
 
-def load_llm_config(config_file_path=None):
+def load_llm_config(config_file_path: str | None = None):
     if config_file_path is None:
         config_file_path = os.environ.get("LLM_CONFIG_FILE", "llm.cfg")
     try:
@@ -42,29 +42,7 @@ def load_llm_config(config_file_path=None):
     return llm_config
 
 
-def is_rate_limit_error(exception):
-    # List of fully qualified names of RateLimitError exceptions from various libraries
-    rate_limit_errors = [
-        "openai.APIStatusError",
-        "openai.APITimeoutError",
-        "openai.error.Timeout",
-        "openai.error.RateLimitError",
-        "openai.error.ServiceUnavailableError",
-        "openai.Timeout",
-        "openai.APIError",
-        "openai.APIConnectionError",
-        "openai.RateLimitError",
-        # Add more as needed
-    ]
-    exception_full_name = (
-        f"{exception.__class__.__module__}.{exception.__class__.__name__}"
-    )
-    logger.warning(f"Exception_full_name: {exception_full_name}")
-    logger.warning(f"Exception: {exception}")
-    return exception_full_name in rate_limit_errors
-
-
-def print_messages(messages, logger):
+def print_messages(messages: list[dict], logger: logging.Logger):
     for m in messages:
         if m["role"] == "user":
             logger.debug(colored(f"{m['content']}\n", "cyan"))
@@ -116,7 +94,7 @@ class TokenCounter:
 
 
 class LLM:
-    def __init__(self, model_name, logger=None):
+    def __init__(self, model_name: str, logger: logging.Logger | None = None):
         configs = load_llm_config()
         if model_name not in configs:
             raise ValueError(f"Model {model_name} not found in llm.cfg")
@@ -142,6 +120,12 @@ class LLM:
                 base_url=self.config["endpoint"],
                 timeout=None,
             )
+
+        self.call_with_retry = retry(
+            retry=retry_if_exception(self.is_rate_limit_error),
+            wait=wait_random_exponential(multiplier=1, max=40),
+            stop=stop_after_attempt(100),
+        )
 
     def _get_azure_oai_kwargs(self):
         """
@@ -170,23 +154,36 @@ class LLM:
             )
         return kwargs
 
-    @retry(
-        retry=retry_if_exception(is_rate_limit_error),
-        wait=wait_random_exponential(multiplier=1, max=40),
-        stop=stop_after_attempt(100),
-    )
+    def is_rate_limit_error(self, exception):
+        # List of fully qualified names of RateLimitError exceptions from various libraries
+        rate_limit_errors = [
+            "openai.APIStatusError",
+            "openai.APITimeoutError",
+            "openai.error.Timeout",
+            "openai.error.RateLimitError",
+            "openai.error.ServiceUnavailableError",
+            "openai.Timeout",
+            "openai.APIError",
+            "openai.APIConnectionError",
+            "openai.RateLimitError",
+            # Add more as needed
+        ]
+        exception_full_name = (
+            f"{exception.__class__.__module__}.{exception.__class__.__name__}"
+        )
+        self.logger.warning(f"Error calling {self.model_name}: {exception_full_name!r}")
+        self.logger.debug(f"Exception: {exception.message}")
+        return exception_full_name in rate_limit_errors
+
     def query_model(self, messages, **kwargs):
         kwargs["max_tokens"] = kwargs.get("max_tokens", self.config.get("max_tokens"))
 
-        return (
-            self.client.chat.completions.create(
-                model=self.config["model"],
-                messages=messages,
-                **kwargs,
-            )
-            .choices[0]
-            .message.content
+        reponse = self.call_with_retry(self.client.chat.completions.create)(
+            model=self.config["model"],
+            messages=messages,
+            **kwargs,
         )
+        return reponse.choices[0].message.content
 
     def __call__(self, messages, *args, **kwargs):
         if not self.config.get("system_prompt_support", True):
@@ -219,7 +216,7 @@ class LLM:
 
 
 class AsyncLLM(LLM):
-    def __init__(self, model_name, logger=None):
+    def __init__(self, model_name, logger: logging.Logger | None = None):
         super().__init__(model_name, logger)
 
         if "azure openai" in self.config.get("tags", []):
@@ -232,25 +229,15 @@ class AsyncLLM(LLM):
                 timeout=None,
             )
 
-    @retry(
-        retry=retry_if_exception(is_rate_limit_error),
-        wait=wait_random_exponential(multiplier=1, max=40),
-        stop=stop_after_attempt(100),
-    )
     async def query_model(self, messages, **kwargs):
         kwargs["max_tokens"] = kwargs.get("max_tokens", self.config.get("max_tokens"))
 
-        return (
-            (
-                await self.client.chat.completions.create(
-                    model=self.config["model"],
-                    messages=messages,
-                    **kwargs,
-                )
-            )
-            .choices[0]
-            .message.content
+        response = await self.call_with_retry(self.client.chat.completions.create)(
+            model=self.config["model"],
+            messages=messages,
+            **kwargs,
         )
+        return response.choices[0].message.content
 
     async def __call__(self, messages, *args, **kwargs):
         if not self.config.get("system_prompt_support", True):
@@ -271,7 +258,7 @@ class AsyncLLM(LLM):
 
 
 class Human:
-    def __init__(self, logger=None):
+    def __init__(self, logger: logging.Logger | None = None):
         self._history = None
         self.logger = logger or logging.getLogger("froggy")
         if prompt_toolkit_available:
@@ -307,7 +294,7 @@ class Human:
 
 
 class Random:
-    def __init__(self, seed, logger=None):
+    def __init__(self, seed: int, logger: logging.Logger | None = None):
         self.seed = seed
         self.logger = logger or logging.getLogger("froggy")
         self.rng = random.Random(seed)
@@ -326,7 +313,9 @@ class Random:
         return action, token_usage
 
 
-def instantiate_llm(config, logger=None, use_async=False):
+def instantiate_llm(
+    config: dict, logger: logging.Logger | None = None, use_async: bool = False
+):
     llm_config = load_llm_config()
     available_models = list(llm_config.keys()) + ["random", "human"]
     if config["llm_name"] not in available_models:
