@@ -68,9 +68,6 @@ class ShellSession:
             os.close(self.filedescriptor)
             self.filedescriptor = None
 
-            if self._terminal is not None:
-                self._terminal.sessions.remove(self)
-
     def read(
         self,
         read_until: str = "",
@@ -246,6 +243,10 @@ class Terminal:
         self.logger.debug(f"Initial output from {session}:\n{initial_output}")
 
         return session
+
+    def close_shell_session(self, session):
+        session.close()
+        self.sessions.remove(session)
 
 
 class DockerTerminal(Terminal):
