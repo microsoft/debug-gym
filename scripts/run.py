@@ -116,7 +116,9 @@ def run_agent(args, problem, config, task_progress: Progress, live):
         description=f"[bold green]\\[{problem}]:",
         log="[bold green]Completed!",
     )
-    task_progress.remove_task(current_task_id)
+    if not args.keep_completed_tasks:
+        task_progress.remove_task(current_task_id)
+
     return success
 
 

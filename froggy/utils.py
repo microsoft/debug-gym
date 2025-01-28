@@ -202,6 +202,11 @@ def load_config():
         help="Force running only problems that have failed.",
     )
     parser.add_argument(
+        "--keep-completed-tasks",
+        action="store_true",
+        help="Keep displaying completed tasks in the workers panel.",
+    )
+    parser.add_argument(
         "-p",
         "--params",
         nargs="+",
@@ -243,6 +248,9 @@ def setup_logger(
 
         class ProgressHandler(logging.Handler):
             def emit(self, record):
+                if task_id not in progress.tasks:
+                    return
+
                 # Strip color codes from the log message
                 message = re.sub(r"\x1b\[[0-9;]*m", "", self.format(record))
                 message = message.replace("\n", "\\n").replace("\r", "\\r")
