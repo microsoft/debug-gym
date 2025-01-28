@@ -229,7 +229,10 @@ class Terminal:
 
     def start_shell_session(self, timeout=30, no_output_timeout=0.1):
         session = ShellSession(
-            self.default_entrypoint, self.env_vars, self.working_dir, logger=self.logger
+            entrypoint=self.default_entrypoint,
+            working_dir=self.working_dir,
+            env_vars=self.env_vars,
+            logger=self.logger,
         )
         self.sessions.append(session)
 
@@ -259,6 +262,7 @@ class DockerTerminal(Terminal):
         base_image: str = "ubuntu:latest",
         volumes: dict[str, dict[str:str]] = None,
         include_os_env_vars: bool = False,
+        map_host_uid_gid: bool = True,
         **kwargs,
         # TODO: dockerfile and/or docker-compose file?
     ):
@@ -280,10 +284,17 @@ class DockerTerminal(Terminal):
         )
         self.base_image = base_image
         self.volumes = volumes or {}
+        self.map_host_uid_gid = map_host_uid_gid
         self.docker_client = docker.from_env()
         self.host_uid = os.getuid()
         self.host_gid = os.getgid()
         self._container = None
+
+    def user_map(self):
+        _user = ""
+        if self.map_host_uid_gid:
+            _user = f"{self.host_uid}:{self.host_gid}"
+        return _user
 
     @property
     def working_dir(self):
@@ -311,9 +322,11 @@ class DockerTerminal(Terminal):
     @property
     def default_entrypoint(self) -> list[str]:
         """Expects the container to have bash installed and python executable available."""
-        return shlex.split(
-            f"docker exec -i --user {self.host_uid}:{self.host_gid} {self.container.name} /bin/bash --noprofile --norc"
-        )
+        user_map = self.user_map()
+        if user_map:
+            user_map = f"--user {user_map}"
+        entrypoint = f"docker exec -i {user_map} {self.container.name} /bin/bash --noprofile --norc"
+        return shlex.split(entrypoint)
 
     def prepare_command(self, entrypoint: str | list[str]) -> list[str]:
         """Prepares a shell command by combining setup commands and entrypoint commands.
@@ -343,7 +356,7 @@ class DockerTerminal(Terminal):
             command,
             workdir=self.working_dir,
             environment=self.env_vars,
-            user=f"{self.host_uid}:{self.host_gid}" if user is None else user,
+            user=self.user_map() if user is None else user,
             stdout=True,
             stderr=True,
         )
@@ -368,7 +381,7 @@ class DockerTerminal(Terminal):
             working_dir=self.working_dir,
             volumes=self.volumes,
             environment=self.env_vars,
-            user=f"{self.host_uid}:{self.host_gid}",
+            user=self.user_map(),
             detach=True,
             auto_remove=True,
             remove=True,
