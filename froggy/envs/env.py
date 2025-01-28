@@ -60,7 +60,7 @@ class RepoEnv(TooledEnv):
     def __init__(
         self,
         path: str | None = None,
-        entrypoint: str = "python -m pytest -sv .",
+        entrypoint: str = "python -m pytest -sq .",
         debug_entrypoint: str | None = None,
         readonly_patterns: list[str] | None = None,
         run_on_rewrite: bool = True,

@@ -29,7 +29,7 @@ class AiderBenchmarkEnv(RepoEnv):
         self.current_sample = self.dataset[options["task_name"]]
 
         directory = self.current_sample["base_directory"]
-        self.setup_workspace(directory, entrypoint="python -m pytest -sv .")
+        self.setup_workspace(directory, entrypoint="python -m pytest -sq .")
 
         obs, infos = super().reset()
         infos["instructions"] = self.instructions

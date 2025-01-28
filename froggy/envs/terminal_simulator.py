@@ -72,7 +72,7 @@ class TerminalSimulatorEnv(RepoEnv):
             self.dataset[buggy_code_info[i]["id"]] = {
                 "original path": buggy_code_info[i]["original_code_paths"],  # list
                 "new code": buggy_code_info[i]["buggy_code_list"],  # list
-                "entry_point": "python -m pytest -sv test.py",
+                "entry_point": "python -m pytest -sq test.py",
                 "instructions": "The program doesn't behave as intended. Investigate the repository, figure out the root cause, then rewrite the code to fix the issue. Beaware that the bug may not be in the code you initially see.",
                 "default_file_name": "code/run_terminal_simulator.py",
             }

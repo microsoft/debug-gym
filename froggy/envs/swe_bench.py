@@ -143,8 +143,9 @@ class SWEBenchEnv(RepoEnv):
                 self.setup_commands.append(f"export {export}")
                 entrypoint = remaining
 
-        # --capture=no from pytest, allows for debugging with pdb
-        debug_entrypoint = entrypoint.replace("pytest", "pytest -s")
+        # -s (capture=no) from pytest, allows for debugging with pdb
+        # -q (quiet) from pytest, to avoid long pytest output
+        debug_entrypoint = entrypoint.replace("pytest", "pytest -sq")
 
         self.setup_workspace(
             path=local_branch_path,
