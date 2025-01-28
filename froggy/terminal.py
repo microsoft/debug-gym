@@ -2,7 +2,6 @@ import atexit
 import errno
 import fcntl
 import io
-import logging
 import os
 import pty
 import shlex
@@ -13,6 +12,8 @@ import time
 
 import docker
 
+from froggy.logger import FroggyLogger
+
 
 class Terminal:
 
@@ -22,10 +23,10 @@ class Terminal:
         setup_commands: list[str] = None,
         env_vars: dict[str, str] = None,
         include_os_env_vars: bool = True,
-        logger: logging.Logger | None = None,
+        logger: FroggyLogger | None = None,
         **kwargs,
     ):
-        self.logger = logger or logging.getLogger("froggy")
+        self.logger = logger or FroggyLogger("froggy")
         self.setup_commands = setup_commands or []
         self.env_vars = env_vars or {}
         if include_os_env_vars:

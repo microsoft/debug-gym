@@ -12,16 +12,16 @@ from froggy.agents.llm_api import (
     Random,
     TokenCounter,
     instantiate_llm,
-    is_rate_limit_error,
     load_llm_config,
     merge_messages,
     print_messages,
 )
+from froggy.logger import FroggyLogger
 
 
 @pytest.fixture
 def logger_mock():
-    logger = logging.getLogger("test_logger")
+    logger = FroggyLogger("test_logger")
     logger.setLevel(logging.DEBUG)
     logs = []
 

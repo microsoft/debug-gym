@@ -1,6 +1,5 @@
 import atexit
 import glob
-import logging
 import os
 import shutil
 import subprocess
@@ -8,11 +7,10 @@ import tempfile
 from glob import glob
 from os.path import join as pjoin
 from pathlib import Path
-from typing import Optional
 
 import numpy as np
-from termcolor import colored
 
+from froggy.logger import FroggyLogger
 from froggy.terminal import Terminal
 from froggy.tools.patchers import CodePatcher
 from froggy.tools.pdb import PDBTool
@@ -69,7 +67,7 @@ class RepoEnv(TooledEnv):
         dir_tree_depth: int | None = None,
         auto_view_change: bool = True,
         terminal: Terminal | None = None,
-        logger=logging.getLogger("froggy"),
+        logger: FroggyLogger | None = None,
     ):
         super().__init__()
 
@@ -81,7 +79,7 @@ class RepoEnv(TooledEnv):
         self.auto_view_change = auto_view_change
         self.terminal = terminal or Terminal()
         self.entrypoint = entrypoint
-        self.logger = logger
+        self.logger = logger or FroggyLogger("froggy")
 
         self.setup_workspace(path, readonly_patterns=readonly_patterns)
         self.last_run_obs = None

@@ -1,7 +1,5 @@
 import json
 
-from tqdm import tqdm
-
 from froggy.agents import AgentBase
 from froggy.agents.utils import (
     HistoryTracker,
@@ -80,14 +78,9 @@ class AgentCoT(AgentBase):
 
         done = False
         highscore = info["score"]
-        pbar = tqdm(
-            total=self.config["max_steps"],
-            desc=f"Debugging inside {self.env.working_dir}",
-            leave=True,
-        )
-        for step in range(self.config["max_steps"]):
+        for step in self.logger.tqdm(range(self.config["max_steps"])):
             highscore = max(highscore, info["score"])
-            pbar.set_postfix_str(
+            self.logger.debug(
                 f"Score: {info['score']}/{info['max_score']} ({info['score']/info['max_score']:.1%}) [Best: {highscore}]".format(
                     info["score"]
                 )
@@ -118,9 +111,8 @@ class AgentCoT(AgentBase):
                 prompt_response_pairs=prompt_response_pairs
             )
 
-            pbar.update()
             if done or info["rewrite_counter"] >= self.config["max_rewrite_steps"]:
-                pbar.set_postfix_str(
+                self.logger.info(
                     f"Score: {info['score']}/{info['max_score']} ({info['score']/info['max_score']:.1%})".format(
                         info["score"]
                     )
