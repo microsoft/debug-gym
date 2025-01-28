@@ -36,14 +36,14 @@ def logger_mock():
 
 
 @pytest.fixture
-def async_llm(logger_mock):
+def async_llm(logger_mock, llm_config_mock):
     # Create an instance of AsyncLLM with a mock configuration
-    model_name = "test-model"
+    model_name = "test_model"
     async_llm = AsyncLLM(model_name, logger=logger_mock)
     return async_llm
 
 
-def test_is_rate_limit_error():
+def test_is_rate_limit_error(async_llm):
     mock_response = MagicMock()
     mock_response.request = "example"
     mock_response.body = {"error": "Rate limit exceeded"}
@@ -51,7 +51,7 @@ def test_is_rate_limit_error():
     exception = RateLimitError(
         "Rate limit exceeded", response=mock_response, body=mock_response.body
     )
-    assert is_rate_limit_error(exception) == True
+    assert async_llm.is_rate_limit_error(exception) == True
 
 
 def test_print_messages(logger_mock):
@@ -163,7 +163,6 @@ async def test_async_llm(llm_config_mock, completion_mock, logger_mock):
 
 
 @patch("builtins.input", lambda *args, **kwargs: "User input")
-@patch("froggy.agents.llm_api.prompt", lambda *args, **kwargs: "User input")
 def test_human():
     human = Human()
     messages = [{"role": "user", "content": "Hello"}]

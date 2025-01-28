@@ -85,7 +85,6 @@ class TestAgentCoT(unittest.TestCase):
         messages = self.agent.build_prompt_step_2(info, response)
         self.assertGreater(len(messages), 0)
 
-    @patch("froggy.agents.cot.tqdm", MagicMock())
     def test_run(self):
         self.env.reset.return_value = (
             None,
