@@ -83,7 +83,6 @@ def make_is_readonly(full_path, base_dir=None, patterns: list[str] = None):
         return lambda file_path: handle_negation(file_path, rules)
 
 
-
 def _walk(path, depth: Optional[int]):
     """recursively list files and directories up to a certain depth"""
     depth = 1e5 if depth is None else depth

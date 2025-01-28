@@ -5,8 +5,8 @@ import tempfile
 from os.path import join as pjoin
 from pathlib import Path
 
-from froggy.envs.env import RepoEnv
 import froggy.utils as utils
+from froggy.envs.env import RepoEnv
 
 
 class AiderBenchmarkEnv(RepoEnv):
@@ -37,7 +37,9 @@ class AiderBenchmarkEnv(RepoEnv):
         infos["instructions"] = self.instructions
         infos["last_run_obs"] = utils.cleanup_pytest_output(infos["last_run_obs"])
 
-        self.max_score = utils.extract_max_score_from_pytest_output(infos["last_run_obs"])
+        self.max_score = utils.extract_max_score_from_pytest_output(
+            infos["last_run_obs"]
+        )
         infos["max_score"] = self.max_score
         infos["score"] = utils.extract_reward_from_pytest_output(infos["last_run_obs"])
 
@@ -84,21 +86,21 @@ class AiderBenchmarkEnv(RepoEnv):
 
     def make_froggyignore(self, directory: str, include_gitignore: bool = True):
         froggyignore_contents = "\n".join(
-                        [
-                            ".DS_Store",
-                            "__pycache__/",
-                            ".approaches/",
-                            ".docs/",
-                            ".meta/",
-                            ".pytest_cache/",
-                            "*test*.py",
-                            "*.pyc",
-                            "*.md",
-                            ".froggyignore",
-                            "log/",
-                            "data/",
-                        ]
-                    )
+            [
+                ".DS_Store",
+                "__pycache__/",
+                ".approaches/",
+                ".docs/",
+                ".meta/",
+                ".pytest_cache/",
+                "*test*.py",
+                "*.pyc",
+                "*.md",
+                ".froggyignore",
+                "log/",
+                "data/",
+            ]
+        )
 
         if include_gitignore and ".gitignore" in os.listdir(directory):
             with open(pjoin(directory, ".gitignore"), "r") as f:
@@ -107,8 +109,4 @@ class AiderBenchmarkEnv(RepoEnv):
                 froggyignore_contents += gitignore_content
 
         with open(directory / ".froggyignore", "w") as f:
-                f.write(froggyignore_contents)
-
-
-
-
+            f.write(froggyignore_contents)

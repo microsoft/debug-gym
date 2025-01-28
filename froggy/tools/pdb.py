@@ -86,7 +86,7 @@ class PDBTool(EnvironmentTool):
         if pdb_cmd is None:
             # remove the first word, which is "python"
             entrypoint = " ".join(self.environment.entrypoint.split()[1:])
-            pdb_cmd = f'python -m pdb {entrypoint}'
+            pdb_cmd = f"python -m pdb {entrypoint}"
 
         initial_output = self.interact_with_pdb(pdb_cmd, expected_output="(Pdb)")
         if "The program finished and will be restarted" in initial_output:

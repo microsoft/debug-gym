@@ -1,5 +1,6 @@
 import atexit
 import glob
+import logging
 import os
 import shutil
 import subprocess
@@ -16,8 +17,6 @@ from froggy.terminal import Terminal
 from froggy.tools.patchers import CodePatcher
 from froggy.tools.pdb import PDBTool
 from froggy.utils import _walk, make_is_readonly, show_line_number
-import logging
-
 
 logger = logging.getLogger("froggy")
 
@@ -123,7 +122,9 @@ class RepoEnv(TooledEnv):
         )
 
         # get list of editable files
-        froggyignore = self.working_dir / ".froggyignore"  # By default look for .froggyignore.
+        froggyignore = (
+            self.working_dir / ".froggyignore"
+        )  # By default look for .froggyignore.
         self.is_readonly = make_is_readonly(froggyignore, patterns=readonly_patterns)
         self.editable_files = [
             p for p in self.all_files if not self.is_readonly(self.working_dir / p)
@@ -133,7 +134,9 @@ class RepoEnv(TooledEnv):
         if entrypoint:
             self.entrypoint = entrypoint
 
-        assert self.entrypoint.split()[0] == "python", "Only support python entrypoint for now."
+        assert (
+            self.entrypoint.split()[0] == "python"
+        ), "Only support python entrypoint for now."
 
         self.current_file = None
         self.current_file_content = None
@@ -214,9 +217,7 @@ class RepoEnv(TooledEnv):
         return self.obs, self.infos
 
     def run(self):
-        success, output = self.terminal.run(
-            [self.entrypoint], timeout=self.run_timeout
-        )
+        success, output = self.terminal.run([self.entrypoint], timeout=self.run_timeout)
         self.last_run_obs = output
         self.score = int(success)
         self.done = success

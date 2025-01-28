@@ -7,8 +7,8 @@ from pathlib import Path
 
 import datasets
 
-from froggy.envs.env import RepoEnv
 import froggy.utils as utils
+from froggy.envs.env import RepoEnv
 
 
 class SWEBenchEnv(RepoEnv):
@@ -64,13 +64,18 @@ class SWEBenchEnv(RepoEnv):
         self.make_froggyignore(local_repo_path=local_repo_path)
 
         # For swebench, we must pass the fail_to_pass and pass_to_pass unit tests.
-        self.setup_workspace(local_repo_path, entrypoint="python -m pytest " + " ".join(fail_to_pass + pass_to_pass))
+        self.setup_workspace(
+            local_repo_path,
+            entrypoint="python -m pytest " + " ".join(fail_to_pass + pass_to_pass),
+        )
 
         # Reset RepoEnv
         obs, infos = super().reset()
         infos["last_run_obs"] = utils.cleanup_pytest_output(infos["last_run_obs"])
 
-        self.max_score = utils.extract_max_score_from_pytest_output(infos["last_run_obs"])
+        self.max_score = utils.extract_max_score_from_pytest_output(
+            infos["last_run_obs"]
+        )
         infos["max_score"] = self.max_score
         infos["score"] = utils.extract_reward_from_pytest_output(infos["last_run_obs"])
 

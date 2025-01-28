@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import subprocess
 import uuid
@@ -10,8 +11,6 @@ from termcolor import colored
 from froggy.agents.llm_api import instantiate_llm
 from froggy.agents.utils import HistoryTracker, build_history_prompt
 from froggy.utils import unescape
-import logging
-
 
 logger = logging.getLogger("froggy")
 
@@ -98,7 +97,9 @@ class AgentBase:
         with open(patch_path, "w") as f:
             f.write(self.env.patch)
 
-        logger.debug(f"Patch saved in {pjoin(self._output_path, task_name, 'froggy.patch')}")
+        logger.debug(
+            f"Patch saved in {pjoin(self._output_path, task_name, 'froggy.patch')}"
+        )
 
     def log(self, task_name="custom"):
         jsonl_output = {
@@ -118,4 +119,6 @@ class AgentBase:
         with open(pjoin(self._output_path, task_name, "froggy.jsonl"), "w") as f:
             json.dump(jsonl_output, f, indent=4)
 
-        logger.debug(f"Log saved in {pjoin(self._output_path, task_name, 'froggy.jsonl')}")
+        logger.debug(
+            f"Log saved in {pjoin(self._output_path, task_name, 'froggy.jsonl')}"
+        )

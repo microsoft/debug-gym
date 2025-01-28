@@ -3,12 +3,13 @@ import json
 from tqdm import tqdm
 
 from froggy.agents import AgentBase
-from froggy.utils import unescape
 from froggy.agents.utils import (
     HistoryTracker,
     build_history_prompt,
     trim_prompt_messages,
 )
+from froggy.utils import unescape
+
 
 class AgentCoT(AgentBase):
     name: str = "cot"
