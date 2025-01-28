@@ -17,13 +17,50 @@ import docker
 
 class ShellSession:
     def __init__(
-        self, filedescriptor, session_id=None, logger=logging.getLogger("froggy")
+        self,
+        entrypoint,
+        working_dir,
+        env_vars=None,
+        session_id=None,
+        logger=logging.getLogger("froggy"),
     ):
-        self.filedescriptor = filedescriptor
+        self.entrypoint = entrypoint
+        self.env_vars = env_vars or {}
+        self.working_dir = working_dir
         self.session_id = session_id or str(uuid.uuid4())
         self.logger = logger
-        self._terminal = None
+        self.start()
         atexit.register(self.close)
+
+    def start(self):
+        self.logger.debug(f"Starting ShellSession with entrypoint:\n{self.entrypoint}")
+
+        master, slave = pty.openpty()
+
+        # set_fd_nonblocking
+        flags = fcntl.fcntl(master, fcntl.F_GETFL)
+        fcntl.fcntl(master, fcntl.F_SETFL, flags | os.O_NONBLOCK)
+
+        # Turn off ECHO on the slave side
+        attrs = termios.tcgetattr(slave)
+        attrs[3] = attrs[3] & ~termios.ECHO  # lflags
+        termios.tcsetattr(slave, termios.TCSANOW, attrs)
+
+        process = subprocess.Popen(
+            self.entrypoint,
+            env=self.env_vars,
+            cwd=self.working_dir,
+            stdin=slave,
+            stdout=slave,
+            stderr=slave,
+            text=True,
+            close_fds=True,
+            start_new_session=True,
+        )
+
+        self.filedescriptor = master
+        # close slave, end in the parent process
+        os.close(slave)
 
     def close(self):
         if self.filedescriptor is not None:
@@ -194,37 +231,9 @@ class Terminal:
         return shlex.split("/bin/bash --noprofile --norc")
 
     def start_shell_session(self, timeout=30, no_output_timeout=0.1):
-        self.logger.debug(
-            f"Starting ShellSession with entrypoint:\n{self.default_entrypoint}"
+        session = ShellSession(
+            self.default_entrypoint, self.env_vars, self.working_dir, logger=self.logger
         )
-
-        master, slave = pty.openpty()
-
-        # set_fd_nonblocking
-        flags = fcntl.fcntl(master, fcntl.F_GETFL)
-        fcntl.fcntl(master, fcntl.F_SETFL, flags | os.O_NONBLOCK)
-
-        # Turn off ECHO on the slave side
-        attrs = termios.tcgetattr(slave)
-        attrs[3] = attrs[3] & ~termios.ECHO  # lflags
-        termios.tcsetattr(slave, termios.TCSANOW, attrs)
-
-        process = subprocess.Popen(
-            self.default_entrypoint,
-            env=self.env_vars,
-            cwd=self.working_dir,
-            stdin=slave,
-            stdout=slave,
-            stderr=slave,
-            text=True,
-            close_fds=True,
-            start_new_session=True,
-        )
-
-        # close slave, end in the parent process
-        os.close(slave)
-        # atexit.register(self.close_pseudo_terminal)
-        session = ShellSession(master, logger=self.logger)
         self.sessions.append(session)
 
         initial_output = ""
