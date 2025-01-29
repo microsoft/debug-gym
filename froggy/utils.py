@@ -1,5 +1,6 @@
 import argparse
 import codecs
+import logging
 import os
 import re
 import signal
@@ -185,9 +186,20 @@ def load_config():
     parser.add_argument(
         "--debug", action="store_true", help="Before sending action to the environment."
     )
-    parser.add_argument("-v", "--verbose", action="store_true", help="Verbose mode")
-    parser.add_argument(
-        "-vv", "--very-verbose", action="store_true", help="Set logging level to DEBUG"
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument(
+        "-v",
+        "--verbose",
+        dest="logging_level",
+        action="store_const",
+        const=logging.DEBUG,
+        help="Verbose mode",
+    )
+    group.add_argument(
+        "--logging-level",
+        dest="logging_level",
+        choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
+        help="Set logging level",
     )
     parser.add_argument(
         "--force-all",

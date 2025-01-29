@@ -52,7 +52,7 @@ class FroggyLogger(logging.Logger):
         self,
         name: str,
         log_dir: str | None = None,
-        verbose: bool = False,
+        level: str | int = logging.INFO,
         mode: str = "a",
     ):
         super().__init__(name)
@@ -62,7 +62,7 @@ class FroggyLogger(logging.Logger):
         )
 
         ph = ProgressHandler(self.task_progress, self.task_id)
-        ph.setLevel(logging.DEBUG if verbose else logging.INFO)
+        ph.setLevel(level)
         formatter = logging.Formatter("%(levelname)-8s %(message)s")
         ph.setFormatter(formatter)
         self.addHandler(ph)
@@ -70,7 +70,7 @@ class FroggyLogger(logging.Logger):
         console = logging.StreamHandler()
         formatter = logging.Formatter("🐸 [%(name)-12s]: %(levelname)-8s %(message)s")
         console.setFormatter(formatter)
-        console.setLevel(logging.DEBUG if verbose else logging.INFO)
+        console.setLevel(level)
         self.addHandler(console)
 
         if log_dir:

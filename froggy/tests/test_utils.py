@@ -402,4 +402,4 @@ def test_load_config():
     assert _config["cot"]["llm_name"] == "gpt20"
     assert _config["cot"]["llm_temperature"] == [0.8, 0.8]
     assert _args.debug is True
-    assert _args.verbose is True
+    assert _args.logging_level == "DEBUG"
