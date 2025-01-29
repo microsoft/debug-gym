@@ -43,7 +43,7 @@ def run_agent(args, problem, config):
     task_logger = FroggyLogger(
         problem,
         log_dir=exp_path,
-        verbose=args.very_verbose,
+        level=args.logging_level,
         mode="w" if args.force_all else "a",
     )
     try:
@@ -134,10 +134,7 @@ def create_agent(agent_type, **kwargs):
 
 def main():
     config, args = load_config()
-    if args.very_verbose:
-        args.verbose = True
-
-    logger = FroggyLogger("froggy", verbose=args.very_verbose)
+    logger = FroggyLogger("froggy", level=args.logging_level)
 
     available_agents = list(config.keys())
     assert (

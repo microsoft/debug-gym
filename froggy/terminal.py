@@ -1,7 +1,7 @@
 import atexit
 import errno
 import fcntl
-import logging
+import io
 import os
 import pty
 import shlex
@@ -23,13 +23,13 @@ class ShellSession:
         working_dir,
         env_vars=None,
         session_id=None,
-        logger=logging.getLogger("froggy"),
+        logger: FroggyLogger | None = None,
     ):
         self.entrypoint = entrypoint
         self.env_vars = env_vars or {}
         self.working_dir = working_dir
         self.session_id = session_id or str(uuid.uuid4())
-        self.logger = logger
+        self.logger = logger or FroggyLogger("froggy")
         self.start()
         atexit.register(self.close)
 
@@ -155,8 +155,6 @@ class Terminal:
         self.env_vars["NO_COLOR"] = "1"  # disable colors
         self.env_vars["PS1"] = ""  # disable prompt
         self._working_dir = working_dir
-        # self._master = None  # PTY master file descriptor
-        self.logger = logger
         self.sessions = []
 
     @property
@@ -408,7 +406,7 @@ class DockerTerminal(Terminal):
 
 
 def select_terminal(
-    terminal_config: dict | None = None, logger=logging.getLogger("froggy")
+    terminal_config: dict | None = None, logger: FroggyLogger | None = None
 ) -> Terminal:
     terminal_config = terminal_config or {"type": "local"}
     terminal_type = terminal_config["type"]

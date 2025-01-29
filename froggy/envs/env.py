@@ -79,6 +79,8 @@ class RepoEnv(TooledEnv):
         self.dir_tree_depth = dir_tree_depth
         self.auto_view_change = auto_view_change
         self.terminal = terminal or Terminal()
+        self.entrypoint = entrypoint
+        self.logger = logger or FroggyLogger("froggy")
 
         self.logger = logger or FroggyLogger("froggy")
 
@@ -129,8 +131,7 @@ class RepoEnv(TooledEnv):
         self.set_entrypoints(entrypoint, debug_entrypoint)
 
         # Set up the terminal working dir
-        self.terminal.working_dir = str(self.working_dir)
-
+        # self.terminal.working_dir = str(self.working_dir)
         self.logger.debug(f"Working directory: {self.working_dir}")
         shutil.copytree(self.path, self.working_dir, dirs_exist_ok=True)
 
