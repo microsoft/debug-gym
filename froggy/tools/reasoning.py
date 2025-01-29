@@ -30,13 +30,13 @@ class ReasoningTool(EnvironmentTool):
     def examples(self):
         if self.allow_chain_action:
             ex = [
-                "```The execution trace points to line 43 in main.py, so I'll place a breakpoint there.</reasoning> ```pdb b 43``` ```",
-                "```There's a shape mismatch that corresponds to a matrix transpose, so I'll rewrite the function to account for the transpose. </reasoning> ```rewrite 10 <c>    m = m.transpose()</c>``` ```",
+                "```reasoning The execution trace points to line 43 in main.py, so I'll place a breakpoint there.</reasoning> ```pdb b 43``` ```",
+                "```reasoning There's a shape mismatch that corresponds to a matrix transpose, so I'll rewrite the function to account for the transpose. </reasoning> ```rewrite 10 <c>    m = m.transpose()</c>``` ```",
             ]
         else:
             ex = [
-                "```The execution trace points to line 43 in main.py, so I'll place a breakpoint there.```",
-                "```There's a shape mismatch that corresponds to a matrix transpose, so I'll rewrite the function to account for the transpose.```",
+                "```reasoning The execution trace points to line 43 in main.py, so I'll place a breakpoint there.```",
+                "```reasoning There's a shape mismatch that corresponds to a matrix transpose, so I'll rewrite the function to account for the transpose.```",
             ]
         return ex
 
