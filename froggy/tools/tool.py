@@ -1,6 +1,5 @@
 class EnvironmentTool:
     name: str = None
-    description: str = None
     instructions: str = None
 
     def __init__(self):

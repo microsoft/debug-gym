@@ -5,30 +5,38 @@ from froggy.tools.toolbox import Toolbox
 @Toolbox.register()
 class ReasoningTool(EnvironmentTool):
     name: str = "reasoning"
-    action: str = "<reasoning>"
-    description: str = "Preface any action with explicit reasoning tokens."
+    action: str = "```reasoning"
 
     @property
     def instructions(self):
         assert hasattr(self, "environment")
         instruction = {
-            "template": "<reasoning> ... </reasoning>",
-            "description": self.description,
+            "template": self.template,
+            "description": "\n".join(
+                ["Preface any action with explicit reasoning tokens.", self.description]
+            ),
             "examples": self.examples,
         }
         return instruction
 
     @property
+    def template(self):
+        if self.allow_chain_action:
+            return "```reasoning ... </reasoning> <next action> ```"
+        else:
+            return "```reasoning ... ```"
+
+    @property
     def examples(self):
         if self.allow_chain_action:
             ex = [
-                "<reasoning> The execution trace points to line 43 in main.py, so I'll place a breakpoint there.</reasoning> ```pdb b 43",
-                "<reasoning> There's a shape mismatch that corresponds to a matrix transpose, so I'll rewrite the function to account for the transpose. </reasoning> ```rewrite ....",
+                "```The execution trace points to line 43 in main.py, so I'll place a breakpoint there.</reasoning> ```pdb b 43``` ```",
+                "```There's a shape mismatch that corresponds to a matrix transpose, so I'll rewrite the function to account for the transpose. </reasoning> ```rewrite 10 <c>    m = m.transpose()</c>``` ```",
             ]
         else:
             ex = [
-                "<reasoning> The execution trace points to line 43 in main.py, so I'll place a breakpoint there.</reasoning> ",
-                "<reasoning> There's a shape mismatch that corresponds to a matrix transpose, so I'll rewrite the function to account for the transpose. </reasoning>",
+                "```The execution trace points to line 43 in main.py, so I'll place a breakpoint there.```",
+                "```There's a shape mismatch that corresponds to a matrix transpose, so I'll rewrite the function to account for the transpose.```",
             ]
         return ex
 
@@ -36,7 +44,7 @@ class ReasoningTool(EnvironmentTool):
     def description(self):
         if self.allow_chain_action:
             desc = f"""You may explicitly reason about the current state and the best course of action before executing. You follow a particular reasoning style:
-You break down complex problems into smaller parts and reason through them step by step, arriving at the best next action before then executing it. You should follow your reasoning with your next action. """
+You break down complex problems into smaller parts and reason through them step by step, arriving at the best next action before then executing it. You should follow your reasoning with your next action. The next action should be a valid action that correctly follows the syntax can be executed in the current environment. The next action cannot be another reasoning action."""
         else:
             desc = f"""You may explicitly reason about the current state and the best course of action. You follow a particular reasoning style:
 You break down complex problems into smaller parts and reason through them step by step, arriving at the best next action(s). """
@@ -67,16 +75,27 @@ You break down complex problems into smaller parts and reason through them step 
         """Reasoning tokens are only to benefit the model, so we strip them and then pass the remainder of the action
         as a free next action.
         """
-        remaining_action = self.remove_reasoning(action)
+        try:
+            _, next_action = self.split_reasoning(action)
+        except:
+            return "SyntaxError: invalid syntax."
+        if next_action.startswith(self.action):
+            return "SyntaxError: invalid syntax. You cannot chain reasoning actions."
         # now execute the next action
-        next_action_obs = self.environment.step(remaining_action)
+        next_action_obs = self.environment.step(next_action)
         if next_action_obs == f"Invalid action: {action}.":
             next_action_obs == f"You must provide a valid action after your reasoning. Found invalid action: {action}."
-        return f"Reasoning text acknowledged. {next_action_obs[0]}"
+        return f"Reasoning text acknowledged.\n{next_action_obs[0]}"
 
-    def use_without_chaining(self):
+    def use_without_chaining(self, action):
+        try:
+            _ = action.split(self.action)[1].split("```")[0].strip()
+        except:
+            return "SyntaxError: invalid syntax."
         return "Reasoning text acknowledged."
 
-    def remove_reasoning(self, action):
-        items = action.split("</reasoning>")
-        return " ".join(items[1:]).lstrip()
+    def split_reasoning(self, action):
+        content = action.split(self.action)[1].rsplit("```", 1)[0].strip()
+        reasoning, next_action = content.split("</reasoning>", 1)
+        reasoning, next_action = reasoning.strip(), next_action.strip()
+        return reasoning, next_action

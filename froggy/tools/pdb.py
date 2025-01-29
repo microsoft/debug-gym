@@ -10,10 +10,9 @@ from froggy.tools.toolbox import Toolbox
 class PDBTool(EnvironmentTool):
     name: str = "pdb"
     action: str = "```pdb"
-    description: str = "A suite of PDB commands available to the user."
     instructions = {
         "template": "```pdb <command>```",
-        "description": "Send a command to the PDB terminal. The command should be a valid PDB command.",
+        "description": "An interface to the Python debugger PDB. Send a command to the PDB terminal. The command should be a valid PDB command.",
         "examples": [
             "```pdb p x``` to print the value of the variable x in the current context.",
             "```pdb b 42``` to set a breakpoint at line 42 in the current file.",
