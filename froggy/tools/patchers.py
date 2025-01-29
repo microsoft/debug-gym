@@ -21,10 +21,9 @@ class CodePatcher(EnvironmentTool):
 
 class SubstitutionPatcher(CodePatcher):
     name = "substitution_patcher"
-    description = "Creates patches of code given start and end lines."
     instructions = {
-        "template": "```rewrite file/path.py head:tail <c>new_code</c>```",
-        "description": "Rewrite the code in file/path.py between lines [head, tail] with the new code. Line numbers are 1-based. When file path is not provided, it's assumed to rewrite the current file. When head and tail are not provided, it's assumed to rewrite the whole code. When only head is provided, it's assumed to rewrite that single line. The new code should be valid python code include proper indentation (can be determined from context), the special tokens <c> and </c> are used to wrap the new code. ",
+        "template": "```rewrite file/path.py start:end <c>new_code</c>```",
+        "description": "Rewrite the code in file/path.py between lines [start, end] with the new code. Line numbers are 1-based. When file path is not provided, it's assumed to rewrite the current file. When start and end are not provided, it's assumed to rewrite the whole code. When only start is provided, it's assumed to rewrite that single line. The new code should be valid python code include proper indentation (can be determined from context), the special tokens <c> and </c> are used to wrap the new code. ",
         "examples": [
             "```rewrite <c>print('hola')</c>``` will rewrite the current file (the entire code) to be print('hola'), because no line number is provided.",
             "```rewrite 10 <c>    print('bonjour')</c>``` will rewite line number 10 of the current file to be print('bonjour'), with the indents ahead (in this case, 4 spaces).",

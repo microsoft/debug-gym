@@ -10,10 +10,9 @@ from froggy.utils import is_subdirectory
 class ViewTool(EnvironmentTool):
     name: str = "view"
     action: str = "```view"
-    description: str = "View a given file and set as current."
     instructions = {
         "template": "```view <path/to/file.py>```",
-        "description": "Specify a file path to navigate to. The file path should be relative to the root directory of the repository.",
+        "description": "Specify a file path to set as current working file. The file path should be relative to the root directory of the repository.",
         "examples": [
             "```view main.py``` to navigate to a file called 'main.py' in the root",
             "```view src/util.py``` to navigate to a file called 'util.py' in a subdirectory called 'src'",

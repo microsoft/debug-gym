@@ -8,7 +8,6 @@ from froggy.tools.toolbox import Toolbox
 class ListdirTool(EnvironmentTool):
     name: str = "listdir"
     action: str = "```listdir"
-    description: str = "List the directory tree at a given subdirectory."
 
     @property
     def instructions(self):
