@@ -4,7 +4,6 @@ import logging
 import os
 import re
 import signal
-import sys
 from contextlib import contextmanager
 from os.path import join as pjoin
 from pathlib import Path
@@ -227,11 +226,6 @@ def load_config():
     return config, args
 
 
-class TaskLogger(logging.LoggerAdapter):
-    def process(self, msg, kwargs):
-        return f"[Task-{self.extra['task']}] {msg}", kwargs
-
-
 def setup_logger(
     name: str,
     log_dir: str | None = None,
@@ -242,18 +236,18 @@ def setup_logger(
 ):
     logger = logging.getLogger(name)
     logger.setLevel(logging.DEBUG)
+    logger.progress = progress
+    logger.task_id = task_id
 
     if progress is not None and task_id is not None:
 
         class ProgressHandler(logging.Handler):
             def emit(self, record):
-                message = self.format(record).replace("\n", "\\n")
-                # Truncate the message to 200 characters
-                # message = (
-                #     message[:100] + "..." + message[-100:]
-                #     if len(message) > 200
-                #     else message
-                # )
+                # Strip color codes from the log message
+                message = re.sub(r"\x1b\[[0-9;]*m", "", self.format(record))
+                message = message.replace("\n", "\\n").replace("\r", "\\r")
+                # Truncate message to 80 characters
+                message = message[:80] + "..." if len(message) > 80 else message
                 progress.update(task_id, log=message)
 
         ph = ProgressHandler()

@@ -11,14 +11,14 @@ zero_shot:
     }
     tools: ["pdb", "view", "patcher:substitution"]
     terminal: {
-        type: "docker",  # "docker" or "local"
+        type: "local",  # "docker" or "local"
         base_image: "python:3.12-slim",
-        setup_commands: ["pip install pytest"]
+        # setup_commands: ["pip install pytest"]
     }
     persistent_breakpoints: True  # in pdb tool
 
     # LLM configs
-    llm_name: "llama-31-h100"
+    llm_name: "gpt-4o-mini"
     llm_temperature: [0.0]  # list of values between 0.0 and 1.0
 
     # Agent configs
