@@ -82,8 +82,6 @@ class RepoEnv(TooledEnv):
         self.entrypoint = entrypoint
         self.logger = logger or FroggyLogger("froggy")
 
-        self.logger = logger or FroggyLogger("froggy")
-
         self.setup_workspace(
             path=path,
             entrypoint=entrypoint,
@@ -131,9 +129,8 @@ class RepoEnv(TooledEnv):
         self.set_entrypoints(entrypoint, debug_entrypoint)
 
         # Set up the terminal working dir
-        # self.terminal.working_dir = str(self.working_dir)
+        self.terminal.working_dir = str(self.working_dir)
         self.logger.debug(f"Working directory: {self.working_dir}")
-        shutil.copytree(self.path, self.working_dir, dirs_exist_ok=True)
 
     def _index_files(self, readonly_patterns: list[str] | None = None):
         # get list of all the files
