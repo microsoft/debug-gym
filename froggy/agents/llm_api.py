@@ -1,5 +1,4 @@
 import json
-import logging
 import os
 import random
 import sys
@@ -16,6 +15,7 @@ from termcolor import colored
 from transformers import AutoTokenizer
 
 from froggy.agents.utils import trim_prompt_messages
+from froggy.logger import FroggyLogger
 
 prompt_toolkit_available = False
 try:
@@ -29,41 +29,24 @@ except ImportError:
     pass
 
 
-logger = logging.getLogger("froggy")
-
-LLM_CONFIG_FILE = os.environ.get("LLM_CONFIG_FILE", "llm.cfg")
-
-
-def is_rate_limit_error(exception):
-    # List of fully qualified names of RateLimitError exceptions from various libraries
-    rate_limit_errors = [
-        "openai.APIStatusError",
-        "openai.APITimeoutError",
-        "openai.error.Timeout",
-        "openai.error.RateLimitError",
-        "openai.error.ServiceUnavailableError",
-        "openai.Timeout",
-        "openai.APIError",
-        "openai.APIConnectionError",
-        "openai.RateLimitError",
-        # Add more as needed
-    ]
-    exception_full_name = (
-        f"{exception.__class__.__module__}.{exception.__class__.__name__}"
-    )
-    logger.warning(f"Exception_full_name: {exception_full_name}")
-    logger.warning(f"Exception: {exception}")
-    return exception_full_name in rate_limit_errors
+def load_llm_config(config_file_path: str | None = None):
+    if config_file_path is None:
+        config_file_path = os.environ.get("LLM_CONFIG_FILE", "llm.cfg")
+    try:
+        llm_config = json.load(open(config_file_path))
+    except FileNotFoundError:
+        raise FileNotFoundError(f"Cannot find llm config file: {config_file_path}")
+    return llm_config
 
 
-def print_messages(messages):
+def print_messages(messages: list[dict], logger: FroggyLogger):
     for m in messages:
         if m["role"] == "user":
-            print(colored(f"{m['content']}\n", "cyan"))
+            logger.debug(colored(f"{m['content']}\n", "cyan"))
         elif m["role"] == "assistant":
-            print(colored(f"{m['content']}\n", "green"))
+            logger.debug(colored(f"{m['content']}\n", "green"))
         elif m["role"] == "system":
-            print(colored(f"{m['content']}\n", "yellow"))
+            logger.debug(colored(f"{m['content']}\n", "yellow"))
         else:
             raise ValueError(f"Unknown role: {m['content']}")
 
@@ -108,30 +91,18 @@ class TokenCounter:
 
 
 class LLM:
-    def __init__(self, model_name, verbose=False):
-        if os.path.exists(LLM_CONFIG_FILE):
-            configs = json.load(open(LLM_CONFIG_FILE))
-            if model_name not in configs:
-                raise ValueError(f"Model {self.model_name} not found in llm.cfg")
-        else:
-            raise ValueError(f"Cannot find {LLM_CONFIG_FILE}.")
+    def __init__(self, model_name: str, logger: FroggyLogger | None = None):
+        configs = load_llm_config()
+        if model_name not in configs:
+            raise ValueError(f"Model {model_name} not found in llm.cfg")
 
         self.model_name = model_name
         self.config = configs[model_name]
-        self.verbose = verbose
-
-        if os.path.exists(LLM_CONFIG_FILE):
-            LLM_CONFIGS = json.load(open(LLM_CONFIG_FILE))
-            available_models = list(LLM_CONFIGS.keys()) + ["random", "human"]
-
-        if self.model_name not in LLM_CONFIGS:
-            raise Exception(f"Model {self.model_name} not found in llm.cfg")
-
-        self.config = LLM_CONFIGS[self.model_name]
+        self.logger = logger or FroggyLogger("froggy")
         self.token_counter = TokenCounter(self.config["tokenizer"])
         self.context_length = self.config["context_limit"] * 1000
 
-        logger.debug(
+        self.logger.debug(
             f"Using {self.model_name} with max context length of {
                 self.context_length:,} tokens."
         )
@@ -146,6 +117,12 @@ class LLM:
                 base_url=self.config["endpoint"],
                 timeout=None,
             )
+
+        self.call_with_retry = retry(
+            retry=retry_if_exception(self.is_rate_limit_error),
+            wait=wait_random_exponential(multiplier=1, max=40),
+            stop=stop_after_attempt(100),
+        )
 
     def _get_azure_oai_kwargs(self):
         """
@@ -174,23 +151,36 @@ class LLM:
             )
         return kwargs
 
-    @retry(
-        retry=retry_if_exception(is_rate_limit_error),
-        wait=wait_random_exponential(multiplier=1, max=40),
-        stop=stop_after_attempt(100),
-    )
+    def is_rate_limit_error(self, exception):
+        # List of fully qualified names of RateLimitError exceptions from various libraries
+        rate_limit_errors = [
+            "openai.APIStatusError",
+            "openai.APITimeoutError",
+            "openai.error.Timeout",
+            "openai.error.RateLimitError",
+            "openai.error.ServiceUnavailableError",
+            "openai.Timeout",
+            "openai.APIError",
+            "openai.APIConnectionError",
+            "openai.RateLimitError",
+            # Add more as needed
+        ]
+        exception_full_name = (
+            f"{exception.__class__.__module__}.{exception.__class__.__name__}"
+        )
+        self.logger.warning(f"Error calling {self.model_name}: {exception_full_name!r}")
+        self.logger.debug(f"Exception: {exception.message}")
+        return exception_full_name in rate_limit_errors
+
     def query_model(self, messages, **kwargs):
         kwargs["max_tokens"] = kwargs.get("max_tokens", self.config.get("max_tokens"))
 
-        return (
-            self.client.chat.completions.create(
-                model=self.config["model"],
-                messages=messages,
-                **kwargs,
-            )
-            .choices[0]
-            .message.content
+        reponse = self.call_with_retry(self.client.chat.completions.create)(
+            model=self.config["model"],
+            messages=messages,
+            **kwargs,
         )
+        return reponse.choices[0].message.content
 
     def __call__(self, messages, *args, **kwargs):
         if not self.config.get("system_prompt_support", True):
@@ -205,16 +195,14 @@ class LLM:
             messages, self.context_length, self.token_counter
         )
 
-        if self.verbose:
-            # Message is a list of dictionaries with role and content keys.
-            # Color each role differently.
-            print_messages(messages)
+        # Message is a list of dictionaries with role and content keys.
+        # Color each role differently.
+        print_messages(messages, self.logger)
 
         response = self.query_model(messages, **kwargs)
         response = response.strip()
 
-        if self.verbose:
-            print(colored(response, "green"))
+        self.logger.debug(colored(response, "green"))
 
         token_usage = {
             "prompt": self.token_counter(messages=messages),
@@ -225,8 +213,8 @@ class LLM:
 
 
 class AsyncLLM(LLM):
-    def __init__(self, model_name, verbose=False):
-        super().__init__(model_name, verbose)
+    def __init__(self, model_name, logger: FroggyLogger | None = None):
+        super().__init__(model_name, logger)
 
         if "azure openai" in self.config.get("tags", []):
             kwargs = self._get_azure_oai_kwargs()
@@ -238,25 +226,15 @@ class AsyncLLM(LLM):
                 timeout=None,
             )
 
-    @retry(
-        retry=retry_if_exception(is_rate_limit_error),
-        wait=wait_random_exponential(multiplier=1, max=40),
-        stop=stop_after_attempt(100),
-    )
     async def query_model(self, messages, **kwargs):
         kwargs["max_tokens"] = kwargs.get("max_tokens", self.config.get("max_tokens"))
 
-        return (
-            (
-                await self.client.chat.completions.create(
-                    model=self.config["model"],
-                    messages=messages,
-                    **kwargs,
-                )
-            )
-            .choices[0]
-            .message.content
+        response = await self.call_with_retry(self.client.chat.completions.create)(
+            model=self.config["model"],
+            messages=messages,
+            **kwargs,
         )
+        return response.choices[0].message.content
 
     async def __call__(self, messages, *args, **kwargs):
         if not self.config.get("system_prompt_support", True):
@@ -277,14 +255,15 @@ class AsyncLLM(LLM):
 
 
 class Human:
-    def __init__(self):
+    def __init__(self, logger: FroggyLogger | None = None):
         self._history = None
+        self.logger = logger or FroggyLogger("froggy")
         if prompt_toolkit_available:
             self._history = InMemoryHistory()
 
     def __call__(self, messages, info, *args, **kwargs):
         # Color each role differently.
-        print_messages(messages)
+        print_messages(messages, self.logger)
         available_commands = info.get("available_commands", [])
 
         if prompt_toolkit_available:
@@ -312,19 +291,16 @@ class Human:
 
 
 class Random:
-    def __init__(self, seed, verbose=False):
+    def __init__(self, seed: int, logger: FroggyLogger | None = None):
         self.seed = seed
-        self.verbose = verbose
+        self.logger = logger or FroggyLogger("froggy")
         self.rng = random.Random(seed)
 
     def __call__(self, messages, info, *args, **kwargs):
-        if self.verbose:
-            print_messages(messages)
+        print_messages(messages, self.logger)
 
         action = self.rng.choice(info.get("available_commands", ["noop"]))
-
-        if self.verbose:
-            print(colored(action, "green"))
+        self.logger.debug(colored(action, "green"))
 
         token_usage = {
             "prompt": len("\n".join([msg["content"] for msg in messages])),
@@ -334,21 +310,23 @@ class Random:
         return action, token_usage
 
 
-def instantiate_llm(config, verbose=False, use_async=False):
-    if os.path.exists(LLM_CONFIG_FILE):
-        LLM_CONFIGS = json.load(open(LLM_CONFIG_FILE))
-        available_models = list(LLM_CONFIGS.keys()) + ["random", "human"]
-    assert (
-        config["llm_name"] in available_models
-    ), f"Model {config['llm_name']} is not available, please make sure the LLM config file is correctly set."
-
+def instantiate_llm(
+    config: dict, logger: FroggyLogger | None = None, use_async: bool = False
+):
+    llm_config = load_llm_config()
+    available_models = list(llm_config.keys()) + ["random", "human"]
+    if config["llm_name"] not in available_models:
+        raise ValueError(
+            f"Model {config['llm_name']} is not available, "
+            "please make sure the LLM config file is correctly set."
+        )
     if config["llm_name"] == "random":
-        llm = Random(config["random_seed"], verbose)
+        llm = Random(config["random_seed"], logger=logger)
     elif config["llm_name"] == "human":
-        llm = Human()
+        llm = Human(logger=logger)
     else:
         if use_async:
-            llm = AsyncLLM(config["llm_name"], verbose=verbose)
+            llm = AsyncLLM(config["llm_name"], logger=logger)
         else:
-            llm = LLM(config["llm_name"], verbose=verbose)
+            llm = LLM(config["llm_name"], logger=logger)
     return llm

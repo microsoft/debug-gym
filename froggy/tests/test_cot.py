@@ -37,7 +37,7 @@ class TestAgentCoT(unittest.TestCase):
         self.env = MagicMock()
         self.llm = MagicMock()
         self.history = MagicMock()
-        self.agent = AgentCoT(self.config_dict, self.env, verbose=False)
+        self.agent = AgentCoT(self.config_dict, self.env)
         self.agent.llm = self.llm
         self.agent.history = self.history
 
@@ -85,7 +85,6 @@ class TestAgentCoT(unittest.TestCase):
         messages = self.agent.build_prompt_step_2(info, response)
         self.assertGreater(len(messages), 0)
 
-    @patch("froggy.agents.cot.tqdm", MagicMock())
     def test_run(self):
         self.env.reset.return_value = (
             None,
@@ -148,7 +147,7 @@ class TestAgentCoT_NoPDB(unittest.TestCase):
         self.env = MagicMock()
         self.llm = MagicMock()
         self.history = MagicMock()
-        self.agent = AgentCoT_NoPDB(self.config_dict, self.env, verbose=False)
+        self.agent = AgentCoT_NoPDB(self.config_dict, self.env)
         self.agent.llm = self.llm
         self.agent.history = self.history
 
