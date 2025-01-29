@@ -309,22 +309,23 @@ class SWEBenchEnv(RepoEnv):
 
         return local_repo_path
 
+    @property
+    def ignore_files(self):
+        return [
+            "**/tests/",
+            ".froggyignore",
+            ".pytest_cache/",
+            "*test*.py",
+            "*.pyc",
+            "*.md",
+            ".*",
+        ]
+
     def make_froggyignore(
         self, local_repo_path, include_gitignore: bool = True, additionnal_contents=[]
     ):
         # Add an ignore file
-        froggyignore_contents = "\n".join(
-            [
-                "**/tests/",
-                ".froggyignore",
-                ".pytest_cache/",
-                "*test*.py",
-                "*.pyc",
-                "*.md",
-                ".*",
-            ]
-            + additionnal_contents
-        )
+        froggyignore_contents = "\n".join(self.ignore_files + additionnal_contents)
         if include_gitignore and ".gitignore" in os.listdir(local_repo_path):
             with open(local_repo_path / ".gitignore", "r") as f:
                 gitignore_content = f.read()
