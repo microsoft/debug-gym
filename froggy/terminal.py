@@ -162,7 +162,7 @@ class Terminal:
         """Lazy initialization of the working directory."""
         if self._working_dir is None:
             temp_dir = tempfile.TemporaryDirectory(prefix="Terminal-")
-            atexit.register(lambda: temp_dir.cleanup())
+            atexit.register(temp_dir.cleanup)
             self._working_dir = temp_dir.name
             self.logger.debug(f"Using temporary working directory: {self._working_dir}")
         return self._working_dir
@@ -227,7 +227,7 @@ class Terminal:
         which could interfere with the terminal setup (clean outputs)"""
         return shlex.split("/bin/bash --noprofile --norc")
 
-    def start_shell_session(self, timeout=30, no_output_timeout=0.1):
+    def start_shell_session(self, timeout=30, no_output_timeout=1):
         session = ShellSession(
             entrypoint=self.default_entrypoint,
             working_dir=self.working_dir,

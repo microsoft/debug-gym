@@ -79,10 +79,7 @@ class RepoEnv(TooledEnv):
         self.dir_tree_depth = dir_tree_depth
         self.auto_view_change = auto_view_change
         self.terminal = terminal or Terminal()
-        self.entrypoint = None  # set in setup_workspace
-        self.debug_entrypoint = None  # set in setup_workspace
         self.logger = logger
-
         self.setup_workspace(
             path=path,
             entrypoint=entrypoint,
@@ -114,9 +111,8 @@ class RepoEnv(TooledEnv):
         # Create a random temporary folder for storing a backup of the repo.
         self.tempdir = tempfile.TemporaryDirectory(prefix="RepoEnv-")
         self.working_dir = Path(self.tempdir.name)
-        atexit.register(
-            self.tempdir.cleanup
-        )  # Make sure to cleanup that folder once done.
+        # Make sure to cleanup that folder once done.
+        atexit.register(self.tempdir.cleanup)
 
         self.logger.debug(f"Working directory: {self.working_dir}")
         shutil.copytree(self.path, self.working_dir, dirs_exist_ok=True, symlinks=True)
@@ -128,11 +124,7 @@ class RepoEnv(TooledEnv):
         self.current_breakpoints_state = {}
 
         # override entrypoint as it might be task dependent
-        if entrypoint:
-            entrypoint = entrypoint or ""
-            debug_entrypoint = debug_entrypoint or entrypoint
-            self.entrypoint = self._prepare_entrypoint(entrypoint)
-            self.debug_entrypoint = self._prepare_entrypoint(debug_entrypoint)
+        self.set_entrypoints(entrypoint, debug_entrypoint)
 
         # Set up the terminal working dir
         self.terminal.working_dir = str(self.working_dir)
@@ -153,6 +145,13 @@ class RepoEnv(TooledEnv):
         self.editable_files = [
             p for p in self.all_files if not self.is_readonly(self.working_dir / p)
         ]
+
+    def set_entrypoints(self, entrypoint, debug_entrypoint):
+        if entrypoint:
+            entrypoint = entrypoint or ""
+            debug_entrypoint = debug_entrypoint or entrypoint
+            self.entrypoint = self._prepare_entrypoint(entrypoint)
+            self.debug_entrypoint = self._prepare_entrypoint(debug_entrypoint)
 
     @staticmethod
     def _prepare_entrypoint(entrypoint):
