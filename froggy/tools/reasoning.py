@@ -44,7 +44,7 @@ class ReasoningTool(EnvironmentTool):
     def description(self):
         if self.allow_chain_action:
             desc = f"""You may explicitly reason about the current state and the best course of action before executing. You follow a particular reasoning style:
-You break down complex problems into smaller parts and reason through them step by step, arriving at the best next action before then executing it. You should follow your reasoning with your next action. The next action should be a valid action that correctly follows the syntax can be executed in the current environment. The next action cannot be another reasoning action."""
+You break down complex problems into smaller parts and reason through them step by step, arriving at the best next action before then executing it. You should follow your reasoning with your next action. The next action should be a valid action, which follows the syntax rules defined by the tools available in the current environment. The next action cannot be another reasoning action."""
         else:
             desc = f"""You may explicitly reason about the current state and the best course of action. You follow a particular reasoning style:
 You break down complex problems into smaller parts and reason through them step by step, arriving at the best next action(s). """
