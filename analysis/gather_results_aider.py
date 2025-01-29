@@ -42,7 +42,9 @@ def main():
                 print(colored(f"Error reading {log_file}", "red"))
 
         # print result statistics
-        success_rate = sum(_results.values()) / len(_results) if len(_results) > 0 else 0.0
+        success_rate = (
+            sum(_results.values()) / len(_results) if len(_results) > 0 else 0.0
+        )
         print(
             colored(
                 f"{agent_name}: {success_rate:.2f} ({sum(_results.values())} out of {len(_results)})",

@@ -1,0 +1,27 @@
+name: "Formatter"
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  schedule:
+    - cron: '37 20 * * 3'
+
+jobs:
+  black:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: psf/black@stable
+        with:
+            options: "--check --verbose --line-length 88 --force-exclude data/*"
+
+  isort:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: isort/isort-action@v1
+        with:
+            requirements-files: "requirements.txt"
+            configuration: "--check-only --diff --profile black --filter-files"
