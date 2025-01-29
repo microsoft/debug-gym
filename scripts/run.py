@@ -1,5 +1,4 @@
 import json
-import logging
 import os
 import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -12,9 +11,10 @@ from rich.progress import BarColumn, Progress, TextColumn, TimeElapsedColumn
 from rich.table import Column
 from termcolor import colored
 
+from froggy.logger import FroggyLogger
 from froggy.terminal import select_terminal
 from froggy.tools.toolbox import Toolbox
-from froggy.utils import load_config, setup_logger
+from froggy.utils import load_config
 
 
 class BreakTaskLoop(Exception):
@@ -36,21 +36,16 @@ def select_env(env_type: str = None):
     return env_class
 
 
-def run_agent(args, problem, config, task_progress: Progress, live):
+def run_agent(args, problem, config):
     config["uuid"] = config.get("uuid", str(uuid.uuid4()))
     exp_path = Path(config["output_path"]) / config["uuid"] / problem
-    # add progress bar for steps of this app, and run the steps
-    current_task_id = task_progress.add_task(f"\\[{problem}]:", log="Starting task...")
 
-    task_logger = setup_logger(
+    task_logger = FroggyLogger(
         problem,
         log_dir=exp_path,
         verbose=args.very_verbose,
         mode="w" if args.force_all else "a",
-        progress=task_progress,
-        task_id=current_task_id,
     )
-    task_logger.live = live
     try:
         previous_run = exp_path / "froggy.jsonl"
         if not args.force_all and os.path.exists(previous_run):
@@ -60,15 +55,8 @@ def run_agent(args, problem, config, task_progress: Progress, live):
 
             task_logger.debug(f"Previous run success: {success}")
             if not args.force_failed or success:
-                task_logger.info(f"Skipping {problem}, already done.")
-                task_progress.stop_task(current_task_id)
-                task_progress.update(
-                    current_task_id,
-                    completed=True,
-                    description=f"[bold gray]\\[{problem}]:",
-                    log="[bold gray]Skipped!",
-                )
-                task_progress.remove_task(current_task_id)
+                task_logger.info("[bold gray]Skipped, already done.")
+                task_logger.stop(remove=not args.keep_completed_tasks)
                 return success
 
         env = create_env(args, config, task_logger)
@@ -96,18 +84,12 @@ def run_agent(args, problem, config, task_progress: Progress, live):
 
         success = False
 
-    task_progress.stop_task(current_task_id)
-    task_progress.update(
-        current_task_id,
-        completed=True,
-        description=f"[bold green]\\[{problem}]:",
-        log="[bold green]Completed!",
-    )
-    task_progress.remove_task(current_task_id)
+    task_logger.info("[bold green]Completed!")
+    task_logger.stop(remove=not args.keep_completed_tasks)
     return success
 
 
-def create_env(args, config: dict, logger: logging.Logger):
+def create_env(args, config: dict, logger: FroggyLogger):
     terminal = select_terminal(config.get("terminal"), logger)
     env_class = select_env(config.get("benchmark"))
     env = env_class(**config["env_kwargs"], terminal=terminal, logger=logger)
@@ -155,7 +137,7 @@ def main():
     if args.very_verbose:
         args.verbose = True
 
-    logger = setup_logger("froggy", verbose=args.very_verbose)
+    logger = FroggyLogger("froggy", verbose=args.very_verbose)
 
     available_agents = list(config.keys())
     assert (
@@ -177,45 +159,24 @@ def main():
         tasks_done = 0
         mean_perf = 0
 
-        # progress bar for current task(s)
-        task_progress = Progress(
-            TimeElapsedColumn(),
-            BarColumn(bar_width=10),
-            TextColumn("{task.description}"),
-            TextColumn(
-                "{task.fields[log]}", table_column=Column(no_wrap=True)  # , width=80)
-            ),
-        )
-
         tasks_succeeded = []
-        overall_progress = Progress(
-            TextColumn("🐸"),
-            TimeElapsedColumn(),
-            BarColumn(),
-            TextColumn("{task.description}"),
-        )
 
-        progress_group = Group(
-            Panel(task_progress, title="Workers"),
-            overall_progress,
-        )
-
-        overall_task_id = overall_progress.add_task("", total=len(problem_list))
+        overall_task_id = logger.overall_progress.add_task("", total=len(problem_list))
         top_descr = "[bold #AAAAAA](%d out of %d tasks done)" % (
             tasks_done,
             len(problem_list),
         )
-        overall_progress.update(overall_task_id, description=top_descr, advance=0)
+        logger.overall_progress.update(
+            overall_task_id, description=top_descr, advance=0
+        )
 
-        with Live(progress_group, refresh_per_second=20) as live:
+        with Live(logger.progress_group, refresh_per_second=20) as live:
             if args.debug:
                 live.stop()  # Because it interferes with pdb.
 
             with ThreadPoolExecutor(num_workers) as executor:
                 futures = {
-                    executor.submit(
-                        run_agent, args, problem, config, task_progress, live
-                    ): problem
+                    executor.submit(run_agent, args, problem, config): problem
                     for problem in problem_list
                 }
                 for future in as_completed(futures):
@@ -235,19 +196,20 @@ def main():
                             f"[bold #AAAAAA]({tasks_done} out of {len(problem_list)} tasks "
                             f"done - [bold green]{mean_perf}[bold #AAAAAA] are successful)"
                         )
-                        overall_progress.update(
+                        logger.overall_progress.update(
                             overall_task_id, description=top_descr, advance=1
                         )
-                    except (KeyboardInterrupt, BreakTaskLoop):
+                    except (KeyboardInterrupt, BreakTaskLoop) as e:
                         live.stop()
                         executor.shutdown(wait=False, cancel_futures=True)
+                        raise e
                     except Exception as e:
                         live.stop()
                         executor.shutdown(wait=False, cancel_futures=True)
                         raise e
 
             # final update for message on overall progress bar
-            overall_progress.update(
+            logger.overall_progress.update(
                 overall_task_id,
                 description=f"[bold green]{mean_perf}/{tasks_done} success!",
             )

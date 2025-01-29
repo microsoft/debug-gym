@@ -1,5 +1,4 @@
 import json
-import logging
 import os
 import subprocess
 import uuid
@@ -10,6 +9,7 @@ import numpy as np
 from froggy.agents.llm_api import instantiate_llm
 from froggy.agents.utils import HistoryTracker, build_history_prompt
 from froggy.envs.env import RepoEnv
+from froggy.logger import FroggyLogger
 from froggy.utils import unescape
 
 
@@ -20,11 +20,11 @@ class AgentBase:
         self,
         config: dict,
         env: RepoEnv,
-        logger: logging.Logger | None = None,
+        logger: FroggyLogger | None = None,
     ):
         self.config = config
         self.env = env
-        self.logger = logger or logging.getLogger("froggy")
+        self.logger = logger or FroggyLogger("froggy")
         self.llm = instantiate_llm(self.config, logger=self.logger)
         self._uuid = self.config.get("uuid", str(uuid.uuid4()))
         self._output_path = pjoin(self.config["output_path"], self._uuid)

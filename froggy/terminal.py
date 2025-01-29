@@ -6,13 +6,14 @@ import os
 import pty
 import shlex
 import subprocess
-import sys
 import tempfile
 import termios
 import time
 import uuid
 
 import docker
+
+from froggy.logger import FroggyLogger
 
 
 class ShellSession:
@@ -142,9 +143,10 @@ class Terminal:
         setup_commands: list[str] = None,
         env_vars: dict[str, str] = None,
         include_os_env_vars: bool = True,
-        logger=logging.getLogger("froggy"),
+        logger: FroggyLogger | None = None,
         **kwargs,
     ):
+        self.logger = logger or FroggyLogger("froggy")
         self.setup_commands = setup_commands or []
         self.env_vars = env_vars or {}
         if include_os_env_vars:
@@ -235,7 +237,6 @@ class Terminal:
             logger=self.logger,
         )
         self.sessions.append(session)
-
         initial_output = ""
         commands = " && ".join(self.setup_commands)
         if commands:

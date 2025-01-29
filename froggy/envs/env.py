@@ -1,6 +1,5 @@
 import atexit
 import glob
-import logging
 import os
 import shutil
 import subprocess
@@ -11,6 +10,7 @@ from pathlib import Path
 
 import numpy as np
 
+from froggy.logger import FroggyLogger
 from froggy.terminal import Terminal
 from froggy.tools.patchers import CodePatcher
 from froggy.tools.pdb import PDBTool
@@ -68,7 +68,7 @@ class RepoEnv(TooledEnv):
         dir_tree_depth: int | None = None,
         auto_view_change: bool = True,
         terminal: Terminal | None = None,
-        logger=logging.getLogger("froggy"),
+        logger: FroggyLogger | None = None,
     ):
         super().__init__()
 
@@ -79,7 +79,9 @@ class RepoEnv(TooledEnv):
         self.dir_tree_depth = dir_tree_depth
         self.auto_view_change = auto_view_change
         self.terminal = terminal or Terminal()
-        self.logger = logger
+
+        self.logger = logger or FroggyLogger("froggy")
+
         self.setup_workspace(
             path=path,
             entrypoint=entrypoint,
@@ -128,6 +130,9 @@ class RepoEnv(TooledEnv):
 
         # Set up the terminal working dir
         self.terminal.working_dir = str(self.working_dir)
+
+        self.logger.debug(f"Working directory: {self.working_dir}")
+        shutil.copytree(self.path, self.working_dir, dirs_exist_ok=True)
 
     def _index_files(self, readonly_patterns: list[str] | None = None):
         # get list of all the files

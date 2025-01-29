@@ -1,5 +1,4 @@
 import json
-import logging
 import os
 import random
 import sys
@@ -16,6 +15,7 @@ from termcolor import colored
 from transformers import AutoTokenizer
 
 from froggy.agents.utils import trim_prompt_messages
+from froggy.logger import FroggyLogger
 
 prompt_toolkit_available = False
 try:
@@ -29,9 +29,6 @@ except ImportError:
     pass
 
 
-logger = logging.getLogger("froggy")
-
-
 def load_llm_config(config_file_path: str | None = None):
     if config_file_path is None:
         config_file_path = os.environ.get("LLM_CONFIG_FILE", "llm.cfg")
@@ -42,7 +39,7 @@ def load_llm_config(config_file_path: str | None = None):
     return llm_config
 
 
-def print_messages(messages: list[dict], logger: logging.Logger):
+def print_messages(messages: list[dict], logger: FroggyLogger):
     for m in messages:
         if m["role"] == "user":
             logger.debug(colored(f"{m['content']}\n", "cyan"))
@@ -94,14 +91,14 @@ class TokenCounter:
 
 
 class LLM:
-    def __init__(self, model_name: str, logger: logging.Logger | None = None):
+    def __init__(self, model_name: str, logger: FroggyLogger | None = None):
         configs = load_llm_config()
         if model_name not in configs:
             raise ValueError(f"Model {model_name} not found in llm.cfg")
 
         self.model_name = model_name
         self.config = configs[model_name]
-        self.logger = logger or logging.getLogger("froggy")
+        self.logger = logger or FroggyLogger("froggy")
         self.token_counter = TokenCounter(self.config["tokenizer"])
         self.context_length = self.config["context_limit"] * 1000
 
@@ -216,7 +213,7 @@ class LLM:
 
 
 class AsyncLLM(LLM):
-    def __init__(self, model_name, logger: logging.Logger | None = None):
+    def __init__(self, model_name, logger: FroggyLogger | None = None):
         super().__init__(model_name, logger)
 
         if "azure openai" in self.config.get("tags", []):
@@ -258,9 +255,9 @@ class AsyncLLM(LLM):
 
 
 class Human:
-    def __init__(self, logger: logging.Logger | None = None):
+    def __init__(self, logger: FroggyLogger | None = None):
         self._history = None
-        self.logger = logger or logging.getLogger("froggy")
+        self.logger = logger or FroggyLogger("froggy")
         if prompt_toolkit_available:
             self._history = InMemoryHistory()
 
@@ -294,9 +291,9 @@ class Human:
 
 
 class Random:
-    def __init__(self, seed: int, logger: logging.Logger | None = None):
+    def __init__(self, seed: int, logger: FroggyLogger | None = None):
         self.seed = seed
-        self.logger = logger or logging.getLogger("froggy")
+        self.logger = logger or FroggyLogger("froggy")
         self.rng = random.Random(seed)
 
     def __call__(self, messages, info, *args, **kwargs):
@@ -314,7 +311,7 @@ class Random:
 
 
 def instantiate_llm(
-    config: dict, logger: logging.Logger | None = None, use_async: bool = False
+    config: dict, logger: FroggyLogger | None = None, use_async: bool = False
 ):
     llm_config = load_llm_config()
     available_models = list(llm_config.keys()) + ["random", "human"]

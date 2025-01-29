@@ -75,7 +75,6 @@ class TestAgentTadpole(unittest.TestCase):
         messages = self.agent.build_prompt_step_2(info)
         self.assertGreater(len(messages), 0)
 
-    @patch("froggy.agents.tadpole.tqdm", MagicMock())
     def test_run(self):
         self.env.reset.return_value = (
             None,

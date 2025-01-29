@@ -1,7 +1,5 @@
 import json
 
-from tqdm import tqdm
-
 from froggy.agents import AgentBase
 from froggy.utils import unescape
 
@@ -35,19 +33,8 @@ class AgentZeroShot(AgentBase):
         done = False
         highscore = info["score"]
 
-        # pbar = tqdm(
-        #     total=self.config["max_steps"],
-        #     desc=f"Debugging inside {self.env.working_dir} - Task: {task_name}",
-        #     leave=True,
-        # )
-        self.logger.progress.update(self.logger.task_id, total=self.config["max_steps"])
-        for step in range(self.config["max_steps"]):
+        for step in self.logger.tqdm(range(self.config["max_steps"])):
             highscore = max(highscore, info["score"])
-            # pbar.set_postfix_str(
-            #     f"Score: {info['score']}/{info['max_score']} ({info['score']/info['max_score']:.1%}) [Best: {highscore}]".format(
-            #         info["score"]
-            #     )
-            # )
             self.logger.info(
                 f"Score: {info['score']}/{info['max_score']} ({info['score']/info['max_score']:.1%}) [Best: {highscore}]".format(
                     info["score"]
@@ -71,14 +58,7 @@ class AgentZeroShot(AgentBase):
                 prompt_response_pairs=[(prompt, answer)]
             )
 
-            # pbar.update()
-            self.logger.progress.update(self.logger.task_id, advance=1)
             if done or info["rewrite_counter"] >= self.config["max_rewrite_steps"]:
-                # pbar.set_postfix_str(
-                #     f"Score: {info['score']}/{info['max_score']} ({info['score']/info['max_score']:.1%})".format(
-                #         info["score"]
-                #     )
-                # )
                 self.logger.info(
                     f"Score: {info['score']}/{info['max_score']} ({info['score']/info['max_score']:.1%})".format(
                         info["score"]
@@ -140,14 +120,10 @@ class AgentZeroShot_PdbAfterRewrites(AgentZeroShot):
 
         done = False
         highscore = info["score"]
-        pbar = tqdm(
-            total=self.config["max_steps"],
-            desc=f"Debugging inside {self.env.working_dir}",
-            leave=True,
-        )
-        for step in range(self.config["max_steps"]):
+
+        for step in self.logger.tqdm(range(self.config["max_steps"])):
             highscore = max(highscore, info["score"])
-            pbar.set_postfix_str(
+            self.logger.info(
                 f"Score: {info['score']}/{info['max_score']} ({info['score']/info['max_score']:.1%}) [Best: {highscore}]".format(
                     info["score"]
                 )
@@ -183,9 +159,8 @@ class AgentZeroShot_PdbAfterRewrites(AgentZeroShot):
                 prompt_response_pairs=[(prompt, answer)]
             )
 
-            pbar.update()
             if done or info["rewrite_counter"] >= self.config["max_rewrite_steps"]:
-                pbar.set_postfix_str(
+                self.logger.info(
                     f"Score: {info['score']}/{info['max_score']} ({info['score']/info['max_score']:.1%})".format(
                         info["score"]
                     )

@@ -202,6 +202,11 @@ def load_config():
         help="Force running only problems that have failed.",
     )
     parser.add_argument(
+        "--keep-completed-tasks",
+        action="store_true",
+        help="Keep displaying completed tasks in the workers panel.",
+    )
+    parser.add_argument(
         "-p",
         "--params",
         nargs="+",

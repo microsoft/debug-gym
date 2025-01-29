@@ -56,7 +56,6 @@ class TestAgentZeroShot(unittest.TestCase):
         messages = self.agent.build_prompt(info)
         self.assertGreater(len(messages), 0)
 
-    @patch("froggy.agents.zero_shot.tqdm", MagicMock())
     def test_run(self):
         self.env.reset.return_value = (
             None,
@@ -172,7 +171,6 @@ class TestAgentZeroShot_PdbAfterRewrites(unittest.TestCase):
         self.agent.llm = self.llm
         self.agent.history = self.history
 
-    @patch("froggy.agents.zero_shot.tqdm", MagicMock())
     def test_run(self):
         self.env.reset.return_value = (
             None,
