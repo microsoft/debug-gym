@@ -218,24 +218,6 @@ def load_config():
         help="Keep displaying completed tasks in the workers panel.",
     )
     parser.add_argument(
-        "-vv", "--very-verbose", action="store_true", help="Set logging level to DEBUG"
-    )
-    parser.add_argument(
-        "--force-all",
-        action="store_true",
-        help="Force running all problems even if they are already done.",
-    )
-    parser.add_argument(
-        "--force-failed",
-        action="store_true",
-        help="Force running only problems that have failed.",
-    )
-    parser.add_argument(
-        "--keep-completed-tasks",
-        action="store_true",
-        help="Keep displaying completed tasks in the workers panel.",
-    )
-    parser.add_argument(
         "-p",
         "--params",
         nargs="+",
