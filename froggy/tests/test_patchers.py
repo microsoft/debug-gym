@@ -2,12 +2,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from froggy.tools.patchers import (
-    CodePatcher,
-    SubstitutionPatcher,
-    UDiffPatcher,
-    WholePatcher,
-)
+from froggy.tools.patchers import CodePatcher, SubstitutionPatcher
 
 
 @pytest.fixture
@@ -18,34 +13,6 @@ def mock_environment():
     env.all_files = ["test.py"]
     env.editable_files = ["test.py"]
     return env
-
-
-def test_udiff_patcher(mock_environment):
-    patcher = UDiffPatcher()
-    patcher.environment = mock_environment
-
-    patch = "```diff\n@@ -1,2 +1,2 @@\n-def greet():\n-    print('Hello, world!')\n+def greet(name):\n+    print(f'Hello, {name}!')\n```"
-    result = patcher.use(patch)
-
-    assert result == "Rewrite successful."
-    assert patcher.rewrite_success
-    mock_environment.overwrite_file.assert_called_once_with(
-        filepath="test.py", content="def greet(name):\n    print(f'Hello, {name}!')\n"
-    )
-
-
-def test_whole_patcher(mock_environment):
-    patcher = WholePatcher()
-    patcher.environment = mock_environment
-
-    patch = "```rewrite\ndef greet(name):\n    print(f'Hello, {name}!')\n```"
-    result = patcher.use(patch)
-
-    assert result == "Rewrite successful."
-    assert patcher.rewrite_success
-    mock_environment.overwrite_file.assert_called_once_with(
-        filepath="test.py", content="\ndef greet(name):\n    print(f'Hello, {name}!')\n"
-    )
 
 
 def test_substitution_patcher(mock_environment):
