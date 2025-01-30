@@ -1,11 +1,6 @@
 from froggy.tools.eval import EvalTool
 from froggy.tools.listdir import ListdirTool
-from froggy.tools.patchers import (
-    CodePatcher,
-    SubstitutionPatcher,
-    UDiffPatcher,
-    WholePatcher,
-)
+from froggy.tools.patchers import CodePatcher, SubstitutionPatcher
 from froggy.tools.pdb import PDBTool
 from froggy.tools.reasoning import ReasoningTool
 from froggy.tools.tool import EnvironmentTool

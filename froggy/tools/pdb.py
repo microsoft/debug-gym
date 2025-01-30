@@ -10,10 +10,9 @@ from froggy.tools.toolbox import Toolbox
 class PDBTool(EnvironmentTool):
     name: str = "pdb"
     action: str = "```pdb"
-    description: str = "A suite of PDB commands available to the user."
     instructions = {
         "template": "```pdb <command>```",
-        "description": "Send a command to the PDB terminal. The command should be a valid PDB command.",
+        "description": "An interface to the Python debugger PDB. Send a command to the PDB terminal. The command should be a valid PDB command.",
         "examples": [
             "```pdb p x``` to print the value of the variable x in the current context.",
             "```pdb b 42``` to set a breakpoint at line 42 in the current file.",
@@ -55,14 +54,6 @@ class PDBTool(EnvironmentTool):
         self.auto_list = auto_list
         self.current_frame_file = None
         self._terminal: Terminal = None
-
-    def register(self, environment):
-        from froggy.envs.env import RepoEnv
-
-        if not isinstance(environment, RepoEnv):
-            raise ValueError("The environment must be a RepoEnv instance.")
-
-        self.environment = environment
 
     @property
     def terminal(self) -> Terminal:
@@ -107,10 +98,6 @@ class PDBTool(EnvironmentTool):
         """Restart the pdb session and restore the breakpoints."""
         self.close_pdb()
         return self.start_pdb()
-
-    def is_triggered(self, action):
-        # e.g. ```pdb b src/main.py:42```
-        return action.startswith(self.action)
 
     def use(self, action):
         command = action.strip("`").split(" ", 1)[1].strip()
