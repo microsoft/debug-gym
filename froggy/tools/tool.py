@@ -1,16 +1,22 @@
 class EnvironmentTool:
     name: str = None
-    description: str = None
+    action: str = None
     instructions: str = None
 
     def __init__(self):
         self.environment = None
 
     def register(self, environment):
+        from froggy.envs.env import RepoEnv
+
+        if not isinstance(environment, RepoEnv):
+            raise ValueError("The environment must be a RepoEnv instance.")
+
         self.environment = environment
 
-    def is_triggered(self, text):
-        raise NotImplementedError("is_triggered method must be implemented.")
+    def is_triggered(self, action):
+        # e.g. ```pdb b src/main.py:42```
+        return action.startswith(self.action)
 
     def use(self, action, environment):
-        raise NotImplementedError("use method must be implemented.")
+        raise NotImplementedError("use method must be implemented in the subclass.")

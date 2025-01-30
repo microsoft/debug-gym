@@ -13,136 +13,17 @@ class CodePatcher(EnvironmentTool):
 
     @staticmethod
     def get(patch_type):
-        if patch_type == "udiff":
-            return UDiffPatcher()
-        elif patch_type == "whole":
-            return WholePatcher()
-        elif patch_type == "substitution":
+        if patch_type == "substitution":
             return SubstitutionPatcher()
         else:
             raise ValueError("Invalid patch type!")
 
 
-class UDiffPatcher(CodePatcher):
-    name = "udiff_patcher"
-    description = "Creates patches of code given UDiff format."
-    instructions = {
-        "template": "```rewrite <unified_diff>```",
-        "description": "After debugging, or whenever a sufficient amount of information has been gathered, use the following command to rewrite the code.\n For example if the code is:\n def greet():\n    print('Hello, world!')\n and the user wants to rewrite the full code, the command would be:\n```rewrite\n@@ -1,2 +1,2 @@\n-def greet():\n-    print('Hello, world!')\n+def greet(name):\n+    print(f'Hello, {name}!')\n```\n this will result in the following code:\ndef greet(name):\n    print(f'Hello, {name}!')\n alternatively, you can rewrite only a line by providing line numbers, e.g.:\n```rewrite\n@@ -2 +2 @@\n-    print('Hello, world!')\n+    print(f'Hello everyone!')\n```\n this will result in the following code:\ndef greet(name):\n    print(f'Hello everyone!')\n",
-    }
-
-    def is_triggered(self, action):
-        return action.startswith(self.action)
-
-    def use(self, patch):
-        code = self.environment.current_file_content
-        patch_lines = patch.split("```diff")[1].split("```")[0]
-        patched_code = self._apply_unified_diff(
-            code, patch_lines.splitlines(keepends=True)
-        )
-
-        if patched_code:
-            new_code = clean_code("".join(patched_code))
-            self.environment.overwrite_file(
-                filepath=self.environment.current_file, content=new_code
-            )
-            self.environment.load_current_file(self.environment.current_file)
-            # TODO: to support breakpoint management
-            self.environment.current_breakpoints_state = {}
-            self.rewrite_success = True
-            return "Rewrite successful."
-
-        self.rewrite_success = False
-        return "Rewrite failed."
-
-    def _apply_unified_diff(self, code_lines, patch_lines):
-        import re
-
-        patched_lines = code_lines.copy()
-        line_offset = 0
-
-        hunk_header_pattern = re.compile(r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@")
-        idx = 0
-
-        while idx < len(patch_lines):
-            line = patch_lines[idx]
-            if line.startswith("@@"):
-                match = hunk_header_pattern.match(line)
-                if not match:
-                    return None  # Invalid hunk header
-
-                # Extract hunk header information
-                src_start = int(match.group(1)) - 1  # Convert to 0-based index
-                src_len = int(match.group(2) or "1")
-                tgt_start = int(match.group(3)) - 1
-                tgt_len = int(match.group(4) or "1")
-
-                idx += 1
-                hunk_lines = []
-                while idx < len(patch_lines) and not patch_lines[idx].startswith("@@"):
-                    hunk_lines.append(patch_lines[idx])
-                    idx += 1
-
-                # Apply the hunk
-                removed = []
-                added = []
-                for hunk_line in hunk_lines:
-                    if hunk_line.startswith("-"):
-                        removed.append(hunk_line[1:])
-                    elif hunk_line.startswith("+"):
-                        added.append(hunk_line[1:])
-                    elif hunk_line.startswith(" "):
-                        continue
-                    elif hunk_line.startswith("\\"):
-                        continue  # Handle \ No newline at end of file
-                    else:
-                        return None  # Invalid hunk line
-
-                # Replace the lines in the original code
-                patched_lines[
-                    src_start + line_offset : src_start + line_offset + len(removed)
-                ] = added
-                line_offset += len(added) - len(removed)
-            else:
-                idx += 1
-
-        return patched_lines
-
-
-class WholePatcher(CodePatcher):
-    name = "whole_patcher"
-    description = "Rewrites the full code."
-    instructions = {
-        "template": "```rewrite <codef>```",
-        "description": "After debugging, or whenever a sufficient amount of information has been gathered, use the following command to rewrite the code.\n For example if the code is:\n def greet():\n    print('Hello, world!')\n and the user wants to rewrite it, the command would be:\n```rewrite\ndef greet(name):\n    print(f'Hello, {name}!')\n```\n this will result in the following code:\ndef greet(name):\n    print(f'Hello, {name}!')\n",
-    }
-
-    def is_triggered(self, action):
-        return action.startswith(self.action)
-
-    def use(self, patch):
-        content = patch.split(self.action)[1].split("```")[0]
-        if content:
-            new_code = clean_code(content)
-            self.environment.overwrite_file(
-                filepath=self.environment.current_file, content=new_code
-            )
-            self.environment.load_current_file(self.environment.current_file)
-            # TODO: to support breakpoint management
-            self.environment.current_breakpoints_state = {}
-            self.rewrite_success = True
-            return "Rewrite successful."
-
-        self.rewrite_success = False
-        return "Rewrite failed."
-
-
 class SubstitutionPatcher(CodePatcher):
     name = "substitution_patcher"
-    description = "Creates patches of code given start and end lines."
     instructions = {
-        "template": "```rewrite file/path.py head:tail <c>new_code</c>```",
-        "description": "Rewrite the code in file/path.py between lines [head, tail] with the new code. Line numbers are 1-based. When file path is not provided, it's assumed to rewrite the current file. When head and tail are not provided, it's assumed to rewrite the whole code. When only head is provided, it's assumed to rewrite that single line. The new code should be valid python code include proper indentation (can be determined from context), the special tokens <c> and </c> are used to wrap the new code. ",
+        "template": "```rewrite file/path.py start:end <c>new_code</c>```",
+        "description": "Rewrite the code in file/path.py between lines [start, end] with the new code. Line numbers are 1-based. When file path is not provided, it's assumed to rewrite the current file. When start and end are not provided, it's assumed to rewrite the whole code. When only start is provided, it's assumed to rewrite that single line. The new code should be valid python code include proper indentation (can be determined from context), the special tokens <c> and </c> are used to wrap the new code. ",
         "examples": [
             "```rewrite <c>print('hola')</c>``` will rewrite the current file (the entire code) to be print('hola'), because no line number is provided.",
             "```rewrite 10 <c>    print('bonjour')</c>``` will rewite line number 10 of the current file to be print('bonjour'), with the indents ahead (in this case, 4 spaces).",
@@ -150,9 +31,6 @@ class SubstitutionPatcher(CodePatcher):
             "```rewrite code/utils.py 4:6 <c>        print('buongiorno')</c>``` will replace the chunk of code between line number 4 and 6 in the file code/utils.py by the single line provided, with the indent ahead (in this case, 8 spaces).",
         ],
     }
-
-    def is_triggered(self, action):
-        return action.startswith(self.action)
 
     def _rewrite_file(self, file_path, head, tail, new_code):
         if file_path is None:
