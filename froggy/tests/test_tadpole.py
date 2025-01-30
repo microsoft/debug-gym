@@ -28,7 +28,7 @@ class TestAgentTadpole(unittest.TestCase):
         self.env = MagicMock()
         self.llm = MagicMock()
         self.history = MagicMock()
-        self.agent = AgentTadpole(self.config_dict, self.env, verbose=False)
+        self.agent = AgentTadpole(self.config_dict, self.env)
         self.agent.llm = self.llm
         self.agent.history = self.history
 
@@ -75,7 +75,6 @@ class TestAgentTadpole(unittest.TestCase):
         messages = self.agent.build_prompt_step_2(info)
         self.assertGreater(len(messages), 0)
 
-    @patch("froggy.agents.tadpole.tqdm", MagicMock())
     def test_run(self):
         self.env.reset.return_value = (
             None,

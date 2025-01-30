@@ -1,7 +1,6 @@
 import atexit
 import copy
 import glob
-import logging
 import os
 import shutil
 import subprocess
@@ -9,18 +8,15 @@ import tempfile
 from glob import glob
 from os.path import join as pjoin
 from pathlib import Path
-from typing import Optional
 
 import numpy as np
-from termcolor import colored
 
+from froggy.logger import FroggyLogger
 from froggy.terminal import Terminal
 from froggy.tools.patchers import CodePatcher
 from froggy.tools.pdb import PDBTool
 from froggy.tools.reasoning import ReasoningTool
 from froggy.utils import _walk, make_is_readonly, show_line_number
-
-logger = logging.getLogger("froggy")
 
 
 class TooledEnv:
@@ -73,6 +69,7 @@ class RepoEnv(TooledEnv):
         dir_tree_depth: int | None = None,
         auto_view_change: bool = True,
         terminal: Terminal | None = None,
+        logger: FroggyLogger | None = None,
     ):
         super().__init__()
 
@@ -84,6 +81,7 @@ class RepoEnv(TooledEnv):
         self.auto_view_change = auto_view_change
         self.terminal = terminal or Terminal()
         self.entrypoint = entrypoint
+        self.logger = logger or FroggyLogger("froggy")
 
         self.setup_workspace(path, readonly_patterns=readonly_patterns)
         self.last_run_obs = None
@@ -113,7 +111,7 @@ class RepoEnv(TooledEnv):
             self.tempdir.cleanup
         )  # Make sure to cleanup that folder once done.
 
-        logger.debug(f"Working directory: {self.working_dir}")
+        self.logger.debug(f"Working directory: {self.working_dir}")
         shutil.copytree(self.path, self.working_dir, dirs_exist_ok=True)
 
         # get list of all the files
@@ -181,6 +179,7 @@ class RepoEnv(TooledEnv):
             shutil.copy2(self.path / filepath, self.working_dir / filepath)
 
     def reset(self, *, seed=None, options: dict = None):
+        self.logger.info(f"Resetting environment")
         options = options or {}
         self.current_file = None
         self.current_file_content = None
@@ -189,6 +188,7 @@ class RepoEnv(TooledEnv):
         self.restore()
 
         # Run the initial code. This will set self.last_run_obs, self.done and self.score.
+        self.logger.info(f"Running initial evaluation")
         self.run()
 
         self.obs = ""
