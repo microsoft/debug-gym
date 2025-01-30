@@ -278,3 +278,65 @@ class PdbAfterRewrites(PdbAgent):
                 break
 
         return done
+
+
+class AgentSolution:
+    name: str = "solution"
+
+    def __init__(
+        self,
+        config: dict,
+        env: RepoEnv,
+        logger: FroggyLogger | None = None,
+    ):
+        self.config = config
+        self.env = env
+        self.logger = logger or FroggyLogger("froggy")
+        self.llm = instantiate_llm(self.config, logger=self.logger)
+        self._uuid = self.config.get("uuid", str(uuid.uuid4()))
+        self._output_path = pjoin(self.config["output_path"], self._uuid)
+
+        os.makedirs(self._output_path, exist_ok=True)
+
+    def run(self, task_name=None, debug=False):
+        self.history.reset()
+        _, info = self.env.reset(options={"task_name": task_name})
+        self.history.step(info)
+
+        if info["done"] is True:
+            return True
+
+        done = False
+        highscore = info["score"]
+
+        for step in self.logger.tqdm(range(self.config["max_steps"])):
+            highscore = max(highscore, info["score"])
+            self.logger.info(
+                f"Score: {info['score']}/{info['max_score']} ({info['score']/info['max_score']:.1%}) [Best: {highscore}]".format(
+                    info["score"]
+                )
+            )
+
+            self.logger.info(f"Applying gold patch to {self.env.working_dir}.")
+            command = f"git -C {self.env.working_dir} apply -"
+            subprocess.run(
+                command.split(), input=self.env.gold_patch, text=True, check=True
+            )
+            self.logger.info("Patch applied successfully.")
+
+            if debug:
+                breakpoint()
+
+            _, _, done, info = self.env.step("```eval```")
+            info["token_usage"] = [0]
+            self.history.step(info)
+
+            if done or info["rewrite_counter"] >= self.config["max_rewrite_steps"]:
+                self.logger.info(
+                    f"Score: {info['score']}/{info['max_score']} ({info['score']/info['max_score']:.1%})".format(
+                        info["score"]
+                    )
+                )
+                break
+
+        return done
