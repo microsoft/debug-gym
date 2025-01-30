@@ -28,12 +28,14 @@ class SWEBenchEnv(RepoEnv):
         # dataset_id: str = "princeton-nlp/SWE-bench_lite",
         split: str = "test",
         base_image: str = "python:3.12",
+        instance_ids: list[str] | None = None,
         **kwargs,
     ):
         super().__init__(**kwargs)
 
         self.dataset_id = dataset_id
         self.split = split
+        self.instance_ids = instance_ids
         self.swe_bench_base_image = base_image
         self.swe_bench_repo_paths = Path.joinpath(
             Path.home(), ".cache", "froggy", "swe-bench"
@@ -70,14 +72,17 @@ class SWEBenchEnv(RepoEnv):
             for repo in tqdm(repos, desc="Cloning repos needed for SWE-Bench"):
                 self.clone_repo(repo_address=repo)
 
-        swebench_instances = load_swebench_dataset(name=self.dataset_id)
+        swebench_instances = load_swebench_dataset(
+            name=self.dataset_id, instance_ids=self.instance_ids
+        )
         docker_client = docker.from_env()
 
         try:
             env_configs_to_build = get_env_configs_to_build(
                 docker_client, swebench_instances
             )
-        except docker.errors.ImageNotFound:
+        # swe-bench catches docker.errors.ImageNotFound and raises Exception
+        except BaseException:
             env_configs_to_build = True
 
         if env_configs_to_build:
@@ -157,6 +162,12 @@ class SWEBenchEnv(RepoEnv):
         return local_branch_path, entrypoint
 
     def setup_task_info(self, task_name):
+        if self.instance_ids:
+            if task_name not in self.instance_ids:
+                raise ValueError(
+                    f"Task `{task_name}` was not found in instance_ids. The available tasks are: {self.instance_ids}.\n"
+                    "Please provide a valid task or initialize the environment without instance_ids to load all tasks."
+                )
         self.task_name = task_name
         self.ds_row = self.dataset[self.task_name]
         self.repo = self.ds_row["repo"]
