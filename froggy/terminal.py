@@ -47,7 +47,7 @@ class ShellSession:
         attrs[3] = attrs[3] & ~termios.ECHO  # lflags
         termios.tcsetattr(slave, termios.TCSANOW, attrs)
 
-        process = subprocess.Popen(
+        self.process = subprocess.Popen(
             self.entrypoint,
             env=self.env_vars,
             cwd=self.working_dir,
@@ -68,6 +68,8 @@ class ShellSession:
             self.logger.debug(f"Closing {self}.")
             os.close(self.filedescriptor)
             self.filedescriptor = None
+
+        self.process.terminate()
 
     def read(
         self,
@@ -133,6 +135,9 @@ class ShellSession:
 
     def __str__(self):
         return f"ShellSession {self.session_id}"
+
+    def __del__(self):
+        self.close()
 
 
 class Terminal:
@@ -249,6 +254,10 @@ class Terminal:
     def close_shell_session(self, session):
         session.close()
         self.sessions.remove(session)
+
+    def close(self):
+        for session in self.sessions:
+            self.close_shell_session(session)
 
 
 class DockerTerminal(Terminal):
@@ -403,6 +412,10 @@ class DockerTerminal(Terminal):
                     "It might have already been removed."
                 )
             self._container = None
+
+    def close(self):
+        super().close()
+        self.clean_up()
 
 
 def select_terminal(

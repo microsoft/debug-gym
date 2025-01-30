@@ -18,29 +18,31 @@ from swebench.harness.utils import get_test_directives, load_swebench_dataset
 from tqdm import tqdm
 
 from froggy.envs.env import RepoEnv
+from froggy.terminal import DockerTerminal, Terminal
 
 
 class SWEBenchEnv(RepoEnv):
+    CACHE = Path.joinpath(Path.home(), ".cache", "froggy", "swe-bench")
 
     def __init__(
         self,
         dataset_id: str = "princeton-nlp/SWE-bench_Verified",
         # dataset_id: str = "princeton-nlp/SWE-bench_lite",
         split: str = "test",
-        base_image: str = "python:3.12",
         instance_ids: list[str] | None = None,
+        terminal: Terminal | None = None,
         **kwargs,
     ):
-        super().__init__(**kwargs)
+        terminal = terminal or DockerTerminal()
+        if isinstance(terminal, DockerTerminal):
+            raise ValueError("SWEBenchEnv only supports DockerTerminal.")
+
+        super().__init__(terminal=terminal, **kwargs)
 
         self.dataset_id = dataset_id
         self.split = split
         self.instance_ids = instance_ids
-        self.swe_bench_base_image = base_image
-        self.swe_bench_repo_paths = Path.joinpath(
-            Path.home(), ".cache", "froggy", "swe-bench"
-        )
-        self.swe_bench_repo_paths.mkdir(parents=True, exist_ok=True)
+        SWEBenchEnv.CACHE.mkdir(parents=True, exist_ok=True)
 
         self.load_dataset()
         self.setup_commands = []
@@ -63,9 +65,7 @@ class SWEBenchEnv(RepoEnv):
         repos = sorted({task["repo"] for task in self.dataset.values()})
         repo_names = [repo.split("/")[1] for repo in repos]
         missing_repos = [
-            repo
-            for repo in repo_names
-            if not Path.exists(self.swe_bench_repo_paths / repo)
+            repo for repo in repo_names if not Path.exists(SWEBenchEnv.CACHE / repo)
         ]
         if missing_repos:
             self.logger.debug("Cloning all repos needed for SWE-Bench...")
@@ -102,9 +102,8 @@ class SWEBenchEnv(RepoEnv):
         self.fail_to_pass = literal_eval(self.ds_row["FAIL_TO_PASS"])
         self.pass_to_pass = literal_eval(self.ds_row["PASS_TO_PASS"])
 
-        # Clone repository (should already be cloned)
-        assert (self.swe_bench_repo_paths / repo_address.split("/")[1]).exists()
-        local_repo_path = self.clone_repo(repo_address=repo_address)
+        local_repo_path = SWEBenchEnv.CACHE / self.repo_name
+        assert local_repo_path.exists()
         local_branch_path = local_repo_path.parent / self.ds_row["instance_id"]
 
         if not local_branch_path.exists():
@@ -188,6 +187,14 @@ class SWEBenchEnv(RepoEnv):
     def reset(self, *, seed=None, options: dict | None = None):
         # TODO: support reset current task, i.e. no options provided.
         options = options or {}
+
+        if self.terminal:
+            # Clean up the previous task
+            self.terminal.close()
+            self.terminal = None
+
+        self.terminal = DockerTerminal()
+
         self.setup_task_info(options["task_name"])
         self.setup_local_repo()
 
@@ -313,7 +320,7 @@ class SWEBenchEnv(RepoEnv):
     def clone_repo(self, repo_address):
         org_name, repo_name = repo_address.split("/")
         repo_url = f"https://github.com/{repo_address.lstrip('/')}"
-        local_repo_path = self.swe_bench_repo_paths / repo_name
+        local_repo_path = SWEBenchEnv.CACHE / repo_name
 
         if not local_repo_path.exists():
             self.logger.info(f"Cloning {repo_url} into {local_repo_path}")

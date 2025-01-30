@@ -64,10 +64,6 @@ class PDBTool(EnvironmentTool):
         return self._session.run(command, timeout=10)
 
     def start_pdb(self, pdb_cmd: str = None) -> str:
-        if self._session is not None:
-            self._session.close()
-            self._session = None
-
         self._session = self.environment.terminal.start_shell_session()
         if pdb_cmd is None:
             # remove the first word, which is "python"

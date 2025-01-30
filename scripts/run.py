@@ -175,6 +175,7 @@ def main():
                 for future in as_completed(futures):
                     if future.cancelled():
                         continue
+
                     try:
                         problem = futures[future]
                         success = future.result()
