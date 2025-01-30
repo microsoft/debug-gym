@@ -4,6 +4,7 @@ from unittest import mock
 from unittest.mock import MagicMock, patch
 
 import pytest
+from filelock import FileLock
 
 from froggy.envs import SWEBenchEnv
 from froggy.envs.env import RepoEnv
@@ -16,9 +17,44 @@ if_docker_running = pytest.mark.skipif(
 )
 
 
-def test_load_dataset(tmp_path):
+# https://pytest-xdist.readthedocs.io/en/stable/how-to.html#making-session-scoped-fixtures-execute-only-once
+@pytest.fixture(scope="session")
+def build_swe_env_once(tmp_path_factory, worker_id):
+    """Build the SWEBench docker image only once.
+    Do not run this fixture directly, use get_swe_env instead.
+    """
+    _build_swe_env = lambda: SWEBenchEnv(instance_ids=["astropy__astropy-14096"])
+    if worker_id == "master":
+        # Not running with pytest-xdist or we are in the master process
+        _build_swe_env()
+    else:
+        # When running with pytest-xdist, synchronize between workers using a lock
+        root_tmp_dir = tmp_path_factory.getbasetemp().parent
+        lock_file = root_tmp_dir / "db_init.lock"
+        with FileLock(str(lock_file)):
+            # Only the first worker to acquire the lock will initialize the DB
+            _build_swe_env()
+
+
+@pytest.fixture
+def get_swe_env(build_swe_env_once):
+    """Instantiate a SWEBenchEnv instance after building the SWEBench docker image."""
+
+    def _swe_env(working_dir=None, map_host_uid_gid=True, **kwargs):
+        instance_ids = ["astropy__astropy-14096"]
+        terminal = DockerTerminal(
+            path=working_dir, map_host_uid_gid=map_host_uid_gid, **kwargs
+        )
+        env = SWEBenchEnv(instance_ids=instance_ids, terminal=terminal)
+        return env
+
+    return _swe_env
+
+
+@if_docker_running
+def test_load_dataset(tmp_path, get_swe_env):
     working_dir = str(tmp_path)
-    swe_env = SWEBenchEnv(path=working_dir)
+    swe_env = get_swe_env(working_dir)
     assert swe_env.dataset_id == "princeton-nlp/SWE-bench_Verified"
     # check if the dataset contains features that SWEBenchEnv expects
     assert list(swe_env.ds.features.keys()) == [
@@ -37,9 +73,10 @@ def test_load_dataset(tmp_path):
     ]
 
 
-def test_clone_repo(tmp_path):
+@if_docker_running
+def test_clone_repo(tmp_path, get_swe_env):
     working_dir = str(tmp_path)
-    swe_env = SWEBenchEnv(path=working_dir)
+    swe_env = get_swe_env(working_dir)
     task_name = "astropy__astropy-14096"
     row = swe_env.dataset[task_name]
     repo_address = row["repo"]
@@ -63,9 +100,10 @@ def test_clone_repo(tmp_path):
         assert "astropy" in repo_content
 
 
-def test_make_froggyignore(tmp_path):
+@if_docker_running
+def test_make_froggyignore(tmp_path, get_swe_env):
     working_dir = str(tmp_path)
-    swe_env = SWEBenchEnv(path=working_dir)
+    swe_env = get_swe_env(working_dir)
     task_name = "astropy__astropy-14096"
     row = swe_env.dataset[task_name]
     repo_address = row["repo"]
@@ -76,9 +114,10 @@ def test_make_froggyignore(tmp_path):
     assert froggyignore == swe_env.ignore_files
 
 
-def test_make_froggyignore_include_gitignore(tmp_path):
+@if_docker_running
+def test_make_froggyignore_include_gitignore(tmp_path, get_swe_env):
     working_dir = str(tmp_path)
-    swe_env = SWEBenchEnv(path=working_dir)
+    swe_env = get_swe_env(working_dir)
     task_name = "astropy__astropy-14096"
     row = swe_env.dataset[task_name]
     repo_address = row["repo"]
@@ -90,9 +129,10 @@ def test_make_froggyignore_include_gitignore(tmp_path):
     assert len(froggyignore) > len(swe_env.ignore_files)
 
 
-def test_make_froggyignore_additional_contents(tmp_path):
+@if_docker_running
+def test_make_froggyignore_additional_contents(tmp_path, get_swe_env):
     working_dir = str(tmp_path)
-    swe_env = SWEBenchEnv(path=working_dir)
+    swe_env = get_swe_env(working_dir)
     task_name = "astropy__astropy-14096"
     row = swe_env.dataset[task_name]
     repo_address = row["repo"]
@@ -108,32 +148,9 @@ def test_make_froggyignore_additional_contents(tmp_path):
     assert froggyignore == swe_env.ignore_files + additionnal_contents
 
 
-@pytest.fixture
-@patch("subprocess.run")
-@patch("os.path.exists", return_value=False)
-@patch("datasets.load_dataset")
-def swe_env(mock_load_hf_dataset, mock_exists, mock_run):
-    # Mock the dataset
-    mock_dataset = MagicMock()
-    mock_dataset.sort.return_value = [
-        {
-            "instance_id": "test_task",
-            "problem_statement": "Test problem statement",
-            "repo": "test_org/test_repo",
-            "base_commit": "test_commit",
-            "test_patch": "test_patch",
-            "FAIL_TO_PASS": "['test_fail_to_pass']",
-            "PASS_TO_PASS": "['test_pass_to_pass']",
-        }
-    ]
-    mock_load_hf_dataset.return_value = {"test": mock_dataset}
-
-    # Initialize the SWEBenchEnv
-    env = SWEBenchEnv()
-    return env
-
-
-def test_instructions(swe_env):
+@if_docker_running
+def test_instructions(get_swe_env):
+    swe_env = get_swe_env()
     swe_env.ds_row = {"problem_statement": "Test problem statement"}
     expected_instructions = {
         "Problem description": "Test problem statement",
@@ -143,44 +160,46 @@ def test_instructions(swe_env):
     assert swe_env.instructions == expected_instructions
 
 
+@if_docker_running
 @patch(
     "froggy.envs.RepoEnv.step",
     return_value=("obs", 5, True, {"last_run_obs": "Raw output"}),
 )
-@patch("froggy.utils.cleanup_pytest_output", return_value="Cleaned output")
-@patch("froggy.utils.extract_reward_from_pytest_output", return_value=5)
-def test_step(mock_extract_reward, mock_cleanup, repo_env, swe_env):
+def test_step(repo_env_step, get_swe_env):
+    swe_env = get_swe_env()
+    swe_env.reset(options={"task_name": "astropy__astropy-14096"})
     obs, score, done, infos = swe_env.step("action")
-    assert infos["last_run_obs"] == "Cleaned output"
-    assert infos["score"] == 5
+    assert obs == "obs"
+    assert score == infos["score"] == 0
+    assert done == infos["done"] == False
+    assert infos["last_run_obs"] == "Raw output"
 
 
-def test_reset(tmp_path):
+@if_docker_running
+def test_reset(tmp_path, get_swe_env):
     working_dir = str(tmp_path)
-    swe_env = SWEBenchEnv(path=working_dir)
+    swe_env = get_swe_env(working_dir)
     task_name = "astropy__astropy-14096"
     obs = "Some observation"
     last_run_obs = "collected 10 items. 5 passed, 5 failed"
     info = {"obs": obs, "last_run_obs": last_run_obs}
-    with (
-        mock.patch.object(SWEBenchEnv, "setup_local_repo"),
-        mock.patch.object(SWEBenchEnv, "setup_terminal"),
-        mock.patch.object(RepoEnv, "reset", return_value=(obs, info)),
-    ):
+    with (mock.patch.object(RepoEnv, "reset", return_value=(obs, info)),):
         reset_obs, reset_infos = swe_env.reset(options={"task_name": task_name})
 
     assert reset_obs == obs
     assert reset_infos == {
         "obs": obs,
         "last_run_obs": last_run_obs,
-        "max_score": 10,
-        "score": 5,
+        "max_score": 1,
+        "score": 0,
+        "done": False,
     }
 
 
-def test_repo_name(tmp_path):
+@if_docker_running
+def test_repo_name(tmp_path, get_swe_env):
     working_dir = str(tmp_path)
-    swe_env = SWEBenchEnv(path=working_dir)
+    swe_env = get_swe_env(working_dir)
     repo = "test_org/test_repo"
     expected_repo_name = "test_org__test_repo"
     assert swe_env.repo_name(repo) == expected_repo_name
@@ -195,15 +214,11 @@ def test_repo_name(tmp_path):
 
 
 @if_docker_running
-def test_run_command_with_raise(tmp_path):
+def test_run_command_with_raise(tmp_path, get_swe_env):
     working_dir = str(tmp_path)
-    terminal = DockerTerminal(
-        base_image="python:3.12-slim",
-        map_host_uid_gid=False,
-    )
-    swe_env = SWEBenchEnv(path=working_dir, terminal=terminal)
-    # install sudo to python:3.12-slim. swe-bench images already have sudo
-    success, output = terminal.run(
+    swe_env = get_swe_env(working_dir=working_dir, map_host_uid_gid=False)
+    # install sudo for testing, swe-bench images already have sudo
+    success, output = swe_env.terminal.run(
         ["apt update", "apt install -y sudo", "echo 'Terminal ready'"]
     )
     assert success
@@ -223,25 +238,6 @@ def test_run_command_with_raise(tmp_path):
     assert status
 
 
-@if_docker_running
-def test_install_conda(tmp_path):
-    working_dir = str(tmp_path)
-    terminal = DockerTerminal(working_dir=working_dir)
-    swe_env = SWEBenchEnv(path=working_dir, terminal=terminal)
-    info_cmd = "source ~/miniconda3/bin/activate || true && conda info"
-    with pytest.raises(ValueError, match=".*conda: command not found"):
-        _, output = swe_env.run_command_with_raise(info_cmd)
-        assert not status
-
-    status, output = swe_env.install_conda()
-
-    assert status
-    assert "installation finished." in output
-    status, output = swe_env.run_command_with_raise(info_cmd)
-    assert status
-    assert "active environment : base" in output in output
-
-
 @pytest.fixture
 def install_configs_mock():
     install_configs = {
@@ -259,21 +255,11 @@ def install_configs_mock():
 
 
 @if_docker_running
-def test_run_pre_intall(tmp_path, install_configs_mock):
+def test_run_install(tmp_path, install_configs_mock, get_swe_env):
     working_dir = str(tmp_path)
-    terminal = DockerTerminal(working_dir=working_dir)
-    swe_env = SWEBenchEnv(path=working_dir, terminal=terminal)
-    swe_env.install_configs = install_configs_mock
-    swe_env.run_pre_install()
-    _, output = swe_env.run_command_with_raise("vim --help")
-    assert "VIM - Vi IMproved" in output
-
-
-@if_docker_running
-def test_run_install(tmp_path, install_configs_mock):
-    working_dir = str(tmp_path)
-    terminal = DockerTerminal(working_dir=working_dir, base_image="python:3.12-slim")
-    swe_env = SWEBenchEnv(path=working_dir, terminal=terminal)
+    swe_env = get_swe_env(
+        working_dir=working_dir, map_host_uid_gid=False, base_image="python:3.12-slim"
+    )
     swe_env.install_configs = install_configs_mock
     swe_env.run_install()
     _, output = swe_env.run_command_with_raise("python -m pytest --version")
@@ -281,10 +267,9 @@ def test_run_install(tmp_path, install_configs_mock):
 
 
 @if_docker_running
-def test_run_post_install(tmp_path, install_configs_mock):
+def test_run_post_install(tmp_path, install_configs_mock, get_swe_env):
     working_dir = str(tmp_path)
-    terminal = DockerTerminal(working_dir=working_dir)
-    swe_env = SWEBenchEnv(path=working_dir, terminal=terminal)
+    swe_env = get_swe_env(working_dir)
     swe_env.install_configs = install_configs_mock
     swe_env.run_post_install()
     _, output = swe_env.run_command_with_raise("cat test.txt")
@@ -345,60 +330,12 @@ def test_run_post_install(tmp_path, install_configs_mock):
 #     install_configs_mock["packages"] = "environment.yml"
 #     install_configs_mock["no_use_env"] = no_use_env
 #     working_dir = str(tmp_path)
-#     terminal = DockerTerminal(working_dir=working_dir)
-#     swe_env = SWEBenchEnv(path=working_dir, terminal=terminal)
-#     swe_env.install_configs = install_configs_mock
-#     swe_env.repo = "test/repo"
-#     swe_env.version = "2.0"
-#     swe_env.ds_row = {}
-#     environment = """
-# name: environment_test
-# dependencies:
-#   - python=3.10.16
-#   - pip=24.2
-#   - pip:
-#     - pytest==8.3.3
-#     - requests==2.32.3""".strip()
-#     with patch("froggy.envs.swe_bench.get_environment_yml", return_value=environment):
-#         swe_env.create_conda_env()
-#     status, output = swe_env.run_command_with_raise("echo $CONDA_DEFAULT_ENV")
-#     assert status
-#     assert output == "test__repo__2.0"
-#     status, output = swe_env.run_command_with_raise("python --version")
-#     assert status
-#     assert output == python_version
-#     status, output = swe_env.run_command_with_raise("pip freeze")
-#     assert status
-#     assert "pytest" in output
-#     assert "requests" in output
 
 
-def test_load_dataset(tmp_path):
+@if_docker_running
+def test_setup_task_info(tmp_path, get_swe_env):
     working_dir = str(tmp_path)
-    swe_env = SWEBenchEnv(path=working_dir)
-    swe_env.load_dataset()
-    assert swe_env.dataset_id == "princeton-nlp/SWE-bench_Verified"
-    task_name = "astropy__astropy-14096"
-    assert task_name in swe_env.dataset.keys()
-    assert list(swe_env.dataset[task_name].keys()) == [
-        "repo",
-        "instance_id",
-        "base_commit",
-        "patch",
-        "test_patch",
-        "problem_statement",
-        "hints_text",
-        "created_at",
-        "version",
-        "FAIL_TO_PASS",
-        "PASS_TO_PASS",
-        "environment_setup_commit",
-    ]
-
-
-def test_setup_task_info(tmp_path):
-    working_dir = str(tmp_path)
-    swe_env = SWEBenchEnv(path=working_dir)
+    swe_env = get_swe_env(working_dir)
     task_name = "astropy__astropy-14096"
     swe_env.load_dataset()
     swe_env.setup_task_info(task_name)
@@ -410,10 +347,10 @@ def test_setup_task_info(tmp_path):
 
 
 @if_docker_running
-def test_setup_local_repo(tmp_path):
+def test_setup_local_repo(tmp_path, get_swe_env):
     working_dir = str(tmp_path)
+    swe_env = get_swe_env(working_dir)
     task_name = "astropy__astropy-14096"
-    swe_env = SWEBenchEnv(path=working_dir)
     swe_env.load_dataset()
     swe_env.setup_task_info(task_name)
     swe_env.setup_local_repo()
