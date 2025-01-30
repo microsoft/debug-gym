@@ -6,7 +6,6 @@ import re
 import signal
 from contextlib import contextmanager
 from os.path import join as pjoin
-from pathlib import Path
 from typing import Optional
 
 import yaml

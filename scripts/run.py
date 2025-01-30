@@ -4,11 +4,7 @@ import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
-from rich.console import Group
 from rich.live import Live
-from rich.panel import Panel
-from rich.progress import BarColumn, Progress, TextColumn, TimeElapsedColumn
-from rich.table import Column
 from termcolor import colored
 
 from froggy.logger import FroggyLogger
