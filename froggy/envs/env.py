@@ -339,10 +339,8 @@ class RepoEnv(TooledEnv):
                     and self.get_tool(triggered_tool.name).infos_cache is not None
                 ):
                     # use done, score and info from the tool that was executed after reasoning
-                    self.done = copy.copy(self.get_tool(triggered_tool.name).done_cache)
-                    self.score = copy.copy(
-                        self.get_tool(triggered_tool.name).score_cache
-                    )
+                    self.done = self.get_tool(triggered_tool.name).done_cache
+                    self.score = self.get_tool(triggered_tool.name).score_cache
                     self.infos = copy.copy(
                         self.get_tool(triggered_tool.name).infos_cache
                     )

@@ -93,9 +93,9 @@ You break down complex problems into smaller parts and reason through them step 
                 ["Error while executing the action after reasoning.", next_obs]
             )
         self.success_chain_action = True
-        self.done_cache = copy.copy(next_done)
+        self.done_cache = next_done
+        self.score_cache = next_score
         self.infos_cache = copy.copy(next_infos)
-        self.score_cache = copy.copy(next_score)
         return "\n".join(
             [
                 "Reasoning:",
