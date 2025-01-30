@@ -1,3 +1,5 @@
+import copy
+
 from froggy.tools.tool import EnvironmentTool
 from froggy.tools.toolbox import Toolbox
 
@@ -53,6 +55,8 @@ You break down complex problems into smaller parts and reason through them step 
     def __init__(self, allow_chain_action: bool = False):
         super().__init__()
         self.allow_chain_action = allow_chain_action
+        self.success_chain_action = False
+        self.done_cache, self.score_cache, self.infos_cache = None, None, None
 
     def register(self, environment):
         from froggy.envs.env import RepoEnv
@@ -66,6 +70,7 @@ You break down complex problems into smaller parts and reason through them step 
         return action.startswith(self.action)
 
     def use(self, action):
+        self.success_chain_action = False
         if self.allow_chain_action:
             return self.use_with_chaining(action)
         else:
@@ -76,23 +81,49 @@ You break down complex problems into smaller parts and reason through them step 
         as a free next action.
         """
         try:
-            _, next_action = self.split_reasoning(action)
+            reasoning_text, next_action = self.split_reasoning(action)
         except:
             return "SyntaxError: invalid syntax."
         if next_action.startswith(self.action):
             return "SyntaxError: invalid syntax. You cannot chain reasoning actions."
         # now execute the next action
-        next_action_obs = self.environment.step(next_action)
-        if next_action_obs == f"Invalid action: {action}.":
-            next_action_obs == f"You must provide a valid action after your reasoning. Found invalid action: {action}."
-        return f"Reasoning text acknowledged.\n{next_action_obs[0]}"
+        try:
+            next_output = self.environment.step(next_action)
+            next_obs, next_score, next_done, next_infos = next_output
+        except:
+            return "\n".join(
+                [
+                    "Error while executing the action after reasoning.",
+                    "SyntaxError: invalid syntax.",
+                ]
+            )
+        if next_obs == f"Invalid action: {action}." or next_obs.startswith(
+            "Error while using tool"
+        ):
+            return "\n".join(
+                ["Error while executing the action after reasoning.", next_obs]
+            )
+        self.success_chain_action = True
+        self.done_cache = copy.copy(next_done)
+        self.infos_cache = copy.copy(next_infos)
+        self.score_cache = copy.copy(next_score)
+        return "\n".join(
+            [
+                "Reasoning:",
+                reasoning_text,
+                "Executing action:",
+                next_action,
+                "Next observation:",
+                next_obs,
+            ]
+        )
 
     def use_without_chaining(self, action):
         try:
-            _ = action.split(self.action)[1].split("```")[0].strip()
+            reasoning_text = action.split(self.action)[1].split("```")[0].strip()
         except:
             return "SyntaxError: invalid syntax."
-        return "Reasoning text acknowledged."
+        return "\n".join(["Reasoning:", reasoning_text])
 
     def split_reasoning(self, action):
         content = action.split(self.action)[1].rsplit("```", 1)[0].strip()

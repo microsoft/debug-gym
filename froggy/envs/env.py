@@ -1,4 +1,5 @@
 import atexit
+import copy
 import glob
 import os
 import shutil
@@ -14,6 +15,7 @@ from froggy.logger import FroggyLogger
 from froggy.terminal import Terminal
 from froggy.tools.patchers import CodePatcher
 from froggy.tools.pdb import PDBTool
+from froggy.tools.reasoning import ReasoningTool
 from froggy.utils import _walk, make_is_readonly, show_line_number
 
 
@@ -330,6 +332,24 @@ class RepoEnv(TooledEnv):
                     current_frame_file = self.get_tool("pdb").current_frame_file
                     if current_frame_file in self.all_files:
                         self.load_current_file(self.get_tool("pdb").current_frame_file)
+            elif isinstance(triggered_tool, ReasoningTool):
+                if (
+                    self.get_tool(triggered_tool.name).success_chain_action is True
+                    and self.get_tool(triggered_tool.name).done_cache is not None
+                    and self.get_tool(triggered_tool.name).infos_cache is not None
+                ):
+                    # use done, score and info from the tool that was executed after reasoning
+                    self.done = copy.copy(self.get_tool(triggered_tool.name).done_cache)
+                    self.score = copy.copy(
+                        self.get_tool(triggered_tool.name).score_cache
+                    )
+                    self.infos = copy.copy(
+                        self.get_tool(triggered_tool.name).infos_cache
+                    )
+                    # update obs and action in info
+                    self.infos["obs"] = self.obs
+                    self.infos["action"] = action
+                    return self.obs, self.score, self.done, self.infos
 
         self.infos = {
             "obs": self.obs,
