@@ -81,7 +81,7 @@ def test_clone_repo(tmp_path, get_swe_env):
     row = swe_env.dataset[task_name]
     repo_address = row["repo"]
     org_name, repo_name = repo_address.split("/")
-    local_repo_path = swe_env.swe_bench_repo_paths / repo_name
+    local_repo_path = SWEBenchEnv.CACHE / repo_name
 
     if not local_repo_path.exists():
         with patch("subprocess.run") as mock_run:
