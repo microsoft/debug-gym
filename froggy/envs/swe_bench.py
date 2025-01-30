@@ -34,7 +34,7 @@ class SWEBenchEnv(RepoEnv):
         **kwargs,
     ):
         terminal = terminal or DockerTerminal()
-        if isinstance(terminal, DockerTerminal):
+        if not isinstance(terminal, DockerTerminal):
             raise ValueError("SWEBenchEnv only supports DockerTerminal.")
 
         super().__init__(terminal=terminal, **kwargs)
