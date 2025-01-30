@@ -58,17 +58,6 @@ You break down complex problems into smaller parts and reason through them step 
         self.success_chain_action = False
         self.done_cache, self.score_cache, self.infos_cache = None, None, None
 
-    def register(self, environment):
-        from froggy.envs.env import RepoEnv
-
-        if not isinstance(environment, RepoEnv):
-            raise ValueError("The environment must be a RepoEnv instance.")
-
-        self.environment = environment
-
-    def is_triggered(self, action):
-        return action.startswith(self.action)
-
     def use(self, action):
         self.success_chain_action = False
         if self.allow_chain_action:

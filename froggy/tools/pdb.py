@@ -55,14 +55,6 @@ class PDBTool(EnvironmentTool):
         self.current_frame_file = None
         self._terminal: Terminal = None
 
-    def register(self, environment):
-        from froggy.envs.env import RepoEnv
-
-        if not isinstance(environment, RepoEnv):
-            raise ValueError("The environment must be a RepoEnv instance.")
-
-        self.environment = environment
-
     @property
     def terminal(self) -> Terminal:
         if self._terminal is None:
@@ -106,10 +98,6 @@ class PDBTool(EnvironmentTool):
         """Restart the pdb session and restore the breakpoints."""
         self.close_pdb()
         return self.start_pdb()
-
-    def is_triggered(self, action):
-        # e.g. ```pdb b src/main.py:42```
-        return action.startswith(self.action)
 
     def use(self, action):
         command = action.strip("`").split(" ", 1)[1].strip()

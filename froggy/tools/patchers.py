@@ -32,9 +32,6 @@ class SubstitutionPatcher(CodePatcher):
         ],
     }
 
-    def is_triggered(self, action):
-        return action.startswith(self.action)
-
     def _rewrite_file(self, file_path, head, tail, new_code):
         if file_path is None:
             # by default, rewrite the current file
