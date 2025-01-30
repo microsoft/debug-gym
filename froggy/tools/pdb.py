@@ -1,7 +1,7 @@
 import copy
 import re
 
-from froggy.terminal import Terminal
+from froggy.terminal import ShellSession
 from froggy.tools.tool import EnvironmentTool
 from froggy.tools.toolbox import Toolbox
 
@@ -54,7 +54,7 @@ class PDBTool(EnvironmentTool):
         self.persistent_breakpoints = persistent_breakpoints
         self.auto_list = auto_list
         self.current_frame_file = None
-        self._terminal: Terminal = None
+        self._session: ShellSession = None
 
     def register(self, environment):
         from froggy.envs.env import RepoEnv
@@ -64,33 +64,28 @@ class PDBTool(EnvironmentTool):
 
         self.environment = environment
 
-    @property
-    def terminal(self) -> Terminal:
-        if self._terminal is None:
-            raise ValueError("Please provide a terminal to the PDB tool.")
-        return self._terminal
-
-    @terminal.setter
-    def terminal(self, terminal: Terminal):
-        self._terminal = terminal
-
     def interact_with_pdb(self, command, expected_output="(Pdb)"):
-        return self.terminal.run_interactive(command, expected_output)
+        return self._session.run(
+            command, expected_output, timeout=300, no_output_timeout=300
+        )
 
     def close_pdb(self, command="q"):
-        return self.terminal.run_interactive(command, timeout=10)
+        return self._session.run(command, timeout=10)
 
-    def start_pdb(self, terminal: Terminal = None, pdb_cmd: str = None) -> str:
-        if terminal is not None:
-            self.terminal = terminal
+    def start_pdb(self, pdb_cmd: str = None) -> str:
+        if self._session is not None:
+            self._session.close()
+            self._session = None
+
+        self._session = self.environment.terminal.start_shell_session()
         if pdb_cmd is None:
             # remove the first word, which is "python"
-            entrypoint = " ".join(self.environment.entrypoint.split()[1:])
+            entrypoint = " ".join(self.environment.debug_entrypoint.split()[1:])
             pdb_cmd = f"python -m pdb {entrypoint}"
 
-        initial_output = self.interact_with_pdb(pdb_cmd, expected_output="(Pdb)")
+        initial_output = self.interact_with_pdb(pdb_cmd)
         if "The program finished and will be restarted" in initial_output:
-            self.close_pseudo_terminal()
+            self.close_pdb()
         else:
             if self.persistent_breakpoints:
                 # restore consistent breakpoints
