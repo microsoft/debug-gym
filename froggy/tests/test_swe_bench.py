@@ -276,60 +276,28 @@ def test_run_post_install(tmp_path, install_configs_mock, get_swe_env):
     assert output == "Test file"
 
 
-# @if_docker_running
-# def test_create_conda_environment(tmp_path, install_configs_mock):
-#     working_dir = str(tmp_path)
-#     terminal = DockerTerminal(working_dir=working_dir)
-#     swe_env = SWEBenchEnv(path=working_dir, terminal=terminal)
-#     swe_env.install_configs = install_configs_mock
-#     swe_env.repo = "test/repo"
-#     swe_env.version = "2.0"
-#     swe_env.create_conda_env()
-#     status, output = swe_env.run_command_with_raise("echo $CONDA_DEFAULT_ENV")
-#     assert status
-#     assert output == "test__repo__2.0"
-#     status, output = swe_env.run_command_with_raise("pip freeze")
-#     assert status
-#     assert "pytest" in output
-#     assert "requests" in output
-
-
-# @if_docker_running
-# def test_create_conda_environment_from_requirements(tmp_path, install_configs_mock):
-#     install_configs_mock["packages"] = "requirements.txt"
-#     working_dir = str(tmp_path)
-#     terminal = DockerTerminal(working_dir=working_dir)
-#     swe_env = SWEBenchEnv(path=working_dir, terminal=terminal)
-#     swe_env.install_configs = install_configs_mock
-#     swe_env.repo = "test/repo"
-#     swe_env.version = "2.0"
-#     swe_env.ds_row = {}
-#     requirements = "pytest==8.3.3\nrequests==2.32.3"
-#     with patch("froggy.envs.swe_bench.get_requirements", return_value=requirements):
-#         swe_env.create_conda_env()
-#     status, output = swe_env.run_command_with_raise("echo $CONDA_DEFAULT_ENV")
-#     assert status
-#     assert output == "test__repo__2.0"
-#     status, output = swe_env.run_command_with_raise("pip freeze")
-#     assert status
-#     assert "pytest" in output
-#     assert "requests" in output
-
-
-# @if_docker_running
-# @pytest.mark.parametrize(
-#     "no_use_env,python_version",
-#     [
-#         (True, "Python 3.12.8"),
-#         (False, "Python 3.10.16"),
-#     ],
-# )
-# def test_create_conda_environment_from_environment(
-#     no_use_env, python_version, tmp_path, install_configs_mock
-# ):
-#     install_configs_mock["packages"] = "environment.yml"
-#     install_configs_mock["no_use_env"] = no_use_env
-#     working_dir = str(tmp_path)
+@if_docker_running
+def test_load_dataset(tmp_path, get_swe_env):
+    working_dir = str(tmp_path)
+    swe_env = get_swe_env(working_dir)
+    swe_env.load_dataset()
+    assert swe_env.dataset_id == "princeton-nlp/SWE-bench_Verified"
+    task_name = "astropy__astropy-14096"
+    assert task_name in swe_env.dataset.keys()
+    assert list(swe_env.dataset[task_name].keys()) == [
+        "repo",
+        "instance_id",
+        "base_commit",
+        "patch",
+        "test_patch",
+        "problem_statement",
+        "hints_text",
+        "created_at",
+        "version",
+        "FAIL_TO_PASS",
+        "PASS_TO_PASS",
+        "environment_setup_commit",
+    ]
 
 
 @if_docker_running
