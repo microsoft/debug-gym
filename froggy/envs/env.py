@@ -130,7 +130,6 @@ class RepoEnv(TooledEnv):
 
         # Set up the terminal working dir
         self.terminal.working_dir = str(self.working_dir)
-        self.logger.debug(f"Working directory: {self.working_dir}")
 
     def _index_files(self, readonly_patterns: list[str] | None = None):
         # get list of all the files

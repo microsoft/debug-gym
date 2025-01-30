@@ -42,6 +42,7 @@ class SWEBenchEnv(RepoEnv):
 
         self.load_dataset()
         self.setup_commands = []
+        self.test_directives = []
 
     @property
     def instructions(self):
