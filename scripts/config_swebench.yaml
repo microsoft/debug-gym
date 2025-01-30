@@ -1,72 +1,19 @@
-
-solution:
-    # Environment configs
-    output_path: "output_swe_bench"
-    # output_path: "output_swe_bench_lite"
-    uuid: "debug"
-    benchmark: "swebench"
-    problems: "all"  # list of problems, e.g., ["astropy__astropy-12907"], or "all"
-    # problems: [
-    #     "django__django-10914",
-    #     "sphinx-doc__sphinx-7686",
-    #     "sphinx-doc__sphinx-8273",
-    #     "sphinx-doc__sphinx-8474",
-    #     "sphinx-doc__sphinx-8506",
-    #     "sphinx-doc__sphinx-8713",
-    #     "sphinx-doc__sphinx-8721",
-    # ]
-
-    env_kwargs: {
-        "dir_tree_depth": 1,
-        "run_on_rewrite": True,
-        "auto_view_change": True,
-        "run_timeout": 30,
-        "dataset_id": "princeton-nlp/SWE-bench_Verified",
-        # "dataset_id": "princeton-nlp/SWE-bench_Lite",
-    }
-    tools: ["pdb", "view", "patcher:substitution", "listdir", "eval"]
-    terminal: {
-        type: "docker",  # "docker" or "local"
-        base_image: "python:3.12",
-    }
-    persistent_breakpoints: True  # in pdb tool
-
-    # LLM configs
-    llm_name: "llama-33-h100"
-    llm_temperature: [0.0]  # list of values between 0.0 and 1.0
-
-    # Agent configs
-    random_seed: 42
-    max_steps: 1
-    max_rewrite_steps: 0
-    memory_size: 20
-    use_conversational_prompt: True
-    save_patch: False
-    log_prompt_response_pairs: False
-    reset_prompt_history_after_rewrite: True
-
 zero_shot:
     # Environment configs
     output_path: "output_swe_bench"
-    uuid: "debug"
     benchmark: "swebench"
     problems: "all"  # list of problems, e.g., ["astropy__astropy-12907"], or "all"
-
     env_kwargs: {
         "dir_tree_depth": 1,
         "run_on_rewrite": True,
         "auto_view_change": True,
         "run_timeout": 30,
     }
-    tools: ["pdb", "view", "patcher:substitution"]
-    terminal: {
-        type: "docker",  # "docker" or "local"
-        base_image: "python:3.12",
-    }
+    tools: ["pdb", "view", "patcher:substitution", "listdir"]
     persistent_breakpoints: True  # in pdb tool
 
     # LLM configs
-    llm_name: "llama-33-h100"
+    llm_name: "llama-31-h100"
     llm_temperature: [0.0]  # list of values between 0.0 and 1.0
 
     # Agent configs
