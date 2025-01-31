@@ -1,8 +1,8 @@
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
-from froggy.tools.patchers import CodePatcher, SubstitutionPatcher
+from froggy.tools.patchers import SubstitutionPatcher
 
 
 @pytest.fixture
@@ -92,7 +92,3 @@ def test_substitution_patcher_invalid_line_number_2(mock_environment):
         == "Invalid line number range, head should be less than or equal to tail.\nRewrite failed."
     )
     assert not patcher.rewrite_success
-
-
-if __name__ == "__main__":
-    pytest.main()
