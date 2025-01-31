@@ -13,5 +13,4 @@ def test_shopping_cart():
     cart.apply_discount("orange", 10)  # 10% discount on oranges
     cart.add_item("apple", 1.0, 3)  # Add more apples
     cart.add_item("orange", 0.75, 2)  # Add more oranges
-    import pdb; pdb.set_trace()
     assert cart.get_total() == 10.23
