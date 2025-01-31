@@ -4,11 +4,6 @@ from unittest.mock import MagicMock, mock_open, patch
 import pytest
 
 from froggy.envs import AiderBenchmarkEnv
-from froggy.utils import (
-    cleanup_pytest_output,
-    extract_max_score_from_pytest_output,
-    extract_reward_from_pytest_output,
-)
 
 
 @pytest.fixture
