@@ -22,7 +22,9 @@ class PlusTool(EnvironmentTool):
             return "SyntaxError: invalid syntax."
         number_1, number_2 = numbers.split()
         # calculate the result
-        assert number_1.isdigit() and number_2.isdigit(), "ValueError: invalid value."
-        result = int(number_1) + int(number_2)
+        try:
+            result = int(number_1) + int(number_2)
+        except:
+            return "ValueError: invalid value."
         return result
         
