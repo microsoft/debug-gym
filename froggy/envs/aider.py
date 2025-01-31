@@ -1,7 +1,5 @@
 import os
-import re
 import subprocess
-import tempfile
 from os.path import join as pjoin
 from pathlib import Path
 
@@ -11,7 +9,7 @@ from froggy.envs.env import RepoEnv
 
 class AiderBenchmarkEnv(RepoEnv):
     REPO_URL = "https://github.com/exercism/python"
-    REPO_PATH = Path(pjoin(tempfile.gettempdir(), "exercism"))
+    REPO_PATH = Path.joinpath(Path.home(), ".cache", "froggy", "exercism")
 
     @property
     def instructions(self):
@@ -31,7 +29,7 @@ class AiderBenchmarkEnv(RepoEnv):
         self.current_sample = self.dataset[options["task_name"]]
 
         directory = self.current_sample["base_directory"]
-        self.setup_workspace(directory)
+        self.setup_workspace(directory, entrypoint="python -m pytest -sq .")
 
         obs, infos = super().reset()
         infos["instructions"] = self.instructions

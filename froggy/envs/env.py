@@ -62,7 +62,8 @@ class RepoEnv(TooledEnv):
     def __init__(
         self,
         path: str | None = None,
-        entrypoint: str = "python -m pytest -sv .",
+        entrypoint: str = "python -m pytest -sq .",
+        debug_entrypoint: str | None = None,
         readonly_patterns: list[str] | None = None,
         run_on_rewrite: bool = True,
         run_timeout: int | None = None,
@@ -83,7 +84,12 @@ class RepoEnv(TooledEnv):
         self.entrypoint = entrypoint
         self.logger = logger or FroggyLogger("froggy")
 
-        self.setup_workspace(path, readonly_patterns=readonly_patterns)
+        self.setup_workspace(
+            path=path,
+            entrypoint=entrypoint,
+            debug_entrypoint=debug_entrypoint,
+            readonly_patterns=readonly_patterns,
+        )
         self.last_run_obs = None
         self.score = 0
         self.done = False
@@ -92,12 +98,14 @@ class RepoEnv(TooledEnv):
     def setup_workspace(
         self,
         path: str,
-        entrypoint: str = None,
-        readonly_patterns: list[str] = None,
+        entrypoint: str | None = None,
+        debug_entrypoint: str | None = None,
+        readonly_patterns: list[str] | None = None,
     ):
         readonly_patterns = readonly_patterns or []
         if self.path:
             self.cleanup_workspace()
+            self.path = None
 
         if path is None:
             return
@@ -107,13 +115,25 @@ class RepoEnv(TooledEnv):
         # Create a random temporary folder for storing a backup of the repo.
         self.tempdir = tempfile.TemporaryDirectory(prefix="RepoEnv-")
         self.working_dir = Path(self.tempdir.name)
-        atexit.register(
-            self.tempdir.cleanup
-        )  # Make sure to cleanup that folder once done.
+        # Make sure to cleanup that folder once done.
+        atexit.register(self.tempdir.cleanup)
 
         self.logger.debug(f"Working directory: {self.working_dir}")
-        shutil.copytree(self.path, self.working_dir, dirs_exist_ok=True)
+        shutil.copytree(self.path, self.working_dir, dirs_exist_ok=True, symlinks=True)
 
+        self._index_files(readonly_patterns)
+
+        self.current_file = None
+        self.current_file_content = None
+        self.current_breakpoints_state = {}
+
+        # override entrypoint as it might be task dependent
+        self.set_entrypoints(entrypoint, debug_entrypoint)
+
+        # Set up the terminal working dir
+        self.terminal.working_dir = str(self.working_dir)
+
+    def _index_files(self, readonly_patterns: list[str] | None = None):
         # get list of all the files
         self.all_files = sorted(
             os.path.relpath(pjoin(path, name), self.working_dir)
@@ -130,20 +150,24 @@ class RepoEnv(TooledEnv):
             p for p in self.all_files if not self.is_readonly(self.working_dir / p)
         ]
 
-        # override entrypoint as it might be task dependent
+    def set_entrypoints(self, entrypoint, debug_entrypoint):
         if entrypoint:
-            self.entrypoint = entrypoint
+            entrypoint = entrypoint or ""
+            debug_entrypoint = debug_entrypoint or entrypoint
+            self.entrypoint = self._prepare_entrypoint(entrypoint)
+            self.debug_entrypoint = self._prepare_entrypoint(debug_entrypoint)
 
-        assert (
-            self.entrypoint.split()[0] == "python"
-        ), "Only support python entrypoint for now."
+    @staticmethod
+    def _prepare_entrypoint(entrypoint):
+        entrypoint_list = entrypoint.split()
 
-        self.current_file = None
-        self.current_file_content = None
-        self.current_breakpoints_state = {}
+        if entrypoint_list[0] != "python":
+            entrypoint_list[0] = f"$(which {entrypoint_list[0]})"
+            entrypoint_list = ["python"] + entrypoint_list
+            entrypoint = entrypoint_list
 
-        # Set up the terminal working dir
-        self.terminal.working_dir = str(self.working_dir)
+        entrypoint = " ".join(entrypoint_list)
+        return entrypoint
 
     def cleanup_workspace(self):
         self.tempdir.cleanup()
@@ -174,18 +198,21 @@ class RepoEnv(TooledEnv):
         relative_filepaths = [os.path.relpath(f, self.path) for f in filepaths]
         for filepath in relative_filepaths:
             if os.path.isdir(self.path / filepath):
+                os.makedirs(self.working_dir / filepath, exist_ok=True)
                 continue
 
             shutil.copy2(self.path / filepath, self.working_dir / filepath)
 
-    def reset(self, *, seed=None, options: dict = None):
+    def reset(self, *, seed=None, options: dict = None, restore_code=True):
         self.logger.info(f"Resetting environment")
         options = options or {}
         self.current_file = None
         self.current_file_content = None
         self.current_breakpoints_state = {}
         self.rewrite_counter = 0
-        self.restore()
+
+        if restore_code:
+            self.restore()
 
         # Run the initial code. This will set self.last_run_obs, self.done and self.score.
         self.logger.info(f"Running initial evaluation")
@@ -193,7 +220,7 @@ class RepoEnv(TooledEnv):
 
         self.obs = ""
         if self.has_tool("pdb"):
-            self.get_tool("pdb").start_pdb(terminal=self.terminal.clone())
+            self.get_tool("pdb").start_pdb()
             self.dbg_obs = self.get_tool("pdb").pdb_obs
             self.obs += "Debugging terminal started:\n" f"{self.dbg_obs}\n"
 
@@ -219,7 +246,7 @@ class RepoEnv(TooledEnv):
         return self.obs, self.infos
 
     def run(self):
-        success, output = self.terminal.run([self.entrypoint], timeout=self.run_timeout)
+        success, output = self.terminal.run(self.entrypoint, timeout=self.run_timeout)
         self.last_run_obs = output
         self.score = int(success)
         self.done = success

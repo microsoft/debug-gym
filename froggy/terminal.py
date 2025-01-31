@@ -9,10 +9,135 @@ import subprocess
 import tempfile
 import termios
 import time
+import uuid
 
 import docker
 
 from froggy.logger import FroggyLogger
+
+
+class ShellSession:
+    def __init__(
+        self,
+        entrypoint,
+        working_dir,
+        env_vars=None,
+        session_id=None,
+        logger: FroggyLogger | None = None,
+    ):
+        self.entrypoint = entrypoint
+        self.env_vars = env_vars or {}
+        self.working_dir = working_dir
+        self.session_id = session_id or str(uuid.uuid4())
+        self.logger = logger or FroggyLogger("froggy")
+        self.start()
+        atexit.register(self.close)
+
+    def start(self):
+        self.logger.debug(f"Starting ShellSession with entrypoint:\n{self.entrypoint}")
+
+        master, slave = pty.openpty()
+
+        # set_fd_nonblocking
+        flags = fcntl.fcntl(master, fcntl.F_GETFL)
+        fcntl.fcntl(master, fcntl.F_SETFL, flags | os.O_NONBLOCK)
+
+        # Turn off ECHO on the slave side
+        attrs = termios.tcgetattr(slave)
+        attrs[3] = attrs[3] & ~termios.ECHO  # lflags
+        termios.tcsetattr(slave, termios.TCSANOW, attrs)
+
+        self.process = subprocess.Popen(
+            self.entrypoint,
+            env=self.env_vars,
+            cwd=self.working_dir,
+            stdin=slave,
+            stdout=slave,
+            stderr=slave,
+            text=True,
+            close_fds=True,
+            start_new_session=True,
+        )
+
+        self.filedescriptor = master
+        # close slave, end in the parent process
+        os.close(slave)
+
+    def close(self):
+        if self.filedescriptor is not None:
+            self.logger.debug(f"Closing {self}.")
+            os.close(self.filedescriptor)
+            self.filedescriptor = None
+
+        self.process.terminate()
+
+    def read(
+        self,
+        read_until: str = "",
+        timeout: int = 300,
+        no_output_timeout: int = 60,
+        read_length: int = 1024,
+    ) -> str:
+        """Read from this Shell session until read_until is found, timeout is reached,
+        or no output change for no_output_timeout seconds.
+        """
+        output = ""
+        start_time = time.time()
+        last_change_time = time.time()
+        while True:
+            if time.time() - start_time > timeout:
+                self.logger.debug(f"Timeout reached while reading from {self}.")
+                break
+            if time.time() - last_change_time > no_output_timeout:
+                self.logger.debug(f"No output change for {no_output_timeout} seconds.")
+                break
+            try:
+                data = os.read(self.filedescriptor, read_length).decode(
+                    "utf-8", errors="ignore"
+                )
+                if data:
+                    output += data
+                    last_change_time = time.time()
+                    if read_until and read_until in output:
+                        break
+            except BlockingIOError:
+                time.sleep(0.1)
+                continue
+            except OSError as e:
+                if e.errno == errno.EIO:
+                    self.logger.debug("End of file reached while reading from PTY.")
+                    break
+                if e.errno != errno.EAGAIN:
+                    raise
+        return output
+
+    def run(
+        self,
+        command: str,
+        read_until: str = "",
+        timeout: int = 300,
+        no_output_timeout: int = 30,
+    ):
+        """Run a command in the Shell session and return the output."""
+        self.logger.debug(f"Sending command to {self}:\n{command}")
+        os.write(self.filedescriptor, command.encode("utf-8") + b"\n")
+
+        output = self.read(
+            read_until=read_until,
+            timeout=timeout,
+            no_output_timeout=no_output_timeout,
+        )
+
+        output = output.strip().strip("\r\n").strip("\n")
+
+        self.logger.debug(f"Output from {self}:\n{output}")
+        return output
+
+    def __str__(self):
+        return f"ShellSession {self.session_id}"
+
+    def __del__(self):
+        self.close()
 
 
 class Terminal:
@@ -35,14 +160,14 @@ class Terminal:
         self.env_vars["NO_COLOR"] = "1"  # disable colors
         self.env_vars["PS1"] = ""  # disable prompt
         self._working_dir = working_dir
-        self._master = None  # PTY master file descriptor
+        self.sessions = []
 
     @property
     def working_dir(self):
         """Lazy initialization of the working directory."""
         if self._working_dir is None:
             temp_dir = tempfile.TemporaryDirectory(prefix="Terminal-")
-            atexit.register(lambda: temp_dir.cleanup())
+            atexit.register(temp_dir.cleanup)
             self._working_dir = temp_dir.name
             self.logger.debug(f"Using temporary working directory: {self._working_dir}")
         return self._working_dir
@@ -64,7 +189,12 @@ class Terminal:
         )
         return command
 
-    def run(self, entrypoint: str | list[str], timeout=None) -> tuple[bool, str]:
+    def run(
+        self,
+        entrypoint: str | list[str],
+        timeout: int = None,
+        raises: bool = False,
+    ) -> tuple[bool, str]:
         """Run a list of commands in the terminal. Return command status and output."""
         command = self.prepare_command(entrypoint)
         self.logger.debug(f"Running command in terminal: {command}")
@@ -83,21 +213,17 @@ class Terminal:
             process.kill()
             stdout, stderr = "", "Timeout expired."
             success = False
+
+        if raises and not success:
+            # Command includes the entrypoint + setup commands
+            self.logger.debug(f"Failed to run command: {command} {output}")
+            raise ValueError(f"Failed to run command: {entrypoint} ", output)
+
         output = (stdout + stderr).strip("\r\n").strip("\n")
         self.logger.debug(
-            f"Output from terminal with status {process.returncode}: {output}"
+            f"Output from terminal with status {process.returncode}:\n{output}"
         )
         return success, output
-
-    def run_interactive(
-        self, entrypoint: str, expected_output: str = "", timeout: int = 30
-    ):
-        """Run a command in the interactive terminal and return the output.
-        Requires a PTY. The terminal stays open after the command is executed.
-        """
-        if not self.has_pseudo_terminal():
-            self.start_pseudo_terminal()
-        return self.interact_with_pseudo_terminal(entrypoint, expected_output, timeout)
 
     @property
     def default_entrypoint(self) -> list[str]:
@@ -106,127 +232,32 @@ class Terminal:
         which could interfere with the terminal setup (clean outputs)"""
         return shlex.split("/bin/bash --noprofile --norc")
 
-    def clone(self) -> "Terminal":
-        return Terminal(
+    def start_shell_session(self, timeout=30, no_output_timeout=1):
+        session = ShellSession(
+            entrypoint=self.default_entrypoint,
             working_dir=self.working_dir,
-            setup_commands=self.setup_commands,
             env_vars=self.env_vars,
             logger=self.logger,
         )
-
-    def has_pseudo_terminal(self):
-        return self._master is not None
-
-    def start_pseudo_terminal(self, timeout=300, no_output_timeout=30):
-        if self.has_pseudo_terminal():
-            self.close_pseudo_terminal()
-
-        self.logger.debug(f"Starting PTY with entrypoint: {self.default_entrypoint}")
-
-        self._master, slave = pty.openpty()
-
-        # set_fd_nonblocking
-        flags = fcntl.fcntl(self._master, fcntl.F_GETFL)
-        fcntl.fcntl(self._master, fcntl.F_SETFL, flags | os.O_NONBLOCK)
-
-        # Turn off ECHO on the slave side
-        attrs = termios.tcgetattr(slave)
-        attrs[3] = attrs[3] & ~termios.ECHO  # lflags
-        termios.tcsetattr(slave, termios.TCSANOW, attrs)
-
-        process = subprocess.Popen(
-            self.default_entrypoint,
-            env=self.env_vars,
-            cwd=self.working_dir,
-            stdin=slave,
-            stdout=slave,
-            stderr=slave,
-            text=True,
-            close_fds=True,
-            start_new_session=True,
-        )
-
-        # close slave, end in the parent process
-        os.close(slave)
-        atexit.register(self.close_pseudo_terminal)
-
+        self.sessions.append(session)
         initial_output = ""
         commands = " && ".join(self.setup_commands)
         if commands:
-            initial_output = self.interact_with_pseudo_terminal(
+            initial_output = session.run(
                 commands, timeout=timeout, no_output_timeout=no_output_timeout
             )
 
-        self.logger.debug(f"Initial output from interactive terminal: {initial_output}")
+        self.logger.debug(f"Initial output from {session}:\n{initial_output}")
 
-        return initial_output
+        return session
 
-    def close_pseudo_terminal(self):
-        if self._master is not None:
-            self.logger.debug("Closing PTY.")
-            os.close(self._master)
-            self._master = None
+    def close_shell_session(self, session):
+        session.close()
+        self.sessions.remove(session)
 
-    def read_pseudo_terminal_output(
-        self,
-        expected_output: str = "",
-        timeout: int = 300,
-        no_output_timeout: int = 30,
-        read_length: int = 1024,
-    ) -> str:
-        """Read from PTY until expected_output is found, timeout is reached,
-        or no output change for no_output_timeout seconds.
-        """
-        output = ""
-        start_time = time.time()
-        last_change_time = time.time()
-        while True:
-            if time.time() - start_time > timeout:
-                self.logger.debug("Timeout reached while reading from PTY.")
-                break
-            if time.time() - last_change_time > no_output_timeout:
-                self.logger.debug(f"No output change for {no_output_timeout} seconds.")
-                break
-            try:
-                data = os.read(self._master, read_length).decode(
-                    "utf-8", errors="ignore"
-                )
-                if data:
-                    output += data
-                    last_change_time = time.time()
-                    if expected_output and expected_output in output:
-                        break
-            except BlockingIOError:
-                time.sleep(0.1)
-                continue
-            except OSError as e:
-                if e.errno == errno.EIO:
-                    self.logger.debug("End of file reached while reading from PTY.")
-                    break
-                if e.errno != errno.EAGAIN:
-                    raise
-        return output
-
-    def interact_with_pseudo_terminal(
-        self,
-        command: str,
-        expected_output: str = "",
-        timeout: int = 300,
-        no_output_timeout: int = 30,
-    ):
-        self.logger.debug(f"Sending command to interactive terminal: {command}")
-        os.write(self._master, command.encode("utf-8") + b"\n")
-
-        output = self.read_pseudo_terminal_output(
-            expected_output=expected_output,
-            timeout=timeout,
-            no_output_timeout=no_output_timeout,
-        )
-
-        output = output.strip().strip("\r\n").strip("\n")
-
-        self.logger.debug(f"Output from interactive terminal: {output}")
-        return output
+    def close(self):
+        for session in self.sessions:
+            self.close_shell_session(session)
 
 
 class DockerTerminal(Terminal):
@@ -239,6 +270,7 @@ class DockerTerminal(Terminal):
         base_image: str = "ubuntu:latest",
         volumes: dict[str, dict[str:str]] = None,
         include_os_env_vars: bool = False,
+        map_host_uid_gid: bool = True,
         **kwargs,
         # TODO: dockerfile and/or docker-compose file?
     ):
@@ -260,11 +292,17 @@ class DockerTerminal(Terminal):
         )
         self.base_image = base_image
         self.volumes = volumes or {}
+        self.map_host_uid_gid = map_host_uid_gid
         self.docker_client = docker.from_env()
         self.host_uid = os.getuid()
         self.host_gid = os.getgid()
-        self._patched_image = None
         self._container = None
+
+    def user_map(self):
+        _user = ""
+        if self.map_host_uid_gid:
+            _user = f"{self.host_uid}:{self.host_gid}"
+        return _user
 
     @property
     def working_dir(self):
@@ -283,13 +321,6 @@ class DockerTerminal(Terminal):
         self.volumes[self._working_dir] = {"bind": self._working_dir, "mode": "rw"}
 
     @property
-    def patched_image(self):
-        """Lazy initialization of the patched image."""
-        if self._patched_image is None:
-            self._patched_image = self.patch_base_image(self.base_image)
-        return self._patched_image
-
-    @property
     def container(self):
         """Lazy initialization of the container."""
         if self._container is None:
@@ -299,9 +330,11 @@ class DockerTerminal(Terminal):
     @property
     def default_entrypoint(self) -> list[str]:
         """Expects the container to have bash installed and python executable available."""
-        return shlex.split(
-            f"docker exec -i {self.container.name} /bin/bash --noprofile --norc"
-        )
+        user_map = self.user_map()
+        if user_map:
+            user_map = f"--user {user_map}"
+        entrypoint = f"docker exec -i {user_map} {self.container.name} /bin/bash --noprofile --norc"
+        return shlex.split(entrypoint)
 
     def prepare_command(self, entrypoint: str | list[str]) -> list[str]:
         """Prepares a shell command by combining setup commands and entrypoint commands.
@@ -311,10 +344,16 @@ class DockerTerminal(Terminal):
         if self.setup_commands:
             entrypoint = self.setup_commands + entrypoint
         entrypoint = " && ".join(entrypoint)
-        command = shlex.split(f'/bin/bash -c "{entrypoint}"')
+        command = ["/bin/bash", "-c", entrypoint]
         return command
 
-    def run(self, entrypoint: str | list[str], timeout=None) -> tuple[bool, str]:
+    def run(
+        self,
+        entrypoint: str | list[str],
+        timeout: int = None,
+        raises: bool = False,
+        user: str = None,
+    ) -> tuple[bool, str]:
         """Run a command in the terminal. Return command status and output."""
         command = self.prepare_command(entrypoint)
 
@@ -325,33 +364,32 @@ class DockerTerminal(Terminal):
             command,
             workdir=self.working_dir,
             environment=self.env_vars,
+            user=self.user_map() if user is None else user,
             stdout=True,
             stderr=True,
         )
         success = status == 0
-        return success, output.decode().strip("\r\n").strip("\n")
 
-    def clone(self) -> "DockerTerminal":
-        terminal = DockerTerminal(
-            base_image=self.base_image,
-            setup_commands=self.setup_commands,
-            volumes=self.volumes,
-            env_vars=self.env_vars,
-            working_dir=self.working_dir,
-            logger=self.logger,
+        if raises and not success:
+            # Command includes the entrypoint + setup commands
+            self.logger.debug(f"Failed to run command: {command} {output}")
+            raise ValueError(f"Failed to run command: {entrypoint} ", output)
+
+        self.logger.debug(
+            f"Output from terminal with status {status}:\n{output.decode()}"
         )
-        return terminal
+        return success, output.decode().strip("\r\n").strip("\n")
 
     def setup_container(self) -> docker.models.containers.Container:
         # Create and start a container mounting volumes and setting environment variables
-        self.logger.debug(f"Setting up container with base image: {self.patched_image}")
+        self.logger.debug(f"Setting up container with base image: {self.base_image}")
         container = self.docker_client.containers.run(
-            image=self.patched_image,
+            image=self.base_image,
             command="sleep infinity",  # Keep the container running
             working_dir=self.working_dir,
             volumes=self.volumes,
             environment=self.env_vars,
-            user=f"{self.host_uid}:{self.host_gid}",
+            user=self.user_map(),
             detach=True,
             auto_remove=True,
             remove=True,
@@ -364,43 +402,33 @@ class DockerTerminal(Terminal):
         return container
 
     def clean_up(self):
+        """Clean up the Docker container."""
         if self.container:
-            self.logger.debug(f"Cleaning up container: {self.container.name}")
-            self.container.stop(timeout=1)
+            try:
+                self.container.stop(timeout=1)
+            except docker.errors.NotFound:
+                self.logger.debug(
+                    f"Container {self.container.name} not found. "
+                    "It might have already been removed."
+                )
+            self._container = None
 
-    def patch_base_image(self, base_image: str) -> str:
-        """Patch the base image creating a user and group with
-        the same UID and GID as the host. This allows the container
-        to write to the host filesystem with the same permissions.
-        Inside the container, the user has root privileges."""
-        try:
-            self.docker_client.images.get(base_image)
-        except docker.errors.ImageNotFound:
-            self.logger.debug(f"Pulling base image: {base_image}")
-            self.docker_client.images.pull(base_image)
+    def close(self):
+        super().close()
+        self.clean_up()
 
-        dockerfile = f"""
-            FROM {base_image}
-            # Create group with GID if it does not exist
-            RUN if ! getent group {self.host_gid} > /dev/null; then \\
-            groupadd -g {self.host_gid} froggy_group; \\
-            fi && \\
-            # Create a user with UID if it does not exist
-            if ! id -u {self.host_uid} > /dev/null 2>&1; then \\
-                useradd -m -u {self.host_uid} -g {self.host_gid} -G sudo froggy_user; \\
-            fi
-            """
 
-        image_tag = f"{base_image}-{self.host_uid}-{self.host_gid}"
-        try:
-            self.docker_client.images.get(image_tag)
-            self.logger.debug(f"Image {image_tag} already exists.")
-        except docker.errors.ImageNotFound:
-            self.logger.debug(f"Building image {image_tag}.")
-            self.docker_client.images.build(
-                fileobj=io.BytesIO(dockerfile.encode("utf-8")),
-                tag=image_tag,
-                rm=True,
-                custom_context=False,
-            )
-        return image_tag
+def select_terminal(
+    terminal_config: dict | None = None, logger: FroggyLogger | None = None
+) -> Terminal:
+    terminal_config = terminal_config or {"type": "local"}
+    terminal_type = terminal_config["type"]
+    match terminal_type:
+        case "docker":
+            from froggy.terminal import DockerTerminal as terminal_class
+        case "local":
+            from froggy.terminal import Terminal as terminal_class
+        case _:
+            raise ValueError(f"Unknown terminal {terminal_type}")
+
+    return terminal_class(**terminal_config, logger=logger)

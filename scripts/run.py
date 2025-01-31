@@ -8,26 +8,13 @@ from rich.live import Live
 from termcolor import colored
 
 from froggy.logger import FroggyLogger
+from froggy.terminal import select_terminal
 from froggy.tools.toolbox import Toolbox
 from froggy.utils import load_config
 
 
 class BreakTaskLoop(Exception):
     pass
-
-
-def select_terminal(terminal_config: dict | None, logger: FroggyLogger):
-    terminal_config = terminal_config or {"type": "local"}
-    terminal_type = terminal_config["type"]
-    match terminal_type:
-        case "docker":
-            from froggy.terminal import DockerTerminal as terminal_class
-        case "local":
-            from froggy.terminal import Terminal as terminal_class
-        case _:
-            raise ValueError(f"Unknown terminal {terminal_type}")
-
-    return terminal_class(logger=logger, **terminal_config)
 
 
 def select_env(env_type: str = None):
@@ -188,6 +175,7 @@ def main():
                 for future in as_completed(futures):
                     if future.cancelled():
                         continue
+
                     try:
                         problem = futures[future]
                         success = future.result()
