@@ -27,7 +27,7 @@ class TestConfigManager(unittest.TestCase):
         })
 
         # This should return the new value but will return cached value
-        self.assertEqual(config.database.host, 'new-host')  # Will fail
+        self.assertEqual(config.database.host, 'new-host')
 
     def test_multiple_instances(self):
         config1 = ConfigManager({
@@ -46,7 +46,7 @@ class TestConfigManager(unittest.TestCase):
 
         # Access both configs again
         # Due to shared cache, this might affect both instances
-        self.assertEqual(config1.database.host, 'new-host')  # Will fail
+        self.assertEqual(config1.database.host, 'new-host')
         self.assertEqual(config2.database.host, 'host2')
 
 
