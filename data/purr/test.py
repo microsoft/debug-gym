@@ -1,4 +1,4 @@
-from main import cat_status
+from code import cat_status
 
 
 def test_cat_status():

@@ -1,4 +1,4 @@
-from main import TreeNode, build_sum_tree, print_tree
+from code import TreeNode, build_sum_tree, print_tree
 
 
 def test_shopping_cart():

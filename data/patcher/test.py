@@ -1,6 +1,5 @@
 import unittest
-
-from patcher import Patcher
+from code import Patcher
 
 
 class TestPatcherTool(unittest.TestCase):
