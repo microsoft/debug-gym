@@ -1,6 +1,5 @@
 import unittest
-
-from main import GradeProcessor
+from code import GradeProcessor
 
 
 class TestGradeProcessor(unittest.TestCase):

@@ -1,4 +1,4 @@
-from main import TomorrowDate
+from code import TomorrowDate
 
 
 def test_tomorrow_date():

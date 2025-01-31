@@ -1,8 +1,7 @@
 import threading
 import unittest
+from code import ThreadSafeCounter, increment_counter
 from typing import List
-
-from main import ThreadSafeCounter, increment_counter
 
 
 class TestThreadSafeCounter(unittest.TestCase):

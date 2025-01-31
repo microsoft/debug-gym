@@ -1,6 +1,5 @@
 import unittest
-
-from plus import PlusTool
+from code import PlusTool
 
 
 class TestPlusTool(unittest.TestCase):
