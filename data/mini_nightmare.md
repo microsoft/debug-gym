@@ -6,8 +6,8 @@ Dynamic attribute access and management.
 
 Hint:
 
-a. `_cache = {}` needs to be instance-level, not shared;
-b. Clear cache when updating values in set()
+- `_cache = {}` needs to be instance-level, not shared;
+- Clear cache when updating values in set()
 ```
     if name in self._cache:
         del self._cache[name]
@@ -56,10 +56,10 @@ Hint:
 Sequence of bugs.
 
 Hint:
-a. L21: `=` vs `==`;
-b. L66: `cat` needs to happen on `dim=1`;
-c. L106: the right key is `attention_mask`;
-d. L98: wrong shape, see `self.max_length`.
+- L21: `=` vs `==`;
+- L66: `cat` needs to happen on `dim=1`;
+- L106: the right key is `attention_mask`;
+- L98: wrong shape, see `self.max_length`.
 
 ### 8.scienfitic calculator
 String split.
