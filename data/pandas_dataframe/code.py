@@ -17,6 +17,6 @@ def load_data():
 def calculate_stats(df):
     print("\nCalculating statistics...\n")
 
-    # Calculate the median fare paid
-    median_fare = df['Price'].median()
-    print("\nMedian fare paid:\n", median_fare)
+    # Calculate the median price paid
+    median_price = df['Price'].median()
+    print("\nMedian price paid:\n", median_price)
