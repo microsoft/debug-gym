@@ -13,7 +13,6 @@ def test_build_prompt_step_1(agent_setup):
     info = {
         "instructions": "Test instructions",
         "dir_tree": "Test dir tree",
-        "editable_files": "Test editable files",
         "current_code_with_line_number": "Test code",
         "current_breakpoints": "Test breakpoints",
         "last_run_obs": "Test last run obs",
@@ -35,7 +34,6 @@ def test_build_prompt_step_2(agent_setup):
     info = {
         "instructions": "Test instructions",
         "dir_tree": "Test dir tree",
-        "editable_files": "Test editable files",
         "current_code_with_line_number": "Test code",
         "current_breakpoints": "Test breakpoints",
         "last_run_obs": "Test last run obs",
@@ -55,7 +53,6 @@ def test_run(agent_setup):
             "max_score": 10,
             "instructions": "Test instructions",
             "dir_tree": "Test dir tree",
-            "editable_files": "Test editable files",
             "current_code_with_line_number": "Test code",
             "current_breakpoints": "Test breakpoints",
             "last_run_obs": "Test last run obs",
@@ -71,7 +68,6 @@ def test_run(agent_setup):
             "max_score": 10,
             "instructions": "Test instructions",
             "dir_tree": "Test dir tree",
-            "editable_files": "Test editable files",
             "current_code_with_line_number": "Test code",
             "current_breakpoints": "Test breakpoints",
             "last_run_obs": "Test last run obs",
