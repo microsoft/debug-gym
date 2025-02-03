@@ -1,8 +1,5 @@
 import os
-import re
 import subprocess
-import tempfile
-from os.path import join as pjoin
 from pathlib import Path
 
 import froggy.utils as utils
@@ -11,7 +8,7 @@ from froggy.envs.env import RepoEnv
 
 class AiderBenchmarkEnv(RepoEnv):
     REPO_URL = "https://github.com/exercism/python"
-    REPO_PATH = Path(pjoin(tempfile.gettempdir(), "exercism"))
+    REPO_PATH = Path.joinpath(Path.home(), ".cache", "froggy", "exercism")
 
     @property
     def instructions(self):
@@ -31,7 +28,7 @@ class AiderBenchmarkEnv(RepoEnv):
         self.current_sample = self.dataset[options["task_name"]]
 
         directory = self.current_sample["base_directory"]
-        self.setup_workspace(directory)
+        self.setup_workspace(directory, entrypoint="python -m pytest -s .")
 
         obs, infos = super().reset()
         infos["instructions"] = self.instructions
@@ -75,38 +72,25 @@ class AiderBenchmarkEnv(RepoEnv):
             instructions += instr_md.read_text() if instr_md.exists() else ""
             instructions += instr_more_md.read_text() if instr_more_md.exists() else ""
 
-            # Add an ignore file
-            self.make_froggyignore(directory, include_gitignore=True)
+            # Add .froggyignore so all files are ignored except Python files.
+            utils.create_ignore_file(
+                directory / ".froggyignore",
+                patterns=[
+                    ".*/",
+                    "__pycache__/",
+                    "*.pyc",
+                    # "*.md",
+                    # "log/",
+                    # "data/",
+                ],
+            )
+            # Add .froggyreadonly so tests are readonly.
+            utils.create_ignore_file(
+                directory / ".froggyreadonly", patterns=["*test*.py"]
+            )
 
             self.dataset[task_name] = {
                 "base_directory": directory,
                 "instructions": instructions,
                 "filename": task_name + ".py",
             }
-
-    def make_froggyignore(self, directory: str, include_gitignore: bool = True):
-        froggyignore_contents = "\n".join(
-            [
-                ".DS_Store",
-                "__pycache__/",
-                ".approaches/",
-                ".docs/",
-                ".meta/",
-                ".pytest_cache/",
-                "*test*.py",
-                "*.pyc",
-                "*.md",
-                ".froggyignore",
-                "log/",
-                "data/",
-            ]
-        )
-
-        if include_gitignore and ".gitignore" in os.listdir(directory):
-            with open(pjoin(directory, ".gitignore"), "r") as f:
-                gitignore_content = f.read()
-                froggyignore_contents += "\n"
-                froggyignore_contents += gitignore_content
-
-        with open(directory / ".froggyignore", "w") as f:
-            f.write(froggyignore_contents)

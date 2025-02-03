@@ -6,7 +6,8 @@ import re
 import signal
 from contextlib import contextmanager
 from os.path import join as pjoin
-from typing import Optional
+from pathlib import Path
+from typing import Callable, Optional
 
 import yaml
 
@@ -54,17 +55,28 @@ def show_line_number(code_string, code_path=None, breakpoints_state=None):
     return "\n".join(output)
 
 
-def make_is_readonly(full_path, base_dir=None, patterns: list[str] = None):
+def make_file_matcher(pattern_file, base_dir=None, patterns: list[str] = None):
+    """
+    Creates a file matcher function based on ignore patterns from a file and additional patterns.
+
+    Args:
+        pattern_file (str): Path to the file containing gitignore-like patterns.
+        base_dir (str, optional): Base directory to resolve relative paths. Defaults to the directory of the pattern_file.
+        patterns (list[str], optional): Additional patterns to include. Defaults to an empty list.
+
+    Returns:
+        function: A function that takes a file path as input and returns True if the file matches any of the patterns, False otherwise.
+    """
     if patterns is None:
         patterns = []
     # Ref: gitignore_parser.parse_gitignore
     from gitignore_parser import _normalize_path, handle_negation, rule_from_pattern
 
-    base_dir = _normalize_path(base_dir or os.path.dirname(full_path))
+    base_dir = _normalize_path(base_dir or os.path.dirname(pattern_file))
 
     lines = []
-    if os.path.isfile(full_path):
-        with open(full_path) as ignore_file:
+    if os.path.isfile(pattern_file):
+        with open(pattern_file) as ignore_file:
             lines = ignore_file.readlines()
 
     lines += patterns
@@ -72,7 +84,7 @@ def make_is_readonly(full_path, base_dir=None, patterns: list[str] = None):
     rules = []
     for i, line in enumerate(lines):
         line = line.rstrip("\n")
-        rule = rule_from_pattern(line.rstrip("\n"), base_dir, (full_path, i))
+        rule = rule_from_pattern(line.rstrip("\n"), base_dir, (pattern_file, i))
         if rule:
             rules.append(rule)
 
@@ -84,7 +96,33 @@ def make_is_readonly(full_path, base_dir=None, patterns: list[str] = None):
         return lambda file_path: handle_negation(file_path, rules)
 
 
-def _walk(path, depth: Optional[int]):
+def create_ignore_file(
+    filepath: str | Path, patterns: list[str] = [], include_gitignore: bool = True
+):
+    """
+    Creates a file at the specified `filepath` containing gitignore-like patterns.
+
+    Files and directories matching the patterns in that file will be treated differently.
+    E.g., Files in a `.froggyignore` file will be ignored by the environment.
+          Files in a `.froggyreadonly` file will be marked as readonly.
+
+    Args:
+        filepath (str): The file path where to create the ignore file.
+        patterns (list[str]): A list of patterns to include in the ignore file.
+        include_gitignore (bool): If True, includes the contents of an existing .gitignore file
+                                  in the ignore file. Default is True.
+    """
+    path = Path(filepath)
+    gitignore_file = path.parent / ".gitignore"
+    if include_gitignore and gitignore_file.exists():
+        with open(gitignore_file) as f:
+            patterns = patterns + f.read().splitlines()
+
+    with open(path, "w") as f:
+        f.write("\n".join(patterns + [path.name]))
+
+
+def _walk(path, depth: int | None = None, skip: Callable | None = None):
     """recursively list files and directories up to a certain depth"""
     depth = 1e5 if depth is None else depth
     if depth == 0:
@@ -92,9 +130,12 @@ def _walk(path, depth: Optional[int]):
 
     with os.scandir(path) as p:
         for entry in p:
+            if skip and skip(entry.path):
+                continue
+
             yield entry.path
             if entry.is_dir() and depth > 0:
-                yield from _walk(entry.path, depth - 1)
+                yield from _walk(entry.path, depth=depth - 1, skip=skip)
 
 
 # Helper class to control boolean flags from the command line with argparse
@@ -184,7 +225,9 @@ def load_config():
     parser.add_argument("config_file", help="path to config file")
     parser.add_argument("--agent", help="zero_shot, cot, tadpole", default="zero_shot")
     parser.add_argument(
-        "--debug", action="store_true", help="Before sending action to the environment."
+        "--debug",
+        action="store_true",
+        help="Break before sending action to the environment.",
     )
     group = parser.add_mutually_exclusive_group()
     group.add_argument(
@@ -194,6 +237,7 @@ def load_config():
         action="store_const",
         const=logging.DEBUG,
         help="Verbose mode",
+        default=logging.INFO,
     )
     group.add_argument(
         "--logging-level",

@@ -4,11 +4,6 @@ from unittest.mock import MagicMock, mock_open, patch
 import pytest
 
 from froggy.envs import AiderBenchmarkEnv
-from froggy.utils import (
-    cleanup_pytest_output,
-    extract_max_score_from_pytest_output,
-    extract_reward_from_pytest_output,
-)
 
 
 @pytest.fixture
@@ -102,10 +97,3 @@ def test_step(mock_extract_reward, mock_cleanup, mock_step, aider_env):
 def test_load_dataset(mock_listdir, mock_exists, mock_run, aider_env):
     aider_env.load_dataset()
     assert mock_run.called
-
-
-@patch("builtins.open", new_callable=mock_open)
-@patch("os.listdir", return_value=[".gitignore"])
-def test_make_froggyignore(mock_listdir, mock_open, aider_env):
-    aider_env.make_froggyignore(Path("test_directory"))
-    mock_open.assert_called_with(Path("test_directory/.froggyignore"), "w")

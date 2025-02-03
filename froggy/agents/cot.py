@@ -131,7 +131,6 @@ class AgentCoT_NoPDB(AgentCoT):
         )
         system_prompt["Instructions"] = info["instructions"]
         system_prompt["Repo directory tree"] = info["dir_tree"]
-        system_prompt["Editable files"] = info["editable_files"]
         system_prompt["Current code in view"] = info["current_code_with_line_number"]
         system_prompt["Current breakpoints"] = info["current_breakpoints"]
         system_prompt["Last execution output"] = info["last_run_obs"]
