@@ -19,6 +19,7 @@ from tqdm import tqdm
 
 from froggy.envs.env import RepoEnv
 from froggy.terminal import DockerTerminal, Terminal
+from froggy.utils import create_ignore_file
 
 
 class SWEBenchEnv(RepoEnv):
@@ -101,6 +102,7 @@ class SWEBenchEnv(RepoEnv):
         # TODO: use fail_to_pass and pass_to_pass
         self.fail_to_pass = literal_eval(self.ds_row["FAIL_TO_PASS"])
         self.pass_to_pass = literal_eval(self.ds_row["PASS_TO_PASS"])
+        self.test_directives = get_test_directives(self.ds_row)
 
         local_repo_path = SWEBenchEnv.CACHE / self.repo_name
         assert local_repo_path.exists()
@@ -122,14 +124,17 @@ class SWEBenchEnv(RepoEnv):
                 subprocess.run(command.split(), input=test_patch, text=True, check=True)
                 self.logger.info("Patch applied successfully.")
 
-            # Make the pdb ignore
-            self.make_froggyignore(local_repo_path=local_branch_path)
+            create_ignore_file(
+                local_branch_path / ".froggyignore", patterns=self.ignore_files
+            )
+            create_ignore_file(
+                local_branch_path / ".froggyreadonly", patterns=self.test_directives
+            )
         else:
             self.logger.debug(
                 f"Local checked out branch {local_branch_path} already exists."
             )
 
-        self.test_directives = get_test_directives(self.ds_row)
         entrypoint = " ".join([self.install_configs["test_cmd"], *self.test_directives])
 
         if (
@@ -260,8 +265,12 @@ class SWEBenchEnv(RepoEnv):
             check=True,
         )
 
-        self.make_froggyignore(
-            local_repo_path=self.working_dir, additionnal_contents=self.test_directives
+        # Need to recreate those files after copying the initial code.
+        create_ignore_file(
+            self.working_dir / ".froggyignore", patterns=self.ignore_files
+        )
+        create_ignore_file(
+            self.working_dir / ".froggyreadonly", patterns=self.test_directives
         )
         self._index_files()
 
@@ -331,28 +340,13 @@ class SWEBenchEnv(RepoEnv):
     @property
     def ignore_files(self):
         return [
-            "**/tests/",
-            ".froggyignore",
-            ".pytest_cache/",
-            "*test*.py",
-            "*.pyc",
-            "*.md",
-            ".*",
+            ".*/",
+            # ".pytest_cache/",
+            # "*test*.py",
+            # "*.pyc",
+            # "*.md",
+            # ".*",
         ]
-
-    def make_froggyignore(
-        self, local_repo_path, include_gitignore: bool = True, additionnal_contents=[]
-    ):
-        # Add an ignore file
-        froggyignore_contents = "\n".join(self.ignore_files + additionnal_contents)
-        if include_gitignore and ".gitignore" in os.listdir(local_repo_path):
-            with open(local_repo_path / ".gitignore", "r") as f:
-                gitignore_content = f.read()
-                froggyignore_contents += "\n"
-                froggyignore_contents += gitignore_content
-
-        with open(local_repo_path / ".froggyignore", "w") as f:
-            f.write(froggyignore_contents)
 
     def run_command_with_raise(self, command):
         command = command.replace("apt-get", "sudo apt-get").replace(

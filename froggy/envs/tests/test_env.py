@@ -225,11 +225,8 @@ def test_restore(
 def test_display_files(mock_directory_tree):
     mock_directory_tree.return_value = "\n|-- file1.py\n|-- file2.py\n"
     env = RepoEnv()
-    result = env.display_files(editable_only=False)
-
-    expected_result = "\nAll files:\n|-- file1.py\n|-- file2.py\n"
-    assert result == expected_result
-    mock_directory_tree.assert_called_once_with(editable_only=False)
+    result = env.display_files()
+    assert result.endswith("\n|-- file1.py\n|-- file2.py\n")
 
 
 @patch("froggy.utils.show_line_number")
@@ -284,7 +281,6 @@ def test_step(
     assert "last_run_obs" in infos
     assert "dbg_obs" in infos
     assert "dir_tree" in infos
-    assert "editable_files" in infos
     assert "current_breakpoints" in infos
     assert "current_code_with_line_number" in infos
     assert "action" in infos
@@ -313,18 +309,16 @@ def test_directory_tree(
 ):
     mock_tempdir.return_value.name = "/mock/tempdir"
     mock_scandir.return_value.__enter__.return_value = [
-        MagicMock(is_dir=lambda: False, path="/path/to/repo/file1.txt"),
-        MagicMock(is_dir=lambda: False, path="/path/to/repo/file2.txt"),
+        MagicMock(is_dir=lambda: False, path="/mock/tempdir/repo/file1.txt"),
+        MagicMock(is_dir=lambda: False, path="/mock/tempdir/repo/file2.txt"),
     ]
     mock_os_walk.return_value = [
-        ("/path/to/repo", ("subdir",), ("file1.py", "file2.py")),
-        ("/path/to/repo/subdir", (), ("subfile1.txt",)),
+        ("/mock/tempdir/repo", ("subdir",), ("file1.txt", "file2.txt")),
+        ("/mock/tempdir/repo/subdir", (), ("subfile1.txt",)),
     ]
     env = RepoEnv(path="/path/to/repo")
     result = env.directory_tree()
-    expected_result = (
-        "\n\n" "/mock/tempdir/\n  " "|-- file1.txt\n  " "|-- file2.txt\n\n"
-    )
+    expected_result = "/mock/tempdir/\n" "  |-- file1.txt\n" "  |-- file2.txt"
     assert result == expected_result
 
 
@@ -372,7 +366,6 @@ def test_reset(
     assert "dbg_obs" in infos
     assert "last_run_obs" in infos
     assert "dir_tree" in infos
-    assert "editable_files" in infos
     assert "current_breakpoints" in infos
     assert "current_code_with_line_number" in infos
     assert "action" in infos

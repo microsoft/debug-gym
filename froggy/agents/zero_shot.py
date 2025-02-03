@@ -1,6 +1,7 @@
 import json
 
 from froggy.agents import AgentBase
+from froggy.agents.llm_api import print_messages
 from froggy.utils import unescape
 
 
@@ -78,7 +79,6 @@ class AgentZeroShot_NoPDB(AgentZeroShot):
         )
         system_prompt["Instructions"] = info["instructions"]
         system_prompt["Repo directory tree"] = info["dir_tree"]
-        system_prompt["Editable files"] = info["editable_files"]
         system_prompt["Current code in view"] = info["current_code_with_line_number"]
         system_prompt["Current breakpoints"] = info["current_breakpoints"]
         system_prompt["Last execution output"] = info["last_run_obs"]
