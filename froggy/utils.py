@@ -129,11 +129,11 @@ def _walk(path, depth: int | None = None, skip: Callable | None = None):
         return
 
     with os.scandir(path) as p:
-        for entry in p:
+        for entry in sorted(p, key=lambda x: x.name):
             if skip and skip(entry.path):
                 continue
 
-            yield entry.path
+            yield Path(entry)
             if entry.is_dir() and depth > 0:
                 yield from _walk(entry.path, depth=depth - 1, skip=skip)
 

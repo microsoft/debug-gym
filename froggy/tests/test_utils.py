@@ -284,13 +284,13 @@ def test_walk():
     for p in _walk(path, 1):
         path_list.append(p)
     expected = [
-        "data/terminal_simulator/.froggyignore",
-        "data/terminal_simulator/buggy",
-        "data/terminal_simulator/code",
-        "data/terminal_simulator/README.md",
-        "data/terminal_simulator/test_part_1.py",
-        "data/terminal_simulator/test_part_2.py",
-        "data/terminal_simulator/test.py",
+        Path("data/terminal_simulator/.froggyignore"),
+        Path("data/terminal_simulator/buggy"),
+        Path("data/terminal_simulator/code"),
+        Path("data/terminal_simulator/README.md"),
+        Path("data/terminal_simulator/test_part_1.py"),
+        Path("data/terminal_simulator/test_part_2.py"),
+        Path("data/terminal_simulator/test.py"),
     ]
     # sort the list
     path_list.sort()
@@ -302,19 +302,19 @@ def test_walk():
     for p in _walk(path, 2):
         path_list.append(p)
     expected = [
-        "data/terminal_simulator/.froggyignore",
-        "data/terminal_simulator/buggy",
-        "data/terminal_simulator/buggy/buggy_code_info_20241031-205241.json",
-        "data/terminal_simulator/code",
-        "data/terminal_simulator/code/__init__.py",
-        "data/terminal_simulator/code/base_simulator.py",
-        "data/terminal_simulator/code/run_terminal_simulator.py",
-        "data/terminal_simulator/code/some_random_code.py",
-        "data/terminal_simulator/code/terminal_simulator.py",
-        "data/terminal_simulator/README.md",
-        "data/terminal_simulator/test_part_1.py",
-        "data/terminal_simulator/test_part_2.py",
-        "data/terminal_simulator/test.py",
+        Path("data/terminal_simulator/.froggyignore"),
+        Path("data/terminal_simulator/buggy"),
+        Path("data/terminal_simulator/buggy/buggy_code_info_20241031-205241.json"),
+        Path("data/terminal_simulator/code"),
+        Path("data/terminal_simulator/code/__init__.py"),
+        Path("data/terminal_simulator/code/base_simulator.py"),
+        Path("data/terminal_simulator/code/run_terminal_simulator.py"),
+        Path("data/terminal_simulator/code/some_random_code.py"),
+        Path("data/terminal_simulator/code/terminal_simulator.py"),
+        Path("data/terminal_simulator/README.md"),
+        Path("data/terminal_simulator/test_part_1.py"),
+        Path("data/terminal_simulator/test_part_2.py"),
+        Path("data/terminal_simulator/test.py"),
     ]
     # sort the list
     path_list.sort()
@@ -326,19 +326,19 @@ def test_walk():
     for p in _walk(path, None):
         path_list.append(p)
     expected = [
-        "data/terminal_simulator/.froggyignore",
-        "data/terminal_simulator/buggy",
-        "data/terminal_simulator/buggy/buggy_code_info_20241031-205241.json",
-        "data/terminal_simulator/code",
-        "data/terminal_simulator/code/__init__.py",
-        "data/terminal_simulator/code/base_simulator.py",
-        "data/terminal_simulator/code/run_terminal_simulator.py",
-        "data/terminal_simulator/code/some_random_code.py",
-        "data/terminal_simulator/code/terminal_simulator.py",
-        "data/terminal_simulator/README.md",
-        "data/terminal_simulator/test_part_1.py",
-        "data/terminal_simulator/test_part_2.py",
-        "data/terminal_simulator/test.py",
+        Path("data/terminal_simulator/.froggyignore"),
+        Path("data/terminal_simulator/buggy"),
+        Path("data/terminal_simulator/buggy/buggy_code_info_20241031-205241.json"),
+        Path("data/terminal_simulator/code"),
+        Path("data/terminal_simulator/code/__init__.py"),
+        Path("data/terminal_simulator/code/base_simulator.py"),
+        Path("data/terminal_simulator/code/run_terminal_simulator.py"),
+        Path("data/terminal_simulator/code/some_random_code.py"),
+        Path("data/terminal_simulator/code/terminal_simulator.py"),
+        Path("data/terminal_simulator/README.md"),
+        Path("data/terminal_simulator/test_part_1.py"),
+        Path("data/terminal_simulator/test_part_2.py"),
+        Path("data/terminal_simulator/test.py"),
     ]
     # sort the list
     path_list.sort()
