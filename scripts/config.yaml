@@ -1,8 +1,8 @@
 zero_shot:
     # Environment configs
-    output_path: "exps/config"
+    output_path: "exps/mini_nightmare/config"
     env_kwargs: {
-        "path": "data/config",
+        "path": "data/mini_nightmare/config",
         "entrypoint": "python -m pytest -sv test.py",
         "dir_tree_depth": 1,
         "run_on_rewrite": True,
@@ -18,8 +18,8 @@ zero_shot:
     persistent_breakpoints: True  # in pdb tool
 
     # LLM configs
-    llm_name: "llama-31-h100"
-    llm_temperature: [0.0]  # list of values between 0.0 and 1.0
+    llm_name: "gpt-4o-az-login"
+    llm_temperature: [0.5]  # list of values between 0.0 and 1.0
 
     # Agent configs
     random_seed: 42

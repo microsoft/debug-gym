@@ -212,17 +212,7 @@ def main():
         logger.info(f"Tasks that succeeded: {tasks_succeeded}")
     else:
         # custom repo
-        print(colored(f"Running agent {agent.name}", "green"))
-        env = create_env(args, config)
-        agent = create_agent(args, config=config, env=env, logger=logger)
-        agent.run(debug=args.debug)
-
-        # optionally apply patch
-        if config["save_patch"]:
-            agent.save_patch()
-
-        # save log
-        agent.log()
+        run_agent(args, problem="custom", config=config)
 
 
 if __name__ == "__main__":
