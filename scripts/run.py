@@ -140,33 +140,34 @@ def main():
 
     config = config[args.agent]
 
-    # run agent, loop over the tasks
-    if "benchmark" in config and "problems" in config:
-        if "all" == config["problems"]:
-            env = create_env(args, config, logger=logger)
-            problem_list = env.dataset.keys()  # all tasks
-        else:
-            assert isinstance(config["problems"], list)
-            problem_list = config["problems"]
+    with Live(logger.progress_group, refresh_per_second=20) as live:
+        if args.debug:
+            live.stop()  # Because it interferes with pdb.
+        # run agent, loop over the tasks
+        if "benchmark" in config and "problems" in config:
+            if "all" == config["problems"]:
+                env = create_env(args, config, logger=logger)
+                problem_list = env.dataset.keys()  # all tasks
+            else:
+                assert isinstance(config["problems"], list)
+                problem_list = config["problems"]
 
-        num_workers = int(os.environ.get("FROGGY_WORKERS", 1))
-        tasks_done = 0
-        mean_perf = 0
+            num_workers = int(os.environ.get("FROGGY_WORKERS", 1))
+            tasks_done = 0
+            mean_perf = 0
 
-        tasks_succeeded = []
+            tasks_succeeded = []
 
-        overall_task_id = logger.overall_progress.add_task("", total=len(problem_list))
-        top_descr = "[bold #AAAAAA](%d out of %d tasks done)" % (
-            tasks_done,
-            len(problem_list),
-        )
-        logger.overall_progress.update(
-            overall_task_id, description=top_descr, advance=0
-        )
-
-        with Live(logger.progress_group, refresh_per_second=20) as live:
-            if args.debug:
-                live.stop()  # Because it interferes with pdb.
+            overall_task_id = logger.overall_progress.add_task(
+                "", total=len(problem_list)
+            )
+            top_descr = "[bold #AAAAAA](%d out of %d tasks done)" % (
+                tasks_done,
+                len(problem_list),
+            )
+            logger.overall_progress.update(
+                overall_task_id, description=top_descr, advance=0
+            )
 
             with ThreadPoolExecutor(num_workers) as executor:
                 futures = {
@@ -209,10 +210,31 @@ def main():
                 description=f"[bold green]{mean_perf}/{tasks_done} success!",
             )
 
-        logger.info(f"Tasks that succeeded: {tasks_succeeded}")
-    else:
-        # custom repo
-        run_agent(args, problem="custom", config=config)
+            logger.info(f"Tasks that succeeded: {tasks_succeeded}")
+        else:
+            # custom repo
+            problem = "custom"
+            config["uuid"] = config.get("uuid", str(uuid.uuid4()))
+            exp_path = Path(config["output_path"]) / config["uuid"] / problem
+            task_logger = FroggyLogger(
+                problem,
+                is_task=True,
+                log_dir=exp_path,
+                level=args.logging_level,
+                mode="w" if args.force_all else "a",
+            )
+
+            env = create_env(args, config, logger=task_logger)
+            agent = create_agent(args.agent, config=config, env=env, logger=task_logger)
+            print(colored(f"Running agent {agent.name}", "green"))
+            agent.run(debug=args.debug)
+
+            # optionally apply patch
+            if config["save_patch"]:
+                agent.save_patch()
+
+            # save log
+            agent.log()
 
 
 if __name__ == "__main__":
