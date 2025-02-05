@@ -99,6 +99,6 @@ class FroggyLogger(logging.Logger):
             yield item
 
     def stop(self, remove: bool = False):
-        self.task_progress.stop(self.task_id)
+        self.task_progress.stop_task(self.task_id)
         if remove:
             self.task_progress.remove_task(self.task_id)

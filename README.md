@@ -19,7 +19,9 @@ First, make a copy of the template,
 
     cp llm.cfg.template llm.cfg
 
-Then, edit `llm.cfg` with your endpoint and API key information. If using `az login` for authentication, you can remove the `api_key` and provide a `scope` instead.
+Then, edit llm.cfg with your endpoint and credentials. You can choose one of these authentication methods:
+- For authenticating with an API key, provide `api_key`.
+- For `az login` or Managed Identity authentication, remove `api_key` and include `scope` instead.
 
 > [!WARNING]
 > When using open-sourced LLMs, e.g., via vLLM, you need to correctly setup `HF_TOKEN` required by the tokenizer.
