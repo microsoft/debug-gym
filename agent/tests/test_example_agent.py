@@ -1,21 +1,17 @@
 from unittest.mock import MagicMock
 
-from froggy.agents.zero_shot import (
-    AgentZeroShot,
-    AgentZeroShot_NoPDB,
-    AgentZeroShot_PdbAfterRewrites,
-)
+from agent.example_agent import PdbAfterRewrites, PdbAgent, RewriteOnly
 
 
 def test_build_question_prompt(agent_setup):
-    agent, _, _, _ = next(agent_setup(AgentZeroShot))
+    agent, _, _, _ = next(agent_setup(PdbAgent))
     messages = agent.build_question_prompt()
     assert len(messages) == 1
     assert "continue your debugging" in messages[0]["content"]
 
 
 def test_build_prompt(agent_setup):
-    agent, _, _, _ = next(agent_setup(AgentZeroShot))
+    agent, _, _, _ = next(agent_setup(PdbAgent))
     info = {
         "instructions": "Test instructions",
         "dir_tree": "Test dir tree",
@@ -28,7 +24,7 @@ def test_build_prompt(agent_setup):
 
 
 def test_run(agent_setup):
-    agent, env, llm, _ = next(agent_setup(AgentZeroShot))
+    agent, env, llm, _ = next(agent_setup(PdbAgent))
     env.reset.return_value = (
         None,
         {
@@ -63,7 +59,7 @@ def test_run(agent_setup):
 
 
 def test_build_system_prompt_no_pdb(agent_setup):
-    agent, _, _, _ = next(agent_setup(AgentZeroShot_NoPDB))
+    agent, _, _, _ = next(agent_setup(RewriteOnly))
     info = {
         "instructions": "Test instructions",
         "dir_tree": "Test dir tree",
@@ -77,14 +73,14 @@ def test_build_system_prompt_no_pdb(agent_setup):
 
 
 def test_build_question_prompt_no_pdb(agent_setup):
-    agent, _, _, _ = next(agent_setup(AgentZeroShot_NoPDB))
+    agent, _, _, _ = next(agent_setup(RewriteOnly))
     messages = agent.build_question_prompt()
     assert len(messages) == 1
     assert "continue your debugging" in messages[0]["content"]
 
 
 def test_run_pdb_after_rewrites(agent_setup):
-    agent, env, llm, _ = next(agent_setup(AgentZeroShot_PdbAfterRewrites))
+    agent, env, llm, _ = next(agent_setup(PdbAfterRewrites))
     env.reset.return_value = (
         None,
         {

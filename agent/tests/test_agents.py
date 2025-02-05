@@ -1,10 +1,6 @@
 import pytest
 
-from froggy.agents.utils import (
-    HistoryTracker,
-    build_history_prompt,
-    trim_prompt_messages,
-)
+from agent.utils import HistoryTracker, build_history_prompt, trim_prompt_messages
 
 
 def test_trim_prompt_messages():
