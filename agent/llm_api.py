@@ -14,7 +14,7 @@ from tenacity import (
 from termcolor import colored
 from transformers import AutoTokenizer
 
-from froggy.agents.utils import trim_prompt_messages
+from agent.utils import trim_prompt_messages
 from froggy.logger import FroggyLogger
 
 prompt_toolkit_available = False
