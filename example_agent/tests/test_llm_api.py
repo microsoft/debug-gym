@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, MagicMock, mock_open, patch
 import pytest
 from openai import RateLimitError
 
-from agent.llm_api import (
+from example_agent.llm_api import (
     LLM,
     AsyncLLM,
     Human,

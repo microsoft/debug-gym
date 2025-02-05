@@ -1,6 +1,6 @@
 from unittest.mock import MagicMock
 
-from agent.example_agent import PdbAfterRewrites, PdbAgent, RewriteOnly
+from example_agent.example_agent import PdbAfterRewrites, PdbAgent, RewriteOnly
 
 
 def test_build_question_prompt(agent_setup):

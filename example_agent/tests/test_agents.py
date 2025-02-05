@@ -1,6 +1,10 @@
 import pytest
 
-from agent.utils import HistoryTracker, build_history_prompt, trim_prompt_messages
+from example_agent.utils import (
+    HistoryTracker,
+    build_history_prompt,
+    trim_prompt_messages,
+)
 
 
 def test_trim_prompt_messages():

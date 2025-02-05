@@ -94,11 +94,11 @@ def create_env(config: dict, logger: FroggyLogger):
 def create_agent(agent_type, **kwargs):
     match agent_type:
         case "pdb_agent":
-            from agent import PdbAgent as agent_class
+            from example_agent import PdbAgent as agent_class
         case "rewrite_only":
-            from agent import RewriteOnly as agent_class
+            from example_agent import RewriteOnly as agent_class
         case "pdb_after_rewrites":
-            from agent import PdbAfterRewrites as agent_class
+            from example_agent import PdbAfterRewrites as agent_class
         case _:
             raise ValueError(f"Unknown agent {agent_type}")
 
