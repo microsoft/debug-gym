@@ -1,9 +1,5 @@
-import argparse
 import copy
 import json
-import os
-
-import yaml
 
 from froggy.utils import unescape
 

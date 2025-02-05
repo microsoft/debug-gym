@@ -7,6 +7,7 @@ from pathlib import Path
 from rich.live import Live
 from termcolor import colored
 
+from froggy.envs import select_env
 from froggy.logger import FroggyLogger
 from froggy.terminal import select_terminal
 from froggy.tools.toolbox import Toolbox
@@ -15,21 +16,6 @@ from froggy.utils import load_config
 
 class BreakTaskLoop(Exception):
     pass
-
-
-def select_env(env_type: str = None):
-    match env_type:
-        case None:
-            from froggy.envs.env import RepoEnv as env_class
-        case "aider":
-            from froggy.envs import AiderBenchmarkEnv as env_class
-        case "swebench":
-            from froggy.envs import SWEBenchEnv as env_class
-        case "terminal_simulator":
-            from froggy.envs import TerminalSimulatorEnv as env_class
-        case _:
-            raise ValueError(f"Unknown benchmark {env_type}")
-    return env_class
 
 
 def run_agent(args, problem, config):
@@ -56,7 +42,7 @@ def run_agent(args, problem, config):
                 task_logger.stop(remove=not args.keep_completed_tasks)
                 return success
 
-        env = create_env(args, config, task_logger)
+        env = create_env(config, task_logger)
         agent = create_agent(args.agent, config=config, env=env, logger=task_logger)
         success = agent.run(task_name=problem, debug=args.debug)
 
@@ -86,7 +72,7 @@ def run_agent(args, problem, config):
     return success
 
 
-def create_env(args, config: dict, logger: FroggyLogger):
+def create_env(config: dict, logger: FroggyLogger):
     terminal = select_terminal(config.get("terminal"), logger)
     env_class = select_env(config.get("benchmark"))
     env = env_class(**config["env_kwargs"], terminal=terminal, logger=logger)
@@ -107,20 +93,12 @@ def create_env(args, config: dict, logger: FroggyLogger):
 
 def create_agent(agent_type, **kwargs):
     match agent_type:
-        case "zero_shot":
-            from froggy.agents import AgentZeroShot as agent_class
-        case "cot":
-            from froggy.agents import AgentCoT as agent_class
-        case "tadpole":
-            from froggy.agents import AgentTadpole as agent_class
-        case "zero_shot_nopdb":
-            from froggy.agents import AgentZeroShot_NoPDB as agent_class
-        case "cot_nopdb":
-            from froggy.agents import AgentCoT_NoPDB as agent_class
-        case "zero_shot_pdb_after_rewrites":
-            from froggy.agents import AgentZeroShot_PdbAfterRewrites as agent_class
-        case "zero_shot_nopdb_whole":
-            from froggy.agents import AgentZeroShot_NoPDB as agent_class
+        case "pdb_agent":
+            from example_agent import PdbAgent as agent_class
+        case "rewrite_only":
+            from example_agent import RewriteOnly as agent_class
+        case "pdb_after_rewrites":
+            from example_agent import PdbAfterRewrites as agent_class
         case _:
             raise ValueError(f"Unknown agent {agent_type}")
 
@@ -144,7 +122,7 @@ def main():
     # Figure out which problems to solve.
     problems = config.get("problems", ["custom"])
     if problems == "all" and "benchmark" in config:
-        env = create_env(args, config, logger=logger)
+        env = create_env(config, logger=logger)
         problems = list(env.dataset.keys())  # all tasks
 
     with Live(logger.progress_group, refresh_per_second=20) as live:

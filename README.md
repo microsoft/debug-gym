@@ -39,32 +39,33 @@ One of the core designs of Froggy is the notion of tools. Users can dynamically 
 | `view` | Viewing tool is used to change an agent's focus to a particular source code file. This is particularly useful when dealing with a repository with multiple files. |
 | `eval` | Eval tool runs the current code repository using the provided entrypoint (e.g., pytest). |
 | `pdb` | Interactive debugger wrapping the python pdb tool. In additon, users can choose to maintain a set of persistent breakpoints (as in some programming IDEs), which are not reset after every eval. With such feature, a new pdb debugging session is activated automatically, with all the breakpoints restored. Note such breakpoint can be cleared by pdb commands such as `cl`. |
-| `patcher` | Patchers are modules that rewrite a certain piece of code to fix the bug. There can be many implementations, such as rewriting a entire file, rewriting a chunk of code in a file, or applying a diff patch to a file. Note that a patcher can only modify files that are editable, which is defined in a `.froggyignore` file in the working repository, sharing the same syntax as `.gitignore`. |
+| `patcher` | Patchers are modules that rewrite a certain piece of code to fix the bug. We provide a patcher that can rewrite a chunk of code in a file by specifying the start and end lines of that chunk to replace. |
 | `reasoning` | Reasoning tool enables the model to output explicit reasoning text. Unlike CoT, the reasoning tool maintains the reasoning text in the history as if it were any other tool/action. When initializing, passing ```allow_chain_action = True``` to allow the agent to output another action after the reasoning tokens, in the same step. |
 
 Upon importing a tool, its action space and observation space will be automatically merged into the agent's action space and observation space; its instruction will also be merged into the overall instruction provided to the agent (e.g., as system prompt).
+
+Users can include a `.froggyignore` file in the repository to specify files and directories that are not visible to Froggy, similarly, they can include a `.froggyreadonly` to specify files and directories that are read only by Froggy. Both files share the same syntax as `.gitignore`.
 
 ## Running Baselines
 
 ### Agents
 
-We have the below LLM-based agents available:
+We have the below LLM-based agents available, they all have minimal design and serve the purpose of demonstrating the Froggy APIs. 
 
-| Agent name | Description |
-| :-: | :----- |
-| `zero_shot` | A minimal agent that takes all available information as part of the prompt and asks the LLM to generate a command. |
-| `cot`| A two-step agent, it first asks the LLM to think step-by-step about the current debugging state, then based on this to generate a command. |
-| `tadpole` | A hierarchical agent consisting a task decomposer and a command generator. The task decomposer determines to continue the current subgoal or to switch to a new one; based on the subgoal, the command generator generates a command. |
-| `zero_shot_nopdb` | `zero_shot` agent, pdb tool is disabled (an agent keeps rewriting). |
-| `cot_nopdb`| `cot` agent, pdb tool is disabled. |
+| Agent name | Available Tools | Description |
+| :-: | :-: | :----- |
+| `pdb_agent` | `pdb`, `patcher`, `view` | A minimal agent that takes all available information as part of the prompt and asks the LLM to generate a command. |
+| `rewrite_only` | `patcher`, `view`  | A `pdb_agent` but `pdb` tool is disabled (an agent keeps rewriting). |
+| `pdb_after_rewrite` | `pdb`, `patcher`, `view`  | A `pdb_agent`, but `pdb` tool is only enabled after certain amount of rewrites. |
 
 ### Benchmarks
+
+We include two widely used benchmarks, namely `aider` and `swebench`.
 
 | Benchmark name | Link |
 | :-: | :----- |
 | `aider` | [https://github.com/Aider-AI/aider](https://github.com/Aider-AI/aider) |
 | `swebench`| [https://github.com/princeton-nlp/SWE-bench](https://github.com/princeton-nlp/SWE-bench) |
-| `terminal_simulator`| A dataset where bug are generated using LLMs, based on human-authored working code. |
 
 ### Run
 
@@ -76,7 +77,7 @@ Add `-v`, `--debug` to be verbose, or to enter debug mode.
 
 ### Debugging Custom Repo
 
-Modify `scripts/config.yaml`, especially the `env_kwargs` to set the path and entrypoint of the custom repository. We assume there is a `.froggyignore` file within the repository that labels files/folders that are not editable.
+Modify `scripts/config.yaml`, especially the `env_kwargs` to set the path and entrypoint of the custom repository. We assume there is a `.froggyignore` file and a `.froggyreadonly` within the repository that labels files/folders that are not seen or not editable, respectively.
 
 As an example, we provide a buggy pytorch code repository in `data/pytorch`.
 

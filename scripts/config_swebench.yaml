@@ -1,4 +1,4 @@
-zero_shot:
+pdb_agent:
     # Environment configs
     output_path: "exps/swebench"
     benchmark: "swebench"
@@ -10,6 +10,11 @@ zero_shot:
         "run_timeout": 30,
     }
     tools: ["pdb", "view", "patcher:substitution", "listdir"]
+    terminal: {
+        type: "docker",  # "docker" or "local"
+        base_image: "python:3.12-slim",
+        setup_commands: ["pip install pytest"]
+    }
     persistent_breakpoints: True  # in pdb tool
 
     # LLM configs
@@ -26,23 +31,29 @@ zero_shot:
     log_prompt_response_pairs: True
     reset_prompt_history_after_rewrite: True
 
-cot:
+rewrite_only:
+    # Environment configs
     # Environment configs
     output_path: "exps/swebench"
     benchmark: "swebench"
-    problems: "all"  # list of problems, or "all"
+    problems: "all"  # list of problems, e.g., ["astropy__astropy-12907"], or "all"
     env_kwargs: {
         "dir_tree_depth": 1,
         "run_on_rewrite": True,
         "auto_view_change": True,
         "run_timeout": 30,
     }
-    tools: ["pdb", "view", "patcher:substitution", "listdir"]
+    tools: ["view", "patcher:substitution", "listdir"]
+    terminal: {
+        type: "docker",  # "docker" or "local"
+        base_image: "python:3.12-slim",
+        setup_commands: ["pip install pytest"]
+    }
     persistent_breakpoints: True  # in pdb tool
 
     # LLM configs
     llm_name: "llama-31-h100"
-    llm_temperature: [0.0, 0.0]  # 0.5 for CoT generation, 0.0 for answer generation
+    llm_temperature: [0.0]  # list of values between 0.0 and 1.0
 
     # Agent configs
     random_seed: 42
@@ -54,23 +65,30 @@ cot:
     log_prompt_response_pairs: True
     reset_prompt_history_after_rewrite: True
 
-tadpole:
+pdb_after_rewrites:
+    # Environment configs
     # Environment configs
     output_path: "exps/swebench"
     benchmark: "swebench"
-    problems: "all"  # list of problems, or "all"
+    problems: "all"  # list of problems, e.g., ["astropy__astropy-12907"], or "all"
     env_kwargs: {
         "dir_tree_depth": 1,
         "run_on_rewrite": True,
         "auto_view_change": True,
         "run_timeout": 30,
     }
+    n_rewrites_before_pdb: 5
     tools: ["pdb", "view", "patcher:substitution", "listdir"]
+    terminal: {
+        type: "docker",  # "docker" or "local"
+        base_image: "python:3.12-slim",
+        setup_commands: ["pip install pytest"]
+    }
     persistent_breakpoints: True  # in pdb tool
 
     # LLM configs
     llm_name: "llama-31-h100"
-    llm_temperature: [0.0, 0.0]  # 0.5 for CoT generation, 0.0 for answer generation
+    llm_temperature: [0.0]  # list of values between 0.0 and 1.0
 
     # Agent configs
     random_seed: 42

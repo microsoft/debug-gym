@@ -1,4 +1,4 @@
-zero_shot:
+pdb_agent:
     # Environment configs
     output_path: "exps/mini_nightmare/config"
     env_kwargs: {
@@ -31,7 +31,7 @@ zero_shot:
     log_prompt_response_pairs: True
     reset_prompt_history_after_rewrite: True
 
-zero_shot_nopdb:
+rewrite_only:
     # Environment configs
     output_path: "exps/mini_nightmare/config"
     env_kwargs: {
@@ -64,7 +64,7 @@ zero_shot_nopdb:
     log_prompt_response_pairs: True
     reset_prompt_history_after_rewrite: True
 
-zero_shot_pdb_after_rewrites:
+pdb_after_rewrites:
     # Environment configs
     output_path: "exps/mini_nightmare/config"
     env_kwargs: {
