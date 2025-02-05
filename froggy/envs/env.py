@@ -260,21 +260,20 @@ class RepoEnv(TooledEnv):
             p for p in self.all_files if not self._is_readonly(self.working_dir / p)
         ]
 
-    def directory_tree(self, root: str = None):
+    def directory_tree(self, root: str = None, max_depth: int | None = None):
         root = Path(root or self.working_dir).absolute()
+        max_depth = max_depth or self.dir_tree_depth
 
         if not root.exists() or root.is_file():
             return (
-                f"\nCould not display directory tree because {root} is not a directory."
+                f"Could not display directory tree because {root} is not a directory."
             )
 
         # initalize with root directory
-        result = [str(self.working_dir) + "/"]
+        result = [str(root) + "/"]
 
         # get all paths with correct depth
-        for path in _walk(root, self.dir_tree_depth, skip=self._is_ignored):
-            path = Path(path)
-
+        for path in _walk(root, max_depth, skip=self._is_ignored):
             rel_path = path.relative_to(root)  # relative path from root
             depth = len(rel_path.parts) - 1  # depth of current path
             indent = "  " * depth  # 2 spaces per level for indent
@@ -285,7 +284,7 @@ class RepoEnv(TooledEnv):
             if path.is_dir():
                 result[-1] += "/"
 
-            if str(rel_path) not in self.editable_files:
+            if str(path.relative_to(self.working_dir)) not in self.editable_files:
                 result[-1] += " (ro)"
 
         return "\n".join(result)
