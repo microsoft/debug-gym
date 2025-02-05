@@ -31,6 +31,7 @@ except ImportError:
 
 
 # Set logging level down to WARNING for endpoint queries.
+logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("openai").setLevel(logging.WARNING)
 logging.getLogger("azure.identity").setLevel(logging.WARNING)
 logging.getLogger("azure.core.pipeline.policies.http_logging_policy").setLevel(
