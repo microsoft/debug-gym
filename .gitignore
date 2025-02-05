@@ -177,7 +177,7 @@ logs/
 # Config files
 *.cfg
 
-# /data
+/data
 
 vscode/out
 vscode/node_modules
