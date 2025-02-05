@@ -5,7 +5,7 @@ def load_data():
     print("Loading data...")
 
     # URL of the Titanic dataset (CSV format)
-    url = "https://gist.githubusercontent.com/teamtom/1af7b484954b2d4b7e981ea3e7a27f24/raw/114fb69dce56b4462a9c3a417e7402330616ad4f/titanic_full.csv"
+    url = "https://gist.githubusercontent.com/chisingh/d004edf19fffe92331e153a39466d38c/raw/titanic.csv"
 
     # Read the CSV file
     df = pd.read_csv(url)
