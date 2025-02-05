@@ -7,6 +7,7 @@ from pathlib import Path
 from rich.live import Live
 from termcolor import colored
 
+from froggy.envs import select_env
 from froggy.logger import FroggyLogger
 from froggy.terminal import select_terminal
 from froggy.tools.toolbox import Toolbox
@@ -15,21 +16,6 @@ from froggy.utils import load_config
 
 class BreakTaskLoop(Exception):
     pass
-
-
-def select_env(env_type: str = None):
-    match env_type:
-        case None:
-            from froggy.envs.env import RepoEnv as env_class
-        case "aider":
-            from froggy.envs import AiderBenchmarkEnv as env_class
-        case "swebench":
-            from froggy.envs import SWEBenchEnv as env_class
-        case "terminal_simulator":
-            from froggy.envs import TerminalSimulatorEnv as env_class
-        case _:
-            raise ValueError(f"Unknown benchmark {env_type}")
-    return env_class
 
 
 def run_agent(args, problem, config):
