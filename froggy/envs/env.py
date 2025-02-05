@@ -16,7 +16,7 @@ from froggy.terminal import Terminal
 from froggy.tools.patchers import CodePatcher
 from froggy.tools.pdb import PDBTool
 from froggy.tools.reasoning import ReasoningTool
-from froggy.utils import _walk, make_is_readonly, show_line_number
+from froggy.utils import _walk, make_file_matcher, show_line_number
 
 
 class TooledEnv:
@@ -133,23 +133,6 @@ class RepoEnv(TooledEnv):
         # Set up the terminal working dir
         self.terminal.working_dir = str(self.working_dir)
 
-    def _index_files(self, readonly_patterns: list[str] | None = None):
-        # get list of all the files
-        self.all_files = sorted(
-            os.path.relpath(pjoin(path, name), self.working_dir)
-            for path, _, files in os.walk(self.working_dir)
-            for name in files
-        )
-
-        # get list of editable files
-        froggyignore = (
-            self.working_dir / ".froggyignore"
-        )  # By default look for .froggyignore.
-        self.is_readonly = make_is_readonly(froggyignore, patterns=readonly_patterns)
-        self.editable_files = [
-            p for p in self.all_files if not self.is_readonly(self.working_dir / p)
-        ]
-
     def set_entrypoints(self, entrypoint, debug_entrypoint):
         if entrypoint:
             entrypoint = entrypoint or ""
@@ -180,13 +163,13 @@ class RepoEnv(TooledEnv):
         }
         return _instruction
 
-    def display_files(self, editable_only: bool = False):
-        msg_prefix = "\nEditable" if editable_only else "\nAll"
-        if self.dir_tree_depth is not None:
-            msg = f"{msg_prefix} files up to depth {self.dir_tree_depth}:"
-        else:
-            msg = f"{msg_prefix} files:"
-        msg += self.directory_tree(editable_only=editable_only)
+    def display_files(self):
+        msg = (
+            "Listing files in the current working directory."
+            " (ro) indicates read-only files."
+            f" Max depth: {str(self.dir_tree_depth)}.\n"
+        )
+        msg += self.directory_tree()
         return msg
 
     def restore(self, *filepaths):
@@ -228,8 +211,7 @@ class RepoEnv(TooledEnv):
             "obs": self.obs,
             "dbg_obs": self.dbg_obs if hasattr(self, "dbg_obs") else "",
             "last_run_obs": self.last_run_obs,
-            "dir_tree": self.display_files(editable_only=False),
-            "editable_files": self.display_files(editable_only=True),
+            "dir_tree": self.display_files(),
             "current_breakpoints": (
                 self.tools["pdb"].current_breakpoints()
                 if self.has_tool("pdb")
@@ -260,37 +242,51 @@ class RepoEnv(TooledEnv):
     def load_file(self, filepath: str) -> str:
         return (self.working_dir / filepath).read_text()
 
-    def directory_tree(self, root: str = None, editable_only: bool = False):
-        root = Path(root or self.path).absolute()
+    def _index_files(self, readonly_patterns: list[str] | None = None):
+        # get all file paths relative to the working directory
+        self._is_ignored = make_file_matcher(
+            self.working_dir / ".froggyignore", patterns=readonly_patterns
+        )
+        self.all_files = sorted(
+            os.path.relpath(path, self.working_dir)
+            for path in _walk(self.working_dir, skip=self._is_ignored)
+        )
+
+        # get list of editable files
+        self._is_readonly = make_file_matcher(
+            self.working_dir / ".froggyreadonly", patterns=readonly_patterns
+        )
+        self.editable_files = [
+            p for p in self.all_files if not self._is_readonly(self.working_dir / p)
+        ]
+
+    def directory_tree(self, root: str = None, max_depth: int | None = None):
+        root = Path(root or self.working_dir).absolute()
+        max_depth = max_depth or self.dir_tree_depth
 
         if not root.exists() or root.is_file():
             return (
-                f"\nCould not display directory tree because {root} is not a directory."
+                f"Could not display directory tree because {root} is not a directory."
             )
 
         # initalize with root directory
-        result = ["\n", str(self.working_dir) + "/"]
+        result = [str(root) + "/"]
 
         # get all paths with correct depth
-        for path in _walk(root, self.dir_tree_depth):
-            path = Path(path)
-
+        for path in _walk(root, max_depth, skip=self._is_ignored):
             rel_path = path.relative_to(root)  # relative path from root
-            depth = len(rel_path.parts)  # depth of current path
+            depth = len(rel_path.parts) - 1  # depth of current path
             indent = "  " * depth  # 2 spaces per level for indent
 
-            if editable_only and self.is_readonly(self.working_dir / rel_path):
-                continue
-
             # file vs direcrory formatting
-            if path.is_dir():
-                result.append(f"{indent}|-- {path.name}/")
-            else:
-                if (str(rel_path) in self.editable_files) or (not editable_only):
-                    result.append(f"{indent}|-- {path.name}")
+            result.append(f"{indent}|-- {path.name}")
 
-        result.append("\n")
-        # join with newlines
+            if path.is_dir():
+                result[-1] += "/"
+
+            if str(path.relative_to(self.working_dir)) not in self.editable_files:
+                result[-1] += " (ro)"
+
         return "\n".join(result)
 
     def current_code_with_line_number(self):
@@ -380,8 +376,7 @@ class RepoEnv(TooledEnv):
             "obs": self.obs,
             "last_run_obs": self.last_run_obs,
             "dbg_obs": self.dbg_obs if hasattr(self, "dbg_obs") else "",
-            "dir_tree": self.display_files(editable_only=False),
-            "editable_files": self.display_files(editable_only=True),
+            "dir_tree": self.display_files(),
             "current_code_with_line_number": self.current_code_with_line_number(),
             "current_breakpoints": (
                 self.tools["pdb"].current_breakpoints()

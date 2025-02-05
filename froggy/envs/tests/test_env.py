@@ -1,3 +1,4 @@
+import os
 from os.path import join as pjoin
 from pathlib import Path
 from unittest.mock import MagicMock, mock_open, patch
@@ -190,46 +191,46 @@ def test_instructions():
     assert instructions == expected_instructions
 
 
-@patch("shutil.copy2")
-@patch("os.path.isdir", return_value=False)
-@patch("glob.glob", return_value=["/path/to/repo/file1.txt", "/path/to/repo/file2.txt"])
-@patch("os.scandir")
-@patch("os.walk")
-@patch("shutil.copytree")
-def test_restore(
-    mock_copytree, mock_os_walk, mock_scandir, mock_glob, mock_isdir, mock_copy2
-):
-    mock_scandir.return_value.__enter__.return_value = [
-        MagicMock(is_dir=lambda: False, path="/path/to/repo/file1.txt"),
-        MagicMock(is_dir=lambda: False, path="/path/to/repo/file2.txt"),
-    ]
-    mock_os_walk.return_value = [
-        ("/path/to/repo", ("subdir",), ("file1.txt", "file2.txt")),
-        ("/path/to/repo/subdir", (), ("subfile1.txt",)),
-    ]
-    env = RepoEnv(path="/path/to/repo")
-    env.restore("/path/to/repo/file1.txt", "/path/to/repo/file2.txt")
+@pytest.fixture
+def env(tmp_path):
+    tmp_path = Path(tmp_path)
+    repo_path = tmp_path / "repo"
+    repo_path.mkdir()
+    subdir_path = repo_path / "subdir"
+    subdir_path.mkdir()
+    (repo_path / "file1.txt").touch()
+    (repo_path / "file2.txt").touch()
+    (subdir_path / "subfile1.txt").touch()
 
-    mock_glob.assert_not_called()
-    mock_isdir.assert_any_call(Path("/path/to/repo/file1.txt"))
-    mock_isdir.assert_any_call(Path("/path/to/repo/file2.txt"))
-    mock_copy2.assert_any_call(
-        Path("/path/to/repo/file1.txt"), Path(env.working_dir) / "file1.txt"
+    env = RepoEnv(path=repo_path, dir_tree_depth=2)
+    return env
+
+
+def test_restore(env):
+    # Change the content of a file
+    file1 = env.working_dir / "file1.txt"
+    with open(file1, "w") as f:
+        f.write("Hello, World!")
+
+    def hash_file(file):
+        with open(file, "rb") as f:
+            return hash(f.read())
+
+    assert hash_file(env.path / "file1.txt") != hash_file(file1)
+    env.restore()
+    assert hash_file(env.path / "file1.txt") == hash_file(file1)
+
+
+def test_display_files(env):
+    result = env.display_files()
+    assert result == (
+        "Listing files in the current working directory. (ro) indicates read-only files. Max depth: 2.\n"
+        f"{env.working_dir}/\n"
+        "|-- file1.txt\n"
+        "|-- file2.txt\n"
+        "|-- subdir/\n"
+        "  |-- subfile1.txt"
     )
-    mock_copy2.assert_any_call(
-        Path("/path/to/repo/file2.txt"), Path(env.working_dir) / "file2.txt"
-    )
-
-
-@patch.object(RepoEnv, "directory_tree")
-def test_display_files(mock_directory_tree):
-    mock_directory_tree.return_value = "\n|-- file1.py\n|-- file2.py\n"
-    env = RepoEnv()
-    result = env.display_files(editable_only=False)
-
-    expected_result = "\nAll files:\n|-- file1.py\n|-- file2.py\n"
-    assert result == expected_result
-    mock_directory_tree.assert_called_once_with(editable_only=False)
 
 
 @patch("froggy.utils.show_line_number")
@@ -284,7 +285,6 @@ def test_step(
     assert "last_run_obs" in infos
     assert "dbg_obs" in infos
     assert "dir_tree" in infos
-    assert "editable_files" in infos
     assert "current_breakpoints" in infos
     assert "current_code_with_line_number" in infos
     assert "action" in infos
@@ -295,71 +295,41 @@ def test_step(
     assert "rewrite_counter" in infos
 
 
-@patch("froggy.utils._walk")
-@patch("pathlib.Path.exists", return_value=True)
-@patch("pathlib.Path.is_file", return_value=False)
-@patch("os.scandir")
-@patch("os.walk")
-@patch("shutil.copytree")
-@patch("tempfile.TemporaryDirectory")
-def test_directory_tree(
-    mock_tempdir,
-    mock_copytree,
-    mock_os_walk,
-    mock_scandir,
-    mock_is_file,
-    mock_exists,
-    mock_walk,
-):
-    mock_tempdir.return_value.name = "/mock/tempdir"
-    mock_scandir.return_value.__enter__.return_value = [
-        MagicMock(is_dir=lambda: False, path="/path/to/repo/file1.txt"),
-        MagicMock(is_dir=lambda: False, path="/path/to/repo/file2.txt"),
-    ]
-    mock_os_walk.return_value = [
-        ("/path/to/repo", ("subdir",), ("file1.py", "file2.py")),
-        ("/path/to/repo/subdir", (), ("subfile1.txt",)),
-    ]
-    env = RepoEnv(path="/path/to/repo")
+def test_directory_tree(tmp_path):
+    tmp_path = Path(tmp_path)
+    repo_path = tmp_path / "repo"
+    repo_path.mkdir()
+    subdir_path = repo_path / "subdir"
+    subdir_path.mkdir()
+    (repo_path / "file1.txt").touch()
+    (repo_path / "file2.txt").touch()
+    (subdir_path / "subfile1.txt").touch()
+
+    env = RepoEnv(path=repo_path, dir_tree_depth=3)
     result = env.directory_tree()
     expected_result = (
-        "\n\n" "/mock/tempdir/\n  " "|-- file1.txt\n  " "|-- file2.txt\n\n"
+        f"{env.working_dir}/\n"
+        "|-- file1.txt\n"
+        "|-- file2.txt\n"
+        "|-- subdir/\n"
+        "  |-- subfile1.txt"
     )
     assert result == expected_result
 
 
 @patch.object(RepoEnv, "restore")
 @patch.object(RepoEnv, "run")
-@patch.object(RepoEnv, "has_tool", return_value=False)
 @patch.object(RepoEnv, "get_tool")
-@patch("os.scandir")
-@patch("os.walk")
-@patch("shutil.copytree")
-@patch("tempfile.TemporaryDirectory")
 def test_reset(
-    mock_tempdir,
-    mock_copytree,
-    mock_os_walk,
-    mock_scandir,
     mock_get_tool,
-    mock_has_tool,
     mock_run,
     mock_restore,
+    env,
 ):
     mock_pdb_tool = MagicMock()
     mock_pdb_tool.start_pseudo_terminal.return_value = None
     mock_pdb_tool.pdb_obs = "PDB started"
     mock_get_tool.return_value = mock_pdb_tool
-    mock_tempdir.return_value.name = "/mock/tempdir"
-    mock_scandir.return_value.__enter__.return_value = [
-        MagicMock(is_dir=lambda: False, path="/path/to/repo/file1.txt"),
-        MagicMock(is_dir=lambda: False, path="/path/to/repo/file2.txt"),
-    ]
-    mock_os_walk.return_value = [
-        ("/path/to/repo", ("subdir",), ("file1.py", "file2.py")),
-        ("/path/to/repo/subdir", (), ("subfile1.txt",)),
-    ]
-    env = RepoEnv(path="/path/to/repo")
     obs, infos = env.reset(seed=42)
 
     mock_restore.assert_called_once()
@@ -372,7 +342,6 @@ def test_reset(
     assert "dbg_obs" in infos
     assert "last_run_obs" in infos
     assert "dir_tree" in infos
-    assert "editable_files" in infos
     assert "current_breakpoints" in infos
     assert "current_code_with_line_number" in infos
     assert "action" in infos
@@ -383,54 +352,32 @@ def test_reset(
     assert "rewrite_counter" in infos
 
 
-@patch("os.scandir")
-@patch("os.walk")
-@patch("shutil.copytree")
-@patch("builtins.open", new_callable=mock_open)
-def test_overwrite_file(mock_open_fn, mock_copytree, mock_os_walk, mock_scandir):
-    mock_scandir.return_value.__enter__.return_value = [
-        MagicMock(is_dir=lambda: False, path="/path/to/repo/file1.txt"),
-        MagicMock(is_dir=lambda: False, path="/path/to/repo/file2.txt"),
-    ]
-    mock_os_walk.return_value = [
-        ("/path/to/repo", ("subdir",), ("file1.py", "file2.py")),
-        ("/path/to/repo/subdir", (), ("subfile1.txt",)),
-    ]
-    env = RepoEnv(path="/path/to/repo")
+def test_overwrite_file(env):
     filepath = "file.py"
     content = 'print("Hello, World!")'
     env.overwrite_file(filepath, content)
 
-    mock_open_fn.assert_called_once_with(pjoin(env.working_dir, filepath), "w")
-    mock_open_fn().write.assert_called_once_with(content)
+    with open(env.working_dir / filepath, "r") as f:
+        assert f.read() == content
 
 
-@patch("os.scandir")
-@patch("os.walk")
-@patch("shutil.copytree")
-@patch("subprocess.run")
-def test_patch(mock_subprocess_run, mock_copytree, mock_os_walk, mock_scandir):
-    mock_result = MagicMock()
-    mock_result.stdout = "diff --git a/path/to/repo/file1.py b/path/to/repo/file1.py\n"
-    mock_subprocess_run.return_value = mock_result
-    mock_scandir.return_value.__enter__.return_value = [
-        MagicMock(is_dir=lambda: False, path="/path/to/repo/file1.txt"),
-        MagicMock(is_dir=lambda: False, path="/path/to/repo/file2.txt"),
-    ]
-    mock_os_walk.return_value = [
-        ("/path/to/repo", ("subdir",), ("file1.py", "file2.py")),
-        ("/path/to/repo/subdir", (), ("subfile1.txt",)),
-    ]
-    env = RepoEnv(path="/path/to/repo")
+def test_patch(env):
+    # Change the content of a file
+    file1 = env.working_dir / "file1.txt"
+    with open(file1, "w") as f:
+        f.write("Hello, World!")
+
     result = env.patch
-    expected_result = "diff --git a/path/to/repo/file1.py b/path/to/repo/file1.py\n"
-
-    mock_subprocess_run.assert_called_once_with(
-        ["git", "diff", "--no-index", env.path, env.working_dir],
-        text=True,
-        capture_output=True,
+    expected = (
+        f"diff --git a{env.path}/file1.txt b{env.path}/file1.txt\n"
+        "index e69de29..b45ef6f 100644\n"
+        f"--- a{env.path}/file1.txt\n"
+        f"+++ b{env.path}/file1.txt\n"
+        "@@ -0,0 +1 @@\n"
+        "+Hello, World!\n"
+        "\\ No newline at end of file\n"
     )
-    assert result == expected_result
+    assert result == expected
 
 
 def test_run_success(tmp_path):

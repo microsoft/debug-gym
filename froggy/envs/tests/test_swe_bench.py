@@ -101,54 +101,6 @@ def test_clone_repo(tmp_path, get_swe_env):
 
 
 @if_docker_running
-def test_make_froggyignore(tmp_path, get_swe_env):
-    working_dir = str(tmp_path)
-    swe_env = get_swe_env(working_dir)
-    task_name = "astropy__astropy-14096"
-    row = swe_env.dataset[task_name]
-    repo_address = row["repo"]
-    local_repo_path = swe_env.clone_repo(repo_address)
-    swe_env.make_froggyignore(local_repo_path, include_gitignore=False)
-    with open(local_repo_path / ".froggyignore", "r") as f:
-        froggyignore = f.read().splitlines()
-    assert froggyignore == swe_env.ignore_files
-
-
-@if_docker_running
-def test_make_froggyignore_include_gitignore(tmp_path, get_swe_env):
-    working_dir = str(tmp_path)
-    swe_env = get_swe_env(working_dir)
-    task_name = "astropy__astropy-14096"
-    row = swe_env.dataset[task_name]
-    repo_address = row["repo"]
-    local_repo_path = swe_env.clone_repo(repo_address)
-    swe_env.make_froggyignore(local_repo_path)
-    with open(local_repo_path / ".froggyignore", "r") as f:
-        froggyignore = f.read().splitlines()
-    assert froggyignore[: len(swe_env.ignore_files)] == swe_env.ignore_files
-    assert len(froggyignore) > len(swe_env.ignore_files)
-
-
-@if_docker_running
-def test_make_froggyignore_additional_contents(tmp_path, get_swe_env):
-    working_dir = str(tmp_path)
-    swe_env = get_swe_env(working_dir)
-    task_name = "astropy__astropy-14096"
-    row = swe_env.dataset[task_name]
-    repo_address = row["repo"]
-    local_repo_path = swe_env.clone_repo(repo_address)
-    additionnal_contents = ["test1", "test2"]
-    swe_env.make_froggyignore(
-        local_repo_path,
-        include_gitignore=False,
-        additionnal_contents=additionnal_contents,
-    )
-    with open(local_repo_path / ".froggyignore", "r") as f:
-        froggyignore = f.read().splitlines()
-    assert froggyignore == swe_env.ignore_files + additionnal_contents
-
-
-@if_docker_running
 def test_instructions(get_swe_env):
     swe_env = get_swe_env()
     swe_env.ds_row = {"problem_statement": "Test problem statement"}

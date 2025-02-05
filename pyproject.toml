@@ -19,8 +19,9 @@ classifiers = [
 [tool.setuptools.dynamic]
 dependencies = {file = ["requirements.txt"]}
 
-[tool.setuptools.packages]
-find = {}
+[tool.setuptools.packages.find]
+exclude = [".*tests.*", "exps/*", "output_*"]
+
 
 [project.optional-dependencies]
 dev = [

@@ -1,4 +1,5 @@
 import logging
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -8,11 +9,12 @@ from froggy.utils import (
     _walk,
     clean_code,
     cleanup_pytest_output,
+    create_ignore_file,
     extract_max_score_from_pytest_output,
     extract_reward_from_pytest_output,
     is_subdirectory,
     load_config,
-    make_is_readonly,
+    make_file_matcher,
     show_line_number,
     str2bool,
     time_limit,
@@ -96,16 +98,9 @@ def test_show_line_number():
     assert show_line_number(code_string) == expected
 
 
-def test_make_is_readonly():
-    import atexit
-    import tempfile
-    from pathlib import Path
-
-    # do the test in a tmp folder
-    tempdir = tempfile.TemporaryDirectory(prefix="TestFroggyignore-")
-    working_dir = Path(tempdir.name)
+def test_make_file_matcher(tmp_path):
+    working_dir = Path(tmp_path)
     ignore_file = working_dir / ".froggyignore"
-    atexit.register(tempdir.cleanup)  # Make sure to cleanup that folder once done.
 
     for with_negation in [False, True]:
         froggyignore_contents = "\n".join(
@@ -128,30 +123,67 @@ def test_make_is_readonly():
             froggyignore_contents += "\n!data/unignore/*"
         with open(ignore_file, "w") as f:
             f.write(froggyignore_contents)
-        is_readonly = make_is_readonly(ignore_file, patterns=["source/*.frog"])
+        is_ignored = make_file_matcher(ignore_file, patterns=["source/*.frog"])
 
-        assert is_readonly(working_dir / "foo.py") is False
-        assert is_readonly(working_dir / "source/source.py") is False
-        assert is_readonly(working_dir / "source/__init__.py") is False
-        assert is_readonly(working_dir / "source/main.frog") is True
-        assert is_readonly(working_dir / "utils/main.frog") is False
-        assert is_readonly(working_dir / ".DS_Store") is True
-        assert is_readonly(working_dir / "foo.pyc") is True
-        assert is_readonly(working_dir / "foo_test.py") is True
-        assert is_readonly(working_dir / "testy.py") is True
-        assert is_readonly(working_dir / "data/foo.py") is True
-        assert is_readonly(working_dir / "docs/source_code.py") is False
-        assert is_readonly(working_dir / ".docs/source_code.py") is True
-        assert is_readonly(working_dir / "this_is_code.md") is True
-        assert is_readonly(working_dir / ".froggyignore") is True
-        assert is_readonly(working_dir / "log/foo.py") is True
-        assert is_readonly(working_dir / "source/fotesto.py") is True
-        assert is_readonly(working_dir / ".meta/important.cc") is True
-        assert is_readonly(working_dir / "data/specific.py") is True
+        assert is_ignored(working_dir / "foo.py") is False
+        assert is_ignored(working_dir / "source/source.py") is False
+        assert is_ignored(working_dir / "source/__init__.py") is False
+        assert is_ignored(working_dir / "source/main.frog") is True
+        assert is_ignored(working_dir / "utils/main.frog") is False
+        assert is_ignored(working_dir / ".DS_Store") is True
+        assert is_ignored(working_dir / "foo.pyc") is True
+        assert is_ignored(working_dir / "foo_test.py") is True
+        assert is_ignored(working_dir / "testy.py") is True
+        assert is_ignored(working_dir / "data/foo.py") is True
+        assert is_ignored(working_dir / "docs/source_code.py") is False
+        assert is_ignored(working_dir / ".docs/source_code.py") is True
+        assert is_ignored(working_dir / "this_is_code.md") is True
+        assert is_ignored(working_dir / ".froggyignore") is True
+        assert is_ignored(working_dir / "log/foo.py") is True
+        assert is_ignored(working_dir / "source/fotesto.py") is True
+        assert is_ignored(working_dir / ".meta/important.cc") is True
+        assert is_ignored(working_dir / "data/specific.py") is True
         if with_negation is True:
-            assert is_readonly(working_dir / "data/unignore/foo.py") is False
+            assert is_ignored(working_dir / "data/unignore/foo.py") is False
         else:
-            assert is_readonly(working_dir / "data/unignore/foo.py") is True
+            assert is_ignored(working_dir / "data/unignore/foo.py") is True
+
+
+def test_create_ignore_file(tmp_path):
+    # Test without including .gitignore
+    test_dir = tmp_path / "test_dir"
+    froggyignore_path = test_dir / ".froggyignore"
+    test_dir.mkdir()
+    create_ignore_file(
+        froggyignore_path, patterns=["*.pyc", "*.log"], include_gitignore=False
+    )
+    assert froggyignore_path.exists()
+    with open(froggyignore_path) as f:
+        contents = f.read().splitlines()
+    assert contents == ["*.pyc", "*.log", ".froggyignore"]
+
+    # Test with including .gitignore
+    gitignore_path = test_dir / ".gitignore"
+    with open(gitignore_path, "w") as f:
+        f.write("*.tmp\n*.bak\n")
+    create_ignore_file(
+        froggyignore_path, patterns=["*.pyc", "*.log"], include_gitignore=True
+    )
+    with open(froggyignore_path) as f:
+        contents = f.read().splitlines()
+    assert contents == ["*.pyc", "*.log", "*.tmp", "*.bak", ".froggyignore"]
+
+    # Test with empty patterns and without including .gitignore
+    create_ignore_file(froggyignore_path, patterns=[], include_gitignore=False)
+    with open(froggyignore_path) as f:
+        contents = f.read().splitlines()
+    assert contents == [".froggyignore"]
+
+    # Test with empty patterns and including .gitignore
+    create_ignore_file(froggyignore_path, patterns=[], include_gitignore=True)
+    with open(froggyignore_path) as f:
+        contents = f.read().splitlines()
+    assert contents == ["*.tmp", "*.bak", ".froggyignore"]
 
 
 def test_str2bool():
@@ -252,13 +284,13 @@ def test_walk():
     for p in _walk(path, 1):
         path_list.append(p)
     expected = [
-        "data/terminal_simulator/.froggyignore",
-        "data/terminal_simulator/buggy",
-        "data/terminal_simulator/code",
-        "data/terminal_simulator/README.md",
-        "data/terminal_simulator/test_part_1.py",
-        "data/terminal_simulator/test_part_2.py",
-        "data/terminal_simulator/test.py",
+        Path("data/terminal_simulator/.froggyignore"),
+        Path("data/terminal_simulator/buggy"),
+        Path("data/terminal_simulator/code"),
+        Path("data/terminal_simulator/README.md"),
+        Path("data/terminal_simulator/test_part_1.py"),
+        Path("data/terminal_simulator/test_part_2.py"),
+        Path("data/terminal_simulator/test.py"),
     ]
     # sort the list
     path_list.sort()
@@ -270,19 +302,19 @@ def test_walk():
     for p in _walk(path, 2):
         path_list.append(p)
     expected = [
-        "data/terminal_simulator/.froggyignore",
-        "data/terminal_simulator/buggy",
-        "data/terminal_simulator/buggy/buggy_code_info_20241031-205241.json",
-        "data/terminal_simulator/code",
-        "data/terminal_simulator/code/__init__.py",
-        "data/terminal_simulator/code/base_simulator.py",
-        "data/terminal_simulator/code/run_terminal_simulator.py",
-        "data/terminal_simulator/code/some_random_code.py",
-        "data/terminal_simulator/code/terminal_simulator.py",
-        "data/terminal_simulator/README.md",
-        "data/terminal_simulator/test_part_1.py",
-        "data/terminal_simulator/test_part_2.py",
-        "data/terminal_simulator/test.py",
+        Path("data/terminal_simulator/.froggyignore"),
+        Path("data/terminal_simulator/buggy"),
+        Path("data/terminal_simulator/buggy/buggy_code_info_20241031-205241.json"),
+        Path("data/terminal_simulator/code"),
+        Path("data/terminal_simulator/code/__init__.py"),
+        Path("data/terminal_simulator/code/base_simulator.py"),
+        Path("data/terminal_simulator/code/run_terminal_simulator.py"),
+        Path("data/terminal_simulator/code/some_random_code.py"),
+        Path("data/terminal_simulator/code/terminal_simulator.py"),
+        Path("data/terminal_simulator/README.md"),
+        Path("data/terminal_simulator/test_part_1.py"),
+        Path("data/terminal_simulator/test_part_2.py"),
+        Path("data/terminal_simulator/test.py"),
     ]
     # sort the list
     path_list.sort()
@@ -294,19 +326,19 @@ def test_walk():
     for p in _walk(path, None):
         path_list.append(p)
     expected = [
-        "data/terminal_simulator/.froggyignore",
-        "data/terminal_simulator/buggy",
-        "data/terminal_simulator/buggy/buggy_code_info_20241031-205241.json",
-        "data/terminal_simulator/code",
-        "data/terminal_simulator/code/__init__.py",
-        "data/terminal_simulator/code/base_simulator.py",
-        "data/terminal_simulator/code/run_terminal_simulator.py",
-        "data/terminal_simulator/code/some_random_code.py",
-        "data/terminal_simulator/code/terminal_simulator.py",
-        "data/terminal_simulator/README.md",
-        "data/terminal_simulator/test_part_1.py",
-        "data/terminal_simulator/test_part_2.py",
-        "data/terminal_simulator/test.py",
+        Path("data/terminal_simulator/.froggyignore"),
+        Path("data/terminal_simulator/buggy"),
+        Path("data/terminal_simulator/buggy/buggy_code_info_20241031-205241.json"),
+        Path("data/terminal_simulator/code"),
+        Path("data/terminal_simulator/code/__init__.py"),
+        Path("data/terminal_simulator/code/base_simulator.py"),
+        Path("data/terminal_simulator/code/run_terminal_simulator.py"),
+        Path("data/terminal_simulator/code/some_random_code.py"),
+        Path("data/terminal_simulator/code/terminal_simulator.py"),
+        Path("data/terminal_simulator/README.md"),
+        Path("data/terminal_simulator/test_part_1.py"),
+        Path("data/terminal_simulator/test_part_2.py"),
+        Path("data/terminal_simulator/test.py"),
     ]
     # sort the list
     path_list.sort()

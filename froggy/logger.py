@@ -51,21 +51,23 @@ class FroggyLogger(logging.Logger):
     def __init__(
         self,
         name: str,
+        is_task: bool = True,
         log_dir: str | None = None,
         level: str | int = logging.INFO,
         mode: str = "a",
     ):
         super().__init__(name)
         self.setLevel(logging.DEBUG)
-        self.task_id = self.task_progress.add_task(
-            f"\\[{name}]:", log="Starting task..."
-        )
+        if is_task:
+            self.task_id = self.task_progress.add_task(
+                f"\\[{name}]:", log="Starting task..."
+            )
 
-        ph = ProgressHandler(self.task_progress, self.task_id)
-        ph.setLevel(level)
-        formatter = logging.Formatter("%(levelname)-8s %(message)s")
-        ph.setFormatter(formatter)
-        self.addHandler(ph)
+            ph = ProgressHandler(self.task_progress, self.task_id)
+            ph.setLevel(level)
+            formatter = logging.Formatter("%(levelname)-8s %(message)s")
+            ph.setFormatter(formatter)
+            self.addHandler(ph)
 
         console = logging.StreamHandler()
         formatter = logging.Formatter("🐸 [%(name)-12s]: %(levelname)-8s %(message)s")
@@ -97,6 +99,6 @@ class FroggyLogger(logging.Logger):
             yield item
 
     def stop(self, remove: bool = False):
-        self.task_progress.stop(self.task_id)
+        self.task_progress.stop_task(self.task_id)
         if remove:
             self.task_progress.remove_task(self.task_id)
