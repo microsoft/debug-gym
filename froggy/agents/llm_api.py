@@ -109,7 +109,6 @@ class LLM:
 
         if "azure openai" in self.config.get("tags", []):
             kwargs = self._get_azure_oai_kwargs()
-
             self.client = AzureOpenAI(**kwargs)
         else:
             self.client = OpenAI(
@@ -141,9 +140,20 @@ class LLM:
         if api_key:  # api key
             kwargs["api_key"] = api_key
         elif scope:  # az login
-            from azure.identity import AzureCliCredential, get_bearer_token_provider
+            from azure.identity import (
+                AzureCliCredential,
+                ChainedTokenCredential,
+                ManagedIdentityCredential,
+                get_bearer_token_provider,
+            )
 
-            credential = get_bearer_token_provider(AzureCliCredential(), scope)
+            credential = get_bearer_token_provider(
+                ChainedTokenCredential(
+                    AzureCliCredential(),
+                    ManagedIdentityCredential(),
+                ),
+                scope,
+            )
             kwargs["azure_ad_token_provider"] = credential
         else:
             raise ValueError(
