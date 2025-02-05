@@ -134,44 +134,40 @@ def main():
     logger = FroggyLogger("froggy", level=args.logging_level, is_task=False)
 
     available_agents = list(config.keys())
-    assert (
-        args.agent in available_agents
-    ), f"Invalid agent. Available agents: {available_agents}"
+    if args.agent not in available_agents:
+        raise ValueError(
+            f"Invalid agent: {args.agent}. Available agents: {available_agents}"
+        )
 
     config = config[args.agent]
 
-    # run agent, loop over the tasks
-    if "benchmark" in config and "problems" in config:
-        if "all" == config["problems"]:
-            env = create_env(args, config, logger=logger)
-            problem_list = env.dataset.keys()  # all tasks
-        else:
-            assert isinstance(config["problems"], list)
-            problem_list = config["problems"]
+    # Figure out which problems to solve.
+    problems = config.get("problems", ["custom"])
+    if problems == "all" and "benchmark" in config:
+        env = create_env(args, config, logger=logger)
+        problems = list(env.dataset.keys())  # all tasks
 
-        num_workers = int(os.environ.get("FROGGY_WORKERS", 1))
+    with Live(logger.progress_group, refresh_per_second=20) as live:
+        num_workers = int(os.environ.get("FROGGY_WORKERS", 0))
+        if args.debug:
+            num_workers = 0
+            live.stop()  # Because it interferes with pdb.
+
         tasks_done = 0
         mean_perf = 0
 
         tasks_succeeded = []
-
-        overall_task_id = logger.overall_progress.add_task("", total=len(problem_list))
-        top_descr = "[bold #AAAAAA](%d out of %d tasks done)" % (
-            tasks_done,
-            len(problem_list),
-        )
-        logger.overall_progress.update(
-            overall_task_id, description=top_descr, advance=0
+        overall_task_id = logger.overall_progress.add_task(
+            description=f"[bold #AAAAAA]({tasks_done} out of {len(problems)} tasks done)",
+            total=len(problems),
         )
 
-        with Live(logger.progress_group, refresh_per_second=20) as live:
-            if args.debug:
-                live.stop()  # Because it interferes with pdb.
-
+        if num_workers > 1:
+            # Multi-thread
             with ThreadPoolExecutor(num_workers) as executor:
                 futures = {
                     executor.submit(run_agent, args, problem, config): problem
-                    for problem in problem_list
+                    for problem in problems
                 }
                 for future in as_completed(futures):
                     if future.cancelled():
@@ -187,12 +183,13 @@ def main():
                             tasks_succeeded.append(problem)
 
                         # update message on overall progress bar
-                        top_descr = (
-                            f"[bold #AAAAAA]({tasks_done} out of {len(problem_list)} tasks "
-                            f"done - [bold green]{mean_perf}[bold #AAAAAA] are successful)"
-                        )
                         logger.overall_progress.update(
-                            overall_task_id, description=top_descr, advance=1
+                            overall_task_id,
+                            description=(
+                                f"[bold #AAAAAA]({tasks_done} out of {len(problems)} tasks "
+                                f"done - [bold green]{mean_perf}[bold #AAAAAA] are successful)"
+                            ),
+                            advance=1,
                         )
                     except (KeyboardInterrupt, BreakTaskLoop) as e:
                         live.stop()
@@ -203,26 +200,41 @@ def main():
                         executor.shutdown(wait=False, cancel_futures=True)
                         raise e
 
-            # final update for message on overall progress bar
-            logger.overall_progress.update(
-                overall_task_id,
-                description=f"[bold green]{mean_perf}/{tasks_done} success!",
-            )
+        else:
+            # Single thread
+            for problem in problems:
+                try:
+                    success = run_agent(args, problem, config)
+                    mean_perf += success
+                    tasks_done += 1
+
+                    if success:
+                        tasks_succeeded.append(problem)
+
+                    # update message on overall progress bar
+                    logger.overall_progress.update(
+                        overall_task_id,
+                        description=(
+                            f"[bold #AAAAAA]({tasks_done} out of {len(problems)} tasks "
+                            f"done - [bold green]{mean_perf}[bold #AAAAAA] are successful)"
+                        ),
+                        advance=1,
+                    )
+                except (KeyboardInterrupt, BreakTaskLoop) as e:
+                    live.stop()
+                    raise e
+                except Exception as e:
+                    live.stop()
+                    raise e
+
+        # final update for message on overall progress bar
+        logger.overall_progress.update(
+            overall_task_id,
+            description=f"[bold green]{mean_perf}/{tasks_done} success!",
+        )
 
         logger.info(f"Tasks that succeeded: {tasks_succeeded}")
-    else:
-        # custom repo
-        print(colored(f"Running agent {agent.name}", "green"))
-        env = create_env(args, config)
-        agent = create_agent(args, config=config, env=env, logger=logger)
-        agent.run(debug=args.debug)
-
-        # optionally apply patch
-        if config["save_patch"]:
-            agent.save_patch()
-
-        # save log
-        agent.log()
+        logger.info(f"Tasks that failed: {set(problems) - set(tasks_succeeded)}")
 
 
 if __name__ == "__main__":
