@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import random
 import sys
@@ -27,6 +28,14 @@ try:
     prompt_toolkit_available = sys.stdout.isatty()
 except ImportError:
     pass
+
+
+# Set logging level down to WARNING for endpoint queries.
+logging.getLogger("openai").setLevel(logging.WARNING)
+logging.getLogger("azure.identity").setLevel(logging.WARNING)
+logging.getLogger("azure.core.pipeline.policies.http_logging_policy").setLevel(
+    logging.WARNING
+)
 
 
 def load_llm_config(config_file_path: str | None = None):
