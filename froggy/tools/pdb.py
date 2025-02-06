@@ -157,7 +157,7 @@ class PDBTool(EnvironmentTool):
             if self.auto_list and command.split()[0] not in ["l", "list"]:
                 if '"""The pytest entry point."""' not in obs:
                     # TODO: add output to self.pdb_obs?
-                    obs += f" list .\n" + self.interact_with_pdb("l .")
+                    obs += f"\nlist .\n" + self.interact_with_pdb("l .")
         else:
             obs = "\n".join([f"Invalid action: {action}", _warning, output])
 
