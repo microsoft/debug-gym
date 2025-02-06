@@ -80,6 +80,7 @@ def create_env(config: dict, logger: FroggyLogger):
 
         if tool == "pdb":
             kwargs["persistent_breakpoints"] = config["persistent_breakpoints"]
+            kwargs["auto_list"] = config["auto_list"]
 
         tool_instantiated = Toolbox.get_tool(tool, **kwargs)
         env.add_tool(tool_instantiated)

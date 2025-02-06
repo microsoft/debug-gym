@@ -16,6 +16,7 @@ pdb_agent:
         setup_commands: ["pip install pytest"]
     }
     persistent_breakpoints: True  # in pdb tool
+    auto_list: True  # in pdb tool
 
     # LLM configs
     llm_name: "gpt-4o-az-login"
@@ -49,6 +50,7 @@ rewrite_only:
         setup_commands: ["pip install pytest"]
     }
     persistent_breakpoints: True  # in pdb tool
+    auto_list: True  # in pdb tool
 
     # LLM configs
     llm_name: "gpt-4o-az-login"
@@ -83,6 +85,7 @@ pdb_after_rewrites:
         setup_commands: ["pip install pytest"]
     }
     persistent_breakpoints: True  # in pdb tool
+    auto_list: True  # in pdb tool
 
     # LLM configs
     llm_name: "gpt-4o-az-login"
