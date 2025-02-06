@@ -4,8 +4,8 @@ import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
-from rich.live import Live
 from termcolor import colored
+from tqdm import tqdm
 
 from froggy.envs import select_env
 from froggy.logger import FroggyLogger
@@ -24,7 +24,6 @@ def run_agent(args, problem, config):
 
     task_logger = FroggyLogger(
         problem,
-        is_task=True,
         log_dir=exp_path,
         level=args.logging_level,
         mode="w" if args.force_all else "a",
@@ -39,7 +38,6 @@ def run_agent(args, problem, config):
             task_logger.debug(f"Previous run success: {success}")
             if not args.force_failed or success:
                 task_logger.info("[bold gray]Skipped, already done.")
-                task_logger.stop(remove=not args.keep_completed_tasks)
                 return success
 
         env = create_env(config, task_logger)
@@ -68,7 +66,6 @@ def run_agent(args, problem, config):
         success = False
 
     task_logger.info("[bold green]Completed!")
-    task_logger.stop(remove=not args.keep_completed_tasks)
     return success
 
 
@@ -109,7 +106,7 @@ def create_agent(agent_type, **kwargs):
 
 def main():
     config, args = load_config()
-    logger = FroggyLogger("froggy", level=args.logging_level, is_task=False)
+    logger = FroggyLogger("froggy", level=args.logging_level)
 
     available_agents = list(config.keys())
     if args.agent not in available_agents:
@@ -125,64 +122,32 @@ def main():
         env = create_env(config, logger=logger)
         problems = list(env.dataset.keys())  # all tasks
 
-    with Live(logger.progress_group, refresh_per_second=20) as live:
-        num_workers = int(os.environ.get("FROGGY_WORKERS", 0))
-        if args.debug:
-            num_workers = 0
-            live.stop()  # Because it interferes with pdb.
+    num_workers = int(os.environ.get("FROGGY_WORKERS", 0))
+    logger.warning(f"Running with {num_workers} workers")
+    if args.debug:
+        num_workers = 0
 
-        tasks_done = 0
-        mean_perf = 0
+    tasks_done = 0
+    mean_perf = 0
+    tasks_succeeded = []
 
-        tasks_succeeded = []
-        overall_task_id = logger.overall_progress.add_task(
-            description=f"[bold #AAAAAA]({tasks_done} out of {len(problems)} tasks done)",
-            total=len(problems),
-        )
+    if num_workers > 1:
+        # Multi-thread
+        with ThreadPoolExecutor(num_workers) as executor:
+            futures = {
+                executor.submit(run_agent, args, problem, config): problem
+                for problem in problems
+            }
+            mean_perf_text = colored(f"{mean_perf}", "green")
+            desc = f"Overall progress ({mean_perf_text} are successful)"
+            pbar = tqdm(as_completed(futures), desc=desc, total=len(problems))
+            for future in pbar:
+                if future.cancelled():
+                    continue
 
-        if num_workers > 1:
-            # Multi-thread
-            with ThreadPoolExecutor(num_workers) as executor:
-                futures = {
-                    executor.submit(run_agent, args, problem, config): problem
-                    for problem in problems
-                }
-                for future in as_completed(futures):
-                    if future.cancelled():
-                        continue
-
-                    try:
-                        problem = futures[future]
-                        success = future.result()
-                        mean_perf += success
-                        tasks_done += 1
-
-                        if success:
-                            tasks_succeeded.append(problem)
-
-                        # update message on overall progress bar
-                        logger.overall_progress.update(
-                            overall_task_id,
-                            description=(
-                                f"[bold #AAAAAA]({tasks_done} out of {len(problems)} tasks "
-                                f"done - [bold green]{mean_perf}[bold #AAAAAA] are successful)"
-                            ),
-                            advance=1,
-                        )
-                    except (KeyboardInterrupt, BreakTaskLoop) as e:
-                        live.stop()
-                        executor.shutdown(wait=False, cancel_futures=True)
-                        raise e
-                    except Exception as e:
-                        live.stop()
-                        executor.shutdown(wait=False, cancel_futures=True)
-                        raise e
-
-        else:
-            # Single thread
-            for problem in problems:
                 try:
-                    success = run_agent(args, problem, config)
+                    problem = futures[future]
+                    success = future.result()
                     mean_perf += success
                     tasks_done += 1
 
@@ -190,26 +155,40 @@ def main():
                         tasks_succeeded.append(problem)
 
                     # update message on overall progress bar
-                    logger.overall_progress.update(
-                        overall_task_id,
-                        description=(
-                            f"[bold #AAAAAA]({tasks_done} out of {len(problems)} tasks "
-                            f"done - [bold green]{mean_perf}[bold #AAAAAA] are successful)"
-                        ),
-                        advance=1,
+                    mean_perf_text = colored(f"{mean_perf}", "green")
+                    pbar.set_description(
+                        f"Overall tasks done ({mean_perf_text} are successful)"
                     )
                 except (KeyboardInterrupt, BreakTaskLoop) as e:
-                    live.stop()
+                    executor.shutdown(wait=False, cancel_futures=True)
                     raise e
                 except Exception as e:
-                    live.stop()
+                    executor.shutdown(wait=False, cancel_futures=True)
                     raise e
 
-        # final update for message on overall progress bar
-        logger.overall_progress.update(
-            overall_task_id,
-            description=f"[bold green]{mean_perf}/{tasks_done} success!",
-        )
+    else:
+        # Single thread
+        mean_perf_text = colored(f"{mean_perf}", "green")
+        desc = f"Overall tasks done ({mean_perf_text} are successful)"
+        pbar = tqdm(problems, desc=desc, total=len(problems))
+        for problem in pbar:
+            try:
+                success = run_agent(args, problem, config)
+                mean_perf += success
+                tasks_done += 1
+
+                if success:
+                    tasks_succeeded.append(problem)
+
+                # update message on overall progress bar
+                mean_perf_text = colored(f"{mean_perf}", "green")
+                pbar.set_description(
+                    f"Overall tasks done ({mean_perf_text} are successful)"
+                )
+            except (KeyboardInterrupt, BreakTaskLoop) as e:
+                raise e
+            except Exception as e:
+                raise e
 
         logger.info(f"Tasks that succeeded: {tasks_succeeded}")
         logger.info(f"Tasks that failed: {set(problems) - set(tasks_succeeded)}")

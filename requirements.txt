@@ -3,7 +3,7 @@ openai
 azure-identity
 tenacity
 pyyaml
-rich
+tqdm
 gitignore_parser
 termcolor
 transformers

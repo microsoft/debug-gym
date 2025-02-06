@@ -235,9 +235,18 @@ def load_config():
         "--verbose",
         dest="logging_level",
         action="store_const",
+        const=logging.INFO,
+        help="Verbose mode",
+        default=logging.WARNING,
+    )
+    group.add_argument(
+        "-vv",
+        "--very-verbose",
+        dest="logging_level",
+        action="store_const",
         const=logging.DEBUG,
         help="Verbose mode",
-        default=logging.INFO,
+        default=logging.WARNING,
     )
     group.add_argument(
         "--logging-level",

@@ -52,11 +52,11 @@ def load_llm_config(config_file_path: str | None = None):
 def print_messages(messages: list[dict], logger: FroggyLogger):
     for m in messages:
         if m["role"] == "user":
-            logger.debug(colored(f"{m['content']}\n", "cyan"))
+            logger.info(colored(f"{m['content']}\n", "cyan"))
         elif m["role"] == "assistant":
-            logger.debug(colored(f"{m['content']}\n", "green"))
+            logger.info(colored(f"{m['content']}\n", "green"))
         elif m["role"] == "system":
-            logger.debug(colored(f"{m['content']}\n", "yellow"))
+            logger.info(colored(f"{m['content']}\n", "yellow"))
         else:
             raise ValueError(f"Unknown role: {m['content']}")
 
@@ -188,6 +188,9 @@ class LLM:
         exception_full_name = (
             f"{exception.__class__.__module__}.{exception.__class__.__name__}"
         )
+        if isinstance(exception, KeyboardInterrupt):
+            return False
+
         self.logger.warning(f"Error calling {self.model_name}: {exception_full_name!r}")
         self.logger.debug(f"Exception: {exception.message}")
         return exception_full_name in rate_limit_errors

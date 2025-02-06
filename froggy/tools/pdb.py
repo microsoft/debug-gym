@@ -56,9 +56,10 @@ class PDBTool(EnvironmentTool):
         self._session: ShellSession = None
 
     def interact_with_pdb(self, command, expected_output="(Pdb)"):
-        return self._session.run(
+        output = self._session.run(
             command, expected_output, timeout=300, no_output_timeout=300
         )
+        return output.replace("(Pdb)", "").strip()  # remove the prompt
 
     def close_pdb(self, command="q"):
         return self._session.run(command, timeout=10)
