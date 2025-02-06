@@ -223,7 +223,11 @@ def extract_reward_from_pytest_output(output):
 def load_config():
     parser = argparse.ArgumentParser()
     parser.add_argument("config_file", help="path to config file")
-    parser.add_argument("--agent", help="zero_shot, cot, tadpole", default="zero_shot")
+    parser.add_argument(
+        "--agent",
+        help="pdb_agent, rewrite_only, pdb_after_rewrites",
+        default="pdb_agent",
+    )
     parser.add_argument(
         "--debug",
         action="store_true",
@@ -275,7 +279,8 @@ def load_config():
         nargs="+",
         metavar="my.setting=value",
         default=[],
-        help="override params of the config file," " e.g. -p 'cot.random_seed=123'",
+        help="override params of the config file,"
+        " e.g. -p 'rewrite_only.random_seed=123'",
     )
     args = parser.parse_args()
     assert os.path.exists(args.config_file), "Invalid config file"
