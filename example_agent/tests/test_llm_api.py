@@ -165,7 +165,12 @@ async def test_async_llm(llm_config_mock, completion_mock, logger_mock):
 def test_human():
     human = Human()
     messages = [{"role": "user", "content": "Hello"}]
-    info = {"available_commands": ["command1", "command2"]}
+    info = {
+        "tools": {
+            "pdb": {"template": "```pdb <command>```"},
+            "view": {"template": "```<path/to/file.py>```"},
+        }
+    }
     response, token_usage = human(messages, info)
     assert response == "User input"
     assert "prompt" in token_usage
