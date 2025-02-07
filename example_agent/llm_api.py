@@ -1,7 +1,6 @@
 import json
 import logging
 import os
-import random
 
 import tiktoken
 from openai import AsyncAzureOpenAI, AsyncOpenAI, AzureOpenAI, OpenAI
@@ -269,27 +268,13 @@ class Human:
     def __call__(self, messages, info, *args, **kwargs):
         # Color each role differently.
         print_messages(messages, self.logger)
+        available_commands = info["instructions"]["Available commands"]
+        available_tools = info["instructions"]["Available tools to solve the problem"]
+        self.logger.info(
+            f"Availalle commands: {available_commands}\n"
+            f"{json.dumps(available_tools, indent=2)}"
+        )
         action = input("apdb> ")
-
-        token_usage = {
-            "prompt": len("\n".join([msg["content"] for msg in messages])),
-            "response": len(action),
-        }
-
-        return action, token_usage
-
-
-class Random:
-    def __init__(self, seed: int, logger: FroggyLogger | None = None):
-        self.seed = seed
-        self.logger = logger or FroggyLogger("froggy")
-        self.rng = random.Random(seed)
-
-    def __call__(self, messages, info, *args, **kwargs):
-        print_messages(messages, self.logger)
-
-        action = self.rng.choice(info.get("available_commands", ["noop"]))
-        self.logger.debug(colored(action, "green"))
 
         token_usage = {
             "prompt": len("\n".join([msg["content"] for msg in messages])),
@@ -303,15 +288,13 @@ def instantiate_llm(
     config: dict, logger: FroggyLogger | None = None, use_async: bool = False
 ):
     llm_config = load_llm_config()
-    available_models = list(llm_config.keys()) + ["random", "human"]
+    available_models = list(llm_config.keys()) + ["human"]
     if config["llm_name"] not in available_models:
         raise ValueError(
             f"Model {config['llm_name']} is not available, "
             "please make sure the LLM config file is correctly set."
         )
-    if config["llm_name"] == "random":
-        llm = Random(config["random_seed"], logger=logger)
-    elif config["llm_name"] == "human":
+    if config["llm_name"] == "human":
         llm = Human(logger=logger)
     else:
         if use_async:

@@ -9,7 +9,6 @@ from example_agent.llm_api import (
     LLM,
     AsyncLLM,
     Human,
-    Random,
     TokenCounter,
     instantiate_llm,
     load_llm_config,
@@ -173,16 +172,6 @@ def test_human():
     assert "response" in token_usage
 
 
-def test_random(logger_mock):
-    random_llm = Random(seed=42, logger=logger_mock)
-    messages = [{"role": "user", "content": "Hello"}]
-    info = {"available_commands": ["command1", "command2"]}
-    response, token_usage = random_llm(messages, info)
-    assert response in ["command1", "command2"]
-    assert "prompt" in token_usage
-    assert "response" in token_usage
-
-
 @patch("tiktoken.encoding_for_model")
 @patch("os.path.exists", return_value=True)
 @patch(
@@ -198,10 +187,6 @@ def test_instantiate_llm(mock_open, mock_exists, mock_encoding_for_model, logger
     config = {"llm_name": "test-model"}
     llm = instantiate_llm(config, logger=logger_mock, use_async=False)
     assert isinstance(llm, LLM)
-
-    config = {"llm_name": "random", "random_seed": 42}
-    llm = instantiate_llm(config, logger=logger_mock, use_async=False)
-    assert isinstance(llm, Random)
 
     config = {"llm_name": "human"}
     llm = instantiate_llm(config, logger=logger_mock, use_async=False)
