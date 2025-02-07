@@ -11,7 +11,7 @@ pdb_agent:
     }
     tools: ["pdb", "view", "patcher:substitution"]
     terminal: {
-        type: "docker",  # "docker" or "local"
+        type: "local",  # "docker" or "local"
         base_image: "python:3.12-slim",
         setup_commands: ["pip install pytest"]
     }
@@ -45,7 +45,7 @@ rewrite_only:
     }
     tools: ["view", "patcher:substitution"]
     terminal: {
-        type: "docker",  # "docker" or "local"
+        type: "local",  # "docker" or "local"
         base_image: "python:3.12-slim",
         setup_commands: ["pip install pytest"]
     }
@@ -80,7 +80,7 @@ pdb_after_rewrites:
     n_rewrites_before_pdb: 5
     tools: ["view", "patcher:substitution", "pdb"]
     terminal: {
-        type: "docker",  # "docker" or "local"
+        type: "local",  # "docker" or "local"
         base_image: "python:3.12-slim",
         setup_commands: ["pip install pytest"]
     }
