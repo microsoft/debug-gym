@@ -16,6 +16,7 @@ pdb_agent:
         setup_commands: ["pip install pytest"]
     }
     persistent_breakpoints: True  # in pdb tool
+    auto_list: True  # in pdb tool
 
     # LLM configs
     llm_name: "llama-31-h100"
@@ -50,6 +51,7 @@ rewrite_only:
         setup_commands: ["pip install pytest"]
     }
     persistent_breakpoints: True  # in pdb tool
+    auto_list: True  # in pdb tool
 
     # LLM configs
     llm_name: "llama-31-h100"
@@ -85,6 +87,7 @@ pdb_after_rewrites:
         setup_commands: ["pip install pytest"]
     }
     persistent_breakpoints: True  # in pdb tool
+    auto_list: True  # in pdb tool
 
     # LLM configs
     llm_name: "llama-31-h100"
