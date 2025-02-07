@@ -123,10 +123,10 @@ def main():
         env = create_env(config, logger=logger)
         problems = list(env.dataset.keys())  # all tasks
 
-    num_workers = int(os.environ.get("FROGGY_WORKERS", 0))
+    num_workers = int(os.environ.get("FROGGY_WORKERS", 1))
     logger.warning(f"Running with {num_workers} workers")
     if args.debug:
-        num_workers = 0
+        num_workers = 1
 
     tasks_done = 0
     mean_perf = 0
