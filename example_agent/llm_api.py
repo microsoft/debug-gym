@@ -2,7 +2,6 @@ import json
 import logging
 import os
 import random
-import sys
 
 import tiktoken
 from openai import AsyncAzureOpenAI, AsyncOpenAI, AzureOpenAI, OpenAI
@@ -17,18 +16,6 @@ from transformers import AutoTokenizer
 
 from example_agent.utils import trim_prompt_messages
 from froggy.logger import FroggyLogger
-
-prompt_toolkit_available = False
-try:
-    # For command line history and autocompletion.
-    from prompt_toolkit import prompt
-    from prompt_toolkit.completion import WordCompleter
-    from prompt_toolkit.history import InMemoryHistory
-
-    prompt_toolkit_available = sys.stdout.isatty()
-except ImportError:
-    pass
-
 
 # Set logging level down to WARNING for endpoint queries.
 logging.getLogger("httpx").setLevel(logging.WARNING)
@@ -278,29 +265,11 @@ class Human:
     def __init__(self, logger: FroggyLogger | None = None):
         self._history = None
         self.logger = logger or FroggyLogger("froggy")
-        if prompt_toolkit_available:
-            self._history = InMemoryHistory()
 
     def __call__(self, messages, info, *args, **kwargs):
         # Color each role differently.
         print_messages(messages, self.logger)
-        available_commands = info.get("available_commands", [])
-
-        if prompt_toolkit_available:
-            actions_completer = WordCompleter(
-                available_commands, ignore_case=True, sentence=True
-            )
-            action = prompt(
-                "apdb> ",
-                completer=actions_completer,
-                history=self._history,
-                enable_history_search=True,
-            )
-        else:
-            if available_commands:
-                print("Available actions: {}\n".format(info["available_commands"]))
-
-            action = input("apdb> ")
+        action = input("apdb> ")
 
         token_usage = {
             "prompt": len("\n".join([msg["content"] for msg in messages])),
