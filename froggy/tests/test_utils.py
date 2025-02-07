@@ -387,18 +387,18 @@ def test_load_config():
     atexit.register(tempdir.cleanup)  # Make sure to cleanup that folder once done.
 
     config_contents = {}
-    config_contents["zero_shot"] = {
+    config_contents["pdb_agent"] = {
         "random_seed": 42,
         "max_steps": 100,
         "llm_name": "gpt2",
         "llm_temperature": [0.5],
     }
-    config_contents["cot"] = {
+    config_contents["rewrite_only"] = {
         "random_seed": 43,
         "max_steps": 50,
         "cot_style": "standard",
         "llm_name": "gpt20",
-        "llm_temperature": [0.3, 0.5],
+        "llm_temperature": [0.3],
     }
 
     # write the config file into yaml
@@ -412,27 +412,27 @@ def test_load_config():
             "config_file",
             str(config_file),
             "--agent",
-            "zero_shot",
+            "pdb_agent",
             "-p",
-            "zero_shot.random_seed=123",
-            "cot.llm_temperature=[0.8, 0.8]",
+            "pdb_agent.random_seed=123",
+            "rewrite_only.llm_temperature=[0.8, 0.8]",
             "-v",
             "--debug",
         ],
     ):
 
         _config, _args = load_config()
-    assert _args.agent == "zero_shot"
-    assert "zero_shot" in _config.keys()
-    assert "cot" in _config.keys()
-    assert _config["zero_shot"]["random_seed"] == 123
-    assert _config["zero_shot"]["max_steps"] == 100
-    assert _config["zero_shot"]["llm_name"] == "gpt2"
-    assert _config["zero_shot"]["llm_temperature"] == [0.5]
-    assert _config["cot"]["random_seed"] == 43
-    assert _config["cot"]["max_steps"] == 50
-    assert _config["cot"]["cot_style"] == "standard"
-    assert _config["cot"]["llm_name"] == "gpt20"
-    assert _config["cot"]["llm_temperature"] == [0.8, 0.8]
+    assert _args.agent == "pdb_agent"
+    assert "pdb_agent" in _config.keys()
+    assert "rewrite_only" in _config.keys()
+    assert _config["pdb_agent"]["random_seed"] == 123
+    assert _config["pdb_agent"]["max_steps"] == 100
+    assert _config["pdb_agent"]["llm_name"] == "gpt2"
+    assert _config["pdb_agent"]["llm_temperature"] == [0.5]
+    assert _config["rewrite_only"]["random_seed"] == 43
+    assert _config["rewrite_only"]["max_steps"] == 50
+    assert _config["rewrite_only"]["cot_style"] == "standard"
+    assert _config["rewrite_only"]["llm_name"] == "gpt20"
+    assert _config["rewrite_only"]["llm_temperature"] == [0.8, 0.8]
     assert _args.debug is True
-    assert _args.logging_level == logging.DEBUG
+    assert _args.logging_level == logging.INFO

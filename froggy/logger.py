@@ -1,75 +1,37 @@
 import logging
-import re
 from pathlib import Path
 
-from rich.console import Group
-from rich.live import Live
-from rich.logging import RichHandler
-from rich.panel import Panel
-from rich.progress import BarColumn, Progress, TextColumn, TimeElapsedColumn
-from rich.table import Column
+from tqdm import tqdm
 
 
-class ProgressHandler(RichHandler):
-    def __init__(self, progress, task_id, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.task_id = task_id
-        self.progress = progress
+class TqdmLoggingHandler(logging.Handler):
+    def __init__(self, level=logging.NOTSET):
+        super().__init__(level)
 
     def emit(self, record):
-        if self.task_id not in self.progress.task_ids:
-            return
-
-        # Strip color codes from the log message
-        message = re.sub(r"\x1b\[[0-9;]*m", "", self.format(record))
-        message = message.replace("\n", "\\n").replace("\r", "\\r")
-        # Truncate message to 80 characters
-        message = message[:80] + "..." if len(message) > 80 else message
-        self.progress.update(self.task_id, log=message)
+        try:
+            msg = self.format(record)
+            tqdm.write(msg)
+            self.flush()
+        except (KeyboardInterrupt, SystemExit):
+            raise
+        except Exception:
+            self.handleError(record)
 
 
 class FroggyLogger(logging.Logger):
-    task_progress = Progress(
-        TimeElapsedColumn(),
-        BarColumn(bar_width=10),
-        TextColumn("{task.description}"),
-        TextColumn(
-            "{task.fields[log]}", table_column=Column(no_wrap=True)  # , width=80)
-        ),
-    )
-    overall_progress = Progress(
-        TextColumn("🐸"),
-        TimeElapsedColumn(),
-        BarColumn(),
-        TextColumn("{task.description}"),
-    )
-    progress_group = Group(
-        Panel(task_progress, title="Workers"),
-        overall_progress,
-    )
 
     def __init__(
         self,
         name: str,
-        is_task: bool = True,
         log_dir: str | None = None,
         level: str | int = logging.INFO,
         mode: str = "a",
     ):
         super().__init__(name)
         self.setLevel(logging.DEBUG)
-        if is_task:
-            self.task_id = self.task_progress.add_task(
-                f"\\[{name}]:", log="Starting task..."
-            )
 
-            ph = ProgressHandler(self.task_progress, self.task_id)
-            ph.setLevel(level)
-            formatter = logging.Formatter("%(levelname)-8s %(message)s")
-            ph.setFormatter(formatter)
-            self.addHandler(ph)
-
-        console = logging.StreamHandler()
+        console = TqdmLoggingHandler()
         formatter = logging.Formatter("🐸 [%(name)-12s]: %(levelname)-8s %(message)s")
         console.setFormatter(formatter)
         console.setLevel(level)
@@ -89,16 +51,7 @@ class FroggyLogger(logging.Logger):
         # Prevent the log messages from being propagated to the root logger
         self.propagate = False
 
-    def tqdm(self, iterable, total=None, desc=None, unit="it", ncols=80):
-        total = len(iterable) if total is None else total
-        desc = "" if desc is None else desc
-        unit = "" if unit is None else unit
-        self.task_progress.update(self.task_id, total=total)
-        for i, item in enumerate(iterable):
-            self.task_progress.update(self.task_id, advance=1)
-            yield item
-
-    def stop(self, remove: bool = False):
-        self.task_progress.stop_task(self.task_id)
-        if remove:
-            self.task_progress.remove_task(self.task_id)
+    def tqdm(self, iterable, desc=None, *args, **kwargs):
+        desc = desc or f"  [{self.name:12s}]"
+        kwargs.pop("leave", None)
+        yield from tqdm(iterable, desc=desc, *args, **kwargs, leave=False)

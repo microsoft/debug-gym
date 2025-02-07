@@ -66,16 +66,16 @@ def test_pdb_use(tmp_path, setup_test_repo):
     pdb.register(environment)
     initial_output = pdb.start_pdb(pdb_cmd="python -m pdb -m pytest -sv .")
     assert """The pytest entry point.""" in initial_output
-    assert "(Pdb)" in initial_output
+    assert "(Pdb)" not in initial_output
     output = pdb.use("pdb l")
     assert """The pytest entry point.""" in output
-    assert "(Pdb)" in output
+    assert "(Pdb)" not in output
     output = pdb.use("pdb c")
     assert "1 failed, 1 passed" in pdb.pdb_obs
     assert "test_fail.py::test_fail FAILED" in pdb.pdb_obs
     assert "test_pass.py::test_pass PASSED" in pdb.pdb_obs
     assert "Reached the end of the file. Restarting the debugging session." in output
-    assert "(Pdb)" in output
+    assert "(Pdb)" not in output
 
 
 def test_pdb_use_default_environment_entrypoint(tmp_path, setup_test_repo):
@@ -87,16 +87,16 @@ def test_pdb_use_default_environment_entrypoint(tmp_path, setup_test_repo):
     pdb.register(environment)
     initial_output = pdb.start_pdb()  # "python -m pdb -m pytest -sq ."
     assert """The pytest entry point.""" in initial_output
-    assert "(Pdb)" in initial_output
+    assert "(Pdb)" not in initial_output
     output = pdb.use("pdb l")
     assert """The pytest entry point.""" in output
-    assert "(Pdb)" in output
+    assert "(Pdb)" not in output
     output = pdb.use("pdb c")
     assert "1 failed, 1 passed" in pdb.pdb_obs
     assert "test_fail.py::test_fail" in pdb.pdb_obs
     assert "test_pass.py::test_pass" not in pdb.pdb_obs
     assert "Reached the end of the file. Restarting the debugging session." in output
-    assert "(Pdb)" in output
+    assert "(Pdb)" not in output
 
 
 @if_docker_running
@@ -118,13 +118,13 @@ def test_pdb_use_docker_terminal(tmp_path, setup_test_repo):
 
     output = pdb.use("pdb l")
     assert """The pytest entry point.""" in output
-    assert "(Pdb)" in output
+    assert "(Pdb)" not in output
     output = pdb.use("pdb c")
     assert "1 failed, 1 passed" in pdb.pdb_obs
     assert "test_fail.py::test_fail FAILED" in pdb.pdb_obs
     assert "test_pass.py::test_pass PASSED" in pdb.pdb_obs
     assert "Reached the end of the file. Restarting the debugging session." in output
-    assert "(Pdb)" in output
+    assert "(Pdb)" not in output
 
 
 def test_initialization():
@@ -152,27 +152,27 @@ def test_register_invalid_environment():
 
 @patch.object(PDBTool, "interact_with_pdb")
 def test_start_pdb(mock_interact_with_pdb):
-    mock_interact_with_pdb.return_value = "(Pdb)"
+    mock_interact_with_pdb.return_value = "pdb returned message"
     env = RepoEnv()
     pdb_tool = PDBTool()
     pdb_tool.register(env)
     output = pdb_tool.start_pdb(pdb_cmd="python script.py")
-    assert output == "(Pdb)"
-    assert pdb_tool.pdb_obs == "(Pdb)"
+    assert output == "pdb returned message"
+    assert pdb_tool.pdb_obs == "pdb returned message"
 
 
 @patch.object(PDBTool, "interact_with_pdb")
 @patch.object(PDBTool, "close_pdb")
 def test_restart_pdb(mock_close_pdb, mock_interact_with_pdb):
-    mock_interact_with_pdb.return_value = "(Pdb)"
+    mock_interact_with_pdb.return_value = "pdb returned message"
     env = RepoEnv()
     pdb_tool = PDBTool()
     pdb_tool.register(env)
     env.entrypoint = "python script.py"
     env.debug_entrypoint = "python -m pdb script.py"
     output = pdb_tool.restart_pdb()
-    assert output == "(Pdb)"
-    assert pdb_tool.pdb_obs == "(Pdb)"
+    assert output == "pdb returned message"
+    assert pdb_tool.pdb_obs == "pdb returned message"
 
 
 @patch.object(PDBTool, "interact_with_pdb")
