@@ -205,7 +205,7 @@ class RepoEnv(TooledEnv):
         if self.has_tool("pdb"):
             self.get_tool("pdb").start_pdb()
             self.dbg_obs = self.get_tool("pdb").pdb_obs
-            self.obs += "Debugging terminal started:\n" f"{self.dbg_obs}\n"
+            # self.obs += "Debugging terminal started:\n" f"{self.dbg_obs}\n"
 
         self.infos = {
             "obs": self.obs,
@@ -224,6 +224,7 @@ class RepoEnv(TooledEnv):
             "max_score": self.max_score,
             "instructions": self.instructions,
             "rewrite_counter": self.rewrite_counter,
+            "tools": self.tool_instructions,
         }
         return self.obs, self.infos
 
@@ -389,6 +390,7 @@ class RepoEnv(TooledEnv):
             "max_score": self.max_score,
             "done": self.done,
             "rewrite_counter": self.rewrite_counter,
+            "tools": self.tool_instructions,
         }
 
         return self.obs, self.score, self.done, self.infos
