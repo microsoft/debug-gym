@@ -224,6 +224,7 @@ class RepoEnv(TooledEnv):
             "max_score": self.max_score,
             "instructions": self.instructions,
             "rewrite_counter": self.rewrite_counter,
+            "tools": self.tool_instructions,
         }
         return self.obs, self.infos
 
@@ -389,6 +390,7 @@ class RepoEnv(TooledEnv):
             "max_score": self.max_score,
             "done": self.done,
             "rewrite_counter": self.rewrite_counter,
+            "tools": self.tool_instructions,
         }
 
         return self.obs, self.score, self.done, self.infos
