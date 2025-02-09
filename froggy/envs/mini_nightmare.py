@@ -36,7 +36,6 @@ class MiniNightmareEnv(RepoEnv):
 
     def reset(self, *, seed=None, options: dict = None):
         options = options or {}
-        self.tempdir.cleanup()
         self.current_sample = self.dataset[options["task_name"]]
 
         directory = self.current_sample["base_directory"]
@@ -67,6 +66,9 @@ class MiniNightmareEnv(RepoEnv):
                 pjoin(self.DATA_PATH, task_name, "test.py")
             ), f"Task {task_name} missing test.py file."
             assert os.path.exists(
+                pjoin(self.DATA_PATH, task_name, "code.py")
+            ), f"Task {task_name} missing code.py file."
+            assert os.path.exists(
                 pjoin(self.DATA_PATH, task_name, ".froggyignore")
             ), f"Task {task_name} missing .froggyignore file."
             assert os.path.exists(
@@ -78,7 +80,7 @@ class MiniNightmareEnv(RepoEnv):
             task_path = pjoin(self.DATA_PATH, task_name)
 
             self.dataset[task_name] = {
-                "entry_point": "python -m pytest -sv test.py",
                 "instructions": "The program doesn't behave as intended. Investigate the repository, figure out the root cause, then rewrite the code to fix the issue. Beaware that the bug may not be in the code you initially see.",
                 "base_directory": task_path,
+                "filename": "code.py",
             }
