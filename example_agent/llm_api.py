@@ -4,7 +4,7 @@ import os
 import sys
 
 import tiktoken
-from openai import AsyncAzureOpenAI, AsyncOpenAI, AzureOpenAI, OpenAI
+from openai import NOT_GIVEN, AsyncAzureOpenAI, AsyncOpenAI, AzureOpenAI, OpenAI
 from tenacity import (
     retry,
     retry_if_exception,
@@ -195,7 +195,9 @@ class LLM:
         return exception_full_name in rate_limit_errors
 
     def query_model(self, messages, **kwargs):
-        kwargs["max_tokens"] = kwargs.get("max_tokens", self.config.get("max_tokens"))
+        kwargs["max_tokens"] = kwargs.get(
+            "max_tokens", self.config.get("max_tokens", NOT_GIVEN)
+        )
 
         reponse = self.call_with_retry(self.client.chat.completions.create)(
             model=self.config["model"],
@@ -249,7 +251,9 @@ class AsyncLLM(LLM):
             )
 
     async def query_model(self, messages, **kwargs):
-        kwargs["max_tokens"] = kwargs.get("max_tokens", self.config.get("max_tokens"))
+        kwargs["max_tokens"] = kwargs.get(
+            "max_tokens", self.config.get("max_tokens", NOT_GIVEN)
+        )
 
         response = await self.call_with_retry(self.client.chat.completions.create)(
             model=self.config["model"],
