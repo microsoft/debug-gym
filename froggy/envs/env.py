@@ -5,6 +5,7 @@ import os
 import shutil
 import subprocess
 import tempfile
+from dataclasses import dataclass
 from glob import glob
 from os.path import join as pjoin
 from pathlib import Path
@@ -16,10 +17,7 @@ from froggy.terminal import Terminal
 from froggy.tools.patchers import CodePatcher
 from froggy.tools.pdb import PDBTool
 from froggy.tools.reasoning import ReasoningTool
-
 from froggy.utils import _walk, make_file_matcher, show_line_number
-
-from dataclasses import dataclass
 
 
 @dataclass
@@ -37,9 +35,6 @@ class EnvInfo:
     done: bool
     rewrite_counter: int
     tools: dict
-
-    # TODO: check where this is used and it's type
-    token_usage = None  # list of int?
 
 
 class TooledEnv:
@@ -253,7 +248,6 @@ class RepoEnv(TooledEnv):
 
         return self.infos
 
-
     def run(self):
         success, output = self.terminal.run(self.entrypoint, timeout=self.run_timeout)
         self.last_run_obs = output
@@ -392,9 +386,7 @@ class RepoEnv(TooledEnv):
                     # use done, score and info from the tool that was executed after reasoning
                     self.done = reasoning_tool.infos_cache.done
                     self.score = reasoning_tool.infos_cache.score
-                    self.infos = copy.copy(
-                        reasoning_tool.infos_cache
-                    )
+                    self.infos = copy.deepcopy(reasoning_tool.infos_cache)
                     # update obs and action in info
                     self.infos.obs = self.obs
                     self.infos.action = action

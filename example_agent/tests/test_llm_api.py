@@ -106,10 +106,10 @@ def test_llm(mock_open, mock_exists, mock_openai, mock_encoding_for_model, logge
 
     llm = LLM(model_name="test-model", logger=logger_mock)
     messages = [{"role": "user", "content": "Hello"}]
-    response, token_usage = llm(messages)
-    assert response == "Response"
-    assert "prompt" in token_usage
-    assert "response" in token_usage
+    llm_response = llm(messages)
+    assert llm_response.response == "Response"
+    assert llm_response.token_usage.prompt == 1
+    assert llm_response.token_usage.response == 1
 
 
 @pytest.fixture
@@ -156,9 +156,10 @@ async def test_async_llm(llm_config_mock, completion_mock, logger_mock):
     llm = AsyncLLM(model_name="test_model", logger=logger_mock)
     llm.client.chat.completions.create = completion_mock
     messages = [{"role": "user", "content": "Hello"}]
-    response, token_usage = await llm(messages)
-    assert response == "some completion mock."
-    assert token_usage == {"prompt": 1, "response": 4}
+    llm_response = await llm(messages)
+    assert llm_response.response == "some completion mock."
+    assert llm_response.token_usage.prompt == 1
+    assert llm_response.token_usage.response == 4
 
 
 @patch("builtins.input", lambda *args, **kwargs: "User input")
@@ -171,10 +172,10 @@ def test_human(build_env_info):
             "view": {"template": "```<path/to/file.py>```"},
         }
     )
-    response, token_usage = human(messages, env_info)
-    assert response == "User input"
-    assert "prompt" in token_usage
-    assert "response" in token_usage
+    llm_response = human(messages, env_info)
+    assert llm_response.response == "User input"
+    assert llm_response.token_usage.prompt == 5
+    assert llm_response.token_usage.response == 10
 
 
 @patch("tiktoken.encoding_for_model")

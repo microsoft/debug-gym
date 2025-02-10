@@ -81,7 +81,8 @@ class PdbAgent:
     def run(self, task_name=None, debug=False):
         self.history.reset()
         info = self.env.reset(options={"task_name": task_name})
-        self.history.step(info)
+        # initial state does not have prompt and response
+        self.history.step(info, None)
 
         if info.done is True:
             # msg = "Environment started with entrypoint passing without errors."
@@ -96,21 +97,15 @@ class PdbAgent:
             )
 
             prompt = self.build_prompt(info)
-            answer, token_usage = self.llm(
+            llm_response = self.llm(
                 prompt, info, temperature=self.config["llm_temperature"][0]
             )
 
             if debug:
                 breakpoint()
 
-            info = self.env.step(answer)
-            info.token_usage = [
-                token_usage
-            ]  # in some other agents this is a list because of multi-step llm calls
-            self.history.step(info)
-            self.history.save_prompt_response_pairs(
-                prompt_response_pairs=[(prompt, answer)]
-            )
+            info = self.env.step(llm_response.response)
+            self.history.step(info, llm_response)
 
             if info.done or info.rewrite_counter >= self.config["max_rewrite_steps"]:
                 self.logger.info(
@@ -219,7 +214,8 @@ class PdbAfterRewrites(PdbAgent):
 
         self.history.reset()
         info = self.env.reset(options={"task_name": task_name})
-        self.history.step(info)
+        # initial state does not have prompt and response
+        self.history.step(info, None)
 
         if info.done is True:
             # msg = "Environment started with entrypoint passing without errors."
@@ -234,17 +230,15 @@ class PdbAfterRewrites(PdbAgent):
             )
 
             prompt = self.build_prompt(info)
-            answer, token_usage = self.llm(
+
+            llm_response = self.llm(
                 prompt, info, temperature=self.config["llm_temperature"][0]
             )
 
             if debug:
                 breakpoint()
 
-            info = self.env.step(answer)
-            info.token_usage = [
-                token_usage
-            ]  # in some other agents this is a list because of multi-step llm calls
+            info = self.env.step(llm_response.response)
 
             # re-introduce pdb tool at the right time
             if (
@@ -256,10 +250,7 @@ class PdbAfterRewrites(PdbAgent):
                 info.instructions = self.env.instructions
                 info.obs += "\nThe pdb tool has been added."
 
-            self.history.step(info)
-            self.history.save_prompt_response_pairs(
-                prompt_response_pairs=[(prompt, answer)]
-            )
+            self.history.step(info, llm_response)
 
             if info.done or info.rewrite_counter >= self.config["max_rewrite_steps"]:
                 self.logger.info(

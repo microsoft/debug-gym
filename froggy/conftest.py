@@ -1,4 +1,3 @@
-
 import pytest
 
 from froggy.envs.env import EnvInfo
@@ -20,7 +19,6 @@ def build_env_info():
         done=False,
         rewrite_counter=0,
         tools=None,
-        token_usage=None,
     ):
         return EnvInfo(
             obs=obs,
@@ -36,6 +34,6 @@ def build_env_info():
             done=done,
             rewrite_counter=rewrite_counter,
             tools=tools if tools is not None else {},
-            # token_usage=token_usage,
         )
+
     return _env_info

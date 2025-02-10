@@ -2,6 +2,7 @@ import json
 import logging
 import os
 import sys
+from dataclasses import dataclass
 
 import tiktoken
 from openai import AsyncAzureOpenAI, AsyncOpenAI, AzureOpenAI, OpenAI
@@ -14,7 +15,6 @@ from tenacity import (
 from termcolor import colored
 from transformers import AutoTokenizer
 
-from example_agent.utils import trim_prompt_messages
 from froggy.logger import FroggyLogger
 
 prompt_toolkit_available = False
@@ -71,6 +71,19 @@ def merge_messages(messages):
     return messages_out
 
 
+@dataclass
+class TokenUsage:
+    prompt: int
+    response: int
+
+
+@dataclass
+class LLMResponse:
+    prompt: list[dict] | str  # Either a string or a list of messages.
+    response: str
+    token_usage: TokenUsage | None = None
+
+
 class TokenCounter:
     def __init__(self, model: str = "gpt-4o"):
         self.model = model
@@ -88,7 +101,7 @@ class TokenCounter:
                 )
                 raise ValueError(msg)
 
-    def __call__(self, *, messages=None, text=None):
+    def __call__(self, *, messages=None, text=None) -> int:
         nb_tokens = 0
         if messages is not None:
             nb_tokens += sum(len(self.tokenize(msg["content"])) for msg in messages)
@@ -204,7 +217,9 @@ class LLM:
         )
         return reponse.choices[0].message.content
 
-    def __call__(self, messages, *args, **kwargs):
+    def __call__(self, messages, *args, **kwargs) -> LLMResponse:
+        from example_agent.utils import trim_prompt_messages
+
         if not self.config.get("system_prompt_support", True):
             # Replace system by user
             for i, m in enumerate(messages):
@@ -226,12 +241,12 @@ class LLM:
 
         self.logger.debug(colored(response, "green"))
 
-        token_usage = {
-            "prompt": self.token_counter(messages=messages),
-            "response": self.token_counter(text=response),
-        }
+        token_usage = TokenUsage(
+            prompt=self.token_counter(messages=messages),
+            response=self.token_counter(text=response),
+        )
 
-        return response, token_usage
+        return LLMResponse(messages, response, token_usage)
 
 
 class AsyncLLM(LLM):
@@ -258,7 +273,7 @@ class AsyncLLM(LLM):
         )
         return response.choices[0].message.content
 
-    async def __call__(self, messages, *args, **kwargs):
+    async def __call__(self, messages, *args, **kwargs) -> LLMResponse:
         if not self.config.get("system_prompt_support", True):
             # Replace system by user
             for i, m in enumerate(messages):
@@ -268,12 +283,12 @@ class AsyncLLM(LLM):
         response = await self.query_model(messages, **kwargs)
         response = response.strip()
 
-        token_usage = {
-            "prompt": self.token_counter(messages=messages),
-            "response": self.token_counter(text=response),
-        }
+        token_usage = TokenUsage(
+            prompt=self.token_counter(messages=messages),
+            response=self.token_counter(text=response),
+        )
 
-        return response, token_usage
+        return LLMResponse(messages, response, token_usage)
 
 
 class Human:
@@ -283,7 +298,7 @@ class Human:
         if prompt_toolkit_available:
             self._history = InMemoryHistory()
 
-    def __call__(self, messages, info, *args, **kwargs):
+    def __call__(self, messages, info, *args, **kwargs) -> LLMResponse:
         # Color each role differently.
         print_messages(messages, self.logger)
         available_commands = [t["template"] for t in info.tools.values()]
@@ -301,12 +316,13 @@ class Human:
             self.logger.info("\n".join(["Available commands:"] + available_commands))
             action = input("> ")
 
-        token_usage = {
-            "prompt": len("\n".join([msg["content"] for msg in messages])),
-            "response": len(action),
-        }
+        prompt_messages = "\n".join([msg["content"] for msg in messages])
+        token_usage = TokenUsage(
+            prompt=len(prompt_messages),
+            response=len(action),
+        )
 
-        return action, token_usage
+        return LLMResponse(prompt_messages, action, token_usage)
 
 
 def instantiate_llm(

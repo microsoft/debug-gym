@@ -1,6 +1,7 @@
 from unittest.mock import MagicMock
 
 from example_agent.example_agent import PdbAfterRewrites, PdbAgent, RewriteOnly
+from example_agent.llm_api import LLMResponse, TokenUsage
 
 
 def test_build_question_prompt(agent_setup):
@@ -45,7 +46,7 @@ def test_run(agent_setup, build_env_info):
         current_breakpoints="Test breakpoints",
         last_run_obs="Test last run obs",
     )
-    llm.return_value = ("Expected answer", "Expected token usage")
+    llm.return_value = LLMResponse("Prompt", "Expected answer", TokenUsage(2, 4))
     result = agent.run(task_name="test_task", debug=False)
     assert result
 
@@ -95,7 +96,7 @@ def test_run_pdb_after_rewrites(agent_setup, build_env_info):
         current_breakpoints="Test breakpoints",
         last_run_obs="Test last run obs",
     )
-    llm.return_value = ("Expected answer", "Expected token usage")
+    llm.return_value = LLMResponse("Prompt", "Expected answer", TokenUsage(2, 4))
     env.tools = {"pdb": MagicMock()}
     result = agent.run(task_name="test_task", debug=False)
     assert result

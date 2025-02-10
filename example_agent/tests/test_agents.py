@@ -1,5 +1,6 @@
 import pytest
 
+from example_agent.llm_api import LLMResponse, TokenUsage
 from example_agent.utils import (
     HistoryTracker,
     build_history_prompt,
@@ -111,34 +112,46 @@ def test_history_tracker(build_env_info):
     assert ht.get() == []
     assert ht.get_all() == []
     assert ht.score() == 0
-    assert ht.prompt_response_pairs == [
-        []
-    ]  # at 0-th step, there is no prompt-response pair
+    assert ht.prompt_response_pairs == []
 
     # json should return an empty dict
     assert ht.json() == {}
 
-    # push some steps
+    # prepare some data
     env_info_1 = build_env_info(obs="obs1", action=None, score=1)
     env_info_2 = build_env_info(obs="obs2", action="action2", score=2)
     env_info_3 = build_env_info(obs="obs3", action="action3", score=3)
-    env_info_4 = build_env_info(obs="obs4", action="action4", score=4, token_usage=12345)
+    env_info_4 = build_env_info(obs="obs4", action="action4", score=4)
     env_info_5 = build_env_info(obs="obs5", action="action5", score=5)
-    ht.step(env_info_1)
-    ht.step(env_info_2)
-    ht.step(env_info_3)
-    ht.step(env_info_4)
-    ht.step(env_info_5)
 
-    # push some prompt-response pairs
-    ht.save_prompt_response_pairs([("prompt_2_1", "response_2_1")])
-    ht.save_prompt_response_pairs(
-        [("prompt_3_1", "response_3_1"), ("prompt_3_2", "response_3_2")]
+    # single prompt format
+    llm_response_2 = LLMResponse("prompt_2_1", "response_2_1")
+    # list of messages format
+    llm_response_3 = LLMResponse(
+        prompt=[
+            {"role": "user", "content": "prompt_3_1"},
+            {"role": "assistent", "content": "response_3_1"},
+            {"role": "user", "content": "prompt_3_2"},
+        ],
+        response="response_3_2",
     )
-    ht.save_prompt_response_pairs([("prompt_4_1", "response_4_1")])
-    ht.save_prompt_response_pairs(
-        [("prompt_5_1", "response_5_1"), ("prompt_5_2", "response_5_2")]
+    llm_response_4 = LLMResponse("prompt_4_1", "response_4_1", TokenUsage(4321, 1234))
+    llm_response_5 = LLMResponse(
+        prompt=[
+            {"role": "user", "content": "prompt_5_1"},
+            {"role": "assistent", "content": "response_5_1"},
+            {"role": "user", "content": "prompt_5_2"},
+        ],
+        response="response_5_2",
     )
+
+    # push some steps and prompt-response pairs
+    # at 0-th step, there is no prompt-response pair
+    ht.step(env_info_1, None)
+    ht.step(env_info_2, llm_response_2)
+    ht.step(env_info_3, llm_response_3)
+    ht.step(env_info_4, llm_response_4)
+    ht.step(env_info_5, llm_response_5)
 
     # get_all should return all steps
     assert ht.get_all() == [env_info_1, env_info_2, env_info_3, env_info_4, env_info_5]
@@ -165,7 +178,10 @@ def test_history_tracker(build_env_info):
         "step_id": 3,
         "action": "action4",
         "obs": "obs4",
-        # "token_usage": 12345,
+        "token_usage": {
+            "prompt": 4321,
+            "response": 1234,
+        },
     }
 
     # json should return also the prompt-response pairs if include_prompt_response_pairs is True
@@ -174,10 +190,8 @@ def test_history_tracker(build_env_info):
         "action": "action3",
         "obs": "obs3",
         "prompt_response_pairs": {
-            "prompt_0": "prompt_3_1",
-            "response_0": "response_3_1",
-            "prompt_1": "prompt_3_2",
-            "response_1": "response_3_2",
+            "prompt": "user: prompt_3_1\nassistent: response_3_1\nuser: prompt_3_2",
+            "response": "response_3_2",
         },
     }
 
@@ -201,7 +215,7 @@ def test_history_tracker(build_env_info):
     assert ht.get() == []
     assert ht.get_all() == []
     assert ht.score() == 0
-    assert ht.prompt_response_pairs == [[]]
+    assert ht.prompt_response_pairs == []
 
     # json should return an empty dict
     assert ht.json() == {}
@@ -229,14 +243,22 @@ def test_build_history_prompt(build_env_info):
 
     # test with non-empty history
     ht = HistoryTracker(history_steps=3)
-    # push some steps
+    # prepare some data
     env_info_1 = build_env_info(obs="obs1", action=None, score=1, rewrite_counter=0)
-    env_info_2 = build_env_info(obs="obs2", action="action2", score=2, rewrite_counter=0)
-    env_info_3 = build_env_info(obs="obs3", action="action3", score=3, rewrite_counter=0)
-    env_info_4 = build_env_info(
-        obs="obs4", action="action4", score=4, rewrite_counter=1, # "token_usage": 12345,
+    env_info_2 = build_env_info(
+        obs="obs2", action="action2", score=2, rewrite_counter=0
     )
-    env_info_5 = build_env_info(obs="obs5", action="action5", score=5, rewrite_counter=1)
+    env_info_3 = build_env_info(
+        obs="obs3", action="action3", score=3, rewrite_counter=0
+    )
+    env_info_4 = build_env_info(
+        obs="obs4", action="action4", score=4, rewrite_counter=1
+    )
+    env_info_5 = build_env_info(
+        obs="obs5", action="action5", score=5, rewrite_counter=1
+    )
+
+    # push some steps
     ht.step(env_info_1)
     ht.step(env_info_2)
     ht.step(env_info_3)
