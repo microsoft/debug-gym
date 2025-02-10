@@ -10,20 +10,20 @@ from froggy.envs.env import EnvInfo
 @pytest.fixture
 def env_info():
     return EnvInfo(
-            obs="obs",
-            max_score=10,
-            score=5,
-            last_run_obs="Raw output",
-            dbg_obs="dbg_obs",
-            dir_tree="dir_tree",
-            current_code_with_line_number="current_code_with_line_number",
-            current_breakpoints="current_breakpoints",
-            action="action",
-            instructions={},
-            done=False,
-            rewrite_counter=0,
-            tools={},
-        )
+        obs="obs",
+        max_score=10,
+        score=5,
+        last_run_obs="Raw output",
+        dbg_obs="dbg_obs",
+        dir_tree="dir_tree",
+        current_code_with_line_number="current_code_with_line_number",
+        current_breakpoints="current_breakpoints",
+        action="action",
+        instructions={},
+        done=False,
+        rewrite_counter=0,
+        tools={},
+    )
 
 
 @pytest.fixture

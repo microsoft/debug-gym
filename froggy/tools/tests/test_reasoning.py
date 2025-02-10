@@ -112,9 +112,7 @@ def test_use_with_chaining(setup_reasoning_tool):
         return_value=("reasoning", "next_action")
     )
     env_info.obs = "Invalid action: action."
-    reasoning_tool.environment.step = MagicMock(
-        return_value=env_info
-    )
+    reasoning_tool.environment.step = MagicMock(return_value=env_info)
     assert (
         reasoning_tool.use_with_chaining("action")
         == "Error while executing the action after reasoning.\nInvalid action: action."
@@ -124,9 +122,7 @@ def test_use_with_chaining(setup_reasoning_tool):
         return_value=("reasoning", "next_action")
     )
     env_info.obs = "Error while using tool: cot"
-    reasoning_tool.environment.step = MagicMock(
-        return_value=env_info
-    )
+    reasoning_tool.environment.step = MagicMock(return_value=env_info)
     assert (
         reasoning_tool.use_with_chaining("action")
         == "Error while executing the action after reasoning.\nError while using tool: cot"

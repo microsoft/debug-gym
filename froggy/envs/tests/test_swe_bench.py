@@ -116,7 +116,7 @@ def test_instructions(get_swe_env):
 def test_step(get_swe_env, build_env_info):
     swe_env = get_swe_env()
     swe_env.reset(options={"task_name": "astropy__astropy-14096"})
-    env_info=build_env_info(obs="obs", score=5, done=True, last_run_obs="Raw output")
+    env_info = build_env_info(obs="obs", score=5, done=True, last_run_obs="Raw output")
     with mock.patch.object(RepoEnv, "step", return_value=env_info):
         infos = swe_env.step("action")
     assert infos.obs == "obs"
