@@ -45,7 +45,7 @@ def test_abstract_methods():
         TypeError,
         match=(
             "Can't instantiate abstract class CompletelyFakeTool "
-            "without an implementation for abstract methods *"
+            "without an implementation for abstract method*"
         ),
     ):
         tool = CompletelyFakeTool()

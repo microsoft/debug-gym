@@ -103,7 +103,7 @@ def test_trim_prompt_messages():
     assert trim_prompt_messages(messages, 65, token_counter) == expected
 
 
-def test_history_tracker():
+def test_history_tracker(build_env_info):
     ht = HistoryTracker(history_steps=3)
 
     # should start empty
@@ -119,11 +119,17 @@ def test_history_tracker():
     assert ht.json() == {}
 
     # push some steps
-    ht.step({"obs": "obs1", "action": None, "score": 1})
-    ht.step({"obs": "obs2", "action": "action2", "score": 2})
-    ht.step({"obs": "obs3", "action": "action3", "score": 3})
-    ht.step({"obs": "obs4", "action": "action4", "score": 4, "token_usage": 12345})
-    ht.step({"obs": "obs5", "action": "action5", "score": 5})
+    env_info_1 = build_env_info(obs="obs1", action=None, score=1)
+    env_info_2 = build_env_info(obs="obs2", action="action2", score=2)
+    env_info_3 = build_env_info(obs="obs3", action="action3", score=3)
+    env_info_4 = build_env_info(obs="obs4", action="action4", score=4, token_usage=12345)
+    env_info_5 = build_env_info(obs="obs5", action="action5", score=5)
+    ht.step(env_info_1)
+    ht.step(env_info_2)
+    ht.step(env_info_3)
+    ht.step(env_info_4)
+    ht.step(env_info_5)
+
     # push some prompt-response pairs
     ht.save_prompt_response_pairs([("prompt_2_1", "response_2_1")])
     ht.save_prompt_response_pairs(
@@ -135,20 +141,10 @@ def test_history_tracker():
     )
 
     # get_all should return all steps
-    assert ht.get_all() == [
-        {"obs": "obs1", "action": None, "score": 1},
-        {"obs": "obs2", "action": "action2", "score": 2},
-        {"obs": "obs3", "action": "action3", "score": 3},
-        {"obs": "obs4", "action": "action4", "score": 4, "token_usage": 12345},
-        {"obs": "obs5", "action": "action5", "score": 5},
-    ]
+    assert ht.get_all() == [env_info_1, env_info_2, env_info_3, env_info_4, env_info_5]
 
     # get should return the last 3 steps
-    assert ht.get() == [
-        {"obs": "obs3", "action": "action3", "score": 3},
-        {"obs": "obs4", "action": "action4", "score": 4, "token_usage": 12345},
-        {"obs": "obs5", "action": "action5", "score": 5},
-    ]
+    assert ht.get() == [env_info_3, env_info_4, env_info_5]
 
     # json should return the last step by default
     assert ht.json() == {
@@ -169,7 +165,7 @@ def test_history_tracker():
         "step_id": 3,
         "action": "action4",
         "obs": "obs4",
-        "token_usage": 12345,
+        # "token_usage": 12345,
     }
 
     # json should return also the prompt-response pairs if include_prompt_response_pairs is True
@@ -211,7 +207,7 @@ def test_history_tracker():
     assert ht.json() == {}
 
 
-def test_build_history_prompt():
+def test_build_history_prompt(build_env_info):
     import json
 
     from froggy.utils import unescape
@@ -234,19 +230,18 @@ def test_build_history_prompt():
     # test with non-empty history
     ht = HistoryTracker(history_steps=3)
     # push some steps
-    ht.step({"obs": "obs1", "action": None, "score": 1, "rewrite_counter": 0})
-    ht.step({"obs": "obs2", "action": "action2", "score": 2, "rewrite_counter": 0})
-    ht.step({"obs": "obs3", "action": "action3", "score": 3, "rewrite_counter": 0})
-    ht.step(
-        {
-            "obs": "obs4",
-            "action": "action4",
-            "score": 4,
-            "token_usage": 12345,
-            "rewrite_counter": 1,
-        }
+    env_info_1 = build_env_info(obs="obs1", action=None, score=1, rewrite_counter=0)
+    env_info_2 = build_env_info(obs="obs2", action="action2", score=2, rewrite_counter=0)
+    env_info_3 = build_env_info(obs="obs3", action="action3", score=3, rewrite_counter=0)
+    env_info_4 = build_env_info(
+        obs="obs4", action="action4", score=4, rewrite_counter=1, # "token_usage": 12345,
     )
-    ht.step({"obs": "obs5", "action": "action5", "score": 5, "rewrite_counter": 1})
+    env_info_5 = build_env_info(obs="obs5", action="action5", score=5, rewrite_counter=1)
+    ht.step(env_info_1)
+    ht.step(env_info_2)
+    ht.step(env_info_3)
+    ht.step(env_info_4)
+    ht.step(env_info_5)
 
     # use_conversational_prompt is False
     # reset_prompt_history_after_rewrite is False

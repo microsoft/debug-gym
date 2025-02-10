@@ -162,16 +162,16 @@ async def test_async_llm(llm_config_mock, completion_mock, logger_mock):
 
 
 @patch("builtins.input", lambda *args, **kwargs: "User input")
-def test_human():
+def test_human(build_env_info):
     human = Human()
     messages = [{"role": "user", "content": "Hello"}]
-    info = {
-        "tools": {
+    env_info = build_env_info(
+        tools={
             "pdb": {"template": "```pdb <command>```"},
             "view": {"template": "```<path/to/file.py>```"},
         }
-    }
-    response, token_usage = human(messages, info)
+    )
+    response, token_usage = human(messages, env_info)
     assert response == "User input"
     assert "prompt" in token_usage
     assert "response" in token_usage

@@ -43,14 +43,14 @@ class TerminalSimulatorEnv(RepoEnv):
             self.tempdir_name, entrypoint=self.current_sample["entry_point"]
         )
 
-        obs, infos = super().reset()
-        infos["instructions"] = self.instructions
+        infos = super().reset()
+        infos.instructions = self.instructions
 
         # By default, open the only modifiable file.
         self.load_current_file(self.current_sample["default_file_name"])
         # an update the infos related to current code.
-        infos["current_code_with_line_number"] = self.current_code_with_line_number()
-        return infos["obs"], infos
+        infos.current_code_with_line_number = self.current_code_with_line_number()
+        return infos
 
     def load_dataset(self):
         assert os.path.exists(

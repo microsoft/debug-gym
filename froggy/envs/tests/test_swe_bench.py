@@ -113,39 +113,34 @@ def test_instructions(get_swe_env):
 
 
 @if_docker_running
-@patch(
-    "froggy.envs.RepoEnv.step",
-    return_value=("obs", 5, True, {"last_run_obs": "Raw output"}),
-)
-def test_step(repo_env_step, get_swe_env):
+def test_step(get_swe_env, build_env_info):
     swe_env = get_swe_env()
     swe_env.reset(options={"task_name": "astropy__astropy-14096"})
-    obs, score, done, infos = swe_env.step("action")
-    assert obs == "obs"
-    assert score == infos["score"] == 0
-    assert done == infos["done"] == False
-    assert infos["last_run_obs"] == "Raw output"
+    env_info=build_env_info(obs="obs", score=5, done=True, last_run_obs="Raw output")
+    with mock.patch.object(RepoEnv, "step", return_value=env_info):
+        infos = swe_env.step("action")
+    assert infos.obs == "obs"
+    assert infos.score == 0
+    assert infos.done == False
+    assert infos.last_run_obs == "Raw output"
 
 
 @if_docker_running
-def test_reset(tmp_path, get_swe_env):
+def test_reset(tmp_path, get_swe_env, build_env_info):
     working_dir = str(tmp_path)
     swe_env = get_swe_env(working_dir)
     task_name = "astropy__astropy-14096"
     obs = "Some observation"
     last_run_obs = "collected 10 items. 5 passed, 5 failed"
-    info = {"obs": obs, "last_run_obs": last_run_obs}
-    with (mock.patch.object(RepoEnv, "reset", return_value=(obs, info)),):
-        reset_obs, reset_infos = swe_env.reset(options={"task_name": task_name})
+    env_info = build_env_info(obs=obs, last_run_obs=last_run_obs)
+    with mock.patch.object(RepoEnv, "reset", return_value=env_info):
+        reset_infos = swe_env.reset(options={"task_name": task_name})
 
-    assert reset_obs == obs
-    assert reset_infos == {
-        "obs": obs,
-        "last_run_obs": last_run_obs,
-        "max_score": 1,
-        "score": 0,
-        "done": False,
-    }
+    assert reset_infos.obs == obs
+    assert reset_infos.last_run_obs == last_run_obs
+    assert reset_infos.max_score == 1
+    assert reset_infos.score == 0
+    assert reset_infos.done == False
 
 
 @if_docker_running

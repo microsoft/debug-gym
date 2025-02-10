@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, mock_open, patch
 import numpy as np
 import pytest
 
-from froggy.envs import RepoEnv, TooledEnv
+from froggy.envs.env import EnvInfo, RepoEnv, TooledEnv
 
 
 @pytest.fixture
@@ -274,25 +274,14 @@ def test_step(
     env = RepoEnv(path=".")
     mock_get_triggered_tools.return_value = [mock_pdb_tool]
 
-    obs, score, done, infos = env.step("some action")
+    infos = env.step("some action")
 
     mock_get_triggered_tools.assert_called_once_with("some action")
     mock_pdb_tool.use.assert_called_once_with("some action")
-    assert obs == "PDB tool used"
-    assert score == 0
-    assert not done
-    assert "obs" in infos
-    assert "last_run_obs" in infos
-    assert "dbg_obs" in infos
-    assert "dir_tree" in infos
-    assert "current_breakpoints" in infos
-    assert "current_code_with_line_number" in infos
-    assert "action" in infos
-    assert "done" in infos
-    assert "score" in infos
-    assert "max_score" in infos
-    assert "instructions" in infos
-    assert "rewrite_counter" in infos
+    assert infos.obs == "PDB tool used"
+    assert infos.score == 0
+    assert not infos.done
+    assert isinstance(infos, EnvInfo)
 
 
 def test_directory_tree(tmp_path):
@@ -330,7 +319,7 @@ def test_reset(
     mock_pdb_tool.start_pseudo_terminal.return_value = None
     mock_pdb_tool.pdb_obs = "PDB started"
     mock_get_tool.return_value = mock_pdb_tool
-    obs, infos = env.reset(seed=42)
+    infos = env.reset(seed=42)
 
     mock_restore.assert_called_once()
     mock_run.assert_called_once()
@@ -338,18 +327,29 @@ def test_reset(
     assert env.current_file_content is None
     assert env.current_breakpoints_state == {}
     assert env.rewrite_counter == 0
-    assert "obs" in infos
-    assert "dbg_obs" in infos
-    assert "last_run_obs" in infos
-    assert "dir_tree" in infos
-    assert "current_breakpoints" in infos
-    assert "current_code_with_line_number" in infos
-    assert "action" in infos
-    assert "done" in infos
-    assert "score" in infos
-    assert "max_score" in infos
-    assert "instructions" in infos
-    assert "rewrite_counter" in infos
+    assert infos == EnvInfo(
+        obs="",
+        last_run_obs=None,
+        dbg_obs="",
+        dir_tree=f"""Listing files in the current working directory. (ro) indicates read-only files. Max depth: 2.
+{env.tempdir.name}/
+|-- file1.txt
+|-- file2.txt
+|-- subdir/
+  |-- subfile1.txt""",
+        current_code_with_line_number="You are currently not working in a file. You can use ```view path/to/file.py``` to navigate to a file first.",
+        current_breakpoints="No breakpoints are set.",
+        action=None,
+        instructions={
+            "Available tools to solve the problem": {},
+            "Available commands": "",
+        },
+        score=0,
+        max_score=1,
+        done=False,
+        rewrite_counter=0,
+        tools={},
+    )
 
 
 def test_overwrite_file(env):
@@ -404,3 +404,37 @@ def test_run_timeout(tmp_path):
     assert output == "Timeout expired."
     assert not done
     assert env.score == 0
+
+
+def test_env_info_initialization():
+    current_code = {"File name": "test.py", "Content": "print('test')"}
+    tools = {"tool1": {"template": "```tool1 ... ```"}}
+    info = EnvInfo(
+        obs="observation",
+        last_run_obs="last_run",
+        dbg_obs="debug",
+        dir_tree="tree",
+        current_code_with_line_number=current_code,
+        current_breakpoints="breakpoints",
+        action="test_action",
+        instructions={"tool": "instruction"},
+        score=5,
+        max_score=10,
+        done=False,
+        rewrite_counter=2,
+        tools=tools,
+    )
+
+    assert info.obs == "observation"
+    assert info.last_run_obs == "last_run"
+    assert info.dbg_obs == "debug"
+    assert info.dir_tree == "tree"
+    assert info.current_code_with_line_number == current_code
+    assert info.current_breakpoints == "breakpoints"
+    assert info.action == "test_action"
+    assert info.instructions == {"tool": "instruction"}
+    assert info.score == 5
+    assert info.max_score == 10
+    assert not info.done
+    assert info.rewrite_counter == 2
+    assert info.tools == tools

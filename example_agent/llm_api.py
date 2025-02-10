@@ -286,7 +286,7 @@ class Human:
     def __call__(self, messages, info, *args, **kwargs):
         # Color each role differently.
         print_messages(messages, self.logger)
-        available_commands = [t["template"] for t in info["tools"].values()]
+        available_commands = [t["template"] for t in info.tools.values()]
         if prompt_toolkit_available:
             actions_completer = WordCompleter(
                 available_commands, ignore_case=True, sentence=True
