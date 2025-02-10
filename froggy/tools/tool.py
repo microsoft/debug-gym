@@ -24,11 +24,3 @@ class EnvironmentTool(ABC):
     @abstractmethod
     def use(self, action, environment):
         raise NotImplementedError("use method must be implemented in the subclass.")
-
-    # @abstractmethod
-    # def reset(self):
-    #     raise NotImplementedError("reset method must be implemented in the subclass.")
-
-    # def on_success(self, callback):
-    #     pass
-    #     # what to do with that?
