@@ -14,7 +14,6 @@ class MiniNightmareEnv(RepoEnv):
         "pandas_dataframe",
         "patcher",
         "purr",
-        "pytorch",
         "scientific_calculator",
         "shopping_cart",
         "sum_tree",
