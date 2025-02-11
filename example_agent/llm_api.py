@@ -182,6 +182,7 @@ class LLM:
             "openai.APIError",
             "openai.APIConnectionError",
             "openai.RateLimitError",
+            "openai.PermissionDeniedError",
             # Add more as needed
         ]
         exception_full_name = (
