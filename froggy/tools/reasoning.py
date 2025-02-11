@@ -96,7 +96,7 @@ You break down complex problems into smaller parts and reason through them step 
                 ["Error while executing the action after reasoning.", next_obs]
             )
         self.success_chain_action = True
-        self.infos_cache = copy.copy(next_infos)
+        self.infos_cache = copy.deepcopy(next_infos)
         return "\n".join(
             [
                 "Reasoning:",
