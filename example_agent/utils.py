@@ -19,7 +19,7 @@ class HistoryTracker:
     def step(self, new_info: EnvInfo, llm_response: LLMResponse | None = None) -> None:
         """llm_response can be None since the initial state does not have prompt and response"""
         self.memory.append(copy.deepcopy(new_info))
-        self.prompt_response_pairs.append(copy.deepcopy(llm_response))
+        self.prompt_response_pairs.append([copy.deepcopy(llm_response)])
 
     def get(self):
         # return the history_steps latest steps
@@ -47,12 +47,16 @@ class HistoryTracker:
             }
             # prompt_response_pairs could be empty for the initial state
             prp = self.prompt_response_pairs[game_step]
-            if prp and include_prompt_response_pairs:
-                json_out["prompt_response_pairs"] = asdict(prp.prompt_response_pair)
 
-            token_usage = prp.token_usage if prp else None
-            if token_usage is not None:
-                json_out["token_usage"] = asdict(token_usage)
+            if prp and include_prompt_response_pairs:
+                json_out["prompt_response_pairs"] = [
+                    # doesn't include None values
+                    asdict(
+                        p,
+                        dict_factory=lambda x: {k: v for (k, v) in x if v is not None},
+                    )
+                    for p in prp
+                ]
 
         return json_out
 

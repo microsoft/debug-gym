@@ -104,7 +104,7 @@ class PdbAgent:
             if debug:
                 breakpoint()
 
-            info = self.env.step(llm_response.prompt_response_pair.response)
+            info = self.env.step(llm_response.response)
             self.history.step(info, llm_response)
 
             if info.done or info.rewrite_counter >= self.config["max_rewrite_steps"]:
@@ -238,7 +238,7 @@ class PdbAfterRewrites(PdbAgent):
             if debug:
                 breakpoint()
 
-            info = self.env.step(llm_response.prompt_response_pair.response)
+            info = self.env.step(llm_response.response)
 
             # re-introduce pdb tool at the right time
             if (

@@ -174,14 +174,17 @@ def test_history_tracker(build_env_info):
     }
 
     # output token_usage if it exists
-    assert ht.json(3) == {
+    assert ht.json(3, include_prompt_response_pairs=True) == {
         "step_id": 3,
         "action": "action4",
         "obs": "obs4",
-        "token_usage": {
-            "prompt": 4321,
-            "response": 1234,
-        },
+        "prompt_response_pairs": [
+            {
+                "prompt": "prompt_4_1",
+                "response": "response_4_1",
+                "token_usage": {"prompt": 4321, "response": 1234},
+            }
+        ],
     }
 
     # json should return also the prompt-response pairs if include_prompt_response_pairs is True
@@ -189,14 +192,16 @@ def test_history_tracker(build_env_info):
         "step_id": 2,
         "action": "action3",
         "obs": "obs3",
-        "prompt_response_pairs": {
-            "prompt": [
-                {"role": "user", "content": "prompt_3_1"},
-                {"role": "assistent", "content": "response_3_1"},
-                {"role": "user", "content": "prompt_3_2"},
-            ],
-            "response": "response_3_2",
-        },
+        "prompt_response_pairs": [
+            {
+                "prompt": [
+                    {"role": "user", "content": "prompt_3_1"},
+                    {"role": "assistent", "content": "response_3_1"},
+                    {"role": "user", "content": "prompt_3_2"},
+                ],
+                "response": "response_3_2",
+            }
+        ],
     }
 
     # for 0-th step, prompt-response pairs should be None

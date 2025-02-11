@@ -72,12 +72,6 @@ def merge_messages(messages):
 
 
 @dataclass
-class PromptResponsePair:
-    prompt: list[dict] | str  # Either a string or a list of messages.
-    response: str
-
-
-@dataclass
 class TokenUsage:
     prompt: int
     response: int
@@ -85,29 +79,24 @@ class TokenUsage:
 
 @dataclass
 class LLMResponse:
-    prompt_response_pair: PromptResponsePair
+    prompt: list[dict] | str  # either a string or a list of messages.
+    response: str
     token_usage: TokenUsage | None = None
 
     def __init__(
         self,
-        prompt: list[dict] | str = None,
-        response: str = None,
+        prompt: list[dict] | str,
+        response: str,
         prompt_token_count: int = None,
         response_token_count: int = None,
-        prompt_response_pair: PromptResponsePair = None,
         token_usage: TokenUsage = None,
     ):
-        if prompt_response_pair is not None:
-            self.prompt_response_pair = prompt_response_pair
-        elif prompt is not None and response is not None:
-            self.prompt_response_pair = PromptResponsePair(prompt, response)
-        else:
-            raise ValueError("A prompt and response pair is required")
-
-        if token_usage is not None:
-            self.token_usage = token_usage
-        elif prompt_token_count is not None and response_token_count is not None:
+        self.prompt = prompt
+        self.response = response
+        if prompt_token_count is not None and response_token_count is not None:
             self.token_usage = TokenUsage(prompt_token_count, response_token_count)
+        else:
+            self.token_usage = token_usage
 
 
 class TokenCounter:

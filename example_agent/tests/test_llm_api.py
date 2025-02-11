@@ -10,7 +10,6 @@ from example_agent.llm_api import (
     AsyncLLM,
     Human,
     LLMResponse,
-    PromptResponsePair,
     TokenCounter,
     TokenUsage,
     instantiate_llm,
@@ -110,8 +109,8 @@ def test_llm(mock_open, mock_exists, mock_openai, mock_encoding_for_model, logge
     llm = LLM(model_name="test-model", logger=logger_mock)
     messages = [{"role": "user", "content": "Hello"}]
     llm_response = llm(messages)
-    assert llm_response.prompt_response_pair.prompt == messages
-    assert llm_response.prompt_response_pair.response == "Response"
+    assert llm_response.prompt == messages
+    assert llm_response.response == "Response"
     assert llm_response.token_usage.prompt == 1
     assert llm_response.token_usage.response == 1
 
@@ -161,8 +160,8 @@ async def test_async_llm(llm_config_mock, completion_mock, logger_mock):
     llm.client.chat.completions.create = completion_mock
     messages = [{"role": "user", "content": "Hello"}]
     llm_response = await llm(messages)
-    assert llm_response.prompt_response_pair.prompt == messages
-    assert llm_response.prompt_response_pair.response == "some completion mock."
+    assert llm_response.prompt == messages
+    assert llm_response.response == "some completion mock."
     assert llm_response.token_usage.prompt == 1
     assert llm_response.token_usage.response == 4
 
@@ -179,8 +178,8 @@ def test_human(build_env_info):
     )
     llm_response = human(messages, env_info)
     # human only uses the messages content
-    assert llm_response.prompt_response_pair.prompt == "Hello"
-    assert llm_response.prompt_response_pair.response == "User input"
+    assert llm_response.prompt == "Hello"
+    assert llm_response.response == "User input"
     assert llm_response.token_usage.prompt == 5
     assert llm_response.token_usage.response == 10
 
@@ -206,19 +205,6 @@ def test_instantiate_llm(mock_open, mock_exists, mock_encoding_for_model, logger
     assert isinstance(llm, Human)
 
 
-def test_llm_response_init_with_prompt_response_pair():
-    prompt_response_pair = PromptResponsePair(
-        prompt=[{"role": "user", "content": "Hello"}], response="Hi"
-    )
-    token_usage = TokenUsage(prompt=1, response=1)
-    llm_response = LLMResponse(
-        prompt_response_pair=prompt_response_pair, token_usage=token_usage
-    )
-
-    assert llm_response.prompt_response_pair == prompt_response_pair
-    assert llm_response.token_usage == token_usage
-
-
 def test_llm_response_init_with_prompt_and_response():
     prompt = [{"role": "user", "content": "Hello"}]
     response = "Hi"
@@ -231,19 +217,22 @@ def test_llm_response_init_with_prompt_and_response():
         response_token_count=response_token_count,
     )
 
-    assert llm_response.prompt_response_pair.prompt == prompt
-    assert llm_response.prompt_response_pair.response == response
+    assert llm_response.prompt == prompt
+    assert llm_response.response == response
     assert llm_response.token_usage.prompt == prompt_token_count
     assert llm_response.token_usage.response == response_token_count
 
 
-def test_llm_response_init_without_required_arguments():
-    with pytest.raises(ValueError, match="A prompt and response pair is required"):
-        LLMResponse()
+def test_llm_response_init_with_token_usage():
+    llm_response = LLMResponse("prompt", "response", token_usage=TokenUsage(1, 1))
+    assert llm_response.prompt == "prompt"
+    assert llm_response.response == "response"
+    assert llm_response.token_usage.prompt == 1
+    assert llm_response.token_usage.response == 1
 
 
 def test_llm_response_init_with_prompt_and_response_only():
     llm_response = LLMResponse("prompt", "response")
-    assert llm_response.prompt_response_pair.prompt == "prompt"
-    assert llm_response.prompt_response_pair.response == "response"
+    assert llm_response.prompt == "prompt"
+    assert llm_response.response == "response"
     assert llm_response.token_usage == None
