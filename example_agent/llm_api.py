@@ -338,10 +338,6 @@ class Human:
             action = input("> ")
 
         prompt_messages = "\n".join([msg["content"] for msg in messages])
-        token_usage = TokenUsage(
-            prompt=len(prompt_messages),
-            response=len(action),
-        )
 
         return LLMResponse(
             prompt=prompt_messages,
