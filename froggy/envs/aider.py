@@ -29,28 +29,25 @@ class AiderBenchmarkEnv(RepoEnv):
 
         directory = self.current_sample["base_directory"]
         self.setup_workspace(directory, entrypoint="python -m pytest -s .")
+        infos = super().reset()
+        infos.instructions = self.instructions
+        infos.last_run_obs = utils.cleanup_pytest_output(infos.last_run_obs)
 
-        obs, infos = super().reset()
-        infos["instructions"] = self.instructions
-        infos["last_run_obs"] = utils.cleanup_pytest_output(infos["last_run_obs"])
-
-        self.max_score = utils.extract_max_score_from_pytest_output(
-            infos["last_run_obs"]
-        )
-        infos["max_score"] = self.max_score
-        infos["score"] = utils.extract_reward_from_pytest_output(infos["last_run_obs"])
+        self.max_score = utils.extract_max_score_from_pytest_output(infos.last_run_obs)
+        infos.max_score = self.max_score
+        infos.score = utils.extract_reward_from_pytest_output(infos.last_run_obs)
 
         # By default, open the only modifiable file.
         self.load_current_file(self.current_sample["filename"])
         # an update the infos related to current code.
-        infos["current_code_with_line_number"] = self.current_code_with_line_number()
-        return infos["obs"], infos
+        infos.current_code_with_line_number = self.current_code_with_line_number()
+        return infos
 
     def step(self, action: str):
-        obs, score, done, infos = super().step(action)
-        infos["last_run_obs"] = utils.cleanup_pytest_output(infos["last_run_obs"])
-        infos["score"] = utils.extract_reward_from_pytest_output(infos["last_run_obs"])
-        return obs, score, done, infos
+        infos = super().step(action)
+        infos.last_run_obs = utils.cleanup_pytest_output(infos.last_run_obs)
+        infos.score = utils.extract_reward_from_pytest_output(infos.last_run_obs)
+        return infos
 
     def load_dataset(self):
         if not os.path.exists(self.REPO_PATH):

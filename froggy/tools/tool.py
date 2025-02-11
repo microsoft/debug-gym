@@ -1,4 +1,7 @@
-class EnvironmentTool:
+from abc import ABC, abstractmethod
+
+
+class EnvironmentTool(ABC):
     name: str = None
     action: str = None
     instructions: str = None
@@ -18,5 +21,6 @@ class EnvironmentTool:
         # e.g. ```pdb b src/main.py:42```
         return action.startswith(self.action)
 
+    @abstractmethod
     def use(self, action, environment):
         raise NotImplementedError("use method must be implemented in the subclass.")

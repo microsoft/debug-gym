@@ -1,5 +1,6 @@
 import pytest
 
+from example_agent.llm_api import LLMResponse, TokenUsage
 from example_agent.utils import (
     HistoryTracker,
     build_history_prompt,
@@ -103,7 +104,7 @@ def test_trim_prompt_messages():
     assert trim_prompt_messages(messages, 65, token_counter) == expected
 
 
-def test_history_tracker():
+def test_history_tracker(build_env_info):
     ht = HistoryTracker(history_steps=3)
 
     # should start empty
@@ -111,44 +112,52 @@ def test_history_tracker():
     assert ht.get() == []
     assert ht.get_all() == []
     assert ht.score() == 0
-    assert ht.prompt_response_pairs == [
-        []
-    ]  # at 0-th step, there is no prompt-response pair
+    assert ht.prompt_response_pairs == []
 
     # json should return an empty dict
     assert ht.json() == {}
 
-    # push some steps
-    ht.step({"obs": "obs1", "action": None, "score": 1})
-    ht.step({"obs": "obs2", "action": "action2", "score": 2})
-    ht.step({"obs": "obs3", "action": "action3", "score": 3})
-    ht.step({"obs": "obs4", "action": "action4", "score": 4, "token_usage": 12345})
-    ht.step({"obs": "obs5", "action": "action5", "score": 5})
-    # push some prompt-response pairs
-    ht.save_prompt_response_pairs([("prompt_2_1", "response_2_1")])
-    ht.save_prompt_response_pairs(
-        [("prompt_3_1", "response_3_1"), ("prompt_3_2", "response_3_2")]
+    # prepare some data
+    env_info_1 = build_env_info(obs="obs1", action=None, score=1)
+    env_info_2 = build_env_info(obs="obs2", action="action2", score=2)
+    env_info_3 = build_env_info(obs="obs3", action="action3", score=3)
+    env_info_4 = build_env_info(obs="obs4", action="action4", score=4)
+    env_info_5 = build_env_info(obs="obs5", action="action5", score=5)
+
+    # single prompt format
+    llm_response_2 = LLMResponse("prompt_2_1", "response_2_1")
+    # list of messages format
+    llm_response_3 = LLMResponse(
+        prompt=[
+            {"role": "user", "content": "prompt_3_1"},
+            {"role": "assistent", "content": "response_3_1"},
+            {"role": "user", "content": "prompt_3_2"},
+        ],
+        response="response_3_2",
     )
-    ht.save_prompt_response_pairs([("prompt_4_1", "response_4_1")])
-    ht.save_prompt_response_pairs(
-        [("prompt_5_1", "response_5_1"), ("prompt_5_2", "response_5_2")]
+    llm_response_4 = LLMResponse("prompt_4_1", "response_4_1", 4321, 1234)
+    llm_response_5 = LLMResponse(
+        prompt=[
+            {"role": "user", "content": "prompt_5_1"},
+            {"role": "assistent", "content": "response_5_1"},
+            {"role": "user", "content": "prompt_5_2"},
+        ],
+        response="response_5_2",
     )
+
+    # push some steps and prompt-response pairs
+    # at 0-th step, there is no prompt-response pair
+    ht.step(env_info_1, None)
+    ht.step(env_info_2, llm_response_2)
+    ht.step(env_info_3, llm_response_3)
+    ht.step(env_info_4, llm_response_4)
+    ht.step(env_info_5, llm_response_5)
 
     # get_all should return all steps
-    assert ht.get_all() == [
-        {"obs": "obs1", "action": None, "score": 1},
-        {"obs": "obs2", "action": "action2", "score": 2},
-        {"obs": "obs3", "action": "action3", "score": 3},
-        {"obs": "obs4", "action": "action4", "score": 4, "token_usage": 12345},
-        {"obs": "obs5", "action": "action5", "score": 5},
-    ]
+    assert ht.get_all() == [env_info_1, env_info_2, env_info_3, env_info_4, env_info_5]
 
     # get should return the last 3 steps
-    assert ht.get() == [
-        {"obs": "obs3", "action": "action3", "score": 3},
-        {"obs": "obs4", "action": "action4", "score": 4, "token_usage": 12345},
-        {"obs": "obs5", "action": "action5", "score": 5},
-    ]
+    assert ht.get() == [env_info_3, env_info_4, env_info_5]
 
     # json should return the last step by default
     assert ht.json() == {
@@ -165,11 +174,17 @@ def test_history_tracker():
     }
 
     # output token_usage if it exists
-    assert ht.json(3) == {
+    assert ht.json(3, include_prompt_response_pairs=True) == {
         "step_id": 3,
         "action": "action4",
         "obs": "obs4",
-        "token_usage": 12345,
+        "prompt_response_pairs": [
+            {
+                "prompt": "prompt_4_1",
+                "response": "response_4_1",
+                "token_usage": {"prompt": 4321, "response": 1234},
+            }
+        ],
     }
 
     # json should return also the prompt-response pairs if include_prompt_response_pairs is True
@@ -177,12 +192,16 @@ def test_history_tracker():
         "step_id": 2,
         "action": "action3",
         "obs": "obs3",
-        "prompt_response_pairs": {
-            "prompt_0": "prompt_3_1",
-            "response_0": "response_3_1",
-            "prompt_1": "prompt_3_2",
-            "response_1": "response_3_2",
-        },
+        "prompt_response_pairs": [
+            {
+                "prompt": [
+                    {"role": "user", "content": "prompt_3_1"},
+                    {"role": "assistent", "content": "response_3_1"},
+                    {"role": "user", "content": "prompt_3_2"},
+                ],
+                "response": "response_3_2",
+            }
+        ],
     }
 
     # for 0-th step, prompt-response pairs should be None
@@ -205,13 +224,13 @@ def test_history_tracker():
     assert ht.get() == []
     assert ht.get_all() == []
     assert ht.score() == 0
-    assert ht.prompt_response_pairs == [[]]
+    assert ht.prompt_response_pairs == []
 
     # json should return an empty dict
     assert ht.json() == {}
 
 
-def test_build_history_prompt():
+def test_build_history_prompt(build_env_info):
     import json
 
     from froggy.utils import unescape
@@ -233,20 +252,27 @@ def test_build_history_prompt():
 
     # test with non-empty history
     ht = HistoryTracker(history_steps=3)
-    # push some steps
-    ht.step({"obs": "obs1", "action": None, "score": 1, "rewrite_counter": 0})
-    ht.step({"obs": "obs2", "action": "action2", "score": 2, "rewrite_counter": 0})
-    ht.step({"obs": "obs3", "action": "action3", "score": 3, "rewrite_counter": 0})
-    ht.step(
-        {
-            "obs": "obs4",
-            "action": "action4",
-            "score": 4,
-            "token_usage": 12345,
-            "rewrite_counter": 1,
-        }
+    # prepare some data
+    env_info_1 = build_env_info(obs="obs1", action=None, score=1, rewrite_counter=0)
+    env_info_2 = build_env_info(
+        obs="obs2", action="action2", score=2, rewrite_counter=0
     )
-    ht.step({"obs": "obs5", "action": "action5", "score": 5, "rewrite_counter": 1})
+    env_info_3 = build_env_info(
+        obs="obs3", action="action3", score=3, rewrite_counter=0
+    )
+    env_info_4 = build_env_info(
+        obs="obs4", action="action4", score=4, rewrite_counter=1
+    )
+    env_info_5 = build_env_info(
+        obs="obs5", action="action5", score=5, rewrite_counter=1
+    )
+
+    # push some steps
+    ht.step(env_info_1)
+    ht.step(env_info_2)
+    ht.step(env_info_3)
+    ht.step(env_info_4)
+    ht.step(env_info_5)
 
     # use_conversational_prompt is False
     # reset_prompt_history_after_rewrite is False

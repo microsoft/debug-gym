@@ -46,7 +46,6 @@ def test_instructions(terminal_simulator_env):
 )
 @patch("os.path.exists", return_value=True)
 @patch("froggy.envs.RepoEnv.load_current_file")
-# @patch('froggy.envs.RepoEnv.reset', return_value=("obs", {"last_run_obs": "Raw output"}))
 def test_reset(
     mock_loadfile, mock_exists, mock_open, mock_copytree, terminal_simulator_env
 ):
@@ -60,9 +59,9 @@ def test_reset(
         }
     }
     options = {"task_name": "test_task"}
-    obs, infos = terminal_simulator_env.reset(options=options)
-    assert infos["instructions"]["Problem description"] == "Test instructions"
-    assert infos["current_code_with_line_number"] is not None
+    infos = terminal_simulator_env.reset(options=options)
+    assert infos.instructions["Problem description"] == "Test instructions"
+    assert infos.current_code_with_line_number is not None
 
 
 @patch("os.path.exists", return_value=True)
@@ -95,6 +94,6 @@ def test_step(
 ):
     terminal_simulator_env.current_sample = {"instructions": "Test instructions"}
     terminal_simulator_env.last_run_obs = "obs"
-    obs, score, done, infos = terminal_simulator_env.step("action")
-    assert infos["last_run_obs"] == "obs"
-    assert infos["score"] == 0
+    infos = terminal_simulator_env.step("action")
+    assert infos.last_run_obs == "obs"
+    assert infos.score == 0
