@@ -135,7 +135,7 @@ def test_history_tracker(build_env_info):
         ],
         response="response_3_2",
     )
-    llm_response_4 = LLMResponse("prompt_4_1", "response_4_1", TokenUsage(4321, 1234))
+    llm_response_4 = LLMResponse("prompt_4_1", "response_4_1", 4321, 1234)
     llm_response_5 = LLMResponse(
         prompt=[
             {"role": "user", "content": "prompt_5_1"},
@@ -190,7 +190,11 @@ def test_history_tracker(build_env_info):
         "action": "action3",
         "obs": "obs3",
         "prompt_response_pairs": {
-            "prompt": "user: prompt_3_1\nassistent: response_3_1\nuser: prompt_3_2",
+            "prompt": [
+                {"role": "user", "content": "prompt_3_1"},
+                {"role": "assistent", "content": "response_3_1"},
+                {"role": "user", "content": "prompt_3_2"},
+            ],
             "response": "response_3_2",
         },
     }

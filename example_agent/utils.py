@@ -28,14 +28,6 @@ class HistoryTracker:
     def get_all(self):
         return self.memory
 
-    def _format_prompt_response_pairs(self, prompt_response_pair):
-        messages = [f"{p["role"]}: {p["content"]}" for p in prompt_response_pair.prompt]
-        prompt = "\n".join(messages)
-        return {
-            "prompt": prompt,
-            "response": prompt_response_pair.response,
-        }
-
     def json(self, game_step=None, include_prompt_response_pairs=False):
         if len(self.memory) == 0:
             return {}
@@ -53,11 +45,10 @@ class HistoryTracker:
                 "action": self.memory[game_step].action,
                 "obs": self.memory[game_step].obs,
             }
+            # prompt_response_pairs could be empty for the initial state
             prp = self.prompt_response_pairs[game_step]
             if prp and include_prompt_response_pairs:
-                json_out["prompt_response_pairs"] = self._format_prompt_response_pairs(
-                    prp
-                )
+                json_out["prompt_response_pairs"] = asdict(prp.prompt_response_pair)
 
             token_usage = prp.token_usage if prp else None
             if token_usage is not None:

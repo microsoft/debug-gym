@@ -72,6 +72,12 @@ def merge_messages(messages):
 
 
 @dataclass
+class PromptResponsePair:
+    prompt: list[dict] | str  # Either a string or a list of messages.
+    response: str
+
+
+@dataclass
 class TokenUsage:
     prompt: int
     response: int
@@ -79,9 +85,29 @@ class TokenUsage:
 
 @dataclass
 class LLMResponse:
-    prompt: list[dict] | str  # Either a string or a list of messages.
-    response: str
+    prompt_response_pair: PromptResponsePair
     token_usage: TokenUsage | None = None
+
+    def __init__(
+        self,
+        prompt: list[dict] | str = None,
+        response: str = None,
+        prompt_token_count: int = None,
+        response_token_count: int = None,
+        prompt_response_pair: PromptResponsePair = None,
+        token_usage: TokenUsage = None,
+    ):
+        if prompt_response_pair is not None:
+            self.prompt_response_pair = prompt_response_pair
+        elif prompt is not None and response is not None:
+            self.prompt_response_pair = PromptResponsePair(prompt, response)
+        else:
+            raise ValueError("A prompt and response pair is required")
+
+        if token_usage is not None:
+            self.token_usage = token_usage
+        elif prompt_token_count is not None and response_token_count is not None:
+            self.token_usage = TokenUsage(prompt_token_count, response_token_count)
 
 
 class TokenCounter:
@@ -243,12 +269,13 @@ class LLM:
 
         self.logger.debug(colored(response, "green"))
 
-        token_usage = TokenUsage(
-            prompt=self.token_counter(messages=messages),
-            response=self.token_counter(text=response),
+        llm_response = LLMResponse(
+            prompt=messages,
+            response=response,
+            prompt_token_count=self.token_counter(messages=messages),
+            response_token_count=self.token_counter(text=response),
         )
-
-        return LLMResponse(messages, response, token_usage)
+        return llm_response
 
 
 class AsyncLLM(LLM):
@@ -287,12 +314,13 @@ class AsyncLLM(LLM):
         response = await self.query_model(messages, **kwargs)
         response = response.strip()
 
-        token_usage = TokenUsage(
-            prompt=self.token_counter(messages=messages),
-            response=self.token_counter(text=response),
+        llm_response = LLMResponse(
+            prompt=messages,
+            response=response,
+            prompt_token_count=self.token_counter(messages=messages),
+            response_token_count=self.token_counter(text=response),
         )
-
-        return LLMResponse(messages, response, token_usage)
+        return llm_response
 
 
 class Human:
@@ -326,7 +354,12 @@ class Human:
             response=len(action),
         )
 
-        return LLMResponse(prompt_messages, action, token_usage)
+        return LLMResponse(
+            prompt=prompt_messages,
+            response=action,
+            prompt_token_count=len(prompt_messages),
+            response_token_count=len(action),
+        )
 
 
 def instantiate_llm(
