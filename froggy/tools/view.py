@@ -28,38 +28,48 @@ class ViewTool(EnvironmentTool):
             new_file = new_file[len(str(self.environment.working_dir)) + 1 :]
 
         if not is_subdirectory(new_file, self.environment.working_dir):
-            obs = (
-                f"Invalid file path. The file path must be inside the root directory: `{self.environment.working_dir}`. "
-                f"Current file: `{self.environment.current_file}`. "
-                "The file is editable."
-                if self.is_editable(self.environment.current_file)
-                else "The file is read-only, it is not editable."
-            )
+            obs = [
+                f"Invalid file path. The file path must be inside the root directory: `{self.environment.working_dir}`.",
+                f"Current file: `{self.environment.current_file}`.",
+                (
+                    "The file is editable."
+                    if self.is_editable(self.environment.current_file)
+                    else "The file is read-only, it is not editable."
+                ),
+            ]
 
         elif new_file == self.environment.current_file:
-            obs = (
-                f"Already viewing `{new_file}`. " "The file is editable."
-                if self.is_editable(new_file)
-                else "The file is read-only, it is not editable."
-            )
+            obs = [
+                f"Already viewing `{new_file}`.",
+                (
+                    "The file is editable."
+                    if self.is_editable(new_file)
+                    else "The file is read-only, it is not editable."
+                ),
+            ]
 
         elif os.path.isfile(pjoin(self.environment.working_dir, new_file)):
             self.environment.load_current_file(filepath=new_file)
             self.environment.current_file = new_file
-            obs = (
-                f"Viewing `{new_file}`. " "The file is editable."
-                if self.is_editable(new_file)
-                else "The file is read-only, it is not editable."
-            )
+            obs = [
+                f"Viewing `{new_file}`.",
+                (
+                    "The file is editable."
+                    if self.is_editable(new_file)
+                    else "The file is read-only, it is not editable."
+                ),
+            ]
 
         else:
-            obs = (
-                f"File not found. Could not navigate to `{new_file}`. "
-                f"Make sure that the file path is given relative to the root: `{self.environment.working_dir}`. "
-                f"Current file: `{self.environment.current_file}`. "
-                "The file is editable."
-                if self.is_editable(self.environment.current_file)
-                else "The file is read-only, it is not editable."
-            )
+            obs = [
+                f"File not found. Could not navigate to `{new_file}`.",
+                f"Make sure that the file path is given relative to the root: `{self.environment.working_dir}`.",
+                f"Current file: `{self.environment.current_file}`.",
+                (
+                    "The file is editable."
+                    if self.is_editable(self.environment.current_file)
+                    else "The file is read-only, it is not editable."
+                ),
+            ]
 
-        return obs
+        return " ".join(obs)
