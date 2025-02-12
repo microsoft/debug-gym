@@ -19,7 +19,6 @@ class BreakTaskLoop(Exception):
 
 
 def run_agent(args, problem, config):
-    config["uuid"] = config.get("uuid", str(uuid.uuid4()))
     exp_path = Path(config["output_path"]) / config["uuid"] / problem
 
     task_logger = FroggyLogger(
@@ -116,6 +115,8 @@ def main():
         )
 
     config = config[args.agent]
+    config["uuid"] = config.get("uuid", str(uuid.uuid4()))
+    logger.warning(f"Experiment UUID: {config['uuid']}")
 
     # Figure out which problems to solve.
     problems = config.get("problems", ["custom"])
