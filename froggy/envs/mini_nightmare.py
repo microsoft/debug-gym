@@ -40,21 +40,19 @@ class MiniNightmareEnv(RepoEnv):
         directory = self.current_sample["base_directory"]
         self.setup_workspace(directory, entrypoint="python -m pytest -sv test.py")
 
-        obs, infos = super().reset()
-        infos["instructions"] = self.instructions
-        infos["last_run_obs"] = utils.cleanup_pytest_output(infos["last_run_obs"])
+        infos = super().reset()
+        infos.instructions = self.instructions
+        infos.last_run_obs = utils.cleanup_pytest_output(infos.last_run_obs)
 
-        self.max_score = utils.extract_max_score_from_pytest_output(
-            infos["last_run_obs"]
-        )
-        infos["max_score"] = self.max_score
-        infos["score"] = utils.extract_reward_from_pytest_output(infos["last_run_obs"])
+        self.max_score = utils.extract_max_score_from_pytest_output(infos.last_run_obs)
+        infos.max_score = self.max_score
+        infos.score = utils.extract_reward_from_pytest_output(infos.last_run_obs)
 
         # By default, open the only modifiable file.
         self.load_current_file(self.current_sample["filename"])
         # an update the infos related to current code.
-        infos["current_code_with_line_number"] = self.current_code_with_line_number()
-        return infos["obs"], infos
+        infos.current_code_with_line_number = self.current_code_with_line_number()
+        return infos
 
     def load_dataset(self):
         assert os.path.exists(
