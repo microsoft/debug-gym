@@ -65,7 +65,7 @@ def run_agent(args, problem, config):
 
         success = False
 
-    task_logger.info("[bold green]Completed!")
+    task_logger.info(f"[bold green]Completed, log saved at: {task_logger.log_file}")
     return success
 
 
