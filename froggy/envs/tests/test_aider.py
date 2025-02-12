@@ -4,6 +4,26 @@ from unittest.mock import MagicMock, mock_open, patch
 import pytest
 
 from froggy.envs import AiderBenchmarkEnv
+from froggy.envs.env import EnvInfo
+
+
+@pytest.fixture
+def env_info():
+    return EnvInfo(
+        obs="obs",
+        max_score=10,
+        score=5,
+        last_run_obs="Raw output",
+        dbg_obs="dbg_obs",
+        dir_tree="dir_tree",
+        current_code_with_line_number="current_code_with_line_number",
+        current_breakpoints="current_breakpoints",
+        action="action",
+        instructions={},
+        done=False,
+        rewrite_counter=0,
+        tools={},
+    )
 
 
 @pytest.fixture
@@ -37,13 +57,7 @@ def test_instructions(aider_env):
     assert aider_env.instructions == expected_instructions
 
 
-@patch(
-    "froggy.envs.RepoEnv.reset",
-    return_value=(
-        "obs",
-        {"obs": "obs", "max_score": 10, "score": 5, "last_run_obs": "Raw output"},
-    ),
-)
+@patch("froggy.envs.RepoEnv.reset")
 @patch("froggy.envs.RepoEnv.current_code_with_line_number", return_value="Current code")
 @patch("froggy.envs.AiderBenchmarkEnv.setup_workspace")
 @patch("froggy.envs.AiderBenchmarkEnv.load_current_file")
@@ -63,7 +77,9 @@ def test_reset(
     mock_line_number,
     repo_env,
     aider_env,
+    env_info,
 ):
+    repo_env.return_value = env_info
     aider_env.dataset = {
         "test_task": {
             "base_directory": "test_directory",
@@ -72,23 +88,21 @@ def test_reset(
         }
     }
     options = {"task_name": "test_task"}
-    obs, infos = aider_env.reset(options=options)
-    assert infos["instructions"]["Problem description"] == "Test instructions"
-    assert infos["last_run_obs"] == "Cleaned output"
-    assert infos["max_score"] == 10
-    assert infos["score"] == 5
+    infos = aider_env.reset(options=options)
+    assert infos.instructions["Problem description"] == "Test instructions"
+    assert infos.last_run_obs == "Cleaned output"
+    assert infos.max_score == 10
+    assert infos.score == 5
 
 
-@patch(
-    "froggy.envs.RepoEnv.step",
-    return_value=("obs", 5, True, {"last_run_obs": "Raw output"}),
-)
+@patch("froggy.envs.RepoEnv.step")
 @patch("froggy.utils.cleanup_pytest_output", return_value="Cleaned output")
 @patch("froggy.utils.extract_reward_from_pytest_output", return_value=5)
-def test_step(mock_extract_reward, mock_cleanup, mock_step, aider_env):
-    obs, score, done, infos = aider_env.step("action")
-    assert infos["last_run_obs"] == "Cleaned output"
-    assert infos["score"] == 5
+def test_step(mock_extract_reward, mock_cleanup, mock_step, aider_env, env_info):
+    mock_step.return_value = env_info
+    infos = aider_env.step("action")
+    assert infos.last_run_obs == "Cleaned output"
+    assert infos.score == 5
 
 
 @patch("subprocess.run")

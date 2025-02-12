@@ -50,11 +50,11 @@ class PdbAgent:
         system_prompt["Overall task"] = (
             "Your goal is to debug a Python program to make sure it can pass a set of test functions. You have access to the pdb debugger tools, you can use them to investigate the code, set breakpoints, and print necessary values to identify the bugs. Once you have gained enough information, propose a rewriting patch to fix the bugs. Avoid rewriting the entire code, focus on the bugs only."
         )
-        system_prompt["Instructions"] = info["instructions"]
-        system_prompt["Repo directory tree"] = info["dir_tree"]
-        system_prompt["Current code in view"] = info["current_code_with_line_number"]
-        system_prompt["Current breakpoints"] = info["current_breakpoints"]
-        system_prompt["Last execution output"] = info["last_run_obs"]
+        system_prompt["Instructions"] = info.instructions
+        system_prompt["Repo directory tree"] = info.dir_tree
+        system_prompt["Current code in view"] = info.current_code_with_line_number
+        system_prompt["Current breakpoints"] = info.current_breakpoints
+        system_prompt["Last execution output"] = info.last_run_obs
         system_prompt = unescape(json.dumps(system_prompt, indent=4))
         messages = [
             {
@@ -80,49 +80,39 @@ class PdbAgent:
 
     def run(self, task_name=None, debug=False):
         self.history.reset()
-        _, info = self.env.reset(options={"task_name": task_name})
-        self.history.step(info)
+        info = self.env.reset(options={"task_name": task_name})
+        # initial state does not have prompt and response
+        self.history.step(info, None)
 
-        if info["done"] is True:
+        if info.done is True:
             # msg = "Environment started with entrypoint passing without errors."
             return True
 
-        done = False
-        highscore = info["score"]
+        highscore = info.score
 
         for step in self.logger.tqdm(range(self.config["max_steps"])):
-            highscore = max(highscore, info["score"])
+            highscore = max(highscore, info.score)
             self.logger.info(
-                f"Score: {info['score']}/{info['max_score']} ({info['score']/info['max_score']:.1%}) [Best: {highscore}]".format(
-                    info["score"]
-                )
+                f"Score: {info.score}/{info.max_score} ({info.score/info.max_score:.1%}) [Best: {highscore}]"
             )
 
             prompt = self.build_prompt(info)
-            answer, token_usage = self.llm(
+            llm_response = self.llm(
                 prompt, info, temperature=self.config["llm_temperature"][0]
             )
 
             if debug:
                 breakpoint()
 
-            _, _, done, info = self.env.step(answer)
-            info["token_usage"] = [
-                token_usage
-            ]  # in some other agents this is a list because of multi-step llm calls
-            self.history.step(info)
-            self.history.save_prompt_response_pairs(
-                prompt_response_pairs=[(prompt, answer)]
-            )
+            info = self.env.step(llm_response.response)
+            self.history.step(info, llm_response)
 
-            if done or info["rewrite_counter"] >= self.config["max_rewrite_steps"]:
+            if info.done or info.rewrite_counter >= self.config["max_rewrite_steps"]:
                 self.logger.info(
-                    f"Score: {info['score']}/{info['max_score']} ({info['score']/info['max_score']:.1%})".format(
-                        info["score"]
-                    )
+                    f"Score: {info.score}/{info.max_score} ({info.score/info.max_score:.1%})"
                 )
                 break
-        return done
+        return info.done
 
     def apply_patch(self, patch_path: str) -> bool:
         patch_command = ["patch", "-p1"]
@@ -189,11 +179,11 @@ class RewriteOnly(PdbAgent):
         system_prompt["Overall task"] = (
             "Your goal is to debug a Python program to make sure it can pass a set of test functions. You need to propose a rewriting patch to fix the bugs. Avoid rewriting the entire code, focus on the bugs only."
         )
-        system_prompt["Instructions"] = info["instructions"]
-        system_prompt["Repo directory tree"] = info["dir_tree"]
-        system_prompt["Current code in view"] = info["current_code_with_line_number"]
-        system_prompt["Current breakpoints"] = info["current_breakpoints"]
-        system_prompt["Last execution output"] = info["last_run_obs"]
+        system_prompt["Instructions"] = info.instructions
+        system_prompt["Repo directory tree"] = info.dir_tree
+        system_prompt["Current code in view"] = info.current_code_with_line_number
+        system_prompt["Current breakpoints"] = info.current_breakpoints
+        system_prompt["Last execution output"] = info.last_run_obs
         system_prompt = unescape(json.dumps(system_prompt, indent=4))
         messages = [
             {
@@ -223,58 +213,49 @@ class PdbAfterRewrites(PdbAgent):
         pdb_tool = self.env.tools.pop("pdb")
 
         self.history.reset()
-        _, info = self.env.reset(options={"task_name": task_name})
-        self.history.step(info)
+        info = self.env.reset(options={"task_name": task_name})
+        # initial state does not have prompt and response
+        self.history.step(info, None)
 
-        if info["done"] is True:
+        if info.done is True:
             # msg = "Environment started with entrypoint passing without errors."
             return True
 
-        done = False
-        highscore = info["score"]
+        highscore = info.score
 
         for step in self.logger.tqdm(range(self.config["max_steps"])):
-            highscore = max(highscore, info["score"])
+            highscore = max(highscore, info.score)
             self.logger.info(
-                f"Score: {info['score']}/{info['max_score']} ({info['score']/info['max_score']:.1%}) [Best: {highscore}]".format(
-                    info["score"]
-                )
+                f"Score: {info.score}/{info.max_score} ({info.score/info.max_score:.1%}) [Best: {highscore}]"
             )
 
             prompt = self.build_prompt(info)
-            answer, token_usage = self.llm(
+
+            llm_response = self.llm(
                 prompt, info, temperature=self.config["llm_temperature"][0]
             )
 
             if debug:
                 breakpoint()
 
-            _, _, done, info = self.env.step(answer)
-            info["token_usage"] = [
-                token_usage
-            ]  # in some other agents this is a list because of multi-step llm calls
+            info = self.env.step(llm_response.response)
 
             # re-introduce pdb tool at the right time
             if (
-                info["rewrite_counter"] >= self.config["n_rewrites_before_pdb"]
+                info.rewrite_counter >= self.config["n_rewrites_before_pdb"]
                 and pdb_tool.name not in self.env.tools
             ):
                 self.env.add_tool(pdb_tool)
                 self.env.tools["pdb"].start_pdb()
-                info["instructions"] = self.env.instructions
-                info["obs"] += "\nThe pdb tool has been added."
+                info.instructions = self.env.instructions
+                info.obs += "\nThe pdb tool has been added."
 
-            self.history.step(info)
-            self.history.save_prompt_response_pairs(
-                prompt_response_pairs=[(prompt, answer)]
-            )
+            self.history.step(info, llm_response)
 
-            if done or info["rewrite_counter"] >= self.config["max_rewrite_steps"]:
+            if info.done or info.rewrite_counter >= self.config["max_rewrite_steps"]:
                 self.logger.info(
-                    f"Score: {info['score']}/{info['max_score']} ({info['score']/info['max_score']:.1%})".format(
-                        info["score"]
-                    )
+                    f"Score: {info.score}/{info.max_score} ({info.score/info.max_score:.1%})"
                 )
                 break
 
-        return done
+        return info.done

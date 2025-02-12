@@ -268,7 +268,7 @@ class PDBTool(EnvironmentTool):
         # self.breakpoints_state is a dict, the keys are "|||".join([file_path, str(line_number)]) and values are breakpoint_command
         if len(self.environment.current_breakpoints_state) == 0:
             return
-        current_breakpoints_state_copy = copy.copy(
+        current_breakpoints_state_copy = copy.deepcopy(
             self.environment.current_breakpoints_state
         )
         if rewrite_file is None:

@@ -9,7 +9,9 @@ from example_agent.llm_api import (
     LLM,
     AsyncLLM,
     Human,
+    LLMResponse,
     TokenCounter,
+    TokenUsage,
     instantiate_llm,
     load_llm_config,
     merge_messages,
@@ -106,10 +108,11 @@ def test_llm(mock_open, mock_exists, mock_openai, mock_encoding_for_model, logge
 
     llm = LLM(model_name="test-model", logger=logger_mock)
     messages = [{"role": "user", "content": "Hello"}]
-    response, token_usage = llm(messages)
-    assert response == "Response"
-    assert "prompt" in token_usage
-    assert "response" in token_usage
+    llm_response = llm(messages)
+    assert llm_response.prompt == messages
+    assert llm_response.response == "Response"
+    assert llm_response.token_usage.prompt == 1
+    assert llm_response.token_usage.response == 1
 
 
 @pytest.fixture
@@ -156,25 +159,29 @@ async def test_async_llm(llm_config_mock, completion_mock, logger_mock):
     llm = AsyncLLM(model_name="test_model", logger=logger_mock)
     llm.client.chat.completions.create = completion_mock
     messages = [{"role": "user", "content": "Hello"}]
-    response, token_usage = await llm(messages)
-    assert response == "some completion mock."
-    assert token_usage == {"prompt": 1, "response": 4}
+    llm_response = await llm(messages)
+    assert llm_response.prompt == messages
+    assert llm_response.response == "some completion mock."
+    assert llm_response.token_usage.prompt == 1
+    assert llm_response.token_usage.response == 4
 
 
 @patch("builtins.input", lambda *args, **kwargs: "User input")
-def test_human():
+def test_human(build_env_info):
     human = Human()
     messages = [{"role": "user", "content": "Hello"}]
-    info = {
-        "tools": {
+    env_info = build_env_info(
+        tools={
             "pdb": {"template": "```pdb <command>```"},
             "view": {"template": "```<path/to/file.py>```"},
         }
-    }
-    response, token_usage = human(messages, info)
-    assert response == "User input"
-    assert "prompt" in token_usage
-    assert "response" in token_usage
+    )
+    llm_response = human(messages, env_info)
+    # human only uses the messages content
+    assert llm_response.prompt == "Hello"
+    assert llm_response.response == "User input"
+    assert llm_response.token_usage.prompt == 5
+    assert llm_response.token_usage.response == 10
 
 
 @patch("tiktoken.encoding_for_model")
@@ -196,3 +203,36 @@ def test_instantiate_llm(mock_open, mock_exists, mock_encoding_for_model, logger
     config = {"llm_name": "human"}
     llm = instantiate_llm(config, logger=logger_mock, use_async=False)
     assert isinstance(llm, Human)
+
+
+def test_llm_response_init_with_prompt_and_response():
+    prompt = [{"role": "user", "content": "Hello"}]
+    response = "Hi"
+    prompt_token_count = 1
+    response_token_count = 1
+    llm_response = LLMResponse(
+        prompt=prompt,
+        response=response,
+        prompt_token_count=prompt_token_count,
+        response_token_count=response_token_count,
+    )
+
+    assert llm_response.prompt == prompt
+    assert llm_response.response == response
+    assert llm_response.token_usage.prompt == prompt_token_count
+    assert llm_response.token_usage.response == response_token_count
+
+
+def test_llm_response_init_with_token_usage():
+    llm_response = LLMResponse("prompt", "response", token_usage=TokenUsage(1, 1))
+    assert llm_response.prompt == "prompt"
+    assert llm_response.response == "response"
+    assert llm_response.token_usage.prompt == 1
+    assert llm_response.token_usage.response == 1
+
+
+def test_llm_response_init_with_prompt_and_response_only():
+    llm_response = LLMResponse("prompt", "response")
+    assert llm_response.prompt == "prompt"
+    assert llm_response.response == "response"
+    assert llm_response.token_usage == None

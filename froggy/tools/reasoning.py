@@ -56,7 +56,10 @@ You break down complex problems into smaller parts and reason through them step 
         super().__init__()
         self.allow_chain_action = allow_chain_action
         self.success_chain_action = False
-        self.done_cache, self.score_cache, self.infos_cache = None, None, None
+
+        from froggy.envs.env import EnvInfo
+
+        self.infos_cache: EnvInfo = None
 
     def use(self, action):
         self.success_chain_action = False
@@ -77,8 +80,8 @@ You break down complex problems into smaller parts and reason through them step 
             return "SyntaxError: invalid syntax. You cannot chain reasoning actions."
         # now execute the next action
         try:
-            next_output = self.environment.step(next_action)
-            next_obs, next_score, next_done, next_infos = next_output
+            next_infos = self.environment.step(next_action)
+            next_obs = next_infos.obs
         except:
             return "\n".join(
                 [
@@ -93,9 +96,7 @@ You break down complex problems into smaller parts and reason through them step 
                 ["Error while executing the action after reasoning.", next_obs]
             )
         self.success_chain_action = True
-        self.done_cache = next_done
-        self.score_cache = next_score
-        self.infos_cache = copy.copy(next_infos)
+        self.infos_cache = copy.deepcopy(next_infos)
         return "\n".join(
             [
                 "Reasoning:",
