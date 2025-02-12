@@ -330,7 +330,7 @@ def test_reset(
     assert infos == EnvInfo(
         obs="",
         last_run_obs=None,
-        dbg_obs="",
+        tools_obs={},
         dir_tree=f"""Listing files in the current working directory. (ro) indicates read-only files. Max depth: 2.
 {env.tempdir.name}/
 |-- file1.txt
@@ -412,7 +412,7 @@ def test_env_info_initialization():
     info = EnvInfo(
         obs="observation",
         last_run_obs="last_run",
-        dbg_obs="debug",
+        tools_obs={},
         dir_tree="tree",
         current_code_with_line_number=current_code,
         current_breakpoints="breakpoints",
@@ -427,7 +427,7 @@ def test_env_info_initialization():
 
     assert info.obs == "observation"
     assert info.last_run_obs == "last_run"
-    assert info.dbg_obs == "debug"
+    assert info.tools_obs == {}
     assert info.dir_tree == "tree"
     assert info.current_code_with_line_number == current_code
     assert info.current_breakpoints == "breakpoints"

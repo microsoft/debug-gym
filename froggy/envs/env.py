@@ -24,7 +24,7 @@ from froggy.utils import _walk, make_file_matcher, show_line_number
 class EnvInfo:
     obs: str
     last_run_obs: str
-    dbg_obs: str
+    tools_obs: dict
     dir_tree: str
     current_code_with_line_number: dict | str
     current_breakpoints: str
@@ -242,16 +242,11 @@ class RepoEnv(TooledEnv):
         self.run()
 
         self.obs = ""
-        if self.has_tool("pdb"):  # to be updated
-            tools_obs = self.event_hooks.notify("on_reset")
-            self.get_tool("pdb").start_pdb()
-            self.dbg_obs = self.get_tool("pdb").pdb_obs
-            # self.obs += "Debugging terminal started:\n" f"{self.dbg_obs}\n"
+        tools_obs = self.event_hooks.notify("on_reset")
 
         self.infos = EnvInfo(
             obs=self.obs,
-            # debug observation
-            dbg_obs=(self.dbg_obs if hasattr(self, "dbg_obs") else ""),
+            tools_obs=tools_obs,
             last_run_obs=self.last_run_obs,
             dir_tree=self.display_files(),
             current_breakpoints=(
@@ -373,6 +368,7 @@ class RepoEnv(TooledEnv):
             len(triggered_tools) <= 1
         ), f"Multiple tools are triggered by the same action! {action}"
 
+        tools_obs = {}
         self.obs = f"Invalid action: {action}."
         if triggered_tools:
             triggered_tool = triggered_tools[0]
@@ -387,13 +383,8 @@ class RepoEnv(TooledEnv):
                     if self.run_on_rewrite:
                         self.obs += "\nNew code has been run."
                         self.run()
-                    if self.has_tool("pdb"):
-                        # Restart pdb to take into account recent changes.
-                        self.get_tool("pdb").restart_pdb()
-                        self.dbg_obs = self.get_tool("pdb").pdb_obs
-                        self.obs += (
-                            "\nDebugging terminal started:\n" f"{self.dbg_obs}\n"
-                        )
+                    tools_obs = self.event_hooks.notify("on_rewrite")
+
             elif isinstance(triggered_tool, PDBTool):
                 if self.auto_view_change:
                     current_frame_file = self.get_tool("pdb").current_frame_file
@@ -418,7 +409,7 @@ class RepoEnv(TooledEnv):
         self.infos = EnvInfo(
             obs=self.obs,
             last_run_obs=self.last_run_obs,
-            dbg_obs=self.dbg_obs if hasattr(self, "dbg_obs") else "",
+            tools_obs=tools_obs,
             dir_tree=self.display_files(),
             current_code_with_line_number=self.current_code_with_line_number(),
             current_breakpoints=(

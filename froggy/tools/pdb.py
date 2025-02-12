@@ -90,7 +90,9 @@ class PDBTool(EnvironmentTool):
         return self.start_pdb()  # start or restart?
 
     def on_rewrite(self):
-        return self.restart_pdb()
+        obs =  self.restart_pdb()
+        obs = "\nDebugging terminal started:\n" f"{obs}\n"
+        return obs
 
     def restart_pdb(self) -> str:
         """Restart the pdb session and restore the breakpoints."""
