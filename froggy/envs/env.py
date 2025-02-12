@@ -5,6 +5,7 @@ import os
 import shutil
 import subprocess
 import tempfile
+from dataclasses import dataclass
 from glob import glob
 from os.path import join as pjoin
 from pathlib import Path
@@ -17,6 +18,23 @@ from froggy.tools.patchers import CodePatcher
 from froggy.tools.pdb import PDBTool
 from froggy.tools.reasoning import ReasoningTool
 from froggy.utils import _walk, make_file_matcher, show_line_number
+
+
+@dataclass
+class EnvInfo:
+    obs: str
+    last_run_obs: str
+    dbg_obs: str
+    dir_tree: str
+    current_code_with_line_number: dict | str
+    current_breakpoints: str
+    action: str
+    instructions: dict
+    score: int
+    max_score: int
+    done: bool
+    rewrite_counter: int
+    tools: dict
 
 
 class TooledEnv:
@@ -83,6 +101,7 @@ class RepoEnv(TooledEnv):
         self.terminal = terminal or Terminal()
         self.entrypoint = entrypoint
         self.logger = logger or FroggyLogger("froggy")
+        self.infos: EnvInfo | None = None
 
         self.setup_workspace(
             path=path,
@@ -207,26 +226,27 @@ class RepoEnv(TooledEnv):
             self.dbg_obs = self.get_tool("pdb").pdb_obs
             # self.obs += "Debugging terminal started:\n" f"{self.dbg_obs}\n"
 
-        self.infos = {
-            "obs": self.obs,
-            "dbg_obs": self.dbg_obs if hasattr(self, "dbg_obs") else "",
-            "last_run_obs": self.last_run_obs,
-            "dir_tree": self.display_files(),
-            "current_breakpoints": (
+        self.infos = EnvInfo(
+            obs=self.obs,
+            dbg_obs=self.dbg_obs if hasattr(self, "dbg_obs") else "",
+            last_run_obs=self.last_run_obs,
+            dir_tree=self.display_files(),
+            current_breakpoints=(
                 self.tools["pdb"].current_breakpoints()
                 if self.has_tool("pdb")
                 else "No breakpoints are set."
             ),
-            "current_code_with_line_number": self.current_code_with_line_number(),
-            "action": None,
-            "done": self.done,
-            "score": self.score,
-            "max_score": self.max_score,
-            "instructions": self.instructions,
-            "rewrite_counter": self.rewrite_counter,
-            "tools": self.tool_instructions,
-        }
-        return self.obs, self.infos
+            current_code_with_line_number=self.current_code_with_line_number(),
+            action=None,
+            done=self.done,
+            score=self.score,
+            max_score=self.max_score,
+            instructions=self.instructions,
+            rewrite_counter=self.rewrite_counter,
+            tools=self.tool_instructions,
+        )
+
+        return self.infos
 
     def run(self):
         success, output = self.terminal.run(self.entrypoint, timeout=self.run_timeout)
@@ -357,40 +377,39 @@ class RepoEnv(TooledEnv):
                     if current_frame_file in self.all_files:
                         self.load_current_file(self.get_tool("pdb").current_frame_file)
             elif isinstance(triggered_tool, ReasoningTool):
+                reasoning_tool = self.get_tool(triggered_tool.name)
                 if (
-                    self.get_tool(triggered_tool.name).success_chain_action is True
-                    and self.get_tool(triggered_tool.name).done_cache is not None
-                    and self.get_tool(triggered_tool.name).infos_cache is not None
+                    reasoning_tool.success_chain_action is True
+                    and reasoning_tool.infos_cache is not None
+                    and reasoning_tool.infos_cache.done is not None
                 ):
                     # use done, score and info from the tool that was executed after reasoning
-                    self.done = self.get_tool(triggered_tool.name).done_cache
-                    self.score = self.get_tool(triggered_tool.name).score_cache
-                    self.infos = copy.copy(
-                        self.get_tool(triggered_tool.name).infos_cache
-                    )
+                    self.done = reasoning_tool.infos_cache.done
+                    self.score = reasoning_tool.infos_cache.score
+                    self.infos = copy.deepcopy(reasoning_tool.infos_cache)
                     # update obs and action in info
-                    self.infos["obs"] = self.obs
-                    self.infos["action"] = action
-                    return self.obs, self.score, self.done, self.infos
+                    self.infos.obs = self.obs
+                    self.infos.action = action
+                    return self.infos
 
-        self.infos = {
-            "obs": self.obs,
-            "last_run_obs": self.last_run_obs,
-            "dbg_obs": self.dbg_obs if hasattr(self, "dbg_obs") else "",
-            "dir_tree": self.display_files(),
-            "current_code_with_line_number": self.current_code_with_line_number(),
-            "current_breakpoints": (
+        self.infos = EnvInfo(
+            obs=self.obs,
+            last_run_obs=self.last_run_obs,
+            dbg_obs=self.dbg_obs if hasattr(self, "dbg_obs") else "",
+            dir_tree=self.display_files(),
+            current_code_with_line_number=self.current_code_with_line_number(),
+            current_breakpoints=(
                 self.tools["pdb"].current_breakpoints()
                 if self.has_tool("pdb")
                 else "No breakpoints are set."
             ),
-            "action": action,
-            "instructions": self.instructions,
-            "score": self.score,
-            "max_score": self.max_score,
-            "done": self.done,
-            "rewrite_counter": self.rewrite_counter,
-            "tools": self.tool_instructions,
-        }
+            action=action,
+            instructions=self.instructions,
+            score=self.score,
+            max_score=self.max_score,
+            done=self.done,
+            rewrite_counter=self.rewrite_counter,
+            tools=self.tool_instructions,
+        )
 
-        return self.obs, self.score, self.done, self.infos
+        return self.infos

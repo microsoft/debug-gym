@@ -280,27 +280,27 @@ class SWEBenchEnv(RepoEnv):
         self.terminal.run(f"git commit -am 'Applied test patch'")
 
         # Reset RepoEnv
-        obs, infos = super().reset(options=options, restore_code=False)
+        infos = super().reset(options=options, restore_code=False)
         # TODO: probably needed cleanup specific to each SWE-Bench repo.
-        # infos["last_run_obs"] = utils.cleanup_pytest_output(infos["last_run_obs"])
+        # infos.last_run_obs = utils.cleanup_pytest_output(infos.last_run_obs)
 
         self.max_score = len(self.fail_to_pass)
-        infos["max_score"] = self.max_score
+        infos.max_score = self.max_score
 
         # TODO: probably needed cleanup specific to each SWE-Bench repo.
-        # infos["last_run_obs"] = utils.cleanup_pytest_output(infos["last_run_obs"])
-        self.score = self._extract_score(infos["last_run_obs"])
+        # infos.last_run_obs = utils.cleanup_pytest_output(infos.last_run_obs)
+        self.score = self._extract_score(infos.last_run_obs)
         self.done = self.score == self.max_score
-        infos["score"] = self.score
-        infos["done"] = self.done
+        infos.score = self.score
+        infos.done = self.done
         assert not self.done, "Tests should be failing before debugging."
 
-        return infos["obs"], infos
+        return infos
 
     def _extract_score(self, obs):
         # TODO: probably needed cleanup specific to each SWE-Bench repo.
-        # infos["last_run_obs"] = utils.cleanup_pytest_output(infos["last_run_obs"])
-        # infos["score"] = utils.extract_reward_from_pytest_output(infos["last_run_obs"])
+        # infos.last_run_obs = utils.cleanup_pytest_output(infos.last_run_obs)
+        # infos.score = utils.extract_reward_from_pytest_output(infos.last_run_obs)
         test_status_map = MAP_REPO_TO_PARSER[self.repo](obs)
         self.logger.debug(f"fail_to_pass: {self.fail_to_pass}")
         self.logger.debug(f"Test status map: {test_status_map}")
@@ -315,16 +315,16 @@ class SWEBenchEnv(RepoEnv):
         return score
 
     def step(self, action: str):
-        obs, score, done, infos = super().step(action)
+        infos = super().step(action)
 
         # TODO: probably needed cleanup specific to each SWE-Bench repo.
-        # infos["last_run_obs"] = utils.cleanup_pytest_output(infos["last_run_obs"])
-        self.score = self._extract_score(infos["last_run_obs"])
+        # infos.last_run_obs = utils.cleanup_pytest_output(infos.last_run_obs)
+        self.score = self._extract_score(infos.last_run_obs)
         self.done = self.score == self.max_score
-        infos["score"] = self.score
-        infos["done"] = self.done
+        infos.score = self.score
+        infos.done = self.done
 
-        return obs, self.score, self.done, infos
+        return infos
 
     def clone_repo(self, repo_address):
         org_name, repo_name = repo_address.split("/")

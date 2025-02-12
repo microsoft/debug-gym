@@ -2,7 +2,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from froggy.envs.env import RepoEnv
+from froggy.envs.env import EnvInfo, RepoEnv
 from froggy.tools.reasoning import ReasoningTool
 
 
@@ -61,8 +61,23 @@ def test_use_with_chaining(setup_reasoning_tool):
     reasoning_tool.split_reasoning = MagicMock(
         return_value=("reasoning", "next_action")
     )
+    env_info = EnvInfo(
+        obs="obs",
+        max_score=10,
+        score=5,
+        last_run_obs="last_run_obs",
+        dbg_obs="dbg_obs",
+        dir_tree="dir_tree",
+        current_code_with_line_number="current_code_with_line_number",
+        current_breakpoints="current_breakpoints",
+        action="action",
+        instructions={},
+        done=False,
+        rewrite_counter=0,
+        tools={},
+    )
     reasoning_tool.environment.step = MagicMock(
-        return_value=("obs", 0.0, False, {"key": "value"})
+        return_value=env_info  # ("obs", 0.0, False, {"key": "value"})
     )
 
     assert (
@@ -96,9 +111,8 @@ def test_use_with_chaining(setup_reasoning_tool):
     reasoning_tool.split_reasoning = MagicMock(
         return_value=("reasoning", "next_action")
     )
-    reasoning_tool.environment.step = MagicMock(
-        return_value=("Invalid action: action.", 0.0, False, {"key": "value"})
-    )
+    env_info.obs = "Invalid action: action."
+    reasoning_tool.environment.step = MagicMock(return_value=env_info)
     assert (
         reasoning_tool.use_with_chaining("action")
         == "Error while executing the action after reasoning.\nInvalid action: action."
@@ -107,9 +121,8 @@ def test_use_with_chaining(setup_reasoning_tool):
     reasoning_tool.split_reasoning = MagicMock(
         return_value=("reasoning", "next_action")
     )
-    reasoning_tool.environment.step = MagicMock(
-        return_value=("Error while using tool: cot", 0.0, False, {"key": "value"})
-    )
+    env_info.obs = "Error while using tool: cot"
+    reasoning_tool.environment.step = MagicMock(return_value=env_info)
     assert (
         reasoning_tool.use_with_chaining("action")
         == "Error while executing the action after reasoning.\nError while using tool: cot"
