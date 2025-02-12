@@ -5,7 +5,27 @@ from unittest.mock import MagicMock, mock_open, patch
 
 import pytest
 
+from froggy.envs.env import EnvInfo
 from froggy.envs.mini_nightmare import MiniNightmareEnv
+
+
+@pytest.fixture
+def env_info():
+    return EnvInfo(
+        obs="obs",
+        max_score=10,
+        score=5,
+        last_run_obs="Raw output",
+        dbg_obs="dbg_obs",
+        dir_tree="dir_tree",
+        current_code_with_line_number="current_code_with_line_number",
+        current_breakpoints="current_breakpoints",
+        action="action",
+        instructions={},
+        done=False,
+        rewrite_counter=0,
+        tools={},
+    )
 
 
 @pytest.fixture
@@ -54,11 +74,11 @@ def test_reset(
     mock_setup_workspace,
     mock_line_number,
     repo_env,
-    aider_env,
+    mini_nightmare_env,
     env_info,
 ):
     repo_env.return_value = env_info
-    aider_env.dataset = {
+    mini_nightmare_env.dataset = {
         "test_task": {
             "base_directory": "test_directory",
             "instructions": "Test instructions",
@@ -66,7 +86,7 @@ def test_reset(
         }
     }
     options = {"task_name": "test_task"}
-    infos = aider_env.reset(options=options)
+    infos = mini_nightmare_env.reset(options=options)
     assert infos.instructions["Problem description"] == "Test instructions"
     assert infos.last_run_obs == "Cleaned output"
     assert infos.max_score == 10

@@ -116,7 +116,7 @@ def main():
 
     config = config[args.agent]
     config["uuid"] = config.get("uuid", str(uuid.uuid4()))
-    logger.warning(f"Experiment UUID: {config['uuid']}")
+    logger.warning(f"Experiment log path: {config['output_path']}/{config['uuid']}")
 
     # Figure out which problems to solve.
     problems = config.get("problems", ["custom"])
