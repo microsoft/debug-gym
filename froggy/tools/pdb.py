@@ -110,7 +110,7 @@ class PDBTool(EnvironmentTool):
         success, output = True, ""
         if command in ["b", "break"]:
             # list all breakpoints
-            success, output = True, self.current_breakpoints()
+            success, output = True, self.environment.current_breakpoints()
         elif command in ["cl", "clear"]:
             # clear all breakpoints
             self.environment.current_breakpoints_state = {}
@@ -172,24 +172,6 @@ class PDBTool(EnvironmentTool):
         # read the current frame info, find the current file, so we can change view to that file.
         self.get_current_frame_file()
         return obs
-
-    def current_breakpoints(self):
-        if len(self.environment.current_breakpoints_state) == 0:
-            return "No breakpoints are set."
-        else:
-            # print the breakpoints sorted by file names and line number
-            breakpoints = []
-            for _key in self.environment.current_breakpoints_state.keys():
-                _file_path, _line_number = _key.split("|||")
-                _line_number = int(_line_number)
-                breakpoints.append([_file_path, _line_number])
-            # sort by file name, if file names are same, sort by line number
-            breakpoints = sorted(breakpoints, key=lambda x: (x[0], x[1]))
-            breakpoints = [
-                f"line {_line_number} in {_file_path}"
-                for _file_path, _line_number in breakpoints
-            ]
-            return "\n".join(breakpoints)
 
     def breakpoint_add_clear(self, action: str, which_file=None):
         # handle adding/removing breakpoints

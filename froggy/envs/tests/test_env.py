@@ -500,3 +500,28 @@ def test_event_hooks_notify():
     observations = event_hooks.notify("on_start")
     assert observations == {subscriber.name: "observation"}
     subscriber.on_start.assert_called_once()
+
+
+def test_current_breakpoints_no_breakpoints():
+    env = RepoEnv()
+    env.current_breakpoints_state = {}
+    result = env.current_breakpoints()
+    assert result == "No breakpoints are set."
+
+
+def test_current_breakpoints_with_breakpoints(tmp_path):
+    env = RepoEnv()
+    env.current_breakpoints_state = {
+        "file1.py|||10": "b file1.py:10",
+        "file1.py|||20": "b file1.py:20",
+        "file1.py|||30": "b file1.py:30",
+        "file2.py|||15": "b file2.py:15",
+    }
+    result = env.current_breakpoints()
+    expected_result = (
+        "line 10 in file1.py\n"
+        "line 20 in file1.py\n"
+        "line 30 in file1.py\n"
+        "line 15 in file2.py"
+    )
+    assert result == expected_result

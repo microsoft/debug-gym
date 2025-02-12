@@ -249,12 +249,8 @@ class RepoEnv(TooledEnv):
             tools_obs=tools_obs,
             last_run_obs=self.last_run_obs,
             dir_tree=self.display_files(),
-            current_breakpoints=(
-                self.tools["pdb"].current_breakpoints()
-                if self.has_tool("pdb")
-                else "No breakpoints are set."
-            ),
             current_code_with_line_number=self.current_code_with_line_number(),
+            current_breakpoints=self.current_breakpoints(),
             action=None,
             done=self.done,
             score=self.score,
@@ -328,6 +324,24 @@ class RepoEnv(TooledEnv):
 
         return "\n".join(result)
 
+    def current_breakpoints(self):
+        if len(self.current_breakpoints_state) == 0:
+            return "No breakpoints are set."
+        else:
+            # print the breakpoints sorted by file names and line number
+            breakpoints = []
+            for _key in self.current_breakpoints_state.keys():
+                _file_path, _line_number = _key.split("|||")
+                _line_number = int(_line_number)
+                breakpoints.append([_file_path, _line_number])
+            # sort by file name, if file names are same, sort by line number
+            breakpoints = sorted(breakpoints, key=lambda x: (x[0], x[1]))
+            breakpoints = [
+                f"line {_line_number} in {_file_path}"
+                for _file_path, _line_number in breakpoints
+            ]
+            return "\n".join(breakpoints)
+
     def current_code_with_line_number(self):
         if self.current_file is None or self.current_file_content is None:
             return "You are currently not working in a file. You can use ```view path/to/file.py``` to navigate to a file first."
@@ -342,7 +356,7 @@ class RepoEnv(TooledEnv):
             )
             + "\n",
         }
-        if self.has_tool("pdb"):
+        if self.current_breakpoints_state:
             output["Note"] = (
                 "B indicates breakpoint before a certain line of code, this can be changed using pdb commands such as b, cl, etc."
             )
@@ -412,11 +426,7 @@ class RepoEnv(TooledEnv):
             tools_obs=tools_obs,
             dir_tree=self.display_files(),
             current_code_with_line_number=self.current_code_with_line_number(),
-            current_breakpoints=(
-                self.tools["pdb"].current_breakpoints()
-                if self.has_tool("pdb")
-                else "No breakpoints are set."
-            ),
+            current_breakpoints=self.current_breakpoints(),
             action=action,
             instructions=self.instructions,
             score=self.score,

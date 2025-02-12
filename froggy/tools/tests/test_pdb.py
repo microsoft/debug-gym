@@ -283,27 +283,6 @@ def test_breakpoint_modify_no_change(tmp_path, setup_pdb_repo_env):
     assert env.current_breakpoints_state == expected_state
 
 
-def test_current_breakpoints_no_breakpoints():
-    env = RepoEnv()
-    pdb_tool = PDBTool()
-    pdb_tool.register(env)
-    pdb_tool.environment.current_breakpoints_state = {}
-    result = pdb_tool.current_breakpoints()
-    assert result == "No breakpoints are set."
-
-
-def test_current_breakpoints_with_breakpoints(tmp_path, setup_pdb_repo_env):
-    pdb_tool, test_repo, env = setup_pdb_repo_env(tmp_path)
-    result = pdb_tool.current_breakpoints()
-    expected_result = (
-        "line 10 in file1.py\n"
-        "line 20 in file1.py\n"
-        "line 30 in file1.py\n"
-        "line 15 in file2.py"
-    )
-    assert result == expected_result
-
-
 @patch.object(PDBTool, "interact_with_pdb")
 def test_get_current_frame_file(mock_interact_with_pdb, tmp_path, setup_pdb_repo_env):
     pdb_tool, test_repo, env = setup_pdb_repo_env(tmp_path)
