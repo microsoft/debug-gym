@@ -23,4 +23,9 @@ class EnvironmentTool(ABC):
 
     @abstractmethod
     def use(self, action, environment):
-        raise NotImplementedError("use method must be implemented in the subclass.")
+        pass
+
+    # abstractmethod?
+    def on_reset(self):
+        pass
+

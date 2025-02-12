@@ -36,10 +36,31 @@ class EnvInfo:
     rewrite_counter: int
     tools: dict
 
+class EventHooks:
+    def __init__(self):
+        self.events = ["on_start", "on_reset", "on_step"]
+        self.event_listeners = {event: [] for event in self.events}
+
+    def subscribe(self, event, tool: "Tool"):
+        if not hasattr(tool, event):
+            raise ValueError(f"Tool does not implement method {event}")
+        self.event_listeners[event].append(tool)
+
+    def unsubscribe(self, event, tool):
+        self.event_listeners[event].remove(tool)
+
+    def notify(self, event):
+        observations = {}
+        for tool in self.event_listeners[event]:
+            observation = getattr(tool, event)()
+            observations[tool.name] = observation
+        return observations
+
 
 class TooledEnv:
     def __init__(self):
         self.tools = {}
+        self.event_hooks = EventHooks()
 
     @property
     def actions(self):
@@ -221,14 +242,16 @@ class RepoEnv(TooledEnv):
         self.run()
 
         self.obs = ""
-        if self.has_tool("pdb"):
+        if self.has_tool("pdb"):  # to be updated
+            tools_obs = self.event_hooks.notify("on_reset")
             self.get_tool("pdb").start_pdb()
             self.dbg_obs = self.get_tool("pdb").pdb_obs
             # self.obs += "Debugging terminal started:\n" f"{self.dbg_obs}\n"
 
         self.infos = EnvInfo(
             obs=self.obs,
-            dbg_obs=self.dbg_obs if hasattr(self, "dbg_obs") else "",
+            # debug observation
+            dbg_obs=(self.dbg_obs if hasattr(self, "dbg_obs") else ""),
             last_run_obs=self.last_run_obs,
             dir_tree=self.display_files(),
             current_breakpoints=(

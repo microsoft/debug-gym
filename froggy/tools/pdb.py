@@ -86,6 +86,12 @@ class PDBTool(EnvironmentTool):
         self.pdb_obs = initial_output
         return initial_output
 
+    def on_reset(self):
+        return self.start_pdb()  # start or restart?
+
+    def on_rewrite(self):
+        return self.restart_pdb()
+
     def restart_pdb(self) -> str:
         """Restart the pdb session and restore the breakpoints."""
         self.close_pdb()

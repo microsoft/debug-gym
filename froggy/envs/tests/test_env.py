@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, mock_open, patch
 import numpy as np
 import pytest
 
-from froggy.envs.env import EnvInfo, RepoEnv, TooledEnv
+from froggy.envs.env import EnvInfo, EventHooks, RepoEnv, TooledEnv
 
 
 @pytest.fixture
@@ -438,3 +438,65 @@ def test_env_info_initialization():
     assert not info.done
     assert info.rewrite_counter == 2
     assert info.tools == tools
+
+
+def test_event_hooks_initialization():
+    event_hooks = EventHooks()
+    assert event_hooks.events == ["on_start", "on_reset", "on_step"]
+    assert event_hooks.event_listeners == {
+        "on_start": [],
+        "on_reset": [],
+        "on_step": [],
+    }
+
+
+def test_event_hooks_subscribe():
+    class ToolMock:
+        def on_start(self):
+            pass
+
+    event_hooks = EventHooks()
+    subscriber = ToolMock()
+    event_hooks.subscribe("on_start", subscriber)
+    assert subscriber in event_hooks.event_listeners["on_start"]
+
+
+def test_event_hooks_subscribe_invalid_subscriber():
+    class InvalidToolMock:
+        pass
+
+    event_hooks = EventHooks()
+    subscriber = InvalidToolMock()
+    with pytest.raises(ValueError, match="Tool does not implement method on_start"):
+        event_hooks.subscribe("on_start", subscriber)
+    assert subscriber not in event_hooks.event_listeners["on_start"]
+
+
+def test_event_hooks_subscribe_invalid_event():
+    class ToolMock:
+        def invalid(self):
+            pass
+
+    event_hooks = EventHooks()
+    subscriber = ToolMock()
+    with pytest.raises(KeyError):
+        event_hooks.subscribe("invalid", subscriber)
+    assert "invalid" not in event_hooks.event_listeners
+
+
+def test_event_hooks_unsubscribe():
+    event_hooks = EventHooks()
+    subscriber = MagicMock()
+    event_hooks.subscribe("on_start", subscriber)
+    event_hooks.unsubscribe("on_start", subscriber)
+    assert subscriber not in event_hooks.event_listeners["on_start"]
+
+
+def test_event_hooks_notify():
+    event_hooks = EventHooks()
+    subscriber = MagicMock()
+    subscriber.on_start.return_value = "observation"
+    event_hooks.subscribe("on_start", subscriber)
+    observations = event_hooks.notify("on_start")
+    assert observations == {subscriber.name: "observation"}
+    subscriber.on_start.assert_called_once()
