@@ -6,14 +6,16 @@ def test_shopping_cart():
     # Create a test tree
     root = TreeNode(1)
     node2 = TreeNode(2)
-    root.left = node2
-    root.right = TreeNode(3)
+    root.set_left(node2)
+    root.set_right(TreeNode(3))
     node4 = TreeNode(4)
     node5 = TreeNode(5)
-    node5.left = node2
-    root.left.left = node4
-    node4.left = node5
+    node5.set_left(node2)
+    root.left.set_left(node4)
+    node4.set_left(node5)
 
     # Build sum tree and print it
     build_sum_tree(root)
-    print_tree(root)
+    output = print_tree(root)
+    
+    assert output == ['Value: 1, Sum: 15', 'Value: 2, Sum: 11', 'Value: 4, Sum: 9', 'Value: 5, Sum: 5', 'Value: 3, Sum: 3']
