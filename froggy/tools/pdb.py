@@ -86,13 +86,17 @@ class PDBTool(EnvironmentTool):
         self.pdb_obs = initial_output
         return initial_output
 
-    def on_reset(self):
-        return self.start_pdb()  # start or restart?
+    def on_env_reset(self):
+        return [{self.name: self.start_pdb()}]  # start or restart?
 
     def on_rewrite(self):
         obs =  self.restart_pdb()
         obs = "\nDebugging terminal started:\n" f"{obs}\n"
-        return obs
+        return [{self.name: obs}]
+
+    def on_rewrite_success(self, rewrite_file, rewrite_head, rewrite_tail, new_code_length, **kwargs):
+        self.breakpoint_modify(rewrite_file, rewrite_head, rewrite_tail, new_code_length)
+        return []
 
     def restart_pdb(self) -> str:
         """Restart the pdb session and restore the breakpoints."""
@@ -171,7 +175,7 @@ class PDBTool(EnvironmentTool):
 
         # read the current frame info, find the current file, so we can change view to that file.
         self.get_current_frame_file()
-        return obs
+        return [{self.name: obs}]
 
     def breakpoint_add_clear(self, action: str, which_file=None):
         # handle adding/removing breakpoints
@@ -322,6 +326,9 @@ class PDBTool(EnvironmentTool):
         # -> ACTION_TO_INDEX = {
         try:
             file_path = output.split("(")[0]
-            self.current_frame_file = file_path
+            if file_path != self.current_frame_file:
+                obs += self.trigger_event("switch_context", filepath=file_path)
+                self.current_frame_file = file_path
+            return obs
         except:
             pass

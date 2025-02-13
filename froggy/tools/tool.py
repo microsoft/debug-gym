@@ -10,7 +10,7 @@ class EnvironmentTool(ABC):
         self.environment = None
 
     def register(self, environment):
-        from froggy.envs.env import RepoEnv
+        from froggy.envs.env import Events, RepoEnv
 
         if not isinstance(environment, RepoEnv):
             raise ValueError("The environment must be a RepoEnv instance.")
@@ -22,10 +22,10 @@ class EnvironmentTool(ABC):
         return action.startswith(self.action)
 
     @abstractmethod
-    def use(self, action, environment):
+    def use(self, action, environment) -> list[dict]:
         pass
 
-    # abstractmethod?
-    def on_reset(self):
-        pass
+    def trigger_event(self, event: str, **kwargs):
+        return self.environment.handle_event(event, source=self, **kwargs)
+
 

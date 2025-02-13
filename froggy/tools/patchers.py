@@ -146,25 +146,31 @@ class SubstitutionPatcher(CodePatcher):
             message = "SyntaxError: invalid syntax."
         if "" != message:
             self.rewrite_success = False
-            return "\n".join([message, "Rewrite failed."])
+            message = "\n".join([message, "Rewrite failed."])
+            obs += [{self.name: message}]
+            obs += self.trigger_event("rewrite_failed", message=message)
+            return obs
 
         message, success, new_code_length = self._rewrite_file(
             file_path, head, tail, new_code
         )
         if success is True:
-            if (
-                hasattr(self.environment, "tools")
-                and isinstance(self.environment.tools, dict)
-                and "pdb" in self.environment.tools
-            ):
-                self.environment.tools["pdb"].breakpoint_modify(
-                    file_path,
-                    head + 1 if isinstance(head, int) else None,
-                    tail + 1 if isinstance(tail, int) else None,
-                    new_code_length,
-                )  # converting head/tail back to 1-based index for breakpoint management
             self.rewrite_success = True
-            return "Rewriting done."
+            message = "Rewriting done."
+            obs += [{self.name: message}]
+            obs += self.trigger_event(
+                "rewrite_success",
+                message=message,
+                rewrite_file=file_path,
+                # converting head/tail back to 1-based index for breakpoint management
+                rewrite_head=head + 1 if isinstance(head, int) else None,
+                rewrite_tail=tail + 1 if isinstance(tail, int) else None,
+                new_code_length=new_code_length,
+            )
+            return obs
 
         self.rewrite_success = False
-        return "\n".join([message, "Rewrite failed."])
+        message = "\n".join([message, "Rewrite failed."])
+        obs += [{self.name: message}]
+        obs += self.trigger_event("rewrite_failed", message=message)
+        return obs
