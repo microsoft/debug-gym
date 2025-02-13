@@ -8,11 +8,10 @@ def load_data():
     # Read the CSV file
     df = pd.read_csv(url)
 
-    # Display the first few rows of the dataframe
-    print(df.head())
     return df
 
 def calculate_stats(df):
-    # Calculate the median price paid
-    median_price = df['Price'].median()
-    return median_price
+    # Calculate the median fare paid
+    median = df['Price'].median()
+    print("\nMedian fare paid:\n", median)
+    return median
