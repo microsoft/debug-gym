@@ -66,7 +66,7 @@ def test_use_with_chaining(setup_reasoning_tool):
         max_score=10,
         score=5,
         last_run_obs="last_run_obs",
-        tools_obs=[],
+        observations=[],
         dir_tree="dir_tree",
         current_code_with_line_number="current_code_with_line_number",
         current_breakpoints="current_breakpoints",

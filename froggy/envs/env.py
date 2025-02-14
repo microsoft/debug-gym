@@ -21,10 +21,16 @@ from froggy.utils import _walk, make_file_matcher, show_line_number
 
 
 @dataclass
+class Observation:
+    origin: str
+    observation: str
+
+
+@dataclass
 class EnvInfo:
     obs: str
     last_run_obs: str
-    tools_obs: dict
+    observations: list[Observation]
     dir_tree: str
     current_code_with_line_number: dict | str
     current_breakpoints: str
@@ -270,11 +276,11 @@ class RepoEnv(TooledEnv):
         self.run()
 
         self.obs = ""
-        tools_obs = self.event_hooks.notify("env_reset")
+        observations = self.event_hooks.notify("env_reset")
 
         self.infos = EnvInfo(
             obs=self.obs,
-            tools_obs=tools_obs,
+            observations=observations,
             last_run_obs=self.last_run_obs,
             dir_tree=self.display_files(),
             current_code_with_line_number=self.current_code_with_line_number(),
@@ -410,12 +416,12 @@ class RepoEnv(TooledEnv):
             len(triggered_tools) <= 1
         ), f"Multiple tools are triggered by the same action! {action}"
 
-        tools_obs = []
+        observations = []
         self.obs = f"Invalid action: {action}."
         if triggered_tools:
             triggered_tool = triggered_tools[0]
             try:
-                tools_obs += triggered_tool.use(action)
+                observations += triggered_tool.use(action)
                 self.obs = ""
                 # self.obs = f"Success using tool {triggered_tool.name}"
             except:
@@ -440,7 +446,7 @@ class RepoEnv(TooledEnv):
         self.infos = EnvInfo(
             obs=self.obs,
             last_run_obs=self.last_run_obs,
-            tools_obs=tools_obs,
+            observations=observations,
             dir_tree=self.display_files(),
             current_code_with_line_number=self.current_code_with_line_number(),
             current_breakpoints=self.current_breakpoints(),
