@@ -13,4 +13,4 @@ class EvalTool(EnvironmentTool):
 
     def use(self, action):
         self.environment.run()
-        return "Evaluation completed."
+        return [{self.name: "Evaluation completed."}]

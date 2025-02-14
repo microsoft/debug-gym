@@ -119,6 +119,7 @@ class SubstitutionPatcher(CodePatcher):
         # parse content to get file_path, head, tail, and new_code
         # code/utils.py 4:6 <c>        print('buongiorno')</c>
         file_path, head, tail = None, None, None
+        obs = []
         message = ""
         try:
             new_code = content.split("<c>", 1)[1].split("</c>", 1)[0]

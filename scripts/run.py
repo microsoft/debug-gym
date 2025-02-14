@@ -84,7 +84,8 @@ def create_env(config: dict, logger: FroggyLogger):
         tool_instantiated = Toolbox.get_tool(tool, **kwargs)
         env.add_tool(tool_instantiated)
         if tool == "pdb":
-            env.event_hooks.subscribe("on_reset", tool_instantiated)
+            env.event_hooks.subscribe("env_reset", tool_instantiated)
+            env.event_hooks.subscribe("rewrite_success", tool_instantiated)
         logger.debug(f"Adding tool to toolbox: {tool_instantiated.__class__.__name__}")
 
     return env

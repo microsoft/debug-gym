@@ -62,4 +62,4 @@ class ViewTool(EnvironmentTool):
                 else "The file is read-only, it is not editable."
             )
 
-        return obs
+        return [{self.name: obs}]

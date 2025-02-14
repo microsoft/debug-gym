@@ -30,9 +30,9 @@ class ListdirTool(EnvironmentTool):
             startpath = pjoin(self.environment.working_dir, listdir_path)
             result = self.environment.directory_tree(root=startpath, max_depth=depth)
         except ValueError as e:
-            return str(e)
+            return [{self.name: str(e)}]
 
-        return result
+        return [{self.name: result}]
 
     def clean_action(self, action):
         listdir_path = action.strip("`").strip()
