@@ -118,6 +118,7 @@ class SubstitutionPatcher(CodePatcher):
         content = patch.split(self.action)[1].split("```")[0].strip()
         # parse content to get file_path, head, tail, and new_code
         # code/utils.py 4:6 <c>        print('buongiorno')</c>
+        from froggy.envs.env import Event  # TODO: move to the top
         file_path, head, tail = None, None, None
         obs = []
         message = ""
@@ -149,7 +150,7 @@ class SubstitutionPatcher(CodePatcher):
             self.rewrite_success = False
             message = "\n".join([message, "Rewrite failed."])
             obs += [{self.name: message}]
-            obs += self.trigger_event("rewrite_failed", message=message)
+            obs += self.trigger_event(Event.REWRITE_FAIL, message=message)
             return obs
 
         message, success, new_code_length = self._rewrite_file(
@@ -160,7 +161,7 @@ class SubstitutionPatcher(CodePatcher):
             message = "Rewriting done."
             obs += [{self.name: message}]
             obs += self.trigger_event(
-                "rewrite_success",
+                Event.REWRITE_SUCCESS,
                 message=message,
                 rewrite_file=file_path,
                 # converting head/tail back to 1-based index for breakpoint management
@@ -173,5 +174,5 @@ class SubstitutionPatcher(CodePatcher):
         self.rewrite_success = False
         message = "\n".join([message, "Rewrite failed."])
         obs += [{self.name: message}]
-        obs += self.trigger_event("rewrite_failed", message=message)
+        obs += self.trigger_event(Event.REWRITE_FAIL, message=message)
         return obs

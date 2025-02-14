@@ -10,7 +10,7 @@ class EnvironmentTool(ABC):
         self.environment = None
 
     def register(self, environment):
-        from froggy.envs.env import Events, RepoEnv
+        from froggy.envs.env import Event, RepoEnv
 
         if not isinstance(environment, RepoEnv):
             raise ValueError("The environment must be a RepoEnv instance.")
@@ -25,7 +25,5 @@ class EnvironmentTool(ABC):
     def use(self, action, environment) -> list[dict]:
         pass
 
-    def trigger_event(self, event: str, **kwargs):
+    def trigger_event(self, event: "Event", **kwargs):  # TODO: import Event from froggy.envs.env
         return self.environment.handle_event(event, source=self, **kwargs)
-
-

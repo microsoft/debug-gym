@@ -42,9 +42,10 @@ class EnvInfo:
     rewrite_counter: int
     tools: dict
 
+
 from enum import Enum
 
-class Events(Enum):
+class Event(Enum):
     ENV_START = "env_start"
     ENV_RESET = "env_reset"
     ENV_STEP = "env_step"
@@ -66,25 +67,25 @@ class Events(Enum):
 
 class EventHooks:
     def __init__(self):
-        self.events = Events.list()
+        self.events = list(Event)
         self.event_listeners = {event: [] for event in self.events}
 
-    def subscribe(self, event, tool: "Tool"):
+    def subscribe(self, event: Event, tool: "Tool"):
         if event not in self.event_listeners:
             raise ValueError(f"Unknown event type: {event}")
-        if not hasattr(tool, f"on_{event}"):  # use handler_name
+        if not hasattr(tool, event.handler_name):
             raise ValueError(f"Tool does not implement method {event}")
         self.event_listeners[event].append(tool)
 
-    def unsubscribe(self, event, tool):
+    def unsubscribe(self, event: Event, tool):
         self.event_listeners[event].remove(tool)
 
-    def notify(self, event, source=None, **kwargs):
+    def notify(self, event: Event, source=None, **kwargs):
         observations = []
         for tool in self.event_listeners[event]:
             if tool == source:
                 continue  # skip the source tool to avoid infinite loop
-            observations += getattr(tool, f"on_{event}")(**kwargs)  # use handler_name
+            observations += getattr(tool, event.handler_name)(**kwargs)
         return observations
 
 
@@ -124,7 +125,7 @@ class TooledEnv:
     def tool_instructions(self):
         return {name: tool.instructions for name, tool in self.tools.items()}
 
-    def handle_event(self, event, source=None, **kwargs):
+    def handle_event(self, event: Event, source=None, **kwargs):
         return self.event_hooks.notify(event, source=source, **kwargs)
 
 
@@ -276,7 +277,7 @@ class RepoEnv(TooledEnv):
         self.run()
 
         self.obs = ""
-        observations = self.event_hooks.notify("env_reset")
+        observations = self.event_hooks.notify(Event.ENV_RESET)
 
         self.infos = EnvInfo(
             obs=self.obs,
@@ -461,18 +462,18 @@ class RepoEnv(TooledEnv):
 
         return self.infos
 
-    def handle_event(self, event, source=None, **kwargs):
+    def handle_event(self, event: Event, source=None, **kwargs):
         observations = []
         obs = ""
-        if event in ["rewrite_success", "rewrite_fail"]:
+        if event in [Event.REWRITE_SUCCESS, Event.REWRITE_FAIL]:
             self.rewrite_counter += 1
 
-        if event == "rewrite_success" and self.run_on_rewrite:
+        if event == Event.REWRITE_FAIL and self.run_on_rewrite:
             # obs += "\nNew code has been run."
             run_obs, _done = self.run()  # remove _done from run
             # observations += [{"environment_run": run_obs}]  # move dict inside run method
 
-        if event == "switch_context" and self.auto_view_change:
+        if event == Event.SWITCH_CONTEXT and self.auto_view_change:
             new_context = kwargs.get("filepath")
             if new_context in self.all_files:
                 self.load_current_file(new_context)

@@ -327,7 +327,8 @@ class PDBTool(EnvironmentTool):
         try:
             file_path = output.split("(")[0]
             if file_path != self.current_frame_file:
-                obs += self.trigger_event("switch_context", filepath=file_path)
+                from froggy.envs.env import Event  # TODO: move to the top
+                obs += self.trigger_event(Event.SWITCH_CONTEXT, filepath=file_path)
                 self.current_frame_file = file_path
             return obs
         except:

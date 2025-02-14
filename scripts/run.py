@@ -8,6 +8,7 @@ from termcolor import colored
 from tqdm import tqdm
 
 from froggy.envs import select_env
+from froggy.envs.env import Event
 from froggy.logger import FroggyLogger
 from froggy.terminal import select_terminal
 from froggy.tools.toolbox import Toolbox
@@ -84,8 +85,8 @@ def create_env(config: dict, logger: FroggyLogger):
         tool_instantiated = Toolbox.get_tool(tool, **kwargs)
         env.add_tool(tool_instantiated)
         if tool == "pdb":
-            env.event_hooks.subscribe("env_reset", tool_instantiated)
-            env.event_hooks.subscribe("rewrite_success", tool_instantiated)
+            env.event_hooks.subscribe(Event.ENV_RESET, tool_instantiated)
+            env.event_hooks.subscribe(Event.REWRITE_SUCCESS, tool_instantiated)
         logger.debug(f"Adding tool to toolbox: {tool_instantiated.__class__.__name__}")
 
     return env
