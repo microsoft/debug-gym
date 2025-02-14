@@ -13,7 +13,7 @@ def build_env_info():
         max_score=10,
         score=5,
         last_run_obs="last_run_obs",
-        tools_obs={},
+        tools_obs=[],
         dir_tree="dir_tree",
         current_code_with_line_number="current_code_with_line_number",
         current_breakpoints="current_breakpoints",
