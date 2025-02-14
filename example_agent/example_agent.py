@@ -55,6 +55,7 @@ class PdbAgent:
         system_prompt["Current code in view"] = info.current_code_with_line_number
         system_prompt["Current breakpoints"] = info.current_breakpoints
         system_prompt["Last execution output"] = info.last_run_obs
+        system_prompt["Observations"] = info.observations
         system_prompt = unescape(json.dumps(system_prompt, indent=4))
         messages = [
             {

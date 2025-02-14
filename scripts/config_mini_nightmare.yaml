@@ -9,7 +9,7 @@ pdb_agent:
         "auto_view_change": True,
         "run_timeout": 10,
     }
-    tools: ["pdb", "view", "patcher:substitution"]
+    tools: ["eval", "pdb", "view", "patcher:substitution"]
     terminal: {
         type: "local",  # "docker" or "local"
         base_image: "python:3.12-slim",
@@ -43,7 +43,7 @@ rewrite_only:
         "auto_view_change": True,
         "run_timeout": 10,
     }
-    tools: ["view", "patcher:substitution"]
+    tools: ["eval", "view", "patcher:substitution"]
     terminal: {
         type: "local",  # "docker" or "local"
         base_image: "python:3.12-slim",
@@ -78,7 +78,7 @@ pdb_after_rewrites:
         "run_timeout": 10,
     }
     n_rewrites_before_pdb: 5
-    tools: ["view", "patcher:substitution", "pdb"]
+    tools: ["eval", "view", "patcher:substitution", "pdb"]
     terminal: {
         type: "local",  # "docker" or "local"
         base_image: "python:3.12-slim",

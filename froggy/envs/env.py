@@ -45,6 +45,7 @@ class EnvInfo:
 
 from enum import Enum
 
+
 class Event(Enum):
     ENV_START = "env_start"
     ENV_RESET = "env_reset"
@@ -74,7 +75,7 @@ class EventHooks:
         if event not in self.event_listeners:
             raise ValueError(f"Unknown event type: {event}")
         if not hasattr(tool, event.handler_name):
-            raise ValueError(f"Tool does not implement method {event}")
+            raise ValueError(f"Tool does not implement method {event.handler_name}")
         self.event_listeners[event].append(tool)
 
     def unsubscribe(self, event: Event, tool):
@@ -272,10 +273,6 @@ class RepoEnv(TooledEnv):
         if restore_code:
             self.restore()
 
-        # Run the initial code. This will set self.last_run_obs, self.done and self.score.
-        self.logger.info(f"Running initial evaluation")
-        self.run()
-
         self.obs = ""
         observations = self.event_hooks.notify(Event.ENV_RESET)
 
@@ -302,8 +299,7 @@ class RepoEnv(TooledEnv):
         self.last_run_obs = output
         self.score = int(success)
         self.done = success
-
-        return self.last_run_obs, self.done
+        return self.last_run_obs
 
     def load_current_file(self, filepath: str) -> bool:
         self.current_file = filepath
@@ -425,8 +421,11 @@ class RepoEnv(TooledEnv):
                 observations += triggered_tool.use(action)
                 self.obs = ""
                 # self.obs = f"Success using tool {triggered_tool.name}"
-            except:
+            except BaseException as e:
                 self.obs = f"Error while using tool {triggered_tool.name} with action: \n{action}"
+                self.logger.warning(
+                    f"Error while using tool {triggered_tool.name} with action: \n{action}. {e}"
+                )
 
             if isinstance(triggered_tool, ReasoningTool):
                 reasoning_tool = self.get_tool(triggered_tool.name)
@@ -468,10 +467,10 @@ class RepoEnv(TooledEnv):
         if event in [Event.REWRITE_SUCCESS, Event.REWRITE_FAIL]:
             self.rewrite_counter += 1
 
-        if event == Event.REWRITE_FAIL and self.run_on_rewrite:
-            # obs += "\nNew code has been run."
-            run_obs, _done = self.run()  # remove _done from run
-            # observations += [{"environment_run": run_obs}]  # move dict inside run method
+        # if event == Event.REWRITE_SUCCESS and self.run_on_rewrite:
+        #     # obs += "\nNew code has been run."
+        #     run_obs, _done = self.run()  # remove _done from run
+        #     # observations += [{"environment_run": run_obs}]  # move dict inside run method
 
         if event == Event.SWITCH_CONTEXT and self.auto_view_change:
             new_context = kwargs.get("filepath")

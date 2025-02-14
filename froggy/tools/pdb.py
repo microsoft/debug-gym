@@ -86,17 +86,19 @@ class PDBTool(EnvironmentTool):
         self.pdb_obs = initial_output
         return initial_output
 
-    def on_env_reset(self):
-        return [{self.name: self.start_pdb()}]  # start or restart?
+    def on_env_reset(self, **kwargs):
+        obs = self.start_pdb()
+        return [{self.name: obs}]  # start or restart?
 
-    def on_rewrite(self):
-        obs =  self.restart_pdb()
+    def on_rewrite_success(
+        self, rewrite_file, rewrite_head, rewrite_tail, new_code_length, **kwargs
+    ):
+        self.breakpoint_modify(
+            rewrite_file, rewrite_head, rewrite_tail, new_code_length
+        )
+        obs = self.restart_pdb()
         obs = "\nDebugging terminal started:\n" f"{obs}\n"
         return [{self.name: obs}]
-
-    def on_rewrite_success(self, rewrite_file, rewrite_head, rewrite_tail, new_code_length, **kwargs):
-        self.breakpoint_modify(rewrite_file, rewrite_head, rewrite_tail, new_code_length)
-        return []
 
     def restart_pdb(self) -> str:
         """Restart the pdb session and restore the breakpoints."""
@@ -328,6 +330,7 @@ class PDBTool(EnvironmentTool):
             file_path = output.split("(")[0]
             if file_path != self.current_frame_file:
                 from froggy.envs.env import Event  # TODO: move to the top
+
                 obs += self.trigger_event(Event.SWITCH_CONTEXT, filepath=file_path)
                 self.current_frame_file = file_path
             return obs

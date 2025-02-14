@@ -12,5 +12,11 @@ class EvalTool(EnvironmentTool):
     }
 
     def use(self, action):
-        self.environment.run()
-        return [{self.name: "Evaluation completed."}]
+        observation = self.environment.run()
+        return [{self.name: observation}]
+
+    def on_env_reset(self, **kwargs):
+        return self.use(None)
+
+    def on_rewrite_success(self, **kwargs):
+        return self.use(None)
