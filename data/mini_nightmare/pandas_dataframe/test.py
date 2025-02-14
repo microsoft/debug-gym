@@ -1,4 +1,8 @@
 from code import calculate_stats, load_data
 
-df = load_data()
-calculate_stats(df)
+
+def test_calculate_stats():
+    df = load_data()
+    median = calculate_stats(df)
+
+    assert median == 14.4542
