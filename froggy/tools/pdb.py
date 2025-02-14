@@ -90,12 +90,8 @@ class PDBTool(EnvironmentTool):
         obs = self.start_pdb()
         return [{self.name: obs}]  # start or restart?
 
-    def on_rewrite_success(
-        self, rewrite_file, rewrite_head, rewrite_tail, new_code_length, **kwargs
-    ):
-        self.breakpoint_modify(
-            rewrite_file, rewrite_head, rewrite_tail, new_code_length
-        )
+    def on_rewrite_success(self, file, head, tail, length, **kwargs):
+        self.breakpoint_modify(file, head, tail, length)
         obs = self.restart_pdb()
         obs = "\nDebugging terminal started:\n" f"{obs}\n"
         return [{self.name: obs}]
