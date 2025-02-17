@@ -68,8 +68,7 @@ class Event(Enum):
 
 class EventHooks:
     def __init__(self):
-        self.events = list(Event)
-        self.event_listeners = {event: [] for event in self.events}
+        self.event_listeners = {event: [] for event in Event}
 
     def subscribe(self, event: Event, tool: "Tool"):
         if event not in self.event_listeners:
@@ -132,13 +131,12 @@ class TooledEnv:
 
 class RepoEnv(TooledEnv):
 
-    DEFAULT_MAX_SCORE = 1
-
     def __init__(
         self,
         path: str | None = None,
         entrypoint: str = "python -m pytest -sq .",
         debug_entrypoint: str | None = None,
+        max_score: int = 1,
         readonly_patterns: list[str] | None = None,
         run_on_rewrite: bool = True,
         run_timeout: int | None = None,
@@ -150,7 +148,7 @@ class RepoEnv(TooledEnv):
         super().__init__()
 
         self.path = None
-        self.max_score = RepoEnv.DEFAULT_MAX_SCORE
+        self.max_score = max_score
         self.run_on_rewrite = run_on_rewrite
         self.run_timeout = run_timeout
         self.dir_tree_depth = dir_tree_depth
@@ -166,7 +164,7 @@ class RepoEnv(TooledEnv):
             debug_entrypoint=debug_entrypoint,
             readonly_patterns=readonly_patterns,
         )
-        self.last_run_obs = None
+        self.last_eval_obs = None
         self.score = 0
         self.done = False
         self.rewrite_counter = 0
@@ -262,13 +260,16 @@ class RepoEnv(TooledEnv):
 
             shutil.copy2(self.path / filepath, self.working_dir / filepath)
 
-    def reset(self, *, seed=None, options: dict = None, restore_code=True):
+    def reset(
+        self, *, seed=None, options: dict = None, restore_code=True, max_score=None
+    ):
         self.logger.info(f"Resetting environment")
         options = options or {}
         self.current_file = None
         self.current_file_content = None
         self.current_breakpoints_state = {}
         self.rewrite_counter = 0
+        self.max_score = max_score or self.max_score
 
         if restore_code:
             self.restore()
@@ -294,12 +295,16 @@ class RepoEnv(TooledEnv):
 
         return self.infos
 
-    def run(self):
+    def eval(self, **kwargs):
+        """Evaluates the current code using the provided entrypoint.
+        Sets the last_eval_obs, score and done flag based on the evaluation result.
+        Returns the last_eval_obs.
+        """
         success, output = self.terminal.run(self.entrypoint, timeout=self.run_timeout)
-        self.last_run_obs = output
+        self.last_eval_obs = output
         self.score = int(success)
         self.done = success
-        return self.last_run_obs
+        return self.last_eval_obs
 
     def load_current_file(self, filepath: str) -> bool:
         self.current_file = filepath

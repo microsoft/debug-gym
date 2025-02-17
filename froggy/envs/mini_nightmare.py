@@ -33,6 +33,13 @@ class MiniNightmareEnv(RepoEnv):
         super().__init__(**kwargs)
         self.load_dataset()
 
+    def eval(self, **kwargs):
+        success, output = self.terminal.run(self.entrypoint, timeout=self.run_timeout)
+        self.max_score = utils.extract_max_score_from_pytest_output(output)
+        self.score = utils.extract_reward_from_pytest_output(output)
+        self.last_eval_obs = utils.cleanup_pytest_output(output)
+        return self.last_eval_obs
+
     def reset(self, *, seed=None, options: dict = None):
         options = options or {}
         self.current_sample = self.dataset[options["task_name"]]
@@ -42,11 +49,6 @@ class MiniNightmareEnv(RepoEnv):
 
         infos = super().reset()
         infos.instructions = self.instructions
-        infos.last_run_obs = utils.cleanup_pytest_output(infos.last_run_obs)
-
-        self.max_score = utils.extract_max_score_from_pytest_output(infos.last_run_obs)
-        infos.max_score = self.max_score
-        infos.score = utils.extract_reward_from_pytest_output(infos.last_run_obs)
 
         # By default, open the only modifiable file.
         self.load_current_file(self.current_sample["filename"])
