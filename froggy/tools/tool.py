@@ -3,7 +3,6 @@ from abc import ABC, abstractmethod
 
 class EnvironmentTool(ABC):
     name: str = None
-    action: str = None
     instructions: str = None
 
     def __init__(self):

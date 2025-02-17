@@ -5,12 +5,11 @@ from froggy.tools.toolbox import Toolbox
 @Toolbox.register()
 class EvalTool(EnvironmentTool):
     name: str = "eval"
-    action: str = "```eval"
     instructions = {
-        "template": "```eval```",
+        "template": "eval()",
         "description": "Evaluate the current code against pre-defined test cases.",
     }
 
-    def use(self, action):
+    def use(self):
         self.environment.run()
         return "Evaluation completed."

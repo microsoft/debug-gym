@@ -7,7 +7,6 @@ from froggy.tools.toolbox import Toolbox
 @Toolbox.register()
 class ReasoningTool(EnvironmentTool):
     name: str = "reasoning"
-    action: str = "```reasoning"
 
     @property
     def instructions(self):
@@ -24,21 +23,21 @@ class ReasoningTool(EnvironmentTool):
     @property
     def template(self):
         if self.allow_chain_action:
-            return "```reasoning ... </reasoning> <next action> ```"
+            return "reasoning(reasoning_text: str, next_action: str)"
         else:
-            return "```reasoning ... ```"
+            return "reasoning(reasoning_text: str)"
 
     @property
     def examples(self):
         if self.allow_chain_action:
             ex = [
-                "```reasoning The execution trace points to line 43 in main.py, so I'll place a breakpoint there.</reasoning> ```pdb b 43``` ```",
-                "```reasoning There's a shape mismatch that corresponds to a matrix transpose, so I'll rewrite the function to account for the transpose. </reasoning> ```rewrite 10 <c>    m = m.transpose()</c>``` ```",
+                """reasoning(reasoning_text="The execution trace points to line 43 in main.py, so I'll place a breakpoint there.", next_action="pdb(b 43)")""",
+                """reasoning(reasoning_text="There's a shape mismatch that corresponds to a matrix transpose, so I'll rewrite the function to account for the transpose.", next_action="rewrite(start=10, new_code='    m = m.transpose()')")""",
             ]
         else:
             ex = [
-                "```reasoning The execution trace points to line 43 in main.py, so I'll place a breakpoint there.```",
-                "```reasoning There's a shape mismatch that corresponds to a matrix transpose, so I'll rewrite the function to account for the transpose.```",
+                """reasoning(reasoning_text="The execution trace points to line 43 in main.py, so I'll place a breakpoint there.")""",
+                """reasoning(reasoning_text="There's a shape mismatch that corresponds to a matrix transpose, so I'll rewrite the function to account for the transpose.")""",
             ]
         return ex
 
@@ -61,22 +60,18 @@ You break down complex problems into smaller parts and reason through them step 
 
         self.infos_cache: EnvInfo = None
 
-    def use(self, action):
+    def use(self, *args, **kwargs):
         self.success_chain_action = False
         if self.allow_chain_action:
-            return self.use_with_chaining(action)
+            return self.use_with_chaining(*args, **kwargs)
         else:
-            return self.use_without_chaining()
+            return self.use_without_chaining(*args, **kwargs)
 
-    def use_with_chaining(self, action):
+    def use_with_chaining(self, reasoning_text: str, next_action: str):
         """Reasoning tokens are only to benefit the model, so we strip them and then pass the remainder of the action
         as a free next action.
         """
-        try:
-            reasoning_text, next_action = self.split_reasoning(action)
-        except:
-            return "SyntaxError: invalid syntax."
-        if next_action.startswith(self.action):
+        if next_action.startswith(self.name):
             return "SyntaxError: invalid syntax. You cannot chain reasoning actions."
         # now execute the next action
         try:
@@ -89,7 +84,7 @@ You break down complex problems into smaller parts and reason through them step 
                     "SyntaxError: invalid syntax.",
                 ]
             )
-        if next_obs == f"Invalid action: {action}." or next_obs.startswith(
+        if next_obs.startswith("Invalid action:") or next_obs.startswith(
             "Error while using tool"
         ):
             return "\n".join(
@@ -108,15 +103,5 @@ You break down complex problems into smaller parts and reason through them step 
             ]
         )
 
-    def use_without_chaining(self, action):
-        try:
-            reasoning_text = action.split(self.action)[1].split("```")[0].strip()
-        except:
-            return "SyntaxError: invalid syntax."
+    def use_without_chaining(self, reasoning_text: str):
         return "\n".join(["Reasoning:", reasoning_text])
-
-    def split_reasoning(self, action):
-        content = action.split(self.action)[1].rsplit("```", 1)[0].strip()
-        reasoning, next_action = content.split("</reasoning>", 1)
-        reasoning, next_action = reasoning.strip(), next_action.strip()
-        return reasoning, next_action

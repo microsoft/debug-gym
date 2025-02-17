@@ -43,12 +43,8 @@ class TooledEnv:
         self.tools = {}
 
     @property
-    def actions(self):
-        return [t.action for t in self.tools.values()]
-
-    @property
     def actions_str(self):
-        return ", ".join([item.strip("`") for item in self.actions])
+        return ", ".join([t.name for t in self.tools.values()])
 
     def seed(self, seed):
         self.rng = np.random.RandomState(seed)
@@ -209,7 +205,7 @@ class RepoEnv(TooledEnv):
     def instructions(self):
         _instruction = {
             "Available tools to solve the problem": self.tool_instructions,
-            "Available commands": self.actions_str,
+            "Available commands": self.tool_names,
         }
         return _instruction
 
@@ -343,7 +339,7 @@ class RepoEnv(TooledEnv):
 
     def current_code_with_line_number(self):
         if self.current_file is None or self.current_file_content is None:
-            return "You are currently not working in a file. You can use ```view path/to/file.py``` to navigate to a file first."
+            return """You are currently not working in a file. You can use view(path="path/to/file.py") to navigate to a file first."""
 
         output = {
             "File name": self.current_file,

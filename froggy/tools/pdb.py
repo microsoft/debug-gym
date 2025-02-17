@@ -9,37 +9,15 @@ from froggy.tools.toolbox import Toolbox
 @Toolbox.register()
 class PDBTool(EnvironmentTool):
     name: str = "pdb"
-    action: str = "```pdb"
     instructions = {
-        "template": "```pdb <command>```",
+        "template": "pdb(command: str)",
         "description": "An interface to the Python debugger PDB. Send a command to the PDB terminal. The command should be a valid PDB command.",
         "examples": [
-            "```pdb p x``` to print the value of the variable x in the current context.",
-            "```pdb b 42``` to set a breakpoint at line 42 in the current file.",
-            "```pdb cl src/code.py:26``` to clear the breakpoint at line 26 in the file src/code.py.",
-            "```pdb c``` to continue the execution until the next breakpoint.",
+            """pdb(command="p x") to print the value of the variable x in the current context.""",
+            """pdb(command="b 42") to set a breakpoint at line 42 in the current file.""",
+            """pdb(command="cl src/code.py:26") to clear the breakpoint at line 26 in the file src/code.py.""",
+            """pdb(command="c") to continue the execution until the next breakpoint.""",
         ],
-        "commonly used pdb commands": {
-            "note": "The commands recognized by the debugger are listed below. Most commands can be abbreviated to one or two letters as indicated; e.g. h(elp) means that either h or help can be used to enter the help command (but not he or hel, nor H or Help or HELP). Arguments to commands must be separated by whitespace (spaces or tabs). Optional arguments are enclosed in square brackets ([]) in the command syntax; the square brackets must not be typed. Alternatives in the command syntax are separated by a vertical bar (|).",
-            "commands": {
-                "h(elp) [command]": "Without argument, print the list of available commands. With a command as argument, print help about that command.",
-                "w(here)": "Print a stack trace, with the most recent frame at the bottom. An arrow (>) indicates the current frame, which determines the context of most commands.",
-                "d(own) [count]": "Move the current frame count (default one) levels down in the stack trace (to a newer frame).",
-                "u(p) [count]": "Move the current frame count (default one) levels up in the stack trace (to an older frame).",
-                "b(reak) [([filename:]lineno | function) [, condition]]": "With a lineno argument, set a break at line lineno in the current file. The line number may be prefixed with a filename and a colon, to specify a breakpoint in another file. Accepatable forms of filename are /abspath/to/file.py, relpath/file.py, module and package.module. With a function argument, set a break at the first executable statement within that function. function can be any expression that evaluates to a function in the current namespace. If a second argument is present, it is an expression which must evaluate to true before the breakpoint is honored. Without argument, list all breaks, including for each breakpoint, the number of times that breakpoint has been hit, the current ignore count, and the associated condition if any. Each breakpoint is assigned a number to which all the other breakpoint commands refer.",
-                "cl(ear) [filename:lineno | bpnumber ...]": "With a filename:lineno argument, clear all the breakpoints at this line. With a space separated list of breakpoint numbers, clear those breakpoints. Without argument, clear all breaks.",
-                "s(tep)": "Execute the current line, stop at the first possible occasion (either in a function that is called or on the next line in the current function).",
-                "n(ext)": "Continue execution until the next line in the current function is reached or it returns. (The difference between next and step is that step stops inside a called function, while next executes called functions at (nearly) full speed, only stopping at the next line in the current function.)",
-                "unt(il) [lineno]": "Without argument, continue execution until the line with a number greater than the current one is reached. With lineno, continue execution until a line with a number greater or equal to lineno is reached. In both cases, also stop when the current frame returns.",
-                "c(ont(inue))": "Continue execution, only stop when a breakpoint is encountered.",
-                "l(ist) [first[, last]]": "List source code for the current file. Without arguments, list 11 lines around the current line or continue the previous listing. With . as argument, list 11 lines around the current line. With one argument, list 11 lines around at that line. With two arguments, list the given range; if the second argument is less than the first, it is interpreted as a count.",
-                "ll | longlist": "List all source code for the current function or frame. Interesting lines are marked as for list.",
-                "a(rgs)": "Print the arguments of the current function and their current values.",
-                "p expression": "Evaluate expression in the current context and print its value.",
-                "pp expression": "Like the p command, except the value of expression is pretty-printed using the pprint module.",
-                "whatis expression": "Print the type of expression.",
-            },
-        },
     }
 
     def __init__(
@@ -91,8 +69,8 @@ class PDBTool(EnvironmentTool):
         self.close_pdb()
         return self.start_pdb()
 
-    def use(self, action):
-        command = action.strip("`").split(" ", 1)[1].strip()
+    def use(self, command: str):
+        command = command.strip()
         _warning = ""
         splits = re.split("\n|;", command)
         if len(splits) > 1:
@@ -159,7 +137,7 @@ class PDBTool(EnvironmentTool):
                     # TODO: add output to self.pdb_obs?
                     obs += f"\nlist .\n" + self.interact_with_pdb("l .")
         else:
-            obs = "\n".join([f"Invalid action: {action}", _warning, output])
+            obs = "\n".join([f"Invalid action: pdb({command})", _warning, output])
 
         # read the current frame info, find the current file, so we can change view to that file.
         self.get_current_frame_file()
