@@ -1,7 +1,8 @@
 import pytest
 
-from froggy.envs.env import RepoEnv
+from froggy.envs.env import Event, RepoEnv
 from froggy.tools.tool import EnvironmentTool
+from froggy.tools.toolbox import Toolbox
 
 
 class FakeTool(EnvironmentTool):
@@ -49,3 +50,22 @@ def test_abstract_methods():
         ),
     ):
         tool = CompletelyFakeTool()
+
+
+def test_auto_subscribe(monkeypatch):
+
+    @Toolbox.register()
+    class ToolWithHandler(FakeTool):
+        def on_env_reset(self, **kwargs):
+            return "Handler for Event.ENV_RESET"
+
+    tool = ToolWithHandler()
+
+    env = RepoEnv()
+    env.add_tool(tool)
+
+    assert tool in env.event_hooks.event_listeners[Event.ENV_RESET]
+    assert len(env.event_hooks.event_listeners[Event.ENV_RESET]) == 1
+    for channel in env.event_hooks.event_listeners:
+        if channel != Event.ENV_RESET:
+            assert tool not in env.event_hooks.event_listeners[channel]
