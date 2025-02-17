@@ -17,10 +17,6 @@ class EnvironmentTool(ABC):
 
         self.environment = environment
 
-    def is_triggered(self, action):
-        # e.g. ```pdb b src/main.py:42```
-        return action.startswith(self.action)
-
     @abstractmethod
     def use(self, action, environment):
         raise NotImplementedError("use method must be implemented in the subclass.")

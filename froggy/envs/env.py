@@ -1,3 +1,4 @@
+import ast
 import atexit
 import copy
 import glob
@@ -65,8 +66,38 @@ class TooledEnv:
     def get_tool(self, tool_name):
         return self.tools[tool_name]
 
+    def parse_args(self, args):
+        args = "f({})".format(args)
+        tree = ast.parse(args)
+        funccall = tree.body[0].value
+        args = [ast.literal_eval(arg) for arg in funccall.args]
+        kwargs = {arg.arg: ast.literal_eval(arg.value) for arg in funccall.keywords}
+        return args, kwargs
+
+    def parse_action(self, action):
+        action = action.strip()
+        assert "(" in action and action.endswith(")"), "Syntax Error: {}".format(action)
+        tool_name, args = action.split("(", 1)
+        args = args[:-1]
+        tool_name, args = tool_name.strip(), args.strip()
+        assert tool_name is not None, "Syntax Error: {}".format(action)
+        try:
+            args, kwargs = self.parse_args(args)
+        except Exception as e:
+            raise Exception("Syntax Error: {}".format(action)) from e
+        return tool_name, args, kwargs
+
     def get_triggered_tools(self, action):
-        return [tool for tool in self.tools.values() if tool.is_triggered(action)]
+        try:
+            tool_name, args, kwargs = self.parse_action(action)
+        except Exception as e:
+            # parse error
+            return e, None
+        if tool_name not in self.tools:
+            # failed to find tool
+            return f"Unregistered tool: {tool_name}", None
+        tool = self.tools[tool_name]
+        return None, [tool, args, kwargs]
 
     @property
     def tool_instructions(self):
@@ -345,17 +376,14 @@ class RepoEnv(TooledEnv):
     def step(self, action: str):
         # given action, return new obs, and update infos
         # the action space is composed of a few smaller action spaces
-        triggered_tools = self.get_triggered_tools(action)
-        assert (
-            len(triggered_tools) <= 1
-        ), f"Multiple tools are triggered by the same action! {action}"
-
-        self.obs = f"Invalid action: {action}."
-        if triggered_tools:
-            triggered_tool = triggered_tools[0]
+        message, tool_info = self.get_triggered_tools(action)
+        if message:
+            self.obs = message
+        else:
+            triggered_tool, args, kwargs = tool_info
             try:
-                self.obs = triggered_tool.use(action)
-            except:
+                self.obs = triggered_tool.use(*args, **kwargs)
+            except Exception as e:
                 self.obs = f"Error while using tool {triggered_tool.name} with action: \n{action}"
 
             if isinstance(triggered_tool, CodePatcher):
