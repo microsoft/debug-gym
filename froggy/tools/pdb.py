@@ -87,6 +87,7 @@ class PDBTool(EnvironmentTool):
         return initial_output
 
     def on_env_reset(self, **kwargs):
+        super().on_env_reset(**kwargs)
         obs = self.start_pdb()
         return [{self.name: obs}]  # start or restart?
 

@@ -1,16 +1,13 @@
 import pytest
 
 from froggy.envs.env import Event, RepoEnv
-from froggy.tools.tool import EnvironmentTool
+from froggy.tools.tool import EnvironmentTool, track_history
 from froggy.tools.toolbox import Toolbox
 
 
 class FakeTool(EnvironmentTool):
-    def use(self, action, environment):
-        pass
-
-    def reset(self):
-        pass
+    def use(self, action):
+        return "observation", [{"FakeTool": "observation"}]
 
 
 def test_register_valid_environment():
@@ -69,3 +66,26 @@ def test_auto_subscribe(monkeypatch):
     for channel in env.event_hooks.event_listeners:
         if channel != Event.ENV_RESET:
             assert tool not in env.event_hooks.event_listeners[channel]
+
+
+def test_track_history():
+    class ToolWithHistory(FakeTool):
+        @track_history
+        def use(self, **kwargs):
+            return super().use(**kwargs)
+
+    tool = ToolWithHistory()
+
+    assert hasattr(tool, "history")
+    assert isinstance(tool.history, list)
+    assert len(tool.history) == 0
+
+    tool.use(action="first")
+    assert len(tool.history) == 1
+    assert tool.history[0].kwargs == {"action": "first"}
+    assert tool.history[0].observation == "observation"
+
+    tool.use(action="second")
+    assert len(tool.history) == 2
+    assert tool.history[1].kwargs == {"action": "second"}
+    assert tool.history[1].observation == "observation"

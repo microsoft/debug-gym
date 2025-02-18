@@ -16,6 +16,7 @@ class EvalTool(EnvironmentTool):
         return obs, [{self.name: obs}]
 
     def on_env_reset(self, **kwargs):
+        super().on_env_reset(**kwargs)
         obs, chain_obs = self.use(**kwargs)
         return chain_obs
 
