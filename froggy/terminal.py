@@ -32,6 +32,12 @@ class ShellSession:
         self.logger = logger or FroggyLogger("froggy")
         self.start()
         atexit.register(self.close)
+        self.default_catch_errors = [
+            "SyntaxError",
+            "IndentationError",
+            "TabError",
+            "KeyError",
+        ]
 
     def start(self):
         self.logger.debug(f"Starting ShellSession with entrypoint:\n{self.entrypoint}")
@@ -98,6 +104,10 @@ class ShellSession:
                 if data:
                     output += data
                     last_change_time = time.time()
+                    for _error in self.default_catch_errors:
+                        if _error in output:
+                            self.logger.debug(f"Error found in output: {_error}")
+                            return output
                     if read_until and read_until in output:
                         break
                 else:
