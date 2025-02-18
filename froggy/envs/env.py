@@ -72,6 +72,12 @@ class TooledEnv:
 
     def parse_action(self, action):
         action = action.strip()
+        # remove ``` in case LLM generates ```tool_name(args, kwargs)```
+        if action.startswith("```"):
+            action = action[3:]
+        if action.endswith("```"):
+            action = action[:-3]
+        action = action.strip()
         assert "(" in action and action.endswith(")"), "Syntax Error: {}".format(action)
         tool_name, args = action.split("(", 1)
         args = args[:-1]
