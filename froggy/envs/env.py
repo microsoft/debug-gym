@@ -80,7 +80,7 @@ class TooledEnv:
         try:
             args, kwargs = self.parse_args(args)
         except Exception as e:
-            raise Exception("Syntax Error: {}\n{}".format(action, e))
+            raise Exception("Syntax Error: {}\n{}".format(action, str(e)))
         return tool_name, args, kwargs
 
     def get_triggered_tools(self, action):
@@ -88,7 +88,7 @@ class TooledEnv:
             tool_name, args, kwargs = self.parse_action(action)
         except Exception as e:
             # parse error
-            return e, None
+            return str(e), None
         if tool_name not in self.tools:
             # failed to find tool
             return f"Unregistered tool: {tool_name}", None
