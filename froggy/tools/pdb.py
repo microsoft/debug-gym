@@ -11,12 +11,12 @@ class PDBTool(EnvironmentTool):
     name: str = "pdb"
     instructions = {
         "template": "pdb(command: str)",
-        "description": "An interface to the Python debugger PDB. Send a command to the PDB terminal. The command should be a valid PDB command.",
+        "description": "An interface to the Python debugger PDB. Send a command string to the PDB terminal. The command should be a valid PDB command.",
         "examples": [
-            """pdb(command="p x") to print the value of the variable x in the current context.""",
-            """pdb(command="b 42") to set a breakpoint at line 42 in the current file.""",
-            """pdb(command="cl src/code.py:26") to clear the breakpoint at line 26 in the file src/code.py.""",
-            """pdb(command="c") to continue the execution until the next breakpoint.""",
+            """pdb("p x") to print the value of the variable x in the current context.""",
+            """pdb("b 42") to set a breakpoint at line 42 in the current file.""",
+            """pdb("cl src/code.py:26") to clear the breakpoint at line 26 in the file src/code.py.""",
+            """pdb("c") to continue the execution until the next breakpoint.""",
         ],
     }
 

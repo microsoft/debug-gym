@@ -17,8 +17,9 @@ class ListdirTool(EnvironmentTool):
             "description": f"List the file and folder contents of a subdirectiory specified by 'path', up to a specified 'depth'. The default 'path' is the working directory, and the default 'depth' is {self.environment.dir_tree_depth}. The path must be relative to the working directory, and the depth must be 1 or greater.",
             "examples": [
                 """listdir() to list the contents of the working directory.""",
-                """listdir(path="src/util") to list the contents of the 'util' subdirectory within the 'src' subdirectory.""",
+                """listdir("src/util") to list the contents of the 'util' subdirectory within the 'src' subdirectory.""",
                 """listdir(path="src", depth=2) to list the contents of the 'src' subdirectory up to a depth of 2.""",
+                """listdir("src/test", 1) to list the contents of the 'src/test' subdirectory up to a depth of 1.""",
             ],
         }
         return instruction

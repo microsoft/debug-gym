@@ -13,7 +13,7 @@ class ViewTool(EnvironmentTool):
         "template": """view(path: str)""",
         "description": "Specify a file path to set as current working file. The file path should be relative to the root directory of the repository.",
         "examples": [
-            """view(path="main.py") to navigate to a file called 'main.py' in the root""",
+            """view("main.py") to navigate to a file called 'main.py' in the root""",
             """view(path="src/util.py") to navigate to a file called 'util.py' in a subdirectory called 'src'""",
         ],
     }

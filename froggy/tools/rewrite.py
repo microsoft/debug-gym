@@ -14,6 +14,7 @@ class RewriteTool(EnvironmentTool):
             """rewrite(start=10, new_code="    print('bonjour')") will rewite line number 10 of the current file to be print('bonjour'), with the indents ahead (in this case, 4 spaces).""",
             """rewrite(start=10, end=20, new_code="    print('hello')\\n    print('hi again')") will replace the chunk of code between line number 10 and 20 in the current file by the two lines provided, both with indents ahead (in this case, 4 spaces).""",
             """rewrite(path='code/utils.py', start=4, end=6, new_code="        print('buongiorno')") will replace the chunk of code between line number 4 and 6 in the file code/utils.py by the single line provided, with the indent ahead (in this case, 8 spaces).""",
+            """rewrite('code/greetings.py', 2, 7, new_code="    print('nihao')") will replace the chunk of code between line number 2 and 7 in the file code/greetings.py by the single line provided, with the indent ahead (in this case, 4 spaces).""",
         ],
     }
 
