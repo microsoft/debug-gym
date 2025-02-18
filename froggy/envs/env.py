@@ -423,7 +423,7 @@ class RepoEnv(TooledEnv):
         if triggered_tools:
             triggered_tool = triggered_tools[0]
             try:
-                self.last_obs, all_obs = triggered_tool.use(action)
+                self.last_obs, all_obs = triggered_tool(action)
                 chain_obs += all_obs
             except BaseException as e:
                 error_message = f"Error while using tool {triggered_tool.name} with action: {action}.\n{e}"

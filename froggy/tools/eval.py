@@ -17,11 +17,11 @@ class EvalTool(EnvironmentTool):
 
     def on_env_reset(self, **kwargs):
         super().on_env_reset(**kwargs)
-        obs, chain_obs = self.use(**kwargs)
+        obs, chain_obs = self(**kwargs)
         return chain_obs
 
     def on_rewrite_success(self, **kwargs):
         if self.environment.run_on_rewrite:
-            obs, chain_obs = self.use(**kwargs)
+            obs, chain_obs = self(**kwargs)
             return chain_obs
         return []

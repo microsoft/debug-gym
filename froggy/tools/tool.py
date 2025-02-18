@@ -35,6 +35,10 @@ class EnvironmentTool(ABC):
         self.environment = None
         self.history = []
 
+    @track_history
+    def __call__(self, action):
+        return self.use(action)
+
     def register(self, environment):
         from froggy.envs.env import Event, RepoEnv
 
@@ -53,14 +57,11 @@ class EnvironmentTool(ABC):
         return action.startswith(self.action)
 
     @abstractmethod
-    @track_history
-    def use(self, action, environment) -> tuple[str, list[dict]]:
-        """This method is called directly by `tool.use()`, or by event handlers.
-        The method returns the observation from using the tool, plus a list of
-        observations that could include chained observations triggered by handlers.
-        The list of observation includes the observation from the tool itself.
-
-        Handlers on the other hand, only return the list of observations.
+    def use(self, action) -> tuple[str, list[dict]]:
+        """This method is invoked directly by `tool()` or by event handlers.
+        It returns the primary observation from using the tool along with a list of
+        additional observations, which may include chained observations triggered by handlers.
+        Note that the list should also include the primary observation.
         """
         pass
 

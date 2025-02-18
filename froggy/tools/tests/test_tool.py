@@ -69,23 +69,18 @@ def test_auto_subscribe(monkeypatch):
 
 
 def test_track_history():
-    class ToolWithHistory(FakeTool):
-        @track_history
-        def use(self, **kwargs):
-            return super().use(**kwargs)
-
-    tool = ToolWithHistory()
+    tool = FakeTool()
 
     assert hasattr(tool, "history")
     assert isinstance(tool.history, list)
     assert len(tool.history) == 0
 
-    tool.use(action="first")
+    tool(action="first")
     assert len(tool.history) == 1
     assert tool.history[0].kwargs == {"action": "first"}
     assert tool.history[0].observation == "observation"
 
-    tool.use(action="second")
+    tool(action="second")
     assert len(tool.history) == 2
     assert tool.history[1].kwargs == {"action": "second"}
     assert tool.history[1].observation == "observation"
