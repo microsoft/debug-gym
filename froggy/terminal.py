@@ -100,6 +100,8 @@ class ShellSession:
                     last_change_time = time.time()
                     if read_until and read_until in output:
                         break
+                else:
+                    time.sleep(0.01)
             except BlockingIOError:
                 time.sleep(0.1)
                 continue
