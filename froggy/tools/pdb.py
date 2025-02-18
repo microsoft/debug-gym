@@ -109,6 +109,7 @@ class PDBTool(EnvironmentTool):
                 output = self.interact_with_pdb(command)
                 self.pdb_obs = output
             except:  # TODO: catch specific exceptions
+                self.restart_pdb()
                 success = False
 
         if success:
@@ -213,6 +214,7 @@ class PDBTool(EnvironmentTool):
                         output = output[len(command) :].strip()
                     self.environment.current_breakpoints_state[_key] = command
                 except:
+                    self.restart_pdb()
                     success = False
         elif _action_type in ["cl", "clear"]:
             command = "cl " + command
@@ -232,6 +234,7 @@ class PDBTool(EnvironmentTool):
                         output = output[len(command) :].strip()
                     del self.environment.current_breakpoints_state[_key]
                 except:
+                    self.restart_pdb()
                     success = False
         else:
             return False, output

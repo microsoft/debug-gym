@@ -232,7 +232,7 @@ class Terminal:
         which could interfere with the terminal setup (clean outputs)"""
         return shlex.split("/bin/bash --noprofile --norc")
 
-    def start_shell_session(self, timeout=30, no_output_timeout=1):
+    def start_shell_session(self, timeout=30, no_output_timeout=30):
         session = ShellSession(
             entrypoint=self.default_entrypoint,
             working_dir=self.working_dir,
