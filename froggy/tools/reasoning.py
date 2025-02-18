@@ -64,9 +64,10 @@ You break down complex problems into smaller parts and reason through them step 
     def use(self, action):
         self.success_chain_action = False
         if self.allow_chain_action:
-            return [{self.name: self.use_with_chaining(action)}]
+            obs = self.use_with_chaining(action)
         else:
-            return [{self.name: self.use_without_chaining()}]
+            obs = self.use_without_chaining()
+        return obs, [{self.name: obs}]
 
     def use_with_chaining(self, action):
         """Reasoning tokens are only to benefit the model, so we strip them and then pass the remainder of the action
@@ -81,7 +82,7 @@ You break down complex problems into smaller parts and reason through them step 
         # now execute the next action
         try:
             next_infos = self.environment.step(next_action)
-            next_obs = next_infos.obs
+            next_obs = next_infos.last_obs
         except:
             return "\n".join(
                 [

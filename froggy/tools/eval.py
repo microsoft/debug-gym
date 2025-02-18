@@ -11,15 +11,16 @@ class EvalTool(EnvironmentTool):
         "description": "Evaluate the current code against pre-defined test cases.",
     }
 
-    def use(self, **kwargs):
-        observation = self.environment.eval(**kwargs)
-        return [{self.name: observation}]
+    def use(self, action=None, **kwargs):
+        obs = self.environment.eval(**kwargs)
+        return obs, [{self.name: obs}]
 
     def on_env_reset(self, **kwargs):
-        return self.use(**kwargs)
+        obs, chain_obs = self.use(**kwargs)
+        return chain_obs
 
     def on_rewrite_success(self, **kwargs):
-        observation = []
         if self.environment.run_on_rewrite:
-            observation += self.use(**kwargs)
-        return observation
+            obs, chain_obs = self.use(**kwargs)
+            return chain_obs
+        return []

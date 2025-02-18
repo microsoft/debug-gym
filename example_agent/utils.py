@@ -36,14 +36,18 @@ class HistoryTracker:
             game_step = len(self.memory) - 1
         if game_step == 0:
             # initial state
-            json_out = {"step_id": game_step, "action": None, "obs": self.memory[0].obs}
+            json_out = {
+                "step_id": game_step,
+                "action": None,
+                "obs": self.memory[0].last_obs,
+            }
             if include_prompt_response_pairs:
                 json_out["prompt_response_pairs"] = None
         else:
             json_out = {
                 "step_id": game_step,
                 "action": self.memory[game_step].action,
-                "obs": self.memory[game_step].obs,
+                "obs": self.memory[game_step].last_obs,
             }
             # prompt_response_pairs could be empty for the initial state
             prp = self.prompt_response_pairs[game_step]
@@ -138,7 +142,7 @@ def build_history_conversation(
     for history_info in _history[latest_rewrite_step:]:
         if history_info.action is not None:
             _messages.append({"role": "assistant", "content": f"{history_info.action}"})
-        _messages.append({"role": "user", "content": f"{history_info.obs}"})
+        _messages.append({"role": "user", "content": f"{history_info.last_obs}"})
     return _messages
 
 
@@ -160,7 +164,7 @@ def build_history_non_conversation(
         _m = {
             "step": _i,
             "command": (None if history_info.action is None else history_info.action),
-            "stdout": history_info.obs,
+            "stdout": history_info.last_obs,
         }
         _history_prompt.append(_m)
     return _history_prompt

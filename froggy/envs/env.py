@@ -28,14 +28,14 @@ class Observation:
 
 @dataclass
 class EnvInfo:
-    obs: str
-    last_run_obs: str
-    observations: list[Observation]
+    last_obs: str
+    chain_obs: list[Observation]
     dir_tree: str
     current_code_with_line_number: dict | str
     current_breakpoints: str
     action: str
     instructions: dict
+    eval_obs: str
     score: int
     max_score: int
     done: bool
@@ -81,12 +81,12 @@ class EventHooks:
         self.event_listeners[event].remove(tool)
 
     def notify(self, event: Event, source=None, **kwargs):
-        observations = []
+        chain_obs = []
         for tool in self.event_listeners[event]:
             if tool == source:
                 continue  # skip the source tool to avoid infinite loop
-            observations += getattr(tool, event.handler_name)(**kwargs)
-        return observations
+            chain_obs += getattr(tool, event.handler_name)(**kwargs)
+        return chain_obs
 
 
 class TooledEnv:
@@ -274,17 +274,17 @@ class RepoEnv(TooledEnv):
         if restore_code:
             self.restore()
 
-        self.obs = ""
-        observations = self.event_hooks.notify(Event.ENV_RESET)
+        self.last_obs = ""
+        chain_obs = self.event_hooks.notify(Event.ENV_RESET)
 
         self.infos = EnvInfo(
-            obs=self.obs,
-            observations=observations,
-            last_run_obs=self.last_run_obs,
+            last_obs=self.last_obs,
+            chain_obs=chain_obs,
             dir_tree=self.display_files(),
             current_code_with_line_number=self.current_code_with_line_number(),
             current_breakpoints=self.current_breakpoints(),
             action=None,
+            eval_obs=self.last_eval_obs,
             done=self.done,
             score=self.score,
             max_score=self.max_score,
@@ -418,19 +418,18 @@ class RepoEnv(TooledEnv):
             len(triggered_tools) <= 1
         ), f"Multiple tools are triggered by the same action! {action}"
 
-        observations = []
-        self.obs = f"Invalid action: {action}."
+        chain_obs = []
+        self.last_obs = f"Invalid action: {action}."
         if triggered_tools:
             triggered_tool = triggered_tools[0]
             try:
-                observations += triggered_tool.use(action)
-                self.obs = ""
-                # self.obs = f"Success using tool {triggered_tool.name}"
+                self.last_obs, all_obs = triggered_tool.use(action)
+                chain_obs += all_obs
             except BaseException as e:
-                self.obs = f"Error while using tool {triggered_tool.name} with action: \n{action}"
-                self.logger.warning(
-                    f"Error while using tool {triggered_tool.name} with action: \n{action}. {e}"
-                )
+                error_message = f"Error while using tool {triggered_tool.name} with action: {action}.\n{e}"
+                chain_obs += [{"env": error_message}]
+                self.last_obs = error_message
+                self.logger.warning(error_message)
 
             if isinstance(triggered_tool, ReasoningTool):
                 reasoning_tool = self.get_tool(triggered_tool.name)
@@ -444,19 +443,19 @@ class RepoEnv(TooledEnv):
                     self.score = reasoning_tool.infos_cache.score
                     self.infos = copy.deepcopy(reasoning_tool.infos_cache)
                     # update obs and action in info
-                    self.infos.obs = self.obs
+                    self.infos.last_obs = self.last_obs
                     self.infos.action = action
                     return self.infos
 
         self.infos = EnvInfo(
-            obs=self.obs,
-            last_run_obs=self.last_run_obs,
-            observations=observations,
+            last_obs=self.last_obs,
+            chain_obs=chain_obs,
             dir_tree=self.display_files(),
             current_code_with_line_number=self.current_code_with_line_number(),
             current_breakpoints=self.current_breakpoints(),
             action=action,
             instructions=self.instructions,
+            eval_obs=self.last_eval_obs,
             score=self.score,
             max_score=self.max_score,
             done=self.done,
@@ -467,15 +466,10 @@ class RepoEnv(TooledEnv):
         return self.infos
 
     def handle_event(self, event: Event, source=None, **kwargs):
-        observations = []
+        chain_obs = []
         obs = ""
         if event in [Event.REWRITE_SUCCESS, Event.REWRITE_FAIL]:
             self.rewrite_counter += 1
-
-        # if event == Event.REWRITE_SUCCESS and self.run_on_rewrite:
-        #     # obs += "\nNew code has been run."
-        #     run_obs, _done = self.run()  # remove _done from run
-        #     # observations += [{"environment_run": run_obs}]  # move dict inside run method
 
         if event == Event.SWITCH_CONTEXT and self.auto_view_change:
             new_context = kwargs.get("filepath")
@@ -483,5 +477,5 @@ class RepoEnv(TooledEnv):
                 self.load_current_file(new_context)
                 obs += f"\nSwitched context to {new_context}."
 
-        observations += self.event_hooks.notify(event, source=source, **kwargs)
-        return observations
+        chain_obs += self.event_hooks.notify(event, source=source, **kwargs)
+        return chain_obs

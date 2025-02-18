@@ -54,8 +54,9 @@ class PdbAgent:
         system_prompt["Repo directory tree"] = info.dir_tree
         system_prompt["Current code in view"] = info.current_code_with_line_number
         system_prompt["Current breakpoints"] = info.current_breakpoints
-        system_prompt["Last execution output"] = info.last_run_obs
-        system_prompt["Observations"] = info.observations
+        system_prompt["Last evaluation output"] = info.eval_obs
+        system_prompt["Last execution output"] = info.last_obs
+        system_prompt["All observations triggered by last execution"] = info.chain_obs
         system_prompt = unescape(json.dumps(system_prompt, indent=4))
         messages = [
             {
@@ -184,7 +185,8 @@ class RewriteOnly(PdbAgent):
         system_prompt["Repo directory tree"] = info.dir_tree
         system_prompt["Current code in view"] = info.current_code_with_line_number
         system_prompt["Current breakpoints"] = info.current_breakpoints
-        system_prompt["Last execution output"] = info.last_run_obs
+        system_prompt["Last evaluation output"] = info.eval_obs
+        system_prompt["Last execution output"] = info.last_obs
         system_prompt = unescape(json.dumps(system_prompt, indent=4))
         messages = [
             {
@@ -249,7 +251,7 @@ class PdbAfterRewrites(PdbAgent):
                 self.env.add_tool(pdb_tool)
                 self.env.tools["pdb"].start_pdb()
                 info.instructions = self.env.instructions
-                info.obs += "\nThe pdb tool has been added."
+                info.last_obs += "\nThe pdb tool has been added."
 
             self.history.step(info, llm_response)
 

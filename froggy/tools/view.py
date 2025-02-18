@@ -72,4 +72,5 @@ class ViewTool(EnvironmentTool):
                 ),
             ]
 
-        return [{self.name: " ".join(obs)}]
+        obs = " ".join(obs)
+        return obs, [{self.name: obs}]

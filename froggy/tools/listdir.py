@@ -28,11 +28,10 @@ class ListdirTool(EnvironmentTool):
         try:
             listdir_path, depth = self.clean_action(action)
             startpath = pjoin(self.environment.working_dir, listdir_path)
-            result = self.environment.directory_tree(root=startpath, max_depth=depth)
+            obs = self.environment.directory_tree(root=startpath, max_depth=depth)
         except ValueError as e:
-            return [{self.name: str(e)}]
-
-        return [{self.name: result}]
+            obs = str(e)
+        return obs, [{self.name: obs}]
 
     def clean_action(self, action):
         listdir_path = action.strip("`").strip()

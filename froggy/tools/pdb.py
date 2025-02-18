@@ -156,7 +156,8 @@ class PDBTool(EnvironmentTool):
                     )
                     + 1
                 )
-                self.environment.last_run_obs = output[:end_index]
+                # TODO: I think this is a shortcut to use the output of pdb instead of eval. Can we remove this?
+                # self.environment.last_eval_obs = output[:end_index]
                 output = (
                     "Reached the end of the file. Restarting the debugging session.\n"
                     + output[end_index:]
@@ -173,7 +174,7 @@ class PDBTool(EnvironmentTool):
 
         # read the current frame info, find the current file, so we can change view to that file.
         self.get_current_frame_file()
-        return [{self.name: obs}]
+        return obs, [{self.name: obs}]
 
     def breakpoint_add_clear(self, action: str, which_file=None):
         # handle adding/removing breakpoints
