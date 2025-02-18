@@ -184,7 +184,7 @@ def test_use_command(mock_interact_with_pdb, tmp_path):
     pdb_tool.register(env)
     env.current_file = "script.py"
     env.all_files = ["script.py"]
-    output = pdb_tool.use("```pdb p x```")
+    output = pdb_tool.use(command="p x")
     assert "output" in output
 
 

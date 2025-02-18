@@ -15,9 +15,9 @@ import numpy as np
 
 from froggy.logger import FroggyLogger
 from froggy.terminal import Terminal
-from froggy.tools.patchers import CodePatcher
 from froggy.tools.pdb import PDBTool
 from froggy.tools.reasoning import ReasoningTool
+from froggy.tools.rewrite import RewriteTool
 from froggy.utils import _walk, make_file_matcher, show_line_number
 
 
@@ -382,7 +382,7 @@ class RepoEnv(TooledEnv):
             except Exception as e:
                 self.obs = f"Error while using tool {triggered_tool.name} with action: \n{action}"
 
-            if isinstance(triggered_tool, CodePatcher):
+            if isinstance(triggered_tool, RewriteTool):
                 self.rewrite_counter += 1
                 if self.get_tool(triggered_tool.name).rewrite_success:
                     if self.run_on_rewrite:
