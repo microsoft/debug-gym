@@ -52,7 +52,7 @@ def test_substitution_patcher_invalid_file(mock_environment):
 
     assert (
         result
-        == "File test.py does not exist or is not in the current repository.\nRewrite failed."
+        == "Error while rewriting the file: File test.py does not exist or is not in the current repository.\nRewrite failed."
     )
     assert not patcher.rewrite_success
 
@@ -79,6 +79,6 @@ def test_substitution_patcher_invalid_line_number_2(mock_environment):
 
     assert (
         result
-        == "Invalid line number range, head should be less than or equal to tail.\nRewrite failed."
+        == "Invalid line number range, start should be less than or equal to end.\nRewrite failed."
     )
     assert not patcher.rewrite_success

@@ -23,10 +23,9 @@ class ListdirTool(EnvironmentTool):
         }
         return instruction
 
-    def use(self, path: str = ".", depth: int = -1):
-        if depth == -1:
+    def use(self, path: str = ".", depth: int = None):
+        if depth is None:
             depth = self.environment.dir_tree_depth
-        depth = int(depth)
         if depth <= 0:
             raise ValueError(f"Depth must be 1 or greater: {depth}")
         try:

@@ -67,10 +67,10 @@ def test_pdb_use(tmp_path, setup_test_repo):
     initial_output = pdb.start_pdb(pdb_cmd="python -m pdb -m pytest -sv .")
     assert """The pytest entry point.""" in initial_output
     assert "(Pdb)" not in initial_output
-    output = pdb.use("pdb l")
+    output = pdb.use(command="l")
     assert """The pytest entry point.""" in output
     assert "(Pdb)" not in output
-    output = pdb.use("pdb c")
+    output = pdb.use("c")
     assert "1 failed, 1 passed" in pdb.pdb_obs
     assert "test_fail.py::test_fail FAILED" in pdb.pdb_obs
     assert "test_pass.py::test_pass PASSED" in pdb.pdb_obs
@@ -88,10 +88,10 @@ def test_pdb_use_default_environment_entrypoint(tmp_path, setup_test_repo):
     initial_output = pdb.start_pdb()  # "python -m pdb -m pytest -sq ."
     assert """The pytest entry point.""" in initial_output
     assert "(Pdb)" not in initial_output
-    output = pdb.use("pdb l")
+    output = pdb.use("l")
     assert """The pytest entry point.""" in output
     assert "(Pdb)" not in output
-    output = pdb.use("pdb c")
+    output = pdb.use(command="c")
     assert "1 failed, 1 passed" in pdb.pdb_obs
     assert "test_fail.py::test_fail" in pdb.pdb_obs
     assert "test_pass.py::test_pass" not in pdb.pdb_obs
@@ -116,10 +116,10 @@ def test_pdb_use_docker_terminal(tmp_path, setup_test_repo):
     pdb_cmd = f"python -m pdb -m pytest -p no:cacheprovider -sv ."
     pdb.start_pdb(pdb_cmd)
 
-    output = pdb.use("pdb l")
+    output = pdb.use("l")
     assert """The pytest entry point.""" in output
     assert "(Pdb)" not in output
-    output = pdb.use("pdb c")
+    output = pdb.use("c")
     assert "1 failed, 1 passed" in pdb.pdb_obs
     assert "test_fail.py::test_fail FAILED" in pdb.pdb_obs
     assert "test_pass.py::test_pass PASSED" in pdb.pdb_obs

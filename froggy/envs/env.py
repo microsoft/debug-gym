@@ -43,7 +43,7 @@ class TooledEnv:
         self.tools = {}
 
     @property
-    def actions_str(self):
+    def tool_names(self):
         return ", ".join([t.name for t in self.tools.values()])
 
     def seed(self, seed):
@@ -80,7 +80,7 @@ class TooledEnv:
         try:
             args, kwargs = self.parse_args(args)
         except Exception as e:
-            raise Exception("Syntax Error: {}".format(action)) from e
+            raise Exception("Syntax Error: {}\n{}".format(action, e))
         return tool_name, args, kwargs
 
     def get_triggered_tools(self, action):

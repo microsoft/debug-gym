@@ -50,7 +50,7 @@ def test_instructions(mini_nightmare_env):
     expected_instructions = {
         "Problem description": "Test instructions",
         "Available tools to solve the problem": mini_nightmare_env.tool_instructions,
-        "Available commands": mini_nightmare_env.actions_str,
+        "Available commands": mini_nightmare_env.tool_names,
     }
     assert mini_nightmare_env.instructions == expected_instructions
 

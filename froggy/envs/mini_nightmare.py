@@ -25,7 +25,7 @@ class MiniNightmareEnv(RepoEnv):
         _instruction = {
             "Problem description": self.current_sample["instructions"],
             "Available tools to solve the problem": self.tool_instructions,
-            "Available commands": self.actions_str,
+            "Available commands": self.tool_names,
         }
         return _instruction
 

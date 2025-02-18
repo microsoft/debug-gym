@@ -107,7 +107,7 @@ def test_instructions(get_swe_env):
     expected_instructions = {
         "Problem description": "Test problem statement",
         "Available tools to solve the problem": swe_env.tool_instructions,
-        "Available commands": swe_env.actions_str,
+        "Available commands": swe_env.tool_names,
     }
     assert swe_env.instructions == expected_instructions
 
