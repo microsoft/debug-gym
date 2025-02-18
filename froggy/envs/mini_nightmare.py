@@ -46,12 +46,24 @@ class MiniNightmareEnv(RepoEnv):
 
         self.max_score = utils.extract_max_score_from_pytest_output(infos.last_run_obs)
         infos.max_score = self.max_score
-        infos.score = utils.extract_reward_from_pytest_output(infos.last_run_obs)
+        self.score = utils.extract_reward_from_pytest_output(infos.last_run_obs)
+        self.done = self.score == self.max_score
+        infos.score = self.score
+        infos.done = self.done
 
         # By default, open the only modifiable file.
         self.load_current_file(self.current_sample["filename"])
         # an update the infos related to current code.
         infos.current_code_with_line_number = self.current_code_with_line_number()
+        return infos
+
+    def step(self, action: str):
+        infos = super().step(action)
+
+        self.score = utils.extract_reward_from_pytest_output(infos.last_run_obs)
+        self.done = self.score == self.max_score
+        infos.score = self.score
+        infos.done = self.done
         return infos
 
     def load_dataset(self):
