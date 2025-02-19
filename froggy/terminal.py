@@ -32,12 +32,13 @@ class ShellSession:
         self.logger = logger or FroggyLogger("froggy")
         self.start()
         atexit.register(self.close)
-        self.default_catch_errors = [
+        self.crashing_errors = [
             "SyntaxError",
             "IndentationError",
             "TabError",
             "KeyError",
         ]
+        self._is_crashing = False
 
     def start(self):
         self.logger.debug(f"Starting ShellSession with entrypoint:\n{self.entrypoint}")
@@ -104,9 +105,12 @@ class ShellSession:
                 if data:
                     output += data
                     last_change_time = time.time()
-                    for _error in self.default_catch_errors:
+                    for _error in self.crashing_errors:
                         if _error in output:
-                            self.logger.debug(f"Error found in output: {_error}")
+                            self.logger.debug(
+                                f"Run crashed, error found in output: {_error}"
+                            )
+                            self._is_crashing = True
                             return output
                     if read_until and read_until in output:
                         break
@@ -121,6 +125,7 @@ class ShellSession:
                     break
                 if e.errno != errno.EAGAIN:
                     raise
+        self._is_crashing = False
         return output
 
     def run(

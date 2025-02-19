@@ -34,6 +34,8 @@ class PDBTool(EnvironmentTool):
         self._session: ShellSession = None
 
     def interact_with_pdb(self, command, expected_output="(Pdb)"):
+        if self._session._is_crashing is True:
+            return "The pdb session failed to start, probably due to an error in the code. Please fix the error and try again."
         output = self._session.run(
             command, expected_output, timeout=300, no_output_timeout=300
         )
@@ -70,6 +72,11 @@ class PDBTool(EnvironmentTool):
         return self.start_pdb()
 
     def use(self, command: str):
+        if self._session is None:
+            self.start_pdb()
+        if self._session._is_crashing is True:
+            return "The pdb session failed to start, probably due to an error in the code. Please fix the error and try again."
+
         command = command.strip()
         _warning = ""
         splits = re.split("\n|;", command)
