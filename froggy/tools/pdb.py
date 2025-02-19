@@ -137,7 +137,7 @@ class PDBTool(EnvironmentTool):
                     # TODO: add output to self.pdb_obs?
                     obs += f"\nlist .\n" + self.interact_with_pdb("l .")
         else:
-            obs = "\n".join([f"Invalid action: ```pdb{tool_args}```", _warning, output])
+            obs = "\n".join([f"Invalid tool arguments: {tool_args}", _warning, output])
 
         # read the current frame info, find the current file, so we can change view to that file.
         self.get_current_frame_file()

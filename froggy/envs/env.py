@@ -362,7 +362,7 @@ class RepoEnv(TooledEnv):
 
             if isinstance(triggered_tool, RewriteTool):
                 self.rewrite_counter += 1
-                if self.get_tool(triggered_tool.name).rewrite_success:
+                if triggered_tool.rewrite_success:
                     if self.run_on_rewrite:
                         self.obs += "\nNew code has been run."
                         self.run()
@@ -375,9 +375,9 @@ class RepoEnv(TooledEnv):
                         )
             elif isinstance(triggered_tool, PDBTool):
                 if self.auto_view_change:
-                    current_frame_file = self.get_tool("pdb").current_frame_file
+                    current_frame_file = triggered_tool.current_frame_file
                     if current_frame_file in self.all_files:
-                        self.load_current_file(self.get_tool("pdb").current_frame_file)
+                        self.load_current_file(triggered_tool.current_frame_file)
 
         self.infos = EnvInfo(
             obs=self.obs,
