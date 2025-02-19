@@ -1,3 +1,4 @@
+from froggy.entities import Observation
 from froggy.tools.tool import EnvironmentTool
 from froggy.tools.toolbox import Toolbox
 from froggy.utils import clean_code
@@ -114,8 +115,8 @@ class SubstitutionPatcher(CodePatcher):
             tail = int(line_numbers[1]) - 1  # 1-based to 0-based
         return "", head, tail
 
-    def use(self, patch):
-        content = patch.split(self.action)[1].split("```")[0].strip()
+    def use(self, action) -> Observation:
+        content = action.split(self.action)[1].split("```")[0].strip()
         # parse content to get file_path, head, tail, and new_code
         # code/utils.py 4:6 <c>        print('buongiorno')</c>
         from froggy.envs.env import Event  # TODO: move to the top
@@ -150,9 +151,8 @@ class SubstitutionPatcher(CodePatcher):
         if "" != message:
             self.rewrite_success = False
             message = "\n".join([message, "Rewrite failed."])
-            obs += [{self.name: message}]
-            obs += self.trigger_event(Event.REWRITE_FAIL, message=message)
-            return message, obs
+            self.trigger_event(Event.REWRITE_FAIL, message=message)
+            return Observation(self.name, message)
 
         message, success, new_code_length = self._rewrite_file(
             file_path, head, tail, new_code
@@ -160,8 +160,7 @@ class SubstitutionPatcher(CodePatcher):
         if success is True:
             self.rewrite_success = True
             message = "Rewriting done."
-            obs += [{self.name: message}]
-            obs += self.trigger_event(
+            self.trigger_event(
                 Event.REWRITE_SUCCESS,
                 message=message,
                 file=file_path,
@@ -170,10 +169,9 @@ class SubstitutionPatcher(CodePatcher):
                 tail=tail + 1 if isinstance(tail, int) else None,
                 length=new_code_length,
             )
-            return message, obs
+            return Observation(self.name, message)
 
         self.rewrite_success = False
         message = "\n".join([message, "Rewrite failed."])
-        obs += [{self.name: message}]
-        obs += self.trigger_event(Event.REWRITE_FAIL, message=message)
-        return message, obs
+        self.trigger_event(Event.REWRITE_FAIL, message=message)
+        return Observation(self.name, message)

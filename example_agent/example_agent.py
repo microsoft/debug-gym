@@ -54,9 +54,11 @@ class PdbAgent:
         system_prompt["Repo directory tree"] = info.dir_tree
         system_prompt["Current code in view"] = info.current_code_with_line_number
         system_prompt["Current breakpoints"] = info.current_breakpoints
-        system_prompt["Last evaluation output"] = info.eval_obs
-        system_prompt["Last execution output"] = info.last_obs
-        system_prompt["All observations triggered by last execution"] = info.chain_obs
+        system_prompt["Last evaluation output"] = info.eval_observation
+        system_prompt["Last execution output"] = info.step_observation.observation
+        # from dataclasses import asdict
+        # system_prompt["All observations triggered by last execution"] = asdict(info.all_triggered_observations)
+
         system_prompt = unescape(json.dumps(system_prompt, indent=4))
         messages = [
             {
@@ -185,8 +187,8 @@ class RewriteOnly(PdbAgent):
         system_prompt["Repo directory tree"] = info.dir_tree
         system_prompt["Current code in view"] = info.current_code_with_line_number
         system_prompt["Current breakpoints"] = info.current_breakpoints
-        system_prompt["Last evaluation output"] = info.eval_obs
-        system_prompt["Last execution output"] = info.last_obs
+        system_prompt["Last evaluation output"] = info.eval_observation.observation
+        system_prompt["Last execution output"] = info.step_observation.observation
         system_prompt = unescape(json.dumps(system_prompt, indent=4))
         messages = [
             {
@@ -251,7 +253,9 @@ class PdbAfterRewrites(PdbAgent):
                 self.env.add_tool(pdb_tool)
                 self.env.tools["pdb"].start_pdb()
                 info.instructions = self.env.instructions
-                info.last_obs += "\nThe pdb tool has been added."
+                info.step_observation.observation += (
+                    "\nThe pdb tool has been added."  # Does this affect anything?
+                )
 
             self.history.step(info, llm_response)
 

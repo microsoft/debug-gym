@@ -1,5 +1,6 @@
 import copy
 
+from froggy.entities import Observation
 from froggy.tools.tool import EnvironmentTool
 from froggy.tools.toolbox import Toolbox
 
@@ -61,13 +62,13 @@ You break down complex problems into smaller parts and reason through them step 
 
         self.infos_cache: EnvInfo = None
 
-    def use(self, action):
+    def use(self, action) -> Observation:
         self.success_chain_action = False
         if self.allow_chain_action:
             obs = self.use_with_chaining(action)
         else:
             obs = self.use_without_chaining()
-        return obs, [{self.name: obs}]
+        return Observation(self.name, obs)
 
     def use_with_chaining(self, action):
         """Reasoning tokens are only to benefit the model, so we strip them and then pass the remainder of the action
@@ -82,7 +83,7 @@ You break down complex problems into smaller parts and reason through them step 
         # now execute the next action
         try:
             next_infos = self.environment.step(next_action)
-            next_obs = next_infos.last_obs
+            next_obs = next_infos.step_observation
         except:
             return "\n".join(
                 [

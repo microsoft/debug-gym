@@ -1,6 +1,7 @@
 from os.path import join as pjoin
 from pathlib import Path
 
+from froggy.entities import Observation
 from froggy.tools.tool import EnvironmentTool
 from froggy.tools.toolbox import Toolbox
 
@@ -24,14 +25,15 @@ class ListdirTool(EnvironmentTool):
         }
         return instruction
 
-    def use(self, action):
+    def use(self, action) -> Observation:
         try:
             listdir_path, depth = self.clean_action(action)
             startpath = pjoin(self.environment.working_dir, listdir_path)
             obs = self.environment.directory_tree(root=startpath, max_depth=depth)
         except ValueError as e:
+            # Raise instead of returning it as an observation?
             obs = str(e)
-        return obs, [{self.name: obs}]
+        return Observation(self.name, obs)
 
     def clean_action(self, action):
         listdir_path = action.strip("`").strip()

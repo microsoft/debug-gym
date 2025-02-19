@@ -1,6 +1,7 @@
 import copy
 import re
 
+from froggy.entities import Event, Observation
 from froggy.terminal import ShellSession
 from froggy.tools.tool import EnvironmentTool
 from froggy.tools.toolbox import Toolbox
@@ -86,23 +87,23 @@ class PDBTool(EnvironmentTool):
         self.pdb_obs = initial_output
         return initial_output
 
-    def on_env_reset(self, **kwargs):
+    def on_env_reset(self, **kwargs) -> Observation:
         super().on_env_reset(**kwargs)
-        obs = self.start_pdb()
-        return [{self.name: obs}]  # start or restart?
+        obs = self.start_pdb()  # start or restart?
+        return Observation(self.name, obs)
 
-    def on_rewrite_success(self, file, head, tail, length, **kwargs):
+    def on_rewrite_success(self, file, head, tail, length, **kwargs) -> Observation:
         self.breakpoint_modify(file, head, tail, length)
         obs = self.restart_pdb()
         obs = "\nDebugging terminal started:\n" f"{obs}\n"
-        return [{self.name: obs}]
+        return Observation(self.name, obs)
 
     def restart_pdb(self) -> str:
         """Restart the pdb session and restore the breakpoints."""
         self.close_pdb()
         return self.start_pdb()
 
-    def use(self, action):
+    def use(self, action) -> Observation:
         command = action.strip("`").split(" ", 1)[1].strip()
         _warning = ""
         splits = re.split("\n|;", command)
@@ -175,7 +176,7 @@ class PDBTool(EnvironmentTool):
 
         # read the current frame info, find the current file, so we can change view to that file.
         self.get_current_frame_file()
-        return obs, [{self.name: obs}]
+        return Observation(self.name, obs)
 
     def breakpoint_add_clear(self, action: str, which_file=None):
         # handle adding/removing breakpoints
@@ -327,10 +328,7 @@ class PDBTool(EnvironmentTool):
         try:
             file_path = output.split("(")[0]
             if file_path != self.current_frame_file:
-                from froggy.envs.env import Event  # TODO: move to the top
-
-                obs += self.trigger_event(Event.SWITCH_CONTEXT, filepath=file_path)
                 self.current_frame_file = file_path
-            return obs
+                self.trigger_event(Event.SWITCH_CONTEXT, filepath=file_path)
         except:
             pass

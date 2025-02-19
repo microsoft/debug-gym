@@ -290,9 +290,8 @@ class SWEBenchEnv(RepoEnv):
 
         # Reset RepoEnv
         # TODO: Create a RepoEnv per task and set max_score at initialization.
-        infos = super().reset(
-            options=options, restore_code=False, max_score=len(self.fail_to_pass)
-        )
+        self.max_score = len(self.fail_to_pass)
+        infos = super().reset(options=options, restore_code=False)
         assert not self.done, "Tests should be failing before debugging."
 
         return infos

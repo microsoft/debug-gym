@@ -12,58 +12,30 @@ from pathlib import Path
 
 import numpy as np
 
+from froggy.entities import Event, Observation
 from froggy.logger import FroggyLogger
 from froggy.terminal import Terminal
-from froggy.tools.patchers import CodePatcher
-from froggy.tools.pdb import PDBTool
 from froggy.tools.reasoning import ReasoningTool
 from froggy.utils import _walk, make_file_matcher, show_line_number
 
 
 @dataclass
-class Observation:
-    origin: str
-    observation: str
-
-
-@dataclass
 class EnvInfo:
-    last_obs: str
-    chain_obs: list[Observation]
+    step_observation: Observation  # obs from the tool triggered by env.step or env.last_eval_obs when env.reset
+    all_triggered_observations: list[
+        Observation
+    ]  # obs from all tools triggered by env.step
+    eval_observation: str  # last eval observation  # TODO: use Observation dataclass
     dir_tree: str
     current_code_with_line_number: dict | str
     current_breakpoints: str
     action: str
     instructions: dict
-    eval_obs: str
     score: int
     max_score: int
     done: bool
     rewrite_counter: int
-    tools: dict
-
-
-from enum import Enum
-
-
-class Event(Enum):
-    ENV_START = "env_start"
-    ENV_RESET = "env_reset"
-    ENV_STEP = "env_step"
-    FILE_CHANGE = "file_change"
-    REWRITE_SUCCESS = "rewrite_success"
-    REWRITE_FAIL = "rewrite_fail"
-    SWITCH_CONTEXT = "switch_context"
-
-    @property
-    def handler_name(self) -> str:
-        """Returns the method name that handles this event, e.g. `on_env_start`"""
-        return f"on_{self.value}"
-
-    @classmethod
-    def list(cls):
-        """Returns list of event names as strings"""
-        return [event.value for event in cls]
+    tools: dict  # TODO: return some tool dataclass
 
 
 class EventHooks:
@@ -80,19 +52,25 @@ class EventHooks:
     def unsubscribe(self, event: Event, tool):
         self.event_listeners[event].remove(tool)
 
-    def notify(self, event: Event, source=None, **kwargs):
-        chain_obs = []
+    def notify(self, event: Event, source=None, **kwargs) -> list[Observation]:
+        """Notify all tools that are subscribed to the event.
+        Returns a list of observations from all tools that are triggered by the event.
+        """
+        observations = []
         for tool in self.event_listeners[event]:
             if tool == source:
                 continue  # skip the source tool to avoid infinite loop
-            chain_obs += getattr(tool, event.handler_name)(**kwargs)
-        return chain_obs
+            observation = getattr(tool, event.handler_name)(**kwargs)
+            if observation:
+                observations.append(observation)
+        return observations
 
 
 class TooledEnv:
     def __init__(self):
         self.tools = {}
         self.event_hooks = EventHooks()
+        self.all_triggered_observations = []
 
     @property
     def actions(self):
@@ -125,8 +103,9 @@ class TooledEnv:
     def tool_instructions(self):
         return {name: tool.instructions for name, tool in self.tools.items()}
 
-    def handle_event(self, event: Event, source=None, **kwargs):
-        return self.event_hooks.notify(event, source=source, **kwargs)
+    def handle_event(self, event: Event, source=None, **kwargs) -> None:
+        observations = self.event_hooks.notify(event, source=source, **kwargs)
+        self.all_triggered_observations = observations
 
 
 class RepoEnv(TooledEnv):
@@ -168,6 +147,7 @@ class RepoEnv(TooledEnv):
         self.score = 0
         self.done = False
         self.rewrite_counter = 0
+        self.all_triggered_observations = []
 
     def setup_workspace(
         self,
@@ -261,30 +241,39 @@ class RepoEnv(TooledEnv):
             shutil.copy2(self.path / filepath, self.working_dir / filepath)
 
     def reset(
-        self, *, seed=None, options: dict = None, restore_code=True, max_score=None
+        self,
+        *,
+        seed=None,
+        options: dict = None,
+        restore_code=True,
     ):
+        """Resets the environment to the initial state and returns the initial observation"""
         self.logger.info(f"Resetting environment")
         options = options or {}
         self.current_file = None
         self.current_file_content = None
         self.current_breakpoints_state = {}
         self.rewrite_counter = 0
-        self.max_score = max_score or self.max_score
+        self.last_eval_obs = None
+        self.done = False
+        self.all_triggered_observations = []
 
         if restore_code:
             self.restore()
 
-        self.last_obs = ""
-        chain_obs = self.event_hooks.notify(Event.ENV_RESET)
+        self.handle_event(Event.ENV_RESET, source="env")
+
+        # get the initial observation, from cache if eval tool already called or running eval
+        self.step_observation = Observation("env", self.last_eval_obs or self.eval())
 
         self.infos = EnvInfo(
-            last_obs=self.last_obs,
-            chain_obs=chain_obs,
+            step_observation=self.step_observation,
+            all_triggered_observations=self.all_triggered_observations,
             dir_tree=self.display_files(),
             current_code_with_line_number=self.current_code_with_line_number(),
             current_breakpoints=self.current_breakpoints(),
             action=None,
-            eval_obs=self.last_eval_obs,
+            eval_observation=self.last_eval_obs,
             done=self.done,
             score=self.score,
             max_score=self.max_score,
@@ -413,22 +402,20 @@ class RepoEnv(TooledEnv):
     def step(self, action: str):
         # given action, return new obs, and update infos
         # the action space is composed of a few smaller action spaces
+        self.all_triggered_observations = []
         triggered_tools = self.get_triggered_tools(action)
         assert (
             len(triggered_tools) <= 1
         ), f"Multiple tools are triggered by the same action! {action}"
 
-        chain_obs = []
-        self.last_obs = f"Invalid action: {action}."
+        self.step_observation = Observation("env", f"Invalid action: {action}.")
         if triggered_tools:
             triggered_tool = triggered_tools[0]
             try:
-                self.last_obs, all_obs = triggered_tool(action)
-                chain_obs += all_obs
+                self.step_observation = triggered_tool(action)
             except BaseException as e:
                 error_message = f"Error while using tool {triggered_tool.name} with action: {action}.\n{e}"
-                chain_obs += [{"env": error_message}]
-                self.last_obs = error_message
+                self.step_observation = Observation("env", error_message)
                 self.logger.warning(error_message)
 
             if isinstance(triggered_tool, ReasoningTool):
@@ -443,19 +430,19 @@ class RepoEnv(TooledEnv):
                     self.score = reasoning_tool.infos_cache.score
                     self.infos = copy.deepcopy(reasoning_tool.infos_cache)
                     # update obs and action in info
-                    self.infos.last_obs = self.last_obs
+                    self.infos.step_observation = self.step_observation
                     self.infos.action = action
                     return self.infos
 
         self.infos = EnvInfo(
-            last_obs=self.last_obs,
-            chain_obs=chain_obs,
+            step_observation=self.step_observation,
+            all_triggered_observations=self.all_triggered_observations,
             dir_tree=self.display_files(),
             current_code_with_line_number=self.current_code_with_line_number(),
             current_breakpoints=self.current_breakpoints(),
             action=action,
             instructions=self.instructions,
-            eval_obs=self.last_eval_obs,
+            eval_observation=self.last_eval_obs,
             score=self.score,
             max_score=self.max_score,
             done=self.done,
@@ -465,17 +452,15 @@ class RepoEnv(TooledEnv):
 
         return self.infos
 
-    def handle_event(self, event: Event, source=None, **kwargs):
-        chain_obs = []
-        obs = ""
+    def handle_event(self, event: Event, source=None, **kwargs) -> None:
         if event in [Event.REWRITE_SUCCESS, Event.REWRITE_FAIL]:
             self.rewrite_counter += 1
-
         if event == Event.SWITCH_CONTEXT and self.auto_view_change:
+            # should be handled by the view tool?
             new_context = kwargs.get("filepath")
             if new_context in self.all_files:
                 self.load_current_file(new_context)
-                obs += f"\nSwitched context to {new_context}."
+                # obs += f"\nSwitched context to {new_context}."
 
-        chain_obs += self.event_hooks.notify(event, source=source, **kwargs)
-        return chain_obs
+        observations = self.event_hooks.notify(event, source=source, **kwargs)
+        self.all_triggered_observations += observations
