@@ -244,6 +244,7 @@ def test_load_dataset(tmp_path, get_swe_env):
         "FAIL_TO_PASS",
         "PASS_TO_PASS",
         "environment_setup_commit",
+        "difficulty",
     ]
 
 
