@@ -41,7 +41,7 @@ class MiniNightmareEnv(RepoEnv):
         self.setup_workspace(
             directory,
             entrypoint="python -m pytest -s test.py",
-            debug_entrypoint="pytest --pdb -s test.py",
+            debug_entrypoint="python -m pdb -m pytest -s test.py",
         )
 
         infos = super().reset()

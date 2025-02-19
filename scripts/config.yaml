@@ -4,7 +4,7 @@ pdb_agent:
     env_kwargs: {
         "path": "data/mini_nightmare/config",
         "entrypoint": "python -m pytest -sv test.py",
-        "debug_entrypoint": "pytest --pdb -s test.py",
+        "debug_entrypoint": "python -m pdb -m pytest -s test.py",
         "dir_tree_depth": 1,
         "run_on_rewrite": True,
         "auto_view_change": True,
@@ -38,7 +38,7 @@ rewrite_only:
     env_kwargs: {
         "path": "data/mini_nightmare/config",
         "entrypoint": "python -m pytest -sv test.py",
-        "debug_entrypoint": "pytest --pdb -s test.py",
+        "debug_entrypoint": "python -m pdb -m pytest -s test.py",
         "dir_tree_depth": 1,
         "run_on_rewrite": True,
         "auto_view_change": True,
@@ -72,7 +72,7 @@ pdb_after_rewrites:
     env_kwargs: {
         "path": "data/mini_nightmare/config",
         "entrypoint": "python -m pytest -sv test.py",
-        "debug_entrypoint": "pytest --pdb -s test.py",
+        "debug_entrypoint": "python -m pdb -m pytest -s test.py",
         "dir_tree_depth": 1,
         "run_on_rewrite": True,
         "auto_view_change": True,
