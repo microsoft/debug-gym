@@ -4,16 +4,16 @@ pdb_agent:
     env_kwargs: {
         "path": "data/mini_nightmare/config",
         "entrypoint": "python -m pytest -sv test.py",
+        "debug_entrypoint": "pytest --pdb -s test.py",
         "dir_tree_depth": 1,
         "run_on_rewrite": True,
         "auto_view_change": True,
         "run_timeout": 10,
     }
-    tools: ["pdb", "view", "patcher:substitution"]
+    tools: ["pdb", "view", "rewrite"]
     terminal: {
         type: "local",  # "docker" or "local"
         base_image: "python:3.12-slim",
-        setup_commands: ["pip install pytest"]
     }
     persistent_breakpoints: True  # in pdb tool
     auto_list: True  # in pdb tool
@@ -38,16 +38,16 @@ rewrite_only:
     env_kwargs: {
         "path": "data/mini_nightmare/config",
         "entrypoint": "python -m pytest -sv test.py",
+        "debug_entrypoint": "pytest --pdb -s test.py",
         "dir_tree_depth": 1,
         "run_on_rewrite": True,
         "auto_view_change": True,
         "run_timeout": 10,
     }
-    tools: ["view", "patcher:substitution"]
+    tools: ["view", "rewrite"]
     terminal: {
         type: "local",  # "docker" or "local"
         base_image: "python:3.12-slim",
-        setup_commands: ["pip install pytest"]
     }
     persistent_breakpoints: True  # in pdb tool
     auto_list: True  # in pdb tool
@@ -72,17 +72,17 @@ pdb_after_rewrites:
     env_kwargs: {
         "path": "data/mini_nightmare/config",
         "entrypoint": "python -m pytest -sv test.py",
+        "debug_entrypoint": "pytest --pdb -s test.py",
         "dir_tree_depth": 1,
         "run_on_rewrite": True,
         "auto_view_change": True,
         "run_timeout": 10,
     }
     n_rewrites_before_pdb: 5
-    tools: ["view", "patcher:substitution", "pdb"]
+    tools: ["view", "rewrite", "pdb"]
     terminal: {
         type: "local",  # "docker" or "local"
         base_image: "python:3.12-slim",
-        setup_commands: ["pip install pytest"]
     }
     persistent_breakpoints: True  # in pdb tool
     auto_list: True  # in pdb tool

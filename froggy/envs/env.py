@@ -14,10 +14,9 @@ import numpy as np
 
 from froggy.logger import FroggyLogger
 from froggy.terminal import Terminal
-from froggy.tools.patchers import CodePatcher
 from froggy.tools.pdb import PDBTool
-from froggy.tools.reasoning import ReasoningTool
-from froggy.utils import _walk, make_file_matcher, show_line_number
+from froggy.tools.rewrite import RewriteTool
+from froggy.utils import _walk, make_file_matcher, parse_action, show_line_number
 
 
 @dataclass
@@ -42,12 +41,8 @@ class TooledEnv:
         self.tools = {}
 
     @property
-    def actions(self):
-        return [t.action for t in self.tools.values()]
-
-    @property
-    def actions_str(self):
-        return ", ".join([item.strip("`") for item in self.actions])
+    def tool_names(self):
+        return ", ".join([t.name for t in self.tools.values()])
 
     def seed(self, seed):
         self.rng = np.random.RandomState(seed)
@@ -66,7 +61,16 @@ class TooledEnv:
         return self.tools[tool_name]
 
     def get_triggered_tools(self, action):
-        return [tool for tool in self.tools.values() if tool.is_triggered(action)]
+        try:
+            tool_name, tool_args = parse_action(action)
+        except Exception as e:
+            # parse error
+            return str(e), None
+        if tool_name not in self.tools:
+            # failed to find tool
+            return f"Unregistered tool: {tool_name}", None
+        tool = self.tools[tool_name]
+        return None, [tool, tool_args]
 
     @property
     def tool_instructions(self):
@@ -100,6 +104,7 @@ class RepoEnv(TooledEnv):
         self.auto_view_change = auto_view_change
         self.terminal = terminal or Terminal()
         self.entrypoint = entrypoint
+        self.debug_entrypoint = debug_entrypoint or entrypoint
         self.logger = logger or FroggyLogger("froggy")
         self.infos: EnvInfo | None = None
 
@@ -178,7 +183,7 @@ class RepoEnv(TooledEnv):
     def instructions(self):
         _instruction = {
             "Available tools to solve the problem": self.tool_instructions,
-            "Available commands": self.actions_str,
+            "Available commands": self.tool_names,
         }
         return _instruction
 
@@ -345,20 +350,17 @@ class RepoEnv(TooledEnv):
     def step(self, action: str):
         # given action, return new obs, and update infos
         # the action space is composed of a few smaller action spaces
-        triggered_tools = self.get_triggered_tools(action)
-        assert (
-            len(triggered_tools) <= 1
-        ), f"Multiple tools are triggered by the same action! {action}"
-
-        self.obs = f"Invalid action: {action}."
-        if triggered_tools:
-            triggered_tool = triggered_tools[0]
+        message, tool_info = self.get_triggered_tools(action)
+        if message:
+            self.obs = message
+        else:
+            triggered_tool, tool_args = tool_info
             try:
-                self.obs = triggered_tool.use(action)
+                self.obs = triggered_tool.use(tool_args)
             except:
                 self.obs = f"Error while using tool {triggered_tool.name} with action: \n{action}"
 
-            if isinstance(triggered_tool, CodePatcher):
+            if isinstance(triggered_tool, RewriteTool):
                 self.rewrite_counter += 1
                 if self.get_tool(triggered_tool.name).rewrite_success:
                     if self.run_on_rewrite:
@@ -376,21 +378,6 @@ class RepoEnv(TooledEnv):
                     current_frame_file = self.get_tool("pdb").current_frame_file
                     if current_frame_file in self.all_files:
                         self.load_current_file(self.get_tool("pdb").current_frame_file)
-            elif isinstance(triggered_tool, ReasoningTool):
-                reasoning_tool = self.get_tool(triggered_tool.name)
-                if (
-                    reasoning_tool.success_chain_action is True
-                    and reasoning_tool.infos_cache is not None
-                    and reasoning_tool.infos_cache.done is not None
-                ):
-                    # use done, score and info from the tool that was executed after reasoning
-                    self.done = reasoning_tool.infos_cache.done
-                    self.score = reasoning_tool.infos_cache.score
-                    self.infos = copy.deepcopy(reasoning_tool.infos_cache)
-                    # update obs and action in info
-                    self.infos.obs = self.obs
-                    self.infos.action = action
-                    return self.infos
 
         self.infos = EnvInfo(
             obs=self.obs,

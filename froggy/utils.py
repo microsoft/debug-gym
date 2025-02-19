@@ -297,3 +297,20 @@ def load_config():
         entry_to_change[keys[-1]] = yaml.safe_load(value)
 
     return config, args
+
+
+def parse_action(action):
+    # e.g. ```pdb b src/main.py:42```
+    # e.g., ```listdir```
+    action = action.strip()
+    assert action.startswith("```") and action.endswith("```")
+    action = action[3:-3].strip()
+    tool_info = action.split(" ", 1)
+    if len(tool_info) == 1:
+        tool_name, tool_args = tool_info[0], ""
+    else:
+        tool_name, tool_args = tool_info
+    tool_name, tool_args = tool_name.strip(), tool_args.strip()
+    # tool_name: pdb
+    # tool_args: b src/main.py:42
+    return tool_name, tool_args

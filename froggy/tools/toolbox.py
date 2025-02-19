@@ -27,7 +27,4 @@ class Toolbox:
 
         tool_cls, _ = cls._tool_registry[base_name]
 
-        if ":" in name:
-            subtype = name.split(":")[1]
-            return tool_cls.get(subtype)
         return tool_cls(**kwargs)

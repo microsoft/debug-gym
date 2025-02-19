@@ -25,13 +25,6 @@ def test_register_invalid_environment():
         tool.register(object())
 
 
-def test_is_triggered():
-    tool = FakeTool()
-    tool.action = "pdb"
-    assert tool.is_triggered("pdb breakpoints")
-    assert not tool.is_triggered("otherstuff")
-
-
 def test_abstract_class():
     with pytest.raises(TypeError):
         EnvironmentTool()
