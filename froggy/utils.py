@@ -303,8 +303,11 @@ def parse_action(action):
     # e.g. ```pdb b src/main.py:42```
     # e.g., ```listdir```
     action = action.strip()
-    assert action.startswith("```") and action.endswith("```")
+    assert action.startswith("```") and action.endswith(
+        "```"
+    ), "Syntax error: invalid action syntax."
     action = action[3:-3].strip()
+    assert len(action) > 0, "Empty action."
     tool_info = action.split(" ", 1)
     if len(tool_info) == 1:
         tool_name, tool_args = tool_info[0], ""
