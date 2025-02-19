@@ -38,7 +38,11 @@ class MiniNightmareEnv(RepoEnv):
         self.current_sample = self.dataset[options["task_name"]]
 
         directory = self.current_sample["base_directory"]
-        self.setup_workspace(directory, entrypoint="python -m pytest -s test.py")
+        self.setup_workspace(
+            directory,
+            entrypoint="python -m pytest -s test.py",
+            debug_entrypoint="pytest --pdb -s test.py",
+        )
 
         infos = super().reset()
         infos.instructions = self.instructions
