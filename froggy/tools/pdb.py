@@ -56,6 +56,8 @@ class PDBTool(EnvironmentTool):
         self._session: ShellSession = None
 
     def interact_with_pdb(self, command, expected_output="(Pdb)"):
+        if self._session._is_crashing is True:
+            return "The pdb session failed to start, probably due to an error in the code. Please fix the error and try again."
         output = self._session.run(
             command, expected_output, timeout=300, no_output_timeout=300
         )
@@ -92,6 +94,11 @@ class PDBTool(EnvironmentTool):
         return self.start_pdb()
 
     def use(self, action):
+        if self._session is None:
+            self.start_pdb()
+        if self._session._is_crashing is True:
+            return "The pdb session failed to start, probably due to an error in the code. Please fix the error and try again."
+
         command = action.strip("`").split(" ", 1)[1].strip()
         _warning = ""
         splits = re.split("\n|;", command)
@@ -131,6 +138,7 @@ class PDBTool(EnvironmentTool):
                 output = self.interact_with_pdb(command)
                 self.pdb_obs = output
             except:  # TODO: catch specific exceptions
+                self.restart_pdb()
                 success = False
 
         if success:
@@ -147,6 +155,7 @@ class PDBTool(EnvironmentTool):
                     + 1
                 )
                 self.environment.last_run_obs = output[:end_index]
+                self.restart_pdb()
                 output = (
                     "Reached the end of the file. Restarting the debugging session.\n"
                     + output[end_index:]
@@ -235,6 +244,7 @@ class PDBTool(EnvironmentTool):
                         output = output[len(command) :].strip()
                     self.environment.current_breakpoints_state[_key] = command
                 except:
+                    self.restart_pdb()
                     success = False
         elif _action_type in ["cl", "clear"]:
             command = "cl " + command
@@ -254,6 +264,7 @@ class PDBTool(EnvironmentTool):
                         output = output[len(command) :].strip()
                     del self.environment.current_breakpoints_state[_key]
                 except:
+                    self.restart_pdb()
                     success = False
         else:
             return False, output

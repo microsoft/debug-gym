@@ -32,6 +32,59 @@ class ShellSession:
         self.logger = logger or FroggyLogger("froggy")
         self.start()
         atexit.register(self.close)
+        self.crashing_errors = [
+            "ArithmeticError",
+            "FloatingPointError",
+            "OverflowError",
+            "ZeroDivisionError",
+            "AssertionError",
+            "AttributeError",
+            "BufferError",
+            "EOFError",
+            "ExceptionGroup",
+            "ImportError",
+            "ModuleNotFoundError",
+            "LookupError",
+            "IndexError",
+            "KeyError",
+            "MemoryError",
+            "NameError",
+            "UnboundLocalError",
+            "OSError",
+            "BlockingIOError",
+            "ChildProcessError",
+            "ConnectionError",
+            "BrokenPipeError",
+            "ConnectionAbortedError",
+            "ConnectionRefusedError",
+            "ConnectionResetError",
+            "FileExistsError",
+            "FileNotFoundError",
+            "InterruptedError",
+            "IsADirectoryError",
+            "NotADirectoryError",
+            "PermissionError",
+            "ProcessLookupError",
+            "TimeoutError",
+            "ReferenceError",
+            "RuntimeError",
+            "NotImplementedError",
+            "PythonFinalizationError",
+            "RecursionError",
+            "StopAsyncIteration",
+            "StopIteration",
+            "SyntaxError",
+            "IndentationError",
+            "TabError",
+            "SystemError",
+            "TypeError",
+            "ValueError",
+            "UnicodeError",
+            "UnicodeDecodeError",
+            "UnicodeEncodeError",
+            "UnicodeTranslateError",
+        ]
+        self._is_crashing = False
 
     def start(self):
         self.logger.debug(f"Starting ShellSession with entrypoint:\n{self.entrypoint}")
@@ -98,6 +151,13 @@ class ShellSession:
                 if data:
                     output += data
                     last_change_time = time.time()
+                    for _error in self.crashing_errors:
+                        if _error in output:
+                            self.logger.debug(
+                                f"Run crashed, error found in output: {_error}"
+                            )
+                            self._is_crashing = True
+                            return output
                     if read_until and read_until in output:
                         break
             except BlockingIOError:
@@ -109,6 +169,7 @@ class ShellSession:
                     break
                 if e.errno != errno.EAGAIN:
                     raise
+        self._is_crashing = False
         return output
 
     def run(
@@ -232,7 +293,7 @@ class Terminal:
         which could interfere with the terminal setup (clean outputs)"""
         return shlex.split("/bin/bash --noprofile --norc")
 
-    def start_shell_session(self, timeout=30, no_output_timeout=1):
+    def start_shell_session(self, timeout=30, no_output_timeout=30):
         session = ShellSession(
             entrypoint=self.default_entrypoint,
             working_dir=self.working_dir,
