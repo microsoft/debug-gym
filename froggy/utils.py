@@ -1,4 +1,5 @@
 import argparse
+import ast
 import codecs
 import logging
 import os
@@ -297,3 +298,42 @@ def load_config():
         entry_to_change[keys[-1]] = yaml.safe_load(value)
 
     return config, args
+
+
+def parse_args(args):
+    args = "f({})".format(args)
+    tree = ast.parse(args)
+    funccall = tree.body[0].value
+    args = [ast.literal_eval(arg) for arg in funccall.args]
+    kwargs = {arg.arg: ast.literal_eval(arg.value) for arg in funccall.keywords}
+    return args, kwargs
+
+
+def parse_action(action):
+    action = action.strip()
+    # remove ``` in case LLM generates ```tool_name(args, kwargs)```
+    if action.startswith("```"):
+        action = action[3:]
+    if action.endswith("```"):
+        action = action[:-3]
+    action = action.strip()
+    if "<c>" in action and "</c>" in action:
+        action, code = action.split("<c>", 1)
+        action = action.strip()
+        code = code.split("</c>", 1)[0]
+        # do not strip code, as it may contain leading/trailing white spaces
+    else:
+        code = None
+
+    assert "(" in action and action.endswith(")"), "Syntax Error: {}".format(action)
+    tool_name, args = action.split("(", 1)
+    args = args[:-1]
+    tool_name, args = tool_name.strip(), args.strip()
+    assert tool_name is not None, "Syntax Error: {}".format(action)
+    try:
+        args, kwargs = parse_args(args)
+    except Exception as e:
+        raise Exception("Syntax Error: {}\n{}".format(action, str(e)))
+    if code:
+        kwargs["new_code"] = code
+    return tool_name, args, kwargs

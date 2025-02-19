@@ -7,14 +7,14 @@ from froggy.utils import clean_code
 class RewriteTool(EnvironmentTool):
     name = "rewrite"
     instructions = {
-        "template": "rewrite(path: str, start: int, end: int, new_code: str)",
+        "template": "rewrite(path: str, start: int, end: int)<c>new_code</c>",
         "description": "Rewrite the code in the specified path, replace the content between lines [start, end] with the new code. Line numbers are 1-based. When file path is not provided, it's assumed to rewrite the current file. When start and end are not provided, it's assumed to rewrite the whole code. When only start is provided, it's assumed to rewrite that single line. The new code should be valid python code include proper indentation (can be determined from context). ",
         "examples": [
-            """rewrite(new_code="print('hola')") will rewrite the current file (the entire code) to be print('hola'), because no line number is provided.""",
-            """rewrite(start=10, new_code="    print('bonjour')") will rewite line number 10 of the current file to be print('bonjour'), with the indents ahead (in this case, 4 spaces).""",
-            """rewrite(start=10, end=20, new_code="    print('hello')\\n    print('hi again')") will replace the chunk of code between line number 10 and 20 in the current file by the two lines provided, both with indents ahead (in this case, 4 spaces).""",
-            """rewrite(path='code/utils.py', start=4, end=6, new_code="        print('buongiorno')") will replace the chunk of code between line number 4 and 6 in the file code/utils.py by the single line provided, with the indent ahead (in this case, 8 spaces).""",
-            """rewrite('code/greetings.py', 2, 7, new_code="    print('nihao')") will replace the chunk of code between line number 2 and 7 in the file code/greetings.py by the single line provided, with the indent ahead (in this case, 4 spaces).""",
+            """rewrite()<c>print('hola')</c> will rewrite the current file (the entire code) to be print('hola'), because no line number is provided.""",
+            """rewrite(start=10)<c>    print('bonjour')</c> will rewite line number 10 of the current file to be print('bonjour'), with the indents ahead (in this case, 4 spaces).""",
+            """rewrite(start=10, end=20)<c>    print('hello')\\n    print('hi again')</c> will replace the chunk of code between line number 10 and 20 in the current file by the two lines provided, both with indents ahead (in this case, 4 spaces).""",
+            """rewrite(path='code/utils.py', start=4, end=6)<c>        print('buongiorno')</c> will replace the chunk of code between line number 4 and 6 in the file code/utils.py by the single line provided, with the indent ahead (in this case, 8 spaces).""",
+            """rewrite('code/greetings.py', 2, 7)<c>    print('nihao')</c> will replace the chunk of code between line number 2 and 7 in the file code/greetings.py by the single line provided, with the indent ahead (in this case, 4 spaces).""",
         ],
     }
 

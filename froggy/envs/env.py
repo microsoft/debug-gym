@@ -1,4 +1,3 @@
-import ast
 import atexit
 import copy
 import glob
@@ -16,9 +15,8 @@ import numpy as np
 from froggy.logger import FroggyLogger
 from froggy.terminal import Terminal
 from froggy.tools.pdb import PDBTool
-from froggy.tools.reasoning import ReasoningTool
 from froggy.tools.rewrite import RewriteTool
-from froggy.utils import _walk, make_file_matcher, show_line_number
+from froggy.utils import _walk, make_file_matcher, parse_action, show_line_number
 
 
 @dataclass
@@ -62,36 +60,9 @@ class TooledEnv:
     def get_tool(self, tool_name):
         return self.tools[tool_name]
 
-    def parse_args(self, args):
-        args = "f({})".format(args)
-        tree = ast.parse(args)
-        funccall = tree.body[0].value
-        args = [ast.literal_eval(arg) for arg in funccall.args]
-        kwargs = {arg.arg: ast.literal_eval(arg.value) for arg in funccall.keywords}
-        return args, kwargs
-
-    def parse_action(self, action):
-        action = action.strip()
-        # remove ``` in case LLM generates ```tool_name(args, kwargs)```
-        if action.startswith("```"):
-            action = action[3:]
-        if action.endswith("```"):
-            action = action[:-3]
-        action = action.strip()
-        assert "(" in action and action.endswith(")"), "Syntax Error: {}".format(action)
-        tool_name, args = action.split("(", 1)
-        args = args[:-1]
-        tool_name, args = tool_name.strip(), args.strip()
-        assert tool_name is not None, "Syntax Error: {}".format(action)
-        try:
-            args, kwargs = self.parse_args(args)
-        except Exception as e:
-            raise Exception("Syntax Error: {}\n{}".format(action, str(e)))
-        return tool_name, args, kwargs
-
     def get_triggered_tools(self, action):
         try:
-            tool_name, args, kwargs = self.parse_action(action)
+            tool_name, args, kwargs = parse_action(action)
         except Exception as e:
             # parse error
             return str(e), None
@@ -407,21 +378,6 @@ class RepoEnv(TooledEnv):
                     current_frame_file = self.get_tool("pdb").current_frame_file
                     if current_frame_file in self.all_files:
                         self.load_current_file(self.get_tool("pdb").current_frame_file)
-            elif isinstance(triggered_tool, ReasoningTool):
-                reasoning_tool = self.get_tool(triggered_tool.name)
-                if (
-                    reasoning_tool.success_chain_action is True
-                    and reasoning_tool.infos_cache is not None
-                    and reasoning_tool.infos_cache.done is not None
-                ):
-                    # use done, score and info from the tool that was executed after reasoning
-                    self.done = reasoning_tool.infos_cache.done
-                    self.score = reasoning_tool.infos_cache.score
-                    self.infos = copy.deepcopy(reasoning_tool.infos_cache)
-                    # update obs and action in info
-                    self.infos.obs = self.obs
-                    self.infos.action = action
-                    return self.infos
 
         self.infos = EnvInfo(
             obs=self.obs,
