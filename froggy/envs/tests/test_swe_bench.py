@@ -107,7 +107,7 @@ def test_instructions(get_swe_env):
     expected_instructions = {
         "Problem description": "Test problem statement",
         "Available tools to solve the problem": swe_env.tool_instructions,
-        "Available commands": swe_env.actions_str,
+        "Available commands": swe_env.tool_names,
     }
     assert swe_env.instructions == expected_instructions
 
@@ -244,6 +244,7 @@ def test_load_dataset(tmp_path, get_swe_env):
         "FAIL_TO_PASS",
         "PASS_TO_PASS",
         "environment_setup_commit",
+        "difficulty",
     ]
 
 

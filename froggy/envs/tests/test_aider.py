@@ -52,7 +52,7 @@ def test_instructions(aider_env):
     expected_instructions = {
         "Problem description": "Test instructions",
         "Available tools to solve the problem": aider_env.tool_instructions,
-        "Available commands": aider_env.actions_str,
+        "Available commands": aider_env.tool_names,
     }
     assert aider_env.instructions == expected_instructions
 
