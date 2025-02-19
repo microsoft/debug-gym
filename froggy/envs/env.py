@@ -133,6 +133,7 @@ class RepoEnv(TooledEnv):
         self.auto_view_change = auto_view_change
         self.terminal = terminal or Terminal()
         self.entrypoint = entrypoint
+        self.debug_entrypoint = debug_entrypoint or entrypoint
         self.logger = logger or FroggyLogger("froggy")
         self.infos: EnvInfo | None = None
 
