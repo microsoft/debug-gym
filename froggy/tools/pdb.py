@@ -63,7 +63,9 @@ class PDBTool(EnvironmentTool):
                     initial_output = "\n".join(
                         [initial_output, "Breakpoints have been restored."]
                     )
-        self.pdb_obs += "\n" + initial_output
+        self.pdb_obs += (
+            initial_output if self.pdb_obs == "" else ("\n" + initial_output)
+        )
         return initial_output
 
     def restart_pdb(self) -> str:
@@ -115,7 +117,7 @@ class PDBTool(EnvironmentTool):
             # other pdb commands, send directly
             try:
                 output = self.interact_with_pdb(command)
-                self.pdb_obs += "\n" + output
+                self.pdb_obs += output if self.pdb_obs == "" else ("\n" + output)
             except:  # TODO: catch specific exceptions
                 self.restart_pdb()
                 success = False
@@ -216,7 +218,7 @@ class PDBTool(EnvironmentTool):
             else:
                 try:
                     output = self.interact_with_pdb(command)
-                    self.pdb_obs += "\n" + output
+                    self.pdb_obs += output if self.pdb_obs == "" else ("\n" + output)
                     # when success, the output always repeats the command, we can remove it
                     output = output.strip()
                     if output.startswith(command):
@@ -236,7 +238,7 @@ class PDBTool(EnvironmentTool):
             else:
                 try:
                     output = self.interact_with_pdb(command)
-                    self.pdb_obs += "\n" + output
+                    self.pdb_obs += output if self.pdb_obs == "" else ("\n" + output)
                     # when success, the output always repeats the command, we can remove it
                     output = output.strip()
                     if output.startswith(command):
