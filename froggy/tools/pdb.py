@@ -133,6 +133,7 @@ class PDBTool(EnvironmentTool):
                     + 1
                 )
                 self.environment.last_run_obs = output[:end_index]
+                self.restart_pdb()
                 output = (
                     "Reached the end of the file. Restarting the debugging session.\n"
                     + output[end_index:]
