@@ -13,7 +13,7 @@ class ListdirTool(EnvironmentTool):
     def instructions(self):
         assert hasattr(self, "environment")
         instruction = {
-            "template": """listdir(path: str, depth: int)""",
+            "template": "listdir(path: str, depth: int)",
             "description": f"List the file and folder contents of a subdirectiory specified by 'path', up to a specified 'depth'. The default 'path' is the working directory, and the default 'depth' is {self.environment.dir_tree_depth}. The path must be relative to the working directory, and the depth must be 1 or greater.",
             "examples": [
                 """listdir() to list the contents of the working directory.""",

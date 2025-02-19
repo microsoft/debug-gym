@@ -8,7 +8,7 @@ class RewriteTool(EnvironmentTool):
     name = "rewrite"
     instructions = {
         "template": "rewrite(path: str, start: int, end: int, new_code: str)",
-        "description": "Rewrite the code in the specified path, replace the content between lines [start, end] with the new code. Line numbers are 1-based. When file path is not provided, it's assumed to rewrite the current file. When start and end are not provided, it's assumed to rewrite the whole code. When only start is provided, it's assumed to rewrite that single line. The new code should be valid python code include proper indentation (can be determined from context), the special tokens <c> and </c> are used to wrap the new code. ",
+        "description": "Rewrite the code in the specified path, replace the content between lines [start, end] with the new code. Line numbers are 1-based. When file path is not provided, it's assumed to rewrite the current file. When start and end are not provided, it's assumed to rewrite the whole code. When only start is provided, it's assumed to rewrite that single line. The new code should be valid python code include proper indentation (can be determined from context). ",
         "examples": [
             """rewrite(new_code="print('hola')") will rewrite the current file (the entire code) to be print('hola'), because no line number is provided.""",
             """rewrite(start=10, new_code="    print('bonjour')") will rewite line number 10 of the current file to be print('bonjour'), with the indents ahead (in this case, 4 spaces).""",
