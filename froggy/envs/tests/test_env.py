@@ -12,7 +12,7 @@ from froggy.terminal import Terminal
 
 @pytest.fixture
 def env_mock():
-    env = TooledEnv()
+    env = RepoEnv()
     return env
 
 

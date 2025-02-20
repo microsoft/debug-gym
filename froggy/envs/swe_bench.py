@@ -191,8 +191,6 @@ class SWEBenchEnv(RepoEnv):
 
     def eval(self, **kwargs):
         success, output = self.terminal.run(self.entrypoint, timeout=self.run_timeout)
-        # TODO: probably needed cleanup specific to each SWE-Bench repo. Does it?
-        # output = utils.cleanup_pytest_output(output)
         self.score = self._extract_score(output)
         self.done = self.score == self.max_score
         self.last_eval_obs = output
@@ -297,9 +295,6 @@ class SWEBenchEnv(RepoEnv):
         return infos
 
     def _extract_score(self, obs):
-        # TODO: probably needed cleanup specific to each SWE-Bench repo. Does it?
-        # infos.last_eval_obs = utils.cleanup_pytest_output(infos.last_eval_obs)
-        # infos.score = utils.extract_reward_from_pytest_output(infos.last_eval_obs)
         test_status_map = MAP_REPO_TO_PARSER[self.repo](obs)
         self.logger.debug(f"fail_to_pass: {self.fail_to_pass}")
         self.logger.debug(f"Test status map: {test_status_map}")
