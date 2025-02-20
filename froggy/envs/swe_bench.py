@@ -54,7 +54,7 @@ class SWEBenchEnv(RepoEnv):
         _instruction = {
             "Problem description": self.ds_row["problem_statement"],
             "Available tools to solve the problem": self.tool_instructions,
-            "Available commands": self.actions_str,
+            "Available commands": self.tool_names,
         }
         return _instruction
 

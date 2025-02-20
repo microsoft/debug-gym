@@ -10,7 +10,6 @@ from froggy.utils import is_subdirectory
 @Toolbox.register()
 class ViewTool(EnvironmentTool):
     name: str = "view"
-    action: str = "```view"
     instructions = {
         "template": "```view <path/to/file.py>```",
         "description": "Specify a file path to set as current working file. The file path should be relative to the root directory of the repository.",
@@ -23,8 +22,20 @@ class ViewTool(EnvironmentTool):
     def is_editable(self, filepath):
         return filepath in self.environment.editable_files
 
-    def use(self, action) -> Observation:
-        new_file = action.strip("`").split(" ", 1)[1].strip()
+    def use(self, tool_args) -> Observation:
+        new_file = tool_args
+        if new_file == "":
+            obs = [
+                "Invalid file path. Please specify a file path.",
+                f"Current file: `{self.environment.current_file}`.",
+                (
+                    "The file is editable."
+                    if self.is_editable(self.environment.current_file)
+                    else "The file is read-only, it is not editable."
+                ),
+            ]
+            return Observation(self.name, " ".join(obs))
+
         if new_file.startswith(str(self.environment.working_dir)):
             new_file = new_file[len(str(self.environment.working_dir)) + 1 :]
 

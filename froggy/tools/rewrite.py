@@ -4,24 +4,9 @@ from froggy.tools.toolbox import Toolbox
 from froggy.utils import clean_code
 
 
-@Toolbox.register(name="patcher")
-class CodePatcher(EnvironmentTool):
-    action = "```rewrite"
-
-    def __init__(self):
-        super().__init__()
-        self.rewrite_success = False
-
-    @staticmethod
-    def get(patch_type):
-        if patch_type == "substitution":
-            return SubstitutionPatcher()
-        else:
-            raise ValueError("Invalid patch type!")
-
-
-class SubstitutionPatcher(CodePatcher):
-    name = "substitution_patcher"
+@Toolbox.register()
+class RewriteTool(EnvironmentTool):
+    name = "rewrite"
     instructions = {
         "template": "```rewrite file/path.py start:end <c>new_code</c>```",
         "description": "Rewrite the code in file/path.py between lines [start, end] with the new code. Line numbers are 1-based. When file path is not provided, it's assumed to rewrite the current file. When start and end are not provided, it's assumed to rewrite the whole code. When only start is provided, it's assumed to rewrite that single line. The new code should be valid python code include proper indentation (can be determined from context), the special tokens <c> and </c> are used to wrap the new code. ",
@@ -115,8 +100,8 @@ class SubstitutionPatcher(CodePatcher):
             tail = int(line_numbers[1]) - 1  # 1-based to 0-based
         return "", head, tail
 
-    def use(self, action) -> Observation:
-        content = action.split(self.action)[1].split("```")[0].strip()
+    def use(self, tool_args) -> Observation:
+        content = tool_args
         # parse content to get file_path, head, tail, and new_code
         # code/utils.py 4:6 <c>        print('buongiorno')</c>
         from froggy.envs.env import Event  # TODO: move to the top

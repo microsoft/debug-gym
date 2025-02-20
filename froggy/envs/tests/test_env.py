@@ -64,39 +64,28 @@ def test_get_tool(env_mock):
 def test_get_triggered_tools(env_mock):
     tool1 = MagicMock()
     tool1.name = "tool1"
-    tool1.is_triggered.return_value = True
     tool2 = MagicMock()
     tool2.name = "tool2"
-    tool2.is_triggered.return_value = False
     env_mock.add_tool(tool1)
     env_mock.add_tool(tool2)
-    triggered_tools = env_mock.get_triggered_tools("action")
-    assert tool1 in triggered_tools
-    assert tool2 not in triggered_tools
+    _, triggered_tool = env_mock.get_triggered_tools("```tool1 arg1 arg2```")
+    assert triggered_tool == [tool1, "arg1 arg2"]
+    _, triggered_tool = env_mock.get_triggered_tools("```tool2```")
+    assert triggered_tool == [tool2, ""]
+    # Test with invalid action
+    error, triggered_tool = env_mock.get_triggered_tools("```tool3```")
+    assert error == "Unregistered tool: tool3"
+    assert triggered_tool is None
 
 
-def test_actions(env_mock):
+def test_tool_names(env_mock):
     tool1 = MagicMock()
     tool1.name = "tool1"
-    tool1.action = "action1"
     tool2 = MagicMock()
     tool2.name = "tool2"
-    tool2.action = "action2"
     env_mock.add_tool(tool1)
     env_mock.add_tool(tool2)
-    assert env_mock.actions == ["action1", "action2"]
-
-
-def test_actions_str(env_mock):
-    tool1 = MagicMock()
-    tool1.name = "tool1"
-    tool1.action = "action1"
-    tool2 = MagicMock()
-    tool2.name = "tool2"
-    tool2.action = "action2"
-    env_mock.add_tool(tool1)
-    env_mock.add_tool(tool2)
-    assert env_mock.actions_str == "action1, action2"
+    assert env_mock.tool_names == "tool1, tool2"
 
 
 def test_tool_instructions(env_mock):
@@ -170,11 +159,9 @@ def test_instructions():
     tool1 = MagicMock()
     tool1.name = "tool1"
     tool1.instructions = "instructions1"
-    tool1.action = "action1"
     tool2 = MagicMock()
     tool2.name = "tool2"
     tool2.instructions = "instructions2"
-    tool2.action = "action2"
 
     env = RepoEnv()
     env.add_tool(tool1)
@@ -185,7 +172,7 @@ def test_instructions():
             "tool1": "instructions1",
             "tool2": "instructions2",
         },
-        "Available commands": "action1, action2",
+        "Available commands": "tool1, tool2",
     }
 
     instructions = env.instructions
@@ -275,11 +262,12 @@ def test_step(
 
     env = RepoEnv(path=".")
     mock_get_triggered_tools.return_value = [mock_pdb_tool]
+    mock_get_triggered_tools.return_value = None, [mock_pdb_tool, "b 10"]
 
-    infos = env.step("some action")
+    infos = env.step("```pdb b 10```")
 
-    mock_get_triggered_tools.assert_called_once_with("some action")
-    mock_pdb_tool.assert_called_once_with("some action")
+    mock_get_triggered_tools.assert_called_once_with("```pdb b 10```")
+    mock_pdb_tool.assert_called_once_with("b 10")
     assert infos.step_observation == observation
     assert infos.score == 0
     assert not infos.done

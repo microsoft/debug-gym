@@ -15,7 +15,7 @@ class AiderBenchmarkEnv(RepoEnv):
         _instruction = {
             "Problem description": self.current_sample["instructions"],
             "Available tools to solve the problem": self.tool_instructions,
-            "Available commands": self.actions_str,
+            "Available commands": self.tool_names,
         }
         return _instruction
 
@@ -39,7 +39,7 @@ class AiderBenchmarkEnv(RepoEnv):
         directory = self.current_sample["base_directory"]
         self.setup_workspace(directory, entrypoint="python -m pytest -s .")
         infos = super().reset()
-        infos.instructions = self.instructions
+        infos.instructions = self.instructions  # TODO: is this needed?
 
         # By default, open the only modifiable file.
         self.load_current_file(self.current_sample["filename"])

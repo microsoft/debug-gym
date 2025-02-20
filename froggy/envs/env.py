@@ -15,8 +15,7 @@ import numpy as np
 from froggy.entities import Event, Observation
 from froggy.logger import FroggyLogger
 from froggy.terminal import Terminal
-from froggy.tools.reasoning import ReasoningTool
-from froggy.utils import _walk, make_file_matcher, show_line_number
+from froggy.utils import _walk, make_file_matcher, parse_action, show_line_number
 
 
 @dataclass
@@ -73,12 +72,8 @@ class TooledEnv:
         self.all_triggered_observations = []
 
     @property
-    def actions(self):
-        return [t.action for t in self.tools.values()]
-
-    @property
-    def actions_str(self):
-        return ", ".join([item.strip("`") for item in self.actions])
+    def tool_names(self):
+        return ", ".join([t.name for t in self.tools.values()])
 
     def seed(self, seed):
         self.rng = np.random.RandomState(seed)
@@ -97,7 +92,16 @@ class TooledEnv:
         return self.tools[tool_name]
 
     def get_triggered_tools(self, action):
-        return [tool for tool in self.tools.values() if tool.is_triggered(action)]
+        try:
+            tool_name, tool_args = parse_action(action)
+        except Exception as e:
+            # parse error
+            return str(e), None
+        if tool_name not in self.tools:
+            # failed to find tool
+            return f"Unregistered tool: {tool_name}", None
+        tool = self.tools[tool_name]
+        return None, [tool, tool_args]
 
     @property
     def tool_instructions(self):
@@ -134,6 +138,7 @@ class RepoEnv(TooledEnv):
         self.auto_view_change = auto_view_change
         self.terminal = terminal or Terminal()
         self.entrypoint = entrypoint
+        self.debug_entrypoint = debug_entrypoint or entrypoint
         self.logger = logger or FroggyLogger("froggy")
         self.infos: EnvInfo | None = None
 
@@ -213,7 +218,7 @@ class RepoEnv(TooledEnv):
     def instructions(self):
         _instruction = {
             "Available tools to solve the problem": self.tool_instructions,
-            "Available commands": self.actions_str,
+            "Available commands": self.tool_names,
         }
         return _instruction
 
@@ -403,36 +408,20 @@ class RepoEnv(TooledEnv):
         # given action, return new obs, and update infos
         # the action space is composed of a few smaller action spaces
         self.all_triggered_observations = []
-        triggered_tools = self.get_triggered_tools(action)
-        assert (
-            len(triggered_tools) <= 1
-        ), f"Multiple tools are triggered by the same action! {action}"
-
-        self.step_observation = Observation("env", f"Invalid action: {action}.")
-        if triggered_tools:
-            triggered_tool = triggered_tools[0]
+        message, tool_info = self.get_triggered_tools(action)
+        if message:
+            self.step_observation = Observation("env", message)
+        else:
+            triggered_tool, tool_args = tool_info
             try:
-                self.step_observation = triggered_tool(action)
+                self.step_observation = triggered_tool(tool_args)
             except BaseException as e:
-                error_message = f"Error while using tool {triggered_tool.name} with action: {action}.\n{e}"
+                error_message = (
+                    f"Error while using tool {triggered_tool.name} "
+                    f"with action: {action}.\n{e}"
+                )
                 self.step_observation = Observation("env", error_message)
                 self.logger.warning(error_message)
-
-            if isinstance(triggered_tool, ReasoningTool):
-                reasoning_tool = self.get_tool(triggered_tool.name)
-                if (
-                    reasoning_tool.success_chain_action is True
-                    and reasoning_tool.infos_cache is not None
-                    and reasoning_tool.infos_cache.done is not None
-                ):
-                    # use done, score and info from the tool that was executed after reasoning
-                    self.done = reasoning_tool.infos_cache.done
-                    self.score = reasoning_tool.infos_cache.score
-                    self.infos = copy.deepcopy(reasoning_tool.infos_cache)
-                    # update obs and action in info
-                    self.infos.step_observation = self.step_observation
-                    self.infos.action = action
-                    return self.infos
 
         self.infos = EnvInfo(
             step_observation=self.step_observation,

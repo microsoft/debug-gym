@@ -25,7 +25,7 @@ class MiniNightmareEnv(RepoEnv):
         _instruction = {
             "Problem description": self.current_sample["instructions"],
             "Available tools to solve the problem": self.tool_instructions,
-            "Available commands": self.actions_str,
+            "Available commands": self.tool_names,
         }
         return _instruction
 
@@ -37,6 +37,7 @@ class MiniNightmareEnv(RepoEnv):
         success, output = self.terminal.run(self.entrypoint, timeout=self.run_timeout)
         self.max_score = utils.extract_max_score_from_pytest_output(output)
         self.score = utils.extract_reward_from_pytest_output(output)
+        self.done = self.score == self.max_score
         self.last_eval_obs = utils.cleanup_pytest_output(output)
         return self.last_eval_obs
 
@@ -45,15 +46,28 @@ class MiniNightmareEnv(RepoEnv):
         self.current_sample = self.dataset[options["task_name"]]
 
         directory = self.current_sample["base_directory"]
-        self.setup_workspace(directory, entrypoint="python -m pytest -sv test.py")
+        self.setup_workspace(
+            directory,
+            entrypoint="python -m pytest -s test.py",
+            debug_entrypoint="python -m pdb -m pytest -s test.py",
+        )
 
         infos = super().reset()
-        infos.instructions = self.instructions
+        infos.instructions = self.instructions  # TODO: is this needed?
 
         # By default, open the only modifiable file.
         self.load_current_file(self.current_sample["filename"])
         # an update the infos related to current code.
         infos.current_code_with_line_number = self.current_code_with_line_number()
+        return infos
+
+    def step(self, action: str):
+        infos = super().step(action)
+
+        self.score = utils.extract_reward_from_pytest_output(infos.last_run_obs)
+        self.done = self.score == self.max_score
+        infos.score = self.score
+        infos.done = self.done
         return infos
 
     def load_dataset(self):

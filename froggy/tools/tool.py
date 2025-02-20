@@ -27,7 +27,6 @@ def track_history(func):
 
 class EnvironmentTool(ABC):
     name: str = None
-    action: str = None
     instructions: str = None
     history: list[Record] = None
 
@@ -51,10 +50,6 @@ class EnvironmentTool(ABC):
         for event in Event:
             if hasattr(self, event.handler_name):
                 environment.event_hooks.subscribe(event, self)
-
-    def is_triggered(self, action):
-        # e.g. ```pdb b src/main.py:42```
-        return action.startswith(self.action)
 
     @abstractmethod
     def use(self, action) -> Observation:

@@ -6,13 +6,12 @@ from froggy.tools.toolbox import Toolbox
 @Toolbox.register()
 class EvalTool(EnvironmentTool):
     name: str = "eval"
-    action: str = "```eval"
     instructions = {
         "template": "```eval```",
         "description": "Evaluate the current code against pre-defined test cases.",
     }
 
-    def use(self, action, **kwargs) -> Observation:
+    def use(self, tool_args, **kwargs) -> Observation:
         obs = self.environment.eval(**kwargs)
         return Observation(self.name, obs)
 

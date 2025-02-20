@@ -9,7 +9,6 @@ from froggy.tools.toolbox import Toolbox
 @Toolbox.register()
 class ListdirTool(EnvironmentTool):
     name: str = "listdir"
-    action: str = "```listdir"
 
     @property
     def instructions(self):
@@ -25,9 +24,9 @@ class ListdirTool(EnvironmentTool):
         }
         return instruction
 
-    def use(self, action) -> Observation:
+    def use(self, tool_args) -> Observation:
         try:
-            listdir_path, depth = self.clean_action(action)
+            listdir_path, depth = self.parse_args(tool_args)
             startpath = pjoin(self.environment.working_dir, listdir_path)
             obs = self.environment.directory_tree(root=startpath, max_depth=depth)
         except ValueError as e:
@@ -35,23 +34,23 @@ class ListdirTool(EnvironmentTool):
             obs = str(e)
         return Observation(self.name, obs)
 
-    def clean_action(self, action):
-        listdir_path = action.strip("`").strip()
-        tmp = listdir_path.split(" ")
+    def parse_args(self, tool_args):
         depth = None
-        if len(tmp) == 1:
+        if tool_args == "":
             # e.g., ```listdir```
             listdir_path = "."
-        elif len(tmp) == 2:
-            # e.g., ```listdir src```
-            listdir_path = tmp[1].strip()
-        elif len(tmp) == 3:
-            # e.g., ```listdir src depth```
-            listdir_path = tmp[1].strip()
-            depth = int(tmp[2].strip())
-            if depth <= 0:
-                raise ValueError(f"Depth must be 1 or greater: {depth}")
         else:
-            raise ValueError(f"Invalid action (too many arguments): {action}")
+            arg_list = tool_args.split(" ")
+            if len(arg_list) == 1:
+                # e.g., ```listdir src```
+                listdir_path = arg_list[0].strip()
+            elif len(arg_list) == 2:
+                # e.g., ```listdir src depth```
+                listdir_path = arg_list[0].strip()
+                depth = int(arg_list[1].strip())
+                if depth <= 0:
+                    raise ValueError(f"Depth must be 1 or greater: {depth}")
+            else:
+                raise ValueError(f"Invalid action (too many arguments): {tool_args}")
 
         return listdir_path, depth

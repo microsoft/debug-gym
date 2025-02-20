@@ -2,7 +2,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from froggy.tools.patchers import SubstitutionPatcher
+from froggy.tools.rewrite import RewriteTool
 
 
 @pytest.fixture
@@ -15,11 +15,11 @@ def mock_environment():
     return env
 
 
-def test_substitution_patcher(mock_environment):
-    patcher = SubstitutionPatcher()
+def test_rewrite(mock_environment):
+    patcher = RewriteTool()
     patcher.environment = mock_environment
 
-    patch = "```rewrite 2 <c>    print(f'Hello, {name}!')</c>```"
+    patch = "2 <c>    print(f'Hello, {name}!')</c>"
     result = patcher.use(patch)
 
     assert result.observation == "Rewriting done."
@@ -29,11 +29,11 @@ def test_substitution_patcher(mock_environment):
     )
 
 
-def test_substitution_patcher_with_file_path(mock_environment):
-    patcher = SubstitutionPatcher()
+def test_rewrite_with_file_path(mock_environment):
+    patcher = RewriteTool()
     patcher.environment = mock_environment
 
-    patch = "```rewrite test.py 2 <c>    print(f'Hello, {name}!')</c>```"
+    patch = "test.py 2 <c>    print(f'Hello, {name}!')</c>"
     result = patcher.use(patch)
 
     assert result.observation == "Rewriting done."
@@ -43,23 +43,23 @@ def test_substitution_patcher_with_file_path(mock_environment):
     )
 
 
-def test_substitution_patcher_invalid_content(mock_environment):
-    patcher = SubstitutionPatcher()
+def test_rewrite_invalid_content(mock_environment):
+    patcher = RewriteTool()
     patcher.environment = mock_environment
 
-    patch = "```rewrite invalid content```"
+    patch = "invalid content"
     result = patcher.use(patch)
 
     assert result.observation == "SyntaxError: invalid syntax.\nRewrite failed."
     assert not patcher.rewrite_success
 
 
-def test_substitution_patcher_invalid_file(mock_environment):
-    patcher = SubstitutionPatcher()
+def test_rewrite_invalid_file(mock_environment):
+    patcher = RewriteTool()
     patcher.environment = mock_environment
     mock_environment.all_files = ["another_file.py"]
 
-    patch = "```rewrite test.py 2 <c>    print(f'Hello, {name}!')</c>```"
+    patch = "test.py 2 <c>    print(f'Hello, {name}!')</c>"
     result = patcher.use(patch)
 
     assert (
@@ -69,11 +69,11 @@ def test_substitution_patcher_invalid_file(mock_environment):
     assert not patcher.rewrite_success
 
 
-def test_substitution_patcher_invalid_line_number(mock_environment):
-    patcher = SubstitutionPatcher()
+def test_rewrite_invalid_line_number(mock_environment):
+    patcher = RewriteTool()
     patcher.environment = mock_environment
 
-    patch = "```rewrite test.py 0 <c>    print(f'Hello, {name}!')</c>```"
+    patch = "test.py 0 <c>    print(f'Hello, {name}!')</c>"
     result = patcher.use(patch)
 
     assert (
@@ -83,11 +83,11 @@ def test_substitution_patcher_invalid_line_number(mock_environment):
     assert not patcher.rewrite_success
 
 
-def test_substitution_patcher_invalid_line_number_2(mock_environment):
-    patcher = SubstitutionPatcher()
+def test_rewrite_invalid_line_number_2(mock_environment):
+    patcher = RewriteTool()
     patcher.environment = mock_environment
 
-    patch = "```rewrite test.py 12:4 <c>    print(f'Hello, {name}!')</c>```"
+    patch = "test.py 12:4 <c>    print(f'Hello, {name}!')</c>"
     result = patcher.use(patch)
 
     assert (

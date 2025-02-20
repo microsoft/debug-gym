@@ -51,14 +51,3 @@ def test_register_existing_tool_raises():
             pass
 
     assert "Cannot register 'duplicate' multiple times." in str(exc.value)
-
-
-def test_get_tool_with_subtype():
-    @Toolbox.register()
-    class SubTool:
-        @classmethod
-        def get(cls, subtype):
-            return f"SubTool subtype: {subtype}"
-
-    result = Toolbox.get_tool("sub:variant")
-    assert result == "SubTool subtype: variant"
