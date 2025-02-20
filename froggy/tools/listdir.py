@@ -30,7 +30,6 @@ class ListdirTool(EnvironmentTool):
             startpath = pjoin(self.environment.working_dir, listdir_path)
             obs = self.environment.directory_tree(root=startpath, max_depth=depth)
         except ValueError as e:
-            # Raise instead of returning it as an observation?
             obs = str(e)
         return Observation(self.name, obs)
 

@@ -36,6 +36,8 @@ class EnvironmentTool(ABC):
 
     @track_history
     def __call__(self, action=None, **kwargs) -> Observation:
+        """Forwards `tool()` to the tool.use() method and
+        tracks the history of tool usage."""
         return self.use(action, **kwargs)
 
     def register(self, environment):
@@ -56,6 +58,7 @@ class EnvironmentTool(ABC):
         """This method is invoked directly by `tool()` or by event handlers,
         and should be overridden by subclasses. Returns an observation which
         includes the tool's name and the result of the action.
+        Don't call this method directly, use `tool()` instead to track history.
         """
         pass
 

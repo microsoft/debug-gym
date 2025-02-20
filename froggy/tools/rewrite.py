@@ -1,4 +1,4 @@
-from froggy.entities import Observation
+from froggy.entities import Event, Observation
 from froggy.tools.tool import EnvironmentTool
 from froggy.tools.toolbox import Toolbox
 from froggy.utils import clean_code
@@ -104,10 +104,8 @@ class RewriteTool(EnvironmentTool):
         content = tool_args
         # parse content to get file_path, head, tail, and new_code
         # code/utils.py 4:6 <c>        print('buongiorno')</c>
-        from froggy.envs.env import Event  # TODO: move to the top
 
         file_path, head, tail = None, None, None
-        obs = []
         message = ""
         try:
             new_code = content.split("<c>", 1)[1].split("</c>", 1)[0]

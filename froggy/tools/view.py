@@ -84,5 +84,4 @@ class ViewTool(EnvironmentTool):
                 ),
             ]
 
-        obs = " ".join(obs)
-        return Observation(self.name, obs)
+        return Observation(self.name, " ".join(obs))

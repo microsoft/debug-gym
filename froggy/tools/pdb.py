@@ -67,7 +67,7 @@ class PDBTool(EnvironmentTool):
 
     def on_env_reset(self, **kwargs) -> Observation:
         super().on_env_reset(**kwargs)
-        obs = self.start_pdb()  # start or restart?
+        obs = self.start_pdb()
         return Observation(self.name, obs)
 
     def on_rewrite_success(self, file, head, tail, length, **kwargs) -> Observation:
@@ -83,7 +83,6 @@ class PDBTool(EnvironmentTool):
 
     def use(self, tool_args) -> Observation:
         command = tool_args
-
         _warning = ""
         splits = re.split("\n|;", command)
         if len(splits) > 1:

@@ -313,9 +313,6 @@ class SWEBenchEnv(RepoEnv):
         assert score <= self.max_score
         return score
 
-    def step(self, action: str):  # TODO: just remove this method
-        return super().step(action)
-
     def clone_repo(self, repo_address):
         org_name, repo_name = repo_address.split("/")
         repo_url = f"https://github.com/{repo_address.lstrip('/')}"

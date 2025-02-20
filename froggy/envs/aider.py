@@ -47,9 +47,6 @@ class AiderBenchmarkEnv(RepoEnv):
         infos.current_code_with_line_number = self.current_code_with_line_number()
         return infos
 
-    def step(self, action: str):
-        return super().step(action)
-
     def load_dataset(self):
         if not os.path.exists(self.REPO_PATH):
             subprocess.run(["git", "clone", self.REPO_URL, self.REPO_PATH], check=True)

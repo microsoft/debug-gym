@@ -8,7 +8,6 @@ from termcolor import colored
 from tqdm import tqdm
 
 from froggy.envs import select_env
-from froggy.envs.env import Event
 from froggy.logger import FroggyLogger
 from froggy.terminal import select_terminal
 from froggy.tools.toolbox import Toolbox
