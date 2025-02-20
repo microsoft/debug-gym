@@ -14,9 +14,9 @@ from froggy.terminal import Terminal
 @pytest.fixture
 def env_info():
     return EnvInfo(
-        step_observation="obs",
+        step_observation=Observation(source="env", observation="obs"),
         all_triggered_observations=[],
-        eval_observation="eval_observation",
+        eval_observation=Observation(source="env", observation="eval_observation"),
         dir_tree="dir_tree",
         current_code_with_line_number="current_code_with_line_number",
         current_breakpoints="current_breakpoints",

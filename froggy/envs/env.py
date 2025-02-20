@@ -24,7 +24,7 @@ class EnvInfo:
     all_triggered_observations: list[
         Observation
     ]  # obs from all tools triggered by env.step
-    eval_observation: str  # last eval observation  # TODO: use Observation dataclass
+    eval_observation: Observation  # last eval observation
     dir_tree: str
     current_code_with_line_number: dict | str
     current_breakpoints: str
@@ -278,7 +278,7 @@ class RepoEnv(TooledEnv):
             current_code_with_line_number=self.current_code_with_line_number(),
             current_breakpoints=self.current_breakpoints(),
             action=None,
-            eval_observation=self.last_eval_obs,
+            eval_observation=Observation("env", self.last_eval_obs),
             done=self.done,
             score=self.score,
             max_score=self.max_score,
@@ -431,7 +431,7 @@ class RepoEnv(TooledEnv):
             current_breakpoints=self.current_breakpoints(),
             action=action,
             instructions=self.instructions,
-            eval_observation=self.last_eval_obs,
+            eval_observation=Observation("env", self.last_eval_obs),
             score=self.score,
             max_score=self.max_score,
             done=self.done,

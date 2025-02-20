@@ -24,7 +24,7 @@ def build_env_info():
         return EnvInfo(
             step_observation == Observation("tool", step_observation),
             all_triggered_observations=all_triggered_observations,
-            eval_observation=eval_observation,
+            eval_observation=Observation("env", eval_observation),
             dir_tree=dir_tree,
             current_code_with_line_number=current_code_with_line_number,
             current_breakpoints=current_breakpoints,

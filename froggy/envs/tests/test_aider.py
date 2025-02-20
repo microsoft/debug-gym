@@ -13,7 +13,7 @@ def env_info():
     return EnvInfo(
         step_observation=Observation("tool", "obs"),
         all_triggered_observations=[],
-        eval_observation="eval_observation",
+        eval_observation=Observation("env", "eval_observation"),
         dir_tree="dir_tree",
         current_code_with_line_number="current_code_with_line_number",
         current_breakpoints="current_breakpoints",
@@ -58,22 +58,11 @@ def test_instructions(aider_env):
     assert aider_env.instructions == expected_instructions
 
 
-# TODO: remove patches if not needed
 @patch("froggy.envs.RepoEnv.reset")
 @patch("froggy.envs.RepoEnv.current_code_with_line_number", return_value="Current code")
 @patch("froggy.envs.AiderBenchmarkEnv.setup_workspace")
 @patch("froggy.envs.AiderBenchmarkEnv.load_current_file")
-@patch("froggy.utils.cleanup_pytest_output", return_value="Cleaned output")
-@patch("froggy.utils.extract_max_score_from_pytest_output", return_value=10)
-@patch("froggy.utils.extract_reward_from_pytest_output", return_value=5)
-@patch("datasets.load_dataset")
-@patch("subprocess.run")
 def test_reset(
-    mock_run,
-    mock_load_dataset,
-    mock_extract_reward,
-    mock_extract_max_score,
-    mock_cleanup,
     mock_load_current_file,
     mock_setup_workspace,
     mock_line_number,
@@ -81,17 +70,19 @@ def test_reset(
     aider_env,
     env_info,
 ):
-    repo_env.return_value = env_info
-    aider_env.dataset = {
+    test_task = {
         "test_task": {
             "base_directory": "test_directory",
             "instructions": "Test instructions",
             "filename": "test_task.py",
         }
     }
+    repo_env.return_value = env_info
+    aider_env.dataset = test_task
     options = {"task_name": "test_task"}
     infos = aider_env.reset(options=options)
-    assert infos.instructions["Problem description"] == "Test instructions"
+    assert aider_env.current_sample == test_task["test_task"]
+    assert infos.current_code_with_line_number == "Current code"
     assert infos.step_observation == Observation("tool", "obs")
     assert infos.max_score == 10
     assert infos.score == 5
