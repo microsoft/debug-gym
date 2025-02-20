@@ -21,9 +21,7 @@ from froggy.utils import _walk, make_file_matcher, parse_action, show_line_numbe
 @dataclass
 class EnvInfo:
     step_observation: Observation  # obs from the tool triggered by env.step or env.last_eval_obs when env.reset
-    all_triggered_observations: list[
-        Observation
-    ]  # obs from all tools triggered by env.step
+    all_observations: list[Observation]  #  env.step + triggered tools obs
     eval_observation: Observation  # last eval observation
     dir_tree: str
     current_code_with_line_number: dict | str
@@ -69,7 +67,7 @@ class TooledEnv:
     def __init__(self):
         self.tools = {}
         self.event_hooks = EventHooks()
-        self.all_triggered_observations = []
+        self.all_observations = []
 
     @property
     def tool_names(self):
@@ -109,7 +107,10 @@ class TooledEnv:
 
     def handle_event(self, event: Event, source=None, **kwargs) -> None:
         observations = self.event_hooks.notify(event, source=source, **kwargs)
-        self.all_triggered_observations = observations
+        self.all_observations += observations
+
+    def clear_all_observations(self):
+        self.all_observations = []
 
 
 class RepoEnv(TooledEnv):
@@ -152,7 +153,6 @@ class RepoEnv(TooledEnv):
         self.score = 0
         self.done = False
         self.rewrite_counter = 0
-        self.all_triggered_observations = []
 
     def setup_workspace(
         self,
@@ -261,24 +261,28 @@ class RepoEnv(TooledEnv):
         self.rewrite_counter = 0
         self.last_eval_obs = ""
         self.done = False
-        self.all_triggered_observations = []
+        self.clear_all_observations()
 
         if restore_code:
             self.restore()
 
         self.handle_event(Event.ENV_RESET, source="env")
 
-        # get the initial observation, from cache if eval tool already called or running eval
-        self.step_observation = Observation("env", self.last_eval_obs or self.eval())
+        # Gets eval (initial observation) from cache if eval tool was already called or by running env.eval
+        if self.last_eval_obs:
+            self.step_observation = Observation("env", self.last_eval_obs)
+        else:
+            self.step_observation = Observation("env", self.eval())
+            self.all_observations.insert(0, self.step_observation)
 
         self.infos = EnvInfo(
             step_observation=self.step_observation,
-            all_triggered_observations=self.all_triggered_observations,
+            all_observations=self.all_observations,
+            eval_observation=Observation("env", self.last_eval_obs),
             dir_tree=self.display_files(),
             current_code_with_line_number=self.current_code_with_line_number(),
             current_breakpoints=self.current_breakpoints(),
             action=None,
-            eval_observation=Observation("env", self.last_eval_obs),
             done=self.done,
             score=self.score,
             max_score=self.max_score,
@@ -407,7 +411,7 @@ class RepoEnv(TooledEnv):
     def step(self, action: str):
         # given action, return new obs, and update infos
         # the action space is composed of a few smaller action spaces
-        self.all_triggered_observations = []
+        self.all_observations = []
         message, tool_info = self.get_triggered_tools(action)
         if message:
             self.step_observation = Observation("env", message)
@@ -423,15 +427,18 @@ class RepoEnv(TooledEnv):
                 self.step_observation = Observation("env", error_message)
                 self.logger.warning(error_message)
 
+        # prepend step_observation to all_observations
+        self.all_observations.insert(0, self.step_observation)
+
         self.infos = EnvInfo(
             step_observation=self.step_observation,
-            all_triggered_observations=self.all_triggered_observations,
+            all_observations=self.all_observations,
+            eval_observation=Observation("env", self.last_eval_obs),
             dir_tree=self.display_files(),
             current_code_with_line_number=self.current_code_with_line_number(),
             current_breakpoints=self.current_breakpoints(),
             action=action,
             instructions=self.instructions,
-            eval_observation=Observation("env", self.last_eval_obs),
             score=self.score,
             max_score=self.max_score,
             done=self.done,
@@ -452,4 +459,4 @@ class RepoEnv(TooledEnv):
                 # obs += f"\nSwitched context to {new_context}."
 
         observations = self.event_hooks.notify(event, source=source, **kwargs)
-        self.all_triggered_observations += observations
+        self.all_observations += observations

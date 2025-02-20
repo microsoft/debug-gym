@@ -15,7 +15,7 @@ from froggy.terminal import Terminal
 def env_info():
     return EnvInfo(
         step_observation=Observation(source="env", observation="obs"),
-        all_triggered_observations=[],
+        all_observations=[],
         eval_observation=Observation(source="env", observation="eval_observation"),
         dir_tree="dir_tree",
         current_code_with_line_number="current_code_with_line_number",

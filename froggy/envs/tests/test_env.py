@@ -319,7 +319,7 @@ def test_reset(
     assert env.rewrite_counter == 0
     assert infos == EnvInfo(
         step_observation=Observation(source="env", observation="1 failed, 0 passed"),
-        all_triggered_observations=[],
+        all_observations=[Observation(source="env", observation="1 failed, 0 passed")],
         eval_observation=Observation(source="env", observation="1 failed, 0 passed"),
         dir_tree=f"""Listing files in the current working directory. (ro) indicates read-only files. Max depth: 2.
 {env.tempdir.name}/

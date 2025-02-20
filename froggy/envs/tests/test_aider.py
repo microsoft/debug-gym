@@ -12,7 +12,7 @@ from froggy.envs.env import EnvInfo
 def env_info():
     return EnvInfo(
         step_observation=Observation("tool", "obs"),
-        all_triggered_observations=[],
+        all_observations=[],
         eval_observation=Observation("env", "eval_observation"),
         dir_tree="dir_tree",
         current_code_with_line_number="current_code_with_line_number",

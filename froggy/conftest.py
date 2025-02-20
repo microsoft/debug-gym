@@ -8,7 +8,7 @@ from froggy.envs.env import EnvInfo
 def build_env_info():
     def _env_info(
         step_observation="obs",
-        all_triggered_observations=[],
+        all_observations=[],
         eval_observation="eval_observation",
         dir_tree="dir_tree",
         current_code_with_line_number="current_code_with_line_number",
@@ -23,7 +23,7 @@ def build_env_info():
     ):
         return EnvInfo(
             step_observation == Observation("tool", step_observation),
-            all_triggered_observations=all_triggered_observations,
+            all_observations=all_observations,
             eval_observation=Observation("env", eval_observation),
             dir_tree=dir_tree,
             current_code_with_line_number=current_code_with_line_number,
