@@ -1,5 +1,6 @@
 import unittest
-from code import ConfigManager
+
+from config_code import ConfigManager
 
 
 class TestConfigManager(unittest.TestCase):

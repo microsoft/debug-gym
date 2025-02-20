@@ -79,8 +79,8 @@ class MiniNightmareEnv(RepoEnv):
                 pjoin(self.DATA_PATH, task_name, "test.py")
             ), f"Task {task_name} missing test.py file."
             assert os.path.exists(
-                pjoin(self.DATA_PATH, task_name, "code.py")
-            ), f"Task {task_name} missing code.py file."
+                pjoin(self.DATA_PATH, task_name, task_name + "code.py")
+            ), f"Task {task_name} missing {task_name}_code.py file."
             assert os.path.exists(
                 pjoin(self.DATA_PATH, task_name, ".froggyignore")
             ), f"Task {task_name} missing .froggyignore file."
@@ -95,5 +95,5 @@ class MiniNightmareEnv(RepoEnv):
             self.dataset[task_name] = {
                 "instructions": "The program doesn't behave as intended. Investigate the repository, figure out the root cause, then rewrite the code to fix the issue. Beaware that the bug may not be in the code you initially see.",
                 "base_directory": task_path,
-                "filename": "code.py",
+                "filename": task_name + "_code.py",
             }

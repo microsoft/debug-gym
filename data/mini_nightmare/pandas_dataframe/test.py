@@ -1,4 +1,4 @@
-from code import calculate_stats, load_data
+from pandas_dataframe_code import calculate_stats, load_data
 
 
 def test_calculate_stats():

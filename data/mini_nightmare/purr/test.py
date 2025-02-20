@@ -1,4 +1,4 @@
-from code import cat_status
+from purr_code import cat_status
 
 
 def test_cat_status():
