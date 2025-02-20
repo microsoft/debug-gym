@@ -73,9 +73,6 @@ class TooledEnv:
     def tool_names(self):
         return ", ".join([t.name for t in self.tools.values()])
 
-    def seed(self, seed):
-        self.rng = np.random.RandomState(seed)
-
     def add_tool(self, tool):
         if tool.name in self.tools:
             raise ValueError(f"Tool {tool.name} already exists!")
@@ -142,6 +139,7 @@ class RepoEnv(TooledEnv):
         self.debug_entrypoint = debug_entrypoint or entrypoint
         self.logger = logger or FroggyLogger("froggy")
         self.infos: EnvInfo | None = None
+        self.rng = None
 
         self.setup_workspace(
             path=path,
@@ -262,6 +260,7 @@ class RepoEnv(TooledEnv):
         self.last_eval_obs = ""
         self.done = False
         self.clear_all_observations()
+        self.seed(seed)
 
         if restore_code:
             self.restore()
@@ -292,6 +291,10 @@ class RepoEnv(TooledEnv):
         )
 
         return self.infos
+
+    def seed(self, seed=None):
+        if seed is not None:
+            self.rng = np.random.RandomState(seed)
 
     def eval(self, **kwargs):
         """Evaluates the current code using the provided entrypoint.
