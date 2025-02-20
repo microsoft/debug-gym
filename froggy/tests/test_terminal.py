@@ -14,7 +14,7 @@ if_docker_running = pytest.mark.skipif(
 
 def test_shell_session_run(tmp_path):
     working_dir = str(tmp_path)
-    entrypoint = ["/bin/bash", "--noprofile", "--norc"]
+    shell_command = "/bin/bash --noprofile --norc"
     env_vars = {
         "NO_COLOR": "1",  # disable colors
         "PS1": "",  # disable prompt
@@ -23,19 +23,19 @@ def test_shell_session_run(tmp_path):
     env_vars_1.update(env_vars)
     session_1 = ShellSession(
         session_id=1,
-        entrypoint=entrypoint,
+        shell_command=shell_command,
         working_dir=working_dir,
         env_vars=env_vars_1,
     )
     session_2 = ShellSession(
         session_id=2,
-        entrypoint=entrypoint,
+        shell_command=shell_command,
         working_dir=working_dir,
         env_vars=env_vars,
     )
 
-    assert session_1.entrypoint == entrypoint
-    assert session_2.entrypoint == entrypoint
+    assert session_1.shell_command == shell_command
+    assert session_2.shell_command == shell_command
 
     assert session_1.working_dir == working_dir
     assert session_2.working_dir == working_dir
@@ -134,7 +134,7 @@ def test_terminal_session(tmp_path):
     terminal = Terminal(working_dir=working_dir)
     assert not terminal.sessions
 
-    session = terminal.start_shell_session(timeout=1)
+    session = terminal.new_shell_session()
     assert len(terminal.sessions) == 1
     output = session.run(command, timeout=1)
     assert output == "Hello World"
@@ -255,7 +255,7 @@ def test_docker_terminal_session(tmp_path):
     terminal = DockerTerminal(working_dir=working_dir, volumes=volumes)
     assert not terminal.sessions
 
-    session = terminal.start_shell_session(timeout=1)
+    session = terminal.new_shell_session()
     assert len(terminal.sessions) == 1
     output = session.run(command, timeout=1)
     assert output == "Hello World"

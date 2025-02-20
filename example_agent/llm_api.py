@@ -257,7 +257,7 @@ class LLM:
         response = self.query_model(messages, **kwargs)
         response = response.strip()
 
-        self.logger.debug(colored(response, "green"))
+        self.logger.info(colored(response, "green"))
 
         llm_response = LLMResponse(
             prompt=messages,
