@@ -1,4 +1,4 @@
-from code import ShoppingCart
+from shopping_cart_code import ShoppingCart
 
 
 def test_shopping_cart():
