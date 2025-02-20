@@ -125,7 +125,7 @@ def test_reset_and_step(get_swe_env, build_env_info):
     env_info = swe_env.step("```listdir```")
     assert env_info.step_observation == Observation(
         source="env",
-        observation="Invalid action: ```listdir```.",
+        observation="Unregistered tool: ```listdir```.",
     )
 
     view_tool = Toolbox.get_tool("listdir")
