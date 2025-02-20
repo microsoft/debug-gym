@@ -39,7 +39,6 @@ class AiderBenchmarkEnv(RepoEnv):
         directory = self.current_sample["base_directory"]
         self.setup_workspace(directory, entrypoint="python -m pytest -s .")
         infos = super().reset()
-        infos.instructions = self.instructions  # TODO: is this needed?
 
         # By default, open the only modifiable file.
         self.load_current_file(self.current_sample["filename"])
