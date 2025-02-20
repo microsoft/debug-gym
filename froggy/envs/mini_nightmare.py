@@ -79,7 +79,7 @@ class MiniNightmareEnv(RepoEnv):
                 pjoin(self.DATA_PATH, task_name, "test.py")
             ), f"Task {task_name} missing test.py file."
             assert os.path.exists(
-                pjoin(self.DATA_PATH, task_name, task_name + "code.py")
+                pjoin(self.DATA_PATH, task_name, task_name + "_code.py")
             ), f"Task {task_name} missing {task_name}_code.py file."
             assert os.path.exists(
                 pjoin(self.DATA_PATH, task_name, ".froggyignore")
