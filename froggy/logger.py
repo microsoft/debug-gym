@@ -1,4 +1,5 @@
 import logging
+import os
 from pathlib import Path
 
 from tqdm import tqdm
@@ -30,6 +31,10 @@ class FroggyLogger(logging.Logger):
     ):
         super().__init__(name)
         self.setLevel(logging.DEBUG)
+
+        # If var env "FROGGY_DEBUG" is set, turn on debug modeé
+        if os.environ.get("FROGGY_DEBUG"):
+            level = logging.DEBUG
 
         console = TqdmLoggingHandler()
         formatter = logging.Formatter("🐸 [%(name)-12s]: %(levelname)-8s %(message)s")
