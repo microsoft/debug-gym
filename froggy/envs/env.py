@@ -159,9 +159,10 @@ class RepoEnv(TooledEnv):
 
     def set_entrypoints(self, entrypoint, debug_entrypoint):
         if entrypoint:
-            entrypoint = entrypoint or ""
-            debug_entrypoint = debug_entrypoint or entrypoint
             self.entrypoint = self._prepare_entrypoint(entrypoint)
+            debug_entrypoint = debug_entrypoint or entrypoint.replace(
+                "python", "python -m pdb"
+            )
             self.debug_entrypoint = self._prepare_entrypoint(debug_entrypoint)
 
     @staticmethod

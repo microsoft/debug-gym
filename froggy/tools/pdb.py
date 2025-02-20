@@ -26,12 +26,15 @@ class PDBTool(EnvironmentTool):
         auto_list: bool = True,
     ):
         super().__init__()
-        self.master = None
         self.pdb_obs = ""
         self.persistent_breakpoints = persistent_breakpoints
         self.auto_list = auto_list
         self.current_frame_file = None
         self._session: ShellSession = None
+
+    @property
+    def pdb_is_running(self):
+        return self._session and self._session.process.poll() is None
 
     def interact_with_pdb(self, command, expected_output="(Pdb)"):
         output = self._session.run(
@@ -39,17 +42,14 @@ class PDBTool(EnvironmentTool):
         )
         return output.replace("(Pdb)", "").strip()  # remove the prompt
 
-    def close_pdb(self, command="q"):
-        return self._session.run(command, timeout=10)
+    def close_pdb(self):
+        self._session.close()
 
-    def start_pdb(self, pdb_cmd: str = None) -> str:
-        self._session = self.environment.terminal.start_shell_session()
-        if pdb_cmd is None:
-            # remove the first word, which is "python"
-            entrypoint = " ".join(self.environment.debug_entrypoint.split()[1:])
-            pdb_cmd = f"python -m pdb {entrypoint}"
+    def start_pdb(self) -> str:
+        self._session = self.environment.terminal.new_shell_session()
+        self._session.start(self.environment.debug_entrypoint)
+        initial_output = self._session.read(read_until="(Pdb)")  # wait for the prompt
 
-        initial_output = self.interact_with_pdb(pdb_cmd)
         if "The program finished and will be restarted" in initial_output:
             self.close_pdb()
         else:
@@ -78,7 +78,12 @@ class PDBTool(EnvironmentTool):
             _warning += f"Multiple commands are not supported. Only the first command will be executed.\n"
 
         success, output = True, ""
-        if command in ["b", "break"]:
+        if not self.pdb_is_running:
+            output += self.start_pdb()
+
+        if not self.pdb_is_running:
+            return f"Tool failure:\n{output}"
+        elif command in ["b", "break"]:
             # list all breakpoints
             success, output = True, self.current_breakpoints()
         elif command in ["cl", "clear"]:
@@ -106,7 +111,7 @@ class PDBTool(EnvironmentTool):
         else:
             # other pdb commands, send directly
             try:
-                output = self.interact_with_pdb(command)
+                output += self.interact_with_pdb(command)
                 self.pdb_obs = output
             except:  # TODO: catch specific exceptions
                 success = False
