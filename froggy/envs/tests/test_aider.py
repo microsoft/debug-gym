@@ -3,6 +3,7 @@ from unittest.mock import MagicMock, mock_open, patch
 
 import pytest
 
+from froggy.entities import Observation
 from froggy.envs import AiderBenchmarkEnv
 from froggy.envs.env import EnvInfo
 
@@ -10,16 +11,16 @@ from froggy.envs.env import EnvInfo
 @pytest.fixture
 def env_info():
     return EnvInfo(
-        obs="obs",
-        max_score=10,
-        score=5,
-        last_run_obs="Raw output",
-        observations=[],
+        step_observation=Observation("tool", "obs"),
+        all_triggered_observations=[],
+        eval_observation="eval_observation",
         dir_tree="dir_tree",
         current_code_with_line_number="current_code_with_line_number",
         current_breakpoints="current_breakpoints",
         action="action",
         instructions={},
+        score=5,
+        max_score=10,
         done=False,
         rewrite_counter=0,
         tools={},
@@ -57,6 +58,7 @@ def test_instructions(aider_env):
     assert aider_env.instructions == expected_instructions
 
 
+# TODO: remove patches if not needed
 @patch("froggy.envs.RepoEnv.reset")
 @patch("froggy.envs.RepoEnv.current_code_with_line_number", return_value="Current code")
 @patch("froggy.envs.AiderBenchmarkEnv.setup_workspace")
@@ -90,18 +92,17 @@ def test_reset(
     options = {"task_name": "test_task"}
     infos = aider_env.reset(options=options)
     assert infos.instructions["Problem description"] == "Test instructions"
-    assert infos.last_run_obs == "Cleaned output"
+    assert infos.step_observation == Observation("tool", "obs")
     assert infos.max_score == 10
     assert infos.score == 5
 
 
+# TODO: Add proper test, mocking repoenv.step doesn't test anything
 @patch("froggy.envs.RepoEnv.step")
-@patch("froggy.utils.cleanup_pytest_output", return_value="Cleaned output")
-@patch("froggy.utils.extract_reward_from_pytest_output", return_value=5)
-def test_step(mock_extract_reward, mock_cleanup, mock_step, aider_env, env_info):
+def test_step(mock_step, aider_env, env_info):
     mock_step.return_value = env_info
     infos = aider_env.step("action")
-    assert infos.last_run_obs == "Cleaned output"
+    assert infos.step_observation == Observation("tool", "obs")
     assert infos.score == 5
 
 

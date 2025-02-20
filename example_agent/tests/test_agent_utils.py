@@ -118,11 +118,11 @@ def test_history_tracker(build_env_info):
     assert ht.json() == {}
 
     # prepare some data
-    env_info_1 = build_env_info(obs="obs1", action=None, score=1)
-    env_info_2 = build_env_info(obs="obs2", action="action2", score=2)
-    env_info_3 = build_env_info(obs="obs3", action="action3", score=3)
-    env_info_4 = build_env_info(obs="obs4", action="action4", score=4)
-    env_info_5 = build_env_info(obs="obs5", action="action5", score=5)
+    env_info_1 = build_env_info(step_observation="obs1", action=None, score=1)
+    env_info_2 = build_env_info(step_observation="obs2", action="action2", score=2)
+    env_info_3 = build_env_info(step_observation="obs3", action="action3", score=3)
+    env_info_4 = build_env_info(step_observation="obs4", action="action4", score=4)
+    env_info_5 = build_env_info(step_observation="obs5", action="action5", score=5)
 
     # single prompt format
     llm_response_2 = LLMResponse("prompt_2_1", "response_2_1")
@@ -253,18 +253,20 @@ def test_build_history_prompt(build_env_info):
     # test with non-empty history
     ht = HistoryTracker(history_steps=3)
     # prepare some data
-    env_info_1 = build_env_info(obs="obs1", action=None, score=1, rewrite_counter=0)
+    env_info_1 = build_env_info(
+        step_observation="obs1", action=None, score=1, rewrite_counter=0
+    )
     env_info_2 = build_env_info(
-        obs="obs2", action="action2", score=2, rewrite_counter=0
+        step_observation="obs2", action="action2", score=2, rewrite_counter=0
     )
     env_info_3 = build_env_info(
-        obs="obs3", action="action3", score=3, rewrite_counter=0
+        step_observation="obs3", action="action3", score=3, rewrite_counter=0
     )
     env_info_4 = build_env_info(
-        obs="obs4", action="action4", score=4, rewrite_counter=1
+        step_observation="obs4", action="action4", score=4, rewrite_counter=1
     )
     env_info_5 = build_env_info(
-        obs="obs5", action="action5", score=5, rewrite_counter=1
+        step_observation="obs5", action="action5", score=5, rewrite_counter=1
     )
 
     # push some steps

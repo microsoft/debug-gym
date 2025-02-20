@@ -1,4 +1,3 @@
-import os
 from os.path import join as pjoin
 from pathlib import Path
 from unittest.mock import MagicMock, mock_open, patch
@@ -6,7 +5,9 @@ from unittest.mock import MagicMock, mock_open, patch
 import numpy as np
 import pytest
 
+from froggy.entities import Event, Observation
 from froggy.envs.env import EnvInfo, EventHooks, RepoEnv, TooledEnv
+from froggy.terminal import Terminal
 
 
 @pytest.fixture
@@ -251,19 +252,20 @@ def test_current_code_with_line_number(mock_show_line_number):
 @patch.object(RepoEnv, "get_triggered_tools")
 @patch.object(RepoEnv, "get_tool")
 @patch.object(RepoEnv, "has_tool", return_value=False)
-@patch.object(RepoEnv, "run")
+@patch.object(RepoEnv, "eval")
 @patch.object(RepoEnv, "display_files")
 @patch.object(RepoEnv, "current_code_with_line_number")
 def test_step(
     mock_current_code_with_line_number,
     mock_display_files,
-    mock_run,
+    mock_eval,
     mock_has_tool,
     mock_get_tool,
     mock_get_triggered_tools,
 ):
     mock_pdb_tool = MagicMock()
-    mock_pdb_tool.use.return_value = "PDB tool used"
+    observation = Observation("pdb", "PDB tool used")
+    mock_pdb_tool.return_value = observation
     mock_pdb_tool.rewrite_success = True
     mock_pdb_tool.current_frame_file = "file.py"
     mock_pdb_tool.pdb_obs = "PDB started"
@@ -277,8 +279,8 @@ def test_step(
     infos = env.step("some action")
 
     mock_get_triggered_tools.assert_called_once_with("some action")
-    mock_pdb_tool.use.assert_called_once_with("some action")
-    assert infos.obs == "PDB tool used"
+    mock_pdb_tool.assert_called_once_with("some action")
+    assert infos.step_observation == observation
     assert infos.score == 0
     assert not infos.done
     assert isinstance(infos, EnvInfo)
@@ -307,11 +309,11 @@ def test_directory_tree(tmp_path):
 
 
 @patch.object(RepoEnv, "restore")
-@patch.object(RepoEnv, "run")
+@patch.object(Terminal, "run", return_value=(False, "1 failed, 0 passed"))
 @patch.object(RepoEnv, "get_tool")
 def test_reset(
     mock_get_tool,
-    mock_run,
+    mock_eval,
     mock_restore,
     env,
 ):
@@ -322,15 +324,15 @@ def test_reset(
     infos = env.reset(seed=42)
 
     mock_restore.assert_called_once()
-    mock_run.assert_called_once()
+    mock_eval.assert_called_once()
     assert env.current_file is None
     assert env.current_file_content is None
     assert env.current_breakpoints_state == {}
     assert env.rewrite_counter == 0
     assert infos == EnvInfo(
-        obs="",
-        last_run_obs=None,
-        observations=[],
+        step_observation=Observation(source="env", observation="1 failed, 0 passed"),
+        all_triggered_observations=[],
+        eval_observation="1 failed, 0 passed",
         dir_tree=f"""Listing files in the current working directory. (ro) indicates read-only files. Max depth: 2.
 {env.tempdir.name}/
 |-- file1.txt
@@ -380,85 +382,48 @@ def test_patch(env):
     assert result == expected
 
 
-def test_run_success(tmp_path):
+def test_eval_success(tmp_path):
     working_dir = str(tmp_path)
     # create a dummy file
     with open(tmp_path / "file.py", "w") as f:
         f.write("print('Hello, World!')")
     env = RepoEnv(path=working_dir, entrypoint="python file.py")
-    output, done = env.run()
+    output = env.eval()
 
     assert output == "Hello, World!"
-    assert done
+    assert env.done
     assert env.score == 1
 
 
-def test_run_timeout(tmp_path):
+def test_eval_timeout(tmp_path):
     working_dir = str(tmp_path)
     # runs for longer than the timeout
     with open(tmp_path / "file.py", "w") as f:
         f.write("import time; time.sleep(5)")
     env = RepoEnv(path=working_dir, entrypoint="python file.py", run_timeout=1)
-    output, done = env.run()
+    output = env.eval()
 
     assert output == "Timeout expired."
-    assert not done
+    assert not env.done
     assert env.score == 0
-
-
-def test_env_info_initialization():
-    current_code = {"File name": "test.py", "Content": "print('test')"}
-    tools = {"tool1": {"template": "```tool1 ... ```"}}
-    info = EnvInfo(
-        obs="observation",
-        last_run_obs="last_run",
-        observations=[],
-        dir_tree="tree",
-        current_code_with_line_number=current_code,
-        current_breakpoints="breakpoints",
-        action="test_action",
-        instructions={"tool": "instruction"},
-        score=5,
-        max_score=10,
-        done=False,
-        rewrite_counter=2,
-        tools=tools,
-    )
-
-    assert info.obs == "observation"
-    assert info.last_run_obs == "last_run"
-    assert info.observations == []
-    assert info.dir_tree == "tree"
-    assert info.current_code_with_line_number == current_code
-    assert info.current_breakpoints == "breakpoints"
-    assert info.action == "test_action"
-    assert info.instructions == {"tool": "instruction"}
-    assert info.score == 5
-    assert info.max_score == 10
-    assert not info.done
-    assert info.rewrite_counter == 2
-    assert info.tools == tools
 
 
 def test_event_hooks_initialization():
     event_hooks = EventHooks()
-    assert event_hooks.events == ["on_start", "on_reset", "on_step"]
-    assert event_hooks.event_listeners == {
-        "on_start": [],
-        "on_reset": [],
-        "on_step": [],
-    }
+    assert set(event_hooks.event_listeners.keys()) == set(Event)
+    for e in Event:
+        assert event_hooks.event_listeners[e] == []
 
 
 def test_event_hooks_subscribe():
     class ToolMock:
-        def on_start(self):
+        def on_env_start(self):
             pass
 
     event_hooks = EventHooks()
     subscriber = ToolMock()
-    event_hooks.subscribe("on_start", subscriber)
-    assert subscriber in event_hooks.event_listeners["on_start"]
+    event_hooks.subscribe(Event.ENV_START, subscriber)
+    assert subscriber in event_hooks.event_listeners[Event.ENV_START]
 
 
 def test_event_hooks_subscribe_invalid_subscriber():
@@ -467,9 +432,9 @@ def test_event_hooks_subscribe_invalid_subscriber():
 
     event_hooks = EventHooks()
     subscriber = InvalidToolMock()
-    with pytest.raises(ValueError, match="Tool does not implement method on_start"):
-        event_hooks.subscribe("on_start", subscriber)
-    assert subscriber not in event_hooks.event_listeners["on_start"]
+    with pytest.raises(ValueError, match="Tool does not implement method on_env_start"):
+        event_hooks.subscribe(Event.ENV_START, subscriber)
+    assert subscriber not in event_hooks.event_listeners[Event.ENV_START]
 
 
 def test_event_hooks_subscribe_invalid_event():
@@ -479,7 +444,7 @@ def test_event_hooks_subscribe_invalid_event():
 
     event_hooks = EventHooks()
     subscriber = ToolMock()
-    with pytest.raises(KeyError):
+    with pytest.raises(ValueError, match="Unknown event type: invalid"):
         event_hooks.subscribe("invalid", subscriber)
     assert "invalid" not in event_hooks.event_listeners
 
@@ -487,19 +452,22 @@ def test_event_hooks_subscribe_invalid_event():
 def test_event_hooks_unsubscribe():
     event_hooks = EventHooks()
     subscriber = MagicMock()
-    event_hooks.subscribe("on_start", subscriber)
-    event_hooks.unsubscribe("on_start", subscriber)
-    assert subscriber not in event_hooks.event_listeners["on_start"]
+    assert subscriber not in event_hooks.event_listeners[Event.ENV_START]
+    event_hooks.subscribe(Event.ENV_START, subscriber)
+    assert subscriber in event_hooks.event_listeners[Event.ENV_START]
+    event_hooks.unsubscribe(Event.ENV_START, subscriber)
+    assert subscriber not in event_hooks.event_listeners[Event.ENV_START]
 
 
 def test_event_hooks_notify():
     event_hooks = EventHooks()
     subscriber = MagicMock()
-    subscriber.on_start.return_value = "observation"
-    event_hooks.subscribe("on_start", subscriber)
-    observations = event_hooks.notify("on_start")
-    assert observations == {subscriber.name: "observation"}
-    subscriber.on_start.assert_called_once()
+    an_observation = Observation("mock", "observation")
+    subscriber.on_env_start.return_value = an_observation
+    event_hooks.subscribe(Event.ENV_START, subscriber)
+    observations = event_hooks.notify(Event.ENV_START)
+    assert observations == [an_observation]
+    subscriber.on_env_start.assert_called_once()
 
 
 def test_current_breakpoints_no_breakpoints():

@@ -143,7 +143,7 @@ class RepoEnv(TooledEnv):
             debug_entrypoint=debug_entrypoint,
             readonly_patterns=readonly_patterns,
         )
-        self.last_eval_obs = None
+        self.last_eval_obs = ""
         self.score = 0
         self.done = False
         self.rewrite_counter = 0
@@ -254,7 +254,7 @@ class RepoEnv(TooledEnv):
         self.current_file_content = None
         self.current_breakpoints_state = {}
         self.rewrite_counter = 0
-        self.last_eval_obs = None
+        self.last_eval_obs = ""
         self.done = False
         self.all_triggered_observations = []
 

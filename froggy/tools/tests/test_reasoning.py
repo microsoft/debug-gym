@@ -62,16 +62,16 @@ def test_use_with_chaining(setup_reasoning_tool):
         return_value=("reasoning", "next_action")
     )
     env_info = EnvInfo(
-        obs="obs",
-        max_score=10,
-        score=5,
-        last_run_obs="last_run_obs",
-        observations=[],
+        step_observation="obs",
+        all_triggered_observations=[],
+        eval_observation="eval_observation",
         dir_tree="dir_tree",
         current_code_with_line_number="current_code_with_line_number",
         current_breakpoints="current_breakpoints",
         action="action",
         instructions={},
+        score=5,
+        max_score=10,
         done=False,
         rewrite_counter=0,
         tools={},

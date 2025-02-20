@@ -1,15 +1,15 @@
 import os
 import subprocess
-from unittest import mock
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 from filelock import FileLock
 
+from froggy.entities import Observation
 from froggy.envs import SWEBenchEnv
-from froggy.envs.env import RepoEnv
 from froggy.envs.swe_bench import SWEBenchEnv
 from froggy.terminal import DockerTerminal
+from froggy.tools.toolbox import Toolbox
 
 if_docker_running = pytest.mark.skipif(
     not subprocess.check_output(["docker", "ps"]),
@@ -113,34 +113,37 @@ def test_instructions(get_swe_env):
 
 
 @if_docker_running
-def test_step(get_swe_env, build_env_info):
+def test_reset_and_step(get_swe_env, build_env_info):
     swe_env = get_swe_env()
-    swe_env.reset(options={"task_name": "astropy__astropy-14096"})
-    env_info = build_env_info(obs="obs", score=5, done=True, last_run_obs="Raw output")
-    with mock.patch.object(RepoEnv, "step", return_value=env_info):
-        infos = swe_env.step("action")
-    assert infos.obs == "obs"
-    assert infos.score == 0
-    assert infos.done == False
-    assert infos.last_run_obs == "Raw output"
+    env_info = swe_env.reset(options={"task_name": "astropy__astropy-14096"})
 
+    assert "short test summary info" in env_info.step_observation.observation
+    assert env_info.score == swe_env.score == 0
+    assert env_info.max_score == swe_env.max_score == 1
+    assert env_info.done == swe_env.done == False
 
-@if_docker_running
-def test_reset(tmp_path, get_swe_env, build_env_info):
-    working_dir = str(tmp_path)
-    swe_env = get_swe_env(working_dir)
-    task_name = "astropy__astropy-14096"
-    obs = "Some observation"
-    last_run_obs = "collected 10 items. 5 passed, 5 failed"
-    env_info = build_env_info(obs=obs, last_run_obs=last_run_obs)
-    with mock.patch.object(RepoEnv, "reset", return_value=env_info):
-        reset_infos = swe_env.reset(options={"task_name": task_name})
+    env_info = swe_env.step("```listdir```")
+    assert env_info.step_observation == Observation(
+        source="env",
+        observation="Invalid action: ```listdir```.",
+    )
 
-    assert reset_infos.obs == obs
-    assert reset_infos.last_run_obs == last_run_obs
-    assert reset_infos.max_score == 1
-    assert reset_infos.score == 0
-    assert reset_infos.done == False
+    view_tool = Toolbox.get_tool("listdir")
+    swe_env.add_tool(view_tool)
+
+    env_info = swe_env.step("```listdir```")
+    assert env_info.step_observation.source == "listdir"
+    listdir_start = f"""{swe_env.working_dir}/
+|-- CHANGES.rst
+|-- CITATION
+|-- CODE_OF_CONDUCT.md
+|-- CONTRIBUTING.md
+|-- GOVERNANCE.md
+|-- LICENSE.rst
+|-- MANIFEST.in
+|-- README.rst
+|-- astropy/"""
+    assert env_info.step_observation.observation.startswith(listdir_start)
 
 
 @if_docker_running
@@ -244,6 +247,7 @@ def test_load_dataset(tmp_path, get_swe_env):
         "FAIL_TO_PASS",
         "PASS_TO_PASS",
         "environment_setup_commit",
+        "difficulty",
     ]
 
 

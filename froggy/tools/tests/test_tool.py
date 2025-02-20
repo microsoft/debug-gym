@@ -1,13 +1,14 @@
 import pytest
 
+from froggy.entities import Observation
 from froggy.envs.env import Event, RepoEnv
-from froggy.tools.tool import EnvironmentTool, track_history
+from froggy.tools.tool import EnvironmentTool, Record, track_history
 from froggy.tools.toolbox import Toolbox
 
 
 class FakeTool(EnvironmentTool):
     def use(self, action):
-        return "observation", [{"FakeTool": "observation"}]
+        return Observation("FakeTool", action)
 
 
 def test_register_valid_environment():
@@ -77,10 +78,16 @@ def test_track_history():
 
     tool(action="first")
     assert len(tool.history) == 1
-    assert tool.history[0].kwargs == {"action": "first"}
-    assert tool.history[0].observation == "observation"
+    assert tool.history[0] == Record(
+        args=(),
+        kwargs={"action": "first"},
+        observation=Observation("FakeTool", "first"),
+    )
 
     tool(action="second")
     assert len(tool.history) == 2
-    assert tool.history[1].kwargs == {"action": "second"}
-    assert tool.history[1].observation == "observation"
+    assert tool.history[1] == Record(
+        args=(),
+        kwargs={"action": "second"},
+        observation=Observation("FakeTool", "second"),
+    )
