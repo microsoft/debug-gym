@@ -252,10 +252,9 @@ class PdbAfterRewrites(PdbAgent):
             ):
                 self.env.add_tool(pdb_tool)
                 self.env.tools["pdb"].start_pdb()
+                # update info tools related fields after adding pdb so it's included when building the next prompt
                 info.instructions = self.env.instructions
-                info.step_observation.observation += (
-                    "\nThe pdb tool has been added."  # Does this affect anything?
-                )
+                info.tools = self.env.tool_instructions
 
             self.history.step(info, llm_response)
 
