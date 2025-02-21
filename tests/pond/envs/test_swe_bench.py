@@ -113,7 +113,7 @@ def test_instructions(get_swe_env):
 
 
 @if_docker_running
-def test_reset_and_step(get_swe_env, build_env_info):
+def test_reset_and_step(get_swe_env):
     swe_env = get_swe_env()
     env_info = swe_env.reset(options={"task_name": "astropy__astropy-14096"})
 
