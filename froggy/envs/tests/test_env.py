@@ -171,7 +171,7 @@ def test_instructions():
             "tool1": "instructions1",
             "tool2": "instructions2",
         },
-        "Available commands": "tool1, tool2",
+        "Available commands": "```tool1```, ```tool2```",
     }
 
     instructions = env.instructions
