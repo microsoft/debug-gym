@@ -1,6 +1,7 @@
 from unittest.mock import MagicMock
 
-from froggy.agents.example_agent import PdbAfterRewrites, PdbAgent, RewriteOnly
+from froggy.agents.rewrite_agent import RewriteOnly
+from froggy.agents.pdb_agent import PdbAfterRewrites, PdbAgent
 from froggy.agents.llm_api import LLMResponse, TokenUsage
 
 
