@@ -104,7 +104,7 @@ class RewriteTool(EnvironmentTool):
         content = tool_args
         # parse content to get file_path, head, tail, and new_code
         # code/utils.py 4:6 <c>        print('buongiorno')</c>
-
+        self.environment.rewrite_counter += 1
         file_path, head, tail = None, None, None
         message = ""
         try:
@@ -134,7 +134,7 @@ class RewriteTool(EnvironmentTool):
         if "" != message:
             self.rewrite_success = False
             message = "\n".join([message, "Rewrite failed."])
-            self.trigger_event(Event.REWRITE_FAIL, message=message)
+            self.queue_event(Event.REWRITE_FAIL, message=message)
             return Observation(self.name, message)
 
         message, success, new_code_length = self._rewrite_file(
@@ -143,7 +143,7 @@ class RewriteTool(EnvironmentTool):
         if success is True:
             self.rewrite_success = True
             message = "Rewriting done."
-            self.trigger_event(
+            self.queue_event(
                 Event.REWRITE_SUCCESS,
                 message=message,
                 file=file_path,
@@ -156,5 +156,5 @@ class RewriteTool(EnvironmentTool):
 
         self.rewrite_success = False
         message = "\n".join([message, "Rewrite failed."])
-        self.trigger_event(Event.REWRITE_FAIL, message=message)
+        self.queue_event(Event.REWRITE_FAIL, message=message)
         return Observation(self.name, message)

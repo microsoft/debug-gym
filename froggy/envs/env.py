@@ -52,14 +52,19 @@ class EventHooks:
     def notify(self, event: Event, source=None, **kwargs) -> list[Observation]:
         """Notify all tools that are subscribed to the event.
         Returns a list of observations from all tools that are triggered by the event.
+        If error occurs while handling the event, an error observation is returned.
         """
         observations = []
         for tool in self.event_listeners[event]:
             if tool == source:
                 continue  # skip the source tool to avoid infinite loop
-            observation = getattr(tool, event.handler_name)(**kwargs)
-            if observation:
-                observations.append(observation)
+            try:
+                observation = getattr(tool, event.handler_name)(**kwargs)
+                if observation:
+                    observations.append(observation)
+            except Exception as e:
+                error_message = f"Error in tool {tool.name} handling {event}:\n{e}"
+                observations.append(Observation(tool.name, error_message))
         return observations
 
 
@@ -67,6 +72,7 @@ class TooledEnv:
     def __init__(self):
         self.tools = {}
         self.event_hooks = EventHooks()
+        self.event_queue = []
         self.all_observations = []
 
     @property
@@ -102,12 +108,23 @@ class TooledEnv:
     def tool_instructions(self):
         return {name: tool.instructions for name, tool in self.tools.items()}
 
-    def handle_event(self, event: Event, source=None, **kwargs) -> None:
-        observations = self.event_hooks.notify(event, source=source, **kwargs)
-        self.all_observations += observations
-
     def clear_all_observations(self):
         self.all_observations = []
+
+    def empty_event_queue(self):
+        self.event_queue = []
+
+    def queue_event(self, event: Event, source=None, **kwargs) -> None:
+        """Add an event to the queue for processing later."""
+        self.event_queue.append((event, source, kwargs))
+
+    def process_events(self) -> list[Observation]:
+        """Process all queued events and handle their observations."""
+        while self.event_queue:
+            event, source, kwargs = self.event_queue.pop(0)
+            observations = self.event_hooks.notify(event=event, source=source, **kwargs)
+            self.all_observations.extend(observations)
+        return self.all_observations
 
 
 class RepoEnv(TooledEnv):
@@ -261,12 +278,15 @@ class RepoEnv(TooledEnv):
         self.last_eval_obs = ""
         self.done = False
         self.clear_all_observations()
+        self.empty_event_queue()
         self.seed(seed)
 
         if restore_code:
             self.restore()
 
-        self.handle_event(Event.ENV_RESET, source="env")
+        # Notify all tools that the environment is reset and get their observations
+        self.queue_event(Event.ENV_RESET, source="env")
+        self.all_observations = self.process_events()
 
         # Gets eval (initial observation) from cache if eval tool was already called or by running env.eval
         if self.last_eval_obs:
@@ -415,7 +435,8 @@ class RepoEnv(TooledEnv):
     def step(self, action: str):
         # given action, return new obs, and update infos
         # the action space is composed of a few smaller action spaces
-        self.all_observations = []
+        self.clear_all_observations()
+        self.empty_event_queue()
         message, tool_info = self.get_triggered_tools(action)
         if message:
             self.step_observation = Observation("env", message)
@@ -431,6 +452,8 @@ class RepoEnv(TooledEnv):
                 self.step_observation = Observation("env", error_message)
                 self.logger.warning(error_message)
 
+        # Process any events that were queued during tool execution
+        self.all_observations = self.process_events()
         # prepend step_observation to all_observations
         self.all_observations.insert(0, self.step_observation)
 
@@ -451,16 +474,3 @@ class RepoEnv(TooledEnv):
         )
 
         return self.infos
-
-    def handle_event(self, event: Event, source=None, **kwargs) -> None:
-        if event in [Event.REWRITE_SUCCESS, Event.REWRITE_FAIL]:
-            self.rewrite_counter += 1
-        if event == Event.SWITCH_CONTEXT and self.auto_view_change:
-            # should be handled by the view tool?
-            new_context = kwargs.get("filepath")
-            if new_context in self.all_files:
-                self.load_current_file(new_context)
-                # obs += f"\nSwitched context to {new_context}."
-
-        observations = self.event_hooks.notify(event, source=source, **kwargs)
-        self.all_observations += observations

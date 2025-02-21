@@ -1,7 +1,7 @@
 import copy
 import re
 
-from froggy.entities import Event, Observation
+from froggy.entities import Observation
 from froggy.terminal import ShellSession
 from froggy.tools.tool import EnvironmentTool
 from froggy.tools.toolbox import Toolbox
@@ -312,6 +312,9 @@ class PDBTool(EnvironmentTool):
             file_path = output.split("(")[0]
             if file_path != self.current_frame_file:
                 self.current_frame_file = file_path
-                self.trigger_event(Event.SWITCH_CONTEXT, filepath=file_path)
+                if self.environment.auto_view_change:
+                    new_context = file_path
+                    if new_context in self.environment.all_files:
+                        self.load_current_file(new_context)
         except:
             pass

@@ -62,8 +62,8 @@ class EnvironmentTool(ABC):
         """
         pass
 
-    def trigger_event(self, event: Event, **kwargs) -> None:
-        self.environment.handle_event(event, source=self, **kwargs)
+    def queue_event(self, event: Event, **kwargs) -> None:
+        self.environment.queue_event(event, source=self, **kwargs)
 
     def on_env_reset(self, **kwargs) -> Observation:
         """Reset the tool state on environment reset.
