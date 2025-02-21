@@ -40,7 +40,7 @@ jobs:
           FROGGY_DEBUG=1 pytest -n 4 -vv --cov=. --cov-report=term-missing --cov-fail-under=90
       - name: Upload pytest log
         if: always()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: pytest-log
           path: pytest.log
