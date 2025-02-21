@@ -264,9 +264,7 @@ class RepoEnv(TooledEnv):
     def reset(
         self,
         *,
-        seed=None,
         options: dict = None,
-        restore_code=True,
     ):
         """Resets the environment to the initial state and returns the initial observation"""
         self.logger.info(f"Resetting environment")
@@ -279,10 +277,6 @@ class RepoEnv(TooledEnv):
         self.done = False
         self.clear_all_observations()
         self.empty_event_queue()
-        self.seed(seed)
-
-        if restore_code:
-            self.restore()
 
         # Notify all tools that the environment is reset and get their observations
         self.queue_event(Event.ENV_RESET, source="env")

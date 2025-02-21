@@ -39,7 +39,7 @@ class MiniNightmareEnv(RepoEnv):
         self.last_eval_obs = utils.cleanup_pytest_output(output)
         return self.last_eval_obs
 
-    def reset(self, *, seed=None, options: dict = None):
+    def reset(self, *, options: dict = None):
         options = options or {}
         self.current_sample = self.dataset[options["task_name"]]
 
@@ -50,7 +50,7 @@ class MiniNightmareEnv(RepoEnv):
             debug_entrypoint="python -m pdb -m pytest -s test.py",
         )
 
-        infos = super().reset()
+        infos = super().reset(options=options)
 
         # By default, open the only modifiable file.
         self.load_current_file(self.current_sample["filename"])
