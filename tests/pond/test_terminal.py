@@ -4,7 +4,14 @@ import time
 import docker
 import pytest
 
-from froggy.pond.terminal import DockerTerminal, ShellSession, Terminal, select_terminal
+from froggy.pond.terminal import (
+    DEFAULT_PS1,
+    DISABLE_ECHO_COMMAND,
+    DockerTerminal,
+    ShellSession,
+    Terminal,
+    select_terminal,
+)
 
 if_docker_running = pytest.mark.skipif(
     not subprocess.check_output(["docker", "ps"]),
@@ -15,23 +22,15 @@ if_docker_running = pytest.mark.skipif(
 def test_shell_session_run(tmp_path):
     working_dir = str(tmp_path)
     shell_command = "/bin/bash --noprofile --norc"
-    env_vars = {
-        "NO_COLOR": "1",  # disable colors
-        "PS1": "",  # disable prompt
-    }
     env_vars_1 = {"TEST_VAR": "TestVar"}
-    env_vars_1.update(env_vars)
     session_1 = ShellSession(
-        session_id=1,
         shell_command=shell_command,
         working_dir=working_dir,
         env_vars=env_vars_1,
     )
     session_2 = ShellSession(
-        session_id=2,
         shell_command=shell_command,
         working_dir=working_dir,
-        env_vars=env_vars,
     )
 
     assert session_1.shell_command == shell_command
@@ -40,32 +39,51 @@ def test_shell_session_run(tmp_path):
     assert session_1.working_dir == working_dir
     assert session_2.working_dir == working_dir
 
-    assert session_1.env_vars == env_vars_1
-    assert session_2.env_vars == env_vars
+    assert session_1.env_vars == env_vars_1 | {"PS1": DEFAULT_PS1}
+    assert session_2.env_vars == {"PS1": DEFAULT_PS1}
 
-    output = session_1.run("echo Hello World", timeout=1)
+    output = session_1.run("echo Hello World", timeout=5)
     assert output == "Hello World"
 
-    session_2.run("export TEST_VAR='FooBar'", timeout=1)
-    output = session_2.run("echo $TEST_VAR", timeout=1)
+    session_2.run("export TEST_VAR='FooBar'", timeout=5)
+    output = session_2.run("echo $TEST_VAR", timeout=5)
     assert output == "FooBar"
 
-    output = session_1.run("echo $TEST_VAR", timeout=1)
+    output = session_1.run("echo $TEST_VAR", timeout=5)
     assert output == "TestVar"
+
+
+def test_shell_session_timeout(tmp_path):
+    working_dir = str(tmp_path)
+    # Write a long-running command to a file
+    long_running_command = "sleep 60"
+
+    shell = ShellSession(
+        shell_command="/bin/bash --noprofile --norc",
+        working_dir=working_dir,
+    )
+
+    timeout = 1
+    with pytest.raises(
+        TimeoutError,
+        match=f"Read timeout after {timeout}",
+    ):
+        shell.run(long_running_command, timeout=timeout)
+    assert shell.is_running is False
 
 
 def test_terminal_init():
     terminal = Terminal()
     assert terminal.setup_commands == []
     assert terminal.env_vars["NO_COLOR"] == "1"
-    assert terminal.env_vars["PS1"] == ""
+    assert terminal.env_vars["PS1"] == DEFAULT_PS1
     assert len(terminal.env_vars) > 2  # NO_COLOR, PS1 + os env vars
     assert terminal.working_dir.startswith("/tmp/Terminal-")
 
 
 def test_terminal_init_no_os_env_vars():
     terminal = Terminal(include_os_env_vars=False)
-    assert terminal.env_vars == {"NO_COLOR": "1", "PS1": ""}
+    assert terminal.env_vars == {"NO_COLOR": "1", "PS1": DEFAULT_PS1}
 
 
 def test_terminal_init_with_params(tmp_path):
@@ -153,7 +171,7 @@ def test_terminal_session(tmp_path):
 def test_docker_terminal_init():
     terminal = DockerTerminal()
     assert terminal.setup_commands == []
-    assert terminal.env_vars == {"NO_COLOR": "1", "PS1": ""}
+    assert terminal.env_vars == {"NO_COLOR": "1", "PS1": DEFAULT_PS1}
     assert terminal.working_dir.startswith("/tmp/Terminal-")
     assert terminal.base_image == "ubuntu:latest"
     assert terminal.volumes[terminal.working_dir] == {
@@ -180,7 +198,7 @@ def test_docker_terminal_init_with_params(tmp_path):
     )
     assert terminal.working_dir == working_dir
     assert terminal.setup_commands == setup_commands
-    assert terminal.env_vars == env_vars | {"NO_COLOR": "1", "PS1": ""}
+    assert terminal.env_vars == env_vars | {"NO_COLOR": "1", "PS1": DEFAULT_PS1}
     assert terminal.base_image == base_image
     assert terminal.volumes == volumes
     assert terminal.container.status == "running"
@@ -258,9 +276,11 @@ def test_docker_terminal_session(tmp_path):
     session = terminal.new_shell_session()
     assert len(terminal.sessions) == 1
     output = session.run(command, timeout=1)
-    assert output == "Hello World"
+    assert output == f"{DISABLE_ECHO_COMMAND}Hello World"
 
+    output = session.start()
     session.run("export TEST_VAR='FooBar'", timeout=1)
+    assert output == f"{DISABLE_ECHO_COMMAND}"
     output = session.run("pwd", timeout=1)
     assert output == working_dir
     output = session.run("echo $TEST_VAR", timeout=1)

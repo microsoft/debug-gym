@@ -3,7 +3,6 @@ from pathlib import Path
 import pytest
 
 from froggy.pond.utils import (
-    TimeoutException,
     _walk,
     clean_code,
     cleanup_pytest_output,
@@ -15,7 +14,7 @@ from froggy.pond.utils import (
     parse_action,
     show_line_number,
     str2bool,
-    time_limit,
+    strip_ansi,
 )
 
 
@@ -252,20 +251,11 @@ def test_extract_reward_from_pytest_output():
     assert extract_reward_from_pytest_output(message_0) == 0
 
 
-def test_time_limit():
-    import time
-
-    with time_limit(3):
-        time.sleep(2)
-    assert True
-
-    with pytest.raises(TimeoutException, match="Timed out!"):
-        with time_limit(1):
-            time.sleep(2)
-
-    with time_limit(None):
-        time.sleep(0.2)
-    assert True
+def test_strip_ansi():
+    message = "\x1b[31mThis is a test message.\x1b[0m"
+    assert strip_ansi(message) == "This is a test message."
+    message = "\x1b[32mThis is another test message.\x1b[0m"
+    assert strip_ansi(message) == "This is another test message."
 
 
 def test_walk():
