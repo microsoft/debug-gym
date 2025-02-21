@@ -1,8 +1,8 @@
 from unittest.mock import MagicMock
 
-from froggy.agents.rewrite_agent import RewriteOnly
-from froggy.agents.pdb_agent import PdbAfterRewrites, PdbAgent
 from froggy.agents.llm_api import LLMResponse, TokenUsage
+from froggy.agents.pdb_agent import PdbAfterRewrites, PdbAgent
+from froggy.agents.rewrite_agent import RewriteOnly
 
 
 def test_build_question_prompt(agent_setup):

@@ -12,7 +12,6 @@ from froggy.logger import FroggyLogger
 from froggy.pond.envs.env import RepoEnv
 from froggy.pond.utils import unescape
 
-
 AGENT_REGISTRY = {}
 
 

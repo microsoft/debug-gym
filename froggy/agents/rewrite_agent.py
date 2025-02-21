@@ -6,8 +6,8 @@ from os.path import join as pjoin
 
 import numpy as np
 
-from froggy.agents.llm_api import instantiate_llm
 from froggy.agents.base_agent import BaseAgent, register_agent
+from froggy.agents.llm_api import instantiate_llm
 from froggy.agents.utils import HistoryTracker, build_history_prompt
 from froggy.logger import FroggyLogger
 from froggy.pond.envs.env import RepoEnv
