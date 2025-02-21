@@ -399,6 +399,7 @@ def test_load_config():
         _config, _args = load_config()
     assert _args.agent == "pdb_agent"
     expected_config = {
+        "agent_type": "pdb_agent",
         "random_seed": 123,
         "max_steps": 100,
         "llm_name": "gpt2",
@@ -427,6 +428,7 @@ def test_load_config():
         _config, _args = load_config()
     assert _args.agent == "pdb_agent"
     expected_config = {
+        "agent_type": "rewrite_only",
         "random_seed": 456,
         "max_steps": 100,
         "cot_style": "standard",
