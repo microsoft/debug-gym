@@ -234,7 +234,7 @@ class RepoEnv(TooledEnv):
     def instructions(self):
         _instruction = {
             "Available tools to solve the problem": self.tool_instructions,
-            "Available commands": [f'```{n}' for n in self.tool_names],
+            "Available commands": [f"```{n}```" for n in self.tool_names],
         }
         return _instruction
 
