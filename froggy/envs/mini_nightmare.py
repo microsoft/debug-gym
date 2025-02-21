@@ -22,12 +22,10 @@ class MiniNightmareEnv(RepoEnv):
 
     @property
     def instructions(self):
-        _instruction = {
+        return {
+            **super().instructions,
             "Problem description": self.current_sample["instructions"],
-            "Available tools to solve the problem": self.tool_instructions,
-            "Available commands": self.tool_names,
         }
-        return _instruction
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)

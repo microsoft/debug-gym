@@ -51,12 +51,10 @@ class SWEBenchEnv(RepoEnv):
 
     @property
     def instructions(self):
-        _instruction = {
+        return {
+            **super().instructions,
             "Problem description": self.ds_row["problem_statement"],
-            "Available tools to solve the problem": self.tool_instructions,
-            "Available commands": self.tool_names,
         }
-        return _instruction
 
     def load_dataset(self):
         self.ds = datasets.load_dataset(self.dataset_id)["test"]
