@@ -7,11 +7,11 @@ from pathlib import Path
 from termcolor import colored
 from tqdm import tqdm
 
-from froggy.pond.envs import select_env
+from froggy.agent.utils import load_config
 from froggy.logger import FroggyLogger
+from froggy.pond.envs import select_env
 from froggy.pond.terminal import select_terminal
 from froggy.pond.tools.toolbox import Toolbox
-from froggy.utils import load_config
 
 
 class BreakTaskLoop(Exception):

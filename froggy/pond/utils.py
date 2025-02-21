@@ -1,6 +1,4 @@
-import argparse
 import codecs
-import logging
 import os
 import re
 import signal
@@ -8,8 +6,6 @@ from contextlib import contextmanager
 from os.path import join as pjoin
 from pathlib import Path
 from typing import Callable, Optional
-
-import yaml
 
 
 def clean_code(code):
@@ -218,85 +214,6 @@ def extract_reward_from_pytest_output(output):
         return int(match.group(1))
 
     return 0
-
-
-def load_config():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("config_file", help="path to config file")
-    parser.add_argument(
-        "--agent",
-        help="pdb_agent, rewrite_only, pdb_after_rewrites",
-        default="pdb_agent",
-    )
-    parser.add_argument(
-        "--debug",
-        action="store_true",
-        help="Break before sending action to the environment.",
-    )
-    group = parser.add_mutually_exclusive_group()
-    group.add_argument(
-        "-v",
-        "--verbose",
-        dest="logging_level",
-        action="store_const",
-        const=logging.INFO,
-        help="Verbose mode",
-        default=logging.WARNING,
-    )
-    group.add_argument(
-        "-vv",
-        "--very-verbose",
-        dest="logging_level",
-        action="store_const",
-        const=logging.DEBUG,
-        help="Verbose mode",
-        default=logging.WARNING,
-    )
-    group.add_argument(
-        "--logging-level",
-        dest="logging_level",
-        choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
-        help="Set logging level",
-    )
-    parser.add_argument(
-        "--force-all",
-        action="store_true",
-        help="Force running all problems even if they are already done.",
-    )
-    parser.add_argument(
-        "--force-failed",
-        action="store_true",
-        help="Force running only problems that have failed.",
-    )
-    parser.add_argument(
-        "--keep-completed-tasks",
-        action="store_true",
-        help="Keep displaying completed tasks in the workers panel.",
-    )
-    parser.add_argument(
-        "-p",
-        "--params",
-        nargs="+",
-        metavar="my.setting=value",
-        default=[],
-        help="override params of the config file,"
-        " e.g. -p 'rewrite_only.random_seed=123'",
-    )
-    args = parser.parse_args()
-    assert os.path.exists(args.config_file), "Invalid config file"
-    with open(args.config_file) as reader:
-        config = yaml.safe_load(reader)
-
-    # Parse overriden params.
-    for param in args.params:
-        fqn_key, value = param.split("=")
-        entry_to_change = config
-        keys = fqn_key.split(".")
-        for k in keys[:-1]:
-            entry_to_change = entry_to_change[k]
-        entry_to_change[keys[-1]] = yaml.safe_load(value)
-
-    return config, args
 
 
 def parse_action(action):

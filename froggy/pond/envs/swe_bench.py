@@ -19,7 +19,7 @@ from tqdm import tqdm
 
 from froggy.pond.envs.env import RepoEnv
 from froggy.pond.terminal import DockerTerminal, Terminal
-from froggy.utils import create_ignore_file
+from froggy.pond.utils import create_ignore_file
 
 
 class SWEBenchEnv(RepoEnv):

@@ -1,7 +1,7 @@
 import os
 from os.path import join as pjoin
 
-import froggy.utils as utils
+import froggy.pond.utils as utils
 from froggy.pond.envs.env import RepoEnv
 
 

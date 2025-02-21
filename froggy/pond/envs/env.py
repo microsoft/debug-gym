@@ -12,10 +12,10 @@ from pathlib import Path
 
 import numpy as np
 
-from froggy.pond.entities import Event, Observation
 from froggy.logger import FroggyLogger
+from froggy.pond.entities import Event, Observation
 from froggy.pond.terminal import Terminal
-from froggy.utils import _walk, make_file_matcher, parse_action, show_line_number
+from froggy.pond.utils import _walk, make_file_matcher, parse_action, show_line_number
 
 
 @dataclass

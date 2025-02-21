@@ -1,9 +1,13 @@
+import logging
+from unittest.mock import patch
+
 import pytest
 
 from froggy.agents.llm_api import LLMResponse, TokenUsage
 from froggy.agents.utils import (
     HistoryTracker,
     build_history_prompt,
+    load_config,
     trim_prompt_messages,
 )
 
@@ -233,7 +237,7 @@ def test_history_tracker(build_env_info):
 def test_build_history_prompt(build_env_info):
     import json
 
-    from froggy.utils import unescape
+    from froggy.pond.utils import unescape
 
     # test with empty history
     ht = HistoryTracker(history_steps=3)
@@ -343,3 +347,68 @@ def test_build_history_prompt(build_env_info):
     ]
     expected += history_messages
     assert messages == expected
+
+
+def test_load_config():
+    import atexit
+    import tempfile
+    from pathlib import Path
+
+    import yaml
+
+    # do the test in a tmp folder
+    tempdir = tempfile.TemporaryDirectory(prefix="TestLoadConfig-")
+    working_dir = Path(tempdir.name)
+    config_file = working_dir / "config.yaml"
+    atexit.register(tempdir.cleanup)  # Make sure to cleanup that folder once done.
+
+    config_contents = {}
+    config_contents["pdb_agent"] = {
+        "random_seed": 42,
+        "max_steps": 100,
+        "llm_name": "gpt2",
+        "llm_temperature": [0.5],
+    }
+    config_contents["rewrite_only"] = {
+        "random_seed": 43,
+        "max_steps": 50,
+        "cot_style": "standard",
+        "llm_name": "gpt20",
+        "llm_temperature": [0.3],
+    }
+
+    # write the config file into yaml
+    with open(config_file, "w") as f:
+        yaml.dump(config_contents, f)
+
+    # now test
+    with patch(
+        "sys.argv",
+        [
+            "config_file",
+            str(config_file),
+            "--agent",
+            "pdb_agent",
+            "-p",
+            "pdb_agent.random_seed=123",
+            "rewrite_only.llm_temperature=[0.8, 0.8]",
+            "-v",
+            "--debug",
+        ],
+    ):
+
+        _config, _args = load_config()
+    assert _args.agent == "pdb_agent"
+    assert "pdb_agent" in _config.keys()
+    assert "rewrite_only" in _config.keys()
+    assert _config["pdb_agent"]["random_seed"] == 123
+    assert _config["pdb_agent"]["max_steps"] == 100
+    assert _config["pdb_agent"]["llm_name"] == "gpt2"
+    assert _config["pdb_agent"]["llm_temperature"] == [0.5]
+    assert _config["rewrite_only"]["random_seed"] == 43
+    assert _config["rewrite_only"]["max_steps"] == 50
+    assert _config["rewrite_only"]["cot_style"] == "standard"
+    assert _config["rewrite_only"]["llm_name"] == "gpt20"
+    assert _config["rewrite_only"]["llm_temperature"] == [0.8, 0.8]
+    assert _args.debug is True
+    assert _args.logging_level == logging.INFO

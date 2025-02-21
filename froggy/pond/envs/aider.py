@@ -2,7 +2,7 @@ import os
 import subprocess
 from pathlib import Path
 
-import froggy.utils as utils
+import froggy.pond.utils as utils
 from froggy.pond.envs.env import RepoEnv
 
 
