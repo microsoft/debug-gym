@@ -42,20 +42,21 @@ class ShellSession:
     def is_running(self):
         return self.process is not None and self.process.poll() is None
 
-    def start(self, command=None):
+    def start(self, command=None, read_until=None):
         self.close()  # Close any existing session
 
+        # Make sure session can read the output until the given sentinel or PS1
         env_vars = dict(self.env_vars)
-        if command is None:
+        if read_until is None:
+            read_until = self.PS1
             env_vars["PS1"] = self.PS1
 
-        # Prepare the command
+        # Prepare entrypoint, combining setup commands and command if provided
+        # For example: `bin/bash -c "setup_command1 && setup_command2 && pdb"`
         entrypoint = self.shell_command
         if command:
             command = " && ".join(self.setup_commands + [command])
             entrypoint = f'{self.shell_command} -c "{command}"'
-        else:
-            entrypoint += " && ".join(self.setup_commands)
 
         self.logger.debug(f"Starting {self} with entrypoint: {entrypoint}")
 
@@ -86,6 +87,15 @@ class ShellSession:
 
         # close slave, end in the parent process
         os.close(slave)
+
+        # Read the output until the sentinel or PS1
+        output = self.read(read_until=read_until).replace(read_until, "")
+
+        # Run setup commands after starting the session if command was not provided
+        if not command and self.setup_commands:
+            command = " && ".join(self.setup_commands)
+            output += self.run(command, read_until)
+        return output
 
     def close(self):
         if self.filedescriptor is not None:

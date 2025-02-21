@@ -359,3 +359,62 @@ def test_select_terminal_unknown():
 def test_select_terminal_invalid_config():
     with pytest.raises(TypeError):
         select_terminal("not a dict")
+
+
+def test_shell_session_start_with_setup_commands(tmp_path):
+    terminal = Terminal(
+        working_dir=str(tmp_path),
+        setup_commands=["echo setup"],
+    )
+    session = terminal.new_shell_session()
+
+    # Test starting without command
+    output = session.start()
+    assert output == "setup"  # from `echo setup` in setup_commands
+    assert session.is_running
+    assert session.filedescriptor is not None
+    assert session.process is not None
+    output = session.run("echo Hello World")
+    assert output == "Hello World"
+    session.close()
+    assert not session.is_running
+    assert session.filedescriptor is None
+    assert session.process is None
+
+    # Test starting with command
+    output = session.start("python", ">>>")
+    assert output.startswith("setup\r\nPython 3.12")
+    assert session.is_running
+    assert session.filedescriptor is not None
+    assert session.process is not None
+    output = session.run("print('test python')", ">>>")
+    assert output == "test python"
+    session.close()
+
+
+def test_shell_session_start_without_setup_commands(tmp_path):
+    terminal = Terminal(working_dir=str(tmp_path))
+    session = terminal.new_shell_session()
+
+    # Test starting without command
+    output = session.start()
+    assert output == ""
+    assert session.is_running
+    assert session.filedescriptor is not None
+    assert session.process is not None
+    output = session.run("echo Hello World")
+    assert output == "Hello World"
+    session.close()
+    assert not session.is_running
+    assert session.filedescriptor is None
+    assert session.process is None
+
+    # Test starting with command
+    output = session.start("python", ">>>")
+    assert output.startswith("Python 3.12")
+    assert session.is_running
+    assert session.filedescriptor is not None
+    assert session.process is not None
+    output = session.run("print('test python')", ">>>")
+    assert output == "test python"
+    session.close()

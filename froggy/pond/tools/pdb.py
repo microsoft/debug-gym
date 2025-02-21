@@ -48,8 +48,10 @@ class PDBTool(EnvironmentTool):
 
     def start_pdb(self) -> str:
         self._session = self.environment.terminal.new_shell_session()
-        self._session.start(self.environment.debug_entrypoint)
-        initial_output = self._session.read(read_until="(Pdb)")  # wait for the prompt
+        # init pdb and wait for the prompt
+        initial_output = self._session.start(
+            self.environment.debug_entrypoint, read_until="(Pdb)"
+        )
 
         if "The program finished and will be restarted" in initial_output:
             self.close_pdb()
