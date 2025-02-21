@@ -2,6 +2,7 @@ base:
     # Environment configs
     output_path: "exps/aider"
     benchmark: "aider"
+    problems: "all"  # list of problems, e.g., ["wordy"], or "all"
     env_kwargs: {
         "dir_tree_depth": 1,
         "run_on_rewrite": True,
@@ -16,7 +17,7 @@ base:
     auto_list: True  # in pdb tool
 
     # LLM configs
-    llm_name: "llama-31-h100"
+    llm_name: "gpt-4o"
     llm_temperature: [0.0]  # list of values between 0.0 and 1.0
 
     # Agent configs

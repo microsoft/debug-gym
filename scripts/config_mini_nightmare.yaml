@@ -2,7 +2,7 @@ base:
     # Environment configs
     output_path: "exps/mini_nightmare"
     benchmark: "mini_nightmare"
-    problems: "all"  # list of problems, e.g., ["wordy"], or "all"
+    problems: "all"  # list of problems, e.g., ["config"], or "all"
     env_kwargs: {
         "dir_tree_depth": 1,
         "run_on_rewrite": True,
@@ -17,8 +17,8 @@ base:
     auto_list: True  # in pdb tool
 
     # LLM configs
-    llm_name: "gpt-4o-az-login"
-    llm_temperature: [0.5]  # list of values between 0.0 and 1.0
+    llm_name: "gpt-4o"
+    llm_temperature: [0.0]  # list of values between 0.0 and 1.0
 
     # Agent configs
     random_seed: 42

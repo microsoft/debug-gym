@@ -19,14 +19,14 @@ base:
     auto_list: True  # in pdb tool
 
     # LLM configs
-    llm_name: "gpt-4o-az-login"
+    llm_name: "gpt-4o"
     llm_temperature: [0.5]  # list of values between 0.0 and 1.0
 
     # Agent configs
     random_seed: 42
     max_steps: 100
     max_rewrite_steps: 10
-    memory_size: 10
+    memory_size: 20
     use_conversational_prompt: True
     save_patch: True
     log_prompt_response_pairs: True
