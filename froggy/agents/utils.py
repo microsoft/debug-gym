@@ -312,4 +312,8 @@ def load_config():
         # base config is not specified
         return_config = config[args.agent]
 
+    # assume agent type is the key if not specified by the user
+    if not return_config.get("agent_type"):
+        return_config["agent_type"] = args.agent
+
     return return_config, args
