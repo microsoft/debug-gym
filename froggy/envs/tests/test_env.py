@@ -1,6 +1,5 @@
-from os.path import join as pjoin
 from pathlib import Path
-from unittest.mock import MagicMock, mock_open, patch
+from unittest.mock import MagicMock, call, patch
 
 import numpy as np
 import pytest
@@ -481,3 +480,30 @@ def test_current_breakpoints_with_breakpoints(tmp_path):
         "line 15 in file2.py"
     )
     assert result == expected_result
+
+
+def test_queue_and_process_events():
+    env = TooledEnv()
+    obs1 = Observation("tool1", "obs1")
+    obs2 = Observation("tool2", "obs2")
+
+    # Queue some test events
+    env.queue_event(Event.ENV_START, "source1", arg1="val1")
+    env.queue_event(Event.ENV_RESET, "source2", arg2="val2")
+    assert len(env.event_queue) == 2
+
+    # Patch the notify method to return some observations
+    with patch.object(EventHooks, "notify", return_value=[obs1, obs2]) as mock:
+        observations = env.process_events()
+
+    # Verify events were processed
+    assert observations == [obs1, obs2, obs1, obs2]
+    assert env.all_observations == [obs1, obs2, obs1, obs2]
+    assert env.event_queue == []
+
+    # Verify notify was called with correct args
+    expected_calls = [
+        call(event=Event.ENV_START, source="source1", arg1="val1"),
+        call(event=Event.ENV_RESET, source="source2", arg2="val2"),
+    ]
+    mock.assert_has_calls(expected_calls)
