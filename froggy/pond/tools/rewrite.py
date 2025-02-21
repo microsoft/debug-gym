@@ -1,7 +1,7 @@
 from froggy.pond.entities import Event, Observation
 from froggy.pond.tools.tool import EnvironmentTool
 from froggy.pond.tools.toolbox import Toolbox
-from froggy.utils import clean_code
+from froggy.pond.utils import clean_code
 
 
 @Toolbox.register()

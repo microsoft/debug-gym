@@ -4,7 +4,7 @@ from os.path import join as pjoin
 from froggy.pond.entities import Observation
 from froggy.pond.tools.tool import EnvironmentTool
 from froggy.pond.tools.toolbox import Toolbox
-from froggy.utils import is_subdirectory
+from froggy.pond.utils import is_subdirectory
 
 
 @Toolbox.register()

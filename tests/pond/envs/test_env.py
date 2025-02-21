@@ -220,7 +220,7 @@ def test_display_files(env):
     )
 
 
-@patch("froggy.utils.show_line_number")
+@patch("froggy.pond.utils.show_line_number")
 def test_current_code_with_line_number(mock_show_line_number):
     mock_show_line_number.return_value = "1    def foo():\n2        return 42"
     env = RepoEnv(path=".")

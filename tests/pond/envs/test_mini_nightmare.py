@@ -1,7 +1,4 @@
-import json
-import os
-import shutil
-from unittest.mock import MagicMock, mock_open, patch
+from unittest.mock import mock_open, patch
 
 import pytest
 
@@ -59,7 +56,10 @@ def test_instructions(mini_nightmare_env):
     assert mini_nightmare_env.instructions == expected_instructions
 
 
-@patch("froggy.pond.envs.RepoEnv.current_code_with_line_number", return_value="Current code")
+@patch(
+    "froggy.pond.envs.RepoEnv.current_code_with_line_number",
+    return_value="Current code",
+)
 @patch("froggy.pond.envs.MiniNightmareEnv.setup_workspace")
 @patch("froggy.pond.envs.MiniNightmareEnv.load_current_file")
 @patch.object(

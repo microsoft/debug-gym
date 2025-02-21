@@ -1,4 +1,3 @@
-from pathlib import Path
 from unittest.mock import MagicMock, mock_open, patch
 
 import pytest
@@ -59,13 +58,13 @@ def test_instructions(aider_env):
 
 
 @patch("froggy.pond.envs.RepoEnv.reset")
-@patch("froggy.pond.envs.RepoEnv.current_code_with_line_number", return_value="Current code")
+@patch(
+    "froggy.pond.envs.RepoEnv.current_code_with_line_number",
+    return_value="Current code",
+)
 @patch("froggy.pond.envs.AiderBenchmarkEnv.setup_workspace")
 @patch("froggy.pond.envs.AiderBenchmarkEnv.load_current_file")
 def test_reset(
-    mock_load_current_file,
-    mock_setup_workspace,
-    mock_line_number,
     repo_env,
     aider_env,
     env_info,
@@ -100,6 +99,6 @@ def test_step(mock_step, aider_env, env_info):
 @patch("subprocess.run")
 @patch("os.path.exists", return_value=False)
 @patch("os.listdir", return_value=[".gitignore"])
-def test_load_dataset(mock_listdir, mock_exists, mock_run, aider_env):
+def test_load_dataset(mock_run, aider_env):
     aider_env.load_dataset()
     assert mock_run.called

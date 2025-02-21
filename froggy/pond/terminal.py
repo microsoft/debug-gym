@@ -450,9 +450,9 @@ def select_terminal(
     terminal_type = terminal_config["type"]
     match terminal_type:
         case "docker":
-            from froggy.pond.terminal import DockerTerminal as terminal_class
+            terminal_class = DockerTerminal
         case "local":
-            from froggy.pond.terminal import Terminal as terminal_class
+            terminal_class = Terminal
         case _:
             raise ValueError(f"Unknown terminal {terminal_type}")
 
