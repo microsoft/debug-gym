@@ -18,7 +18,7 @@ def test_build_prompt(agent_setup, build_env_info):
         dir_tree="Test dir tree",
         current_code_with_line_number="Test code",
         current_breakpoints="Test breakpoints",
-        last_run_obs="Test last run obs",
+        step_observation="Test last run obs",
     )
     messages = agent.build_prompt(info)
     assert len(messages) > 0
@@ -34,7 +34,7 @@ def test_run(agent_setup, build_env_info):
         dir_tree="Test dir tree",
         current_code_with_line_number="Test code",
         current_breakpoints="Test breakpoints",
-        last_run_obs="Test last run obs",
+        step_observation="Test last run obs",
     )
     env.step.return_value = build_env_info(
         done=True,
@@ -44,7 +44,7 @@ def test_run(agent_setup, build_env_info):
         dir_tree="Test dir tree",
         current_code_with_line_number="Test code",
         current_breakpoints="Test breakpoints",
-        last_run_obs="Test last run obs",
+        step_observation="Test last run obs",
     )
     llm.return_value = LLMResponse("Prompt", "Expected answer", TokenUsage(2, 4))
     result = agent.run(task_name="test_task", debug=False)
@@ -58,7 +58,7 @@ def test_build_system_prompt_no_pdb(agent_setup, build_env_info):
         dir_tree="Test dir tree",
         current_code_with_line_number="Test code",
         current_breakpoints="Test breakpoints",
-        last_run_obs="Test last run obs",
+        step_observation="Test last run obs",
     )
     messages = agent.build_system_prompt(info)
     assert len(messages) == 1
@@ -83,7 +83,7 @@ def test_run_pdb_after_rewrites(agent_setup, build_env_info):
         dir_tree="Test dir tree",
         current_code_with_line_number="Test code",
         current_breakpoints="Test breakpoints",
-        last_run_obs="Test last run obs",
+        step_observation="Test last run obs",
     )
     env.step.return_value = build_env_info(
         done=True,
@@ -94,7 +94,7 @@ def test_run_pdb_after_rewrites(agent_setup, build_env_info):
         dir_tree="Test dir tree",
         current_code_with_line_number="Test code",
         current_breakpoints="Test breakpoints",
-        last_run_obs="Test last run obs",
+        step_observation="Test last run obs",
     )
     llm.return_value = LLMResponse("Prompt", "Expected answer", TokenUsage(2, 4))
     env.tools = {"pdb": MagicMock()}

@@ -54,7 +54,11 @@ class PdbAgent:
         system_prompt["Repo directory tree"] = info.dir_tree
         system_prompt["Current code in view"] = info.current_code_with_line_number
         system_prompt["Current breakpoints"] = info.current_breakpoints
-        system_prompt["Last execution output"] = info.last_run_obs
+        system_prompt["Last evaluation output"] = info.eval_observation.observation
+        system_prompt["Last execution output"] = info.step_observation.observation
+        # from dataclasses import asdict
+        # system_prompt["All observations triggered by last execution"] = asdict(info.all_observations)
+
         system_prompt = unescape(json.dumps(system_prompt, indent=4))
         messages = [
             {
@@ -183,7 +187,8 @@ class RewriteOnly(PdbAgent):
         system_prompt["Repo directory tree"] = info.dir_tree
         system_prompt["Current code in view"] = info.current_code_with_line_number
         system_prompt["Current breakpoints"] = info.current_breakpoints
-        system_prompt["Last execution output"] = info.last_run_obs
+        system_prompt["Last evaluation output"] = info.eval_observation.observation
+        system_prompt["Last execution output"] = info.step_observation.observation
         system_prompt = unescape(json.dumps(system_prompt, indent=4))
         messages = [
             {
@@ -247,8 +252,9 @@ class PdbAfterRewrites(PdbAgent):
             ):
                 self.env.add_tool(pdb_tool)
                 self.env.tools["pdb"].start_pdb()
+                # update info tools related fields after adding pdb so it's included when building the next prompt
                 info.instructions = self.env.instructions
-                info.obs += "\nThe pdb tool has been added."
+                info.tools = self.env.tool_instructions
 
             self.history.step(info, llm_response)
 

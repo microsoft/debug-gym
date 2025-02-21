@@ -22,16 +22,22 @@ class MiniNightmareEnv(RepoEnv):
 
     @property
     def instructions(self):
-        _instruction = {
+        return {
+            **super().instructions,
             "Problem description": self.current_sample["instructions"],
-            "Available tools to solve the problem": self.tool_instructions,
-            "Available commands": self.tool_names,
         }
-        return _instruction
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.load_dataset()
+
+    def eval(self, **kwargs):
+        success, output = self.terminal.run(self.entrypoint, timeout=self.run_timeout)
+        self.max_score = utils.extract_max_score_from_pytest_output(output)
+        self.score = utils.extract_reward_from_pytest_output(output)
+        self.done = self.score == self.max_score
+        self.last_eval_obs = utils.cleanup_pytest_output(output)
+        return self.last_eval_obs
 
     def reset(self, *, seed=None, options: dict = None):
         options = options or {}
@@ -45,29 +51,11 @@ class MiniNightmareEnv(RepoEnv):
         )
 
         infos = super().reset()
-        infos.instructions = self.instructions
-        infos.last_run_obs = utils.cleanup_pytest_output(infos.last_run_obs)
-
-        self.max_score = utils.extract_max_score_from_pytest_output(infos.last_run_obs)
-        infos.max_score = self.max_score
-        self.score = utils.extract_reward_from_pytest_output(infos.last_run_obs)
-        self.done = self.score == self.max_score
-        infos.score = self.score
-        infos.done = self.done
 
         # By default, open the only modifiable file.
         self.load_current_file(self.current_sample["filename"])
         # an update the infos related to current code.
         infos.current_code_with_line_number = self.current_code_with_line_number()
-        return infos
-
-    def step(self, action: str):
-        infos = super().step(action)
-
-        self.score = utils.extract_reward_from_pytest_output(infos.last_run_obs)
-        self.done = self.score == self.max_score
-        infos.score = self.score
-        infos.done = self.done
         return infos
 
     def load_dataset(self):

@@ -12,18 +12,17 @@ from pathlib import Path
 
 import numpy as np
 
+from froggy.entities import Event, Observation
 from froggy.logger import FroggyLogger
 from froggy.terminal import Terminal
-from froggy.tools.pdb import PDBTool
-from froggy.tools.rewrite import RewriteTool
 from froggy.utils import _walk, make_file_matcher, parse_action, show_line_number
 
 
 @dataclass
 class EnvInfo:
-    obs: str
-    last_run_obs: str
-    dbg_obs: str
+    step_observation: Observation  # obs from the tool triggered by env.step or env.last_eval_obs when env.reset
+    all_observations: list[Observation]  #  env.step + triggered tools obs
+    eval_observation: Observation  # last eval observation
     dir_tree: str
     current_code_with_line_number: dict | str
     current_breakpoints: str
@@ -33,19 +32,52 @@ class EnvInfo:
     max_score: int
     done: bool
     rewrite_counter: int
-    tools: dict
+    tools: dict  # TODO: return some tool dataclass
+
+
+class EventHooks:
+    def __init__(self):
+        self.event_listeners = {event: [] for event in Event}
+
+    def subscribe(self, event: Event, tool: "Tool"):
+        if event not in self.event_listeners:
+            raise ValueError(f"Unknown event type: {event}")
+        if not hasattr(tool, event.handler_name):
+            raise ValueError(f"Tool does not implement method {event.handler_name}")
+        self.event_listeners[event].append(tool)
+
+    def unsubscribe(self, event: Event, tool):
+        self.event_listeners[event].remove(tool)
+
+    def notify(self, event: Event, source=None, **kwargs) -> list[Observation]:
+        """Notify all tools that are subscribed to the event.
+        Returns a list of observations from all tools that are triggered by the event.
+        If error occurs while handling the event, an error observation is returned.
+        """
+        observations = []
+        for tool in self.event_listeners[event]:
+            if tool == source:
+                continue  # skip the source tool to avoid infinite loop
+            try:
+                observation = getattr(tool, event.handler_name)(**kwargs)
+                if observation:
+                    observations.append(observation)
+            except Exception as e:
+                error_message = f"Error in tool {tool.name} handling {event}:\n{e}"
+                observations.append(Observation(tool.name, error_message))
+        return observations
 
 
 class TooledEnv:
     def __init__(self):
         self.tools = {}
+        self.event_hooks = EventHooks()
+        self.event_queue = []
+        self.all_observations = []
 
     @property
     def tool_names(self):
-        return ", ".join([t.name for t in self.tools.values()])
-
-    def seed(self, seed):
-        self.rng = np.random.RandomState(seed)
+        return ", ".join([f"```{t.name}```" for t in self.tools.values()])
 
     def add_tool(self, tool):
         if tool.name in self.tools:
@@ -76,16 +108,33 @@ class TooledEnv:
     def tool_instructions(self):
         return {name: tool.instructions for name, tool in self.tools.items()}
 
+    def clear_all_observations(self):
+        self.all_observations = []
+
+    def empty_event_queue(self):
+        self.event_queue = []
+
+    def queue_event(self, event: Event, source=None, **kwargs) -> None:
+        """Add an event to the queue for processing later."""
+        self.event_queue.append((event, source, kwargs))
+
+    def process_events(self) -> list[Observation]:
+        """Process all queued events and handle their observations."""
+        while self.event_queue:
+            event, source, kwargs = self.event_queue.pop(0)
+            observations = self.event_hooks.notify(event=event, source=source, **kwargs)
+            self.all_observations.extend(observations)
+        return self.all_observations
+
 
 class RepoEnv(TooledEnv):
-
-    DEFAULT_MAX_SCORE = 1
 
     def __init__(
         self,
         path: str | None = None,
         entrypoint: str = "python -m pytest -sq .",
         debug_entrypoint: str | None = None,
+        max_score: int = 1,
         readonly_patterns: list[str] | None = None,
         run_on_rewrite: bool = True,
         run_timeout: int | None = None,
@@ -97,7 +146,7 @@ class RepoEnv(TooledEnv):
         super().__init__()
 
         self.path = None
-        self.max_score = RepoEnv.DEFAULT_MAX_SCORE
+        self.max_score = max_score
         self.run_on_rewrite = run_on_rewrite
         self.run_timeout = run_timeout
         self.dir_tree_depth = dir_tree_depth
@@ -107,6 +156,7 @@ class RepoEnv(TooledEnv):
         self.debug_entrypoint = debug_entrypoint or entrypoint
         self.logger = logger or FroggyLogger("froggy")
         self.infos: EnvInfo | None = None
+        self.rng = None
 
         self.setup_workspace(
             path=path,
@@ -114,7 +164,7 @@ class RepoEnv(TooledEnv):
             debug_entrypoint=debug_entrypoint,
             readonly_patterns=readonly_patterns,
         )
-        self.last_run_obs = None
+        self.last_eval_obs = ""
         self.score = 0
         self.done = False
         self.rewrite_counter = 0
@@ -211,38 +261,47 @@ class RepoEnv(TooledEnv):
 
             shutil.copy2(self.path / filepath, self.working_dir / filepath)
 
-    def reset(self, *, seed=None, options: dict = None, restore_code=True):
+    def reset(
+        self,
+        *,
+        seed=None,
+        options: dict = None,
+        restore_code=True,
+    ):
+        """Resets the environment to the initial state and returns the initial observation"""
         self.logger.info(f"Resetting environment")
         options = options or {}
         self.current_file = None
         self.current_file_content = None
         self.current_breakpoints_state = {}
         self.rewrite_counter = 0
+        self.last_eval_obs = ""
+        self.done = False
+        self.clear_all_observations()
+        self.empty_event_queue()
+        self.seed(seed)
 
         if restore_code:
             self.restore()
 
-        # Run the initial code. This will set self.last_run_obs, self.done and self.score.
-        self.logger.info(f"Running initial evaluation")
-        self.run()
+        # Notify all tools that the environment is reset and get their observations
+        self.queue_event(Event.ENV_RESET, source="env")
+        self.all_observations = self.process_events()
 
-        self.obs = ""
-        if self.has_tool("pdb"):
-            self.get_tool("pdb").start_pdb()
-            self.dbg_obs = self.get_tool("pdb").pdb_obs
-            # self.obs += "Debugging terminal started:\n" f"{self.dbg_obs}\n"
+        # Gets eval (initial observation) from cache if eval tool was already called or by running env.eval
+        if self.last_eval_obs:
+            self.step_observation = Observation("env", self.last_eval_obs)
+        else:
+            self.step_observation = Observation("env", self.eval())
+            self.all_observations.insert(0, self.step_observation)
 
         self.infos = EnvInfo(
-            obs=self.obs,
-            dbg_obs=self.dbg_obs if hasattr(self, "dbg_obs") else "",
-            last_run_obs=self.last_run_obs,
+            step_observation=self.step_observation,
+            all_observations=self.all_observations,
+            eval_observation=Observation("env", self.last_eval_obs),
             dir_tree=self.display_files(),
-            current_breakpoints=(
-                self.tools["pdb"].current_breakpoints()
-                if self.has_tool("pdb")
-                else "No breakpoints are set."
-            ),
             current_code_with_line_number=self.current_code_with_line_number(),
+            current_breakpoints=self.current_breakpoints(),
             action=None,
             done=self.done,
             score=self.score,
@@ -254,13 +313,20 @@ class RepoEnv(TooledEnv):
 
         return self.infos
 
-    def run(self):
+    def seed(self, seed=None):
+        if seed is not None:
+            self.rng = np.random.RandomState(seed)
+
+    def eval(self, **kwargs):
+        """Evaluates the current code using the provided entrypoint.
+        Sets the last_eval_obs, score and done flag based on the evaluation result.
+        Returns the last_eval_obs.
+        """
         success, output = self.terminal.run(self.entrypoint, timeout=self.run_timeout)
-        self.last_run_obs = output
+        self.last_eval_obs = output
         self.score = int(success)
         self.done = success
-
-        return self.last_run_obs, self.done
+        return self.last_eval_obs
 
     def load_current_file(self, filepath: str) -> bool:
         self.current_file = filepath
@@ -316,6 +382,24 @@ class RepoEnv(TooledEnv):
 
         return "\n".join(result)
 
+    def current_breakpoints(self):
+        if len(self.current_breakpoints_state) == 0:
+            return "No breakpoints are set."
+        else:
+            # print the breakpoints sorted by file names and line number
+            breakpoints = []
+            for _key in self.current_breakpoints_state.keys():
+                _file_path, _line_number = _key.split("|||")
+                _line_number = int(_line_number)
+                breakpoints.append([_file_path, _line_number])
+            # sort by file name, if file names are same, sort by line number
+            breakpoints = sorted(breakpoints, key=lambda x: (x[0], x[1]))
+            breakpoints = [
+                f"line {_line_number} in {_file_path}"
+                for _file_path, _line_number in breakpoints
+            ]
+            return "\n".join(breakpoints)
+
     def current_code_with_line_number(self):
         if self.current_file is None or self.current_file_content is None:
             return "You are currently not working in a file. You can use ```view path/to/file.py``` to navigate to a file first."
@@ -330,7 +414,7 @@ class RepoEnv(TooledEnv):
             )
             + "\n",
         }
-        if self.has_tool("pdb"):
+        if self.current_breakpoints_state:
             output["Note"] = (
                 "B indicates breakpoint before a certain line of code, this can be changed using pdb commands such as b, cl, etc."
             )
@@ -351,46 +435,35 @@ class RepoEnv(TooledEnv):
     def step(self, action: str):
         # given action, return new obs, and update infos
         # the action space is composed of a few smaller action spaces
+        self.clear_all_observations()
+        self.empty_event_queue()
         message, tool_info = self.get_triggered_tools(action)
         if message:
-            self.obs = message
+            self.step_observation = Observation("env", message)
         else:
             triggered_tool, tool_args = tool_info
             try:
-                self.obs = triggered_tool.use(tool_args)
-            except:
-                self.obs = f"Error while using tool {triggered_tool.name} with action: \n{action}"
+                self.step_observation = triggered_tool(tool_args)
+            except BaseException as e:
+                error_message = (
+                    f"Error while using tool {triggered_tool.name} "
+                    f"with action: {action}.\n{e}"
+                )
+                self.step_observation = Observation("env", error_message)
+                self.logger.warning(error_message)
 
-            if isinstance(triggered_tool, RewriteTool):
-                self.rewrite_counter += 1
-                if triggered_tool.rewrite_success:
-                    if self.run_on_rewrite:
-                        self.obs += "\nNew code has been run."
-                        self.run()
-                    if self.has_tool("pdb"):
-                        # Restart pdb to take into account recent changes.
-                        self.get_tool("pdb").restart_pdb()
-                        self.dbg_obs = self.get_tool("pdb").pdb_obs
-                        self.obs += (
-                            "\nDebugging terminal started:\n" f"{self.dbg_obs}\n"
-                        )
-            elif isinstance(triggered_tool, PDBTool):
-                if self.auto_view_change:
-                    current_frame_file = triggered_tool.current_frame_file
-                    if current_frame_file in self.all_files:
-                        self.load_current_file(triggered_tool.current_frame_file)
+        # Process any events that were queued during tool execution
+        self.all_observations = self.process_events()
+        # prepend step_observation to all_observations
+        self.all_observations.insert(0, self.step_observation)
 
         self.infos = EnvInfo(
-            obs=self.obs,
-            last_run_obs=self.last_run_obs,
-            dbg_obs=self.dbg_obs if hasattr(self, "dbg_obs") else "",
+            step_observation=self.step_observation,
+            all_observations=self.all_observations,
+            eval_observation=Observation("env", self.last_eval_obs),
             dir_tree=self.display_files(),
             current_code_with_line_number=self.current_code_with_line_number(),
-            current_breakpoints=(
-                self.tools["pdb"].current_breakpoints()
-                if self.has_tool("pdb")
-                else "No breakpoints are set."
-            ),
+            current_breakpoints=self.current_breakpoints(),
             action=action,
             instructions=self.instructions,
             score=self.score,

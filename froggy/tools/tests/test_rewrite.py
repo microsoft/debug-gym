@@ -22,7 +22,7 @@ def test_rewrite(mock_environment):
     patch = "2 <c>    print(f'Hello, {name}!')</c>"
     result = patcher.use(patch)
 
-    assert result == "Rewriting done."
+    assert result.observation == "Rewriting done."
     assert patcher.rewrite_success
     mock_environment.overwrite_file.assert_called_once_with(
         filepath="test.py", content=""
@@ -36,7 +36,7 @@ def test_rewrite_with_file_path(mock_environment):
     patch = "test.py 2 <c>    print(f'Hello, {name}!')</c>"
     result = patcher.use(patch)
 
-    assert result == "Rewriting done."
+    assert result.observation == "Rewriting done."
     assert patcher.rewrite_success
     mock_environment.overwrite_file.assert_called_once_with(
         filepath="test.py", content=""
@@ -50,7 +50,7 @@ def test_rewrite_invalid_content(mock_environment):
     patch = "invalid content"
     result = patcher.use(patch)
 
-    assert result == "SyntaxError: invalid syntax.\nRewrite failed."
+    assert result.observation == "SyntaxError: invalid syntax.\nRewrite failed."
     assert not patcher.rewrite_success
 
 
@@ -63,7 +63,7 @@ def test_rewrite_invalid_file(mock_environment):
     result = patcher.use(patch)
 
     assert (
-        result
+        result.observation
         == "File test.py does not exist or is not in the current repository.\nRewrite failed."
     )
     assert not patcher.rewrite_success
@@ -76,7 +76,10 @@ def test_rewrite_invalid_line_number(mock_environment):
     patch = "test.py 0 <c>    print(f'Hello, {name}!')</c>"
     result = patcher.use(patch)
 
-    assert result == "Invalid line number, line numbers are 1-based.\nRewrite failed."
+    assert (
+        result.observation
+        == "Invalid line number, line numbers are 1-based.\nRewrite failed."
+    )
     assert not patcher.rewrite_success
 
 
@@ -88,7 +91,7 @@ def test_rewrite_invalid_line_number_2(mock_environment):
     result = patcher.use(patch)
 
     assert (
-        result
+        result.observation
         == "Invalid line number range, head should be less than or equal to tail.\nRewrite failed."
     )
     assert not patcher.rewrite_success

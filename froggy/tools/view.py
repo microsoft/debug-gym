@@ -1,6 +1,7 @@
 import os
 from os.path import join as pjoin
 
+from froggy.entities import Observation
 from froggy.tools.tool import EnvironmentTool
 from froggy.tools.toolbox import Toolbox
 from froggy.utils import is_subdirectory
@@ -21,7 +22,7 @@ class ViewTool(EnvironmentTool):
     def is_editable(self, filepath):
         return filepath in self.environment.editable_files
 
-    def use(self, tool_args):
+    def use(self, tool_args) -> Observation:
         new_file = tool_args
         if new_file == "":
             obs = [
@@ -33,7 +34,7 @@ class ViewTool(EnvironmentTool):
                     else "The file is read-only, it is not editable."
                 ),
             ]
-            return " ".join(obs)
+            return Observation(self.name, " ".join(obs))
 
         if new_file.startswith(str(self.environment.working_dir)):
             new_file = new_file[len(str(self.environment.working_dir)) + 1 :]
@@ -83,4 +84,4 @@ class ViewTool(EnvironmentTool):
                 ),
             ]
 
-        return " ".join(obs)
+        return Observation(self.name, " ".join(obs))

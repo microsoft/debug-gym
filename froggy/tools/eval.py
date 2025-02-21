@@ -1,3 +1,4 @@
+from froggy.entities import Observation
 from froggy.tools.tool import EnvironmentTool
 from froggy.tools.toolbox import Toolbox
 
@@ -10,6 +11,15 @@ class EvalTool(EnvironmentTool):
         "description": "Evaluate the current code against pre-defined test cases.",
     }
 
-    def use(self, tool_args):
-        self.environment.run()
-        return "Evaluation completed."
+    def use(self, tool_args, **kwargs) -> Observation:
+        obs = self.environment.eval(**kwargs)
+        return Observation(self.name, obs)
+
+    def on_env_reset(self, **kwargs):
+        super().on_env_reset(**kwargs)
+        return self(**kwargs)
+
+    def on_rewrite_success(self, **kwargs):
+        if self.environment.run_on_rewrite:
+            return self(**kwargs)
+        return None

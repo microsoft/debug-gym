@@ -1,3 +1,4 @@
+from froggy.entities import Event, Observation
 from froggy.tools.tool import EnvironmentTool
 from froggy.tools.toolbox import Toolbox
 from froggy.utils import clean_code
@@ -99,10 +100,11 @@ class RewriteTool(EnvironmentTool):
             tail = int(line_numbers[1]) - 1  # 1-based to 0-based
         return "", head, tail
 
-    def use(self, tool_args):
+    def use(self, tool_args) -> Observation:
         content = tool_args
         # parse content to get file_path, head, tail, and new_code
         # code/utils.py 4:6 <c>        print('buongiorno')</c>
+        self.environment.rewrite_counter += 1
         file_path, head, tail = None, None, None
         message = ""
         try:
@@ -131,25 +133,28 @@ class RewriteTool(EnvironmentTool):
             message = "SyntaxError: invalid syntax."
         if "" != message:
             self.rewrite_success = False
-            return "\n".join([message, "Rewrite failed."])
+            message = "\n".join([message, "Rewrite failed."])
+            self.queue_event(Event.REWRITE_FAIL, message=message)
+            return Observation(self.name, message)
 
         message, success, new_code_length = self._rewrite_file(
             file_path, head, tail, new_code
         )
         if success is True:
-            if (
-                hasattr(self.environment, "tools")
-                and isinstance(self.environment.tools, dict)
-                and "pdb" in self.environment.tools
-            ):
-                self.environment.tools["pdb"].breakpoint_modify(
-                    file_path,
-                    head + 1 if isinstance(head, int) else None,
-                    tail + 1 if isinstance(tail, int) else None,
-                    new_code_length,
-                )  # converting head/tail back to 1-based index for breakpoint management
             self.rewrite_success = True
-            return "Rewriting done."
+            message = "Rewriting done."
+            self.queue_event(
+                Event.REWRITE_SUCCESS,
+                message=message,
+                file=file_path,
+                # converting head/tail back to 1-based index for breakpoint management
+                head=head + 1 if isinstance(head, int) else None,
+                tail=tail + 1 if isinstance(tail, int) else None,
+                length=new_code_length,
+            )
+            return Observation(self.name, message)
 
         self.rewrite_success = False
-        return "\n".join([message, "Rewrite failed."])
+        message = "\n".join([message, "Rewrite failed."])
+        self.queue_event(Event.REWRITE_FAIL, message=message)
+        return Observation(self.name, message)

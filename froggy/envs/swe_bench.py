@@ -51,12 +51,10 @@ class SWEBenchEnv(RepoEnv):
 
     @property
     def instructions(self):
-        _instruction = {
+        return {
+            **super().instructions,
             "Problem description": self.ds_row["problem_statement"],
-            "Available tools to solve the problem": self.tool_instructions,
-            "Available commands": self.tool_names,
         }
-        return _instruction
 
     def load_dataset(self):
         self.ds = datasets.load_dataset(self.dataset_id)["test"]
@@ -189,6 +187,13 @@ class SWEBenchEnv(RepoEnv):
         patch = result.stdout.replace(str(self.working_dir), str(self.path))
         return patch
 
+    def eval(self, **kwargs):
+        success, output = self.terminal.run(self.entrypoint, timeout=self.run_timeout)
+        self.score = self._extract_score(output)
+        self.done = self.score == self.max_score
+        self.last_eval_obs = output
+        return self.last_eval_obs
+
     def reset(self, *, seed=None, options: dict | None = None):
         # TODO: support reset current task, i.e. no options provided.
         options = options or {}
@@ -280,27 +285,14 @@ class SWEBenchEnv(RepoEnv):
         self.terminal.run(f"git commit -am 'Applied test patch'")
 
         # Reset RepoEnv
-        infos = super().reset(options=options, restore_code=False)
-        # TODO: probably needed cleanup specific to each SWE-Bench repo.
-        # infos.last_run_obs = utils.cleanup_pytest_output(infos.last_run_obs)
-
+        # TODO: Create a RepoEnv per task and set max_score at initialization.
         self.max_score = len(self.fail_to_pass)
-        infos.max_score = self.max_score
-
-        # TODO: probably needed cleanup specific to each SWE-Bench repo.
-        # infos.last_run_obs = utils.cleanup_pytest_output(infos.last_run_obs)
-        self.score = self._extract_score(infos.last_run_obs)
-        self.done = self.score == self.max_score
-        infos.score = self.score
-        infos.done = self.done
+        infos = super().reset(options=options, restore_code=False)
         assert not self.done, "Tests should be failing before debugging."
 
         return infos
 
     def _extract_score(self, obs):
-        # TODO: probably needed cleanup specific to each SWE-Bench repo.
-        # infos.last_run_obs = utils.cleanup_pytest_output(infos.last_run_obs)
-        # infos.score = utils.extract_reward_from_pytest_output(infos.last_run_obs)
         test_status_map = MAP_REPO_TO_PARSER[self.repo](obs)
         self.logger.debug(f"fail_to_pass: {self.fail_to_pass}")
         self.logger.debug(f"Test status map: {test_status_map}")
@@ -313,18 +305,6 @@ class SWEBenchEnv(RepoEnv):
         )
         assert score <= self.max_score
         return score
-
-    def step(self, action: str):
-        infos = super().step(action)
-
-        # TODO: probably needed cleanup specific to each SWE-Bench repo.
-        # infos.last_run_obs = utils.cleanup_pytest_output(infos.last_run_obs)
-        self.score = self._extract_score(infos.last_run_obs)
-        self.done = self.score == self.max_score
-        infos.score = self.score
-        infos.done = self.done
-
-        return infos
 
     def clone_repo(self, repo_address):
         org_name, repo_name = repo_address.split("/")
