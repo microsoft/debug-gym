@@ -13,8 +13,20 @@ from froggy.pond.envs.env import RepoEnv
 from froggy.pond.utils import unescape
 
 
+AGENT_REGISTRY = {}
+
+
+def register_agent(cls):
+    if not issubclass(cls, BaseAgent):
+        raise ValueError("agent_class must be a subclass of BaseAgent")
+    if cls.name is None:
+        raise ValueError("agent_class must have a name attribute")
+    AGENT_REGISTRY[cls.name.lower()] = cls
+    return cls
+
+
 class BaseAgent:
-    name: str = "base agent"
+    name: str = None
     system_prompt: str = None
     action_prompt: str = None
 
@@ -168,3 +180,23 @@ class BaseAgent:
         self.logger.debug(
             f"Log saved in {pjoin(self._output_path, task_name, 'froggy.jsonl')}"
         )
+
+
+def create_agent(agent_type: str, **agent_kwargs):
+    if agent_type in AGENT_REGISTRY:
+        agent_class = AGENT_REGISTRY[agent_type]
+    elif "." in agent_type:
+        # try to import agent_type module
+        import importlib
+    
+        parts = agent_type.split('.')
+        module_name = '.'.join(parts[:-1])
+        class_name = parts[-1]
+
+        module = importlib.import_module(module_name)
+        agent_class = getattr(module, class_name)
+    else:
+        raise ValueError(f"Unknown agent type: {agent_type}")
+
+    agent = agent_class(**agent_kwargs)
+    return agent

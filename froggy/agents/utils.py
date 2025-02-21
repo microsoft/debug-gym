@@ -10,6 +10,7 @@ import yaml
 from froggy.agents.llm_api import LLMResponse
 from froggy.pond.envs.env import EnvInfo
 from froggy.pond.utils import unescape
+from froggy.logger import FroggyLogger
 
 
 class HistoryTracker:
@@ -222,8 +223,6 @@ def load_config():
     parser.add_argument("config_file", help="path to config file")
     parser.add_argument(
         "--agent",
-        help="pdb_agent, rewrite_only, pdb_after_rewrites",
-        default="pdb_agent",
     )
     parser.add_argument(
         "--debug",
@@ -293,4 +292,18 @@ def load_config():
             entry_to_change = entry_to_change[k]
         entry_to_change[keys[-1]] = yaml.safe_load(value)
 
-    return config, args
+    available_agents = list(config.keys())
+
+    if not args.agent:
+        # pick first agent
+        args.agent = available_agents[0]
+    elif args.agent not in available_agents:
+        raise ValueError(
+            f"Invalid agent: {args.agent}. Available agents: {available_agents}"
+        )
+
+    # assume agent type is the key if not specified by the user
+    if not config[args.agent].get('agent_type'):
+        config[args.agent]['agent_type'] = args.agent
+
+    return config[args.agent], args

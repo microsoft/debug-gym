@@ -7,15 +7,16 @@ from os.path import join as pjoin
 import numpy as np
 
 from froggy.agents.llm_api import instantiate_llm
-from froggy.agents.base_agent import BaseAgent
+from froggy.agents.base_agent import BaseAgent, register_agent
 from froggy.agents.utils import HistoryTracker, build_history_prompt
 from froggy.logger import FroggyLogger
 from froggy.pond.envs.env import RepoEnv
 from froggy.pond.utils import unescape
 
 
+@register_agent
 class PdbAgent(BaseAgent):
-    name = "pdb agent"
+    name = "pdb_agent"
     system_prompt = (
         "Your goal is to debug a Python program to make sure it can pass a set of test functions. You have access to the pdb debugger tools, you can use them to investigate the code, set breakpoints, and print necessary values to identify the bugs. Once you have gained enough information, propose a rewriting patch to fix the bugs. Avoid rewriting the entire code, focus on the bugs only."
     )
@@ -24,8 +25,9 @@ class PdbAgent(BaseAgent):
     )
 
 
+@register_agent
 class PdbAfterRewrites(PdbAgent):
-    name: str = "pdb after rewrites"
+    name: str = "pdb_after_rewrites"
 
     def run(self, task_name=None, debug=False):
         # remove the pdb tool from the environment

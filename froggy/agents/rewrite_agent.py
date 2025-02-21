@@ -7,15 +7,16 @@ from os.path import join as pjoin
 import numpy as np
 
 from froggy.agents.llm_api import instantiate_llm
-from froggy.agents.base_agent import BaseAgent
+from froggy.agents.base_agent import BaseAgent, register_agent
 from froggy.agents.utils import HistoryTracker, build_history_prompt
 from froggy.logger import FroggyLogger
 from froggy.pond.envs.env import RepoEnv
 from froggy.pond.utils import unescape
 
 
+@register_agent
 class RewriteOnly(BaseAgent):
-    name: str = "rewrite only"
+    name: str = "rewrite_only"
     system_prompt: str = (
         "Your goal is to debug a Python program to make sure it can pass a set of test functions. You need to propose a rewriting patch to fix the bugs. Avoid rewriting the entire code, focus on the bugs only."
     )

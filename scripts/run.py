@@ -7,6 +7,7 @@ from pathlib import Path
 from termcolor import colored
 from tqdm import tqdm
 
+from froggy.agents.base_agent import create_agent
 from froggy.agents.utils import load_config
 from froggy.logger import FroggyLogger
 from froggy.pond.envs import select_env
@@ -40,7 +41,12 @@ def run_agent(args, problem, config):
                 return success
 
         env = create_env(config, task_logger)
-        agent = create_agent(args.agent, config=config, env=env, logger=task_logger)
+        agent = create_agent(
+            config["agent_type"],
+            config=config,
+            env=env,
+            logger=task_logger,
+        )
         success = agent.run(task_name=problem, debug=args.debug)
 
         # optionally apply patch
@@ -88,33 +94,10 @@ def create_env(config: dict, logger: FroggyLogger):
     return env
 
 
-def create_agent(agent_type, **kwargs):
-    match agent_type:
-        case "pdb_agent":
-            from froggy.agents import PdbAgent as agent_class
-        case "rewrite_only":
-            from froggy.agents import RewriteOnly as agent_class
-        case "pdb_after_rewrites":
-            from froggy.agents import PdbAfterRewrites as agent_class
-        case _:
-            raise ValueError(f"Unknown agent {agent_type}")
-
-    agent = agent_class(**kwargs)
-
-    return agent
-
-
 def main():
     config, args = load_config()
     logger = FroggyLogger("froggy", level=args.logging_level)
 
-    available_agents = list(config.keys())
-    if args.agent not in available_agents:
-        raise ValueError(
-            f"Invalid agent: {args.agent}. Available agents: {available_agents}"
-        )
-
-    config = config[args.agent]
     config["uuid"] = config.get("uuid", str(uuid.uuid4()))
     logger.warning(f"Experiment log path: {config['output_path']}/{config['uuid']}")
 
