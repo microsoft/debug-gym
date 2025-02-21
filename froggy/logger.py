@@ -1,5 +1,6 @@
 import logging
 import os
+import re
 from pathlib import Path
 
 from tqdm import tqdm
@@ -18,6 +19,14 @@ class TqdmLoggingHandler(logging.Handler):
             raise
         except Exception:
             self.handleError(record)
+
+
+class StripAnsiFormatter(logging.Formatter):
+    ansi_escape = re.compile(r"\x1B[@-_][0-?]*[ -/]*[@-~]")
+
+    def format(self, record):
+        msg = super().format(record)
+        return self.ansi_escape.sub("", msg)
 
 
 class FroggyLogger(logging.Logger):
@@ -48,7 +57,7 @@ class FroggyLogger(logging.Logger):
 
             self.log_file = log_dir / f"{name}.log"
             fh = logging.FileHandler(self.log_file, mode=mode)
-            formatter = logging.Formatter("%(asctime)s %(levelname)-8s %(message)s")
+            formatter = StripAnsiFormatter("%(asctime)s %(levelname)-8s %(message)s")
             fh.setFormatter(formatter)
             fh.setLevel(logging.DEBUG)
             self.addHandler(fh)
