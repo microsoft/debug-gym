@@ -426,7 +426,7 @@ def test_load_config():
         ],
     ):
         _config, _args = load_config()
-    assert _args.agent == "pdb_agent"
+    assert _args.agent == "rewrite_only"
     expected_config = {
         "agent_type": "rewrite_only",
         "random_seed": 456,
