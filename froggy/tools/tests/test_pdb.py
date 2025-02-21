@@ -61,10 +61,14 @@ def test_pdb_use(tmp_path, setup_test_repo):
     # Test PDBTool with Terminal, verbose pytest
     tests_path = str(setup_test_repo(tmp_path))
     terminal = Terminal()
-    environment = RepoEnv(path=tests_path, terminal=terminal)
+    environment = RepoEnv(
+        path=tests_path,
+        terminal=terminal,
+        debug_entrypoint="python -m pdb -m pytest -sv .",
+    )
     pdb = PDBTool()
     pdb.register(environment)
-    initial_output = pdb.start_pdb(pdb_cmd="python -m pdb -m pytest -sv .")
+    initial_output = pdb.start_pdb()
     assert """The pytest entry point.""" in initial_output
     assert "(Pdb)" not in initial_output
 
@@ -81,7 +85,7 @@ def test_pdb_use(tmp_path, setup_test_repo):
 
 
 def test_pdb_use_default_environment_entrypoint(tmp_path, setup_test_repo):
-    # Test PDBTool with default environment entrypoint, quite pytest
+    # Test PDBTool with default environment entrypoint, quiet pytest
     tests_path = str(setup_test_repo(tmp_path))
     terminal = Terminal()
     environment = RepoEnv(path=tests_path, terminal=terminal)
@@ -113,12 +117,14 @@ def test_pdb_use_docker_terminal(tmp_path, setup_test_repo):
         env_vars={"PYTHONDONTWRITEBYTECODE": "1"},  # avoid __pycache__
         map_host_uid_gid=False,  # run as root
     )
-    environment = RepoEnv(path=tests_path, terminal=terminal)
+    # no:cacheprovider to avoid .pytest_cache
+    debug_entrypoint = f"python -m pdb -m pytest -p no:cacheprovider -sv ."
+    environment = RepoEnv(
+        path=tests_path, terminal=terminal, debug_entrypoint=debug_entrypoint
+    )
     pdb = PDBTool()
     pdb.register(environment)
-    # no:cacheprovider to avoid .pytest_cache
-    pdb_cmd = f"python -m pdb -m pytest -p no:cacheprovider -sv ."
-    pdb.start_pdb(pdb_cmd)
+    pdb.start_pdb()
 
     output = pdb.use("l").observation
     assert """The pytest entry point.""" in output
@@ -134,7 +140,6 @@ def test_pdb_use_docker_terminal(tmp_path, setup_test_repo):
 
 def test_initialization():
     pdb_tool = PDBTool()
-    assert pdb_tool.master is None
     assert pdb_tool.pdb_obs == ""
     assert not pdb_tool.persistent_breakpoints
     assert pdb_tool.auto_list
@@ -153,44 +158,6 @@ def test_register_invalid_environment():
     pdb_tool = PDBTool()
     with pytest.raises(ValueError, match="The environment must be a RepoEnv instance."):
         pdb_tool.register(MagicMock())
-
-
-@patch.object(PDBTool, "interact_with_pdb")
-def test_start_pdb(mock_interact_with_pdb):
-    mock_interact_with_pdb.return_value = "pdb returned message"
-    env = RepoEnv()
-    pdb_tool = PDBTool()
-    pdb_tool.register(env)
-    output = pdb_tool.start_pdb(pdb_cmd="python script.py")
-    assert output == "pdb returned message"
-    assert pdb_tool.pdb_obs == "pdb returned message"
-
-
-@patch.object(PDBTool, "interact_with_pdb")
-@patch.object(PDBTool, "close_pdb")
-def test_restart_pdb(mock_close_pdb, mock_interact_with_pdb):
-    mock_interact_with_pdb.return_value = "pdb returned message"
-    env = RepoEnv()
-    pdb_tool = PDBTool()
-    pdb_tool.register(env)
-    env.entrypoint = "python script.py"
-    env.debug_entrypoint = "python -m pdb script.py"
-    output = pdb_tool.restart_pdb()
-    assert output == "pdb returned message"
-    assert pdb_tool.pdb_obs == "pdb returned message"
-
-
-@patch.object(PDBTool, "interact_with_pdb")
-def test_use_command(mock_interact_with_pdb, tmp_path):
-    mock_interact_with_pdb.return_value = "output"
-    env = RepoEnv()
-    env.working_dir = str(tmp_path)
-    pdb_tool = PDBTool()
-    pdb_tool.register(env)
-    env.current_file = "script.py"
-    env.all_files = ["script.py"]
-    output = pdb_tool.use("p x")
-    assert "output" in output.observation
 
 
 @patch.object(PDBTool, "interact_with_pdb")
@@ -297,3 +264,22 @@ def test_get_current_frame_file(mock_interact_with_pdb, tmp_path, setup_pdb_repo
     )
     pdb_tool.get_current_frame_file()
     assert str(fail_test_path).endswith(pdb_tool.current_frame_file)
+
+
+def test_pdb_crashing(tmp_path, setup_test_repo):
+    tests_path = setup_test_repo(tmp_path)
+    with open(tests_path / "test_fail.py", "w") as f:
+        f.write("def test_fail():\nassert False")  # IndentationError
+
+    environment = RepoEnv(
+        path=tests_path,
+        entrypoint="python -m pytest -s test.py",
+        debug_entrypoint="python -m pdb -m pytest -s test_fail.py",
+    )
+    pdb = PDBTool()
+    pdb.register(environment)
+
+    initial_output = pdb.start_pdb()
+    assert "The pytest entry point." in initial_output
+    output = pdb.interact_with_pdb("c")
+    assert "IndentationError" in output

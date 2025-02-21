@@ -17,26 +17,51 @@ from froggy.logger import FroggyLogger
 
 
 class ShellSession:
+    PS1 = "FROGGY_PS1"  # use as sentinel to know when to stop reading.
+
     def __init__(
         self,
-        entrypoint,
+        shell_command: str,
         working_dir,
+        setup_commands=None,
         env_vars=None,
         session_id=None,
         logger: FroggyLogger | None = None,
     ):
-        self.entrypoint = entrypoint
-        self.env_vars = env_vars or {}
+        self.shell_command = shell_command
         self.working_dir = working_dir
+        self.setup_commands = setup_commands or []
+        self.env_vars = env_vars or {}
         self.session_id = session_id or str(uuid.uuid4())
         self.logger = logger or FroggyLogger("froggy")
-        self.start()
+        self.filedescriptor = None
+        self.process = None
         atexit.register(self.close)
 
-    def start(self):
-        self.logger.debug(f"Starting ShellSession with entrypoint:\n{self.entrypoint}")
+    @property
+    def is_running(self):
+        return self.process is not None and self.process.poll() is None
 
+    def start(self, command=None):
+        self.close()  # Close any existing session
+
+        env_vars = dict(self.env_vars)
+        if command is None:
+            env_vars["PS1"] = self.PS1
+
+        # Prepare the command
+        entrypoint = self.shell_command
+        if command:
+            command = " && ".join(self.setup_commands + [command])
+            entrypoint = f'{self.shell_command} -c "{command}"'
+        else:
+            entrypoint += " && ".join(self.setup_commands)
+
+        self.logger.debug(f"Starting {self} with entrypoint: {entrypoint}")
+
+        # Prepare the file descriptor
         master, slave = pty.openpty()
+        self.filedescriptor = master
 
         # set_fd_nonblocking
         flags = fcntl.fcntl(master, fcntl.F_GETFL)
@@ -48,8 +73,8 @@ class ShellSession:
         termios.tcsetattr(slave, termios.TCSANOW, attrs)
 
         self.process = subprocess.Popen(
-            self.entrypoint,
-            env=self.env_vars,
+            shlex.split(entrypoint),
+            env=env_vars,
             cwd=self.working_dir,
             stdin=slave,
             stdout=slave,
@@ -59,7 +84,6 @@ class ShellSession:
             start_new_session=True,
         )
 
-        self.filedescriptor = master
         # close slave, end in the parent process
         os.close(slave)
 
@@ -69,11 +93,13 @@ class ShellSession:
             os.close(self.filedescriptor)
             self.filedescriptor = None
 
-        self.process.terminate()
+        if self.process:
+            self.process.terminate()
+            self.process = None
 
     def read(
         self,
-        read_until: str = "",
+        read_until: str | None = None,
         timeout: int = 300,
         no_output_timeout: int = 60,
         read_length: int = 1024,
@@ -81,6 +107,7 @@ class ShellSession:
         """Read from this Shell session until read_until is found, timeout is reached,
         or no output change for no_output_timeout seconds.
         """
+        read_until = read_until or self.PS1
         output = ""
         start_time = time.time()
         last_change_time = time.time()
@@ -107,10 +134,13 @@ class ShellSession:
                 continue
             except OSError as e:
                 if e.errno == errno.EIO:
+                    self.is_closed = True
                     self.logger.debug("End of file reached while reading from PTY.")
                     break
                 if e.errno != errno.EAGAIN:
                     raise
+
+        output = output.replace(read_until, "")
         return output
 
     def run(
@@ -121,6 +151,9 @@ class ShellSession:
         no_output_timeout: int = 30,
     ):
         """Run a command in the Shell session and return the output."""
+        if not self.is_running:
+            self.start()
+
         self.logger.debug(f"Sending command to {self}:\n{command}")
         os.write(self.filedescriptor, command.encode("utf-8") + b"\n")
 
@@ -180,15 +213,13 @@ class Terminal:
 
     def prepare_command(self, entrypoint: str | list[str]) -> list[str]:
         """Prepares a shell command by combining setup commands and entrypoint commands.
-        Then wraps the command in a shell (self.default_entrypoint) call."""
+        Then wraps the command in a shell (self.default_shell_command) call."""
         if isinstance(entrypoint, str):
             entrypoint = [entrypoint]
         if self.setup_commands:
             entrypoint = self.setup_commands + entrypoint
         entrypoint = " && ".join(entrypoint)
-        command = shlex.split(
-            f'{shlex.join(self.default_entrypoint)} -c "{entrypoint}"'
-        )
+        command = shlex.split(f'{self.default_shell_command} -c "{entrypoint}"')
         return command
 
     def run(
@@ -228,29 +259,21 @@ class Terminal:
         return success, output
 
     @property
-    def default_entrypoint(self) -> list[str]:
+    def default_shell_command(self) -> str:
         """Starts a new bash session exporting the current python executable as 'python'.
         Flags --noprofile and --norc are used to avoid loading any bash profile or rc file,
         which could interfere with the terminal setup (clean outputs)"""
-        return shlex.split("/bin/bash --noprofile --norc")
+        return "/bin/bash --noprofile --norc"
 
-    def start_shell_session(self, timeout=30, no_output_timeout=1):
+    def new_shell_session(self):
         session = ShellSession(
-            entrypoint=self.default_entrypoint,
+            shell_command=self.default_shell_command,
+            setup_commands=self.setup_commands,
             working_dir=self.working_dir,
             env_vars=self.env_vars,
             logger=self.logger,
         )
         self.sessions.append(session)
-        initial_output = ""
-        commands = " && ".join(self.setup_commands)
-        if commands:
-            initial_output = session.run(
-                commands, timeout=timeout, no_output_timeout=no_output_timeout
-            )
-
-        self.logger.debug(f"Initial output from {session}:\n{initial_output}")
-
         return session
 
     def close_shell_session(self, session):
@@ -330,13 +353,13 @@ class DockerTerminal(Terminal):
         return self._container
 
     @property
-    def default_entrypoint(self) -> list[str]:
+    def default_shell_command(self) -> list[str]:
         """Expects the container to have bash installed and python executable available."""
         user_map = self.user_map()
         if user_map:
             user_map = f"--user {user_map}"
         entrypoint = f"docker exec -i {user_map} {self.container.name} /bin/bash --noprofile --norc"
-        return shlex.split(entrypoint)
+        return entrypoint
 
     def prepare_command(self, entrypoint: str | list[str]) -> list[str]:
         """Prepares a shell command by combining setup commands and entrypoint commands.

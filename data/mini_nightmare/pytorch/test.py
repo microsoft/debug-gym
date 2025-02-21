@@ -1,4 +1,4 @@
-from code import prefix_tuning
+from pytorch_code import prefix_tuning
 
 
 def check(candidate):

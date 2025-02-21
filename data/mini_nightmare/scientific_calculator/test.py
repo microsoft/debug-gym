@@ -1,5 +1,6 @@
 import unittest
-from code import PlusTool
+
+from scientific_calculator_code import PlusTool
 
 
 class TestPlusTool(unittest.TestCase):
