@@ -84,7 +84,7 @@ def test_tool_names(env_mock):
     tool2.name = "tool2"
     env_mock.add_tool(tool1)
     env_mock.add_tool(tool2)
-    assert env_mock.tool_names == "tool1, tool2"
+    assert env_mock.tool_names == "```tool1```, ```tool2```"
 
 
 def test_tool_instructions(env_mock):
