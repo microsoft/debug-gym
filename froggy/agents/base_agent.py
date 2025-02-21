@@ -188,9 +188,9 @@ def create_agent(agent_type: str, **agent_kwargs):
     elif "." in agent_type:
         # try to import agent_type module
         import importlib
-    
-        parts = agent_type.split('.')
-        module_name = '.'.join(parts[:-1])
+
+        parts = agent_type.split(".")
+        module_name = ".".join(parts[:-1])
         class_name = parts[-1]
 
         module = importlib.import_module(module_name)

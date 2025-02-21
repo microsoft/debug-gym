@@ -303,7 +303,7 @@ def load_config():
         )
 
     # assume agent type is the key if not specified by the user
-    if not config[args.agent].get('agent_type'):
-        config[args.agent]['agent_type'] = args.agent
+    if not config[args.agent].get("agent_type"):
+        config[args.agent]["agent_type"] = args.agent
 
     return config[args.agent], args
