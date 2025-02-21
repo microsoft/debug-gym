@@ -7,10 +7,10 @@ from pathlib import Path
 from termcolor import colored
 from tqdm import tqdm
 
-from froggy.envs import select_env
+from froggy.pond.envs import select_env
 from froggy.logger import FroggyLogger
-from froggy.terminal import select_terminal
-from froggy.tools.toolbox import Toolbox
+from froggy.pond.terminal import select_terminal
+from froggy.pond.tools.toolbox import Toolbox
 from froggy.utils import load_config
 
 
@@ -91,11 +91,11 @@ def create_env(config: dict, logger: FroggyLogger):
 def create_agent(agent_type, **kwargs):
     match agent_type:
         case "pdb_agent":
-            from example_agent import PdbAgent as agent_class
+            from froggy.agents import PdbAgent as agent_class
         case "rewrite_only":
-            from example_agent import RewriteOnly as agent_class
+            from froggy.agents import RewriteOnly as agent_class
         case "pdb_after_rewrites":
-            from example_agent import PdbAfterRewrites as agent_class
+            from froggy.agents import PdbAfterRewrites as agent_class
         case _:
             raise ValueError(f"Unknown agent {agent_type}")
 

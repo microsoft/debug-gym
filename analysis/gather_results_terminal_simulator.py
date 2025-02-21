@@ -4,7 +4,7 @@ from os.path import join as pjoin
 
 from termcolor import colored
 
-from froggy.envs import TerminalSimulatorEnv
+from froggy.pond.envs import TerminalSimulatorEnv
 
 
 def main():
