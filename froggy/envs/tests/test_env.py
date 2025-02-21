@@ -295,22 +295,19 @@ def test_directory_tree(tmp_path):
     assert result == expected_result
 
 
-@patch.object(RepoEnv, "restore")
 @patch.object(Terminal, "run", return_value=(False, "1 failed, 0 passed"))
 @patch.object(RepoEnv, "get_tool")
 def test_reset(
     mock_get_tool,
     mock_eval,
-    mock_restore,
     env,
 ):
     mock_pdb_tool = MagicMock()
     mock_pdb_tool.start_pseudo_terminal.return_value = None
     mock_pdb_tool.pdb_obs = "PDB started"
     mock_get_tool.return_value = mock_pdb_tool
-    infos = env.reset(seed=42)
+    infos = env.reset()
 
-    mock_restore.assert_called_once()
     mock_eval.assert_called_once()
     assert env.current_file is None
     assert env.current_file_content is None

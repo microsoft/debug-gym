@@ -194,7 +194,7 @@ class SWEBenchEnv(RepoEnv):
         self.last_eval_obs = output
         return self.last_eval_obs
 
-    def reset(self, *, seed=None, options: dict | None = None):
+    def reset(self, *, options: dict | None = None):
         # TODO: support reset current task, i.e. no options provided.
         options = options or {}
 
@@ -287,7 +287,7 @@ class SWEBenchEnv(RepoEnv):
         # Reset RepoEnv
         # TODO: Create a RepoEnv per task and set max_score at initialization.
         self.max_score = len(self.fail_to_pass)
-        infos = super().reset(options=options, restore_code=False)
+        infos = super().reset(options=options)
         assert not self.done, "Tests should be failing before debugging."
 
         return infos
