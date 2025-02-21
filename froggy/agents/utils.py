@@ -10,7 +10,6 @@ import yaml
 from froggy.agents.llm_api import LLMResponse
 from froggy.pond.envs.env import EnvInfo
 from froggy.pond.utils import unescape
-from froggy.logger import FroggyLogger
 
 
 class HistoryTracker:
@@ -292,7 +291,7 @@ def load_config():
             entry_to_change = entry_to_change[k]
         entry_to_change[keys[-1]] = yaml.safe_load(value)
 
-    available_agents = list(config.keys())
+    available_agents = [item for item in list(config.keys()) if item != "base"]
 
     if not args.agent:
         # pick first agent
@@ -302,8 +301,19 @@ def load_config():
             f"Invalid agent: {args.agent}. Available agents: {available_agents}"
         )
 
-    # assume agent type is the key if not specified by the user
-    if not config[args.agent].get("agent_type"):
-        config[args.agent]["agent_type"] = args.agent
+    if "base" in config:
+        # base config is specified (shared across agents)
+        return_config = config["base"]
+        agent_specific_config = config[args.agent]
+        for key in agent_specific_config:
+            # override base config with agent specific config
+            return_config[key] = agent_specific_config[key]
+    else:
+        # base config is not specified
+        return_config = config[args.agent]
 
-    return config[args.agent], args
+    # assume agent type is the key if not specified by the user
+    if not return_config.get("agent_type"):
+        return_config["agent_type"] = args.agent
+
+    return return_config, args
