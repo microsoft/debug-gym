@@ -1,11 +1,9 @@
 import codecs
 import os
 import re
-import signal
-from contextlib import contextmanager
 from os.path import join as pjoin
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Callable
 
 
 def clean_code(code):
@@ -155,25 +153,8 @@ def is_subdirectory(path, directory):
     return not os.path.relpath(path, directory).startswith("..")
 
 
-class TimeoutException(Exception):
-    pass
-
-
-@contextmanager
-def time_limit(seconds: Optional[int]):
-    if seconds is None:
-        yield
-        return
-
-    def signal_handler(signum, frame):
-        raise TimeoutException("Timed out!")
-
-    signal.signal(signal.SIGALRM, signal_handler)
-    signal.alarm(seconds)
-    try:
-        yield
-    finally:
-        signal.alarm(0)
+def strip_ansi(s):
+    return re.sub(r"\x1B[@-_][0-?]*[ -/]*[@-~]", "", s)
 
 
 def cleanup_pytest_output(output):

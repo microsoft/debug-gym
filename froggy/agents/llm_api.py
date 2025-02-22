@@ -329,7 +329,7 @@ class Human:
                 available_commands, ignore_case=True, sentence=True
             )
             action = prompt(
-                "> ",
+                "\n> ",
                 completer=actions_completer,
                 history=self._history,
                 enable_history_search=True,

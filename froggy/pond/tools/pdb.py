@@ -37,10 +37,13 @@ class PDBTool(EnvironmentTool):
     def pdb_is_running(self):
         return self._session and self._session.process.poll() is None
 
-    def interact_with_pdb(self, command, expected_output="(Pdb)"):
-        output = self._session.run(
-            command, expected_output, timeout=300, no_output_timeout=300
-        )
+    def interact_with_pdb(self, command):
+        timeout = 300
+        try:
+            output = self._session.run(command, read_until="(Pdb)", timeout=timeout)
+        except TimeoutError:
+            output = f"The command `{command}` timed out after {timeout} secs."
+
         return output.replace("(Pdb)", "").strip()  # remove the prompt
 
     def close_pdb(self):
@@ -48,8 +51,10 @@ class PDBTool(EnvironmentTool):
 
     def start_pdb(self) -> str:
         self._session = self.environment.terminal.new_shell_session()
-        self._session.start(self.environment.debug_entrypoint)
-        initial_output = self._session.read(read_until="(Pdb)")  # wait for the prompt
+        # init pdb and wait for the prompt
+        initial_output = self._session.start(
+            self.environment.debug_entrypoint, read_until="(Pdb)"
+        )
 
         if "The program finished and will be restarted" in initial_output:
             self.close_pdb()
@@ -150,15 +155,21 @@ class PDBTool(EnvironmentTool):
             obs = "\n".join([_warning, output]).strip()
 
             # Add the current frame information to the observation.
-            if self.auto_list and command.split()[0] not in ["l", "list"]:
+            if (
+                self.pdb_is_running
+                and self.auto_list
+                and command.split()[0] not in ["l", "list"]
+            ):
                 if '"""The pytest entry point."""' not in obs:
                     # TODO: add output to self.pdb_obs?
                     obs += f"\nlist .\n" + self.interact_with_pdb("l .")
         else:
             obs = "\n".join([f"Invalid tool arguments: {tool_args}", _warning, output])
 
-        # read the current frame info, find the current file, so we can change view to that file.
-        self.get_current_frame_file()
+        if self.pdb_is_running:
+            # read the current frame info, find the current file, so we can change view to that file.
+            self.get_current_frame_file()
+
         return Observation(self.name, obs)
 
     def breakpoint_add_clear(self, action: str, which_file=None):
