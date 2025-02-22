@@ -1,11 +1,10 @@
 import logging
 import os
-import re
 from pathlib import Path
 
 from tqdm import tqdm
 
-from froggy.pond.utils import strip_ansi
+from froggy.utils import strip_ansi
 
 
 class TqdmLoggingHandler(logging.Handler):
