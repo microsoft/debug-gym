@@ -60,7 +60,7 @@ class PDBTool(EnvironmentTool):
             self.close_pdb()
         else:
             if self.persistent_breakpoints:
-                # restore consistent breakpoints
+                # restore persistent breakpoints
                 for _, _command in self.environment.current_breakpoints_state.items():
                     self.interact_with_pdb(_command)
                 if len(self.environment.current_breakpoints_state) > 0:

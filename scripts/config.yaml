@@ -1,8 +1,8 @@
 base:
     # Environment configs
-    output_path: "exps/mini_nightmare/config"
+    output_path: "exps/pytorch"
     env_kwargs: {
-        "path": "data/mini_nightmare/config",
+        "path": "data/pytorch",
         "entrypoint": "python -m pytest -sv test.py",
         "debug_entrypoint": "python -m pdb -m pytest -s test.py",
         "dir_tree_depth": 1,
