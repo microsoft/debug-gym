@@ -14,7 +14,6 @@ from froggy.pond.utils import (
     parse_action,
     show_line_number,
     str2bool,
-    strip_ansi,
 )
 
 
@@ -249,13 +248,6 @@ def test_extract_reward_from_pytest_output():
     message_0 = "============================= here are some random text ==============================="
 
     assert extract_reward_from_pytest_output(message_0) == 0
-
-
-def test_strip_ansi():
-    message = "\x1b[31mThis is a test message.\x1b[0m"
-    assert strip_ansi(message) == "This is a test message."
-    message = "\x1b[32mThis is another test message.\x1b[0m"
-    assert strip_ansi(message) == "This is another test message."
 
 
 def test_walk():
