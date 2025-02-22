@@ -15,6 +15,7 @@ import docker
 from froggy.logger import FroggyLogger
 from froggy.utils import strip_ansi
 
+DEFAULT_TIMEOUT = 300
 DEFAULT_PS1 = "FROGGY_PS1"
 DISABLE_ECHO_COMMAND = "stty -echo"
 
@@ -113,11 +114,12 @@ class ShellSession:
     def read(
         self,
         read_until: str | None = None,
-        timeout: int = 10,
+        timeout: int | None = None,
         read_length: int = 1024,
     ) -> str:
         """Read from this Shell session until read_until is found, timeout is reached"""
         read_until = read_until or self.default_read_until
+        timeout = timeout or DEFAULT_TIMEOUT
 
         output = ""
         start_time = time.time()
@@ -157,7 +159,7 @@ class ShellSession:
         self,
         command: str,
         read_until: str | None = None,
-        timeout: int = 300,
+        timeout: int | None = None,
     ):
         """Run a command in the Shell session and return the output."""
         output = ""
