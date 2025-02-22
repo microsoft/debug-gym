@@ -13,7 +13,7 @@ import uuid
 import docker
 
 from froggy.logger import FroggyLogger
-from froggy.pond.utils import strip_ansi
+from froggy.utils import strip_ansi
 
 DEFAULT_PS1 = "FROGGY_PS1"
 DISABLE_ECHO_COMMAND = "stty -echo"
@@ -42,7 +42,7 @@ class ShellSession:
         if not self.env_vars.get("PS1"):
             self.env_vars["PS1"] = DEFAULT_PS1
 
-        self.default_read_until = self.env_vars["PS1"]  # Disable echo
+        self.default_read_until = self.env_vars["PS1"]
 
         atexit.register(self.close)
 

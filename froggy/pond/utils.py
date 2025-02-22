@@ -153,10 +153,6 @@ def is_subdirectory(path, directory):
     return not os.path.relpath(path, directory).startswith("..")
 
 
-def strip_ansi(s):
-    return re.sub(r"\x1B[@-_][0-?]*[ -/]*[@-~]", "", s)
-
-
 def cleanup_pytest_output(output):
     # Remove timing, root dir, and platform to avoid randomizing LLM's response.
     res = re.sub(
