@@ -1,4 +1,4 @@
-pdb_agent:
+base:
     # Environment configs
     output_path: "exps/aider"
     benchmark: "aider"
@@ -9,7 +9,6 @@ pdb_agent:
         "auto_view_change": True,
         "run_timeout": 10,
     }
-    tools: ["eval", "pdb", "view", "rewrite"]
     terminal: {
         type: "local",  # "docker" or "local"
         base_image: "python:3.12-slim",
@@ -18,7 +17,7 @@ pdb_agent:
     auto_list: True  # in pdb tool
 
     # LLM configs
-    llm_name: "llama-31-h100"
+    llm_name: "gpt-4o"
     llm_temperature: [0.0]  # list of values between 0.0 and 1.0
 
     # Agent configs
@@ -30,70 +29,13 @@ pdb_agent:
     save_patch: True
     log_prompt_response_pairs: True
     reset_prompt_history_after_rewrite: True
+
+pdb_agent:
+    tools: ["eval", "pdb", "view", "rewrite"]
 
 rewrite_only:
-    # Environment configs
-    output_path: "exps/aider"
-    benchmark: "aider"
-    problems: "all"  # list of problems, e.g., ["wordy"], or "all"
-    env_kwargs: {
-        "dir_tree_depth": 1,
-        "run_on_rewrite": True,
-        "auto_view_change": True,
-        "run_timeout": 10,
-    }
     tools: ["eval", "view", "rewrite"]
-    terminal: {
-        type: "local",  # "docker" or "local"
-        base_image: "python:3.12-slim",
-    }
-    persistent_breakpoints: True  # in pdb tool
-    auto_list: True  # in pdb tool
-
-    # LLM configs
-    llm_name: "llama-31-h100"
-    llm_temperature: [0.0]  # list of values between 0.0 and 1.0
-
-    # Agent configs
-    random_seed: 42
-    max_steps: 100
-    max_rewrite_steps: 10
-    memory_size: 20
-    use_conversational_prompt: True
-    save_patch: True
-    log_prompt_response_pairs: True
-    reset_prompt_history_after_rewrite: True
 
 pdb_after_rewrites:
-    # Environment configs
-    output_path: "exps/aider"
-    benchmark: "aider"
-    problems: "all"  # list of problems, e.g., ["wordy"], or "all"
-    env_kwargs: {
-        "dir_tree_depth": 1,
-        "run_on_rewrite": True,
-        "auto_view_change": True,
-        "run_timeout": 10,
-    }
     n_rewrites_before_pdb: 5
     tools: ["eval", "view", "rewrite", "pdb"]
-    terminal: {
-        type: "local",  # "docker" or "local"
-        base_image: "python:3.12-slim",
-    }
-    persistent_breakpoints: True  # in pdb tool
-    auto_list: True  # in pdb tool
-
-    # LLM configs
-    llm_name: "llama-31-h100"
-    llm_temperature: [0.0]  # list of values between 0.0 and 1.0
-
-    # Agent configs
-    random_seed: 42
-    max_steps: 100
-    max_rewrite_steps: 10
-    memory_size: 20
-    use_conversational_prompt: True
-    save_patch: True
-    log_prompt_response_pairs: True
-    reset_prompt_history_after_rewrite: True

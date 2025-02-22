@@ -12,9 +12,22 @@ from froggy.logger import FroggyLogger
 from froggy.pond.envs.env import RepoEnv
 from froggy.pond.utils import unescape
 
+AGENT_REGISTRY = {}
 
-class PdbAgent:
-    name: str = "pdb agent"
+
+def register_agent(cls):
+    if not issubclass(cls, BaseAgent):
+        raise ValueError("agent_class must be a subclass of BaseAgent")
+    if cls.name is None:
+        raise ValueError("agent_class must have a name attribute")
+    AGENT_REGISTRY[cls.name.lower()] = cls
+    return cls
+
+
+class BaseAgent:
+    name: str = None
+    system_prompt: str = None
+    action_prompt: str = None
 
     def __init__(
         self,
@@ -47,17 +60,13 @@ class PdbAgent:
 
     def build_system_prompt(self, info):
         system_prompt = {}
-        system_prompt["Overall task"] = (
-            "Your goal is to debug a Python program to make sure it can pass a set of test functions. You have access to the pdb debugger tools, you can use them to investigate the code, set breakpoints, and print necessary values to identify the bugs. Once you have gained enough information, propose a rewriting patch to fix the bugs. Avoid rewriting the entire code, focus on the bugs only."
-        )
+        system_prompt["Overall task"] = self.system_prompt
         system_prompt["Instructions"] = info.instructions
         system_prompt["Repo directory tree"] = info.dir_tree
         system_prompt["Current code in view"] = info.current_code_with_line_number
         system_prompt["Current breakpoints"] = info.current_breakpoints
         system_prompt["Last evaluation output"] = info.eval_observation.observation
         system_prompt["Last execution output"] = info.step_observation.observation
-        # from dataclasses import asdict
-        # system_prompt["All observations triggered by last execution"] = asdict(info.all_observations)
 
         system_prompt = unescape(json.dumps(system_prompt, indent=4))
         messages = [
@@ -70,10 +79,7 @@ class PdbAgent:
 
     def build_question_prompt(self):
         messages = []
-        question = "Based on the instruction, the current code, the last execution output, and the history information, "
-        question += "continue your debugging process using pdb commands or to propose a patch using rewrite command. "
-        question += "Output a single command, nothing else. Do not repeat your previous commands unless they can provide more information."
-        messages.append({"role": "user", "content": question})
+        messages.append({"role": "user", "content": self.action_prompt})
         return messages
 
     def build_prompt(self, info):
@@ -175,93 +181,21 @@ class PdbAgent:
         )
 
 
-class RewriteOnly(PdbAgent):
-    name: str = "rewrite only"
+def create_agent(agent_type: str, **agent_kwargs):
+    if agent_type in AGENT_REGISTRY:
+        agent_class = AGENT_REGISTRY[agent_type]
+    elif "." in agent_type:
+        # try to import agent_type module
+        import importlib
 
-    def build_system_prompt(self, info):
-        system_prompt = {}
-        system_prompt["Overall task"] = (
-            "Your goal is to debug a Python program to make sure it can pass a set of test functions. You need to propose a rewriting patch to fix the bugs. Avoid rewriting the entire code, focus on the bugs only."
-        )
-        system_prompt["Instructions"] = info.instructions
-        system_prompt["Repo directory tree"] = info.dir_tree
-        system_prompt["Current code in view"] = info.current_code_with_line_number
-        system_prompt["Current breakpoints"] = info.current_breakpoints
-        system_prompt["Last evaluation output"] = info.eval_observation.observation
-        system_prompt["Last execution output"] = info.step_observation.observation
-        system_prompt = unescape(json.dumps(system_prompt, indent=4))
-        messages = [
-            {
-                "role": "system",
-                "content": system_prompt,
-            }
-        ]
-        return messages
+        parts = agent_type.split(".")
+        module_name = ".".join(parts[:-1])
+        class_name = parts[-1]
 
-    def build_question_prompt(self):
-        messages = []
-        question = "Based on the instruction, the current code, the last execution output, and the history information, "
-        question += (
-            "continue your debugging process to propose a patch using rewrite command. "
-        )
-        question += "Output a single command, nothing else. Do not repeat your previous commands unless they can provide more information."
-        messages.append({"role": "user", "content": question})
-        return messages
+        module = importlib.import_module(module_name)
+        agent_class = getattr(module, class_name)
+    else:
+        raise ValueError(f"Unknown agent type: {agent_type}")
 
-
-class PdbAfterRewrites(PdbAgent):
-    name: str = "pdb after rewrites"
-
-    def run(self, task_name=None, debug=False):
-        # remove the pdb tool from the environment
-        assert "pdb" in self.env.tools, "pdb not found in env tools"
-        pdb_tool = self.env.tools.pop("pdb")
-
-        self.history.reset()
-        info = self.env.reset(options={"task_name": task_name})
-        # initial state does not have prompt and response
-        self.history.step(info, None)
-
-        if info.done is True:
-            # msg = "Environment started with entrypoint passing without errors."
-            return True
-
-        highscore = info.score
-
-        for step in self.logger.tqdm(range(self.config["max_steps"])):
-            highscore = max(highscore, info.score)
-            self.logger.info(
-                f"Score: {info.score}/{info.max_score} ({info.score/info.max_score:.1%}) [Best: {highscore}]"
-            )
-
-            prompt = self.build_prompt(info)
-
-            llm_response = self.llm(
-                prompt, info, temperature=self.config["llm_temperature"][0]
-            )
-
-            if debug:
-                breakpoint()
-
-            info = self.env.step(llm_response.response)
-
-            # re-introduce pdb tool at the right time
-            if (
-                info.rewrite_counter >= self.config["n_rewrites_before_pdb"]
-                and pdb_tool.name not in self.env.tools
-            ):
-                self.env.add_tool(pdb_tool)
-                self.env.tools["pdb"].start_pdb()
-                # update info tools related fields after adding pdb so it's included when building the next prompt
-                info.instructions = self.env.instructions
-                info.tools = self.env.tool_instructions
-
-            self.history.step(info, llm_response)
-
-            if info.done or info.rewrite_counter >= self.config["max_rewrite_steps"]:
-                self.logger.info(
-                    f"Score: {info.score}/{info.max_score} ({info.score/info.max_score:.1%})"
-                )
-                break
-
-        return info.done
+    agent = agent_class(**agent_kwargs)
+    return agent
