@@ -1,9 +1,10 @@
 import logging
 import os
-import re
 from pathlib import Path
 
 from tqdm import tqdm
+
+from froggy.utils import strip_ansi
 
 
 class TqdmLoggingHandler(logging.Handler):
@@ -22,11 +23,10 @@ class TqdmLoggingHandler(logging.Handler):
 
 
 class StripAnsiFormatter(logging.Formatter):
-    ansi_escape = re.compile(r"\x1B[@-_][0-?]*[ -/]*[@-~]")
 
     def format(self, record):
         msg = super().format(record)
-        return self.ansi_escape.sub("", msg)
+        return strip_ansi(msg)
 
 
 class FroggyLogger(logging.Logger):

@@ -1,7 +1,6 @@
 import atexit
 import errno
 import fcntl
-import io
 import os
 import pty
 import shlex
@@ -14,48 +13,52 @@ import uuid
 import docker
 
 from froggy.logger import FroggyLogger
+from froggy.utils import strip_ansi
+
+DEFAULT_PS1 = "FROGGY_PS1"
+DISABLE_ECHO_COMMAND = "stty -echo"
 
 
 class ShellSession:
-    PS1 = "FROGGY_PS1"  # use as sentinel to know when to stop reading.
 
     def __init__(
         self,
         shell_command: str,
-        working_dir,
-        setup_commands=None,
-        env_vars=None,
-        session_id=None,
+        working_dir: str,
+        setup_commands: list[str] | None = None,
+        env_vars: dict[str, str] | None = None,
         logger: FroggyLogger | None = None,
     ):
+        self._session_id = str(uuid.uuid4()).split("-")[0]
         self.shell_command = shell_command
         self.working_dir = working_dir
-        self.setup_commands = setup_commands or []
-        self.env_vars = env_vars or {}
-        self.session_id = session_id or str(uuid.uuid4())
+        self.setup_commands = list(setup_commands or [])
+        self.env_vars = dict(env_vars or {})
         self.logger = logger or FroggyLogger("froggy")
         self.filedescriptor = None
         self.process = None
+
+        # Make sure session can read the output until the given sentinel or PS1
+        if not self.env_vars.get("PS1"):
+            self.env_vars["PS1"] = DEFAULT_PS1
+
+        self.default_read_until = self.env_vars["PS1"]
+
         atexit.register(self.close)
 
     @property
     def is_running(self):
         return self.process is not None and self.process.poll() is None
 
-    def start(self, command=None):
+    def start(self, command=None, read_until=None):
         self.close()  # Close any existing session
 
-        env_vars = dict(self.env_vars)
-        if command is None:
-            env_vars["PS1"] = self.PS1
-
-        # Prepare the command
+        # Prepare entrypoint, combining setup commands and command if provided
+        # For example: `bin/bash -c "setup_command1 && setup_command2 && pdb"`
         entrypoint = self.shell_command
         if command:
             command = " && ".join(self.setup_commands + [command])
             entrypoint = f'{self.shell_command} -c "{command}"'
-        else:
-            entrypoint += " && ".join(self.setup_commands)
 
         self.logger.debug(f"Starting {self} with entrypoint: {entrypoint}")
 
@@ -74,7 +77,7 @@ class ShellSession:
 
         self.process = subprocess.Popen(
             shlex.split(entrypoint),
-            env=env_vars,
+            env=self.env_vars,
             cwd=self.working_dir,
             stdin=slave,
             stdout=slave,
@@ -86,6 +89,16 @@ class ShellSession:
 
         # close slave, end in the parent process
         os.close(slave)
+
+        # Read the output until the sentinel or PS1
+        output = self.read(read_until=read_until)
+
+        # Run setup commands after starting the session if command was not provided
+        if not command and self.setup_commands:
+            command = " && ".join(self.setup_commands)
+            output += self.run(command, read_until)
+
+        return output
 
     def close(self):
         if self.filedescriptor is not None:
@@ -100,31 +113,26 @@ class ShellSession:
     def read(
         self,
         read_until: str | None = None,
-        timeout: int = 300,
-        no_output_timeout: int = 60,
+        timeout: int = 10,
         read_length: int = 1024,
     ) -> str:
-        """Read from this Shell session until read_until is found, timeout is reached,
-        or no output change for no_output_timeout seconds.
-        """
-        read_until = read_until or self.PS1
+        """Read from this Shell session until read_until is found, timeout is reached"""
+        read_until = read_until or self.default_read_until
+
         output = ""
         start_time = time.time()
-        last_change_time = time.time()
         while True:
             if time.time() - start_time > timeout:
-                self.logger.debug(f"Timeout reached while reading from {self}.")
-                break
-            if time.time() - last_change_time > no_output_timeout:
-                self.logger.debug(f"No output change for {no_output_timeout} seconds.")
-                break
+                raise TimeoutError(
+                    f"{self}: Read timeout after {timeout} secs. Read so far: {output!r}"
+                )
+
             try:
                 data = os.read(self.filedescriptor, read_length).decode(
                     "utf-8", errors="ignore"
                 )
                 if data:
                     output += data
-                    last_change_time = time.time()
                     if read_until and read_until in output:
                         break
                 else:
@@ -140,36 +148,38 @@ class ShellSession:
                 if e.errno != errno.EAGAIN:
                     raise
 
-        output = output.replace(read_until, "")
+        # Strip out ANSI escape codes.
+        output = strip_ansi(output)
+        output = output.replace(read_until, "").strip().strip("\r\n")
         return output
 
     def run(
         self,
         command: str,
-        read_until: str = "",
+        read_until: str | None = None,
         timeout: int = 300,
-        no_output_timeout: int = 30,
     ):
         """Run a command in the Shell session and return the output."""
+        output = ""
         if not self.is_running:
-            self.start()
+            output += self.start()
+            self.logger.debug(f"{self}: Initial output: {output!r}")
 
-        self.logger.debug(f"Sending command to {self}:\n{command}")
+        self.logger.debug(f"{self}: Running {command!r}")
         os.write(self.filedescriptor, command.encode("utf-8") + b"\n")
 
-        output = self.read(
-            read_until=read_until,
-            timeout=timeout,
-            no_output_timeout=no_output_timeout,
-        )
+        try:
+            output += self.read(read_until=read_until, timeout=timeout)
+        except TimeoutError as e:
+            self.close()
+            self.logger.debug(f"{e!r}")
+            raise
 
-        output = output.strip().strip("\r\n").strip("\n")
-
-        self.logger.debug(f"Output from {self}:\n{output}")
+        self.logger.debug(f"{self}: Output: {output!r}")
         return output
 
     def __str__(self):
-        return f"ShellSession {self.session_id}"
+        return f"Shell[{self._session_id}]"
 
     def __del__(self):
         self.close()
@@ -193,7 +203,9 @@ class Terminal:
             self.env_vars = self.env_vars | dict(os.environ)
         # Clean up output by disabling terminal prompt and colors
         self.env_vars["NO_COLOR"] = "1"  # disable colors
-        self.env_vars["PS1"] = ""  # disable prompt
+        self.env_vars["PS1"] = (
+            DEFAULT_PS1  # use a sentinel to know when to stop reading
+        )
         self._working_dir = working_dir
         self.sessions = []
 
@@ -358,8 +370,19 @@ class DockerTerminal(Terminal):
         user_map = self.user_map()
         if user_map:
             user_map = f"--user {user_map}"
-        entrypoint = f"docker exec -i {user_map} {self.container.name} /bin/bash --noprofile --norc"
+        entrypoint = f"docker exec -t -i {user_map} {self.container.name} /bin/bash --noprofile --norc"
         return entrypoint
+
+    def new_shell_session(self):
+        session = ShellSession(
+            shell_command=self.default_shell_command,
+            setup_commands=[DISABLE_ECHO_COMMAND] + self.setup_commands,
+            working_dir=self.working_dir,
+            env_vars=self.env_vars,
+            logger=self.logger,
+        )
+        self.sessions.append(session)
+        return session
 
     def prepare_command(self, entrypoint: str | list[str]) -> list[str]:
         """Prepares a shell command by combining setup commands and entrypoint commands.
