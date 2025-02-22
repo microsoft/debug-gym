@@ -255,6 +255,8 @@ class LLM:
         print_messages(messages, self.logger)
 
         response = self.query_model(messages, **kwargs)
+        if response is None:
+            response = ""
         response = response.strip()
 
         self.logger.info(colored(response, "green"))
