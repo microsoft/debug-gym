@@ -4,20 +4,6 @@
 
 `froggy` is a text-based interactive debugging framework, designed for debugging Python programs. 
 
-The structure of `froggy` is as below:
-```bash
-froggy
-├── pond
-│   ├── envs
-│   ├── terminal
-│   └── tools
-└── agents
-```
-
-`froggy.pond` is a simulation environment. Given a code repository, an agent can iteratively interact with a set of tools, such as `pdb`, that are designed for investigate the code. Once gathered enough information, the agent can propose a patch that rewrites certain lines of the code. The terminal will subsequently execute the new code against a set of test cases.
-
-`froggy.agents` are LLM-based debugging agents that use `froggy.pond` to interact with code repositories to seek necessary information and thus fix potential bugs. At an interaction step, the agent takes a text observation that describes the environment states and tool states as input, it is expected to generate a command, subsequently, the environment will provide a new text observation in response, describing the state change caused by that command. 
-
 ## Installation
 
     conda create -n froggy python=3.12
@@ -40,8 +26,24 @@ Then, edit llm.cfg with your endpoint and credentials. You can choose one of the
 > [!WARNING]
 > When using open-sourced LLMs, e.g., via vLLM, you need to correctly setup `HF_TOKEN` required by the tokenizer.
 
-
 ## System Design
+
+The structure of `froggy` is as below:
+```bash
+froggy
+├── pond
+│   ├── envs
+│   ├── terminal
+│   └── tools
+└── agents
+```
+
+`froggy.pond` is a simulation environment. Given a code repository, an agent can iteratively interact with a set of tools, such as `pdb`, that are designed for investigate the code. Once gathered enough information, the agent can propose a patch that rewrites certain lines of the code. The terminal will subsequently execute the new code against a set of test cases.
+
+`froggy.agents` are LLM-based debugging agents that use `froggy.pond` to interact with code repositories to seek necessary information and thus fix potential bugs. At an interaction step, the agent takes a text observation that describes the environment states and tool states as input, it is expected to generate a command, subsequently, the environment will provide a new text observation in response, describing the state change caused by that command. 
+
+### Environment and Tools
+
 
 Our base environment, `RepoEnv`, is an interactive environment that follows the [Gymnasium](https://github.com/Farama-Foundation/Gymnasium) paradigm. Once the environment `env` instantiated, one can use `env.reset()` to start an episode and receives initial informations. Then, one can interact with the environment using `env.step(action)`, where `action` is one of the available tools (see below), doing so will return subsequent informations (e.g, error message, debugger stdout, etc.)
 
