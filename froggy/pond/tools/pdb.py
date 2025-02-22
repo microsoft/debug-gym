@@ -35,14 +35,14 @@ class PDBTool(EnvironmentTool):
 
     @property
     def pdb_is_running(self):
-        return self._session and self._session.process.poll() is None
+        return self._session is not None and self._session.is_running
 
-    def interact_with_pdb(self, command):
-        timeout = 300
+    def interact_with_pdb(self, command: str, timeout: int | None = None):
+        timeout = timeout or self.environment.run_timeout
         try:
             output = self._session.run(command, read_until="(Pdb)", timeout=timeout)
-        except TimeoutError:
-            output = f"The command `{command}` timed out after {timeout} secs."
+        except TimeoutError as e:
+            output = f"The command `{command}` has timed out. {e!r}"
 
         return output.replace("(Pdb)", "").strip()  # remove the prompt
 

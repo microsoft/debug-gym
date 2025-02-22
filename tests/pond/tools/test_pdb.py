@@ -283,3 +283,25 @@ def test_pdb_crashing(tmp_path, setup_test_repo):
     assert "The pytest entry point." in initial_output
     output = pdb.interact_with_pdb("c")
     assert "IndentationError" in output
+
+
+def test_pdb_timeout(tmp_path, setup_test_repo):
+    tests_path = setup_test_repo(tmp_path)
+    with open(tests_path / "test_fail.py", "w") as f:
+        f.write(
+            "def test_fail():\n  print('Sleeping...'); import time; time.sleep(10)"
+        )  # IndentationError
+
+    environment = RepoEnv(
+        path=tests_path,
+        entrypoint="python -m pytest -s test.py",
+        debug_entrypoint="python -m pdb -m pytest -sv test_fail.py",
+    )
+    pdb = PDBTool()
+    pdb.register(environment)
+
+    initial_output = pdb.start_pdb()
+    assert "The pytest entry point." in initial_output
+    output = pdb.interact_with_pdb("c", timeout=1)
+    assert "timed out" in output
+    assert pdb.pdb_is_running is False
