@@ -40,7 +40,6 @@ One of the core designs of Froggy is the notion of tools. Users can dynamically 
 | `eval` | Eval tool runs the current code repository using the provided entrypoint (e.g., pytest). |
 | `pdb` | Interactive debugger wrapping the python pdb tool. In additon, users can choose to maintain a set of persistent breakpoints (as in some programming IDEs), which are not reset after every eval. With such feature, a new pdb debugging session is activated automatically, with all the breakpoints restored. Note such breakpoint can be cleared by pdb commands such as `cl`. |
 | `patcher` | Patchers are modules that rewrite a certain piece of code to fix the bug. We provide a patcher that can rewrite a chunk of code in a file by specifying the start and end lines of that chunk to replace. |
-| `reasoning` | Reasoning tool enables the model to output explicit reasoning text. Unlike CoT, the reasoning tool maintains the reasoning text in the history as if it were any other tool/action. When initializing, passing ```allow_chain_action = True``` to allow the agent to output another action after the reasoning tokens, in the same step. |
 
 Upon importing a tool, its action space and observation space will be automatically merged into the agent's action space and observation space; its instruction will also be merged into the overall instruction provided to the agent (e.g., as system prompt).
 
@@ -54,18 +53,19 @@ We have the below LLM-based agents available, they all have minimal design and s
 
 | Agent name | Available Tools | Description |
 | :-: | :-: | :----- |
-| `pdb_agent` | `pdb`, `patcher`, `view` | A minimal agent that takes all available information as part of the prompt and asks the LLM to generate a command. |
-| `rewrite_only` | `patcher`, `view`  | A `pdb_agent` but `pdb` tool is disabled (an agent keeps rewriting). |
-| `pdb_after_rewrite` | `pdb`, `patcher`, `view`  | A `pdb_agent`, but `pdb` tool is only enabled after certain amount of rewrites. |
+| `pdb_agent` | `pdb`, `patcher`, `view`, `eval` | A minimal agent that takes all available information as part of the prompt and asks the LLM to generate a command. |
+| `rewrite_only` | `patcher`, `view`, `eval`  | A `pdb_agent` but `pdb` tool is disabled (an agent keeps rewriting). |
+| `pdb_after_rewrite` | `pdb`, `patcher`, `view`, `eval`  | A `pdb_agent`, but `pdb` tool is only enabled after certain amount of rewrites. |
 
 ### Benchmarks
 
-We include two widely used benchmarks, namely `aider` and `swebench`.
+We include two widely used benchmarks, namely `aider` and `swebench`, and a small set of minimal buggy code snippets, namely `mini_nightmare`.
 
 | Benchmark name | Link |
 | :-: | :----- |
 | `aider` | [https://github.com/Aider-AI/aider](https://github.com/Aider-AI/aider) |
 | `swebench`| [https://github.com/princeton-nlp/SWE-bench](https://github.com/princeton-nlp/SWE-bench) |
+| `mini_nightmare` | A set of 10 hand-crafted minimal buggy code snippet where rewrite only agents have harder time to tackle. [Read detail](https://github.com/microsoft/Froggy/blob/main/data/mini_nightmare/mini_nightmare.md) |
 
 ### Run
 
