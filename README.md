@@ -1,8 +1,22 @@
-# Froggy
+# Froggy: an Interactive Debugging Framework
 
 <img src="https://github.com/microsoft/Froggy/blob/main/media/froggy_logo.png" width=50% height=50%>
 
-Froggy is an interactive debugging system for Python. This LLM-based agent can import tools such as `pdb` to interactively investigate the code and generate patches to fix it.
+`froggy` is a text-based interactive debugging framework, designed for debugging Python programs. 
+
+The structure of `froggy` is as below:
+```bash
+froggy
+├── pond
+│   ├── envs
+│   ├── terminal
+│   └── tools
+└── agents
+```
+
+`froggy.pond` is a simulation environment. Given a code repository, an agent can iteratively interact with a set of tools, such as `pdb`, that are designed for investigate the code. Once gathered enough information, the agent can propose a patch that rewrites certain lines of the code. The terminal will subsequently execute the new code against a set of test cases.
+
+`froggy.agents` are LLM-based debugging agents that use `froggy.pond` to interact with code repositories to seek necessary information and thus fix potential bugs. At an interaction step, the agent takes a text observation that describes the environment states and tool states as input, it is expected to generate a command, subsequently, the environment will provide a new text observation in response, describing the state change caused by that command. 
 
 ## Installation
 
