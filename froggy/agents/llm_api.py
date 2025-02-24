@@ -160,6 +160,18 @@ class LLM:
             stop=stop_after_attempt(100),
         )
 
+        if not self.config.get("system_prompt_support", True):
+            # Replace system prompt by user prompt.
+            self.logger.warning(
+                "System prompt is not supported by the model, it will be replaced by user prompt."
+            )
+
+        if "ignore_kwargs" in self.config:
+            for kw in self.config["ignore_kwargs"]:
+                self.logger.warning(
+                    f"LLM argument {kw} is not supported by the model, it will be ignored."
+                )
+
     def _get_azure_oai_kwargs(self):
         """
         Returns a dictionary of keyword arguments required for connecting to Azure OpenAI.
@@ -243,17 +255,11 @@ class LLM:
             for i, m in enumerate(messages):
                 if m["role"] == "system":
                     messages[i]["role"] = "user"
-                    self.logger.warning(
-                        "System prompt not supported by the model, replacing it by user prompt."
-                    )
 
         if "ignore_kwargs" in self.config:
             for kw in self.config["ignore_kwargs"]:
                 if kw in kwargs:
                     del kwargs[kw]
-                    self.logger.warning(
-                        f"Removing {kw} from the query because it is not supported by the model."
-                    )
 
         # Merge consecutive messages with same role.
         messages = merge_messages(messages)

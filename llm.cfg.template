@@ -20,7 +20,7 @@
         "ignore_kwargs": ["temperature", "top_p", "presence_penalty", "frequency_penalty", "logprobs", "top_logprobs", "logit_bias", "max_tokens"]
     },
     "gpt-4o-az-login": {
-        "model": "gpt-4o-gs",
+        "model": "gpt-4o",
         "tokenizer": "gpt-4o",
         "endpoint": "[YOUR_ENDPOINT]",
         "scope": "[YOUR_SCOPE]",
