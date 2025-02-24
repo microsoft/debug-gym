@@ -164,10 +164,21 @@ class RepoEnv(TooledEnv):
             debug_entrypoint=debug_entrypoint,
             readonly_patterns=readonly_patterns,
         )
-        self.last_eval_obs = ""
+        self._reset_env_state()
+
+    def _reset_env_state(self):
+        """Reset the environment state to the initial state."""
+        # reset all state variables
+        self.current_file = None
+        self.current_file_content = None
+        self.current_breakpoints_state = {}
+        self.rewrite_counter = 0
+        self.last_eval_output: EvalOutput = None
         self.score = 0
         self.done = False
-        self.rewrite_counter = 0
+        # clear all observations and event queue (queue should be empty already)
+        self.clear_all_observations()
+        self.empty_event_queue()
 
     def setup_workspace(
         self,
@@ -197,15 +208,12 @@ class RepoEnv(TooledEnv):
 
         self._index_files(readonly_patterns)
 
-        self.current_file = None
-        self.current_file_content = None
-        self.current_breakpoints_state = {}
-
         # override entrypoint as it might be task dependent
         self.set_entrypoints(entrypoint, debug_entrypoint)
 
         # Set up the terminal working dir
         self.terminal.working_dir = str(self.working_dir)
+        self._reset_env_state()
 
     def set_entrypoints(self, entrypoint, debug_entrypoint):
         if entrypoint:
@@ -265,14 +273,8 @@ class RepoEnv(TooledEnv):
         """Resets the environment and returns eval as the initial observation."""
         self.logger.info(f"Resetting environment")
         options = options or {}
-        self.current_file = None
-        self.current_file_content = None
-        self.current_breakpoints_state = {}
-        self.rewrite_counter = 0
-        self.last_eval_obs = ""
-        self.done = False
-        self.clear_all_observations()
-        self.empty_event_queue()
+
+        self._reset_env_state()
 
         # Notify all tools that the environment is reset and get their observations
         self.queue_event(Event.ENV_RESET, source="env")
