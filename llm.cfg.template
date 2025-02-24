@@ -1,12 +1,23 @@
 {
     "gpt-4o": {
-        "model": "gpt-4o-gs",
+        "model": "gpt-4o",
         "tokenizer": "gpt-4o",
         "endpoint": "[YOUR_ENDPOINT]",
         "api_key": "[YOUR_API_KEY]",
         "tags": ["gpt-4o", "azure openai", "GCR"],
         "api_version": "2024-09-01-preview",
         "context_limit": 128
+    },
+    "o1-mini": {
+        "model": "o1-mini",
+        "tokenizer": "gpt-4o",
+        "endpoint": "[YOUR_ENDPOINT]",
+        "api_key": "[YOUR_API_KEY]",
+        "tags": ["gpt-4o", "azure openai", "GCR"],
+        "api_version": "2024-09-01-preview",
+        "context_limit": 128,
+        "system_prompt_support": false,
+        "ignore_kwargs": ["temperature", "top_p", "presence_penalty", "frequency_penalty", "logprobs", "top_logprobs", "logit_bias", "max_tokens"]
     },
     "gpt-4o-az-login": {
         "model": "gpt-4o-gs",

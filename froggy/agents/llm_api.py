@@ -247,13 +247,13 @@ class LLM:
                         "System prompt not supported by the model, replacing it by user prompt."
                     )
 
-        if not self.config.get("temperature_support", True):
-            # certain models do not support temperature
-            if "temperature" in kwargs:
-                del kwargs["temperature"]
-                self.logger.warning(
-                    "Temperature not supported by the model, removing it from the query."
-                )
+        if "ignore_kwargs" in self.config:
+            for kw in self.config["ignore_kwargs"]:
+                if kw in kwargs:
+                    del kwargs[kw]
+                    self.logger.warning(
+                        f"Removing {kw} from the query because it is not supported by the model."
+                    )
 
         # Merge consecutive messages with same role.
         messages = merge_messages(messages)
