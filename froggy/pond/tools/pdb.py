@@ -89,7 +89,11 @@ class PDBTool(EnvironmentTool):
     def use(self, tool_args) -> Observation:
         command = tool_args
         _warning = ""
-        if command.split()[0] in ["p", "pp"] or command.startswith("print("):
+        if (
+            command == ""
+            or command.split()[0] in ["p", "pp"]
+            or command.startswith("print(")
+        ):
             # OK to have ";" or "\n" in the command
             pass
         else:
@@ -103,7 +107,10 @@ class PDBTool(EnvironmentTool):
             output += self.start_pdb()
 
         if not self.pdb_is_running:
-            return f"Tool failure:\n{output}"
+            return Observation(self.name, f"Tool failure:\n{output}")
+        elif command == "":
+            # empty command
+            return Observation(self.name, "Tool failure:\nEmpty command.")
         elif command in ["b", "break"]:
             # list all breakpoints
             success, output = True, self.environment.current_breakpoints()
