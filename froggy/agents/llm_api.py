@@ -243,11 +243,17 @@ class LLM:
             for i, m in enumerate(messages):
                 if m["role"] == "system":
                     messages[i]["role"] = "user"
+                    self.logger.warning(
+                        "System prompt not supported by the model, replacing it by user prompt."
+                    )
 
         if not self.config.get("temperature_support", True):
             # certain models do not support temperature
             if "temperature" in kwargs:
                 del kwargs["temperature"]
+                self.logger.warning(
+                    "Temperature not supported by the model, removing it from the query."
+                )
 
         # Merge consecutive messages with same role.
         messages = merge_messages(messages)
