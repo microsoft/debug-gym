@@ -100,7 +100,7 @@ class PDBTool(EnvironmentTool):
             splits = re.split("\n|;", command)
             if len(splits) > 1:
                 command = splits[0].strip()
-                _warning += f"Multiple commands are not supported. Only the first command will be executed.\n"
+                _warning += f"Multiple commands are not supported. Only the first command will be executed."
 
         success, output = True, ""
         if not self.pdb_is_running:
