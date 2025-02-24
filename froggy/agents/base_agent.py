@@ -46,6 +46,12 @@ class BaseAgent:
 
         self.set_seed(self.config["random_seed"])
         self.history = HistoryTracker(self.config["memory_size"])
+        self.has_system_prompt = True
+        assert "llm_name" in self.config, "llm_name must be provided in config"
+        for key in ["o1", "o1-preview", "o1-mini", "o3-mini"]:
+            if key in self.config["llm_name"]:
+                self.has_system_prompt = False
+                break
 
     def set_seed(self, seed):
         np.random.seed(seed)
@@ -71,7 +77,7 @@ class BaseAgent:
         system_prompt = unescape(json.dumps(system_prompt, indent=4))
         messages = [
             {
-                "role": "system",
+                "role": "system" if self.has_system_prompt else "user",
                 "content": system_prompt,
             }
         ]
