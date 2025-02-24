@@ -228,12 +228,12 @@ class LLM:
             "max_tokens", self.config.get("max_tokens", NOT_GIVEN)
         )
 
-        reponse = self.call_with_retry(self.client.chat.completions.create)(
+        response = self.call_with_retry(self.client.chat.completions.create)(
             model=self.config["model"],
             messages=messages,
             **kwargs,
         )
-        return reponse.choices[0].message.content
+        return response.choices[0].message.content
 
     def __call__(self, messages, *args, **kwargs) -> LLMResponse:
         from froggy.agents.utils import trim_prompt_messages
