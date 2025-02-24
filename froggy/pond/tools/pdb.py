@@ -89,17 +89,28 @@ class PDBTool(EnvironmentTool):
     def use(self, tool_args) -> Observation:
         command = tool_args
         _warning = ""
-        splits = re.split("\n|;", command)
-        if len(splits) > 1:
-            command = splits.strip()
-            _warning += f"Multiple commands are not supported. Only the first command will be executed.\n"
+        if (
+            command == ""
+            or command.split()[0] in ["p", "pp"]
+            or command.startswith("print(")
+        ):
+            # OK to have ";" or "\n" in the command
+            pass
+        else:
+            splits = re.split("\n|;", command)
+            if len(splits) > 1:
+                command = splits[0].strip()
+                _warning += f"Multiple commands are not supported. Only the first command will be executed."
 
         success, output = True, ""
         if not self.pdb_is_running:
             output += self.start_pdb()
 
         if not self.pdb_is_running:
-            return f"Tool failure:\n{output}"
+            return Observation(self.name, f"Tool failure:\n{output}")
+        elif command == "":
+            # empty command
+            return Observation(self.name, "Tool failure:\nEmpty command.")
         elif command in ["b", "break"]:
             # list all breakpoints
             success, output = True, self.environment.current_breakpoints()
