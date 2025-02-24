@@ -12,8 +12,8 @@ class EvalTool(EnvironmentTool):
     }
 
     def use(self, tool_args, **kwargs) -> Observation:
-        obs = self.environment.eval(**kwargs)
-        return Observation(self.name, obs)
+        eval_output = self.environment.eval(**kwargs)
+        return Observation(self.name, eval_output.output)
 
     def on_env_reset(self, **kwargs):
         super().on_env_reset(**kwargs)

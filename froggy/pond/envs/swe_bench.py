@@ -17,6 +17,7 @@ from swebench.harness.test_spec import make_test_spec
 from swebench.harness.utils import get_test_directives, load_swebench_dataset
 from tqdm import tqdm
 
+from froggy.pond.entities import EvalOutput
 from froggy.pond.envs.env import RepoEnv
 from froggy.pond.terminal import DockerTerminal, Terminal
 from froggy.pond.utils import create_ignore_file
@@ -187,12 +188,19 @@ class SWEBenchEnv(RepoEnv):
         patch = result.stdout.replace(str(self.working_dir), str(self.path))
         return patch
 
-    def eval(self, **kwargs):
-        success, output = self.terminal.run(self.entrypoint, timeout=self.run_timeout)
-        self.score = self._extract_score(output)
-        self.done = self.score == self.max_score
-        self.last_eval_obs = output
-        return self.last_eval_obs
+    def calculate_score(self, eval_output: EvalOutput) -> int:
+        test_status_map = MAP_REPO_TO_PARSER[self.repo](eval_output.output)
+        self.logger.debug(f"fail_to_pass: {self.fail_to_pass}")
+        self.logger.debug(f"Test status map: {test_status_map}")
+        score = sum(
+            1
+            for test in self.fail_to_pass
+            # *Do not* assume silent success for now as done in SWE-Bench grading.py
+            if test_status_map.get(test, TestStatus.ERROR.value)
+            in (TestStatus.PASSED.value, TestStatus.XFAIL.value)
+        )
+        assert score <= self.max_score
+        return score
 
     def reset(self, *, options: dict | None = None):
         # TODO: support reset current task, i.e. no options provided.
@@ -291,20 +299,6 @@ class SWEBenchEnv(RepoEnv):
         assert not self.done, "Tests should be failing before debugging."
 
         return infos
-
-    def _extract_score(self, obs):
-        test_status_map = MAP_REPO_TO_PARSER[self.repo](obs)
-        self.logger.debug(f"fail_to_pass: {self.fail_to_pass}")
-        self.logger.debug(f"Test status map: {test_status_map}")
-        score = sum(
-            1
-            for test in self.fail_to_pass
-            # *Do not* assume silent success for now as done in SWE-Bench grading.py
-            if test_status_map.get(test, TestStatus.ERROR.value)
-            in (TestStatus.PASSED.value, TestStatus.XFAIL.value)
-        )
-        assert score <= self.max_score
-        return score
 
     def clone_repo(self, repo_address):
         org_name, repo_name = repo_address.split("/")

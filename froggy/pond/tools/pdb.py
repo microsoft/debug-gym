@@ -137,7 +137,7 @@ class PDBTool(EnvironmentTool):
             # sometimes it will run into the end of the program
             # we need to put the stdout before:
             # The program exited via sys.exit().
-            # into self.last_eval_obs, and remove them from the output
+            # into self.last_eval_output, and remove them from the output
             if "The program exited via sys.exit()." in output:
                 # end index is the last occurrence of the program exited (from the \n after)
                 end_index = (
@@ -147,7 +147,7 @@ class PDBTool(EnvironmentTool):
                     + 1
                 )
                 # TODO: I think this is a shortcut to use the output of pdb instead of eval. Can we remove this?
-                # self.environment.last_eval_obs = output[:end_index]
+                # self.environment.last_eval_output = output[:end_index]
                 output = (
                     "Reached the end of the file. Restarting the debugging session.\n"
                     + output[end_index:]
