@@ -244,6 +244,11 @@ class LLM:
                 if m["role"] == "system":
                     messages[i]["role"] = "user"
 
+        if not self.config.get("temperature_support", True):
+            # certain models do not support temperature
+            if "temperature" in kwargs:
+                del kwargs["temperature"]
+
         # Merge consecutive messages with same role.
         messages = merge_messages(messages)
         messages = trim_prompt_messages(
