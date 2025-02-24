@@ -232,7 +232,9 @@ def test_extract_max_score_from_pytest_output():
     assert extract_max_score_from_pytest_output(message_0) == 1
 
     message_rand = "============================= here are some random text ==============================="
-    with pytest.raises(ValueError, match="No test cases found in the pytest output."):
+    with pytest.raises(
+        ValueError, match="Cannot extract max score from pytest output."
+    ):
         extract_max_score_from_pytest_output(message_rand)
 
 
