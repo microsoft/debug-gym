@@ -146,8 +146,6 @@ class PDBTool(EnvironmentTool):
                     )
                     + 1
                 )
-                # TODO: I think this is a shortcut to use the output of pdb instead of eval. Can we remove this?
-                # self.environment.last_eval_output = output[:end_index]
                 output = (
                     "Reached the end of the file. Restarting the debugging session.\n"
                     + output[end_index:]
@@ -161,7 +159,6 @@ class PDBTool(EnvironmentTool):
                 and command.split()[0] not in ["l", "list"]
             ):
                 if '"""The pytest entry point."""' not in obs:
-                    # TODO: add output to self.pdb_obs?
                     obs += f"\nlist .\n" + self.interact_with_pdb("l .")
         else:
             obs = "\n".join([f"Invalid tool arguments: {tool_args}", _warning, output])
