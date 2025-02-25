@@ -167,10 +167,9 @@ class LLM:
             )
 
         if "ignore_kwargs" in self.config:
-            for kw in self.config["ignore_kwargs"]:
-                self.logger.warning(
-                    f"LLM argument {kw} is not supported by the model, it will be ignored."
-                )
+            self.logger.warning(
+                f"LLM arguments {", ".join(self.config['ignore_kwargs'])} are not supported by the model, they will be ignored."
+            )
 
     def _get_azure_oai_kwargs(self):
         """
