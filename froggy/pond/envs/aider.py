@@ -28,8 +28,11 @@ class AiderBenchmarkEnv(RepoEnv):
     def calculate_score(self, eval_output: EvalOutput) -> int:
         return utils.extract_reward_from_pytest_output(eval_output.output)
 
-    def cleanup_eval_output(self, eval_output: EvalOutput) -> str:
-        return utils.cleanup_pytest_output(eval_output.output)
+    def eval(self, **kwargs) -> EvalOutput:
+        eval_output = self.terminal.run(self.entrypoint, timeout=self.run_timeout)
+        eval_output = utils.cleanup_pytest_output(eval_output.output)
+        self.last_eval_output = EvalOutput(*eval_output)
+        return self.last_eval_output
 
     def reset(self, *, options: dict = None):
         options = options or {}

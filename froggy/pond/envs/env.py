@@ -282,10 +282,10 @@ class RepoEnv(TooledEnv):
 
         # Gets eval (initial observation) from cache or by running env.eval
         if self.last_eval_output:  # if eval tool was triggered by Event.ENV_RESET
-            self.step_observation = Observation("env", self.last_eval_output_text)
+            self.step_observation = Observation("env", self.last_eval_output.output)
         else:  # if eval tool was not triggered by Event.ENV_RESET
             self.last_eval_output = self.eval()
-            self.step_observation = Observation("env", self.last_eval_output_text)
+            self.step_observation = Observation("env", self.last_eval_output.output)
             self.all_observations.insert(0, self.step_observation)
 
         self.max_score = self.calculate_max_score(self.last_eval_output)
@@ -295,7 +295,7 @@ class RepoEnv(TooledEnv):
         self.infos = EnvInfo(
             step_observation=self.step_observation,
             all_observations=self.all_observations,
-            eval_observation=Observation("env", self.last_eval_output_text),
+            eval_observation=Observation("env", self.last_eval_output.output),
             dir_tree=self.display_files(),
             current_code_with_line_number=self.current_code_with_line_number(),
             current_breakpoints=self.current_breakpoints(),
@@ -329,21 +329,12 @@ class RepoEnv(TooledEnv):
         Override in subclasses for different behavior."""
         return self.score == self.max_score
 
-    def cleanup_eval_output(self, eval_output: EvalOutput) -> str:
-        """Cleanup the eval output before setting it as the last_eval_output.
-        Override in subclasses for different behavior."""
-        return eval_output.output
-
-    @property
-    def last_eval_output_text(self) -> str:
-        return self.cleanup_eval_output(self.last_eval_output)
-
     def eval(self, **kwargs) -> EvalOutput:
         """Evaluates the current code using the provided entrypoint.
         Sets the last_eval_output and returns it.
         Override in subclasses for different behavior."""
-        output = self.terminal.run(self.entrypoint, timeout=self.run_timeout)
-        self.last_eval_output = EvalOutput(*output)
+        eval_output = self.terminal.run(self.entrypoint, timeout=self.run_timeout)
+        self.last_eval_output = EvalOutput(*eval_output)
         return self.last_eval_output
 
     def load_current_file(self, filepath: str) -> bool:
@@ -482,7 +473,7 @@ class RepoEnv(TooledEnv):
         self.infos = EnvInfo(
             step_observation=self.step_observation,
             all_observations=self.all_observations,
-            eval_observation=Observation("env", self.last_eval_output_text),
+            eval_observation=Observation("env", self.last_eval_output.output),
             dir_tree=self.display_files(),
             current_code_with_line_number=self.current_code_with_line_number(),
             current_breakpoints=self.current_breakpoints(),
