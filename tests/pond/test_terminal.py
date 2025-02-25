@@ -74,7 +74,7 @@ def test_shell_session_timeout(tmp_path):
 
 def test_terminal_init():
     terminal = Terminal()
-    assert terminal.setup_commands == []
+    assert terminal.session_commands == []
     assert terminal.env_vars["NO_COLOR"] == "1"
     assert terminal.env_vars["PS1"] == DEFAULT_PS1
     assert len(terminal.env_vars) > 2  # NO_COLOR, PS1 + os env vars
@@ -88,11 +88,11 @@ def test_terminal_init_no_os_env_vars():
 
 def test_terminal_init_with_params(tmp_path):
     working_dir = str(tmp_path)
-    setup_commands = ["echo 'Hello World'"]
+    session_commands = ["echo 'Hello World'"]
     env_vars = {"ENV_VAR": "value"}
-    terminal = Terminal(working_dir, setup_commands, env_vars)
+    terminal = Terminal(working_dir, session_commands, env_vars)
     assert terminal.working_dir == working_dir
-    assert terminal.setup_commands == setup_commands
+    assert terminal.session_commands == session_commands
     assert terminal.env_vars["NO_COLOR"] == "1"
     assert terminal.env_vars["ENV_VAR"] == "value"
     status, output = terminal.run("pwd", timeout=1)
@@ -170,7 +170,7 @@ def test_terminal_session(tmp_path):
 @if_docker_running
 def test_docker_terminal_init():
     terminal = DockerTerminal()
-    assert terminal.setup_commands == []
+    assert terminal.session_commands == []
     assert terminal.env_vars == {"NO_COLOR": "1", "PS1": DEFAULT_PS1}
     assert terminal.working_dir.startswith("/tmp/Terminal-")
     assert terminal.base_image == "ubuntu:latest"
@@ -185,19 +185,19 @@ def test_docker_terminal_init():
 @if_docker_running
 def test_docker_terminal_init_with_params(tmp_path):
     working_dir = str(tmp_path)
-    setup_commands = ["mkdir new_dir"]
+    session_commands = ["mkdir new_dir"]
     env_vars = {"ENV_VAR": "value"}
     base_image = "ubuntu:24.04"
     volumes = {working_dir: {"bind": working_dir, "mode": "rw"}}
     terminal = DockerTerminal(
         working_dir=working_dir,
-        setup_commands=setup_commands,
+        session_commands=session_commands,
         env_vars=env_vars,
         base_image=base_image,
         volumes=volumes,
     )
     assert terminal.working_dir == working_dir
-    assert terminal.setup_commands == setup_commands
+    assert terminal.session_commands == session_commands
     assert terminal.env_vars == env_vars | {"NO_COLOR": "1", "PS1": DEFAULT_PS1}
     assert terminal.base_image == base_image
     assert terminal.volumes == volumes
@@ -309,10 +309,10 @@ def test_docker_terminal_update_volumes_with_working_dir(tmp_path):
         pytest.param(DockerTerminal, marks=if_docker_running),
     ],
 )
-def test_terminal_multiple_setup_commands(tmp_path, terminal_cls):
+def test_terminal_multiple_session_commands(tmp_path, terminal_cls):
     working_dir = str(tmp_path)
-    setup_commands = ["echo 'Hello'", "echo 'World'"]
-    terminal = terminal_cls(working_dir, setup_commands)
+    session_commands = ["echo 'Hello'", "echo 'World'"]
+    terminal = terminal_cls(working_dir, session_commands)
     status, output = terminal.run("pwd", timeout=1)
     assert status
     assert output == f"Hello\nWorld\n{working_dir}"
@@ -381,16 +381,16 @@ def test_select_terminal_invalid_config():
         select_terminal("not a dict")
 
 
-def test_shell_session_start_with_setup_commands(tmp_path):
+def test_shell_session_start_with_session_commands(tmp_path):
     terminal = Terminal(
         working_dir=str(tmp_path),
-        setup_commands=["echo setup"],
+        session_commands=["echo setup"],
     )
     session = terminal.new_shell_session()
 
     # Test starting without command
     output = session.start()
-    assert output == "setup"  # from `echo setup` in setup_commands
+    assert output == "setup"  # from `echo setup` in session_commands
     assert session.is_running
     assert session.filedescriptor is not None
     assert session.process is not None
@@ -412,7 +412,7 @@ def test_shell_session_start_with_setup_commands(tmp_path):
     session.close()
 
 
-def test_shell_session_start_without_setup_commands(tmp_path):
+def test_shell_session_start_without_session_commands(tmp_path):
     terminal = Terminal(working_dir=str(tmp_path))
     session = terminal.new_shell_session()
 
@@ -438,3 +438,23 @@ def test_shell_session_start_without_setup_commands(tmp_path):
     output = session.run("print('test python')", ">>>")
     assert output == "test python"
     session.close()
+
+
+@if_docker_running
+def test_run_setup_commands_success(tmp_path):
+    working_dir = str(tmp_path)
+    setup_commands = ["touch test1.txt", "echo test > test2.txt"]
+    terminal = DockerTerminal(working_dir, setup_commands=setup_commands)
+    assert terminal.container is not None
+    assert terminal.container.status == "running"
+    _, output = terminal.run("ls", timeout=1)
+    assert output == "test1.txt\ntest2.txt"
+
+
+@if_docker_running
+def test_run_setup_commands_failure(tmp_path):
+    working_dir = str(tmp_path)
+    setup_commands = ["echo install", "ls ./non_existent_dir"]
+    with pytest.raises(ValueError, match="Failed to run setup command:*"):
+        terminal = DockerTerminal(working_dir, setup_commands=setup_commands)
+        terminal.container  # start the container

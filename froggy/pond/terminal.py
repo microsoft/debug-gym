@@ -26,14 +26,14 @@ class ShellSession:
         self,
         shell_command: str,
         working_dir: str,
-        setup_commands: list[str] | None = None,
+        session_commands: list[str] | None = None,
         env_vars: dict[str, str] | None = None,
         logger: FroggyLogger | None = None,
     ):
         self._session_id = str(uuid.uuid4()).split("-")[0]
         self.shell_command = shell_command
         self.working_dir = working_dir
-        self.setup_commands = list(setup_commands or [])
+        self.session_commands = list(session_commands or [])
         self.env_vars = dict(env_vars or {})
         self.logger = logger or FroggyLogger("froggy")
         self.filedescriptor = None
@@ -54,11 +54,11 @@ class ShellSession:
     def start(self, command=None, read_until=None):
         self.close()  # Close any existing session
 
-        # Prepare entrypoint, combining setup commands and command if provided
-        # For example: `bin/bash -c "setup_command1 && setup_command2 && pdb"`
+        # Prepare entrypoint, combining session commands and command if provided
+        # For example: `bin/bash -c "session_command1 && session_command2 && pdb"`
         entrypoint = self.shell_command
         if command:
-            command = " && ".join(self.setup_commands + [command])
+            command = " && ".join(self.session_commands + [command])
             entrypoint = f'{self.shell_command} -c "{command}"'
 
         self.logger.debug(f"Starting {self} with entrypoint: {entrypoint}")
@@ -94,9 +94,9 @@ class ShellSession:
         # Read the output until the sentinel or PS1
         output = self.read(read_until=read_until)
 
-        # Run setup commands after starting the session if command was not provided
-        if not command and self.setup_commands:
-            command = " && ".join(self.setup_commands)
+        # Run session commands after starting the session if command was not provided
+        if not command and self.session_commands:
+            command = " && ".join(self.session_commands)
             output += self.run(command, read_until)
 
         return output
@@ -192,14 +192,14 @@ class Terminal:
     def __init__(
         self,
         working_dir: str = None,
-        setup_commands: list[str] = None,
+        session_commands: list[str] = None,
         env_vars: dict[str, str] = None,
         include_os_env_vars: bool = True,
         logger: FroggyLogger | None = None,
         **kwargs,
     ):
         self.logger = logger or FroggyLogger("froggy")
-        self.setup_commands = setup_commands or []
+        self.session_commands = session_commands or []
         self.env_vars = env_vars or {}
         if include_os_env_vars:
             self.env_vars = self.env_vars | dict(os.environ)
@@ -226,12 +226,12 @@ class Terminal:
         self._working_dir = value
 
     def prepare_command(self, entrypoint: str | list[str]) -> list[str]:
-        """Prepares a shell command by combining setup commands and entrypoint commands.
+        """Prepares a shell command by combining session commands and entrypoint commands.
         Then wraps the command in a shell (self.default_shell_command) call."""
         if isinstance(entrypoint, str):
             entrypoint = [entrypoint]
-        if self.setup_commands:
-            entrypoint = self.setup_commands + entrypoint
+        if self.session_commands:
+            entrypoint = self.session_commands + entrypoint
         entrypoint = " && ".join(entrypoint)
         command = shlex.split(f'{self.default_shell_command} -c "{entrypoint}"')
         return command
@@ -262,7 +262,7 @@ class Terminal:
             success = False
 
         if raises and not success:
-            # Command includes the entrypoint + setup commands
+            # Command includes the entrypoint + session commands
             self.logger.debug(f"Failed to run command: {command} {output}")
             raise ValueError(f"Failed to run command: {entrypoint} ", output)
 
@@ -282,7 +282,7 @@ class Terminal:
     def new_shell_session(self):
         session = ShellSession(
             shell_command=self.default_shell_command,
-            setup_commands=self.setup_commands,
+            session_commands=self.session_commands,
             working_dir=self.working_dir,
             env_vars=self.env_vars,
             logger=self.logger,
@@ -303,12 +303,15 @@ class DockerTerminal(Terminal):
 
     def __init__(
         self,
-        working_dir: str = None,
-        setup_commands: list[str] = None,
-        env_vars: dict[str, str] = None,
-        base_image: str = "ubuntu:latest",
-        volumes: dict[str, dict[str:str]] = None,
+        working_dir: str | None = None,
+        session_commands: list[str] | None = None,
+        env_vars: dict[str, str] | None = None,
         include_os_env_vars: bool = False,
+        logger: FroggyLogger | None = None,
+        # Docker-specific parameters
+        base_image: str = "ubuntu:latest",
+        setup_commands: list[str] | None = None,
+        volumes: dict[str, dict[str:str]] | None = None,
         map_host_uid_gid: bool = True,
         **kwargs,
         # TODO: dockerfile and/or docker-compose file?
@@ -324,12 +327,14 @@ class DockerTerminal(Terminal):
         """
         super().__init__(
             working_dir=working_dir,
-            setup_commands=setup_commands,
+            session_commands=session_commands,
             env_vars=env_vars,
             include_os_env_vars=include_os_env_vars,
+            logger=logger,
             **kwargs,
         )
         self.base_image = base_image
+        self.setup_commands = setup_commands or []
         self.volumes = volumes or {}
         self.map_host_uid_gid = map_host_uid_gid
         self.docker_client = docker.from_env()
@@ -378,7 +383,7 @@ class DockerTerminal(Terminal):
     def new_shell_session(self):
         session = ShellSession(
             shell_command=self.default_shell_command,
-            setup_commands=[DISABLE_ECHO_COMMAND] + self.setup_commands,
+            session_commands=[DISABLE_ECHO_COMMAND] + self.session_commands,
             working_dir=self.working_dir,
             env_vars=self.env_vars,
             logger=self.logger,
@@ -387,12 +392,12 @@ class DockerTerminal(Terminal):
         return session
 
     def prepare_command(self, entrypoint: str | list[str]) -> list[str]:
-        """Prepares a shell command by combining setup commands and entrypoint commands.
+        """Prepares a shell command by combining session commands and entrypoint commands.
         Then wraps the command in a shell call."""
         if isinstance(entrypoint, str):
             entrypoint = [entrypoint]
-        if self.setup_commands:
-            entrypoint = self.setup_commands + entrypoint
+        if self.session_commands:
+            entrypoint = self.session_commands + entrypoint
         entrypoint = " && ".join(entrypoint)
         command = ["/bin/bash", "-c", entrypoint]
         return command
@@ -421,7 +426,7 @@ class DockerTerminal(Terminal):
         success = status == 0
 
         if raises and not success:
-            # Command includes the entrypoint + setup commands
+            # Command includes the entrypoint + session commands
             self.logger.debug(f"Failed to run command: {command} {output}")
             raise ValueError(f"Failed to run command: {entrypoint} ", output)
 
@@ -447,9 +452,29 @@ class DockerTerminal(Terminal):
         container_name = f"froggy_{container.name}"
         container.rename(container_name)
         container.reload()
+        self._run_setup_commands(container)
         self.logger.debug(f"Container {container_name} started successfully.")
         atexit.register(self.clean_up)
         return container
+
+    def _run_setup_commands(self, container):
+        """Run setup commands if any. If commands fail, stop the container."""
+        if self.setup_commands:
+            setup_commands = " && ".join(self.setup_commands)
+            self.logger.debug(f"Running setup commands: {setup_commands}")
+            status, output = container.exec_run(
+                ["/bin/bash", "-c", setup_commands],
+                user="root",  # Run as root to allow installations
+                workdir=self.working_dir,
+                environment=self.env_vars,
+            )
+            if status != 0:
+                container.stop()
+                raise ValueError(
+                    f"Failed to run setup command: {setup_commands}\n"
+                    f"Output: {output.decode()}"
+                )
+            self.logger.debug(f"Setup commands ran successfully.")
 
     def clean_up(self):
         """Clean up the Docker container."""
@@ -471,13 +496,17 @@ class DockerTerminal(Terminal):
 def select_terminal(
     terminal_config: dict | None = None, logger: FroggyLogger | None = None
 ) -> Terminal:
+    logger = logger or FroggyLogger("froggy")
     terminal_config = terminal_config or {"type": "local"}
     terminal_type = terminal_config["type"]
+    docker_only = ["base_image", "setup_commands", "volumes", "map_host_uid_gid"]
     match terminal_type:
         case "docker":
             terminal_class = DockerTerminal
         case "local":
             terminal_class = Terminal
+            if any(cfg in terminal_config for cfg in docker_only):
+                logger.warning("Ignoring Docker-only parameters for local terminal.")
         case _:
             raise ValueError(f"Unknown terminal {terminal_type}")
 
