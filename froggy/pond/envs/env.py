@@ -173,7 +173,7 @@ class RepoEnv(TooledEnv):
         self.current_file_content = None
         self.current_breakpoints_state = {}
         self.rewrite_counter = 0
-        self.last_eval_output: EvalOutput = None
+        self.last_eval: EvalOutput = None
         self.score = 0
         self.done = False
         # clear all observations and event queue (queue should be empty already)
@@ -281,21 +281,21 @@ class RepoEnv(TooledEnv):
         self.all_observations = self.process_events()
 
         # Gets eval (initial observation) from cache or by running env.eval
-        if self.last_eval_output:  # if eval tool was triggered by Event.ENV_RESET
-            self.step_observation = Observation("env", self.last_eval_output.output)
+        if self.last_eval:  # if eval tool was triggered by Event.ENV_RESET
+            self.step_observation = Observation("env", self.last_eval.output)
         else:  # if eval tool was not triggered by Event.ENV_RESET
-            self.last_eval_output = self.eval()
-            self.step_observation = Observation("env", self.last_eval_output.output)
+            self.last_eval = self.eval()
+            self.step_observation = Observation("env", self.last_eval.output)
             self.all_observations.insert(0, self.step_observation)
 
-        self.max_score = self.calculate_max_score(self.last_eval_output)
-        self.score = self.calculate_score(self.last_eval_output)
-        self.done = self.calculate_done(self.last_eval_output)
+        self.max_score = self.calculate_max_score(self.last_eval)
+        self.score = self.calculate_score(self.last_eval)
+        self.done = self.calculate_done(self.last_eval)
 
         self.infos = EnvInfo(
             step_observation=self.step_observation,
             all_observations=self.all_observations,
-            eval_observation=Observation("env", self.last_eval_output.output),
+            eval_observation=Observation("env", self.last_eval.output),
             dir_tree=self.display_files(),
             current_code_with_line_number=self.current_code_with_line_number(),
             current_breakpoints=self.current_breakpoints(),
@@ -331,11 +331,11 @@ class RepoEnv(TooledEnv):
 
     def eval(self, **kwargs) -> EvalOutput:
         """Evaluates the current code using the provided entrypoint.
-        Sets the last_eval_output and returns it.
+        Sets the last_eval and returns it.
         Override in subclasses for different behavior."""
-        eval_output = self.terminal.run(self.entrypoint, timeout=self.run_timeout)
-        self.last_eval_output = EvalOutput(*eval_output)
-        return self.last_eval_output
+        success, output = self.terminal.run(self.entrypoint, timeout=self.run_timeout)
+        self.last_eval = EvalOutput(success, output)
+        return self.last_eval
 
     def load_current_file(self, filepath: str) -> bool:
         self.current_file = filepath
@@ -467,13 +467,13 @@ class RepoEnv(TooledEnv):
         self.all_observations.insert(0, self.step_observation)
 
         # Calculate score and done based on the last eval output
-        self.score = self.calculate_score(self.last_eval_output)
-        self.done = self.calculate_done(self.last_eval_output)
+        self.score = self.calculate_score(self.last_eval)
+        self.done = self.calculate_done(self.last_eval)
 
         self.infos = EnvInfo(
             step_observation=self.step_observation,
             all_observations=self.all_observations,
-            eval_observation=Observation("env", self.last_eval_output.output),
+            eval_observation=Observation("env", self.last_eval.output),
             dir_tree=self.display_files(),
             current_code_with_line_number=self.current_code_with_line_number(),
             current_breakpoints=self.current_breakpoints(),

@@ -39,10 +39,10 @@ class MiniNightmareEnv(RepoEnv):
         return utils.extract_reward_from_pytest_output(eval_output.output)
 
     def eval(self, **kwargs) -> EvalOutput:
-        eval_output = self.terminal.run(self.entrypoint, timeout=self.run_timeout)
-        eval_output = utils.cleanup_pytest_output(eval_output.output)
-        self.last_eval_output = EvalOutput(*eval_output)
-        return self.last_eval_output
+        success, output = self.terminal.run(self.entrypoint, timeout=self.run_timeout)
+        output = utils.cleanup_pytest_output(output)
+        self.last_eval = EvalOutput(success, output)
+        return self.last_eval
 
     def reset(self, *, options: dict = None):
         options = options or {}
