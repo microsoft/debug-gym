@@ -306,10 +306,12 @@ class DockerTerminal(Terminal):
         working_dir: str | None = None,
         session_commands: list[str] | None = None,
         env_vars: dict[str, str] | None = None,
+        include_os_env_vars: bool = False,
+        logger: FroggyLogger | None = None,
+        # Docker-specific parameters
         base_image: str = "ubuntu:latest",
         setup_commands: list[str] | None = None,
         volumes: dict[str, dict[str:str]] | None = None,
-        include_os_env_vars: bool = False,
         map_host_uid_gid: bool = True,
         **kwargs,
         # TODO: dockerfile and/or docker-compose file?
@@ -328,6 +330,7 @@ class DockerTerminal(Terminal):
             session_commands=session_commands,
             env_vars=env_vars,
             include_os_env_vars=include_os_env_vars,
+            logger=logger,
             **kwargs,
         )
         self.base_image = base_image
@@ -493,13 +496,17 @@ class DockerTerminal(Terminal):
 def select_terminal(
     terminal_config: dict | None = None, logger: FroggyLogger | None = None
 ) -> Terminal:
+    logger = logger or FroggyLogger("froggy")
     terminal_config = terminal_config or {"type": "local"}
     terminal_type = terminal_config["type"]
+    docker_only = ["base_image", "setup_commands", "volumes", "map_host_uid_gid"]
     match terminal_type:
         case "docker":
             terminal_class = DockerTerminal
         case "local":
             terminal_class = Terminal
+            if any(cfg in terminal_config for cfg in docker_only):
+                logger.warning("Ignoring Docker-only parameters for local terminal.")
         case _:
             raise ValueError(f"Unknown terminal {terminal_type}")
 
