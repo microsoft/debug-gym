@@ -54,8 +54,8 @@ class ShellSession:
     def start(self, command=None, read_until=None):
         self.close()  # Close any existing session
 
-        # Prepare entrypoint, combining setup commands and command if provided
-        # For example: `bin/bash -c "setup_command1 && setup_command2 && pdb"`
+        # Prepare entrypoint, combining session commands and command if provided
+        # For example: `bin/bash -c "session_command1 && session_command2 && pdb"`
         entrypoint = self.shell_command
         if command:
             command = " && ".join(self.session_commands + [command])
@@ -94,7 +94,7 @@ class ShellSession:
         # Read the output until the sentinel or PS1
         output = self.read(read_until=read_until)
 
-        # Run setup commands after starting the session if command was not provided
+        # Run session commands after starting the session if command was not provided
         if not command and self.session_commands:
             command = " && ".join(self.session_commands)
             output += self.run(command, read_until)
@@ -226,7 +226,7 @@ class Terminal:
         self._working_dir = value
 
     def prepare_command(self, entrypoint: str | list[str]) -> list[str]:
-        """Prepares a shell command by combining setup commands and entrypoint commands.
+        """Prepares a shell command by combining session commands and entrypoint commands.
         Then wraps the command in a shell (self.default_shell_command) call."""
         if isinstance(entrypoint, str):
             entrypoint = [entrypoint]
@@ -262,7 +262,7 @@ class Terminal:
             success = False
 
         if raises and not success:
-            # Command includes the entrypoint + setup commands
+            # Command includes the entrypoint + session commands
             self.logger.debug(f"Failed to run command: {command} {output}")
             raise ValueError(f"Failed to run command: {entrypoint} ", output)
 
@@ -307,7 +307,7 @@ class DockerTerminal(Terminal):
         session_commands: list[str] | None = None,
         env_vars: dict[str, str] | None = None,
         base_image: str = "ubuntu:latest",
-        install_commands: list[str] | None = None,
+        setup_commands: list[str] | None = None,
         volumes: dict[str, dict[str:str]] | None = None,
         include_os_env_vars: bool = False,
         map_host_uid_gid: bool = True,
@@ -331,7 +331,7 @@ class DockerTerminal(Terminal):
             **kwargs,
         )
         self.base_image = base_image
-        self.install_commands = install_commands or []
+        self.setup_commands = setup_commands or []
         self.volumes = volumes or {}
         self.map_host_uid_gid = map_host_uid_gid
         self.docker_client = docker.from_env()
@@ -389,7 +389,7 @@ class DockerTerminal(Terminal):
         return session
 
     def prepare_command(self, entrypoint: str | list[str]) -> list[str]:
-        """Prepares a shell command by combining setup commands and entrypoint commands.
+        """Prepares a shell command by combining session commands and entrypoint commands.
         Then wraps the command in a shell call."""
         if isinstance(entrypoint, str):
             entrypoint = [entrypoint]
@@ -423,7 +423,7 @@ class DockerTerminal(Terminal):
         success = status == 0
 
         if raises and not success:
-            # Command includes the entrypoint + setup commands
+            # Command includes the entrypoint + session commands
             self.logger.debug(f"Failed to run command: {command} {output}")
             raise ValueError(f"Failed to run command: {entrypoint} ", output)
 
@@ -449,19 +449,18 @@ class DockerTerminal(Terminal):
         container_name = f"froggy_{container.name}"
         container.rename(container_name)
         container.reload()
-        self._run_install_commands(container)
+        self._run_setup_commands(container)
         self.logger.debug(f"Container {container_name} started successfully.")
         atexit.register(self.clean_up)
         return container
 
-    def _run_install_commands(self, container):  # rename to _run_session_commands
-        """Run install commands if any.
-        If the commands fail, stop the container."""
-        if self.install_commands:
-            install_commands = " && ".join(self.install_commands)
-            self.logger.debug(f"Running install commands: {install_commands}")
+    def _run_setup_commands(self, container):
+        """Run setup commands if any. If commands fail, stop the container."""
+        if self.setup_commands:
+            setup_commands = " && ".join(self.setup_commands)
+            self.logger.debug(f"Running setup commands: {setup_commands}")
             status, output = container.exec_run(
-                ["/bin/bash", "-c", install_commands],
+                ["/bin/bash", "-c", setup_commands],
                 user="root",  # Run as root to allow installations
                 workdir=self.working_dir,
                 environment=self.env_vars,
@@ -469,10 +468,10 @@ class DockerTerminal(Terminal):
             if status != 0:
                 container.stop()
                 raise ValueError(
-                    f"Failed to run install command: {install_commands}\n"
+                    f"Failed to run setup command: {setup_commands}\n"
                     f"Output: {output.decode()}"
                 )
-            self.logger.debug(f"Install command completed.")
+            self.logger.debug(f"Setup commands ran successfully.")
 
     def clean_up(self):
         """Clean up the Docker container."""

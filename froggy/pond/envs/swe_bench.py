@@ -147,7 +147,7 @@ class SWEBenchEnv(RepoEnv):
             self.install_configs["install"] += " && python -m pip install pytest"
 
             if entrypoint.startswith("PYTHONWARNINGS"):
-                # Move PYTHONWARNINGS from the entrypoint to the setup commands
+                # Move PYTHONWARNINGS from the entrypoint to the session commands
                 export, remaining = entrypoint.split(" ", 1)
                 self.session_commands.append(f"export {export}")
                 entrypoint = remaining
