@@ -178,7 +178,7 @@ def extract_max_score_from_pytest_output(output):
     if match:
         return max(int(match.group(1)), 1.0)
     else:
-        raise ValueError("No test cases found in the pytest output.", output)
+        raise ValueError("Cannot extract max score from pytest output.", output)
 
 
 def extract_reward_from_pytest_output(output):

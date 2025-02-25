@@ -3,6 +3,7 @@ import subprocess
 from pathlib import Path
 
 import froggy.pond.utils as utils
+from froggy.pond.entities import EvalOutput
 from froggy.pond.envs.env import RepoEnv
 
 
@@ -21,14 +22,17 @@ class AiderBenchmarkEnv(RepoEnv):
         super().__init__(**kwargs)
         self.load_dataset()
 
-    def eval(self, **kwargs):
-        # if not self.done:  # Skip evaluation if the task is already solved.
+    def calculate_max_score(self, eval_output: EvalOutput) -> int:
+        return utils.extract_max_score_from_pytest_output(eval_output.output)
+
+    def calculate_score(self, eval_output: EvalOutput) -> int:
+        return utils.extract_reward_from_pytest_output(eval_output.output)
+
+    def eval(self, **kwargs) -> EvalOutput:
         success, output = self.terminal.run(self.entrypoint, timeout=self.run_timeout)
-        self.max_score = utils.extract_max_score_from_pytest_output(output)
-        self.score = utils.extract_reward_from_pytest_output(output)
-        self.done = self.score == self.max_score
-        self.last_eval_obs = utils.cleanup_pytest_output(output)
-        return self.last_eval_obs
+        output = utils.cleanup_pytest_output(output)
+        self.last_eval = EvalOutput(success, output)
+        return self.last_eval
 
     def reset(self, *, options: dict = None):
         options = options or {}

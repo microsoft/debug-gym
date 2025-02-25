@@ -1,5 +1,4 @@
 import atexit
-import copy
 import glob
 import os
 import shutil
@@ -13,14 +12,15 @@ from pathlib import Path
 import numpy as np
 
 from froggy.logger import FroggyLogger
-from froggy.pond.entities import Event, Observation
+from froggy.pond.entities import EvalOutput, Event, Observation
 from froggy.pond.terminal import Terminal
 from froggy.pond.utils import _walk, make_file_matcher, parse_action, show_line_number
 
 
 @dataclass
 class EnvInfo:
-    step_observation: Observation  # obs from the tool triggered by env.step or env.last_eval_obs when env.reset
+    # obs from tool triggered by `env.step` or eval if `env.reset`
+    step_observation: Observation
     all_observations: list[Observation]  #  env.step + triggered tools obs
     eval_observation: Observation  # last eval observation
     dir_tree: str
@@ -134,7 +134,7 @@ class RepoEnv(TooledEnv):
         path: str | None = None,
         entrypoint: str = "python -m pytest -sq .",
         debug_entrypoint: str | None = None,
-        max_score: int = 1,
+        max_score: int | None = None,
         readonly_patterns: list[str] | None = None,
         run_on_rewrite: bool = True,
         run_timeout: int | None = None,
@@ -164,10 +164,21 @@ class RepoEnv(TooledEnv):
             debug_entrypoint=debug_entrypoint,
             readonly_patterns=readonly_patterns,
         )
-        self.last_eval_obs = ""
+        self._reset_env_state()
+
+    def _reset_env_state(self):
+        """Reset the environment state to the initial state."""
+        # reset all state variables
+        self.current_file = None
+        self.current_file_content = None
+        self.current_breakpoints_state = {}
+        self.rewrite_counter = 0
+        self.last_eval: EvalOutput = None
         self.score = 0
         self.done = False
-        self.rewrite_counter = 0
+        # clear all observations and event queue (queue should be empty already)
+        self.clear_all_observations()
+        self.empty_event_queue()
 
     def setup_workspace(
         self,
@@ -197,15 +208,12 @@ class RepoEnv(TooledEnv):
 
         self._index_files(readonly_patterns)
 
-        self.current_file = None
-        self.current_file_content = None
-        self.current_breakpoints_state = {}
-
         # override entrypoint as it might be task dependent
         self.set_entrypoints(entrypoint, debug_entrypoint)
 
         # Set up the terminal working dir
         self.terminal.working_dir = str(self.working_dir)
+        self._reset_env_state()
 
     def set_entrypoints(self, entrypoint, debug_entrypoint):
         if entrypoint:
@@ -261,38 +269,33 @@ class RepoEnv(TooledEnv):
 
             shutil.copy2(self.path / filepath, self.working_dir / filepath)
 
-    def reset(
-        self,
-        *,
-        options: dict = None,
-    ):
-        """Resets the environment to the initial state and returns the initial observation"""
+    def reset(self, *, options: dict = None):
+        """Resets the environment and returns eval as the initial observation."""
         self.logger.info(f"Resetting environment")
         options = options or {}
-        self.current_file = None
-        self.current_file_content = None
-        self.current_breakpoints_state = {}
-        self.rewrite_counter = 0
-        self.last_eval_obs = ""
-        self.done = False
-        self.clear_all_observations()
-        self.empty_event_queue()
+
+        self._reset_env_state()
 
         # Notify all tools that the environment is reset and get their observations
         self.queue_event(Event.ENV_RESET, source="env")
         self.all_observations = self.process_events()
 
-        # Gets eval (initial observation) from cache if eval tool was already called or by running env.eval
-        if self.last_eval_obs:
-            self.step_observation = Observation("env", self.last_eval_obs)
-        else:
-            self.step_observation = Observation("env", self.eval())
+        # Gets eval (initial observation) from cache or by running env.eval
+        if self.last_eval:  # if eval tool was triggered by Event.ENV_RESET
+            self.step_observation = Observation("env", self.last_eval.output)
+        else:  # if eval tool was not triggered by Event.ENV_RESET
+            self.last_eval = self.eval()
+            self.step_observation = Observation("env", self.last_eval.output)
             self.all_observations.insert(0, self.step_observation)
+
+        self.max_score = self.calculate_max_score(self.last_eval)
+        self.score = self.calculate_score(self.last_eval)
+        self.done = self.calculate_done(self.last_eval)
 
         self.infos = EnvInfo(
             step_observation=self.step_observation,
             all_observations=self.all_observations,
-            eval_observation=Observation("env", self.last_eval_obs),
+            eval_observation=Observation("env", self.last_eval.output),
             dir_tree=self.display_files(),
             current_code_with_line_number=self.current_code_with_line_number(),
             current_breakpoints=self.current_breakpoints(),
@@ -304,23 +307,35 @@ class RepoEnv(TooledEnv):
             rewrite_counter=self.rewrite_counter,
             tools=self.tool_instructions,
         )
-
         return self.infos
 
     def seed(self, seed=None):
         if seed is not None:
             self.rng = np.random.RandomState(seed)
 
-    def eval(self, **kwargs):
+    def calculate_max_score(self, eval_output: EvalOutput) -> int:
+        """Calculate the maximum score. Called once at reset.
+        Override in subclasses for different behavior."""
+        # Default to 1 (eval) if max_score is not set
+        return self.max_score or 1
+
+    def calculate_score(self, eval_output: EvalOutput) -> int:
+        """Calculate the score from the eval output.
+        Override in subclasses for different behavior."""
+        return eval_output.success
+
+    def calculate_done(self, eval_output: EvalOutput) -> bool:
+        """Determine if the task is done.
+        Override in subclasses for different behavior."""
+        return self.score == self.max_score
+
+    def eval(self, **kwargs) -> EvalOutput:
         """Evaluates the current code using the provided entrypoint.
-        Sets the last_eval_obs, score and done flag based on the evaluation result.
-        Returns the last_eval_obs.
-        """
+        Sets the last_eval and returns it.
+        Override in subclasses for different behavior."""
         success, output = self.terminal.run(self.entrypoint, timeout=self.run_timeout)
-        self.last_eval_obs = output
-        self.score = int(success)
-        self.done = success
-        return self.last_eval_obs
+        self.last_eval = EvalOutput(success, output)
+        return self.last_eval
 
     def load_current_file(self, filepath: str) -> bool:
         self.current_file = filepath
@@ -451,10 +466,14 @@ class RepoEnv(TooledEnv):
         # prepend step_observation to all_observations
         self.all_observations.insert(0, self.step_observation)
 
+        # Calculate score and done based on the last eval output
+        self.score = self.calculate_score(self.last_eval)
+        self.done = self.calculate_done(self.last_eval)
+
         self.infos = EnvInfo(
             step_observation=self.step_observation,
             all_observations=self.all_observations,
-            eval_observation=Observation("env", self.last_eval_obs),
+            eval_observation=Observation("env", self.last_eval.output),
             dir_tree=self.display_files(),
             current_code_with_line_number=self.current_code_with_line_number(),
             current_breakpoints=self.current_breakpoints(),

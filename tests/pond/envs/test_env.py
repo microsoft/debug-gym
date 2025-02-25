@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, call, patch
 import numpy as np
 import pytest
 
-from froggy.pond.entities import Event, Observation
+from froggy.pond.entities import EvalOutput, Event, Observation
 from froggy.pond.envs.env import EnvInfo, EventHooks, RepoEnv, TooledEnv
 from froggy.pond.terminal import Terminal
 
@@ -260,6 +260,7 @@ def test_step(
     mock_current_code_with_line_number.return_value = "code with line numbers"
 
     env = RepoEnv(path=".")
+    env.last_eval = EvalOutput(success=False, output="1 failed, 0 passed")
     mock_get_triggered_tools.return_value = [mock_pdb_tool]
     mock_get_triggered_tools.return_value = None, [mock_pdb_tool, "b 10"]
 
@@ -373,10 +374,7 @@ def test_eval_success(tmp_path):
         f.write("print('Hello, World!')")
     env = RepoEnv(path=working_dir, entrypoint="python file.py")
     output = env.eval()
-
-    assert output == "Hello, World!"
-    assert env.done
-    assert env.score == 1
+    assert output == EvalOutput(success=True, output="Hello, World!")
 
 
 def test_eval_timeout(tmp_path):
@@ -386,10 +384,7 @@ def test_eval_timeout(tmp_path):
         f.write("import time; time.sleep(5)")
     env = RepoEnv(path=working_dir, entrypoint="python file.py", run_timeout=1)
     output = env.eval()
-
-    assert output == "Timeout expired."
-    assert not env.done
-    assert env.score == 0
+    assert output == EvalOutput(success=False, output="Timeout expired.")
 
 
 def test_event_hooks_initialization():

@@ -3,6 +3,12 @@ from enum import Enum
 
 
 @dataclass
+class EvalOutput:
+    success: bool
+    output: str
+
+
+@dataclass
 class Observation:
     source: str
     observation: str
