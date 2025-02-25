@@ -26,14 +26,14 @@ class ShellSession:
         self,
         shell_command: str,
         working_dir: str,
-        setup_commands: list[str] | None = None,
+        session_commands: list[str] | None = None,
         env_vars: dict[str, str] | None = None,
         logger: FroggyLogger | None = None,
     ):
         self._session_id = str(uuid.uuid4()).split("-")[0]
         self.shell_command = shell_command
         self.working_dir = working_dir
-        self.setup_commands = list(setup_commands or [])
+        self.session_commands = list(session_commands or [])
         self.env_vars = dict(env_vars or {})
         self.logger = logger or FroggyLogger("froggy")
         self.filedescriptor = None
@@ -58,7 +58,7 @@ class ShellSession:
         # For example: `bin/bash -c "setup_command1 && setup_command2 && pdb"`
         entrypoint = self.shell_command
         if command:
-            command = " && ".join(self.setup_commands + [command])
+            command = " && ".join(self.session_commands + [command])
             entrypoint = f'{self.shell_command} -c "{command}"'
 
         self.logger.debug(f"Starting {self} with entrypoint: {entrypoint}")
@@ -95,8 +95,8 @@ class ShellSession:
         output = self.read(read_until=read_until)
 
         # Run setup commands after starting the session if command was not provided
-        if not command and self.setup_commands:
-            command = " && ".join(self.setup_commands)
+        if not command and self.session_commands:
+            command = " && ".join(self.session_commands)
             output += self.run(command, read_until)
 
         return output
@@ -192,14 +192,14 @@ class Terminal:
     def __init__(
         self,
         working_dir: str = None,
-        setup_commands: list[str] = None,
+        session_commands: list[str] = None,
         env_vars: dict[str, str] = None,
         include_os_env_vars: bool = True,
         logger: FroggyLogger | None = None,
         **kwargs,
     ):
         self.logger = logger or FroggyLogger("froggy")
-        self.setup_commands = setup_commands or []
+        self.session_commands = session_commands or []
         self.env_vars = env_vars or {}
         if include_os_env_vars:
             self.env_vars = self.env_vars | dict(os.environ)
@@ -230,8 +230,8 @@ class Terminal:
         Then wraps the command in a shell (self.default_shell_command) call."""
         if isinstance(entrypoint, str):
             entrypoint = [entrypoint]
-        if self.setup_commands:
-            entrypoint = self.setup_commands + entrypoint
+        if self.session_commands:
+            entrypoint = self.session_commands + entrypoint
         entrypoint = " && ".join(entrypoint)
         command = shlex.split(f'{self.default_shell_command} -c "{entrypoint}"')
         return command
@@ -282,7 +282,7 @@ class Terminal:
     def new_shell_session(self):
         session = ShellSession(
             shell_command=self.default_shell_command,
-            setup_commands=self.setup_commands,
+            session_commands=self.session_commands,
             working_dir=self.working_dir,
             env_vars=self.env_vars,
             logger=self.logger,
@@ -304,7 +304,7 @@ class DockerTerminal(Terminal):
     def __init__(
         self,
         working_dir: str | None = None,
-        setup_commands: list[str] | None = None,
+        session_commands: list[str] | None = None,
         env_vars: dict[str, str] | None = None,
         base_image: str = "ubuntu:latest",
         install_commands: list[str] | None = None,
@@ -325,7 +325,7 @@ class DockerTerminal(Terminal):
         """
         super().__init__(
             working_dir=working_dir,
-            setup_commands=setup_commands,
+            session_commands=session_commands,
             env_vars=env_vars,
             include_os_env_vars=include_os_env_vars,
             **kwargs,
@@ -380,7 +380,7 @@ class DockerTerminal(Terminal):
     def new_shell_session(self):
         session = ShellSession(
             shell_command=self.default_shell_command,
-            setup_commands=[DISABLE_ECHO_COMMAND] + self.setup_commands,
+            session_commands=[DISABLE_ECHO_COMMAND] + self.session_commands,
             working_dir=self.working_dir,
             env_vars=self.env_vars,
             logger=self.logger,
@@ -393,8 +393,8 @@ class DockerTerminal(Terminal):
         Then wraps the command in a shell call."""
         if isinstance(entrypoint, str):
             entrypoint = [entrypoint]
-        if self.setup_commands:
-            entrypoint = self.setup_commands + entrypoint
+        if self.session_commands:
+            entrypoint = self.session_commands + entrypoint
         entrypoint = " && ".join(entrypoint)
         command = ["/bin/bash", "-c", entrypoint]
         return command
@@ -454,7 +454,7 @@ class DockerTerminal(Terminal):
         atexit.register(self.clean_up)
         return container
 
-    def _run_install_commands(self, container):  # rename to _run_setup_commands
+    def _run_install_commands(self, container):  # rename to _run_session_commands
         """Run install commands if any.
         If the commands fail, stop the container."""
         if self.install_commands:

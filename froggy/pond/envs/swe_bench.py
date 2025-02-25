@@ -47,7 +47,7 @@ class SWEBenchEnv(RepoEnv):
         SWEBenchEnv.CACHE.mkdir(parents=True, exist_ok=True)
 
         self.load_dataset()
-        self.setup_commands = []
+        self.session_commands = []
         self.test_directives = []
 
     @property
@@ -149,7 +149,7 @@ class SWEBenchEnv(RepoEnv):
             if entrypoint.startswith("PYTHONWARNINGS"):
                 # Move PYTHONWARNINGS from the entrypoint to the setup commands
                 export, remaining = entrypoint.split(" ", 1)
-                self.setup_commands.append(f"export {export}")
+                self.session_commands.append(f"export {export}")
                 entrypoint = remaining
 
         # -s (capture=no) from pytest, allows for debugging with pdb
@@ -260,8 +260,8 @@ class SWEBenchEnv(RepoEnv):
         # Copy the initial code to the working directory.
         self.terminal.run(f"cp -r /testbed/. {self.working_dir}")
 
-        self.terminal.setup_commands.append("source /opt/miniconda3/bin/activate")
-        self.terminal.setup_commands.append(f"conda activate testbed")
+        self.terminal.session_commands.append("source /opt/miniconda3/bin/activate")
+        self.terminal.session_commands.append(f"conda activate testbed")
 
         self.run_install()
         self.run_post_install()
@@ -332,7 +332,7 @@ class SWEBenchEnv(RepoEnv):
     def prepare_eval_commands(self):
         """Add eval_cmd to be executed every time the terminal is called"""
         for eval_cmd in self.install_configs.get("eval_commands", []):
-            self.setup_commands.append(eval_cmd)
+            self.session_commands.append(eval_cmd)
 
     def run_install(self):
         install_cmd = self.install_configs.get("install", "")

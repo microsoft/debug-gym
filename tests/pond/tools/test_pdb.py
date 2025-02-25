@@ -113,7 +113,7 @@ def test_pdb_use_docker_terminal(tmp_path, setup_test_repo):
     tests_path = str(setup_test_repo(tmp_path))
     terminal = DockerTerminal(
         base_image="python:3.12-slim",
-        setup_commands=["pip install pytest"],
+        session_commands=["pip install pytest"],
         env_vars={"PYTHONDONTWRITEBYTECODE": "1"},  # avoid __pycache__
         map_host_uid_gid=False,  # run as root
     )
