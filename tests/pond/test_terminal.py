@@ -438,3 +438,23 @@ def test_shell_session_start_without_setup_commands(tmp_path):
     output = session.run("print('test python')", ">>>")
     assert output == "test python"
     session.close()
+
+
+@if_docker_running
+def test_run_install_commands_success(tmp_path):
+    working_dir = str(tmp_path)
+    install_commands = ["touch test1.txt", "echo test > test2.txt"]
+    terminal = DockerTerminal(working_dir, install_commands=install_commands)
+    assert terminal.container is not None
+    assert terminal.container.status == "running"
+    _, output = terminal.run("ls", timeout=1)
+    assert output == "test1.txt\ntest2.txt"
+
+
+@if_docker_running
+def test_run_install_commands_failure(tmp_path):
+    working_dir = str(tmp_path)
+    install_commands = ["echo install", "ls ./non_existent_dir"]
+    with pytest.raises(ValueError, match="Failed to run install command:*"):
+        terminal = DockerTerminal(working_dir, install_commands=install_commands)
+        terminal.container  # trigger install commands

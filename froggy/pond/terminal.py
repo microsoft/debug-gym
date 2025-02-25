@@ -303,11 +303,12 @@ class DockerTerminal(Terminal):
 
     def __init__(
         self,
-        working_dir: str = None,
-        setup_commands: list[str] = None,
-        env_vars: dict[str, str] = None,
+        working_dir: str | None = None,
+        setup_commands: list[str] | None = None,
+        env_vars: dict[str, str] | None = None,
         base_image: str = "ubuntu:latest",
-        volumes: dict[str, dict[str:str]] = None,
+        install_commands: list[str] | None = None,
+        volumes: dict[str, dict[str:str]] | None = None,
         include_os_env_vars: bool = False,
         map_host_uid_gid: bool = True,
         **kwargs,
@@ -330,6 +331,7 @@ class DockerTerminal(Terminal):
             **kwargs,
         )
         self.base_image = base_image
+        self.install_commands = install_commands or []
         self.volumes = volumes or {}
         self.map_host_uid_gid = map_host_uid_gid
         self.docker_client = docker.from_env()
@@ -447,9 +449,30 @@ class DockerTerminal(Terminal):
         container_name = f"froggy_{container.name}"
         container.rename(container_name)
         container.reload()
+        self._run_install_commands(container)
         self.logger.debug(f"Container {container_name} started successfully.")
         atexit.register(self.clean_up)
         return container
+
+    def _run_install_commands(self, container):  # rename to _run_setup_commands
+        """Run install commands if any.
+        If the commands fail, stop the container."""
+        if self.install_commands:
+            install_commands = " && ".join(self.install_commands)
+            self.logger.debug(f"Running install commands: {install_commands}")
+            status, output = container.exec_run(
+                ["/bin/bash", "-c", install_commands],
+                user="root",  # Run as root to allow installations
+                workdir=self.working_dir,
+                environment=self.env_vars,
+            )
+            if status != 0:
+                container.stop()
+                raise ValueError(
+                    f"Failed to run install command: {install_commands}\n"
+                    f"Output: {output.decode()}"
+                )
+            self.logger.debug(f"Install command completed.")
 
     def clean_up(self):
         """Clean up the Docker container."""
