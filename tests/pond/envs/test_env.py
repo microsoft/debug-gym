@@ -260,7 +260,7 @@ def test_step(
     mock_current_code_with_line_number.return_value = "code with line numbers"
 
     env = RepoEnv(path=".")
-    env.last_eval_output = EvalOutput(success=False, output="1 failed, 0 passed")
+    env.last_eval = EvalOutput(success=False, output="1 failed, 0 passed")
     mock_get_triggered_tools.return_value = [mock_pdb_tool]
     mock_get_triggered_tools.return_value = None, [mock_pdb_tool, "b 10"]
 

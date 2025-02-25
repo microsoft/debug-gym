@@ -160,6 +160,17 @@ class LLM:
             stop=stop_after_attempt(100),
         )
 
+        if not self.config.get("system_prompt_support", True):
+            # Replace system prompt by user prompt.
+            self.logger.warning(
+                "System prompt is not supported by the model, it will be replaced by user prompt."
+            )
+
+        if "ignore_kwargs" in self.config:
+            self.logger.warning(
+                f"LLM arguments {", ".join(self.config['ignore_kwargs'])} are not supported by the model, they will be ignored."
+            )
+
     def _get_azure_oai_kwargs(self):
         """
         Returns a dictionary of keyword arguments required for connecting to Azure OpenAI.
@@ -228,12 +239,12 @@ class LLM:
             "max_tokens", self.config.get("max_tokens", NOT_GIVEN)
         )
 
-        reponse = self.call_with_retry(self.client.chat.completions.create)(
+        response = self.call_with_retry(self.client.chat.completions.create)(
             model=self.config["model"],
             messages=messages,
             **kwargs,
         )
-        return reponse.choices[0].message.content
+        return response.choices[0].message.content
 
     def __call__(self, messages, *args, **kwargs) -> LLMResponse:
         from froggy.agents.utils import trim_prompt_messages
@@ -243,6 +254,11 @@ class LLM:
             for i, m in enumerate(messages):
                 if m["role"] == "system":
                     messages[i]["role"] = "user"
+
+        if "ignore_kwargs" in self.config:
+            for kw in self.config["ignore_kwargs"]:
+                if kw in kwargs:
+                    del kwargs[kw]
 
         # Merge consecutive messages with same role.
         messages = merge_messages(messages)

@@ -7,7 +7,7 @@ base:
         "dir_tree_depth": 1,
         "run_on_rewrite": True,
         "auto_view_change": True,
-        "run_timeout": 10,
+        "run_timeout": 30,
     }
     terminal: {
         type: "local",  # "docker" or "local"
@@ -18,7 +18,7 @@ base:
 
     # LLM configs
     llm_name: "gpt-4o"
-    llm_temperature: [0.0]  # list of values between 0.0 and 1.0
+    llm_temperature: [0.5]  # list of values between 0.0 and 1.0
 
     # Agent configs
     random_seed: 42

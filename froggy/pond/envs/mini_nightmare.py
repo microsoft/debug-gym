@@ -38,8 +38,11 @@ class MiniNightmareEnv(RepoEnv):
     def calculate_score(self, eval_output: EvalOutput) -> int:
         return utils.extract_reward_from_pytest_output(eval_output.output)
 
-    def cleanup_eval_output(self, eval_output: EvalOutput) -> str:
-        return utils.cleanup_pytest_output(eval_output.output)
+    def eval(self, **kwargs) -> EvalOutput:
+        success, output = self.terminal.run(self.entrypoint, timeout=self.run_timeout)
+        output = utils.cleanup_pytest_output(output)
+        self.last_eval = EvalOutput(success, output)
+        return self.last_eval
 
     def reset(self, *, options: dict = None):
         options = options or {}
