@@ -28,7 +28,7 @@ class MiniNightmareEnv(RepoEnv):
             "Problem description": self.current_sample["instructions"],
         }
 
-    def __init__(self, entrypoint: str = "python -m pytest -s .", **kwargs):
+    def __init__(self, entrypoint: str = "python -m pytest -s test.py", **kwargs):
         super().__init__(entrypoint=entrypoint, **kwargs)
         self.load_dataset()
 
