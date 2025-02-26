@@ -39,7 +39,7 @@ class AiderBenchmarkEnv(RepoEnv):
         self.current_sample = self.dataset[options["task_name"]]
 
         directory = self.current_sample["base_directory"]
-        self.setup_workspace(directory, entrypoint="python -m pytest -s .")
+        self.setup_workspace(directory, entrypoint=self.entrypoint)
         infos = super().reset(options=options)
 
         # By default, open the only modifiable file.
