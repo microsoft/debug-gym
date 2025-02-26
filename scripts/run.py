@@ -37,7 +37,7 @@ def run_agent(args, problem, config):
 
             task_logger.debug(f"Previous run success: {success}")
             if not args.force_failed or success:
-                task_logger.info("[bold gray]Skipped, already done.")
+                task_logger.info("Skipped, already done.")
                 return success
 
         env = create_env(config, task_logger)
@@ -70,7 +70,7 @@ def run_agent(args, problem, config):
 
         success = False
 
-    task_logger.info(f"[bold green]Completed, log saved at: {task_logger.log_file}")
+    task_logger.info(f"Completed, log saved at: {task_logger.log_file}")
     return success
 
 
