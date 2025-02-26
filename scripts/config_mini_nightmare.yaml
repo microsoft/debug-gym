@@ -4,6 +4,7 @@ base:
     benchmark: "mini_nightmare"
     problems: "all"  # list of problems, e.g., ["config"], or "all"
     env_kwargs: {
+        "entrypoint": "python -m pytest -s test.py",
         "dir_tree_depth": 1,
         "run_on_rewrite": True,
         "auto_view_change": True,

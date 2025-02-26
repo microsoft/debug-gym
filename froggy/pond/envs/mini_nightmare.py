@@ -28,8 +28,8 @@ class MiniNightmareEnv(RepoEnv):
             "Problem description": self.current_sample["instructions"],
         }
 
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
+    def __init__(self, entrypoint: str = "python -m pytest -s test.py", **kwargs):
+        super().__init__(entrypoint=entrypoint, **kwargs)
         self.load_dataset()
 
     def calculate_max_score(self, eval_output: EvalOutput) -> int:
@@ -49,11 +49,7 @@ class MiniNightmareEnv(RepoEnv):
         self.current_sample = self.dataset[options["task_name"]]
 
         directory = self.current_sample["base_directory"]
-        self.setup_workspace(
-            directory,
-            entrypoint="python -m pytest -s test.py",
-            debug_entrypoint="python -m pdb -m pytest -s test.py",
-        )
+        self.setup_workspace(directory, entrypoint=self.entrypoint)
 
         infos = super().reset(options=options)
 
