@@ -1,21 +1,17 @@
 base:
     # Environment configs
-    output_path: "exps/swebench"
+    output_path: "exps/swebench-lite"
     benchmark: "swebench"
     problems: "all"  # list of problems, e.g., ["astropy__astropy-12907"], or "all"
     env_kwargs: {
         "dir_tree_depth": 1,
         "run_on_rewrite": True,
         "auto_view_change": True,
-        "run_timeout": 30,
+        "run_timeout": 300,
+        "dataset_id": "princeton-nlp/SWE-bench_lite"
     }
     terminal: {
-        type: "docker",  # "docker" or "local"
-        base_image: "python:3.12-slim",
-        # session_commands define commands that are always executed before starting a shell session or running a single command in the terminal.
-        # session_commands:["conda activate aider"],
-        # setup_commands define commands that are executed only once when the terminal is created. This is only supported for Docker terminal.
-        setup_commands: ["pip install pytest"],
+        type: "docker",
     }
     persistent_breakpoints: True  # in pdb tool
     auto_list: True  # in pdb tool
