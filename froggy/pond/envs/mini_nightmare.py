@@ -28,8 +28,8 @@ class MiniNightmareEnv(RepoEnv):
             "Problem description": self.current_sample["instructions"],
         }
 
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
+    def __init__(self, entrypoint: str = "python -m pytest -s .", **kwargs):
+        super().__init__(entrypoint=entrypoint, **kwargs)
         self.load_dataset()
 
     def calculate_max_score(self, eval_output: EvalOutput) -> int:
