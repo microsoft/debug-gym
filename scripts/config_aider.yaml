@@ -4,6 +4,7 @@ base:
     benchmark: "aider"
     problems: "all"  # list of problems, e.g., ["wordy"], or "all"
     env_kwargs: {
+        "entry_point": "python -m pytest -s .",
         "dir_tree_depth": 1,
         "run_on_rewrite": True,
         "auto_view_change": True,
