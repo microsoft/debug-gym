@@ -52,6 +52,7 @@ class PdbAfterRewrites(PdbAgent):
             llm_response = self.llm(
                 prompt, info, temperature=self.config["llm_temperature"][0]
             )
+            llm_response.response = self.parse_r1_response(llm_response.response)
 
             if debug:
                 breakpoint()
