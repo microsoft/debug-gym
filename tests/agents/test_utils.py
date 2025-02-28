@@ -49,13 +49,17 @@ def test_trim_prompt_messages():
         trim_prompt_messages(messages, -1, token_counter)
 
     messages = [{"role": "user", "content": "User message"}]
-    assert trim_prompt_messages(messages, 0, token_counter) == messages
+    trimmed_messages = [{"role": "user", "content": "U...e"}]
+    assert trim_prompt_messages(messages, 5, token_counter) == trimmed_messages
 
     messages = [
         {"role": "system", "content": "System message"},
         {"role": "user", "content": "User message"},
     ]
-    expected = [{"role": "user", "content": "User message"}]
+    expected = [
+        {"role": "system", "content": "System message"},
+        {"role": "user", "content": "U...e"},
+    ]
     assert trim_prompt_messages(messages, 20, token_counter) == expected
 
     messages = [
@@ -221,6 +225,19 @@ def test_history_tracker(build_env_info):
 
     # len should return the number of steps
     assert len(ht) == 5
+
+    # Test cloning
+    ht_clone = ht.clone()
+    assert ht_clone.memory == ht.memory
+    assert ht_clone.prompt_response_pairs == ht.prompt_response_pairs
+    assert ht_clone.history_steps == ht.history_steps
+    assert ht_clone is not ht
+
+    # test filtering out
+    ht_filtered = ht.filter_out(actions=["action2", "action4"])
+    for step in ht_filtered.get_all():
+        assert step.action not in ["action2", "action4"]
+        assert step.action in [None, "action3", "action5"]
 
     # should reset properly
     ht.reset()

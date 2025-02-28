@@ -21,10 +21,18 @@ class HistoryTracker:
         self.memory: list[EnvInfo] = []
         self.prompt_response_pairs: list[LLMResponse | None] = []
 
-    def step(self, new_info: EnvInfo, llm_response: LLMResponse | None = None) -> None:
-        """llm_response can be None since the initial state does not have prompt and response"""
+    def step(
+        self,
+        new_info: EnvInfo,
+        llm_responses: list[LLMResponse] | LLMResponse | None = None,
+    ) -> None:
+        """llm_responses can be None since the initial state does not have prompt and response"""
         self.memory.append(copy.deepcopy(new_info))
-        self.prompt_response_pairs.append([copy.deepcopy(llm_response)])
+
+        llm_responses = llm_responses or []
+        if not isinstance(llm_responses, list):
+            llm_responses = [llm_responses]
+        self.prompt_response_pairs.append(copy.deepcopy(llm_responses))
 
     def get(self):
         # return the history_steps latest steps
@@ -75,6 +83,39 @@ class HistoryTracker:
     def __len__(self):
         return len(self.memory)
 
+    def clone(self):
+        return copy.deepcopy(self)
+
+    def filter_out(self, actions: list[str]):
+        history = HistoryTracker(self.history_steps)
+        for info, llm_response in zip(self.memory, self.prompt_response_pairs):
+            if info.action not in actions:
+                history.step(info, llm_response)
+
+        return history
+
+
+def trim(text, max_length, where="middle"):
+    if len(text) <= max_length:
+        return text
+
+    ellipsis = "..."
+    if max_length <= len(ellipsis):
+        return ellipsis[:max_length]
+
+    match where:
+        case "end":
+            return text[: max_length - len(ellipsis)] + ellipsis
+        case "start":
+            return ellipsis + text[-(max_length - len(ellipsis)) :]
+        case "middle":
+            half_length = (max_length - len(ellipsis)) // 2
+            return text[:half_length] + ellipsis + text[-half_length:]
+        case _:
+            raise ValueError(f"Invalid value for `where`: {where!r}.")
+
+    return text
+
 
 def trim_prompt_messages(
     messages: list[dict], context_length: int, token_counter: callable
@@ -110,12 +151,18 @@ def trim_prompt_messages(
         new_messages.append(messages[0])
         new_length += message_lengths[0]
 
-    new_messages.append(messages[-1])
+    assert (
+        new_length <= context_length
+    ), f"The system message execeeds: {new_length} > {context_length}!"
+
+    new_messages.append(dict(messages[-1]))
     new_length += message_lengths[-1]
     if new_length > context_length:
-        # just keep the last message, remove the system message
-        new_messages = [messages[-1]]
-        new_length = message_lengths[-1]
+        token_space_remaining = context_length - (new_length - message_lengths[-1])
+        # just keep the system message and trim the last message
+        new_messages[-1]["content"] = trim(
+            new_messages[-1]["content"], token_space_remaining, where="middle"
+        )
     else:
         # adding back the messages in between (from latest to earliest)
         start = 1 if messages[0]["role"] == "system" else 0
