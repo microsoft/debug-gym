@@ -478,7 +478,7 @@ class DockerTerminal(Terminal):
 
     def clean_up(self):
         """Clean up the Docker container."""
-        if self.container:
+        if self._container is not None:
             try:
                 self.container.stop(timeout=1)
             except docker.errors.NotFound:
