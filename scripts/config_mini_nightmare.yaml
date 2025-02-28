@@ -44,3 +44,6 @@ rewrite_only:
 pdb_after_rewrites:
     n_rewrites_before_pdb: 5
     tools: ["eval", "view", "rewrite", "pdb"]
+
+pdb_hitl:
+    tools: ["eval", "view", "rewrite", "pdb"]
