@@ -231,8 +231,29 @@ class LLM:
         if isinstance(exception, KeyboardInterrupt):
             return False
 
-        self.logger.warning(f"Error calling {self.model_name}: {exception_full_name!r}")
-        self.logger.debug(f"Exception: {exception.message}")
+        # Look for error code that shouldn't be retry.
+        match exception_full_name:
+            case "openai.APIStatusError":
+                if "'status': 429" in exception.message:  # Rate Limit Exceeded
+                    self.logger.debug(
+                        f"Error calling {self.model_name}: {exception_full_name!r} {exception.message}"
+                    )
+                    return True
+                elif "'status': 504" in exception.message:  # Gateway Timeout
+                    self.logger.debug(
+                        f"Error calling {self.model_name}: {exception_full_name!r} {exception.message}"
+                    )
+                    return True
+                else:
+                    self.logger.warning(
+                        f"Error calling {self.model_name}: {exception_full_name!r} {exception.message}"
+                    )
+                    return False
+            case _:
+                self.logger.debug(
+                    f"Error calling {self.model_name}: {exception_full_name!r} {exception.message}"
+                )
+
         return exception_full_name in rate_limit_errors
 
     def query_model(self, messages, **kwargs):
@@ -263,9 +284,16 @@ class LLM:
 
         # Merge consecutive messages with same role.
         messages = merge_messages(messages)
-        messages = trim_prompt_messages(
-            messages, self.context_length, self.token_counter
-        )
+        messages_length = self.token_counter(messages=messages)
+        if messages_length > self.context_length:
+            self.logger.info(
+                f"Prompt is too long ({messages_length:,} tokens), it will be truncated."
+            )
+            messages = trim_prompt_messages(
+                messages, self.context_length, self.token_counter
+            )
+            messages_length = self.token_counter(messages=messages)
+            self.logger.info(f"Prompt truncated to {messages_length:,} tokens.")
 
         # Message is a list of dictionaries with role and content keys.
         # Color each role differently.
