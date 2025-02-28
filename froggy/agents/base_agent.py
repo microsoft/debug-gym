@@ -7,7 +7,7 @@ from os.path import join as pjoin
 import numpy as np
 
 from froggy.agents.llm_api import instantiate_llm
-from froggy.agents.utils import HistoryTracker, build_history_prompt
+from froggy.agents.utils import HistoryTracker, build_history_prompt, trim
 from froggy.logger import FroggyLogger
 from froggy.pond.envs.env import RepoEnv
 from froggy.pond.utils import unescape
@@ -52,7 +52,7 @@ class BaseAgent:
 
     def build_history_prompt(self):
         messages = build_history_prompt(
-            self.history,
+            self.history.filter_out(actions=["eval", None]),
             self.config["use_conversational_prompt"],
             self.config["reset_prompt_history_after_rewrite"],
         )
@@ -70,10 +70,16 @@ class BaseAgent:
         system_prompt = {}
         system_prompt["Overall task"] = self.system_prompt
         system_prompt["Instructions"] = info.instructions
-        system_prompt["Repo directory tree"] = info.dir_tree
+        system_prompt["Repo directory tree"] = trim(
+            info.dir_tree, int(0.1 * self.llm.context_length), where="end"
+        )
         system_prompt["Current code in view"] = info.current_code_with_line_number
         system_prompt["Current breakpoints"] = info.current_breakpoints
-        system_prompt["Last evaluation output"] = info.eval_observation.observation
+        system_prompt["Last evaluation output"] = trim(
+            info.eval_observation.observation,
+            int(0.7 * self.llm.context_length),
+            where="middle",
+        )
 
         system_prompt = unescape(json.dumps(system_prompt, indent=4))
         messages = [
@@ -102,7 +108,6 @@ class BaseAgent:
         self.history.step(info, None)
 
         if info.done is True:
-            # msg = "Environment started with entrypoint passing without errors."
             return True
 
         highscore = info.score
