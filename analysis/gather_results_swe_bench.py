@@ -56,6 +56,7 @@ def main(args):
             dir_tree_depth=1,
             run_on_rewrite=True,
             auto_view_change=True,
+            dataset_id=args.dataset_id,
         )
         problem_list = env.dataset.keys()  # all tasks
 
@@ -83,6 +84,11 @@ def parse_args():
         "--agents",
         nargs="+",
         help="Agent UUID(s) for which to collect the logs. Default: all agent found in `path`.",
+    )
+    parser.add_argument(
+        "--dataset-id",
+        default="princeton-nlp/SWE-bench_lite",
+        help="SWE-Bench dataset ID to use.",
     )
     parser.add_argument(
         "--ignore-missing", action="store_true", help="Ignore missing experiments"
