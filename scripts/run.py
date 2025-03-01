@@ -28,6 +28,7 @@ def run_agent(args, problem, config):
         level=args.logging_level,
         mode="w" if args.force_all else "a",
     )
+    env = None
     try:
         previous_run = exp_path / "froggy.jsonl"
         if not args.force_all and os.path.exists(previous_run):
@@ -69,6 +70,9 @@ def run_agent(args, problem, config):
             raise e
 
         success = False
+    finally:
+        if env:
+            env.close()
 
     task_logger.info(f"Completed, log saved at: {task_logger.log_file}")
     return success

@@ -157,6 +157,7 @@ class RepoEnv(TooledEnv):
         self.logger = logger or FroggyLogger("froggy")
         self.infos: EnvInfo | None = None
         self.rng = None
+        self.tempdir = None
 
         self.setup_workspace(
             path=path,
@@ -236,7 +237,8 @@ class RepoEnv(TooledEnv):
         return entrypoint
 
     def cleanup_workspace(self):
-        self.tempdir.cleanup()
+        if self.tempdir:
+            self.tempdir.cleanup()
 
     @property
     def instructions(self):
@@ -487,3 +489,8 @@ class RepoEnv(TooledEnv):
         )
 
         return self.infos
+
+    def close(self):
+        self.cleanup_workspace()
+        if self.terminal:
+            self.terminal.close()

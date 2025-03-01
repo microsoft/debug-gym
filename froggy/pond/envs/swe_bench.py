@@ -206,12 +206,9 @@ class SWEBenchEnv(RepoEnv):
         # TODO: support reset current task, i.e. no options provided.
         options = options or {}
 
-        if self.terminal:
-            # Clean up the previous task
-            self.terminal.close()
-            self.terminal = None
-
-        self.terminal = DockerTerminal()
+        # Clean up the previous task, if any.
+        self.close()
+        # self.terminal = DockerTerminal()
 
         self.setup_task_info(options["task_name"])
         self.setup_local_repo()
