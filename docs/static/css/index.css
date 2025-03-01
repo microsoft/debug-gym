@@ -143,6 +143,7 @@ code {
 
 a {
   color: #2f6dd1;
+  text-decoration: underline dotted
 }
 
 h1 code,
