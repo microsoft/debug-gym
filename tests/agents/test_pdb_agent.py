@@ -1,9 +1,9 @@
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from froggy.agents.llm_api import LLMResponse, TokenUsage
 from froggy.agents.pdb_agent import PdbHumanInTheLoop, PdbAfterRewrites, PdbAgent
 from froggy.agents.rewrite_agent import RewriteOnly
-
+from froggy.agents.llm_api import Human
 
 def test_build_question_prompt(agent_setup):
     agent, _, _, _ = next(agent_setup(PdbAgent))
@@ -102,7 +102,8 @@ def test_run_pdb_after_rewrites(agent_setup, build_env_info):
     result = agent.run(task_name="test_task", debug=False)
     assert result
 
-def test_human_in_the_loop(agent_setup, build_env_info):
+@patch.object(Human, '__call__', return_value=LLMResponse("Prompt", "```pdb c```", TokenUsage(2, 4)))
+def test_human_in_the_loop(human, agent_setup, build_env_info):
     agent, env, llm, _ = next(agent_setup(PdbHumanInTheLoop))
     env.reset.return_value = build_env_info(
         done=False,
@@ -116,6 +117,22 @@ def test_human_in_the_loop(agent_setup, build_env_info):
         step_observation="Test last run obs",
     )
     env.step.return_value = build_env_info(
+        done=False,
+        score=10,
+        max_score=10,
+        rewrite_counter=0,
+        instructions="Test instructions",
+        dir_tree="Test dir tree",
+        current_code_with_line_number="Test code",
+        current_breakpoints="Test breakpoints",
+        step_observation="Test last run obs",
+    )
+
+    env.clone.return_value = MagicMock()
+    llm.return_value = LLMResponse("Prompt", "Expected answer", TokenUsage(2, 4))
+    env.tools = {"pdb": MagicMock()}
+
+    env.clone().step.return_value = build_env_info(
         done=True,
         score=10,
         max_score=10,
@@ -126,7 +143,9 @@ def test_human_in_the_loop(agent_setup, build_env_info):
         current_breakpoints="Test breakpoints",
         step_observation="Test last run obs",
     )
-    llm.return_value = LLMResponse("Prompt", "Expected answer", TokenUsage(2, 4))
-    env.tools = {"pdb": MagicMock()}
     result = agent.run(task_name="test_task", debug=False)
-    assert result
+    assert result is False
+    assert env.clone.called
+    assert env.clone().reset.called
+    assert env.clone().step.called
+    assert human.called
