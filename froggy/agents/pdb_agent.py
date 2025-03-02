@@ -117,11 +117,12 @@ class PdbHumanInTheLoop(PdbAgent):
 
             # make a copy of the env for the human in the loop
             self.hitl_env = self.env.clone()
+            hitl_info = self.hitl_env.reset(options={"task_name": task_name})
             # replay the history up to the current step
             for step in self.history.get_all():
                 if step.done:
                     break
-                self.hitl_env.step(step.action)
+                hitl_info = self.hitl_env.step(step.action)
 
             info = self.env.step(llm_response.response)
 
@@ -129,19 +130,19 @@ class PdbHumanInTheLoop(PdbAgent):
 
             if info.done or info.rewrite_counter >= self.config["max_rewrite_steps"]:
                 self.logger.info(
-                    f"Score: {info.score}/{info.max_score} ({info.score/info.max_score:.1%})"
+                    f"Score (llm): {info.score}/{info.max_score} ({info.score/info.max_score:.1%})"
                 )
                 break
 
             # call the human in the loop
             hitl_response = self.hitl(
-                prompt, info, temperature=self.config["llm_temperature"][0]
+                prompt, hitl_info, temperature=self.config["llm_temperature"][0]
             )
-            info = self.hitl_env.step(hitl_response.response)
+            hitl_info = self.hitl_env.step(hitl_response.response)
 
-            if info.done or info.rewrite_counter >= self.config["max_rewrite_steps"]:
+            if hitl_info.done or hitl_info.rewrite_counter >= self.config["max_rewrite_steps"]:
                 self.logger.info(
-                    f"Score: {info.score}/{info.max_score} ({info.score/info.max_score:.1%})"
+                    f"Score (human): {hitl_info.score}/{hitl_info.max_score} ({hitl_info.score/hitl_info.max_score:.1%})"
                 )
                 break
 
