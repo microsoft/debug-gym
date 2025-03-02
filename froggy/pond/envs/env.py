@@ -505,4 +505,12 @@ class RepoEnv(TooledEnv):
             logger=self.logger,
         )
 
+        new_env.setup_workspace(
+            path=new_env.path,
+            entrypoint=new_env.entrypoint,
+            debug_entrypoint=new_env.debug_entrypoint,
+            readonly_patterns=None
+        )
+        self._reset_env_state()
+
         return new_env

@@ -1,7 +1,7 @@
 from unittest.mock import MagicMock
 
 from froggy.agents.llm_api import LLMResponse, TokenUsage
-from froggy.agents.pdb_agent import PdbAfterRewrites, PdbAgent
+from froggy.agents.pdb_agent import PdbHumanInTheLoop, PdbAfterRewrites, PdbAgent
 from froggy.agents.rewrite_agent import RewriteOnly
 
 
@@ -75,6 +75,35 @@ def test_build_question_prompt_no_pdb(agent_setup):
 
 def test_run_pdb_after_rewrites(agent_setup, build_env_info):
     agent, env, llm, _ = next(agent_setup(PdbAfterRewrites))
+    env.reset.return_value = build_env_info(
+        done=False,
+        score=0,
+        max_score=10,
+        rewrite_counter=0,
+        instructions="Test instructions",
+        dir_tree="Test dir tree",
+        current_code_with_line_number="Test code",
+        current_breakpoints="Test breakpoints",
+        step_observation="Test last run obs",
+    )
+    env.step.return_value = build_env_info(
+        done=True,
+        score=10,
+        max_score=10,
+        rewrite_counter=0,
+        instructions="Test instructions",
+        dir_tree="Test dir tree",
+        current_code_with_line_number="Test code",
+        current_breakpoints="Test breakpoints",
+        step_observation="Test last run obs",
+    )
+    llm.return_value = LLMResponse("Prompt", "Expected answer", TokenUsage(2, 4))
+    env.tools = {"pdb": MagicMock()}
+    result = agent.run(task_name="test_task", debug=False)
+    assert result
+
+def test_human_in_the_loop(agent_setup, build_env_info):
+    agent, env, llm, _ = next(agent_setup(PdbHumanInTheLoop))
     env.reset.return_value = build_env_info(
         done=False,
         score=0,

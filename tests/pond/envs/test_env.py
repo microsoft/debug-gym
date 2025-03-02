@@ -499,3 +499,8 @@ def test_queue_and_process_events():
         call(event=Event.ENV_RESET, source="source2", arg2="val2"),
     ]
     mock.assert_has_calls(expected_calls)
+
+def test_clone(env):
+    cloned_env = env.clone()
+    assert cloned_env is not env
+    assert cloned_env.path == env.path
