@@ -502,5 +502,20 @@ def test_queue_and_process_events():
 
 def test_clone(env):
     cloned_env = env.clone()
-    assert cloned_env is not env
-    assert cloned_env.path == env.path
+
+     # Check that the cloned environment is a different instance
+    assert id(env) != id(cloned_env)
+
+    # Check that the properties are the same
+    assert env.path == cloned_env.path
+    assert env.entrypoint == cloned_env.entrypoint
+    assert env.debug_entrypoint == cloned_env.debug_entrypoint
+    assert env.max_score == cloned_env.max_score
+    assert env.run_on_rewrite == cloned_env.run_on_rewrite
+    assert env.run_timeout == cloned_env.run_timeout
+    assert env.dir_tree_depth == cloned_env.dir_tree_depth
+    assert env.auto_view_change == cloned_env.auto_view_change
+    assert env.logger == cloned_env.logger
+
+    # Check that the terminal is not the same instance
+    assert id(env.terminal) != id(cloned_env.terminal)
