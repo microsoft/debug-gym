@@ -1,4 +1,4 @@
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, patch, call
 
 from froggy.agents.llm_api import LLMResponse, TokenUsage
 from froggy.agents.pdb_agent import PdbHumanInTheLoop, PdbAfterRewrites, PdbAgent
@@ -104,7 +104,7 @@ def test_run_pdb_after_rewrites(agent_setup, build_env_info):
 
 @patch.object(Human, '__call__', return_value=LLMResponse("Prompt", "```pdb c```", TokenUsage(2, 4)))
 def test_human_in_the_loop(human, agent_setup, build_env_info):
-    agent, env, llm, _ = next(agent_setup(PdbHumanInTheLoop))
+    agent, env, llm, history = next(agent_setup(PdbHumanInTheLoop))
     env.reset.return_value = build_env_info(
         done=False,
         score=0,
@@ -145,7 +145,21 @@ def test_human_in_the_loop(human, agent_setup, build_env_info):
     )
     result = agent.run(task_name="test_task", debug=False)
     assert result is False
+    # test that llm actions were executed
+    assert env.step.called
+    env.step.assert_called_with(llm().response)
+    assert env.step().done is False
+    # test that llm actions were logged
+    assert history.step.called
+    history.step.assert_has_calls([
+        call(env.reset(options={"task_name": "test_task"}), None),
+        call(env.step(llm().response), llm()),
+    ])
+    # test that env was cloned
     assert env.clone.called
     assert env.clone().reset.called
+    # test that human action was executed
     assert env.clone().step.called
-    assert human.called
+    env.clone().step.assert_called_with(human().response)
+    # ensure that human action was not logged
+    assert call(env.clone().step(), human()) not in history.step.mock_calls
