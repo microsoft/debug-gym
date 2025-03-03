@@ -7,6 +7,17 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 
+plt.rcParams.update(
+    {
+        "font.size": 20,  # Base font size
+        "axes.labelsize": 20,  # Axis labels
+        "axes.titlesize": 20,  # Plot title
+        "xtick.labelsize": 20,  # X-axis tick labels
+        "ytick.labelsize": 20,  # Y-axis tick labels
+        "legend.fontsize": 14,  # Legend text
+    }
+)
+
 
 def analyze_froggy_results(model_name):
     """
@@ -85,10 +96,18 @@ def plot_multiple_cumulative_success(df_dict, figsize=(12, 7)):
         max_rewrites = max(df["rewrite_count"])
 
         avg_perf_per_rewrite = []
+        std_dev_per_rewrite = []
         for i in range(int(max_rewrites) + 1):
-            avg_perf_per_rewrite.append(
-                df[df["rewrite_count"] <= i]["success"].sum() / len(df)
-            )
+            accumulated_success = []
+            for seed in [0, 1, 2]:
+                _df = df[df["rewrite_count"] <= i]
+                _success = _df[_df["seed"] == seed]["success"].sum() / len(
+                    df[df["seed"] == seed]
+                )
+                # import pdb; pdb.set_trace()
+                accumulated_success.append(_success)
+            avg_perf_per_rewrite.append(np.mean(accumulated_success))
+            std_dev_per_rewrite.append(np.std(accumulated_success))
 
         final_success_rate = avg_perf_per_rewrite[-1]
         # Plot steps and points with success rate in legend
@@ -98,6 +117,13 @@ def plot_multiple_cumulative_success(df_dict, figsize=(12, 7)):
             where="post",
             label=f"{model_name} ({final_success_rate:.1%})",
         )
+        plt.fill_between(
+            np.arange(max_rewrites + 1),
+            np.array(avg_perf_per_rewrite) - np.array(std_dev_per_rewrite),
+            np.array(avg_perf_per_rewrite) + np.array(std_dev_per_rewrite),
+            alpha=0.2,
+            step="post",
+        )
         # plt.scatter(np.arange(max_rewrites + 1), cumulative_success,
         #            alpha=0.3, marker='o')
         # Add light horizontal line at final average
@@ -105,58 +131,9 @@ def plot_multiple_cumulative_success(df_dict, figsize=(12, 7)):
 
     plt.xlabel("Average Number of Rewrites")
     plt.ylabel("Cumulative Average Success Rate")
-    plt.title("Cumulative Average Success Rates (Averaged Across Seeds)")
+    plt.title("Cumulative Average Success Rates (Averaged Across 3 Runs)")
     plt.grid(True, alpha=0.3)
-    plt.legend(bbox_to_anchor=(1.05, 1), loc="upper left")
-    plt.tight_layout()
-    plt.show()
-
-
-def plot_multiple_cumulative_success_by_resp_tokens(
-    df_dict, figsize=(12, 7), num_points=100
-):
-    """
-    Creates a comparative plot showing cumulative success rates vs response tokens for multiple models
-
-    Args:
-        df_dict (dict): Dictionary mapping model names to their DataFrames with averaged results
-        figsize (tuple): Figure size (width, height)
-        num_points (int): Number of points to sample for the curve (default: 100)
-    """
-    plt.figure(figsize=figsize)
-
-    for model_name, df in df_dict.items():
-        # Get response tokens array and success array
-        tokens = df["response_tokens"].values
-        success = df["success"].values
-
-        # Create logarithmically spaced points for better visualization
-        max_tokens = tokens.max()
-        token_points = np.geomspace(1, max_tokens, num_points)
-        token_points = np.unique(np.round(token_points)).astype(int)
-
-        # Vectorized computation of success rates
-        avg_perf = np.array(
-            [success[tokens <= t].sum() / len(df) for t in token_points]
-        )
-
-        final_success_rate = df["success"].mean()
-
-        # Plot with interpolation
-        plt.plot(
-            token_points, avg_perf, label=f"{model_name} ({final_success_rate:.1%})"
-        )
-        plt.scatter(token_points, avg_perf, alpha=0.3, marker="o")
-
-        # Add light horizontal line at final average
-        plt.axhline(y=final_success_rate, linestyle="--", alpha=0.2)
-
-    plt.xscale("log")  # Use log scale for better visualization
-    plt.xlabel("Maximum Response Tokens")
-    plt.ylabel("Average Success Rate")
-    plt.title("Success Rate vs Response Tokens (Averaged Across Seeds)")
-    plt.grid(True, alpha=0.3)
-    plt.legend(bbox_to_anchor=(1.05, 1), loc="upper left")
+    # plt.legend(bbox_to_anchor=(1.05, 1), loc="upper left")
     plt.tight_layout()
     plt.show()
 
@@ -213,6 +190,5 @@ results_dict = {
 }
 
 # Plot comparison
-plot_figure_1(results_dict)
-# plot_multiple_cumulative_success(results_dict)
+plot_multiple_cumulative_success(results_dict)
 # plot_multiple_cumulative_success_by_resp_tokens(results_dict)
