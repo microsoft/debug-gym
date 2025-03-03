@@ -58,6 +58,14 @@ class BaseAgent:
         )
         return messages
 
+    def parse_reasoning_model_response(self, response, reasoning_end_token):
+        # Strip the reasoning, e.g., in Deepseek r1, between <think> and </think>.
+        reasoning_end = response.find(reasoning_end_token)
+        if reasoning_end != -1:
+            reasoning_end += len(reasoning_end_token)
+            response = response[reasoning_end:].strip()
+        return response
+
     def build_system_prompt(self, info):
         system_prompt = {}
         system_prompt["Overall task"] = self.system_prompt
@@ -66,7 +74,6 @@ class BaseAgent:
         system_prompt["Current code in view"] = info.current_code_with_line_number
         system_prompt["Current breakpoints"] = info.current_breakpoints
         system_prompt["Last evaluation output"] = info.eval_observation.observation
-        system_prompt["Last execution output"] = info.step_observation.observation
 
         system_prompt = unescape(json.dumps(system_prompt, indent=4))
         messages = [
@@ -110,6 +117,11 @@ class BaseAgent:
             llm_response = self.llm(
                 prompt, info, temperature=self.config["llm_temperature"][0]
             )
+            if self.llm.reasoning_end_token is not None:
+                llm_response.response = self.parse_reasoning_model_response(
+                    llm_response.response,
+                    reasoning_end_token=self.llm.reasoning_end_token,
+                )
 
             if debug:
                 breakpoint()

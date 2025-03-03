@@ -138,6 +138,7 @@ class LLM:
         self.logger = logger or FroggyLogger("froggy")
         self.token_counter = TokenCounter(self.config["tokenizer"])
         self.context_length = self.config["context_limit"] * 1000
+        self.reasoning_end_token = self.config.get("reasoning_end_token", None)
 
         self.logger.debug(
             f"Using {self.model_name} with max context length of {

@@ -18,7 +18,7 @@ from froggy.pond.utils import unescape
 class PdbAgent(BaseAgent):
     name = "pdb_agent"
     system_prompt = "Your goal is to debug a Python program to make sure it can pass a set of test functions. You have access to the pdb debugger tools, you can use them to investigate the code, set breakpoints, and print necessary values to identify the bugs. Once you have gained enough information, propose a rewriting patch to fix the bugs. Avoid rewriting the entire code, focus on the bugs only."
-    action_prompt = "Based on the instruction, the current code, the last execution output, and the history information, continue your debugging process using pdb commands or to propose a patch using rewrite command. Output a single command, nothing else. Do not repeat your previous commands unless they can provide more information."
+    action_prompt = "Based on the instruction, the current code, the last execution output, and the history information, continue your debugging process using pdb commands or to propose a patch using rewrite command. Output a single command, nothing else. Do not repeat your previous commands unless they can provide more information. You must be concise and avoid overthinking."
 
 
 @register_agent
@@ -52,6 +52,11 @@ class PdbAfterRewrites(PdbAgent):
             llm_response = self.llm(
                 prompt, info, temperature=self.config["llm_temperature"][0]
             )
+            if self.llm.reasoning_end_token is not None:
+                llm_response.response = self.parse_reasoning_model_response(
+                    llm_response.response,
+                    reasoning_end_token=self.llm.reasoning_end_token,
+                )
 
             if debug:
                 breakpoint()
