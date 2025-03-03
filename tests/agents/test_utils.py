@@ -8,6 +8,7 @@ from froggy.agents.utils import (
     HistoryTracker,
     build_history_prompt,
     load_config,
+    trim,
     trim_prompt_messages,
 )
 
@@ -49,7 +50,7 @@ def test_trim_prompt_messages():
         trim_prompt_messages(messages, -1, token_counter)
 
     messages = [{"role": "user", "content": "User message"}]
-    trimmed_messages = [{"role": "user", "content": "U...e"}]
+    trimmed_messages = [{"role": "user", "content": "Us…ge"}]
     assert trim_prompt_messages(messages, 5, token_counter) == trimmed_messages
 
     messages = [
@@ -58,7 +59,7 @@ def test_trim_prompt_messages():
     ]
     expected = [
         {"role": "system", "content": "System message"},
-        {"role": "user", "content": "U...e"},
+        {"role": "user", "content": "Us…ge"},
     ]
     assert trim_prompt_messages(messages, 20, token_counter) == expected
 
@@ -455,3 +456,40 @@ def test_load_config():
     assert _config == expected_config
     assert _args.debug is True
     assert _args.logging_level == logging.INFO
+
+
+def test_trim():
+    def token_counter(text):
+        return len(text)
+
+    # Test trimming from the middle
+    assert trim("Hello world", 5, token_counter) == "He…ld"
+    assert trim("Hello world", 11, token_counter) == "Hello world"
+
+    # Test trimming from the end
+    assert trim("Hello world", 5, token_counter, where="end") == "Hell…"
+    assert trim("Hello world", 11, token_counter, where="end") == "Hello world"
+
+    # Test trimming from the start
+    assert trim("Hello world", 5, token_counter, where="start") == "…orld"
+    assert trim("Hello world", 11, token_counter, where="start") == "Hello world"
+
+    # Test trimming with very short max_length
+    assert trim("Hello world", 1, token_counter) == "…"
+    assert trim("Hello world", 0, token_counter) == ""
+
+    # Test trimming with exact length
+    assert trim("Hi", 2, token_counter) == "Hi"
+    assert trim("Hi", 1, token_counter) == "…"
+
+    # Test invalid `where` value
+    with pytest.raises(ValueError, match="Invalid value for `where`"):
+        trim("Hello world", 5, token_counter, where="invalid")
+
+    def token_counter(text):
+        return len(text) // 2
+
+    # Test trimming with a different token counter
+    assert trim("1234567890", 3, token_counter) == "12…90"
+    assert trim("1234567890", 4, token_counter) == "123…890"
+    assert trim("1234567890", 5, token_counter) == "1234567890"

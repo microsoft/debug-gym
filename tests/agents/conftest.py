@@ -89,6 +89,8 @@ def agent_setup(tmp_path, open_data):
             env = MagicMock()
             llm = MagicMock()
             llm.reasoning_end_token = None
+            llm.context_length = 4096
+            llm.token_counter = lambda x: len(x)
             history = MagicMock()
             agent = agent_class(config_dict, env)
             agent.llm = llm

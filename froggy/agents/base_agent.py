@@ -67,21 +67,43 @@ class BaseAgent:
         return response
 
     def build_system_prompt(self, info):
+        def calc_tokens_left(system_prompt: dict):
+            system_prompt = unescape(
+                json.dumps(system_prompt, indent=2, sort_keys=True)
+            )
+            return self.llm.context_length - self.llm.token_counter(text=system_prompt)
+
         system_prompt = {}
         system_prompt["Overall task"] = self.system_prompt
         system_prompt["Instructions"] = info.instructions
         system_prompt["Repo directory tree"] = trim(
-            info.dir_tree, int(0.1 * self.llm.context_length), where="end"
+            info.dir_tree,
+            min(int(0.1 * self.llm.context_length), calc_tokens_left(system_prompt)),
+            token_counter=self.llm.token_counter,
+            where="end",
         )
-        system_prompt["Current code in view"] = info.current_code_with_line_number
         system_prompt["Current breakpoints"] = info.current_breakpoints
+        system_prompt["Current code in view"] = info.current_code_with_line_number
+        if isinstance(info.current_code_with_line_number, dict):
+            system_prompt["Current code in view"] = dict(
+                info.current_code_with_line_number
+            )
+            system_prompt["Current code in view"]["Content"] = trim(
+                system_prompt["Current code in view"]["Content"],
+                min(
+                    int(0.8 * self.llm.context_length), calc_tokens_left(system_prompt)
+                ),
+                token_counter=self.llm.token_counter,
+                where="end",
+            )
+
         system_prompt["Last evaluation output"] = trim(
             info.eval_observation.observation,
-            int(0.7 * self.llm.context_length),
+            min(int(0.8 * self.llm.context_length), calc_tokens_left(system_prompt)),
+            token_counter=self.llm.token_counter,
             where="middle",
         )
-
-        system_prompt = unescape(json.dumps(system_prompt, indent=4))
+        system_prompt = unescape(json.dumps(system_prompt, indent=2, sort_keys=True))
         messages = [
             {
                 "role": "system",

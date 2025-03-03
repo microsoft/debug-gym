@@ -95,11 +95,17 @@ class HistoryTracker:
         return history
 
 
-def trim(text, max_length, where="middle"):
+def trim(text: str, max_length: int, token_counter: callable, where: str = "middle"):
+    # Get an approximate number of characters per token ratio in the text.
+    nb_tokens = token_counter(text=text)
+    chars_per_token = len(text) / nb_tokens
+    # Adjust the max_length based on the chars_per_token ratio.
+    max_length = int(max_length * chars_per_token)
+
     if len(text) <= max_length:
         return text
 
-    ellipsis = "..."
+    ellipsis = "…"
     if max_length <= len(ellipsis):
         return ellipsis[:max_length]
 
@@ -161,7 +167,10 @@ def trim_prompt_messages(
         token_space_remaining = context_length - (new_length - message_lengths[-1])
         # just keep the system message and trim the last message
         new_messages[-1]["content"] = trim(
-            new_messages[-1]["content"], token_space_remaining, where="middle"
+            new_messages[-1]["content"],
+            token_space_remaining,
+            token_counter=token_counter,
+            where="middle",
         )
     else:
         # adding back the messages in between (from latest to earliest)
