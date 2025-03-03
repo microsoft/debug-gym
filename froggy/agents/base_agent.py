@@ -58,13 +58,12 @@ class BaseAgent:
         )
         return messages
 
-    def parse_r1_response(self, response):
-        if "deepseek-r1" in self.config["llm_name"].lower():
-            # Strip the reasoning <think> and </think>.
-            reasoning_end = response.find("</think>")
-            if reasoning_end != -1:
-                reasoning_end += len("</think>")
-                response = response[reasoning_end:].strip()
+    def parse_reasoning_model_response(self, response, reasoning_end_token):
+        # Strip the reasoning, e.g., in Deepseek r1, between <think> and </think>.
+        reasoning_end = response.find(reasoning_end_token)
+        if reasoning_end != -1:
+            reasoning_end += len(reasoning_end_token)
+            response = response[reasoning_end:].strip()
         return response
 
     def build_system_prompt(self, info):
@@ -118,7 +117,11 @@ class BaseAgent:
             llm_response = self.llm(
                 prompt, info, temperature=self.config["llm_temperature"][0]
             )
-            llm_response.response = self.parse_r1_response(llm_response.response)
+            if self.llm.reasoning_end_token is not None:
+                llm_response.response = self.parse_reasoning_model_response(
+                    llm_response.response,
+                    reasoning_end_token=self.llm.reasoning_end_token,
+                )
 
             if debug:
                 breakpoint()

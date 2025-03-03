@@ -88,6 +88,7 @@ def agent_setup(tmp_path, open_data):
             }
             env = MagicMock()
             llm = MagicMock()
+            llm.reasoning_end_token = None
             history = MagicMock()
             agent = agent_class(config_dict, env)
             agent.llm = llm
