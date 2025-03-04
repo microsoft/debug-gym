@@ -12,11 +12,11 @@ import uuid
 
 import docker
 
-from debug_gym.logger import FroggyLogger
+from debug_gym.logger import DebugGymLogger
 from debug_gym.utils import strip_ansi
 
 DEFAULT_TIMEOUT = 300
-DEFAULT_PS1 = "FROGGY_PS1"
+DEFAULT_PS1 = "DEBUG_GYM_PS1"
 DISABLE_ECHO_COMMAND = "stty -echo"
 
 
@@ -28,14 +28,14 @@ class ShellSession:
         working_dir: str,
         session_commands: list[str] | None = None,
         env_vars: dict[str, str] | None = None,
-        logger: FroggyLogger | None = None,
+        logger: DebugGymLogger | None = None,
     ):
         self._session_id = str(uuid.uuid4()).split("-")[0]
         self.shell_command = shell_command
         self.working_dir = working_dir
         self.session_commands = list(session_commands or [])
         self.env_vars = dict(env_vars or {})
-        self.logger = logger or FroggyLogger("froggy")
+        self.logger = logger or DebugGymLogger("debug-gym")
         self.filedescriptor = None
         self.process = None
 
@@ -195,10 +195,10 @@ class Terminal:
         session_commands: list[str] = None,
         env_vars: dict[str, str] = None,
         include_os_env_vars: bool = True,
-        logger: FroggyLogger | None = None,
+        logger: DebugGymLogger | None = None,
         **kwargs,
     ):
-        self.logger = logger or FroggyLogger("froggy")
+        self.logger = logger or DebugGymLogger("debug-gym")
         self.session_commands = session_commands or []
         self.env_vars = env_vars or {}
         if include_os_env_vars:
@@ -307,7 +307,7 @@ class DockerTerminal(Terminal):
         session_commands: list[str] | None = None,
         env_vars: dict[str, str] | None = None,
         include_os_env_vars: bool = False,
-        logger: FroggyLogger | None = None,
+        logger: DebugGymLogger | None = None,
         # Docker-specific parameters
         base_image: str = "ubuntu:latest",
         setup_commands: list[str] | None = None,
@@ -494,9 +494,9 @@ class DockerTerminal(Terminal):
 
 
 def select_terminal(
-    terminal_config: dict | None = None, logger: FroggyLogger | None = None
+    terminal_config: dict | None = None, logger: DebugGymLogger | None = None
 ) -> Terminal:
-    logger = logger or FroggyLogger("froggy")
+    logger = logger or DebugGymLogger("debug-gym")
     terminal_config = terminal_config or {"type": "local"}
     terminal_type = terminal_config["type"]
     docker_only = ["base_image", "setup_commands", "volumes", "map_host_uid_gid"]

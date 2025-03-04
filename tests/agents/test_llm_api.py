@@ -17,12 +17,12 @@ from debug_gym.agents.llm_api import (
     merge_messages,
     print_messages,
 )
-from debug_gym.logger import FroggyLogger
+from debug_gym.logger import DebugGymLogger
 
 
 @pytest.fixture
 def logger_mock():
-    logger = FroggyLogger("test_logger")
+    logger = DebugGymLogger("test_logger")
     logger.setLevel(logging.DEBUG)
     logs = []
 

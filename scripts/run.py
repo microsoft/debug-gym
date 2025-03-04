@@ -9,7 +9,7 @@ from tqdm import tqdm
 
 from debug_gym.agents.base_agent import create_agent
 from debug_gym.agents.utils import load_config
-from debug_gym.logger import FroggyLogger
+from debug_gym.logger import DebugGymLogger
 from debug_gym.gym.envs import select_env
 from debug_gym.gym.terminal import select_terminal
 from debug_gym.gym.tools.toolbox import Toolbox
@@ -22,14 +22,14 @@ class BreakTaskLoop(Exception):
 def run_agent(args, problem, config):
     exp_path = Path(config["output_path"]) / config["uuid"] / problem
 
-    task_logger = FroggyLogger(
+    task_logger = DebugGymLogger(
         problem,
         log_dir=exp_path,
         level=args.logging_level,
         mode="w" if args.force_all else "a",
     )
     try:
-        previous_run = exp_path / "froggy.jsonl"
+        previous_run = exp_path / "debug_gym.jsonl"
         if not args.force_all and os.path.exists(previous_run):
             task_logger.debug(f"Previous run found: {previous_run}")
             with open(previous_run) as reader:
@@ -74,7 +74,7 @@ def run_agent(args, problem, config):
     return success
 
 
-def create_env(config: dict, logger: FroggyLogger):
+def create_env(config: dict, logger: DebugGymLogger):
     terminal = select_terminal(config.get("terminal"), logger)
     env_class = select_env(config.get("benchmark"))
     env = env_class(**config["env_kwargs"], terminal=terminal, logger=logger)
@@ -96,7 +96,7 @@ def create_env(config: dict, logger: FroggyLogger):
 
 def main():
     config, args = load_config()
-    logger = FroggyLogger("froggy", level=args.logging_level)
+    logger = DebugGymLogger("debug-gym", level=args.logging_level)
 
     config["uuid"] = config.get("uuid", str(uuid.uuid4()))
     logger.warning(f"Experiment log path: {config['output_path']}/{config['uuid']}")
@@ -107,7 +107,7 @@ def main():
         env = create_env(config, logger=logger)
         problems = list(env.dataset.keys())  # all tasks
 
-    num_workers = int(os.environ.get("FROGGY_WORKERS", 1))
+    num_workers = int(os.environ.get("DEBUG_GYM_WORKERS", 1))
     logger.warning(f"Running with {num_workers} workers")
     if args.debug:
         num_workers = 1

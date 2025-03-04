@@ -8,7 +8,7 @@ import numpy as np
 
 from debug_gym.agents.llm_api import instantiate_llm
 from debug_gym.agents.utils import HistoryTracker, build_history_prompt
-from debug_gym.logger import FroggyLogger
+from debug_gym.logger import DebugGymLogger
 from debug_gym.gym.envs.env import RepoEnv
 from debug_gym.gym.utils import unescape
 
@@ -33,11 +33,11 @@ class BaseAgent:
         self,
         config: dict,
         env: RepoEnv,
-        logger: FroggyLogger | None = None,
+        logger: DebugGymLogger | None = None,
     ):
         self.config = config
         self.env = env
-        self.logger = logger or FroggyLogger("froggy")
+        self.logger = logger or DebugGymLogger("debug-gym")
         self.llm = instantiate_llm(self.config, logger=self.logger)
         self._uuid = self.config.get("uuid", str(uuid.uuid4()))
         self._output_path = pjoin(self.config["output_path"], self._uuid)
@@ -160,12 +160,12 @@ class BaseAgent:
 
     def save_patch(self, task_name="custom"):
         os.makedirs(pjoin(self._output_path, task_name), exist_ok=True)
-        patch_path = pjoin(self._output_path, task_name, "froggy.patch")
+        patch_path = pjoin(self._output_path, task_name, "debug_gym.patch")
         with open(patch_path, "w") as f:
             f.write(self.env.patch)
 
         self.logger.debug(
-            f"Patch saved in {pjoin(self._output_path, task_name, 'froggy.patch')}"
+            f"Patch saved in {pjoin(self._output_path, task_name, 'debug_gym.patch')}"
         )
 
     def log(self, task_name="custom"):
@@ -185,11 +185,11 @@ class BaseAgent:
             )
             jsonl_output["log"].append(step_json)
         os.makedirs(pjoin(self._output_path, task_name), exist_ok=True)
-        with open(pjoin(self._output_path, task_name, "froggy.jsonl"), "w") as f:
+        with open(pjoin(self._output_path, task_name, "debug_gym.jsonl"), "w") as f:
             json.dump(jsonl_output, f, indent=4)
 
         self.logger.debug(
-            f"Log saved in {pjoin(self._output_path, task_name, 'froggy.jsonl')}"
+            f"Log saved in {pjoin(self._output_path, task_name, 'debug_gym.jsonl')}"
         )
 
 

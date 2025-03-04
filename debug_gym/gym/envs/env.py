@@ -11,7 +11,7 @@ from pathlib import Path
 
 import numpy as np
 
-from debug_gym.logger import FroggyLogger
+from debug_gym.logger import DebugGymLogger
 from debug_gym.gym.entities import EvalOutput, Event, Observation
 from debug_gym.gym.terminal import Terminal
 from debug_gym.gym.utils import _walk, make_file_matcher, parse_action, show_line_number
@@ -141,7 +141,7 @@ class RepoEnv(TooledEnv):
         dir_tree_depth: int | None = None,
         auto_view_change: bool = True,
         terminal: Terminal | None = None,
-        logger: FroggyLogger | None = None,
+        logger: DebugGymLogger | None = None,
     ):
         super().__init__()
 
@@ -154,7 +154,7 @@ class RepoEnv(TooledEnv):
         self.terminal = terminal or Terminal()
         self.entrypoint = entrypoint
         self.debug_entrypoint = debug_entrypoint or entrypoint
-        self.logger = logger or FroggyLogger("froggy")
+        self.logger = logger or DebugGymLogger("debug-gym")
         self.infos: EnvInfo | None = None
         self.rng = None
 

@@ -15,7 +15,7 @@ from tenacity import (
 from termcolor import colored
 from transformers import AutoTokenizer
 
-from debug_gym.logger import FroggyLogger
+from debug_gym.logger import DebugGymLogger
 
 prompt_toolkit_available = False
 try:
@@ -48,7 +48,7 @@ def load_llm_config(config_file_path: str | None = None):
     return llm_config
 
 
-def print_messages(messages: list[dict], logger: FroggyLogger):
+def print_messages(messages: list[dict], logger: DebugGymLogger):
     for m in messages:
         if m["role"] == "user":
             logger.info(colored(f"{m['content']}\n", "cyan"))
@@ -128,14 +128,14 @@ class TokenCounter:
 
 
 class LLM:
-    def __init__(self, model_name: str, logger: FroggyLogger | None = None):
+    def __init__(self, model_name: str, logger: DebugGymLogger | None = None):
         configs = load_llm_config()
         if model_name not in configs:
             raise ValueError(f"Model {model_name} not found in llm.cfg")
 
         self.model_name = model_name
         self.config = configs[model_name]
-        self.logger = logger or FroggyLogger("froggy")
+        self.logger = logger or DebugGymLogger("debug-gym")
         self.token_counter = TokenCounter(self.config["tokenizer"])
         self.context_length = self.config["context_limit"] * 1000
         self.reasoning_end_token = self.config.get("reasoning_end_token", None)
@@ -288,7 +288,7 @@ class LLM:
 
 
 class AsyncLLM(LLM):
-    def __init__(self, model_name, logger: FroggyLogger | None = None):
+    def __init__(self, model_name, logger: DebugGymLogger | None = None):
         super().__init__(model_name, logger)
 
         if "azure openai" in self.config.get("tags", []):
@@ -333,9 +333,9 @@ class AsyncLLM(LLM):
 
 
 class Human:
-    def __init__(self, logger: FroggyLogger | None = None):
+    def __init__(self, logger: DebugGymLogger | None = None):
         self._history = None
-        self.logger = logger or FroggyLogger("froggy")
+        self.logger = logger or DebugGymLogger("debug-gym")
         if prompt_toolkit_available:
             self._history = InMemoryHistory()
 
@@ -368,7 +368,7 @@ class Human:
 
 
 def instantiate_llm(
-    config: dict, logger: FroggyLogger | None = None, use_async: bool = False
+    config: dict, logger: DebugGymLogger | None = None, use_async: bool = False
 ):
     llm_config = load_llm_config()
     available_models = list(llm_config.keys()) + ["human"]

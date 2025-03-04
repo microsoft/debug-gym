@@ -29,7 +29,7 @@ class StripAnsiFormatter(logging.Formatter):
         return strip_ansi(msg)
 
 
-class FroggyLogger(logging.Logger):
+class DebugGymLogger(logging.Logger):
 
     def __init__(
         self,
@@ -41,8 +41,8 @@ class FroggyLogger(logging.Logger):
         super().__init__(name)
         self.setLevel(logging.DEBUG)
 
-        # If var env "FROGGY_DEBUG" is set, turn on debug modeé
-        if os.environ.get("FROGGY_DEBUG"):
+        # If var env "DEBUG_GYM_DEBUG" is set, turn on debug modeé
+        if os.environ.get("DEBUG_GYM_DEBUG"):
             level = logging.DEBUG
 
         console = TqdmLoggingHandler()
