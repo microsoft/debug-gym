@@ -1,7 +1,5 @@
 # Debug-Gym: an Interactive Debugging Framework
 
-<img src="https://github.com/microsoft/debug-gym/blob/main/media/debug_gym_logo.png" width=50% height=50%>
-
 `debug-gym` is a text-based interactive debugging framework, designed for debugging Python programs. 
 
 [[Technical Report](https://arxiv.org/)] [[Project Page](https://arxiv.org/)]
