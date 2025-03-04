@@ -9,10 +9,10 @@ from tqdm import tqdm
 
 from debug_gym.agents.base_agent import create_agent
 from debug_gym.agents.utils import load_config
-from debug_gym.logger import DebugGymLogger
 from debug_gym.gym.envs import select_env
 from debug_gym.gym.terminal import select_terminal
 from debug_gym.gym.tools.toolbox import Toolbox
+from debug_gym.logger import DebugGymLogger
 
 
 class BreakTaskLoop(Exception):
