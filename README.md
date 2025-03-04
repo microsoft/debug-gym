@@ -1,15 +1,15 @@
-# Froggy: an Interactive Debugging Framework
+# Debug-Gym: an Interactive Debugging Framework
 
-<img src="https://github.com/microsoft/Froggy/blob/main/media/froggy_logo.png" width=50% height=50%>
+<img src="https://github.com/microsoft/debug-gym/blob/main/media/debug_gym_logo.png" width=50% height=50%>
 
-`froggy` is a text-based interactive debugging framework, designed for debugging Python programs. 
+`debug-gym` is a text-based interactive debugging framework, designed for debugging Python programs. 
 
 [[Technical Report](https://arxiv.org/)] [[Project Page](https://arxiv.org/)]
 
 ## 1. Installation
 
-    conda create -n froggy python=3.12
-    conda activate froggy
+    conda create -n debug-gym python=3.12
+    conda activate debug-gym
     pip install -e .
 
 To install the development dependencies:
@@ -33,19 +33,19 @@ Then, edit llm.cfg with your endpoint and credentials. You can choose one of the
 
 ## 2. System Design
 
-The structure of `froggy` is as below:
+The structure of `debug-gym` is as below:
 ```bash
-froggy
-├── pond
+debug-gym
+├── gym
 │   ├── envs
 │   ├── terminal
 │   └── tools
 └── agents
 ```
 
-`froggy.pond` is a simulation environment. Given a code repository, an agent can iteratively interact with a set of tools, such as `pdb`, that are designed for investigate the code. Once gathered enough information, the agent can propose a patch that rewrites certain lines of the code. The terminal will subsequently execute the new code against a set of test cases.
+`debug_gym.gym` is a simulation environment. Given a code repository, an agent can iteratively interact with a set of tools, such as `pdb`, that are designed for investigate the code. Once gathered enough information, the agent can propose a patch that rewrites certain lines of the code. The terminal will subsequently execute the new code against a set of test cases.
 
-`froggy.agents` are LLM-based debugging agents that use `froggy.pond` to interact with code repositories to seek necessary information and thus fix potential bugs. At an interaction step, the agent takes a text observation that describes the environment states and tool states as input, it is expected to generate a command, subsequently, the environment will provide a new text observation in response, describing the state change caused by that command. 
+`debug_gym.agents` are LLM-based debugging agents that use `debug_gym.gym` to interact with code repositories to seek necessary information and thus fix potential bugs. At an interaction step, the agent takes a text observation that describes the environment states and tool states as input, it is expected to generate a command, subsequently, the environment will provide a new text observation in response, describing the state change caused by that command. 
  
 ---
 
@@ -53,7 +53,7 @@ froggy
 
 Our base environment, `RepoEnv`, is an interactive environment that follows the [Gymnasium](https://github.com/Farama-Foundation/Gymnasium) paradigm. Once the environment `env` is instantiated, one can use `env.reset()` to start an episode and receives initial informations. Then, one can interact with the environment using `env.step(action)`, where `action` specifies one of the available tools (see below), doing so will return subsequent informations (e.g, error message, debugger stdout, etc.)
 
-One of the core designs of `froggy` is the notion of tools. Users can dynamically import tools, or develop customized tools and utilize them in the environment. Tools are modules that augment an agent's action space, observation space, or provide additonal functionalities to the agent. Below are the set of tools we have implemented so far.
+One of the core designs of `debug-gym` is the notion of tools. Users can dynamically import tools, or develop customized tools and utilize them in the environment. Tools are modules that augment an agent's action space, observation space, or provide additonal functionalities to the agent. Below are the set of tools we have implemented so far.
 
 | Tool name | Description |
 | :-: | :----- |
@@ -63,15 +63,15 @@ One of the core designs of `froggy` is the notion of tools. Users can dynamicall
 | `pdb` | Interactive debugger wrapping the [Python pdb tool](https://docs.python.org/3/library/pdb.html). In additon, users can choose to maintain a set of persistent breakpoints (as in some programming IDEs), which are not reset after every eval. With such feature, a new pdb debugging session is activated automatically, with all the breakpoints restored. Note such breakpoint can be cleared by pdb commands such as `cl`. |
 | `rewrite` | It can be used to rewrite a certain piece of code to fix the bug. The inputs of this tool call include the file path, the start and end line numbers, and the new code. |
 
-Upon importing a tool, its action space and observation space will be automatically merged into `froggy`'s action space and observation space; its instruction will also be merged into the overall instruction provided to the agent (e.g., as system prompt).
+Upon importing a tool, its action space and observation space will be automatically merged into `debug-gym`'s action space and observation space; its instruction will also be merged into the overall instruction provided to the agent (e.g., as system prompt).
 
-Users can include a `.froggyignore` file in the repository to specify files and directories that are not visible to `froggy`, similarly, they can include a `.froggyreadonly` to specify files and directories that are read only by `froggy` (e.g., the test files). Both files share the same syntax as `.gitignore`.
+Users can include a `.debugignore` file in the repository to specify files and directories that are not visible to `debug-gym`, similarly, they can include a `.debugreadonly` to specify files and directories that are read only by the agents (e.g., the test files). Both files share the same syntax as `.gitignore`.
 
 ---
 
 #### 2.2. Agents
 
-We provide the below LLM-based agents, they all have minimal design and serve the purpose of demonstrating the `froggy` APIs. 
+We provide the below LLM-based agents, they all have minimal design and serve the purpose of demonstrating the `debug-gym` APIs. 
 
 | Agent name | Available Tools | Description |
 | :-: | :-: | :----- |
@@ -83,13 +83,13 @@ We provide the below LLM-based agents, they all have minimal design and serve th
 
 #### 2.3. Benchmarks
 
-To demonstrate how to integrate `froggy` with coding tasks and repositories, we provide example code importing two widely used benchmarks, namely `aider` and `swebench`, and a small set of minimal buggy code snippets, namely `mini_nightmare`.
+To demonstrate how to integrate `debug-gym` with coding tasks and repositories, we provide example code importing two widely used benchmarks, namely `aider` and `swebench`, and a small set of minimal buggy code snippets, namely `mini_nightmare`.
 
 | Benchmark name | Link |
 | :-: | :----- |
 | `aider` | [https://github.com/Aider-AI/aider](https://github.com/Aider-AI/aider) |
 | `swebench`| [https://github.com/princeton-nlp/SWE-bench](https://github.com/princeton-nlp/SWE-bench) |
-| `mini_nightmare` | A set of 10 hand-crafted minimal buggy code snippet where rewrite only agents have harder time to tackle. Read details [here](https://github.com/microsoft/Froggy/blob/main/data/mini_nightmare/mini_nightmare.md). |
+| `mini_nightmare` | A set of 10 hand-crafted minimal buggy code snippet where rewrite only agents have harder time to tackle. Read details [here](https://github.com/microsoft/debug-gym/blob/main/data/mini_nightmare/mini_nightmare.md). |
 
 ---
 
@@ -111,14 +111,14 @@ Add `-v`, `--debug` to be verbose, or to enter debug mode.
 
 #### 3.2. Debugging a Custom Repository
 
-Modify `scripts/config.yaml`, especially the `env_kwargs` to set the path and entrypoint of the custom repository. We assume there is a `.froggyignore` file and a `.froggyreadonly` within the repository that labels files/folders that are not seen or not editable, respectively.
+Modify `scripts/config.yaml`, especially the `env_kwargs` to set the path and entrypoint of the custom repository. We assume there is a `.debugignore` file and a `.debugreadonly` within the repository that labels files/folders that are not seen or not editable, respectively.
 
 As an example, we provide a buggy pytorch code repository in `data/pytorch`.
 
     python scripts/run.py scripts/config.yaml --agent <agent name>
 
 #### 3.3. Design Your Own Tool
-`froggy`'s modular design makes it extensible. Users are encouraged to extend `froggy` to their specific usecases, for example by creating new tools that diversify an agent's action and observation spaces. For detailed instruction on designing new tools that are `froggy`-compatible, please refer to the [Technical Report](https://arxiv.org/). 
+`debug-gym`'s modular design makes it extensible. Users are encouraged to extend `debug-gym` to their specific usecases, for example by creating new tools that diversify an agent's action and observation spaces. For detailed instruction on designing new tools that are `debug-gym`-compatible, please refer to the [Technical Report](https://arxiv.org/). 
 
 ## Citation
 ```
