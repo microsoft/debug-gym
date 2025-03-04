@@ -57,13 +57,13 @@ def test_instructions(aider_env):
     assert aider_env.instructions == expected_instructions
 
 
-@patch("froggy.pond.envs.RepoEnv.reset")
+@patch("debug_gym.gym.envs.RepoEnv.reset")
 @patch(
-    "froggy.pond.envs.RepoEnv.current_code_with_line_number",
+    "debug_gym.gym.envs.RepoEnv.current_code_with_line_number",
     return_value="Current code",
 )
-@patch("froggy.pond.envs.AiderBenchmarkEnv.setup_workspace")
-@patch("froggy.pond.envs.AiderBenchmarkEnv.load_current_file")
+@patch("debug_gym.gym.envs.AiderBenchmarkEnv.setup_workspace")
+@patch("debug_gym.gym.envs.AiderBenchmarkEnv.load_current_file")
 def test_reset(
     mock_load_current_file,
     mock_setup_workspace,
@@ -91,7 +91,7 @@ def test_reset(
 
 
 # TODO: Add proper test, mocking repoenv.step doesn't test anything
-@patch("froggy.pond.envs.RepoEnv.step")
+@patch("debug_gym.gym.envs.RepoEnv.step")
 def test_step(mock_step, aider_env, env_info):
     mock_step.return_value = env_info
     infos = aider_env.step("action")

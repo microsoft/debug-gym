@@ -1,7 +1,7 @@
 import os
 from os.path import join as pjoin
 
-import froggy.pond.utils as utils
+import debug_gym.gym.utils as utils
 from debug_gym.gym.entities import EvalOutput
 from debug_gym.gym.envs.env import RepoEnv
 
@@ -71,11 +71,11 @@ class MiniNightmareEnv(RepoEnv):
                 pjoin(self.DATA_PATH, task_name, task_name + "_code.py")
             ), f"Task {task_name} missing {task_name}_code.py file."
             assert os.path.exists(
-                pjoin(self.DATA_PATH, task_name, ".froggyignore")
-            ), f"Task {task_name} missing .froggyignore file."
+                pjoin(self.DATA_PATH, task_name, ".debugignore")
+            ), f"Task {task_name} missing .debugignore file."
             assert os.path.exists(
-                pjoin(self.DATA_PATH, task_name, ".froggyreadonly")
-            ), f"Task {task_name} missing .froggyreadonly file."
+                pjoin(self.DATA_PATH, task_name, ".debugreadonly")
+            ), f"Task {task_name} missing .debugreadonly file."
 
         self.dataset = {}
         for task_name in self.TASK_NAMES:

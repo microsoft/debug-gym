@@ -288,4 +288,4 @@ def test_setup_local_repo(tmp_path, get_swe_env):
     git_diff = [l for l in git_diff.split("\n") if not l.startswith("index ")]
     assert git_diff == swe_env.ds_row["test_patch"].split("\n")
 
-    assert ".froggyignore" in os.listdir(swe_env.working_dir)
+    assert ".debugignore" in os.listdir(swe_env.working_dir)

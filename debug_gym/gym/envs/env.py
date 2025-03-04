@@ -11,10 +11,10 @@ from pathlib import Path
 
 import numpy as np
 
-from debug_gym.logger import DebugGymLogger
 from debug_gym.gym.entities import EvalOutput, Event, Observation
 from debug_gym.gym.terminal import Terminal
 from debug_gym.gym.utils import _walk, make_file_matcher, parse_action, show_line_number
+from debug_gym.logger import DebugGymLogger
 
 
 @dataclass
@@ -347,7 +347,7 @@ class RepoEnv(TooledEnv):
     def _index_files(self, readonly_patterns: list[str] | None = None):
         # get all file paths relative to the working directory
         self._is_ignored = make_file_matcher(
-            self.working_dir / ".froggyignore", patterns=readonly_patterns
+            self.working_dir / ".debugignore", patterns=readonly_patterns
         )
         self.all_files = sorted(
             os.path.relpath(path, self.working_dir)
@@ -356,7 +356,7 @@ class RepoEnv(TooledEnv):
 
         # get list of editable files
         self._is_readonly = make_file_matcher(
-            self.working_dir / ".froggyreadonly", patterns=readonly_patterns
+            self.working_dir / ".debugreadonly", patterns=readonly_patterns
         )
         self.editable_files = [
             p for p in self.all_files if not self._is_readonly(self.working_dir / p)

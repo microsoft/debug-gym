@@ -57,11 +57,11 @@ def test_instructions(mini_nightmare_env):
 
 
 @patch(
-    "froggy.pond.envs.RepoEnv.current_code_with_line_number",
+    "debug_gym.gym.envs.RepoEnv.current_code_with_line_number",
     return_value="Current code",
 )
-@patch("froggy.pond.envs.MiniNightmareEnv.setup_workspace")
-@patch("froggy.pond.envs.MiniNightmareEnv.load_current_file")
+@patch("debug_gym.gym.envs.MiniNightmareEnv.setup_workspace")
+@patch("debug_gym.gym.envs.MiniNightmareEnv.load_current_file")
 @patch.object(
     Terminal,
     "run",

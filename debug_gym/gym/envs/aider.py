@@ -2,14 +2,14 @@ import os
 import subprocess
 from pathlib import Path
 
-import froggy.pond.utils as utils
+import debug_gym.gym.utils as utils
 from debug_gym.gym.entities import EvalOutput
 from debug_gym.gym.envs.env import RepoEnv
 
 
 class AiderBenchmarkEnv(RepoEnv):
     REPO_URL = "https://github.com/exercism/python"
-    REPO_PATH = Path.joinpath(Path.home(), ".cache", "froggy", "exercism")
+    REPO_PATH = Path.joinpath(Path.home(), ".cache", "debug_gym", "exercism")
 
     @property
     def instructions(self):
@@ -68,9 +68,9 @@ class AiderBenchmarkEnv(RepoEnv):
             instructions += instr_md.read_text() if instr_md.exists() else ""
             instructions += instr_more_md.read_text() if instr_more_md.exists() else ""
 
-            # Add .froggyignore so all files are ignored except Python files.
+            # Add .debugignore so all files are ignored except Python files.
             utils.create_ignore_file(
-                directory / ".froggyignore",
+                directory / ".debugignore",
                 patterns=[
                     ".*/",
                     "__pycache__/",
@@ -80,9 +80,9 @@ class AiderBenchmarkEnv(RepoEnv):
                     # "data/",
                 ],
             )
-            # Add .froggyreadonly so tests are readonly.
+            # Add .debugreadonly so tests are readonly.
             utils.create_ignore_file(
-                directory / ".froggyreadonly", patterns=["*test*.py"]
+                directory / ".debugreadonly", patterns=["*test*.py"]
             )
 
             self.dataset[task_name] = {

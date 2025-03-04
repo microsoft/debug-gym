@@ -97,8 +97,8 @@ def create_ignore_file(
     Creates a file at the specified `filepath` containing gitignore-like patterns.
 
     Files and directories matching the patterns in that file will be treated differently.
-    E.g., Files in a `.froggyignore` file will be ignored by the environment.
-          Files in a `.froggyreadonly` file will be marked as readonly.
+    E.g., Files in a `.debugignore` file will be ignored by the environment.
+          Files in a `.debugreadonly` file will be marked as readonly.
 
     Args:
         filepath (str): The file path where to create the ignore file.

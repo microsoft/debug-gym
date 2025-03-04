@@ -96,10 +96,10 @@ def test_show_line_number():
 
 def test_make_file_matcher(tmp_path):
     working_dir = Path(tmp_path)
-    ignore_file = working_dir / ".froggyignore"
+    ignore_file = working_dir / ".debugignore"
 
     for with_negation in [False, True]:
-        froggyignore_contents = "\n".join(
+        debugignore_contents = "\n".join(
             [
                 ".DS_Store",
                 "__pycache__/",
@@ -110,15 +110,15 @@ def test_make_file_matcher(tmp_path):
                 "*test*.py",
                 "*.pyc",
                 "*.md",
-                ".froggyignore",
+                ".debugignore",
                 "log/",
                 "data/",
             ]
         )
         if with_negation is True:
-            froggyignore_contents += "\n!data/unignore/*"
+            debugignore_contents += "\n!data/unignore/*"
         with open(ignore_file, "w") as f:
-            f.write(froggyignore_contents)
+            f.write(debugignore_contents)
         is_ignored = make_file_matcher(ignore_file, patterns=["source/*.frog"])
 
         assert is_ignored(working_dir / "foo.py") is False
@@ -134,7 +134,7 @@ def test_make_file_matcher(tmp_path):
         assert is_ignored(working_dir / "docs/source_code.py") is False
         assert is_ignored(working_dir / ".docs/source_code.py") is True
         assert is_ignored(working_dir / "this_is_code.md") is True
-        assert is_ignored(working_dir / ".froggyignore") is True
+        assert is_ignored(working_dir / ".debugignore") is True
         assert is_ignored(working_dir / "log/foo.py") is True
         assert is_ignored(working_dir / "source/fotesto.py") is True
         assert is_ignored(working_dir / ".meta/important.cc") is True
@@ -148,38 +148,38 @@ def test_make_file_matcher(tmp_path):
 def test_create_ignore_file(tmp_path):
     # Test without including .gitignore
     test_dir = tmp_path / "test_dir"
-    froggyignore_path = test_dir / ".froggyignore"
+    debugignore_path = test_dir / ".debugignore"
     test_dir.mkdir()
     create_ignore_file(
-        froggyignore_path, patterns=["*.pyc", "*.log"], include_gitignore=False
+        debugignore_path, patterns=["*.pyc", "*.log"], include_gitignore=False
     )
-    assert froggyignore_path.exists()
-    with open(froggyignore_path) as f:
+    assert debugignore_path.exists()
+    with open(debugignore_path) as f:
         contents = f.read().splitlines()
-    assert contents == ["*.pyc", "*.log", ".froggyignore"]
+    assert contents == ["*.pyc", "*.log", ".debugignore"]
 
     # Test with including .gitignore
     gitignore_path = test_dir / ".gitignore"
     with open(gitignore_path, "w") as f:
         f.write("*.tmp\n*.bak\n")
     create_ignore_file(
-        froggyignore_path, patterns=["*.pyc", "*.log"], include_gitignore=True
+        debugignore_path, patterns=["*.pyc", "*.log"], include_gitignore=True
     )
-    with open(froggyignore_path) as f:
+    with open(debugignore_path) as f:
         contents = f.read().splitlines()
-    assert contents == ["*.pyc", "*.log", "*.tmp", "*.bak", ".froggyignore"]
+    assert contents == ["*.pyc", "*.log", "*.tmp", "*.bak", ".debugignore"]
 
     # Test with empty patterns and without including .gitignore
-    create_ignore_file(froggyignore_path, patterns=[], include_gitignore=False)
-    with open(froggyignore_path) as f:
+    create_ignore_file(debugignore_path, patterns=[], include_gitignore=False)
+    with open(debugignore_path) as f:
         contents = f.read().splitlines()
-    assert contents == [".froggyignore"]
+    assert contents == [".debugignore"]
 
     # Test with empty patterns and including .gitignore
-    create_ignore_file(froggyignore_path, patterns=[], include_gitignore=True)
-    with open(froggyignore_path) as f:
+    create_ignore_file(debugignore_path, patterns=[], include_gitignore=True)
+    with open(debugignore_path) as f:
         contents = f.read().splitlines()
-    assert contents == ["*.tmp", "*.bak", ".froggyignore"]
+    assert contents == ["*.tmp", "*.bak", ".debugignore"]
 
 
 def test_str2bool():
@@ -291,56 +291,56 @@ def test_walk():
         Path("data/mini_nightmare/config"),
         Path("data/mini_nightmare/config/config_code.py"),
         Path("data/mini_nightmare/config/test.py"),
-        Path("data/mini_nightmare/config/.froggyignore"),
-        Path("data/mini_nightmare/config/.froggyreadonly"),
+        Path("data/mini_nightmare/config/.debugignore"),
+        Path("data/mini_nightmare/config/.debugreadonly"),
         Path("data/mini_nightmare/counter"),
         Path("data/mini_nightmare/counter/counter_code.py"),
         Path("data/mini_nightmare/counter/test.py"),
-        Path("data/mini_nightmare/counter/.froggyignore"),
-        Path("data/mini_nightmare/counter/.froggyreadonly"),
+        Path("data/mini_nightmare/counter/.debugignore"),
+        Path("data/mini_nightmare/counter/.debugreadonly"),
         Path("data/mini_nightmare/grader"),
         Path("data/mini_nightmare/grader/grader_code.py"),
         Path("data/mini_nightmare/grader/test.py"),
-        Path("data/mini_nightmare/grader/.froggyignore"),
-        Path("data/mini_nightmare/grader/.froggyreadonly"),
+        Path("data/mini_nightmare/grader/.debugignore"),
+        Path("data/mini_nightmare/grader/.debugreadonly"),
         Path("data/mini_nightmare/mini_nightmare.md"),
         Path("data/mini_nightmare/pandas_dataframe"),
         Path("data/mini_nightmare/pandas_dataframe/pandas_dataframe_code.py"),
         Path("data/mini_nightmare/pandas_dataframe/test.py"),
-        Path("data/mini_nightmare/pandas_dataframe/.froggyignore"),
-        Path("data/mini_nightmare/pandas_dataframe/.froggyreadonly"),
+        Path("data/mini_nightmare/pandas_dataframe/.debugignore"),
+        Path("data/mini_nightmare/pandas_dataframe/.debugreadonly"),
         Path("data/mini_nightmare/patcher"),
         Path("data/mini_nightmare/patcher/patcher_code.py"),
         Path("data/mini_nightmare/patcher/test.py"),
         Path("data/mini_nightmare/patcher/source_code.txt"),
-        Path("data/mini_nightmare/patcher/.froggyignore"),
-        Path("data/mini_nightmare/patcher/.froggyreadonly"),
+        Path("data/mini_nightmare/patcher/.debugignore"),
+        Path("data/mini_nightmare/patcher/.debugreadonly"),
         Path("data/mini_nightmare/purr"),
         Path("data/mini_nightmare/purr/purr_code.py"),
         Path("data/mini_nightmare/purr/test.py"),
-        Path("data/mini_nightmare/purr/.froggyignore"),
-        Path("data/mini_nightmare/purr/.froggyreadonly"),
+        Path("data/mini_nightmare/purr/.debugignore"),
+        Path("data/mini_nightmare/purr/.debugreadonly"),
         Path("data/mini_nightmare/scientific_calculator"),
         Path("data/mini_nightmare/scientific_calculator/scientific_calculator_code.py"),
         Path("data/mini_nightmare/scientific_calculator/test.py"),
         Path("data/mini_nightmare/scientific_calculator/scientific_calculator_tool.py"),
-        Path("data/mini_nightmare/scientific_calculator/.froggyignore"),
-        Path("data/mini_nightmare/scientific_calculator/.froggyreadonly"),
+        Path("data/mini_nightmare/scientific_calculator/.debugignore"),
+        Path("data/mini_nightmare/scientific_calculator/.debugreadonly"),
         Path("data/mini_nightmare/shopping_cart"),
         Path("data/mini_nightmare/shopping_cart/shopping_cart_code.py"),
         Path("data/mini_nightmare/shopping_cart/test.py"),
-        Path("data/mini_nightmare/shopping_cart/.froggyignore"),
-        Path("data/mini_nightmare/shopping_cart/.froggyreadonly"),
+        Path("data/mini_nightmare/shopping_cart/.debugignore"),
+        Path("data/mini_nightmare/shopping_cart/.debugreadonly"),
         Path("data/mini_nightmare/sum_tree"),
         Path("data/mini_nightmare/sum_tree/sum_tree_code.py"),
         Path("data/mini_nightmare/sum_tree/test.py"),
-        Path("data/mini_nightmare/sum_tree/.froggyignore"),
-        Path("data/mini_nightmare/sum_tree/.froggyreadonly"),
+        Path("data/mini_nightmare/sum_tree/.debugignore"),
+        Path("data/mini_nightmare/sum_tree/.debugreadonly"),
         Path("data/mini_nightmare/tomorrow_date"),
         Path("data/mini_nightmare/tomorrow_date/tomorrow_date_code.py"),
         Path("data/mini_nightmare/tomorrow_date/test.py"),
-        Path("data/mini_nightmare/tomorrow_date/.froggyignore"),
-        Path("data/mini_nightmare/tomorrow_date/.froggyreadonly"),
+        Path("data/mini_nightmare/tomorrow_date/.debugignore"),
+        Path("data/mini_nightmare/tomorrow_date/.debugreadonly"),
     ]
     # sort the list
     path_list.sort()
@@ -355,56 +355,56 @@ def test_walk():
         Path("data/mini_nightmare/config"),
         Path("data/mini_nightmare/config/config_code.py"),
         Path("data/mini_nightmare/config/test.py"),
-        Path("data/mini_nightmare/config/.froggyignore"),
-        Path("data/mini_nightmare/config/.froggyreadonly"),
+        Path("data/mini_nightmare/config/.debugignore"),
+        Path("data/mini_nightmare/config/.debugreadonly"),
         Path("data/mini_nightmare/counter"),
         Path("data/mini_nightmare/counter/counter_code.py"),
         Path("data/mini_nightmare/counter/test.py"),
-        Path("data/mini_nightmare/counter/.froggyignore"),
-        Path("data/mini_nightmare/counter/.froggyreadonly"),
+        Path("data/mini_nightmare/counter/.debugignore"),
+        Path("data/mini_nightmare/counter/.debugreadonly"),
         Path("data/mini_nightmare/grader"),
         Path("data/mini_nightmare/grader/grader_code.py"),
         Path("data/mini_nightmare/grader/test.py"),
-        Path("data/mini_nightmare/grader/.froggyignore"),
-        Path("data/mini_nightmare/grader/.froggyreadonly"),
+        Path("data/mini_nightmare/grader/.debugignore"),
+        Path("data/mini_nightmare/grader/.debugreadonly"),
         Path("data/mini_nightmare/mini_nightmare.md"),
         Path("data/mini_nightmare/pandas_dataframe"),
         Path("data/mini_nightmare/pandas_dataframe/pandas_dataframe_code.py"),
         Path("data/mini_nightmare/pandas_dataframe/test.py"),
-        Path("data/mini_nightmare/pandas_dataframe/.froggyignore"),
-        Path("data/mini_nightmare/pandas_dataframe/.froggyreadonly"),
+        Path("data/mini_nightmare/pandas_dataframe/.debugignore"),
+        Path("data/mini_nightmare/pandas_dataframe/.debugreadonly"),
         Path("data/mini_nightmare/patcher"),
         Path("data/mini_nightmare/patcher/patcher_code.py"),
         Path("data/mini_nightmare/patcher/test.py"),
         Path("data/mini_nightmare/patcher/source_code.txt"),
-        Path("data/mini_nightmare/patcher/.froggyignore"),
-        Path("data/mini_nightmare/patcher/.froggyreadonly"),
+        Path("data/mini_nightmare/patcher/.debugignore"),
+        Path("data/mini_nightmare/patcher/.debugreadonly"),
         Path("data/mini_nightmare/purr"),
         Path("data/mini_nightmare/purr/purr_code.py"),
         Path("data/mini_nightmare/purr/test.py"),
-        Path("data/mini_nightmare/purr/.froggyignore"),
-        Path("data/mini_nightmare/purr/.froggyreadonly"),
+        Path("data/mini_nightmare/purr/.debugignore"),
+        Path("data/mini_nightmare/purr/.debugreadonly"),
         Path("data/mini_nightmare/scientific_calculator"),
         Path("data/mini_nightmare/scientific_calculator/scientific_calculator_code.py"),
         Path("data/mini_nightmare/scientific_calculator/test.py"),
         Path("data/mini_nightmare/scientific_calculator/scientific_calculator_tool.py"),
-        Path("data/mini_nightmare/scientific_calculator/.froggyignore"),
-        Path("data/mini_nightmare/scientific_calculator/.froggyreadonly"),
+        Path("data/mini_nightmare/scientific_calculator/.debugignore"),
+        Path("data/mini_nightmare/scientific_calculator/.debugreadonly"),
         Path("data/mini_nightmare/shopping_cart"),
         Path("data/mini_nightmare/shopping_cart/shopping_cart_code.py"),
         Path("data/mini_nightmare/shopping_cart/test.py"),
-        Path("data/mini_nightmare/shopping_cart/.froggyignore"),
-        Path("data/mini_nightmare/shopping_cart/.froggyreadonly"),
+        Path("data/mini_nightmare/shopping_cart/.debugignore"),
+        Path("data/mini_nightmare/shopping_cart/.debugreadonly"),
         Path("data/mini_nightmare/sum_tree"),
         Path("data/mini_nightmare/sum_tree/sum_tree_code.py"),
         Path("data/mini_nightmare/sum_tree/test.py"),
-        Path("data/mini_nightmare/sum_tree/.froggyignore"),
-        Path("data/mini_nightmare/sum_tree/.froggyreadonly"),
+        Path("data/mini_nightmare/sum_tree/.debugignore"),
+        Path("data/mini_nightmare/sum_tree/.debugreadonly"),
         Path("data/mini_nightmare/tomorrow_date"),
         Path("data/mini_nightmare/tomorrow_date/tomorrow_date_code.py"),
         Path("data/mini_nightmare/tomorrow_date/test.py"),
-        Path("data/mini_nightmare/tomorrow_date/.froggyignore"),
-        Path("data/mini_nightmare/tomorrow_date/.froggyreadonly"),
+        Path("data/mini_nightmare/tomorrow_date/.debugignore"),
+        Path("data/mini_nightmare/tomorrow_date/.debugreadonly"),
     ]
     # sort the list
     path_list.sort()

@@ -24,7 +24,7 @@ from debug_gym.gym.utils import create_ignore_file
 
 
 class SWEBenchEnv(RepoEnv):
-    CACHE = Path.joinpath(Path.home(), ".cache", "froggy", "swe-bench")
+    CACHE = Path.joinpath(Path.home(), ".cache", "debug_gym", "swe-bench")
 
     def __init__(
         self,
@@ -124,10 +124,10 @@ class SWEBenchEnv(RepoEnv):
                 self.logger.info("Patch applied successfully.")
 
             create_ignore_file(
-                local_branch_path / ".froggyignore", patterns=self.ignore_files
+                local_branch_path / ".debugignore", patterns=self.ignore_files
             )
             create_ignore_file(
-                local_branch_path / ".froggyreadonly", patterns=self.test_directives
+                local_branch_path / ".debugreadonly", patterns=self.test_directives
             )
         else:
             self.logger.debug(
@@ -228,9 +228,9 @@ class SWEBenchEnv(RepoEnv):
         # Create new group (if needed) and user.
         uid = os.getuid()
         group_id = os.getgid()
-        self.terminal.run(f"groupadd -g {group_id} froggy_group", user="root")
+        self.terminal.run(f"groupadd -g {group_id} debug_gym_group", user="root")
         self.terminal.run(
-            f"useradd -m -u {uid} -g {group_id} -G sudo froggy_user", user="root"
+            f"useradd -m -u {uid} -g {group_id} -G sudo debug_gym_user", user="root"
         )
         # Allow for the user to pip install in the env. TODO: This is still slow.
         # self.terminal.run(f"chmod -R o+rwX /opt/miniconda3/envs/testbed", user="root")
@@ -280,16 +280,16 @@ class SWEBenchEnv(RepoEnv):
 
         # Need to recreate those files after copying the initial code.
         create_ignore_file(
-            self.working_dir / ".froggyignore", patterns=self.ignore_files
+            self.working_dir / ".debugignore", patterns=self.ignore_files
         )
         create_ignore_file(
-            self.working_dir / ".froggyreadonly", patterns=self.test_directives
+            self.working_dir / ".debugreadonly", patterns=self.test_directives
         )
         self._index_files()
 
         self.terminal.run(f"git config user.name 'SWE-Bench'")
         self.terminal.run(f"git config user.email '<>'")
-        self.terminal.run(f"git add .froggyignore")
+        self.terminal.run(f"git add .debugignore")
         self.terminal.run(f"git commit -am 'Applied test patch'")
 
         # Reset RepoEnv
