@@ -1,7 +1,7 @@
-from froggy.pond.entities import Event, Observation
-from froggy.pond.tools.tool import EnvironmentTool
-from froggy.pond.tools.toolbox import Toolbox
-from froggy.pond.utils import clean_code
+from debug_gym.gym.entities import Event, Observation
+from debug_gym.gym.tools.tool import EnvironmentTool
+from debug_gym.gym.tools.toolbox import Toolbox
+from debug_gym.gym.utils import clean_code
 
 
 @Toolbox.register()

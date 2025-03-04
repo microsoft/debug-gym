@@ -3,9 +3,9 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from froggy.pond.envs.env import RepoEnv
-from froggy.pond.terminal import DockerTerminal, Terminal
-from froggy.pond.tools.pdb import PDBTool
+from debug_gym.gym.envs.env import RepoEnv
+from debug_gym.gym.terminal import DockerTerminal, Terminal
+from debug_gym.gym.tools.pdb import PDBTool
 
 if_docker_running = pytest.mark.skipif(
     not subprocess.check_output(["docker", "ps"]),

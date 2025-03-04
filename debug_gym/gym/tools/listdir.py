@@ -1,9 +1,9 @@
 from os.path import join as pjoin
 from pathlib import Path
 
-from froggy.pond.entities import Observation
-from froggy.pond.tools.tool import EnvironmentTool
-from froggy.pond.tools.toolbox import Toolbox
+from debug_gym.gym.entities import Observation
+from debug_gym.gym.tools.tool import EnvironmentTool
+from debug_gym.gym.tools.toolbox import Toolbox
 
 
 @Toolbox.register()

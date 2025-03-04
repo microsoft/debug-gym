@@ -1,6 +1,6 @@
 import pytest
 
-from froggy.pond.tools.toolbox import Toolbox
+from debug_gym.gym.tools.toolbox import Toolbox
 
 
 def test_register_tool():

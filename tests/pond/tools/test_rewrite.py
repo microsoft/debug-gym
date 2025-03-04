@@ -2,7 +2,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from froggy.pond.tools.rewrite import RewriteTool
+from debug_gym.gym.tools.rewrite import RewriteTool
 
 
 @pytest.fixture

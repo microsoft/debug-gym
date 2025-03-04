@@ -15,7 +15,7 @@ from tenacity import (
 from termcolor import colored
 from transformers import AutoTokenizer
 
-from froggy.logger import FroggyLogger
+from debug_gym.logger import FroggyLogger
 
 prompt_toolkit_available = False
 try:
@@ -248,7 +248,7 @@ class LLM:
         return response.choices[0].message.content
 
     def __call__(self, messages, *args, **kwargs) -> LLMResponse:
-        from froggy.agents.utils import trim_prompt_messages
+        from debug_gym.agents.utils import trim_prompt_messages
 
         if not self.config.get("system_prompt_support", True):
             # Replace system by user

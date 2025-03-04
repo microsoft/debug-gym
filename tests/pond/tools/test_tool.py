@@ -1,9 +1,9 @@
 import pytest
 
-from froggy.pond.entities import Observation
-from froggy.pond.envs.env import Event, RepoEnv
-from froggy.pond.tools.tool import EnvironmentTool, Record, track_history
-from froggy.pond.tools.toolbox import Toolbox
+from debug_gym.gym.entities import Observation
+from debug_gym.gym.envs.env import Event, RepoEnv
+from debug_gym.gym.tools.tool import EnvironmentTool, Record, track_history
+from debug_gym.gym.tools.toolbox import Toolbox
 
 
 class FakeTool(EnvironmentTool):

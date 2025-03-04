@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from functools import wraps
 
-from froggy.pond.entities import Event, Observation
+from debug_gym.gym.entities import Event, Observation
 
 
 @dataclass
@@ -41,7 +41,7 @@ class EnvironmentTool(ABC):
         return self.use(action, **kwargs)
 
     def register(self, environment):
-        from froggy.pond.envs.env import RepoEnv
+        from debug_gym.gym.envs.env import RepoEnv
 
         if not isinstance(environment, RepoEnv):
             raise ValueError("The environment must be a RepoEnv instance.")

@@ -5,11 +5,11 @@ from unittest.mock import patch
 import pytest
 from filelock import FileLock
 
-from froggy.pond.entities import Observation
-from froggy.pond.envs import SWEBenchEnv
-from froggy.pond.envs.swe_bench import SWEBenchEnv
-from froggy.pond.terminal import DockerTerminal
-from froggy.pond.tools.toolbox import Toolbox
+from debug_gym.gym.entities import Observation
+from debug_gym.gym.envs import SWEBenchEnv
+from debug_gym.gym.envs.swe_bench import SWEBenchEnv
+from debug_gym.gym.terminal import DockerTerminal
+from debug_gym.gym.tools.toolbox import Toolbox
 
 if_docker_running = pytest.mark.skipif(
     not subprocess.check_output(["docker", "ps"]),

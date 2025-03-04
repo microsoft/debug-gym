@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from froggy.pond.utils import (
+from debug_gym.gym.utils import (
     _walk,
     clean_code,
     cleanup_pytest_output,

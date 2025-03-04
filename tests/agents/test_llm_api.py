@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, MagicMock, mock_open, patch
 import pytest
 from openai import RateLimitError
 
-from froggy.agents.llm_api import (
+from debug_gym.agents.llm_api import (
     LLM,
     AsyncLLM,
     Human,
@@ -17,7 +17,7 @@ from froggy.agents.llm_api import (
     merge_messages,
     print_messages,
 )
-from froggy.logger import FroggyLogger
+from debug_gym.logger import FroggyLogger
 
 
 @pytest.fixture

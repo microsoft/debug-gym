@@ -4,9 +4,9 @@ from unittest.mock import MagicMock, call, patch
 import numpy as np
 import pytest
 
-from froggy.pond.entities import EvalOutput, Event, Observation
-from froggy.pond.envs.env import EnvInfo, EventHooks, RepoEnv, TooledEnv
-from froggy.pond.terminal import Terminal
+from debug_gym.gym.entities import EvalOutput, Event, Observation
+from debug_gym.gym.envs.env import EnvInfo, EventHooks, RepoEnv, TooledEnv
+from debug_gym.gym.terminal import Terminal
 
 
 @pytest.fixture

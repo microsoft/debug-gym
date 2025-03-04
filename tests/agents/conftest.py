@@ -3,8 +3,8 @@ from unittest.mock import MagicMock, mock_open, patch
 
 import pytest
 
-from froggy.pond.entities import Observation
-from froggy.pond.envs.env import EnvInfo
+from debug_gym.gym.entities import Observation
+from debug_gym.gym.envs.env import EnvInfo
 
 
 @pytest.fixture

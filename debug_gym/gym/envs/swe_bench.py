@@ -17,10 +17,10 @@ from swebench.harness.test_spec import make_test_spec
 from swebench.harness.utils import get_test_directives, load_swebench_dataset
 from tqdm import tqdm
 
-from froggy.pond.entities import EvalOutput
-from froggy.pond.envs.env import RepoEnv
-from froggy.pond.terminal import DockerTerminal, Terminal
-from froggy.pond.utils import create_ignore_file
+from debug_gym.gym.entities import EvalOutput
+from debug_gym.gym.envs.env import RepoEnv
+from debug_gym.gym.terminal import DockerTerminal, Terminal
+from debug_gym.gym.utils import create_ignore_file
 
 
 class SWEBenchEnv(RepoEnv):

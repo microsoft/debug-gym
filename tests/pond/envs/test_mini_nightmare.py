@@ -2,10 +2,10 @@ from unittest.mock import mock_open, patch
 
 import pytest
 
-from froggy.pond.entities import Observation
-from froggy.pond.envs.env import EnvInfo
-from froggy.pond.envs.mini_nightmare import MiniNightmareEnv
-from froggy.pond.terminal import Terminal
+from debug_gym.gym.entities import Observation
+from debug_gym.gym.envs.env import EnvInfo
+from debug_gym.gym.envs.mini_nightmare import MiniNightmareEnv
+from debug_gym.gym.terminal import Terminal
 
 
 @pytest.fixture

@@ -12,8 +12,8 @@ import uuid
 
 import docker
 
-from froggy.logger import FroggyLogger
-from froggy.utils import strip_ansi
+from debug_gym.logger import FroggyLogger
+from debug_gym.utils import strip_ansi
 
 DEFAULT_TIMEOUT = 300
 DEFAULT_PS1 = "FROGGY_PS1"

@@ -7,9 +7,9 @@ from dataclasses import asdict
 
 import yaml
 
-from froggy.agents.llm_api import LLMResponse
-from froggy.pond.envs.env import EnvInfo
-from froggy.pond.utils import unescape
+from debug_gym.agents.llm_api import LLMResponse
+from debug_gym.gym.envs.env import EnvInfo
+from debug_gym.gym.utils import unescape
 
 
 class HistoryTracker:

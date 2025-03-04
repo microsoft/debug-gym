@@ -11,10 +11,10 @@ from pathlib import Path
 
 import numpy as np
 
-from froggy.logger import FroggyLogger
-from froggy.pond.entities import EvalOutput, Event, Observation
-from froggy.pond.terminal import Terminal
-from froggy.pond.utils import _walk, make_file_matcher, parse_action, show_line_number
+from debug_gym.logger import FroggyLogger
+from debug_gym.gym.entities import EvalOutput, Event, Observation
+from debug_gym.gym.terminal import Terminal
+from debug_gym.gym.utils import _walk, make_file_matcher, parse_action, show_line_number
 
 
 @dataclass

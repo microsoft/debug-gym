@@ -3,8 +3,8 @@ import subprocess
 from pathlib import Path
 
 import froggy.pond.utils as utils
-from froggy.pond.entities import EvalOutput
-from froggy.pond.envs.env import RepoEnv
+from debug_gym.gym.entities import EvalOutput
+from debug_gym.gym.envs.env import RepoEnv
 
 
 class AiderBenchmarkEnv(RepoEnv):

@@ -4,7 +4,7 @@ from pathlib import Path
 
 from tqdm import tqdm
 
-from froggy.utils import strip_ansi
+from debug_gym.utils import strip_ansi
 
 
 class TqdmLoggingHandler(logging.Handler):
