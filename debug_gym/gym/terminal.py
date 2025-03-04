@@ -449,7 +449,7 @@ class DockerTerminal(Terminal):
             auto_remove=True,
             remove=True,
         )
-        container_name = f"froggy_{container.name}"
+        container_name = f"debug_gym_{container.name}"
         container.rename(container_name)
         container.reload()
         self._run_setup_commands(container)

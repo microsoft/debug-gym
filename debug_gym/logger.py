@@ -41,7 +41,7 @@ class DebugGymLogger(logging.Logger):
         super().__init__(name)
         self.setLevel(logging.DEBUG)
 
-        # If var env "DEBUG_GYM_DEBUG" is set, turn on debug modeé
+        # If var env "DEBUG_GYM_DEBUG" is set, turn on debug mode
         if os.environ.get("DEBUG_GYM_DEBUG"):
             level = logging.DEBUG
 
