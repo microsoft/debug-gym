@@ -181,6 +181,6 @@ vscode/out
 vscode/node_modules
 vscode/package-lock.json
 
-# Froggy stuff
-.froggyignore
-.froggyreadonly
+# debug-gym stuff
+.debugignore
+.debugreadonly
