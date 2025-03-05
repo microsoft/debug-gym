@@ -96,8 +96,12 @@ class HistoryTracker:
 
 
 def trim(text: str, max_length: int, token_counter: callable, where: str = "middle"):
+
     # Get an approximate number of characters per token ratio in the text.
     nb_tokens = token_counter(text=text)
+    if nb_tokens == 0:
+        return text
+
     chars_per_token = len(text) / nb_tokens
     # Adjust the max_length based on the chars_per_token ratio.
     max_length = int(max_length * chars_per_token)
