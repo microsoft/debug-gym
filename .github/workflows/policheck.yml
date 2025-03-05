@@ -17,7 +17,7 @@ jobs:
         run: PoliCheck.exe /f . /o policheck-results
 
       - name: Upload PoliCheck Results
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: policheck-report
           path: policheck-results/
