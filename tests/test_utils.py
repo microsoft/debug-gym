@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from froggy.utils import strip_ansi
+from debug_gym.utils import strip_ansi
 
 
 def test_strip_ansi():
