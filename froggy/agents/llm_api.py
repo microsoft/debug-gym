@@ -198,8 +198,8 @@ class LLM:
 
             credential = get_bearer_token_provider(
                 ChainedTokenCredential(
-                    AzureCliCredential(),
                     ManagedIdentityCredential(),
+                    AzureCliCredential(),
                 ),
                 scope,
             )
@@ -240,6 +240,14 @@ class LLM:
                     )
                     return True
                 elif "'status': 504" in exception.message:  # Gateway Timeout
+                    self.logger.debug(
+                        f"Error calling {self.model_name}: {exception_full_name!r} {exception.message}"
+                    )
+                    return True
+                elif (
+                    "'status': 413" in exception.message
+                    and "A previous prompt was too large." in exception.message
+                ):  # A previous prompt was too large.
                     self.logger.debug(
                         f"Error calling {self.model_name}: {exception_full_name!r} {exception.message}"
                     )
@@ -285,9 +293,10 @@ class LLM:
         # Merge consecutive messages with same role.
         messages = merge_messages(messages)
         messages_length = self.token_counter(messages=messages)
+        self.logger.debug(f"Prompt size is {messages_length:,} tokens.")
         if messages_length > self.context_length:
             self.logger.info(
-                f"Prompt is too long ({messages_length:,} tokens), it will be truncated."
+                f"Prompt is too long. {self.model_name} only allows for {self.context_length:,} tokens."
             )
             messages = trim_prompt_messages(
                 messages, self.context_length, self.token_counter
