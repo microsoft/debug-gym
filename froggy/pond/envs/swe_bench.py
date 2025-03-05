@@ -1,4 +1,5 @@
 import os
+import re
 import shutil
 import subprocess
 from ast import literal_eval
@@ -6,7 +7,11 @@ from pathlib import Path
 
 import datasets
 import docker
-from swebench.harness.constants import MAP_REPO_VERSION_TO_SPECS, TestStatus
+from swebench.harness.constants import (
+    MAP_REPO_VERSION_TO_SPECS,
+    NON_TEST_EXTS,
+    TestStatus,
+)
 from swebench.harness.docker_build import (
     build_env_images,
     build_instance_image,
@@ -35,7 +40,7 @@ class SWEBenchEnv(RepoEnv):
         terminal: Terminal | None = None,
         **kwargs,
     ):
-        terminal = terminal or DockerTerminal()
+        terminal = terminal or DockerTerminal(logger=kwargs.get("logger"))
         if not isinstance(terminal, DockerTerminal):
             raise ValueError("SWEBenchEnv only supports DockerTerminal.")
 
@@ -208,7 +213,6 @@ class SWEBenchEnv(RepoEnv):
 
         # Clean up the previous task, if any.
         self.close()
-        # self.terminal = DockerTerminal()
 
         self.setup_task_info(options["task_name"])
         self.setup_local_repo()
@@ -279,9 +283,13 @@ class SWEBenchEnv(RepoEnv):
         create_ignore_file(
             self.working_dir / ".froggyignore", patterns=self.ignore_files
         )
-        create_ignore_file(
-            self.working_dir / ".froggyreadonly", patterns=self.test_directives
-        )
+
+        # Get test directives from test patch and remove non-test files
+        test_files = re.findall(r"diff --git a/.* b/(.*)", self.ds_row["test_patch"])
+        test_files = [
+            f for f in test_files if not any(f.endswith(ext) for ext in NON_TEST_EXTS)
+        ]
+        create_ignore_file(self.working_dir / ".froggyreadonly", patterns=test_files)
         self._index_files()
 
         self.terminal.run(f"git config user.name 'SWE-Bench'")
