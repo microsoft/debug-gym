@@ -1,0 +1,23 @@
+name: PoliCheck Scan
+
+on: [push, pull_request]
+
+jobs:
+  policheck:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: Install PoliCheck
+        run: |
+          choco install policheck --yes  # If available via Chocolatey
+
+      - name: Run PoliCheck
+        run: PoliCheck.exe /f . /o policheck-results
+
+      - name: Upload PoliCheck Results
+        uses: actions/upload-artifact@v3
+        with:
+          name: policheck-report
+          path: policheck-results/
