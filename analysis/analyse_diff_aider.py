@@ -189,21 +189,9 @@ def plot_winning_time_per_game(df_dict, figsize=(12, 7)):
 
 # Example usage:
 model_names = [
-    # "../exps/mini_nightmare/rewrite_4o-mini",
-    # "../exps/mini_nightmare/rewrite_4o",
-    # "../exps/mini_nightmare/rewrite_o1",
-    # "../exps/mini_nightmare/rewrite_o3-mini",
-    # "../exps/mini_nightmare/pdb_4o-mini",
-    # "../exps/mini_nightmare/pdb_4o",
-    # "../exps/mini_nightmare/pdb_o1",
-    # "../exps/mini_nightmare/pdb_o3-mini",
-    # "../exps/mini_nightmare/seq_4o-mini",
-    # "../exps/mini_nightmare/seq_4o",
-    # "../exps/mini_nightmare/seq_o1",
-    # "../exps/mini_nightmare/seq_o3-mini",
-    "../exps/aider/rewrite_4o",
-    "../exps/aider/pdb_4o",
-    "../exps/aider/seq_4o",
+    "../exps/aider/rewrite_4o/rewrite_4o",
+    "../exps/aider/pdb_4o/pdb_4o",
+    "../exps/aider/seq_4o/seq_4o",
 ]
 
 # Analyze all models with seed averaging

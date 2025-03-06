@@ -14,7 +14,7 @@ plt.rcParams.update(
         "axes.titlesize": 20,  # Plot title
         "xtick.labelsize": 20,  # X-axis tick labels
         "ytick.labelsize": 20,  # Y-axis tick labels
-        "legend.fontsize": 14,  # Legend text
+        "legend.fontsize": 20,  # Legend text
     }
 )
 
@@ -47,7 +47,9 @@ def analyze_froggy_results(model_name):
             total_response_tokens = 0
             rewrite_count = 0
             for step in data.get("log", []):
-                if step.get("action") and "```rewrite" in step["action"]:
+                if step.get("action") and step["action"].strip().startswith(
+                    "```rewrite"
+                ):
                     rewrite_count += 1
 
                 # Extract token usage from prompt_response_pairs
@@ -58,6 +60,9 @@ def analyze_froggy_results(model_name):
                             total_response_tokens += pair["token_usage"].get(
                                 "response", 0
                             )
+
+                if rewrite_count == 10:
+                    break
 
             results.append(
                 {
@@ -78,6 +83,12 @@ def analyze_froggy_results(model_name):
     print("\nResults by task:")
     print(df)
     return df
+
+
+agent_name_map = {
+    "rewrite_4o": "gpt-4o",
+    "rewrite_r1-distill-qwen-32b": "r1-distill-qwen-32b",
+}
 
 
 def plot_multiple_cumulative_success(df_dict, figsize=(12, 7)):
@@ -115,7 +126,7 @@ def plot_multiple_cumulative_success(df_dict, figsize=(12, 7)):
             np.arange(max_rewrites + 1),
             avg_perf_per_rewrite,
             where="post",
-            label=f"{model_name} ({final_success_rate:.1%})",
+            label=f"{agent_name_map[model_name]}",
         )
         plt.fill_between(
             np.arange(max_rewrites + 1),
@@ -133,6 +144,7 @@ def plot_multiple_cumulative_success(df_dict, figsize=(12, 7)):
     plt.ylabel("Cumulative Average Success Rate")
     plt.title("Cumulative Average Success Rates (Averaged Across 3 Runs)")
     plt.grid(True, alpha=0.3)
+    plt.legend()
     # plt.legend(bbox_to_anchor=(1.05, 1), loc="upper left")
     plt.tight_layout()
     plt.show()
@@ -179,9 +191,8 @@ def analyze_froggy_results_with_seeds(base_model_name, seeds=[0, 1, 2]):
 
 # Example usage:
 model_names = [
-    "../exps/aider/rewrite_4o",
-    # "../exps/aider/pdb_4o",
-    # "../exps/aider/seq_4o",
+    "../exps/aider/rewrite_4o/rewrite_4o",
+    "../exps/aider/rewrite_r1-distill-qwen-32b/rewrite_r1-distill-qwen-32b",
 ]
 
 # Analyze all models with seed averaging

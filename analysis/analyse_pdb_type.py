@@ -53,8 +53,8 @@ def analyze_froggy_results(model_name):
                 if step.get("action") and "```rewrite" in step["action"]:
                     rewrite_count += 1
 
-                if step.get("action") and "```pdb" in step["action"]:
-                    pdb_command = step["action"].split("```pdb")[1].strip()
+                if step.get("action") and step["action"].strip().startswith("```pdb"):
+                    pdb_command = step["action"].split("```pdb", 1)[1].strip()
                     pdb_command = pdb_command.split(" ")[0]
                     pdb_command = pdb_command.strip("`").strip()
                     if pdb_command not in pdb_command_category:
@@ -195,8 +195,17 @@ def plot_pdb_command_categories(df_dict, figsize=(12, 7)):
     plt.xticks(rotation=45)
     # custom x ticks
     plt.xticks(
-        [0, 1, 2, 3],
-        ["4o-mini", "4o", "o1", "o3-mini"],
+        [0, 1, 2, 3, 4, 5, 6, 7],
+        [
+            "4o-mini",
+            "4o",
+            "o1",
+            "o3-mini",
+            "llama32-3b",
+            "llama33-70b",
+            "r1-llama-70b",
+            "r1-qwen-32b",
+        ],
     )
 
     # plt.grid(True, alpha=0.3)
@@ -206,18 +215,14 @@ def plot_pdb_command_categories(df_dict, figsize=(12, 7)):
 
 # Example usage:
 model_names = [
-    # "../exps/aider/rewrite_4o-mini",
-    # "../exps/aider/rewrite_4o",
-    # "../exps/aider/rewrite_o1",
-    # "../exps/aider/rewrite_o3-mini",
-    "../exps/aider/pdb_4o-mini",
-    "../exps/aider/pdb_4o",
-    "../exps/aider/pdb_o1",
-    "../exps/aider/pdb_o3-mini",
-    # "../exps/aider/seq_4o-mini",
-    # "../exps/aider/seq_4o",
-    # "../exps/aider/seq_o1",
-    # "../exps/aider/seq_o3-mini",
+    "../exps/aider/pdb_4o-mini/pdb_4o-mini",
+    "../exps/aider/pdb_4o/pdb_4o",
+    "../exps/aider/pdb_o1/pdb_o1",
+    "../exps/aider/pdb_o3-mini/pdb_o3-mini",
+    "../exps/aider/pdb_llama32-3b/pdb_llama32-3b",
+    "../exps/aider/pdb_llama33-70b/pdb_llama33-70b",
+    "../exps/aider/pdb_r1-distill-llama-70b/pdb_r1-distill-llama-70b",
+    "../exps/aider/pdb_r1-distill-qwen-32b/pdb_r1-distill-qwen-32b",
 ]
 
 # Analyze all models with seed averaging

@@ -150,36 +150,38 @@ def plot_winning_time_per_game(df_dict, figsize=(12, 7)):
         # import pdb; pdb.set_trace()
         all_data.append([agent_name_map[agent_model.split("_")[0]], grouped_df])
     # ignore tasks where all agent_model failed or succeeded
-    keep_index = []
-    all_solved = 0
-    all_failed = 0
-    # import pdb; pdb.set_trace()
-    # for i in range(len(all_data[0][1])):
-    #     if all([all_data[j][1]["success"][i] == 0 for j in range(len(all_data))]):
-    #         # import pdb; pdb.set_trace()
-    #         all_failed += 1
-    #         continue
-    #     if all([all_data[j][1]["success"][i] == 3 for j in range(len(all_data))]):
-    #         # import pdb; pdb.set_trace()
-    #         all_solved += 1
-    #         continue
-    #     keep_index.append(i)
-    # print("---------------", len(keep_index), all_solved, all_failed)
-    # for i in range(len(all_data)):
-    #     all_data[i][1] = all_data[i][1].iloc[keep_index]
-
-    # import pdb; pdb.set_trace()
-
-    # Plot grouped bar plot
-    x = np.arange(len(all_data[0][1]["task"]))
-    width = 0.2
 
     # nice palette
     sns.set_palette("Set2")
-    for i, (model_name, df) in enumerate(all_data):
-        plt.bar(x + i * width, df["success"], width, label=model_name)
+    f, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(20, 5), sharex=True)
+    # subplot 1: rewrite_4o vs pdb_4o vs seq_4o
+    ax1.set_title("gpt-4o")
+    x = np.arange(len(all_data[0][1]["task"]))
+    width = 0.2
+    for i, (model_name, df) in enumerate(all_data[:3]):
+        ax1.bar(x + i * width, df["success"], width, label=model_name)
 
-    plt.ylabel("Number of success in 3 runs")
+    # subplot 2: rewrite_llama33-70b vs pdb_llama33-70b vs seq_llama33-70b
+    ax2.set_title("llama3.3-70b-instruct")
+    for i, (model_name, df) in enumerate(all_data[3:6]):
+        ax2.bar(x + i * width, df["success"], width, label=model_name)
+
+    # subplot 3: rewrite_r1-distill-llama-70b vs pdb_r1-distill-llama-70b vs seq_r1-distill-llama-70b
+    ax3.set_title("r1-llama-70b")
+    for i, (model_name, df) in enumerate(all_data[6:]):
+        ax3.bar(x + i * width, df["success"], width, label=model_name)
+
+    ax1.set_ylabel("")
+    ax2.set_ylabel("")
+    ax3.set_ylabel("")
+    f.text(
+        0.05,
+        0.55,
+        "Number of success in 3 runs",
+        va="center",
+        rotation="vertical",
+    )
+
     plt.xticks(x + width, all_data[0][1]["task"], rotation=45)
     plt.yticks(np.arange(0, 4, 1))
     plt.legend()
@@ -189,21 +191,15 @@ def plot_winning_time_per_game(df_dict, figsize=(12, 7)):
 
 # Example usage:
 model_names = [
-    # "../exps/mini_nightmare/rewrite_4o-mini",
-    "../exps/mini_nightmare/rewrite_4o",
-    # "../exps/mini_nightmare/rewrite_o1",
-    # "../exps/mini_nightmare/rewrite_o3-mini",
-    # "../exps/mini_nightmare/pdb_4o-mini",
-    "../exps/mini_nightmare/pdb_4o",
-    # "../exps/mini_nightmare/pdb_o1",
-    # "../exps/mini_nightmare/pdb_o3-mini",
-    # "../exps/mini_nightmare/seq_4o-mini",
-    "../exps/mini_nightmare/seq_4o",
-    # "../exps/mini_nightmare/seq_o1",
-    # "../exps/mini_nightmare/seq_o3-mini",
-    # "../exps/aider/rewrite_4o",
-    # "../exps/aider/pdb_4o",
-    # "../exps/aider/seq_4o",
+    "../exps/mini_nightmare/rewrite_4o/rewrite_4o",
+    "../exps/mini_nightmare/pdb_4o/pdb_4o",
+    "../exps/mini_nightmare/seq_4o/seq_4o",
+    "../exps/mini_nightmare/rewrite_llama33-70b/rewrite_llama33-70b",
+    "../exps/mini_nightmare/pdb_llama33-70b/pdb_llama33-70b",
+    "../exps/mini_nightmare/seq_llama33-70b/seq_llama33-70b",
+    "../exps/mini_nightmare/rewrite_r1-distill-llama-70b/rewrite_r1-distill-llama-70b",
+    "../exps/mini_nightmare/pdb_r1-distill-llama-70b/pdb_r1-distill-llama-70b",
+    "../exps/mini_nightmare/seq_r1-distill-llama-70b/seq_r1-distill-llama-70b",
 ]
 
 # Analyze all models with seed averaging

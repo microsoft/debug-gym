@@ -180,9 +180,9 @@ def plot_episode_length(df_dict, figsize=(12, 7)):
     )
 
     plt.ylim(0, 30)
-    plt.ylabel("Average Episode Length")
+    plt.ylabel("Number of steps")
     plt.xlabel("Backbone LLM")
-    plt.title("Average Episode Lengths (Averaged Across 3 Runs)")
+    plt.title("Average success episode length (over 3 runs on Aider)")
     plt.xticks(rotation=90)
     # custom x ticks
     plt.xticks(
@@ -320,7 +320,7 @@ def plot_episode_response_tokens(df_dict, figsize=(12, 7)):
         color="black",
     )
 
-    ax1.set_ylim(2000, 10000)
+    ax1.set_ylim(2000, 17000)
     ax2.set_ylim(0, 1000)
 
     ax1.set_ylabel("")
@@ -329,7 +329,7 @@ def plot_episode_response_tokens(df_dict, figsize=(12, 7)):
     f.text(
         0.05,
         0.55,
-        "Average Response Tokens (Averaged Across 3 Runs)",
+        "Average success response tokens (over 3 runs on Aider)",
         va="center",
         rotation="vertical",
     )
@@ -435,5 +435,5 @@ for name in tqdm(model_names):
     results_dict[name.split("/")[-1]] = analyze_froggy_results_with_seeds(name)
 
 # Plot comparison
-plot_episode_length(results_dict)
-# plot_episode_response_tokens(results_dict)
+# plot_episode_length(results_dict)
+plot_episode_response_tokens(results_dict)
