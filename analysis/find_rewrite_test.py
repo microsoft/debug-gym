@@ -122,7 +122,7 @@ def find_rewrite_test(df_dict, figsize=(12, 7)):
 
 # Example usage:
 model_names = [
-    "../exps/swe-bench/pdb_o1/pdb_o1",
+    "../exps/swe-bench/seq_o1/seq_o1",
     # "../exps/aider/pdb_r1-distill-qwen-32b/pdb_r1-distill-qwen-32b",
 ]
 

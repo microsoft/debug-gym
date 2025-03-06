@@ -14,15 +14,23 @@ plt.rcParams.update(
         "axes.titlesize": 20,  # Plot title
         "xtick.labelsize": 20,  # X-axis tick labels
         "ytick.labelsize": 20,  # Y-axis tick labels
-        "legend.fontsize": 14,  # Legend text
+        "legend.fontsize": 20,  # Legend text
     }
 )
+
+pdb_command_mapping = {
+    "break": "b",
+    "continue": "c",
+    "clear": "cl",
+    "print": "p",
+    "next": "n",
+    "list": "l",
+}
 
 
 def analyze_froggy_results(model_name):
     """
     Analyzes froggy.jsonl files for a given model to extract success rates and rewrite counts.
-
     Args:
         model_name (str): Path to the model directory (e.g. 'exps/aider/rewrite_4o_0')
 
@@ -47,7 +55,15 @@ def analyze_froggy_results(model_name):
             total_response_tokens = 0
             rewrite_count = 0
             episode_length = 0
-            pdb_command_category = {"b": 0, "c": 0, "cl": 0, "p": 0, "n": 0, "other": 0}
+            pdb_command_category = {
+                "b": 0,
+                "c": 0,
+                "cl": 0,
+                "p": 0,
+                "n": 0,
+                "l": 0,
+                "other": 0,
+            }
             for step in data.get("log", []):
                 episode_length += 1
                 if step.get("action") and "```rewrite" in step["action"]:
@@ -57,11 +73,16 @@ def analyze_froggy_results(model_name):
                     pdb_command = step["action"].split("```pdb", 1)[1].strip()
                     pdb_command = pdb_command.split(" ")[0]
                     pdb_command = pdb_command.strip("`").strip()
-                    if pdb_command not in pdb_command_category:
+                    if (
+                        pdb_command not in pdb_command_category
+                        and pdb_command not in pdb_command_mapping
+                    ):
                         pdb_command_category["other"] += 1
                         print("--------", pdb_command)
-                    else:
+                    elif pdb_command in pdb_command_category:
                         pdb_command_category[pdb_command] += 1
+                    else:
+                        pdb_command_category[pdb_command_mapping[pdb_command]] += 1
 
                 # Extract token usage from prompt_response_pairs
                 if step.get("prompt_response_pairs"):
@@ -147,7 +168,15 @@ def plot_pdb_command_categories(df_dict, figsize=(12, 7)):
     # Create plot for each model
     for model_name, df in df_dict.items():
         # 4o-mini, 4o, o1, o3-mini
-        pdb_category_per_model = {"b": 0, "c": 0, "cl": 0, "p": 0, "n": 0, "other": 0}
+        pdb_category_per_model = {
+            "b": 0,
+            "c": 0,
+            "cl": 0,
+            "p": 0,
+            "n": 0,
+            "l": 0,
+            "other": 0,
+        }
         pdb_call_count = 0
         for _kv in df["pdb_command_category"].items():
             if _kv[1] == {}:
@@ -169,6 +198,7 @@ def plot_pdb_command_categories(df_dict, figsize=(12, 7)):
                 pdb_category_per_model["cl"],
                 pdb_category_per_model["p"],
                 pdb_category_per_model["n"],
+                pdb_category_per_model["l"],
                 pdb_category_per_model["other"],
             ]
         )
@@ -177,7 +207,7 @@ def plot_pdb_command_categories(df_dict, figsize=(12, 7)):
     # import pdb; pdb.set_trace()
     # convert to DataFrame
     all_data = pd.DataFrame(
-        all_data, columns=["name", "model", "b", "c", "cl", "p", "n", "other"]
+        all_data, columns=["name", "model", "b", "c", "cl", "p", "n", "l", "other"]
     )
     # import pdb; pdb.set_trace()
     # nice palette
@@ -185,7 +215,7 @@ def plot_pdb_command_categories(df_dict, figsize=(12, 7)):
     # set color
     sns.set_palette(palette)
     # stacked bar plot showing the distribution of PDB command categories for each model
-    all_data.set_index("name")[["b", "c", "cl", "p", "n", "other"]].plot(
+    all_data.set_index("name")[["b", "c", "cl", "p", "n", "l", "other"]].plot(
         kind="bar", stacked=True, figsize=figsize
     )
     plt.title("Distribution of PDB command being issued")
