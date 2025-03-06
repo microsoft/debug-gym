@@ -64,32 +64,32 @@ class ShellSession:
         self.logger.debug(f"Starting {self} with entrypoint: {entrypoint}")
 
         # Prepare the file descriptor
-        master, slave = pty.openpty()
-        self.filedescriptor = master
+        _server, _client = pty.openpty()
+        self.filedescriptor = _server
 
         # set_fd_nonblocking
-        flags = fcntl.fcntl(master, fcntl.F_GETFL)
-        fcntl.fcntl(master, fcntl.F_SETFL, flags | os.O_NONBLOCK)
+        flags = fcntl.fcntl(_server, fcntl.F_GETFL)
+        fcntl.fcntl(_server, fcntl.F_SETFL, flags | os.O_NONBLOCK)
 
-        # Turn off ECHO on the slave side
-        attrs = termios.tcgetattr(slave)
+        # Turn off ECHO on the _client side
+        attrs = termios.tcgetattr(_client)
         attrs[3] = attrs[3] & ~termios.ECHO  # lflags
-        termios.tcsetattr(slave, termios.TCSANOW, attrs)
+        termios.tcsetattr(_client, termios.TCSANOW, attrs)
 
         self.process = subprocess.Popen(
             shlex.split(entrypoint),
             env=self.env_vars,
             cwd=self.working_dir,
-            stdin=slave,
-            stdout=slave,
-            stderr=slave,
+            stdin=_client,
+            stdout=_client,
+            stderr=_client,
             text=True,
             close_fds=True,
             start_new_session=True,
         )
 
-        # close slave, end in the parent process
-        os.close(slave)
+        # close _client, end in the parent process
+        os.close(_client)
 
         # Read the output until the sentinel or PS1
         output = self.read(read_until=read_until)
