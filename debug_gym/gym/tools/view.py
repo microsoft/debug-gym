@@ -28,12 +28,15 @@ class ViewTool(EnvironmentTool):
             obs = [
                 "Invalid file path. Please specify a file path.",
                 f"Current file: `{self.environment.current_file}`.",
-                (
+            ]
+            # if current file is None, then no need to check if it is editable
+            if self.environment.current_file is not None:
+                obs.append(
                     "The file is editable."
                     if self.is_editable(self.environment.current_file)
                     else "The file is read-only, it is not editable."
-                ),
-            ]
+                )
+
             return Observation(self.name, " ".join(obs))
 
         if new_file.startswith(str(self.environment.working_dir)):
@@ -43,12 +46,14 @@ class ViewTool(EnvironmentTool):
             obs = [
                 f"Invalid file path. The file path must be inside the root directory: `{self.environment.working_dir}`.",
                 f"Current file: `{self.environment.current_file}`.",
-                (
+            ]
+            # if current file is None, then no need to check if it is editable
+            if self.environment.current_file is not None:
+                obs.append(
                     "The file is editable."
                     if self.is_editable(self.environment.current_file)
                     else "The file is read-only, it is not editable."
-                ),
-            ]
+                )
 
         elif new_file == self.environment.current_file:
             obs = [
@@ -77,11 +82,13 @@ class ViewTool(EnvironmentTool):
                 f"File not found. Could not navigate to `{new_file}`.",
                 f"Make sure that the file path is given relative to the root: `{self.environment.working_dir}`.",
                 f"Current file: `{self.environment.current_file}`.",
-                (
+            ]
+            # if current file is None, then no need to check if it is editable
+            if self.environment.current_file is not None:
+                obs.append(
                     "The file is editable."
                     if self.is_editable(self.environment.current_file)
                     else "The file is read-only, it is not editable."
-                ),
-            ]
+                )
 
         return Observation(self.name, " ".join(obs))
