@@ -373,6 +373,9 @@ class Human:
     def __init__(self, logger: FroggyLogger | None = None):
         self._history = None
         self.logger = logger or FroggyLogger("froggy")
+        self.token_counter = None
+        self.context_length = None
+        self.reasoning_end_token = None
         if prompt_toolkit_available:
             self._history = InMemoryHistory()
 

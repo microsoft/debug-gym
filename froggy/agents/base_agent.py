@@ -76,33 +76,48 @@ class BaseAgent:
         system_prompt = {}
         system_prompt["Overall task"] = self.system_prompt
         system_prompt["Instructions"] = info.instructions
-        system_prompt["Repo directory tree"] = trim(
-            info.dir_tree,
-            min(int(0.1 * self.llm.context_length), calc_tokens_left(system_prompt)),
-            token_counter=self.llm.token_counter,
-            where="end",
-        )
+        if self.llm.context_length is not None and self.llm.token_counter is not None:
+            system_prompt["Repo directory tree"] = trim(
+                info.dir_tree,
+                min(
+                    int(0.1 * self.llm.context_length), calc_tokens_left(system_prompt)
+                ),
+                token_counter=self.llm.token_counter,
+                where="end",
+            )
+        else:
+            system_prompt["Repo directory tree"] = info.dir_tree
         system_prompt["Current breakpoints"] = info.current_breakpoints
         system_prompt["Current code in view"] = info.current_code_with_line_number
         if isinstance(info.current_code_with_line_number, dict):
             system_prompt["Current code in view"] = dict(
                 info.current_code_with_line_number
             )
-            system_prompt["Current code in view"]["Content"] = trim(
-                system_prompt["Current code in view"]["Content"],
+            if (
+                self.llm.context_length is not None
+                and self.llm.token_counter is not None
+            ):
+                system_prompt["Current code in view"]["Content"] = trim(
+                    system_prompt["Current code in view"]["Content"],
+                    min(
+                        int(0.8 * self.llm.context_length),
+                        calc_tokens_left(system_prompt),
+                    ),
+                    token_counter=self.llm.token_counter,
+                    where="end",
+                )
+
+        if self.llm.context_length is not None and self.llm.token_counter is not None:
+            system_prompt["Last evaluation output"] = trim(
+                info.eval_observation.observation,
                 min(
                     int(0.8 * self.llm.context_length), calc_tokens_left(system_prompt)
                 ),
                 token_counter=self.llm.token_counter,
-                where="end",
+                where="middle",
             )
-
-        system_prompt["Last evaluation output"] = trim(
-            info.eval_observation.observation,
-            min(int(0.8 * self.llm.context_length), calc_tokens_left(system_prompt)),
-            token_counter=self.llm.token_counter,
-            where="middle",
-        )
+        else:
+            system_prompt["Last evaluation output"] = info.eval_observation.observation
         system_prompt = unescape(json.dumps(system_prompt, indent=2, sort_keys=True))
         messages = [
             {
