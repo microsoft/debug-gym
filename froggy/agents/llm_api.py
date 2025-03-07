@@ -163,12 +163,12 @@ class LLM:
 
         if not self.config.get("system_prompt_support", True):
             # Replace system prompt by user prompt.
-            self.logger.warning(
+            self.logger.debug(
                 "System prompt is not supported by the model, it will be replaced by user prompt."
             )
 
         if "ignore_kwargs" in self.config:
-            self.logger.warning(
+            self.logger.debug(
                 f"LLM arguments {", ".join(self.config['ignore_kwargs'])} are not supported by the model, they will be ignored."
             )
 

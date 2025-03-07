@@ -465,7 +465,7 @@ class RepoEnv(TooledEnv):
                     f"with action: {action}.\n{e}"
                 )
                 self.step_observation = Observation("env", error_message)
-                self.logger.warning(error_message)
+                self.logger.debug(error_message)
 
         # Process any events that were queued during tool execution
         self.all_observations = self.process_events()
