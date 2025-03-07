@@ -10,6 +10,12 @@ from termcolor import colored
 from debug_gym.gym.envs import SWEBenchEnv
 
 
+def map_uuid(input):
+    if "pdb_agent_" in input:
+        input = input.replace("pdb_agent_", "pdb_")
+    return input
+
+
 def main(args):
     # Collect all *.jsonl files in the output directory
     log_files = glob(str(args.path / "**" / "froggy.jsonl"), recursive=True)
@@ -23,7 +29,7 @@ def main(args):
 
             result = {
                 "success": data["success"],
-                "uuid": data["uuid"],
+                "uuid": map_uuid(data["uuid"]),
                 "agent_type": data["agent_type"],
                 "problem": data["problem"],
             }
