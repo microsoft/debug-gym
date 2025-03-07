@@ -46,6 +46,7 @@
 </head>
 <body>
 
+  <div id='cookie-banner'></div>
 
   <section class="hero">
     <div class="hero-body">
@@ -181,6 +182,13 @@
 
 
   <footer class="footer">
+  <script>
+      function manageConsent() {
+          if (WcpConsent.siteConsent.isConsentRequired) {
+              WcpConsent.siteConsent.manageConsent();
+          }
+      }
+  </script>
   <div class="container">
     <div class="columns is-centered">
       <div class="column is-8">
@@ -203,6 +211,9 @@
 <!-- You can add a tracker to track page visits by creating an account at statcounter.com -->
 
     <!-- End of Statcounter Code -->
+
+    <!-- Microsoft EU cookie compliance library -->
+<script src="https://wcpstatic.microsoft.com/mscc/lib/v2/wcp-consent.js"></script>
 
   </body>
   </html>
