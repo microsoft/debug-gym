@@ -46,10 +46,10 @@ $(document).ready(function() {
 	window.WcpConsent && WcpConsent.init("en-US", "cookie-banner", function (err, _siteConsent) {
 	}, onConsentChanged, WcpConsent.themes.light);
   
-	// const cookieManager = document.querySelector('#footer-cookie-link');
-	// if (consentRequired() && cookieManager && cookieManager.parentElement) {
-	//   cookieManager.parentElement.style.visibility = 'visible';
-	// }
+	const cookieManager = document.querySelector('#footer-cookie-link');
+	if (consentRequired() && cookieManager && cookieManager.parentElement) {
+	  cookieManager.parentElement.style.visibility = 'visible';
+	}
   
 	// initialize consent
 	onConsentChanged();
