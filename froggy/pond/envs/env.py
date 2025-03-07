@@ -223,6 +223,10 @@ class RepoEnv(TooledEnv):
                 "python", "python -m pdb"
             )
             self.debug_entrypoint = self._prepare_entrypoint(debug_entrypoint)
+        if self.debug_entrypoint is not None and "-m pdb" not in self.debug_entrypoint:
+            self.debug_entrypoint = self.debug_entrypoint.replace(
+                "python", "python -m pdb"
+            )
 
     @staticmethod
     def _prepare_entrypoint(entrypoint):

@@ -448,6 +448,8 @@ class DockerTerminal(Terminal):
             detach=True,
             auto_remove=True,
             remove=True,
+            tty=True,
+            stdin_open=True,
         )
         container_name = f"froggy_{container.name}"
         container.rename(container_name)
