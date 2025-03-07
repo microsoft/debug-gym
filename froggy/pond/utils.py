@@ -202,7 +202,7 @@ def parse_action(action):
     ), "Syntax error: invalid action syntax. Make sure the action is enclosed in triple backticks ``` on both sides."
     action = action[3:-3].strip()
     assert len(action) > 0, "Empty action."
-    tool_info = action.split(" ", 1)
+    tool_info = action.split(maxsplit=1)
     if len(tool_info) == 1:
         tool_name, tool_args = tool_info[0], ""
     else:
