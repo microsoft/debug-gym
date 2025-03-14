@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Debugging Timeline</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .metadata { border: 1px solid #ccc; padding: 10px; margin-bottom: 20px; }
+        .timeline { display: flex; overflow-x: auto; gap: 10px; margin-bottom: 20px; }
+        .step { padding: 10px; border: 1px solid #ddd; cursor: pointer; }
+        .step.active { background-color: #e0f7fa; border-color: #007bff; }
+        .details { border: 1px solid #ccc; padding: 10px; }
+        pre { background: #f5f5f5; padding: 10px; white-space: pre-wrap; }
+        .nav-buttons { margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <h1>Debugging Timeline</h1>
+
+    <!-- Metadata Section -->
+    <div class="metadata">
+        <h2>Metadata</h2>
+        <p><strong>Problem:</strong> {{ metadata.problem }}</p>
+        <p><strong>UUID:</strong> {{ metadata.uuid }}</p>
+        <p><strong>Success:</strong> {{ metadata.success }}</p>
+        <p><strong>Config:</strong></p>
+        <pre>{{ metadata.config | tojson_pretty }}</pre>
+    </div>
+
+    <!-- Timeline Section -->
+    <h2>Timeline</h2>
+    <div class="timeline">
+        {% for i in range(total_steps) %}
+            <div class="step" data-step-id="{{ i }}">Step {{ i }}</div>
+        {% endfor %}
+    </div>
+
+    <!-- Navigation Buttons -->
+    <div class="nav-buttons">
+        <button id="prev-btn" disabled>Previous</button>
+        <button id="next-btn">Next</button>
+    </div>
+
+    <!-- Step Details -->
+    <div class="details" id="step-details">
+        <h3>Step Details</h3>
+        <p>Select a step to view details.</p>
+    </div>
+
+    <script>
+        const totalSteps = {{ total_steps }};
+        let currentStep = 0;
+
+        // Fetch step data from the server
+        async function fetchStep(stepId) {
+            const response = await fetch(`/get_step/${stepId}`);
+            const data = await response.json();
+            if (!data.error) {
+                document.getElementById('step-details').innerHTML = `
+                    <h3>Step ${stepId}</h3>
+                    <p><strong>Action:</strong></p><pre>${data.action || 'None'}</pre>
+                    <p><strong>Observation:</strong></p><pre>${data.obs}</pre>
+                    <p><strong>Prompt/Response Pairs:</strong></p><pre>${JSON.stringify(data.prompt_response_pairs, null, 2) || 'None'}</pre>
+                `;
+            }
+        }
+
+        // Update active step and navigation buttons
+        function updateStep(newStep) {
+            document.querySelectorAll('.step').forEach(step => step.classList.remove('active'));
+            document.querySelector(`.step[data-step-id="${newStep}"]`).classList.add('active');
+            currentStep = newStep;
+            fetchStep(currentStep);
+            document.getElementById('prev-btn').disabled = currentStep === 0;
+            document.getElementById('next-btn').disabled = currentStep === totalSteps - 1;
+        }
+
+        // Event listeners for timeline steps
+        document.querySelectorAll('.step').forEach(step => {
+            step.addEventListener('click', () => {
+                const stepId = parseInt(step.dataset.stepId);
+                updateStep(stepId);
+            });
+        });
+
+        // Navigation button listeners
+        document.getElementById('prev-btn').addEventListener('click', () => {
+            if (currentStep > 0) updateStep(currentStep - 1);
+        });
+        document.getElementById('next-btn').addEventListener('click', () => {
+            if (currentStep < totalSteps - 1) updateStep(currentStep + 1);
+        });
+
+        // Load the first step by default
+        if (totalSteps > 0) updateStep(0);
+    </script>
+</body>
+</html>
