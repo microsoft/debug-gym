@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import re
 import sys
 from dataclasses import dataclass
 
@@ -100,29 +101,55 @@ class LLMResponse:
 
 
 class TokenCounter:
-    def __init__(self, model: str = "gpt-4o"):
+    def __init__(self, model: str = "gpt-4o", config: dict = None):
+        self.config = config or {}
         self.model = model
-        try:
-            self.tokenize = tiktoken.encoding_for_model(model).encode
-        except KeyError:
+        self.claude = False
+        self.tokenize = None
+        if "claude" in self.model:
+            self.claude = True
+        else:
             try:
-                # Try to load from transformers.
-                self.tokenize = AutoTokenizer.from_pretrained(model).tokenize
-            except OSError:
-                msg = (
-                    f"Tokenizer not found for model {model},"
-                    " make sure you have access to the model"
-                    " (e.g., HuggingFace API key is correctly set)."
-                )
-                raise ValueError(msg)
+                self.tokenize = tiktoken.encoding_for_model(model).encode
+            except KeyError:
+                try:
+                    # Try to load from transformers.
+                    self.tokenize = AutoTokenizer.from_pretrained(model).tokenize
+                except OSError:
+                    msg = (
+                        f"Tokenizer not found for model {model},"
+                        " make sure you have access to the model"
+                        " (e.g., HuggingFace API key is correctly set)."
+                    )
+                    raise ValueError(msg)
+
+    def get_claude_token_count(self, messages):
+        # Call the token counting endpoint
+        messages = [{"role": "user", "content": [{"type": "text", "text": messages}]}]
+        import anthropic
+
+        client = anthropic.Anthropic(api_key=self.config["api_key"])
+        response = client.messages.count_tokens(model=self.model, messages=messages)
+        # Extract the token count from the JSON response
+        token_json = response.json()
+        token_count = json.loads(token_json)["input_tokens"]
+        return int(token_count)
 
     def __call__(self, *, messages=None, text=None) -> int:
         nb_tokens = 0
         if messages is not None:
-            nb_tokens += sum(len(self.tokenize(msg["content"])) for msg in messages)
+            if self.claude:
+                nb_tokens += sum(
+                    self.get_claude_token_count(msg["content"]) for msg in messages
+                )
+            else:
+                nb_tokens += sum(len(self.tokenize(msg["content"])) for msg in messages)
 
         if text is not None:
-            nb_tokens += len(self.tokenize(text))
+            if self.claude:
+                nb_tokens += self.get_claude_token_count(text)
+            else:
+                nb_tokens += len(self.tokenize(text))
 
         return nb_tokens
 
@@ -136,7 +163,7 @@ class LLM:
         self.model_name = model_name
         self.config = configs[model_name]
         self.logger = logger or DebugGymLogger("debug-gym")
-        self.token_counter = TokenCounter(self.config["tokenizer"])
+        self.token_counter = TokenCounter(self.config["tokenizer"], self.config)
         self.context_length = self.config["context_limit"] * 1000
         self.reasoning_end_token = self.config.get("reasoning_end_token", None)
 
@@ -148,6 +175,10 @@ class LLM:
         if "azure openai" in self.config.get("tags", []):
             kwargs = self._get_azure_oai_kwargs()
             self.client = AzureOpenAI(**kwargs)
+        elif "anthropic" in self.config.get("tags", []):
+            from anthropic import Anthropic
+
+            self.client = Anthropic(api_key=self.config["api_key"])
         else:
             self.client = OpenAI(
                 api_key=self.config["api_key"],
@@ -223,6 +254,8 @@ class LLM:
             "openai.APIConnectionError",
             "openai.RateLimitError",
             "openai.PermissionDeniedError",
+            "anthropic.error.RateLimitError",
+            "anthropic.InternalServerError",
             # Add more as needed
         ]
         exception_full_name = (
@@ -264,17 +297,72 @@ class LLM:
 
         return exception_full_name in rate_limit_errors
 
+    def query_anthropic_model(self, messages, **kwargs):
+        kwargs["max_tokens"] = kwargs.get(
+            "max_tokens", self.config.get("max_tokens", NOT_GIVEN)
+        )
+        system_prompt = ""
+        for i in range(len(messages)):
+            if messages[i]["role"] == "system":
+                system_prompt = messages[i]["content"]
+            if messages[i]["role"] == "user":
+                user_prompt = [
+                    {
+                        "role": "user",
+                        "content": [{"type": "text", "text": messages[i]["content"]}],
+                    }
+                ]
+
+        if "thinking" in self.config.get("tags", []):
+            kwargs["max_tokens"] = 20000
+            kwargs["temperature"] = 1.0
+            response = (
+                self.client.messages.create(
+                    model=self.config["model"],
+                    thinking={"type": "enabled", "budget_tokens": 16000},
+                    system=system_prompt,
+                    messages=user_prompt,
+                    **kwargs,
+                )
+                .content[1]
+                .text
+            )
+        else:
+            kwargs["max_tokens"] = 8192
+            response = (
+                self.client.messages.create(
+                    model=self.config["model"],
+                    system=system_prompt,
+                    messages=user_prompt,
+                    **kwargs,
+                )
+                .content[0]
+                .text
+            )
+
+        response = response.strip()
+        # only keep the content between the two ```.
+        p = re.compile(r"```(.*?)```", re.DOTALL)
+        if p.search(response) is not None:
+            # ```...```
+            response = p.search(response).group(0)
+        else:
+            response = ""
+        return response
+
     def query_model(self, messages, **kwargs):
         kwargs["max_tokens"] = kwargs.get(
             "max_tokens", self.config.get("max_tokens", NOT_GIVEN)
         )
-
-        response = self.call_with_retry(self.client.chat.completions.create)(
-            model=self.config["model"],
-            messages=messages,
-            **kwargs,
-        )
-        return response.choices[0].message.content
+        if "anthropic" in self.config.get("tags", []):
+            return self.query_anthropic_model(messages, **kwargs)
+        else:
+            response = self.call_with_retry(self.client.chat.completions.create)(
+                model=self.config["model"],
+                messages=messages,
+                **kwargs,
+            )
+            return response.choices[0].message.content
 
     def __call__(self, messages, *args, **kwargs) -> LLMResponse:
         from debug_gym.agents.utils import trim_prompt_messages
