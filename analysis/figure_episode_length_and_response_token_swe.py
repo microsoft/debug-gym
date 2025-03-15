@@ -18,6 +18,7 @@ plt.rcParams.update(
         "legend.fontsize": 20,  # Legend text
     }
 )
+ONLY_SUCCESS = False
 
 
 def analyze_froggy_results(model_name):
@@ -145,7 +146,8 @@ def plot_episode_length(df_dict, figsize=(12, 7)):
     # Create plot for each model
     for model_name, df in df_dict.items():
         # ignore the data points where the agent failed
-        df = df[df["success"]]
+        if ONLY_SUCCESS:
+            df = df[df["success"]]
         for agent in ["rewrite", "pdb", "seq"]:
             if agent not in model_name:
                 continue
@@ -181,26 +183,28 @@ def plot_episode_length(df_dict, figsize=(12, 7)):
         color="black",
     )
 
-    plt.ylim(0, 15)
+    plt.ylim(0, 30)
     plt.ylabel("Number of steps")
     plt.xlabel("Backbone LLM")
     plt.title("Average success episode length (over 3 runs on swe-bench)")
     plt.xticks(rotation=90)
     # custom x ticks
     plt.xticks(
+        np.arange(len(all_data)),
         [
-            0,
-            1,
-            2,
-            3,
-            4,
-            5,
-        ],
-        [
+            "llama33-70b",
+            "4o",
+            "4o-mini",
             "o1",
             "o3-mini",
+            "llama33-70b",
+            "4o",
+            "4o-mini",
             "o1",
             "o3-mini",
+            "llama33-70b",
+            "4o",
+            "4o-mini",
             "o1",
             "o3-mini",
         ],
@@ -228,7 +232,8 @@ def plot_episode_response_tokens(df_dict, figsize=(12, 7)):
     # Create plot for each model
     for model_name, df in df_dict.items():
         # ignore the data points where the agent failed
-        df = df[df["success"]]
+        if ONLY_SUCCESS:
+            df = df[df["success"]]
         for agent in ["rewrite", "pdb", "seq"]:
             if agent not in model_name:
                 continue
@@ -275,19 +280,21 @@ def plot_episode_response_tokens(df_dict, figsize=(12, 7)):
     plt.xticks(rotation=90)
     # custom x ticks
     plt.xticks(
+        np.arange(len(all_data)),
         [
-            0,
-            1,
-            2,
-            3,
-            4,
-            5,
-        ],
-        [
+            "llama33-70b",
+            "4o",
+            "4o-mini",
             "o1",
             "o3-mini",
+            "llama33-70b",
+            "4o",
+            "4o-mini",
             "o1",
             "o3-mini",
+            "llama33-70b",
+            "4o",
+            "4o-mini",
             "o1",
             "o3-mini",
         ],
@@ -300,20 +307,32 @@ def plot_episode_response_tokens(df_dict, figsize=(12, 7)):
 
 
 # Example usage:
-model_names = [
-    "../exps/swe-bench/rewrite_o1/rewrite_o1",
-    "../exps/swe-bench/rewrite_o3-mini/rewrite_o3-mini",
-    "../exps/swe-bench/pdb_o1/pdb_o1",
-    "../exps/swe-bench/pdb_o3-mini/pdb_o3-mini",
-    "../exps/swe-bench/seq_o1/seq_o1",
-    "../exps/swe-bench/seq_o3-mini/seq_o3-mini",
+model_paths = [
+    "../exps/swe-bench/rewrite_llama33-70b",
+    "../exps/swe-bench/rewrite_4o",
+    "../exps/swe-bench/rewrite_4o-mini",
+    "../exps/swe-bench/rewrite_o1",
+    "../exps/swe-bench/rewrite_o3-mini",
+    "../exps/swe-bench/pdb_llama33-70b",
+    "../exps/swe-bench/pdb_4o",
+    "../exps/swe-bench/pdb_4o-mini",
+    "../exps/swe-bench/pdb_o1",
+    "../exps/swe-bench/pdb_o3-mini",
+    "../exps/swe-bench/seq_llama33-70b",
+    "../exps/swe-bench/seq_4o",
+    "../exps/swe-bench/seq_4o-mini",
+    "../exps/swe-bench/seq_o1",
+    "../exps/swe-bench/seq_o3-mini",
 ]
 
 # Analyze all models with seed averaging
 results_dict = {}
-for name in tqdm(model_names):
-    results_dict[name.split("/")[-1]] = analyze_froggy_results_with_seeds(name)
+for _path in tqdm(model_paths):
+    _name = _path.split("/")[-1]
+    results_dict[_name] = analyze_froggy_results_with_seeds(
+        _path + "/" + _name, seeds=[0, 1, 2]
+    )
 
 # Plot comparison
-plot_episode_length(results_dict)
-# plot_episode_response_tokens(results_dict)
+# plot_episode_length(results_dict)
+plot_episode_response_tokens(results_dict)

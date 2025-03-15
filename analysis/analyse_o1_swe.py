@@ -45,14 +45,10 @@ def analyze_froggy_results(model_name):
             # Count rewrite commands
             episode_length = 0
 
-            tool_counter = {
-                "```view": 0,
-                "```listdir": 0,
-                "```pdb": 0,
-                "```rewrite": 0,
-                "```eval": 0,
-                "other": 0,
-            }
+            rewrite_success = []
+            rewrite_length = []
+            rewrite_repeat = 0
+            seen_rewrite = set()
 
             for step in data.get("log", []):
                 episode_length += 1
@@ -60,29 +56,31 @@ def analyze_froggy_results(model_name):
                     break
                 if step.get("action") is None:
                     continue
-                flag = False
-                for tool_key in tool_counter:
-                    if step["action"].strip().startswith(tool_key):
-                        tool_counter[tool_key] += 1
-                        # if tool_key == "```pdb":
-                        #     if not step.get("obs").strip().startswith("Tool failure"):
-                        #         print("=" * 20)
-                        #         print(jsonl_file, step.get("step_id"))
-                        #         print(step.get("action"))
-                        #         print(step.get("obs"))
-                        flag = True
-                        break
-                if not flag:
-                    # print("=" * 20)
-                    # print(step.get("action"))
-                    tool_counter["other"] += 1
+                if step["action"].strip().startswith("```rewrite"):
+                    action_length = len(step["action"].split())
+                    rewrite_length.append(action_length)
+                    success = "Rewriting done." in step["obs"]
+                    rewrite_success.append(int(success))
+                    if step["action"].strip() not in seen_rewrite:
+                        seen_rewrite.add(step["action"].strip())
+                    else:
+                        rewrite_repeat += 1
+
+            # if len(seen_rewrite) == len(rewrite_length):
+            #     rewrite_repeat = -1
+            # else:
+            #     rewrite_repeat = rewrite_repeat / float(len(rewrite_length)) if len(rewrite_length) > 0 else 0
+            if rewrite_repeat > 0:
+                rewrite_repeat = 1
 
             results.append(
                 {
                     "task": task,
                     "success": success,
                     "episode_length": episode_length,
-                    "tool_counter": tool_counter,
+                    "rewrite_success": rewrite_success,
+                    "rewrite_length": rewrite_length,
+                    "rewrite_repeat": rewrite_repeat,
                 }
             )
 
@@ -119,9 +117,9 @@ def analyze_froggy_results_with_seeds(base_model_name, seeds=[0, 1, 2]):
     return combined_df
 
 
-def plot_tool_use_categories(df_dict, figsize=(12, 7)):
+def plot_rewrite_stats(df_dict, figsize=(12, 7)):
     """
-    Creates a grouped hist plot showing the distribution of tool use categories for each model.
+    Compute the average rewrite success rate and average rewrite length for each model
     Args:
         df_dict (dict): Dictionary mapping model names to their DataFrames with averaged results
         figsize (tuple): Figure size (width, height)
@@ -129,49 +127,30 @@ def plot_tool_use_categories(df_dict, figsize=(12, 7)):
     plt.figure(figsize=figsize)
 
     all_data = []
-    # Create plot for each model
     for model_name, df in df_dict.items():
-        # o1, o3-mini, o1, o3-mini, o1, o3-mini
-        tool_category_per_model = {
-            "```view": 0,
-            "```listdir": 0,
-            "```pdb": 0,
-            "```rewrite": 0,
-            "```eval": 0,
-            "other": 0,
-        }
-        # import pdb; pdb.set_trace()
-        tool_call_count = 0
-        for _kv in df["tool_counter"].items():
-            if _kv[1] == {}:
-                continue
-            # import pdb; pdb.set_trace()
-            for k, v in _kv[1].items():
-                tool_call_count += v
-                tool_category_per_model[k] += v
-        # percentage
-        tool_category_per_model = {
-            k: round(v / tool_call_count, 2) for k, v in tool_category_per_model.items()
-        }
-        all_data.append(
-            [
-                model_name,
-                model_name.split("_")[1],
-                tool_category_per_model["```view"],
-                tool_category_per_model["```listdir"],
-                tool_category_per_model["```pdb"],
-                tool_category_per_model["```rewrite"],
-                tool_category_per_model["```eval"],
-                tool_category_per_model["other"],
-            ]
+        # Compute the average rewrite success rate and average rewrite length
+        avg_rewrite_success = df["rewrite_success"].apply(lambda x: np.mean(x)).mean()
+        avg_rewrite_length = df["rewrite_length"].apply(lambda x: np.mean(x)).mean()
+        # ignore if rewrite_repeat is -1
+        avg_rewrite_repeat = (
+            df[df["rewrite_repeat"] != -1]["rewrite_repeat"].mean()
+            if len(df[df["rewrite_repeat"] != -1]) > 0
+            else 0
         )
+
+        all_data.append(
+            [model_name, avg_rewrite_success, avg_rewrite_length, avg_rewrite_repeat]
+        )
+
     # all_data = np.array(all_data)
     print(all_data)
-    # import pdb; pdb.set_trace()
+    import pdb
+
+    pdb.set_trace()
     # convert to DataFrame
     all_data = pd.DataFrame(
         all_data,
-        columns=["name", "model", "view", "listdir", "pdb", "rewrite", "eval", "other"],
+        columns=["name", "avg_rewrite_success", "avg_rewrite_length"],
     )
     # import pdb; pdb.set_trace()
     # nice palette
@@ -189,23 +168,7 @@ def plot_tool_use_categories(df_dict, figsize=(12, 7)):
     # custom x ticks
     plt.xticks(
         np.arange(len(all_data)),
-        [
-            "rw llama33",
-            "rw 4o",
-            "rw 4o-mini",
-            "rw o1",
-            "rw o3-mini",
-            "dbg llama33",
-            "dbg 4o",
-            "dbg 4o-mini",
-            "dbg o1",
-            "dbg o3-mini",
-            "sc llama33",
-            "sc 4o",
-            "sc 4o-mini",
-            "sc o1",
-            "sc o3-mini",
-        ],
+        ["rewrite", "debug", "second chance"],
     )
 
     # plt.grid(True, alpha=0.3)
@@ -215,20 +178,14 @@ def plot_tool_use_categories(df_dict, figsize=(12, 7)):
 
 # Example usage:
 model_paths = [
-    "../exps/swe-bench/rewrite_llama33-70b",
     "../exps/swe-bench/rewrite_4o",
-    "../exps/swe-bench/rewrite_4o-mini",
-    "../exps/swe-bench/rewrite_o1",
-    "../exps/swe-bench/rewrite_o3-mini",
-    "../exps/swe-bench/pdb_llama33-70b",
     "../exps/swe-bench/pdb_4o",
-    "../exps/swe-bench/pdb_4o-mini",
-    "../exps/swe-bench/pdb_o1",
-    "../exps/swe-bench/pdb_o3-mini",
-    "../exps/swe-bench/seq_llama33-70b",
     "../exps/swe-bench/seq_4o",
-    "../exps/swe-bench/seq_4o-mini",
+    "../exps/swe-bench/rewrite_o1",
+    "../exps/swe-bench/pdb_o1",
     "../exps/swe-bench/seq_o1",
+    "../exps/swe-bench/rewrite_o3-mini",
+    "../exps/swe-bench/pdb_o3-mini",
     "../exps/swe-bench/seq_o3-mini",
 ]
 
@@ -241,4 +198,4 @@ for _path in tqdm(model_paths):
     )
 
 # Plot comparison
-plot_tool_use_categories(results_dict)
+plot_rewrite_stats(results_dict)
