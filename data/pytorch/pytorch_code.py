@@ -18,7 +18,7 @@ def prefix_tuning():
             self.data = [
                 torch.randint(0, 100, (max_length,)) for _ in range(num_samples)
             ]  # Random integers as token ids
-            self.labels = [1 if i % 2 = 0 else 0 for i in range(num_samples)]  # 1 for positive, 0 for negative
+            self.labels = [1 if i % 2 == 0 else 0 for i in range(num_samples)]  # 1 for positive, 0 for negative
 
         def __len__(self):
             return len(self.data)

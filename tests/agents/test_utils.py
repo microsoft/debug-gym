@@ -3,8 +3,8 @@ from unittest.mock import patch
 
 import pytest
 
-from froggy.agents.llm_api import LLMResponse, TokenUsage
-from froggy.agents.utils import (
+from debug_gym.agents.llm_api import LLMResponse, TokenUsage
+from debug_gym.agents.utils import (
     HistoryTracker,
     build_history_prompt,
     load_config,
@@ -255,7 +255,7 @@ def test_history_tracker(build_env_info):
 def test_build_history_prompt(build_env_info):
     import json
 
-    from froggy.pond.utils import unescape
+    from debug_gym.gym.utils import unescape
 
     # test with empty history
     ht = HistoryTracker(history_steps=3)

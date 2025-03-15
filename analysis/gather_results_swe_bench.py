@@ -7,7 +7,7 @@ from pathlib import Path
 import pandas as pd
 from termcolor import colored
 
-from froggy.pond.envs import SWEBenchEnv
+from debug_gym.gym.envs import SWEBenchEnv
 
 
 def main(args):
