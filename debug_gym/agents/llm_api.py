@@ -310,14 +310,14 @@ class LLM:
                 user_assistant_prompt.append(
                     {
                         "role": "user",
-                        "content": [{"type": "text", "text": messages[i]["content"]}],
+                        "content": messages[i]["content"],
                     }
                 )
             elif messages[i]["role"] == "assistant":
                 user_assistant_prompt.append(
                     {
                         "role": "assistant",
-                        "content": [{"type": "text", "text": messages[i]["content"]}],
+                        "content": messages[i]["content"],
                     }
                 )
             else:
