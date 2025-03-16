@@ -316,8 +316,9 @@ class LLM:
         if "thinking" in self.config.get("tags", []):
             kwargs["max_tokens"] = 20000
             kwargs["temperature"] = 1.0
+
             response = (
-                self.client.messages.create(
+                self.call_with_retry(self.client.messages.create)(
                     model=self.config["model"],
                     thinking={"type": "enabled", "budget_tokens": 16000},
                     system=system_prompt,
@@ -330,7 +331,7 @@ class LLM:
         else:
             kwargs["max_tokens"] = 8192
             response = (
-                self.client.messages.create(
+                self.call_with_retry(self.client.messages.create)(
                     model=self.config["model"],
                     system=system_prompt,
                     messages=user_prompt,
