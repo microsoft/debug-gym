@@ -302,16 +302,26 @@ class LLM:
             "max_tokens", self.config.get("max_tokens", NOT_GIVEN)
         )
         system_prompt = ""
+        user_assistant_prompt = []
         for i in range(len(messages)):
             if messages[i]["role"] == "system":
                 system_prompt = messages[i]["content"]
-            if messages[i]["role"] == "user":
-                user_prompt = [
+            elif messages[i]["role"] == "user":
+                user_assistant_prompt.append(
                     {
                         "role": "user",
                         "content": [{"type": "text", "text": messages[i]["content"]}],
                     }
-                ]
+                )
+            elif messages[i]["role"] == "assistant":
+                user_assistant_prompt.append(
+                    {
+                        "role": "assistant",
+                        "content": [{"type": "text", "text": messages[i]["content"]}],
+                    }
+                )
+            else:
+                raise ValueError(f"Unknown role: {messages[i]['role']}")
 
         if "thinking" in self.config.get("tags", []):
             kwargs["max_tokens"] = 20000
@@ -322,7 +332,7 @@ class LLM:
                     model=self.config["model"],
                     thinking={"type": "enabled", "budget_tokens": 16000},
                     system=system_prompt,
-                    messages=user_prompt,
+                    messages=user_assistant_prompt,
                     **kwargs,
                 )
                 .content[1]
@@ -334,7 +344,7 @@ class LLM:
                 self.call_with_retry(self.client.messages.create)(
                     model=self.config["model"],
                     system=system_prompt,
-                    messages=user_prompt,
+                    messages=user_assistant_prompt,
                     **kwargs,
                 )
                 .content[0]
