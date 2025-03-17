@@ -82,7 +82,7 @@ def test_token_counter(mock_encoding_for_model):
     mock_encoding.encode = lambda x: x.split()
     mock_encoding_for_model.return_value = mock_encoding
 
-    counter = TokenCounter(model="gpt-4o")
+    counter = TokenCounter(model="gpt-4o", config={})
     messages = [{"content": "Hello"}, {"content": "How are you?"}]
     assert counter(messages=messages) > 0
     assert counter(text="Hello") > 0

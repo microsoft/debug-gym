@@ -448,6 +448,8 @@ class DockerTerminal(Terminal):
             detach=True,
             auto_remove=True,
             remove=True,
+            tty=True,
+            stdin_open=True,
         )
         container_name = f"debug_gym_{container.name}"
         container.rename(container_name)
@@ -478,7 +480,7 @@ class DockerTerminal(Terminal):
 
     def clean_up(self):
         """Clean up the Docker container."""
-        if self.container:
+        if self._container is not None:
             try:
                 self.container.stop(timeout=1)
             except docker.errors.NotFound:

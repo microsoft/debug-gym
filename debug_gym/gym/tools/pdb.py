@@ -5,6 +5,7 @@ from debug_gym.gym.entities import Observation
 from debug_gym.gym.terminal import ShellSession
 from debug_gym.gym.tools.tool import EnvironmentTool
 from debug_gym.gym.tools.toolbox import Toolbox
+from debug_gym.gym.utils import get_code_length
 
 
 @Toolbox.register()
@@ -223,6 +224,14 @@ class PDBTool(EnvironmentTool):
                     f"Breakpoint already exists at line {_line_number} in {which_file}.",
                 )
             else:
+                # check if line number is valid
+                code_string = self.environment.load_file(which_file)
+                code_length = get_code_length(code_string)
+                if int(_line_number) > code_length or int(_line_number) < 1:
+                    return (
+                        False,
+                        f"Invalid line number: {_line_number}, expected between 1 and {code_length}.",
+                    )
                 try:
                     output = self.interact_with_pdb(command)
                     self.pdb_obs = output
