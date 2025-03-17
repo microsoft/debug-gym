@@ -101,9 +101,15 @@ class LLMResponse:
 
 
 class TokenCounter:
-    def __init__(self, model: str = "gpt-4o", config: dict = None):
+    def __init__(
+        self,
+        model: str = "gpt-4o",
+        config: dict = None,
+        logger: DebugGymLogger | None = None,
+    ):
         self.config = config or {}
         self.model = model
+        self.logger = logger or DebugGymLogger("debug-gym")
         self.claude = False
         self.tokenize = None
         if "claude" in self.model:
@@ -129,7 +135,15 @@ class TokenCounter:
         import anthropic
 
         client = anthropic.Anthropic(api_key=self.config["api_key"])
-        response = client.messages.count_tokens(model=self.model, messages=messages)
+        try:
+            response = client.messages.count_tokens(model=self.model, messages=messages)
+        except Exception as e:
+            self.logger.warning(
+                f"Error calling Claude token count API: {e!r}. "
+                "The message was: {messages}."
+                "Will return 0 tokens."
+            )
+            return 0
         # Extract the token count from the JSON response
         token_json = response.json()
         token_count = json.loads(token_json)["input_tokens"]
@@ -163,7 +177,9 @@ class LLM:
         self.model_name = model_name
         self.config = configs[model_name]
         self.logger = logger or DebugGymLogger("debug-gym")
-        self.token_counter = TokenCounter(self.config["tokenizer"], self.config)
+        self.token_counter = TokenCounter(
+            self.config["tokenizer"], self.config, self.logger
+        )
         self.context_length = self.config["context_limit"] * 1000
         self.reasoning_end_token = self.config.get("reasoning_end_token", None)
 
