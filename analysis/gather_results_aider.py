@@ -4,7 +4,7 @@ from os.path import join as pjoin
 
 from termcolor import colored
 
-from froggy.pond.envs import AiderBenchmarkEnv
+from debug_gym.gym.envs import AiderBenchmarkEnv
 
 
 def main():

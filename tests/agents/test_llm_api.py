@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, MagicMock, mock_open, patch
 import pytest
 from openai import RateLimitError
 
-from froggy.agents.llm_api import (
+from debug_gym.agents.llm_api import (
     LLM,
     AsyncLLM,
     Human,
@@ -17,12 +17,12 @@ from froggy.agents.llm_api import (
     merge_messages,
     print_messages,
 )
-from froggy.logger import FroggyLogger
+from debug_gym.logger import DebugGymLogger
 
 
 @pytest.fixture
 def logger_mock():
-    logger = FroggyLogger("test_logger")
+    logger = DebugGymLogger("test_logger")
     logger.setLevel(logging.DEBUG)
     logs = []
 
@@ -82,7 +82,7 @@ def test_token_counter(mock_encoding_for_model):
     mock_encoding.encode = lambda x: x.split()
     mock_encoding_for_model.return_value = mock_encoding
 
-    counter = TokenCounter(model="gpt-4o")
+    counter = TokenCounter(model="gpt-4o", config={})
     messages = [{"content": "Hello"}, {"content": "How are you?"}]
     assert counter(messages=messages) > 0
     assert counter(text="Hello") > 0

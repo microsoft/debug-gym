@@ -27,5 +27,22 @@
         "tags": ["gpt-4o", "azure openai", "GCR"],
         "api_version": "2024-09-01-preview",
         "context_limit": 128
+    },
+    "deepseek-r1-distill-qwen-32b": {
+        "model": "deepseek-ai/DeepSeek-R1-Distill-Qwen-32B",
+        "tokenizer": "Qwen/Qwen2.5-32B",
+        "endpoint": "[YOUR_ENDPOINT]",
+        "api_key": "[YOUR_API_KEY]",
+        "tags": ["DeepSeek-R1-Distill-Qwen-32B", "H100"],
+        "system_prompt_support": false,
+        "context_limit": 128,
+        "reasoning_end_token": "</think>"
+    },
+    "claude-3.7":{
+        "model": "claude-3-7-sonnet-20250219",
+        "tokenizer": "claude-3-7-sonnet-20250219",
+        "tags": ["anthropic", "claude", "claude-3.7"],
+        "context_limit": 100,
+        "api_key": "[YOUR_API_KEY]"
     }
 }

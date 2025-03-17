@@ -1,9 +1,9 @@
 from unittest.mock import MagicMock, patch, call
 
-from froggy.agents.llm_api import LLMResponse, TokenUsage
-from froggy.agents.pdb_agent import PdbHumanInTheLoop, PdbAfterRewrites, PdbAgent
-from froggy.agents.rewrite_agent import RewriteOnly
-from froggy.agents.llm_api import Human
+from debug_gym.agents.llm_api import LLMResponse, TokenUsage
+from debug_gym.agents.pdb_agent import PdbHumanInTheLoop, PdbAfterRewrites, PdbAgent
+from debug_gym.agents.rewrite_agent import RewriteOnly
+
 
 def test_build_question_prompt(agent_setup):
     agent, _, _, _ = next(agent_setup(PdbAgent))

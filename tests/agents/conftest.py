@@ -3,8 +3,8 @@ from unittest.mock import MagicMock, mock_open, patch
 
 import pytest
 
-from froggy.pond.entities import Observation
-from froggy.pond.envs.env import EnvInfo
+from debug_gym.gym.entities import Observation
+from debug_gym.gym.envs.env import EnvInfo
 
 
 @pytest.fixture
@@ -64,6 +64,9 @@ def open_data():
 
 @pytest.fixture
 def agent_setup(tmp_path, open_data):
+    def _length(text):
+        return len(text)
+
     def _agent_setup(agent_class):
         with (
             patch("tiktoken.encoding_for_model") as mock_encoding_for_model,
@@ -88,6 +91,9 @@ def agent_setup(tmp_path, open_data):
             }
             env = MagicMock()
             llm = MagicMock()
+            llm.reasoning_end_token = None
+            llm.context_length = 4096
+            llm.token_counter = _length
             history = MagicMock()
             agent = agent_class(config_dict, env)
             agent.llm = llm
