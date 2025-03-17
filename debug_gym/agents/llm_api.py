@@ -271,6 +271,7 @@ class LLM:
             "openai.RateLimitError",
             "openai.PermissionDeniedError",
             "anthropic.RateLimitError",
+            "anthropic.OverloadedError",
             "anthropic.InternalServerError",
             # Add more as needed
         ]
