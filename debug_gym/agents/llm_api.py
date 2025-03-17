@@ -301,9 +301,11 @@ class LLM:
         kwargs["max_tokens"] = kwargs.get(
             "max_tokens", self.config.get("max_tokens", NOT_GIVEN)
         )
-        system_prompt = ""
+        system_prompt = " "  # weird exceptions sometimes if empty
         user_assistant_prompt = []
         for i in range(len(messages)):
+            if messages[i]["content"] == "":
+                continue
             if messages[i]["role"] == "system":
                 system_prompt = messages[i]["content"]
             elif messages[i]["role"] == "user":
@@ -322,6 +324,13 @@ class LLM:
                 )
             else:
                 raise ValueError(f"Unknown role: {messages[i]['role']}")
+        if len(user_assistant_prompt) == 0:
+            user_assistant_prompt = [
+                {
+                    "role": "user",
+                    "content": "Your answer is: ",
+                }
+            ]
 
         if "thinking" in self.config.get("tags", []):
             kwargs["max_tokens"] = 20000
