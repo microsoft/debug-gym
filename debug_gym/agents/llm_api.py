@@ -131,16 +131,18 @@ class TokenCounter:
 
     def get_claude_token_count(self, messages):
         # Call the token counting endpoint
-        messages = [{"role": "user", "content": [{"type": "text", "text": messages}]}]
+        _messages = [{"role": "user", "content": [{"type": "text", "text": messages}]}]
         import anthropic
 
         client = anthropic.Anthropic(api_key=self.config["api_key"])
         try:
-            response = client.messages.count_tokens(model=self.model, messages=messages)
+            response = client.messages.count_tokens(
+                model=self.model, messages=_messages
+            )
         except Exception as e:
             self.logger.warning(
                 f"Error calling Claude token count API: {e!r}. "
-                "The message was: {messages}."
+                f"The message was: {messages}."
                 "Will return 0 tokens."
             )
             return 0
