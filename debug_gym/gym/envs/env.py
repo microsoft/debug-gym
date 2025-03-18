@@ -507,7 +507,7 @@ class RepoEnv(TooledEnv):
             run_timeout=self.run_timeout,
             dir_tree_depth=self.dir_tree_depth,
             auto_view_change=self.auto_view_change,
-            terminal=None,  
+            terminal=Terminal(),  
             logger=self.logger,
         )
 

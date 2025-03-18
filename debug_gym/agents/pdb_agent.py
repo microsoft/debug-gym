@@ -1,5 +1,5 @@
 from debug_gym.agents.base_agent import BaseAgent, register_agent
-
+from debug_gym.agents.llm_api import instantiate_llm
 
 @register_agent
 class PdbAgent(BaseAgent):

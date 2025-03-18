@@ -1,6 +1,6 @@
 from unittest.mock import MagicMock, patch, call
 
-from debug_gym.agents.llm_api import LLMResponse, TokenUsage
+from debug_gym.agents.llm_api import LLMResponse, TokenUsage, Human
 from debug_gym.agents.pdb_agent import PdbHumanInTheLoop, PdbAfterRewrites, PdbAgent
 from debug_gym.agents.rewrite_agent import RewriteOnly
 
