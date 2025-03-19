@@ -37,5 +37,12 @@
         "system_prompt_support": false,
         "context_limit": 128,
         "reasoning_end_token": "</think>"
+    },
+    "claude-3.7":{
+        "model": "claude-3-7-sonnet-20250219",
+        "tokenizer": "claude-3-7-sonnet-20250219",
+        "tags": ["anthropic", "claude", "claude-3.7"],
+        "context_limit": 100,
+        "api_key": "[YOUR_API_KEY]"
     }
 }

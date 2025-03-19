@@ -7,7 +7,7 @@ from os.path import join as pjoin
 import numpy as np
 
 from debug_gym.agents.llm_api import instantiate_llm
-from debug_gym.agents.utils import HistoryTracker, build_history_prompt
+from debug_gym.agents.utils import HistoryTracker, build_history_prompt, trim
 from debug_gym.gym.envs.env import RepoEnv
 from debug_gym.gym.utils import unescape
 from debug_gym.logger import DebugGymLogger
@@ -52,7 +52,7 @@ class BaseAgent:
 
     def build_history_prompt(self):
         messages = build_history_prompt(
-            self.history,
+            self.history.filter_out(actions=["eval", None]),
             self.config["use_conversational_prompt"],
             self.config["reset_prompt_history_after_rewrite"],
         )
@@ -67,15 +67,58 @@ class BaseAgent:
         return response
 
     def build_system_prompt(self, info):
+        def calc_tokens_left(system_prompt: dict):
+            system_prompt = unescape(
+                json.dumps(system_prompt, indent=2, sort_keys=True)
+            )
+            return self.llm.context_length - self.llm.token_counter(text=system_prompt)
+
         system_prompt = {}
         system_prompt["Overall task"] = self.system_prompt
         system_prompt["Instructions"] = info.instructions
-        system_prompt["Repo directory tree"] = info.dir_tree
-        system_prompt["Current code in view"] = info.current_code_with_line_number
+        if self.llm.context_length is not None and self.llm.token_counter is not None:
+            system_prompt["Repo directory tree"] = trim(
+                info.dir_tree,
+                min(
+                    int(0.1 * self.llm.context_length), calc_tokens_left(system_prompt)
+                ),
+                token_counter=self.llm.token_counter,
+                where="end",
+            )
+        else:
+            system_prompt["Repo directory tree"] = info.dir_tree
         system_prompt["Current breakpoints"] = info.current_breakpoints
-        system_prompt["Last evaluation output"] = info.eval_observation.observation
+        system_prompt["Current code in view"] = info.current_code_with_line_number
+        if isinstance(info.current_code_with_line_number, dict):
+            system_prompt["Current code in view"] = dict(
+                info.current_code_with_line_number
+            )
+            if (
+                self.llm.context_length is not None
+                and self.llm.token_counter is not None
+            ):
+                system_prompt["Current code in view"]["Content"] = trim(
+                    system_prompt["Current code in view"]["Content"],
+                    min(
+                        int(0.8 * self.llm.context_length),
+                        calc_tokens_left(system_prompt),
+                    ),
+                    token_counter=self.llm.token_counter,
+                    where="end",
+                )
 
-        system_prompt = unescape(json.dumps(system_prompt, indent=4))
+        if self.llm.context_length is not None and self.llm.token_counter is not None:
+            system_prompt["Last evaluation output"] = trim(
+                info.eval_observation.observation,
+                min(
+                    int(0.8 * self.llm.context_length), calc_tokens_left(system_prompt)
+                ),
+                token_counter=self.llm.token_counter,
+                where="middle",
+            )
+        else:
+            system_prompt["Last evaluation output"] = info.eval_observation.observation
+        system_prompt = unescape(json.dumps(system_prompt, indent=2, sort_keys=True))
         messages = [
             {
                 "role": "system",
@@ -102,7 +145,6 @@ class BaseAgent:
         self.history.step(info, None)
 
         if info.done is True:
-            # msg = "Environment started with entrypoint passing without errors."
             return True
 
         highscore = info.score

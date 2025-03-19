@@ -157,6 +157,7 @@ class RepoEnv(TooledEnv):
         self.logger = logger or DebugGymLogger("debug-gym")
         self.infos: EnvInfo | None = None
         self.rng = None
+        self.tempdir = None
 
         self.setup_workspace(
             path=path,
@@ -222,6 +223,10 @@ class RepoEnv(TooledEnv):
                 "python", "python -m pdb"
             )
             self.debug_entrypoint = self._prepare_entrypoint(debug_entrypoint)
+        if self.debug_entrypoint is not None and "-m pdb" not in self.debug_entrypoint:
+            self.debug_entrypoint = self.debug_entrypoint.replace(
+                "python", "python -m pdb"
+            )
 
     @staticmethod
     def _prepare_entrypoint(entrypoint):
@@ -236,7 +241,8 @@ class RepoEnv(TooledEnv):
         return entrypoint
 
     def cleanup_workspace(self):
-        self.tempdir.cleanup()
+        if self.tempdir:
+            self.tempdir.cleanup()
 
     @property
     def instructions(self):
@@ -459,7 +465,7 @@ class RepoEnv(TooledEnv):
                     f"with action: {action}.\n{e}"
                 )
                 self.step_observation = Observation("env", error_message)
-                self.logger.warning(error_message)
+                self.logger.debug(error_message)
 
         # Process any events that were queued during tool execution
         self.all_observations = self.process_events()
@@ -487,3 +493,8 @@ class RepoEnv(TooledEnv):
         )
 
         return self.infos
+
+    def close(self):
+        self.cleanup_workspace()
+        if self.terminal:
+            self.terminal.close()

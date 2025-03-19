@@ -28,6 +28,7 @@ def run_agent(args, problem, config):
         level=args.logging_level,
         mode="w" if args.force_all else "a",
     )
+    env = None
     try:
         previous_run = exp_path / "debug_gym.jsonl"
         if not args.force_all and os.path.exists(previous_run):
@@ -37,7 +38,7 @@ def run_agent(args, problem, config):
 
             task_logger.debug(f"Previous run success: {success}")
             if not args.force_failed or success:
-                task_logger.info("[bold gray]Skipped, already done.")
+                task_logger.info("Skipped, already done.")
                 return success
 
         env = create_env(config, task_logger)
@@ -69,8 +70,11 @@ def run_agent(args, problem, config):
             raise e
 
         success = False
+    finally:
+        if env:
+            env.close()
 
-    task_logger.info(f"[bold green]Completed, log saved at: {task_logger.log_file}")
+    task_logger.info(f"Completed, log saved at: {task_logger.log_file}")
     return success
 
 
