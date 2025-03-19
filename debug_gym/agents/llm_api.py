@@ -154,6 +154,9 @@ class TokenCounter:
     def __call__(self, *, messages=None, text=None) -> int:
         nb_tokens = 0
         if messages is not None:
+            messages = [item for item in messages if item["content"] != ""]
+            if len(messages) == 0:
+                return 0
             if self.claude:
                 nb_tokens += sum(
                     self.get_claude_token_count(msg["content"]) for msg in messages
@@ -162,6 +165,8 @@ class TokenCounter:
                 nb_tokens += sum(len(self.tokenize(msg["content"])) for msg in messages)
 
         if text is not None:
+            if len(text) == 0:
+                return 0
             if self.claude:
                 nb_tokens += self.get_claude_token_count(text)
             else:
@@ -274,6 +279,7 @@ class LLM:
             "openai.PermissionDeniedError",
             "anthropic.RateLimitError",
             "anthropic.OverloadedError",
+            "anthropic._exceptions.OverloadedError",
             "anthropic.InternalServerError",
             # Add more as needed
         ]
