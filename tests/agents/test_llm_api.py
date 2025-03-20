@@ -87,43 +87,36 @@ def test_merge_messages():
     assert len(merged) == 2
     assert merged[0]["content"] == "Hello\n\nHow are you?"
 
-@patch("tiktoken.encoding_for_model")
-def test_token_counter(mock_encoding_for_model):
-    mock_encoding = MagicMock()
-    mock_encoding.encode = lambda x: x.split()
-    mock_encoding_for_model.return_value = mock_encoding
 
-    counter = TokenCounter(model="gpt-4o", config={})
-    messages = [{"content": "Hello"}, {"content": "How are you?"}]
-    assert counter(messages=messages) > 0
-    assert counter(text="Hello") > 0
-
-
-@patch("tiktoken.encoding_for_model")
 @patch("openai.resources.chat.completions.Completions.create")
-@patch("os.path.exists", return_value=True)
 @patch(
-    "builtins.open",
-    new_callable=mock_open,
-    read_data='{"test-model": {"model": "test-model", "max_tokens": 100, "tokenizer": "gpt-4o", "context_limit": 4, "api_key": "test-api-key", "endpoint": "https://test-endpoint", "api_version": "v1", "tags": ["azure openai"]}}',
+    "debug_gym.agents.llm_api.load_llm_config",
+    return_value={
+        "openai": {
+            "model": "openai",
+            "max_tokens": 100,
+            "tokenizer": "gpt-4o",
+            "context_limit": 4,
+            "api_key": "test-api-key",
+            "endpoint": "https://test-endpoint",
+            "api_version": "v1",
+            "tags": ["azure openai"],
+        }
+    },
 )
-def test_llm(mock_open, mock_exists, mock_openai, mock_encoding_for_model, logger_mock):
-    mock_encoding = MagicMock()
-    mock_encoding.encode = lambda x: x.split()
-    mock_encoding_for_model.return_value = mock_encoding
-
+def test_llm(mock_llm_config, mock_openai, logger_mock):
     mock_response = MagicMock()
     mock_response.choices = [MagicMock()]
-    mock_response.choices[0].message.content = "Response"
+    mock_response.choices[0].message.content = "Some response from OpenAI"
     mock_openai.return_value = mock_response
 
-    llm = LLM(model_name="test-model", logger=logger_mock)
-    messages = [{"role": "user", "content": "Hello"}]
+    llm = OpenAILLM(model_name="openai", logger=logger_mock)
+    messages = [{"role": "user", "content": "Hello World"}]
     llm_response = llm(messages)
     assert llm_response.prompt == messages
-    assert llm_response.response == "Response"
-    assert llm_response.token_usage.prompt == 1
-    assert llm_response.token_usage.response == 1
+    assert llm_response.response == "Some response from OpenAI"
+    assert llm_response.token_usage.prompt == 2
+    assert llm_response.token_usage.response == 5
 
 
 @pytest.fixture
