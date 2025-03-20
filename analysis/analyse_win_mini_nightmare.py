@@ -6,22 +6,23 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
+from tqdm import tqdm
 
 plt.rcParams.update(
     {
-        "font.size": 20,  # Base font size
-        "axes.labelsize": 20,  # Axis labels
-        "axes.titlesize": 20,  # Plot title
-        "xtick.labelsize": 20,  # X-axis tick labels
-        "ytick.labelsize": 20,  # Y-axis tick labels
-        "legend.fontsize": 20,  # Legend text
+        "font.size": 22,  # Base font size
+        "axes.labelsize": 22,  # Axis labels
+        "axes.titlesize": 22,  # Plot title
+        "xtick.labelsize": 22,  # X-axis tick labels
+        "ytick.labelsize": 22,  # Y-axis tick labels
+        "legend.fontsize": 22,  # Legend text
     }
 )
 
 agent_name_map = {
     "rewrite": "rewrite",
     "pdb": "debug",
-    "seq": "second chance",
+    "seq": "debug(5)",
 }
 
 
@@ -135,7 +136,6 @@ def plot_winning_time_per_game(df_dict, figsize=(12, 7)):
         df_dict (dict): Dictionary mapping model names to their DataFrames with averaged results
         figsize (tuple): Figure size (width, height)
     """
-    plt.figure(figsize=figsize)
 
     all_data = []
     # Create plot for each model
@@ -153,35 +153,38 @@ def plot_winning_time_per_game(df_dict, figsize=(12, 7)):
 
     # nice palette
     sns.set_palette("Set2")
-    f, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(20, 5), sharex=True)
+    f, (ax1, ax2, ax3, ax4) = plt.subplots(4, 1, figsize=(20, 5), sharex=True)
     # subplot 1: rewrite_4o vs pdb_4o vs seq_4o
     ax1.set_title("gpt-4o")
     x = np.arange(len(all_data[0][1]["task"]))
     width = 0.2
     for i, (model_name, df) in enumerate(all_data[:3]):
         ax1.bar(x + i * width, df["success"], width, label=model_name)
+    ax1.set_yticks(np.arange(0, 4, 1))
 
     # subplot 2: rewrite_llama33-70b vs pdb_llama33-70b vs seq_llama33-70b
     ax2.set_title("llama3.3-70b-instruct")
     for i, (model_name, df) in enumerate(all_data[3:6]):
         ax2.bar(x + i * width, df["success"], width, label=model_name)
+    ax2.set_yticks(np.arange(0, 4, 1))
 
     # subplot 3: rewrite_r1-distill-llama-70b vs pdb_r1-distill-llama-70b vs seq_r1-distill-llama-70b
     ax3.set_title("r1-llama-70b")
-    for i, (model_name, df) in enumerate(all_data[6:]):
+    for i, (model_name, df) in enumerate(all_data[6:9]):
         ax3.bar(x + i * width, df["success"], width, label=model_name)
+    ax3.set_yticks(np.arange(0, 4, 1))
+
+    # subplot 4: rewrite_claude37 vs pdb_claude37 vs seq_claude37
+    ax4.set_title("claude37")
+    for i, (model_name, df) in enumerate(all_data[9:]):
+        ax4.bar(x + i * width, df["success"], width, label=model_name)
+    ax4.set_yticks(np.arange(0, 4, 1))
 
     ax1.set_ylabel("")
     ax2.set_ylabel("")
-    ax3.set_ylabel("")
-    f.text(
-        0.05,
-        0.55,
-        "Number of success in 3 runs",
-        va="center",
-        rotation="vertical",
-    )
-
+    ax3.set_ylabel("Number of success in 3 runs")
+    ax4.set_ylabel("")
+    # plt.ylabel("Number of success in 3 runs")
     plt.xticks(x + width, all_data[0][1]["task"], rotation=45)
     plt.yticks(np.arange(0, 4, 1))
     plt.legend()
@@ -190,21 +193,28 @@ def plot_winning_time_per_game(df_dict, figsize=(12, 7)):
 
 
 # Example usage:
-model_names = [
-    "../exps/mini_nightmare/rewrite_4o/rewrite_4o",
-    "../exps/mini_nightmare/pdb_4o/pdb_4o",
-    "../exps/mini_nightmare/seq_4o/seq_4o",
-    "../exps/mini_nightmare/rewrite_llama33-70b/rewrite_llama33-70b",
-    "../exps/mini_nightmare/pdb_llama33-70b/pdb_llama33-70b",
-    "../exps/mini_nightmare/seq_llama33-70b/seq_llama33-70b",
-    "../exps/mini_nightmare/rewrite_r1-distill-llama-70b/rewrite_r1-distill-llama-70b",
-    "../exps/mini_nightmare/pdb_r1-distill-llama-70b/pdb_r1-distill-llama-70b",
-    "../exps/mini_nightmare/seq_r1-distill-llama-70b/seq_r1-distill-llama-70b",
+model_paths = [
+    "../exps/mini_nightmare/rewrite_4o",
+    "../exps/mini_nightmare/pdb_4o",
+    "../exps/mini_nightmare/seq_4o",
+    "../exps/mini_nightmare/rewrite_llama33-70b",
+    "../exps/mini_nightmare/pdb_llama33-70b",
+    "../exps/mini_nightmare/seq_llama33-70b",
+    "../exps/mini_nightmare/rewrite_r1-distill-llama-70b",
+    "../exps/mini_nightmare/pdb_r1-distill-llama-70b",
+    "../exps/mini_nightmare/seq_r1-distill-llama-70b",
+    "../exps/mini_nightmare/rewrite_claude37",
+    "../exps/mini_nightmare/pdb_claude37",
+    "../exps/mini_nightmare/seq_claude37",
 ]
 
 # Analyze all models with seed averaging
-results_dict = {
-    name.split("/")[-1]: analyze_froggy_results_with_seeds(name) for name in model_names
-}
+results_dict = {}
+for _path in tqdm(model_paths):
+    _name = _path.split("/")[-1]
+    results_dict[_name] = analyze_froggy_results_with_seeds(
+        _path + "/" + _name, seeds=[0, 1, 2]
+    )
+
 # Plot comparison
 plot_winning_time_per_game(results_dict)

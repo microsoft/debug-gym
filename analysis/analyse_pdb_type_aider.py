@@ -6,15 +6,16 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
+from tqdm import tqdm
 
 plt.rcParams.update(
     {
-        "font.size": 20,  # Base font size
-        "axes.labelsize": 20,  # Axis labels
-        "axes.titlesize": 20,  # Plot title
-        "xtick.labelsize": 20,  # X-axis tick labels
-        "ytick.labelsize": 20,  # Y-axis tick labels
-        "legend.fontsize": 20,  # Legend text
+        "font.size": 22,  # Base font size
+        "axes.labelsize": 22,  # Axis labels
+        "axes.titlesize": 22,  # Plot title
+        "xtick.labelsize": 22,  # X-axis tick labels
+        "ytick.labelsize": 22,  # Y-axis tick labels
+        "legend.fontsize": 22,  # Legend text
     }
 )
 
@@ -162,7 +163,6 @@ def plot_pdb_command_categories(df_dict, figsize=(12, 7)):
         df_dict (dict): Dictionary mapping model names to their DataFrames with averaged results
         figsize (tuple): Figure size (width, height)
     """
-    plt.figure(figsize=figsize)
 
     all_data = []
     # Create plot for each model
@@ -225,16 +225,16 @@ def plot_pdb_command_categories(df_dict, figsize=(12, 7)):
     plt.xticks(rotation=45)
     # custom x ticks
     plt.xticks(
-        [0, 1, 2, 3, 4, 5, 6, 7],
+        np.arange(len(all_data)),
         [
-            "4o-mini",
-            "4o",
-            "o1",
-            "o3-mini",
-            "llama32-3b",
-            "llama33-70b",
+            "llama-3b",
+            "llama-70b",
             "r1-llama-70b",
             "r1-qwen-32b",
+            "4o",
+            "4o-mini",
+            "o1",
+            "o3-mini",
         ],
     )
 
@@ -244,20 +244,23 @@ def plot_pdb_command_categories(df_dict, figsize=(12, 7)):
 
 
 # Example usage:
-model_names = [
-    "../exps/aider/pdb_4o-mini/pdb_4o-mini",
-    "../exps/aider/pdb_4o/pdb_4o",
-    "../exps/aider/pdb_o1/pdb_o1",
-    "../exps/aider/pdb_o3-mini/pdb_o3-mini",
-    "../exps/aider/pdb_llama32-3b/pdb_llama32-3b",
-    "../exps/aider/pdb_llama33-70b/pdb_llama33-70b",
-    "../exps/aider/pdb_r1-distill-llama-70b/pdb_r1-distill-llama-70b",
-    "../exps/aider/pdb_r1-distill-qwen-32b/pdb_r1-distill-qwen-32b",
+model_paths = [
+    "../exps/aider/pdb_llama32-3b",
+    "../exps/aider/pdb_llama33-70b",
+    "../exps/aider/pdb_r1-distill-llama-70b",
+    "../exps/aider/pdb_r1-distill-qwen-32b",
+    "../exps/aider/pdb_4o",
+    "../exps/aider/pdb_4o-mini",
+    "../exps/aider/pdb_o1",
+    "../exps/aider/pdb_o3-mini",
 ]
 
 # Analyze all models with seed averaging
-results_dict = {
-    name.split("/")[-1]: analyze_froggy_results_with_seeds(name) for name in model_names
-}
+results_dict = {}
+for _path in tqdm(model_paths):
+    _name = _path.split("/")[-1]
+    results_dict[_name] = analyze_froggy_results_with_seeds(
+        _path + "/" + _name, seeds=[0, 1, 2]
+    )
 # Plot comparison
 plot_pdb_command_categories(results_dict)

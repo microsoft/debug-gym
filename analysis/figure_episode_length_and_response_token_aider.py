@@ -10,12 +10,12 @@ from tqdm import tqdm
 
 plt.rcParams.update(
     {
-        "font.size": 20,  # Base font size
-        "axes.labelsize": 20,  # Axis labels
-        "axes.titlesize": 20,  # Plot title
-        "xtick.labelsize": 20,  # X-axis tick labels
-        "ytick.labelsize": 20,  # Y-axis tick labels
-        "legend.fontsize": 20,  # Legend text
+        "font.size": 22,  # Base font size
+        "axes.labelsize": 22,  # Axis labels
+        "axes.titlesize": 22,  # Plot title
+        "xtick.labelsize": 22,  # X-axis tick labels
+        "ytick.labelsize": 22,  # Y-axis tick labels
+        "legend.fontsize": 22,  # Legend text
     }
 )
 
@@ -126,7 +126,7 @@ def analyze_froggy_results_with_seeds(base_model_name, seeds=[0, 1, 2]):
 agent_name_map = {
     "rewrite": "rewrite",
     "pdb": "debug",
-    "seq": "second chance",
+    "seq": "debug(5)",
 }
 
 
@@ -182,61 +182,36 @@ def plot_episode_length(df_dict, figsize=(12, 7)):
     plt.ylim(0, 30)
     plt.ylabel("Number of steps")
     plt.xlabel("Backbone LLM")
-    plt.title("Average success episode length (over 3 runs on Aider)")
+    plt.title("Success episode length")
     plt.xticks(rotation=90)
     # custom x ticks
     plt.xticks(
+        np.arange(len(all_data)),
         [
-            0,
-            1,
-            2,
-            3,
-            4,
-            5,
-            6,
-            7,
-            8,
-            9,
-            10,
-            11,
-            12,
-            13,
-            14,
-            15,
-            16,
-            17,
-            18,
-            19,
-            20,
-            21,
-            22,
-            23,
-        ],
-        [
-            "4o-mini",
+            "llama-3b",
+            "llama-70b",
+            "r1-llama-70b",
+            "r1-qwen-32b",
             "4o",
+            "4o-mini",
             "o1",
             "o3-mini",
-            "llama32-3b",
-            "llama33-70b",
-            "r1-distill-llama-70b",
-            "r1-distill-qwen-32b",
-            "4o-mini",
+            "llama-3b",
+            "llama-70b",
+            "r1-llama-70b",
+            "r1-qwen-32b",
             "4o",
+            "4o-mini",
             "o1",
             "o3-mini",
-            "llama32-3b",
-            "llama33-70b",
-            "r1-distill-llama-70b",
-            "r1-distill-qwen-32b",
-            "4o-mini",
+            "llama-3b",
+            "llama-70b",
+            "r1-llama-70b",
+            "r1-qwen-32b",
             "4o",
+            "4o-mini",
             "o1",
             "o3-mini",
-            "llama32-3b",
-            "llama33-70b",
-            "r1-distill-llama-70b",
-            "r1-distill-qwen-32b",
         ],
     )
     # # cutsom legend with same three colors as above
@@ -326,73 +301,49 @@ def plot_episode_response_tokens(df_dict, figsize=(12, 7)):
     ax1.set_ylabel("")
     ax2.set_ylabel("")
     # then, set a new label on the plot (basically just a piece of text) and move it to where it makes sense (requires trial and error)
-    f.text(
-        0.05,
-        0.55,
-        "Average success response tokens (over 3 runs on Aider)",
-        va="center",
-        rotation="vertical",
-    )
+    # f.text(
+    #     0.05,
+    #     0.55,
+    #     "Success response tokens",
+    #     va="center",
+    #     rotation="vertical",
+    # )
     f.subplots_adjust(
         left=0.09, right=0.99, bottom=0.31, top=0.97, hspace=0.08, wspace=0.2
     )
     ax2.get_legend().remove()
     plt.xlabel("Backbone LLM")
+    plt.ylabel("Success response tokens")
     # plt.title("Average Response Tokens (Averaged Across 3 Runs)")
     plt.xticks(rotation=90)
     # custom x ticks
     plt.xticks(
+        np.arange(len(all_data)),
         [
-            0,
-            1,
-            2,
-            3,
-            4,
-            5,
-            6,
-            7,
-            8,
-            9,
-            10,
-            11,
-            12,
-            13,
-            14,
-            15,
-            16,
-            17,
-            18,
-            19,
-            20,
-            21,
-            22,
-            23,
-        ],
-        [
-            "4o-mini",
+            "llama-3b",
+            "llama-70b",
+            "r1-llama-70b",
+            "r1-qwen-32b",
             "4o",
+            "4o-mini",
             "o1",
             "o3-mini",
-            "llama32-3b",
-            "llama33-70b",
-            "r1-distill-llama-70b",
-            "r1-distill-qwen-32b",
-            "4o-mini",
+            "llama-3b",
+            "llama-70b",
+            "r1-llama-70b",
+            "r1-qwen-32b",
             "4o",
+            "4o-mini",
             "o1",
             "o3-mini",
-            "llama32-3b",
-            "llama33-70b",
-            "r1-distill-llama-70b",
-            "r1-distill-qwen-32b",
-            "4o-mini",
+            "llama-3b",
+            "llama-70b",
+            "r1-llama-70b",
+            "r1-qwen-32b",
             "4o",
+            "4o-mini",
             "o1",
             "o3-mini",
-            "llama32-3b",
-            "llama33-70b",
-            "r1-distill-llama-70b",
-            "r1-distill-qwen-32b",
         ],
     )
 
@@ -402,38 +353,40 @@ def plot_episode_response_tokens(df_dict, figsize=(12, 7)):
 
 
 # Example usage:
-model_names = [
-    "../exps/aider/rewrite_4o-mini/rewrite_4o-mini",
-    "../exps/aider/rewrite_4o/rewrite_4o",
-    "../exps/aider/rewrite_o1/rewrite_o1",
-    "../exps/aider/rewrite_o3-mini/rewrite_o3-mini",
-    "../exps/aider/rewrite_llama32-3b/rewrite_llama32-3b",
-    "../exps/aider/rewrite_llama33-70b/rewrite_llama33-70b",
-    "../exps/aider/rewrite_r1-distill-llama-70b/rewrite_r1-distill-llama-70b",
-    "../exps/aider/rewrite_r1-distill-qwen-32b/rewrite_r1-distill-qwen-32b",
-    "../exps/aider/pdb_4o-mini/pdb_4o-mini",
-    "../exps/aider/pdb_4o/pdb_4o",
-    "../exps/aider/pdb_o1/pdb_o1",
-    "../exps/aider/pdb_o3-mini/pdb_o3-mini",
-    "../exps/aider/pdb_llama32-3b/pdb_llama32-3b",
-    "../exps/aider/pdb_llama33-70b/pdb_llama33-70b",
-    "../exps/aider/pdb_r1-distill-llama-70b/pdb_r1-distill-llama-70b",
-    "../exps/aider/pdb_r1-distill-qwen-32b/pdb_r1-distill-qwen-32b",
-    "../exps/aider/seq_4o-mini/seq_4o-mini",
-    "../exps/aider/seq_4o/seq_4o",
-    "../exps/aider/seq_o1/seq_o1",
-    "../exps/aider/seq_o3-mini/seq_o3-mini",
-    "../exps/aider/seq_llama32-3b/seq_llama32-3b",
-    "../exps/aider/seq_llama33-70b/seq_llama33-70b",
-    "../exps/aider/seq_r1-distill-llama-70b/seq_r1-distill-llama-70b",
-    "../exps/aider/seq_r1-distill-qwen-32b/seq_r1-distill-qwen-32b",
+model_paths = [
+    "../exps/aider/rewrite_llama32-3b",
+    "../exps/aider/rewrite_llama33-70b",
+    "../exps/aider/rewrite_r1-distill-llama-70b",
+    "../exps/aider/rewrite_r1-distill-qwen-32b",
+    "../exps/aider/rewrite_4o",
+    "../exps/aider/rewrite_4o-mini",
+    "../exps/aider/rewrite_o1",
+    "../exps/aider/rewrite_o3-mini",
+    "../exps/aider/pdb_llama32-3b",
+    "../exps/aider/pdb_llama33-70b",
+    "../exps/aider/pdb_r1-distill-llama-70b",
+    "../exps/aider/pdb_r1-distill-qwen-32b",
+    "../exps/aider/pdb_4o",
+    "../exps/aider/pdb_4o-mini",
+    "../exps/aider/pdb_o1",
+    "../exps/aider/pdb_o3-mini",
+    "../exps/aider/seq_llama32-3b",
+    "../exps/aider/seq_llama33-70b",
+    "../exps/aider/seq_r1-distill-llama-70b",
+    "../exps/aider/seq_r1-distill-qwen-32b",
+    "../exps/aider/seq_4o",
+    "../exps/aider/seq_4o-mini",
+    "../exps/aider/seq_o1",
+    "../exps/aider/seq_o3-mini",
 ]
 
 # Analyze all models with seed averaging
 results_dict = {}
-for name in tqdm(model_names):
-    results_dict[name.split("/")[-1]] = analyze_froggy_results_with_seeds(name)
-
+for _path in tqdm(model_paths):
+    _name = _path.split("/")[-1]
+    results_dict[_name] = analyze_froggy_results_with_seeds(
+        _path + "/" + _name, seeds=[0, 1, 2]
+    )
 # Plot comparison
 # plot_episode_length(results_dict)
 plot_episode_response_tokens(results_dict)
