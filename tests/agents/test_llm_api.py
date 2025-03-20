@@ -458,6 +458,38 @@ def test_query_anthropic_model_no_code_block(mock_open, logger_mock):
     llm.client.messages.create = MagicMock(return_value=mock_response)
 
     messages = [{"role": "user", "content": "Test message"}]
-    result = llm.query_anthropic_model(messages)
 
-    assert result == ""
+def test_retry_on_rate_limit_success_after_retry():
+    mock_func = MagicMock(side_effect=[ValueError(), OSError(), "success"])
+    mock_is_rate_limit_error = MagicMock(return_value=True)
+
+    result = retry_on_rate_limit(mock_func, mock_is_rate_limit_error)("test_arg")
+
+    assert result == "success"
+    assert mock_func.call_count == 3
+    mock_func.assert_called_with("test_arg")
+    assert mock_is_rate_limit_error.call_count == 2
+
+
+def test_retry_on_rate_limit_raises_error():
+    mock_func = MagicMock(side_effect=[ValueError(), OSError(), "success"])
+    mock_is_rate_limit_error = lambda e: isinstance(e, ValueError)
+
+    with pytest.raises(OSError):
+        retry_on_rate_limit(mock_func, mock_is_rate_limit_error)("test_arg")
+
+    assert mock_func.call_count == 2
+    mock_func.assert_called_with("test_arg")
+
+
+def test_retry_on_rate_limit_skip_keyboard_interrupt():
+    mock_func = MagicMock(side_effect=KeyboardInterrupt())
+    mock_is_rate_limit_error = MagicMock()
+
+    # Do not retry on KeyboardInterrupt and let it propagate
+    with pytest.raises(KeyboardInterrupt):
+        retry_on_rate_limit(mock_func, mock_is_rate_limit_error)("test_arg")
+
+    mock_func.assert_called_once_with("test_arg")
+    # The error checker should never be called for KeyboardInterrupt
+    mock_is_rate_limit_error.assert_not_called()

@@ -85,6 +85,26 @@ def merge_messages(messages: list[dict]) -> list[dict]:
     return messages_out
 
 
+def retry_on_rate_limit(func, is_rate_limit_error_func, multiplier=1, max_wait=40, max_attempts=100):
+    """Executes a function with retry logic for rate limits. Never retries on KeyboardInterrupt.
+    Args:
+        func: The function to execute with retries
+        is_rate_limit_error_func: Function that checks if an exception is a rate limit error
+        *args, **kwargs: Arguments to pass to the function
+
+    Returns:
+        The result of the function call
+    """
+    retry_decorator = retry(
+        retry=(
+            retry_if_not_exception_type(KeyboardInterrupt) &
+            retry_if_exception(is_rate_limit_error_func)
+        ),
+        wait=wait_random_exponential(multiplier=multiplier, max=max_wait),
+        stop=stop_after_attempt(max_attempts),
+    )
+    return retry_decorator(func)
+
 @dataclass
 class TokenUsage:
     prompt: int
