@@ -75,6 +75,17 @@ def test_merge_messages():
     assert len(merged) == 2
     assert merged[0]["content"] == "Hello\n\nHow are you?"
 
+    # Ignore empty message
+    messages = [
+        {"role": "user", "content": "Hello"},
+        {"role": "user", "content": ""},
+        {"role": "user", "content": "How are you?"},
+        {"role": "user", "content": ""},
+        {"role": "assistant", "content": "Hi"},
+    ]
+    merged = merge_messages(messages)
+    assert len(merged) == 2
+    assert merged[0]["content"] == "Hello\n\nHow are you?"
 
 @patch("tiktoken.encoding_for_model")
 def test_token_counter(mock_encoding_for_model):

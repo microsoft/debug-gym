@@ -50,6 +50,8 @@ def load_llm_config(config_file_path: str | None = None):
 
 
 def print_messages(messages: list[dict], logger: DebugGymLogger):
+    """Print messages coloring each role differently.
+    Messages is a list of dictionaries with role and content keys."""
     for m in messages:
         if m["role"] == "user":
             logger.info(colored(f"{m['content']}\n", "cyan"))
@@ -61,14 +63,25 @@ def print_messages(messages: list[dict], logger: DebugGymLogger):
             raise ValueError(f"Unknown role: {m['content']}")
 
 
-def merge_messages(messages):
-    messages_out = [dict(messages[0])]
-    for message in messages[1:]:
-        if message["role"] == messages_out[-1]["role"]:
-            messages_out[-1]["content"] += "\n\n" + message["content"]
-        else:
-            messages_out.append(dict(message))
+def merge_messages(messages: list[dict]) -> list[dict]:
+    """Merge consecutive messages with same role into one message."""
+    messages_out = []
+    to_merge = []
 
+    def merge():
+        content = "\n\n".join(m["content"] for m in to_merge if m["content"])
+        if content:
+            messages_out.append({"role": current_role, "content": content})
+
+    current_role = None
+    for message in messages:
+        if current_role == message["role"]:
+            to_merge.append(message)
+        else:
+            merge()  # merge the previous messages
+            current_role = message["role"]
+            to_merge = [message]
+    merge()  # merge the last messages
     return messages_out
 
 
