@@ -127,6 +127,7 @@ def test_human_in_the_loop(human, agent_setup, build_env_info):
         current_breakpoints="Test breakpoints",
         step_observation="Test last run obs",
     )
+    history.get_all.return_value = [build_env_info(action="```pdb b 10```"), build_env_info(action="```pdb p x```")]
 
     env.clone.return_value = MagicMock()
     llm.return_value = LLMResponse("Prompt", "Expected answer", TokenUsage(2, 4))
@@ -144,22 +145,33 @@ def test_human_in_the_loop(human, agent_setup, build_env_info):
         step_observation="Test last run obs",
     )
     result = agent.run(task_name="test_task", debug=False)
+
     assert result is False
     # test that llm actions were executed
     assert env.step.called
     env.step.assert_called_with(llm().response)
     assert env.step().done is False
+
     # test that llm actions were logged
     assert history.step.called
     history.step.assert_has_calls([
         call(env.reset(options={"task_name": "test_task"}), None),
         call(env.step(llm().response), llm()),
     ])
+
     # test that env was cloned
     assert env.clone.called
     assert env.clone().reset.called
+    
+    # assert that cloned env was called with history steps
+    env.clone().step.assert_has_calls([
+        call(history.get_all()[0].action),
+        call(history.get_all()[1].action),
+    ])
+    
     # test that human action was executed
     assert env.clone().step.called
     env.clone().step.assert_called_with(human().response)
-    # ensure that human action was not logged
+
+    # ensure that human action was not recorded in history
     assert call(env.clone().step(), human()) not in history.step.mock_calls
