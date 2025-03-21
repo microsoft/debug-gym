@@ -22,6 +22,8 @@ dependencies = {file = ["requirements.txt"]}
 [tool.setuptools.packages.find]
 exclude = [".*tests.*", "exps/*", "output_*"]
 
+[tool.coverage.run]
+omit = ["tests/*"]
 
 [project.optional-dependencies]
 dev = [
