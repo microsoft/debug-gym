@@ -180,9 +180,8 @@ def plot_episode_length(df_dict, figsize=(12, 7)):
     )
 
     plt.ylim(0, 30)
-    plt.ylabel("Number of steps")
+    plt.ylabel("Steps")
     plt.xlabel("Backbone LLM")
-    plt.title("Success episode length")
     plt.xticks(rotation=90)
     # custom x ticks
     plt.xticks(
@@ -313,7 +312,7 @@ def plot_episode_response_tokens(df_dict, figsize=(12, 7)):
     )
     ax2.get_legend().remove()
     plt.xlabel("Backbone LLM")
-    plt.ylabel("Success response tokens")
+    plt.ylabel("Response tokens")
     # plt.title("Average Response Tokens (Averaged Across 3 Runs)")
     plt.xticks(rotation=90)
     # custom x ticks

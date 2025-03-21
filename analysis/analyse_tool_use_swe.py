@@ -10,12 +10,12 @@ from tqdm import tqdm
 
 plt.rcParams.update(
     {
-        "font.size": 20,  # Base font size
-        "axes.labelsize": 20,  # Axis labels
-        "axes.titlesize": 20,  # Plot title
-        "xtick.labelsize": 20,  # X-axis tick labels
-        "ytick.labelsize": 20,  # Y-axis tick labels
-        "legend.fontsize": 20,  # Legend text
+        "font.size": 22,  # Base font size
+        "axes.labelsize": 22,  # Axis labels
+        "axes.titlesize": 22,  # Plot title
+        "xtick.labelsize": 22,  # X-axis tick labels
+        "ytick.labelsize": 22,  # Y-axis tick labels
+        "legend.fontsize": 22,  # Legend text
     }
 )
 
@@ -32,59 +32,60 @@ def analyze_froggy_results(model_name):
     model_dir = os.path.join(model_name)
     results = []
 
-    for jsonl_file in glob.glob(f"{model_dir}/**/froggy.jsonl", recursive=True):
-        # Get task name from directory path
-        task = os.path.dirname(jsonl_file).split("/")[-1]
+    for jsonl_name in ["froggy.jsonl", "debug_gym.jsonl"]:
+        for jsonl_file in glob.glob(f"{model_dir}/**/{jsonl_name}", recursive=True):
+            # Get task name from directory path
+            task = os.path.dirname(jsonl_file).split("/")[-1]
 
-        with open(jsonl_file) as f:
-            data = json.load(f)
+            with open(jsonl_file) as f:
+                data = json.load(f)
 
-            # Extract success status
-            success = data.get("success", False)
+                # Extract success status
+                success = data.get("success", False)
 
-            # Count rewrite commands
-            episode_length = 0
+                # Count rewrite commands
+                episode_length = 0
 
-            tool_counter = {
-                "```view": 0,
-                "```listdir": 0,
-                "```pdb": 0,
-                "```rewrite": 0,
-                "```eval": 0,
-                "other": 0,
-            }
-
-            for step in data.get("log", []):
-                episode_length += 1
-                if episode_length > 50:
-                    break
-                if step.get("action") is None:
-                    continue
-                flag = False
-                for tool_key in tool_counter:
-                    if step["action"].strip().startswith(tool_key):
-                        tool_counter[tool_key] += 1
-                        # if tool_key == "```pdb":
-                        #     if not step.get("obs").strip().startswith("Tool failure"):
-                        #         print("=" * 20)
-                        #         print(jsonl_file, step.get("step_id"))
-                        #         print(step.get("action"))
-                        #         print(step.get("obs"))
-                        flag = True
-                        break
-                if not flag:
-                    # print("=" * 20)
-                    # print(step.get("action"))
-                    tool_counter["other"] += 1
-
-            results.append(
-                {
-                    "task": task,
-                    "success": success,
-                    "episode_length": episode_length,
-                    "tool_counter": tool_counter,
+                tool_counter = {
+                    "```view": 0,
+                    "```listdir": 0,
+                    "```pdb": 0,
+                    "```rewrite": 0,
+                    "```eval": 0,
+                    "other": 0,
                 }
-            )
+
+                for step in data.get("log", []):
+                    episode_length += 1
+                    if episode_length > 50:
+                        break
+                    if step.get("action") is None:
+                        continue
+                    flag = False
+                    for tool_key in tool_counter:
+                        if step["action"].strip().startswith(tool_key):
+                            tool_counter[tool_key] += 1
+                            # if tool_key == "```pdb":
+                            #     if not step.get("obs").strip().startswith("Tool failure"):
+                            #         print("=" * 20)
+                            #         print(jsonl_file, step.get("step_id"))
+                            #         print(step.get("action"))
+                            #         print(step.get("obs"))
+                            flag = True
+                            break
+                    if not flag:
+                        # print("=" * 20)
+                        # print(step.get("action"))
+                        tool_counter["other"] += 1
+
+                results.append(
+                    {
+                        "task": task,
+                        "success": success,
+                        "episode_length": episode_length,
+                        "tool_counter": tool_counter,
+                    }
+                )
 
     df = pd.DataFrame(results)
     # import pdb; pdb.set_trace()
@@ -126,7 +127,6 @@ def plot_tool_use_categories(df_dict, figsize=(12, 7)):
         df_dict (dict): Dictionary mapping model names to their DataFrames with averaged results
         figsize (tuple): Figure size (width, height)
     """
-    plt.figure(figsize=figsize)
 
     all_data = []
     # Create plot for each model
@@ -182,7 +182,6 @@ def plot_tool_use_categories(df_dict, figsize=(12, 7)):
     all_data.set_index("name")[
         ["view", "listdir", "pdb", "rewrite", "eval", "other"]
     ].plot(kind="bar", stacked=True, figsize=figsize)
-    plt.title("Distribution of tool calls")
     plt.xlabel("Backbone LLM")
     plt.ylabel("Percentage")
     plt.xticks(rotation=90)
@@ -195,16 +194,19 @@ def plot_tool_use_categories(df_dict, figsize=(12, 7)):
             "rw 4o-mini",
             "rw o1",
             "rw o3-mini",
+            "rw claude37",
             "dbg llama33",
             "dbg 4o",
             "dbg 4o-mini",
             "dbg o1",
             "dbg o3-mini",
-            "sc llama33",
-            "sc 4o",
-            "sc 4o-mini",
-            "sc o1",
-            "sc o3-mini",
+            "dbg claude37",
+            "d(5) llama33",
+            "d(5) 4o",
+            "d(5) 4o-mini",
+            "d(5) o1",
+            "d(5) o3-mini",
+            "d(5) claude37",
         ],
     )
 
@@ -220,16 +222,19 @@ model_paths = [
     "../exps/swe-bench/rewrite_4o-mini",
     "../exps/swe-bench/rewrite_o1",
     "../exps/swe-bench/rewrite_o3-mini",
+    "../exps/swe-bench/rewrite_claude37",
     "../exps/swe-bench/pdb_llama33-70b",
     "../exps/swe-bench/pdb_4o",
     "../exps/swe-bench/pdb_4o-mini",
     "../exps/swe-bench/pdb_o1",
     "../exps/swe-bench/pdb_o3-mini",
+    "../exps/swe-bench/pdb_claude37",
     "../exps/swe-bench/seq_llama33-70b",
     "../exps/swe-bench/seq_4o",
     "../exps/swe-bench/seq_4o-mini",
     "../exps/swe-bench/seq_o1",
     "../exps/swe-bench/seq_o3-mini",
+    "../exps/swe-bench/seq_claude37",
 ]
 
 # Analyze all models with seed averaging

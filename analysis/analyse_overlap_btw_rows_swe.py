@@ -10,19 +10,19 @@ from tqdm import tqdm
 
 plt.rcParams.update(
     {
-        "font.size": 20,  # Base font size
-        "axes.labelsize": 20,  # Axis labels
-        "axes.titlesize": 20,  # Plot title
-        "xtick.labelsize": 20,  # X-axis tick labels
-        "ytick.labelsize": 20,  # Y-axis tick labels
-        "legend.fontsize": 20,  # Legend text
+        "font.size": 22,  # Base font size
+        "axes.labelsize": 22,  # Axis labels
+        "axes.titlesize": 22,  # Plot title
+        "xtick.labelsize": 22,  # X-axis tick labels
+        "ytick.labelsize": 22,  # Y-axis tick labels
+        "legend.fontsize": 22,  # Legend text
     }
 )
 
 agent_name_map = {
     "rewrite": "rewrite",
     "pdb": "debug",
-    "seq": "second chance",
+    "seq": "debug(5)",
 }
 
 
@@ -39,21 +39,22 @@ def analyze_froggy_results(model_name):
     model_dir = os.path.join(model_name)
     results = []
 
-    for jsonl_file in glob.glob(f"{model_dir}/**/froggy.jsonl", recursive=True):
-        # Get task name from directory path
-        task = os.path.dirname(jsonl_file).split("/")[-1]
+    for jsonl_name in ["froggy.jsonl", "debug_gym.jsonl"]:
+        for jsonl_file in glob.glob(f"{model_dir}/**/{jsonl_name}", recursive=True):
+            # Get task name from directory path
+            task = os.path.dirname(jsonl_file).split("/")[-1]
 
-        with open(jsonl_file) as f:
-            data = json.load(f)
-            # Extract success status
-            success = data.get("success", False)
+            with open(jsonl_file) as f:
+                data = json.load(f)
+                # Extract success status
+                success = data.get("success", False)
 
-            results.append(
-                {
-                    "task": task,
-                    "success": success,
-                }
-            )
+                results.append(
+                    {
+                        "task": task,
+                        "success": success,
+                    }
+                )
 
     df = pd.DataFrame(results)
     return df
@@ -123,8 +124,7 @@ def plot_overlap_winning_games_between_agents(df_dict, figsize=(12, 7)):
         )
 
     new_data = []
-    # sort the llm names: llama33-70b, 4o-mini, 4o, o1, o3-mini
-    for _llm in ["llama33-70b", "4o-mini", "4o", "o1", "o3-mini"]:
+    for _llm in ["llama33-70b", "4o", "4o-mini", "o1", "o3-mini", "claude37"]:
         # get the indices of all games won by this
         _indices_1, _indices_2, _indices_3 = [], [], []
         for _data in all_data:
@@ -164,6 +164,19 @@ def plot_overlap_winning_games_between_agents(df_dict, figsize=(12, 7)):
     sns.barplot(data=df, x="llm", y="count", hue="won")
     plt.xlabel("LLM backbone")
     plt.ylabel("#Games succeeded by all agents (out of 300)")
+    plt.yticks(
+        np.arange(0, 141, 20),
+        [
+            "0",
+            "20",
+            "40",
+            "60",
+            "80",
+            "100",
+            "120",
+            "140",
+        ],
+    )  # Set y-ticks for the first subplot
     plt.legend()
     # add grid
     plt.grid(True, alpha=0.3)
@@ -177,16 +190,19 @@ model_paths = [
     "../exps/swe-bench/rewrite_4o-mini",
     "../exps/swe-bench/rewrite_o1",
     "../exps/swe-bench/rewrite_o3-mini",
+    "../exps/swe-bench/rewrite_claude37",
     "../exps/swe-bench/pdb_llama33-70b",
     "../exps/swe-bench/pdb_4o",
     "../exps/swe-bench/pdb_4o-mini",
     "../exps/swe-bench/pdb_o1",
     "../exps/swe-bench/pdb_o3-mini",
+    "../exps/swe-bench/pdb_claude37",
     "../exps/swe-bench/seq_llama33-70b",
     "../exps/swe-bench/seq_4o",
     "../exps/swe-bench/seq_4o-mini",
     "../exps/swe-bench/seq_o1",
     "../exps/swe-bench/seq_o3-mini",
+    "../exps/swe-bench/seq_claude37",
 ]
 
 # Analyze all models with seed averaging

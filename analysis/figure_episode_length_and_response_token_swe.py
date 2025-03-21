@@ -10,15 +10,15 @@ from tqdm import tqdm
 
 plt.rcParams.update(
     {
-        "font.size": 20,  # Base font size
-        "axes.labelsize": 20,  # Axis labels
-        "axes.titlesize": 20,  # Plot title
-        "xtick.labelsize": 20,  # X-axis tick labels
-        "ytick.labelsize": 20,  # Y-axis tick labels
-        "legend.fontsize": 20,  # Legend text
+        "font.size": 22,  # Base font size
+        "axes.labelsize": 22,  # Axis labels
+        "axes.titlesize": 22,  # Plot title
+        "xtick.labelsize": 22,  # X-axis tick labels
+        "ytick.labelsize": 22,  # Y-axis tick labels
+        "legend.fontsize": 22,  # Legend text
     }
 )
-ONLY_SUCCESS = False
+ONLY_SUCCESS = True
 
 
 def analyze_froggy_results(model_name):
@@ -34,56 +34,53 @@ def analyze_froggy_results(model_name):
     model_dir = os.path.join(model_name)
     results = []
 
-    for jsonl_file in glob.glob(f"{model_dir}/**/froggy.jsonl", recursive=True):
-        # Get task name from directory path
-        task = os.path.dirname(jsonl_file).split("/")[-1]
+    for jsonl_name in ["froggy.jsonl", "debug_gym.jsonl"]:
+        for jsonl_file in glob.glob(f"{model_dir}/**/{jsonl_name}", recursive=True):
+            # Get task name from directory path
+            task = os.path.dirname(jsonl_file).split("/")[-1]
 
-        with open(jsonl_file) as f:
-            data = json.load(f)
+            with open(jsonl_file) as f:
+                data = json.load(f)
 
-            # Extract success status
-            success = data.get("success", False)
+                # Extract success status
+                success = data.get("success", False)
 
-            # Count rewrite commands
-            total_prompt_tokens = 0
-            total_response_tokens = 0
-            rewrite_count = 0
-            episode_length = 0
-            for step in data.get("log", []):
-                episode_length += 1
-                if episode_length == 50:
-                    break
-                if step.get("action") and "```rewrite" in step["action"]:
-                    rewrite_count += 1
+                # Count rewrite commands
+                total_prompt_tokens = 0
+                total_response_tokens = 0
+                rewrite_count = 0
+                episode_length = 0
+                for step in data.get("log", []):
+                    episode_length += 1
+                    if episode_length == 50:
+                        break
+                    if step.get("action") and "```rewrite" in step["action"]:
+                        rewrite_count += 1
 
-                # Extract token usage from prompt_response_pairs
-                if step.get("prompt_response_pairs"):
-                    for pair in step["prompt_response_pairs"]:
-                        if isinstance(pair.get("token_usage"), dict):
-                            total_prompt_tokens += pair["token_usage"].get("prompt", 0)
-                            total_response_tokens += pair["token_usage"].get(
-                                "response", 0
-                            )
+                    # Extract token usage from prompt_response_pairs
+                    if step.get("prompt_response_pairs"):
+                        for pair in step["prompt_response_pairs"]:
+                            if isinstance(pair.get("token_usage"), dict):
+                                total_prompt_tokens += pair["token_usage"].get(
+                                    "prompt", 0
+                                )
+                                total_response_tokens += pair["token_usage"].get(
+                                    "response", 0
+                                )
 
-            results.append(
-                {
-                    "task": task,
-                    "success": success,
-                    "rewrite_count": rewrite_count,
-                    "prompt_tokens": total_prompt_tokens,
-                    "response_tokens": total_response_tokens,
-                    "episode_length": episode_length,
-                }
-            )
+                results.append(
+                    {
+                        "task": task,
+                        "success": success,
+                        "rewrite_count": rewrite_count,
+                        "prompt_tokens": total_prompt_tokens,
+                        "response_tokens": total_response_tokens,
+                        "episode_length": episode_length,
+                    }
+                )
 
     df = pd.DataFrame(results)
 
-    # print("Success rate:", df["success"].mean())
-    # print("Average rewrites:", df["rewrite_count"].mean())
-    # print("Average prompt tokens:", df["prompt_tokens"].mean())
-    # print("Average response tokens:", df["response_tokens"].mean())
-    # print("\nResults by task:")
-    # print(df)
     return df
 
 
@@ -112,24 +109,13 @@ def analyze_froggy_results_with_seeds(base_model_name, seeds=[0, 1, 2]):
     # Combine all DataFrames
     combined_df = pd.concat(all_dfs)
 
-    # Group by task and calculate means
-    averaged_df = (
-        combined_df.groupby("task")
-        .agg({"success": "mean", "rewrite_count": "mean"})
-        .reset_index()
-    )
-
-    # print(f"\nAveraged results for {base_model_name}:")
-    # print(f"Success rate: {averaged_df['success'].mean():.2%}")
-    # print(f"Average rewrites: {averaged_df['rewrite_count'].mean():.2f}")
-
     return combined_df
 
 
 agent_name_map = {
     "rewrite": "rewrite",
     "pdb": "debug",
-    "seq": "second chance",
+    "seq": "debug(5)",
 }
 
 
@@ -184,9 +170,8 @@ def plot_episode_length(df_dict, figsize=(12, 7)):
     )
 
     plt.ylim(0, 30)
-    plt.ylabel("Number of steps")
+    plt.ylabel("Steps")
     plt.xlabel("Backbone LLM")
-    plt.title("Average success episode length (over 3 runs on swe-bench)")
     plt.xticks(rotation=90)
     # custom x ticks
     plt.xticks(
@@ -197,16 +182,19 @@ def plot_episode_length(df_dict, figsize=(12, 7)):
             "4o-mini",
             "o1",
             "o3-mini",
+            "claude37",
             "llama33-70b",
             "4o",
             "4o-mini",
             "o1",
             "o3-mini",
+            "claude37",
             "llama33-70b",
             "4o",
             "4o-mini",
             "o1",
             "o3-mini",
+            "claude37",
         ],
     )
     # # cutsom legend with same three colors as above
@@ -273,10 +261,21 @@ def plot_episode_response_tokens(df_dict, figsize=(12, 7)):
         capsize=5,
         color="black",
     )
-    plt.ylim(0, 1000)
-    plt.ylabel("Number of tokens")
+    plt.ylim(0, 1200)
+    plt.yticks(
+        np.arange(0, 1201, 200),
+        [
+            "0",
+            "200",
+            "400",
+            "600",
+            "800",
+            "1000",
+            "1200",
+        ],
+    )
+    plt.ylabel("Response tokens")
     plt.xlabel("Backbone LLM")
-    plt.title("Average Response Tokens (Averaged Across 3 Runs)")
     plt.xticks(rotation=90)
     # custom x ticks
     plt.xticks(
@@ -287,16 +286,19 @@ def plot_episode_response_tokens(df_dict, figsize=(12, 7)):
             "4o-mini",
             "o1",
             "o3-mini",
+            "claude37",
             "llama33-70b",
             "4o",
             "4o-mini",
             "o1",
             "o3-mini",
+            "claude37",
             "llama33-70b",
             "4o",
             "4o-mini",
             "o1",
             "o3-mini",
+            "claude37",
         ],
     )
     plt.legend.loc = "upper left"
@@ -313,16 +315,19 @@ model_paths = [
     "../exps/swe-bench/rewrite_4o-mini",
     "../exps/swe-bench/rewrite_o1",
     "../exps/swe-bench/rewrite_o3-mini",
+    "../exps/swe-bench/rewrite_claude37",
     "../exps/swe-bench/pdb_llama33-70b",
     "../exps/swe-bench/pdb_4o",
     "../exps/swe-bench/pdb_4o-mini",
     "../exps/swe-bench/pdb_o1",
     "../exps/swe-bench/pdb_o3-mini",
+    "../exps/swe-bench/pdb_claude37",
     "../exps/swe-bench/seq_llama33-70b",
     "../exps/swe-bench/seq_4o",
     "../exps/swe-bench/seq_4o-mini",
     "../exps/swe-bench/seq_o1",
     "../exps/swe-bench/seq_o3-mini",
+    "../exps/swe-bench/seq_claude37",
 ]
 
 # Analyze all models with seed averaging
