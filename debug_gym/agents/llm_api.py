@@ -276,6 +276,7 @@ class AnthropicLLM(LLM):
         rate_limit_errors = [
             "anthropic.RateLimitError",
             "anthropic.OverloadedError",
+            "anthropic._exceptions.OverloadedError",
             "anthropic.InternalServerError",
         ]
         exception_full_name = (
@@ -434,7 +435,9 @@ class OpenAILLM(LLM):
                     return False
             case _:
                 self.logger.debug(
-                    f"Error calling {self.model_name}: {exception_full_name!r} {exception.message if hasattr(exception, 'message') else exception}"
+                    f"Error calling {self.model_name}: {exception_full_name!r} {
+                        exception.message if hasattr(exception, 'message') else exception
+                    }"
                 )
 
         return exception_full_name in rate_limit_errors

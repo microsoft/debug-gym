@@ -163,7 +163,7 @@ def trim_prompt_messages(
 
     assert (
         new_length <= context_length
-    ), f"The system message execeeds: {new_length} > {context_length}!"
+    ), f"The system message exceeds: {new_length} > {context_length}!"
 
     new_messages.append(dict(messages[-1]))
     new_length += message_lengths[-1]
