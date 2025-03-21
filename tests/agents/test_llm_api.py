@@ -6,16 +6,17 @@ import pytest
 from openai import RateLimitError
 
 from debug_gym.agents.llm_api import (
-    LLM,
-    AsyncLLM,
+    AnthropicLLM,
+    AzureOpenAILLM,
     Human,
     LLMResponse,
-    TokenCounter,
+    OpenAILLM,
     TokenUsage,
     instantiate_llm,
     load_llm_config,
     merge_messages,
     print_messages,
+    retry_on_rate_limit,
 )
 from debug_gym.logger import DebugGymLogger
 
@@ -37,14 +38,14 @@ def logger_mock():
 
 
 @pytest.fixture
-def async_llm(logger_mock, llm_config_mock):
-    # Create an instance of AsyncLLM with a mock configuration
+def openai_llm(logger_mock, llm_config_mock):
+    # Create an instance of AsyncOpenAILLM with a mock configuration
     model_name = "test_model"
-    async_llm = AsyncLLM(model_name, logger=logger_mock)
-    return async_llm
+    _async_llm = OpenAILLM(model_name, logger=logger_mock)
+    return _async_llm
 
 
-def test_is_rate_limit_error(async_llm):
+def test_is_rate_limit_error(openai_llm):
     mock_response = MagicMock()
     mock_response.request = "example"
     mock_response.body = {"error": "Rate limit exceeded"}
@@ -52,7 +53,7 @@ def test_is_rate_limit_error(async_llm):
     exception = RateLimitError(
         "Rate limit exceeded", response=mock_response, body=mock_response.body
     )
-    assert async_llm.is_rate_limit_error(exception) == True
+    assert openai_llm.is_rate_limit_error(exception) == True
 
 
 def test_print_messages(logger_mock):
@@ -158,18 +159,6 @@ def completion_mock():
     return AsyncMock(return_value=mock_response)
 
 
-@pytest.mark.asyncio
-async def test_async_llm(llm_config_mock, completion_mock, logger_mock):
-    llm = AsyncLLM(model_name="test_model", logger=logger_mock)
-    llm.client.chat.completions.create = completion_mock
-    messages = [{"role": "user", "content": "Hello"}]
-    llm_response = await llm(messages)
-    assert llm_response.prompt == messages
-    assert llm_response.response == "some completion mock."
-    assert llm_response.token_usage.prompt == 1
-    assert llm_response.token_usage.response == 4
-
-
 @patch("builtins.input", lambda *args, **kwargs: "User input")
 def test_human(build_env_info):
     human = Human()
@@ -189,24 +178,41 @@ def test_human(build_env_info):
 
 
 @patch("tiktoken.encoding_for_model")
-@patch("os.path.exists", return_value=True)
 @patch(
     "builtins.open",
     new_callable=mock_open,
-    read_data='{"test-model": {"model": "test-model", "max_tokens": 100, "tokenizer": "gpt-4o", "context_limit": 4, "api_key": "test-api-key", "endpoint": "https://test-endpoint", "api_version": "v1", "tags": ["azure openai"]}}',
+    read_data=json.dumps(
+        {
+            "gpt-4o-mini": {
+                "model": "gpt-4o-mini_2024-07-18",
+                "max_tokens": 100,
+                "tokenizer": "gpt-4o-mini",
+                "context_limit": 4,
+                "api_key": "test-api-key",
+                "endpoint": "https://test-endpoint",
+                "api_version": "v1",
+                "tags": ["azure openai"],
+            }
+        }
+    ),
 )
-def test_instantiate_llm(mock_open, mock_exists, mock_encoding_for_model, logger_mock):
+def test_instantiate_llm(mock_open, mock_encoding_for_model, logger_mock):
     mock_encoding = MagicMock()
     mock_encoding.encode = lambda x: x.split()
     mock_encoding_for_model.return_value = mock_encoding
 
-    config = {"llm_name": "test-model"}
-    llm = instantiate_llm(config, logger=logger_mock, use_async=False)
-    assert isinstance(llm, LLM)
+    config = {"llm_name": "gpt-4o-mini"}
+    llm = instantiate_llm(config, logger=logger_mock)
+    assert isinstance(llm, AzureOpenAILLM)
 
     config = {"llm_name": "human"}
-    llm = instantiate_llm(config, logger=logger_mock, use_async=False)
+    llm = instantiate_llm(config, logger=logger_mock)
     assert isinstance(llm, Human)
+
+    unknown = "unknown"
+    config = {"llm_name": unknown}
+    with pytest.raises(ValueError, match="Model unknown not found in llm.cfg.*"):
+        instantiate_llm(config, logger=logger_mock)
 
 
 def test_llm_response_init_with_prompt_and_response():
@@ -266,22 +272,28 @@ anthropic_thinking_config = {
 
 
 @patch(
-    "builtins.open",
-    new_callable=mock_open,
-    read_data=json.dumps(anthropic_config | anthropic_thinking_config),
+    "debug_gym.agents.llm_api.load_llm_config",
+    return_value=anthropic_config | anthropic_thinking_config,
 )
-def test_query_anthropic_model_basic(mock_open, logger_mock):
-    llm = LLM("test-anthropic", logger=logger_mock)
+def test_query_anthropic_model_basic(mock_llm_config, logger_mock):
+    llm = AnthropicLLM("test-anthropic", logger=logger_mock)
 
     mock_response = MagicMock()
     mock_response.content = [MagicMock()]
     mock_response.content[0].text = "```python\nprint('Hello World')\n```"
     llm.client.messages.create = MagicMock(return_value=mock_response)
+    llm.count_tokens = MagicMock(return_value=10)
 
     messages = [{"role": "user", "content": "Write a Hello World program"}]
-    result = llm.query_anthropic_model(messages)
+    llm_response = llm(messages)
 
-    assert result == "```python\nprint('Hello World')\n```"
+    assert llm_response.prompt == [
+        {"role": "user", "content": "Write a Hello World program"}
+    ]
+    assert llm_response.response == "```python\nprint('Hello World')\n```"
+    assert llm_response.token_usage.prompt == 10  # from mock
+    assert llm_response.token_usage.response == 10  # from mock
+
     llm.client.messages.create.assert_called_once()
     assert llm.client.messages.create.call_args[1]["model"] == "claude-3-opus-20240229"
     assert llm.client.messages.create.call_args[1]["max_tokens"] == 8192
@@ -289,22 +301,28 @@ def test_query_anthropic_model_basic(mock_open, logger_mock):
 
 
 @patch(
-    "builtins.open",
-    new_callable=mock_open,
-    read_data=json.dumps(anthropic_thinking_config),
+    "debug_gym.agents.llm_api.load_llm_config",
+    return_value=anthropic_thinking_config,
 )
-def test_query_anthropic_model_with_thinking(mock_open, logger_mock):
-    llm = LLM("test-anthropic-thinking", logger=logger_mock)
+def test_query_anthropic_model_with_thinking(mock_llm_config, logger_mock):
+    llm = AnthropicLLM("test-anthropic-thinking", logger=logger_mock)
 
     mock_response = MagicMock()
     mock_response.content = [MagicMock(), MagicMock()]
     mock_response.content[1].text = "```python\nprint('Hello World')\n```"
     llm.client.messages.create = MagicMock(return_value=mock_response)
+    llm.count_tokens = MagicMock(return_value=10)
 
     messages = [{"role": "user", "content": "Write a Hello World program"}]
-    result = llm.query_anthropic_model(messages)
 
-    assert result == "```python\nprint('Hello World')\n```"
+    llm_response = llm(messages)
+    assert llm_response.prompt == [
+        {"role": "user", "content": "Write a Hello World program"}
+    ]
+    assert llm_response.response == "```python\nprint('Hello World')\n```"
+    assert llm_response.token_usage.prompt == 10  # from mock
+    assert llm_response.token_usage.response == 10  # from mock
+
     llm.client.messages.create.assert_called_once()
     assert llm.client.messages.create.call_args[1]["model"] == "claude-3-opus-20240229"
     assert llm.client.messages.create.call_args[1]["max_tokens"] == 20000
@@ -313,20 +331,23 @@ def test_query_anthropic_model_with_thinking(mock_open, logger_mock):
     assert llm.client.messages.create.call_args[1]["thinking"]["budget_tokens"] == 16000
 
 
-@patch("builtins.open", new_callable=mock_open, read_data=json.dumps(anthropic_config))
-def test_query_anthropic_model_empty_messages(mock_open, logger_mock):
-    llm = LLM("test-anthropic", logger=logger_mock)
+# DOES THIS TEST MAKE SENSE?
+@patch("debug_gym.agents.llm_api.load_llm_config", return_value=anthropic_config)
+def test_query_anthropic_model_empty_messages(mock_llm_config, logger_mock):
+    llm = AnthropicLLM("test-anthropic", logger=logger_mock)
 
     mock_response = MagicMock()
     mock_response.content = [MagicMock()]
     mock_response.content[0].text = "```sample response```"
     llm.client.messages.create = MagicMock(return_value=mock_response)
+    llm.count_tokens = MagicMock(return_value=10)
 
     messages = []
-    result = llm.query_anthropic_model(messages)
+    llm_response = llm(messages)
 
     # Verify default user prompt was added
-    assert result == "```sample response```"
+    assert llm_response.prompt == []
+    assert llm_response.response == "```sample response```"
     llm.client.messages.create.assert_called_once()
     assert len(llm.client.messages.create.call_args[1]["messages"]) == 1
     assert llm.client.messages.create.call_args[1]["messages"][0]["role"] == "user"
@@ -336,22 +357,24 @@ def test_query_anthropic_model_empty_messages(mock_open, logger_mock):
     )
 
 
-@patch("builtins.open", new_callable=mock_open, read_data=json.dumps(anthropic_config))
-def test_query_anthropic_model_with_system_prompt(mock_open, logger_mock):
-    llm = LLM("test-anthropic", logger=logger_mock)
+@patch("debug_gym.agents.llm_api.load_llm_config", return_value=anthropic_config)
+def test_query_anthropic_model_with_system_prompt(mock_llm_config, logger_mock):
+    llm = AnthropicLLM("test-anthropic", logger=logger_mock)
 
     mock_response = MagicMock()
     mock_response.content = [MagicMock()]
     mock_response.content[0].text = "```system response```"
     llm.client.messages.create = MagicMock(return_value=mock_response)
+    llm.count_tokens = MagicMock(return_value=10)
 
     messages = [
         {"role": "system", "content": "You are a helpful coding assistant"},
         {"role": "user", "content": "Help me with Python"},
     ]
-    result = llm.query_anthropic_model(messages)
+    llm_response = llm(messages)
 
-    assert result == "```system response```"
+    assert llm_response.prompt == messages
+    assert llm_response.response == "```system response```"
     llm.client.messages.create.assert_called_once()
     assert (
         llm.client.messages.create.call_args[1]["system"]
@@ -361,14 +384,14 @@ def test_query_anthropic_model_with_system_prompt(mock_open, logger_mock):
     assert llm.client.messages.create.call_args[1]["messages"][0]["role"] == "user"
 
 
-@patch("builtins.open", new_callable=mock_open, read_data=json.dumps(anthropic_config))
-def test_query_anthropic_model_with_conversation(mock_open, logger_mock):
-    llm = LLM("test-anthropic", logger=logger_mock)
-
+@patch("debug_gym.agents.llm_api.load_llm_config", return_value=anthropic_config)
+def test_query_anthropic_model_with_conversation(mock_llm_config, logger_mock):
+    llm = AnthropicLLM("test-anthropic", logger=logger_mock)
     mock_response = MagicMock()
     mock_response.content = [MagicMock()]
     mock_response.content[0].text = "```response to conversation```"
     llm.client.messages.create = MagicMock(return_value=mock_response)
+    llm.count_tokens = MagicMock(return_value=10)
 
     # Test with a conversation (user and assistant messages)
     messages = [
@@ -377,10 +400,11 @@ def test_query_anthropic_model_with_conversation(mock_open, logger_mock):
         {"role": "assistant", "content": "Hi there! How can I help you?"},
         {"role": "user", "content": "I need help with Python"},
     ]
-    result = llm.query_anthropic_model(messages)
+    mock_response = llm(messages)
 
     # Verify conversation handling
-    assert result == "```response to conversation```"
+    assert mock_response.prompt == messages
+    assert mock_response.response == "```response to conversation```"
     llm.client.messages.create.assert_called_once()
     assert (
         llm.client.messages.create.call_args[1]["system"]
@@ -392,23 +416,23 @@ def test_query_anthropic_model_with_conversation(mock_open, logger_mock):
     assert llm.client.messages.create.call_args[1]["messages"][2]["role"] == "user"
 
 
-@patch("builtins.open", new_callable=mock_open, read_data=json.dumps(anthropic_config))
-def test_query_anthropic_model_empty_content(mock_open, logger_mock):
-    llm = LLM("test-anthropic", logger=logger_mock)
-
+@patch("debug_gym.agents.llm_api.load_llm_config", return_value=anthropic_config)
+def test_query_anthropic_model_empty_content(mock_llm_config, logger_mock):
+    llm = AnthropicLLM("test-anthropic", logger=logger_mock)
     mock_response = MagicMock()
     mock_response.content = [MagicMock()]
     mock_response.content[0].text = "```response```"
     llm.client.messages.create = MagicMock(return_value=mock_response)
+    llm.count_tokens = MagicMock(return_value=10)
 
     messages = [
         {"role": "system", "content": "You are a helpful assistant"},
         {"role": "user", "content": ""},  # Empty content should be skipped
         {"role": "user", "content": "Real question"},
     ]
-    result = llm.query_anthropic_model(messages)
+    result = llm(messages)
 
-    assert result == "```response```"
+    assert result.response == "```response```"
     llm.client.messages.create.assert_called_once()
     assert len(llm.client.messages.create.call_args[1]["messages"]) == 1
     assert (
@@ -417,47 +441,44 @@ def test_query_anthropic_model_empty_content(mock_open, logger_mock):
     )
 
 
-@patch("builtins.open", new_callable=mock_open, read_data=json.dumps(anthropic_config))
-def test_query_anthropic_model_unknown_role(mock_open, logger_mock):
-    llm = LLM("test-anthropic", logger=logger_mock)
-
+@patch("debug_gym.agents.llm_api.load_llm_config", return_value=anthropic_config)
+def test_query_anthropic_model_unknown_role(mock_llm_config, logger_mock):
+    llm = AnthropicLLM("test-anthropic", logger=logger_mock)
     llm.client.messages.create = MagicMock()
-
+    llm.count_tokens = MagicMock(return_value=10)
     messages = [{"role": "unknown", "content": "This has an unknown role"}]
-
-    with pytest.raises(ValueError, match="Unknown role: unknown"):
-        llm.query_anthropic_model(messages)
+    with pytest.raises(ValueError, match="Unknown role: .* unknown .*"):
+        llm(messages)
 
 
 @patch(
-    "builtins.open",
-    new_callable=mock_open,
-    read_data=json.dumps(anthropic_config | {"max_tokens": 4000}),
+    "debug_gym.agents.llm_api.load_llm_config",
+    return_value=anthropic_config | {"max_tokens": 4000},
 )
-def test_query_anthropic_model_max_tokens_from_config(mock_open, logger_mock):
-    llm = LLM("test-anthropic", logger=logger_mock)
-
+def test_query_anthropic_model_max_tokens_from_config(mock_llm_config, logger_mock):
+    llm = AnthropicLLM("test-anthropic", logger=logger_mock)
     mock_response = MagicMock()
     mock_response.content = [MagicMock()]
     mock_response.content[0].text = "```response```"
     llm.client.messages.create = MagicMock(return_value=mock_response)
-
+    llm.count_tokens = MagicMock(return_value=10)
     messages = [{"role": "user", "content": "Test message"}]
-    llm.query_anthropic_model(messages)
-
+    llm(messages)
     assert llm.client.messages.create.call_args[1]["max_tokens"] == 8192
 
 
-@patch("builtins.open", new_callable=mock_open, read_data=json.dumps(anthropic_config))
-def test_query_anthropic_model_no_code_block(mock_open, logger_mock):
-    llm = LLM("test-anthropic", logger=logger_mock)
-
+@patch("debug_gym.agents.llm_api.load_llm_config", return_value=anthropic_config)
+def test_query_anthropic_model_no_code_block(mock_llm_config, logger_mock):
+    llm = AnthropicLLM("test-anthropic", logger=logger_mock)
     mock_response = MagicMock()
     mock_response.content = [MagicMock()]
     mock_response.content[0].text = "This is a response without any code blocks"
     llm.client.messages.create = MagicMock(return_value=mock_response)
-
+    llm.count_tokens = MagicMock(return_value=10)
     messages = [{"role": "user", "content": "Test message"}]
+    result = llm(messages)
+    assert result.response == ""
+
 
 def test_retry_on_rate_limit_success_after_retry():
     mock_func = MagicMock(side_effect=[ValueError(), OSError(), "success"])
