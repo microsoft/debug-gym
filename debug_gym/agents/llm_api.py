@@ -546,21 +546,24 @@ class Human:
         )
 
 
-def instantiate_llm(
-    config: dict, logger: DebugGymLogger | None = None, use_async: bool = False
-):
+def instantiate_llm(config: dict, logger: DebugGymLogger | None = None) -> LLM:
+    llm_name = config["llm_name"]
+    if llm_name == "human":
+        return Human(llm_name, logger=logger)
+
     llm_config = load_llm_config()
-    available_models = list(llm_config.keys()) + ["human"]
-    if config["llm_name"] not in available_models:
+    try:
+        tags = llm_config[llm_name].get("tags", [])
+    except KeyError:
         raise ValueError(
-            f"Model {config['llm_name']} is not available, "
-            "please make sure the LLM config file is correctly set."
+            f"Model {llm_name} not found in llm.cfg, please "
+            "make sure the LLM config file is correctly set."
         )
-    if config["llm_name"] == "human":
-        llm = Human(logger=logger)
+    if "azure openai" in tags:
+        klass = AzureOpenAILLM
+    elif "anthropic" in tags:
+        klass = AnthropicLLM
     else:
-        if use_async:
-            llm = AsyncLLM(config["llm_name"], logger=logger)
-        else:
-            llm = LLM(config["llm_name"], logger=logger)
+        klass = OpenAILLM
+    llm = klass(llm_name, logger=logger)
     return llm

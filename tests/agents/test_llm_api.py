@@ -177,33 +177,52 @@ def test_human(build_env_info):
     assert llm_response.token_usage.response == 10
 
 
-@patch("tiktoken.encoding_for_model")
 @patch(
-    "builtins.open",
-    new_callable=mock_open,
-    read_data=json.dumps(
-        {
-            "gpt-4o-mini": {
-                "model": "gpt-4o-mini_2024-07-18",
-                "max_tokens": 100,
-                "tokenizer": "gpt-4o-mini",
-                "context_limit": 4,
-                "api_key": "test-api-key",
-                "endpoint": "https://test-endpoint",
-                "api_version": "v1",
-                "tags": ["azure openai"],
-            }
-        }
-    ),
+    "debug_gym.agents.llm_api.load_llm_config",
+    return_value={
+        "gpt-4o-mini-azure": {
+            "model": "gpt-4o-mini_2024-07-18",
+            "max_tokens": 100,
+            "tokenizer": "gpt-4o-mini",
+            "context_limit": 4,
+            "api_key": "test-api-key",
+            "endpoint": "https://test-endpoint",
+            "api_version": "v1",
+            "tags": ["azure openai"],
+        },
+        "gpt-4o-mini": {
+            "model": "gpt-4o-mini_2024-07-18",
+            "max_tokens": 100,
+            "tokenizer": "gpt-4o-mini",
+            "context_limit": 4,
+            "api_key": "test-api-key",
+            "endpoint": "https://test-endpoint",
+            "api_version": "v1",
+            "tags": ["openai"],
+        },
+        "claude-3.7": {
+            "model": "claude-3-7-sonnet-20250219",
+            "max_tokens": 100,
+            "tokenizer": "claude-3-7-sonnet-20250219",
+            "context_limit": 4,
+            "api_key": "test-api-key",
+            "tags": ["anthropic", "claude", "claude-3.7"],
+        },
+    },
 )
-def test_instantiate_llm(mock_open, mock_encoding_for_model, logger_mock):
-    mock_encoding = MagicMock()
-    mock_encoding.encode = lambda x: x.split()
-    mock_encoding_for_model.return_value = mock_encoding
-
+def test_instantiate_llm(mock_open, logger_mock):
+    # tags are used to filter models
     config = {"llm_name": "gpt-4o-mini"}
     llm = instantiate_llm(config, logger=logger_mock)
+    assert isinstance(llm, OpenAILLM)
+
+    config = {"llm_name": "gpt-4o-mini-azure"}
+    llm = instantiate_llm(config, logger=logger_mock)
     assert isinstance(llm, AzureOpenAILLM)
+
+    config = {"llm_name": "claude-3.7"}
+    llm = instantiate_llm(config, logger=logger_mock)
+    assert isinstance(llm, AnthropicLLM)
 
     config = {"llm_name": "human"}
     llm = instantiate_llm(config, logger=logger_mock)
