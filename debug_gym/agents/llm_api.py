@@ -7,7 +7,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
 import tiktoken
-from openai import NOT_GIVEN, AsyncAzureOpenAI, AsyncOpenAI, AzureOpenAI, OpenAI
+from openai import NOT_GIVEN, AzureOpenAI, OpenAI
 from tenacity import (
     retry,
     retry_if_exception,
@@ -18,6 +18,7 @@ from tenacity import (
 from termcolor import colored
 from transformers import AutoTokenizer
 
+from debug_gym.agents.utils import merge_messages, print_messages
 from debug_gym.logger import DebugGymLogger
 
 prompt_toolkit_available = False
@@ -49,42 +50,6 @@ def load_llm_config(config_file_path: str | None = None):
     except FileNotFoundError:
         raise FileNotFoundError(f"Cannot find llm config file: {config_file_path}")
     return llm_config
-
-
-def print_messages(messages: list[dict], logger: DebugGymLogger):
-    """Print messages coloring each role differently.
-    Messages is a list of dictionaries with role and content keys."""
-    for m in messages:
-        if m["role"] == "user":
-            logger.info(colored(f"{m['content']}\n", "cyan"))
-        elif m["role"] == "assistant":
-            logger.info(colored(f"{m['content']}\n", "green"))
-        elif m["role"] == "system":
-            logger.info(colored(f"{m['content']}\n", "yellow"))
-        else:
-            raise ValueError(f"Unknown role: {m['content']}")
-
-
-def merge_messages(messages: list[dict]) -> list[dict]:
-    """Merge consecutive messages with same role into one message."""
-    messages_out = []
-    to_merge = []
-
-    def merge():
-        content = "\n\n".join(m["content"] for m in to_merge if m["content"])
-        if content:
-            messages_out.append({"role": current_role, "content": content})
-
-    current_role = None
-    for message in messages:
-        if current_role == message["role"]:
-            to_merge.append(message)
-        else:
-            merge()  # merge the previous messages
-            current_role = message["role"]
-            to_merge = [message]
-    merge()  # merge the last messages
-    return messages_out
 
 
 def retry_on_rate_limit(

@@ -6,6 +6,7 @@ import os
 from dataclasses import asdict
 
 import yaml
+from termcolor import colored
 
 from debug_gym.agents.llm_api import LLMResponse
 from debug_gym.gym.envs.env import EnvInfo
@@ -93,6 +94,42 @@ class HistoryTracker:
                 history.step(info, llm_response)
 
         return history
+
+
+def print_messages(messages: list[dict], logger: DebugGymLogger):
+    """Print messages coloring each role differently.
+    Messages is a list of dictionaries with role and content keys."""
+    for m in messages:
+        if m["role"] == "user":
+            logger.info(colored(f"{m['content']}\n", "cyan"))
+        elif m["role"] == "assistant":
+            logger.info(colored(f"{m['content']}\n", "green"))
+        elif m["role"] == "system":
+            logger.info(colored(f"{m['content']}\n", "yellow"))
+        else:
+            raise ValueError(f"Unknown role: {m['content']}")
+
+
+def merge_messages(messages: list[dict]) -> list[dict]:
+    """Merge consecutive messages with same role into one message."""
+    messages_out = []
+    to_merge = []
+
+    def merge():
+        content = "\n\n".join(m["content"] for m in to_merge if m["content"])
+        if content:
+            messages_out.append({"role": current_role, "content": content})
+
+    current_role = None
+    for message in messages:
+        if current_role == message["role"]:
+            to_merge.append(message)
+        else:
+            merge()  # merge the previous messages
+            current_role = message["role"]
+            to_merge = [message]
+    merge()  # merge the last messages
+    return messages_out
 
 
 def trim(text: str, max_length: int, count_tokens: callable, where: str = "middle"):

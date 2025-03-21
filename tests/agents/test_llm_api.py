@@ -14,8 +14,6 @@ from debug_gym.agents.llm_api import (
     TokenUsage,
     instantiate_llm,
     load_llm_config,
-    merge_messages,
-    print_messages,
     retry_on_rate_limit,
 )
 from debug_gym.logger import DebugGymLogger
@@ -54,39 +52,6 @@ def test_is_rate_limit_error(openai_llm):
         "Rate limit exceeded", response=mock_response, body=mock_response.body
     )
     assert openai_llm.is_rate_limit_error(exception) == True
-
-
-def test_print_messages(logger_mock):
-    messages = [
-        {"role": "user", "content": "Hello"},
-        {"role": "assistant", "content": "Hi"},
-        {"role": "system", "content": "System message"},
-    ]
-    print_messages(messages, logger_mock)
-    assert logger_mock._log_history == ["Hello\n", "Hi\n", "System message\n"]
-
-
-def test_merge_messages():
-    messages = [
-        {"role": "user", "content": "Hello"},
-        {"role": "user", "content": "How are you?"},
-        {"role": "assistant", "content": "Hi"},
-    ]
-    merged = merge_messages(messages)
-    assert len(merged) == 2
-    assert merged[0]["content"] == "Hello\n\nHow are you?"
-
-    # Ignore empty message
-    messages = [
-        {"role": "user", "content": "Hello"},
-        {"role": "user", "content": ""},
-        {"role": "user", "content": "How are you?"},
-        {"role": "user", "content": ""},
-        {"role": "assistant", "content": "Hi"},
-    ]
-    merged = merge_messages(messages)
-    assert len(merged) == 2
-    assert merged[0]["content"] == "Hello\n\nHow are you?"
 
 
 @patch("openai.resources.chat.completions.Completions.create")
