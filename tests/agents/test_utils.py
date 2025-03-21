@@ -14,25 +14,25 @@ from debug_gym.agents.utils import (
 
 
 def test_trim_prompt_messages():
-    def token_counter(text):
+    def count_tokens(text):
         return len(text)
 
     with pytest.raises(Exception, match="messages should not be empty"):
-        trim_prompt_messages([], 5, token_counter)
+        trim_prompt_messages([], 5, count_tokens)
 
     with pytest.raises(
         Exception,
         match='all messages should be dictionaries with keys "content" and "role"',
     ):
         messages = [{"role": "system", "key": "System message"}]
-        trim_prompt_messages(messages, 20, token_counter)
+        trim_prompt_messages(messages, 20, count_tokens)
 
     with pytest.raises(Exception, match="the last message should be from the user"):
         messages = [
             {"role": "system", "content": "System message"},
             {"role": "assistant", "content": "Assistant message"},
         ]
-        trim_prompt_messages(messages, 20, token_counter)
+        trim_prompt_messages(messages, 20, count_tokens)
 
     with pytest.raises(
         Exception,
@@ -43,15 +43,15 @@ def test_trim_prompt_messages():
             {"role": "system", "content": "System message 2"},
             {"role": "user", "content": "User message"},
         ]
-        trim_prompt_messages(messages, 20, token_counter)
+        trim_prompt_messages(messages, 20, count_tokens)
 
     with pytest.raises(Exception, match="context_length should be non-negative"):
         messages = [{"role": "user", "content": "User message"}]
-        trim_prompt_messages(messages, -1, token_counter)
+        trim_prompt_messages(messages, -1, count_tokens)
 
     messages = [{"role": "user", "content": "User message"}]
     trimmed_messages = [{"role": "user", "content": "Us…ge"}]
-    assert trim_prompt_messages(messages, 5, token_counter) == trimmed_messages
+    assert trim_prompt_messages(messages, 5, count_tokens) == trimmed_messages
 
     messages = [
         {"role": "system", "content": "System message"},
@@ -61,7 +61,7 @@ def test_trim_prompt_messages():
         {"role": "system", "content": "System message"},
         {"role": "user", "content": "Us…ge"},
     ]
-    assert trim_prompt_messages(messages, 20, token_counter) == expected
+    assert trim_prompt_messages(messages, 20, count_tokens) == expected
 
     messages = [
         {"role": "user", "content": "User message"},
@@ -69,7 +69,7 @@ def test_trim_prompt_messages():
         {"role": "user", "content": "User message 2"},
     ]
     expected = messages
-    assert trim_prompt_messages(messages, 200, token_counter) == expected
+    assert trim_prompt_messages(messages, 200, count_tokens) == expected
 
     messages = [
         {"role": "user", "content": "User message 1"},
@@ -80,7 +80,7 @@ def test_trim_prompt_messages():
         {"role": "assistant", "content": "Assistant message"},
         {"role": "user", "content": "User message 2"},
     ]
-    assert trim_prompt_messages(messages, 35, token_counter) == expected
+    assert trim_prompt_messages(messages, 35, count_tokens) == expected
 
     messages = [
         {"role": "system", "content": "System message"},
@@ -92,7 +92,7 @@ def test_trim_prompt_messages():
         {"role": "system", "content": "System message"},
         {"role": "user", "content": "User message 2"},
     ]
-    assert trim_prompt_messages(messages, 35, token_counter) == expected
+    assert trim_prompt_messages(messages, 35, count_tokens) == expected
 
     messages = [
         {"role": "system", "content": "System message"},
@@ -110,7 +110,7 @@ def test_trim_prompt_messages():
         {"role": "assistant", "content": "Assistant message 3"},
         {"role": "user", "content": "User message 4"},
     ]
-    assert trim_prompt_messages(messages, 65, token_counter) == expected
+    assert trim_prompt_messages(messages, 65, count_tokens) == expected
 
 
 def test_history_tracker(build_env_info):
@@ -459,37 +459,37 @@ def test_load_config():
 
 
 def test_trim():
-    def token_counter(text):
+    def count_tokens(text):
         return len(text)
 
     # Test trimming from the middle
-    assert trim("Hello world", 5, token_counter) == "He…ld"
-    assert trim("Hello world", 11, token_counter) == "Hello world"
+    assert trim("Hello world", 5, count_tokens) == "He…ld"
+    assert trim("Hello world", 11, count_tokens) == "Hello world"
 
     # Test trimming from the end
-    assert trim("Hello world", 5, token_counter, where="end") == "Hell…"
-    assert trim("Hello world", 11, token_counter, where="end") == "Hello world"
+    assert trim("Hello world", 5, count_tokens, where="end") == "Hell…"
+    assert trim("Hello world", 11, count_tokens, where="end") == "Hello world"
 
     # Test trimming from the start
-    assert trim("Hello world", 5, token_counter, where="start") == "…orld"
-    assert trim("Hello world", 11, token_counter, where="start") == "Hello world"
+    assert trim("Hello world", 5, count_tokens, where="start") == "…orld"
+    assert trim("Hello world", 11, count_tokens, where="start") == "Hello world"
 
     # Test trimming with very short max_length
-    assert trim("Hello world", 1, token_counter) == "…"
-    assert trim("Hello world", 0, token_counter) == ""
+    assert trim("Hello world", 1, count_tokens) == "…"
+    assert trim("Hello world", 0, count_tokens) == ""
 
     # Test trimming with exact length
-    assert trim("Hi", 2, token_counter) == "Hi"
-    assert trim("Hi", 1, token_counter) == "…"
+    assert trim("Hi", 2, count_tokens) == "Hi"
+    assert trim("Hi", 1, count_tokens) == "…"
 
     # Test invalid `where` value
     with pytest.raises(ValueError, match="Invalid value for `where`"):
-        trim("Hello world", 5, token_counter, where="invalid")
+        trim("Hello world", 5, count_tokens, where="invalid")
 
-    def token_counter(text):
+    def another_count_tokens(text):
         return len(text) // 2
 
     # Test trimming with a different token counter
-    assert trim("1234567890", 3, token_counter) == "12…90"
-    assert trim("1234567890", 4, token_counter) == "123…890"
-    assert trim("1234567890", 5, token_counter) == "1234567890"
+    assert trim("1234567890", 3, another_count_tokens) == "12…90"
+    assert trim("1234567890", 4, another_count_tokens) == "123…890"
+    assert trim("1234567890", 5, another_count_tokens) == "1234567890"

@@ -95,10 +95,9 @@ class HistoryTracker:
         return history
 
 
-def trim(text: str, max_length: int, token_counter: callable, where: str = "middle"):
-
+def trim(text: str, max_length: int, count_tokens: callable, where: str = "middle"):
     # Get an approximate number of characters per token ratio in the text.
-    nb_tokens = token_counter(text=text)
+    nb_tokens = count_tokens(text=text)
     if nb_tokens == 0:
         return text
 
@@ -128,12 +127,12 @@ def trim(text: str, max_length: int, token_counter: callable, where: str = "midd
 
 
 def trim_prompt_messages(
-    messages: list[dict], context_length: int, token_counter: callable
+    messages: list[dict], context_length: int, count_tokens: callable
 ):
     # Trim message content to context length
     # messages: list of dict, each dict has keys "content" and "role"
     # context_length: int, maximum number of tokens
-    # token_counter: function, count the number of tokens in a string
+    # count_tokens: function, count the number of tokens in a string
     # messages should not be empty
     assert len(messages) > 0, "messages should not be empty"
     # all messages should be dictionaries with keys "content" and "role"
@@ -150,7 +149,7 @@ def trim_prompt_messages(
     # context_length should be non-negative
     assert context_length >= 0, "context_length should be non-negative"
 
-    message_lengths = [token_counter(text=item["content"]) for item in messages]
+    message_lengths = [count_tokens(item["content"]) for item in messages]
     total_length = sum(message_lengths)
     if total_length <= context_length:
         return messages
@@ -173,7 +172,7 @@ def trim_prompt_messages(
         new_messages[-1]["content"] = trim(
             new_messages[-1]["content"],
             token_space_remaining,
-            token_counter=token_counter,
+            count_tokens=count_tokens,
             where="middle",
         )
     else:

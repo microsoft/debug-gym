@@ -71,18 +71,18 @@ class BaseAgent:
             system_prompt = unescape(
                 json.dumps(system_prompt, indent=2, sort_keys=True)
             )
-            return self.llm.context_length - self.llm.token_counter(text=system_prompt)
+            return self.llm.context_length - self.llm.count_tokens(system_prompt)
 
         system_prompt = {}
         system_prompt["Overall task"] = self.system_prompt
         system_prompt["Instructions"] = info.instructions
-        if self.llm.context_length is not None and self.llm.token_counter is not None:
+        if self.llm.context_length is not None and self.llm.count_tokens is not None:
             system_prompt["Repo directory tree"] = trim(
                 info.dir_tree,
                 min(
                     int(0.1 * self.llm.context_length), calc_tokens_left(system_prompt)
                 ),
-                token_counter=self.llm.token_counter,
+                count_tokens=self.llm.count_tokens,
                 where="end",
             )
         else:
@@ -95,7 +95,7 @@ class BaseAgent:
             )
             if (
                 self.llm.context_length is not None
-                and self.llm.token_counter is not None
+                and self.llm.count_tokens is not None
             ):
                 system_prompt["Current code in view"]["Content"] = trim(
                     system_prompt["Current code in view"]["Content"],
@@ -103,17 +103,17 @@ class BaseAgent:
                         int(0.8 * self.llm.context_length),
                         calc_tokens_left(system_prompt),
                     ),
-                    token_counter=self.llm.token_counter,
+                    count_tokens=self.llm.count_tokens,
                     where="end",
                 )
 
-        if self.llm.context_length is not None and self.llm.token_counter is not None:
+        if self.llm.context_length is not None and self.llm.count_tokens is not None:
             system_prompt["Last evaluation output"] = trim(
                 info.eval_observation.observation,
                 min(
                     int(0.8 * self.llm.context_length), calc_tokens_left(system_prompt)
                 ),
-                token_counter=self.llm.token_counter,
+                count_tokens=self.llm.count_tokens,
                 where="middle",
             )
         else:

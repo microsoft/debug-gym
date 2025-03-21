@@ -166,10 +166,6 @@ class LLM(ABC):
         """Abstract method to tokenize a text."""
         pass
 
-    def token_counter(self, text: str) -> int:
-        """Count the number of tokens in a text."""
-        return self.count_tokens(text)
-
     def count_tokens(self, text: str) -> int:
         """Count the number of tokens in a text."""
         return len(self.tokenize(text))
@@ -517,10 +513,6 @@ class Human:
 
     def count_tokens(self, text: str) -> int:
         return len(self.tokenize(text))
-
-    def token_counter(self, text: str) -> int:
-        """Count the number of tokens in a text."""
-        return self.count_tokens(text)
 
     def __call__(self, messages, info, *args, **kwargs) -> LLMResponse:
         print_messages(messages, self.logger)
