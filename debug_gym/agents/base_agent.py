@@ -6,8 +6,9 @@ from os.path import join as pjoin
 
 import numpy as np
 
+from debug_gym.agents.history_tracker import HistoryTracker, build_history_prompt
 from debug_gym.agents.llm_api import instantiate_llm
-from debug_gym.agents.utils import HistoryTracker, build_history_prompt, trim
+from debug_gym.agents.utils import trim
 from debug_gym.gym.envs.env import RepoEnv
 from debug_gym.gym.utils import unescape
 from debug_gym.logger import DebugGymLogger

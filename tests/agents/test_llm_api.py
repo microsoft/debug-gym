@@ -20,22 +20,6 @@ from debug_gym.logger import DebugGymLogger
 
 
 @pytest.fixture
-def logger_mock():
-    logger = DebugGymLogger("test_logger")
-    logger.setLevel(logging.DEBUG)
-    logs = []
-
-    class ListHandler(logging.Handler):
-        def emit(self, record):
-            logs.append(record.getMessage())
-
-    handler = ListHandler()
-    logger.addHandler(handler)
-    logger._log_history = logs
-    return logger
-
-
-@pytest.fixture
 def openai_llm(logger_mock, llm_config_mock):
     # Create an instance of AsyncOpenAILLM with a mock configuration
     model_name = "test_model"

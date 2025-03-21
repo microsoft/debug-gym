@@ -1,10 +1,28 @@
 import json
+import logging
 from unittest.mock import MagicMock, mock_open, patch
 
 import pytest
 
 from debug_gym.gym.entities import Observation
 from debug_gym.gym.envs.env import EnvInfo
+from debug_gym.logger import DebugGymLogger
+
+
+@pytest.fixture
+def logger_mock():
+    logger = DebugGymLogger("test_logger")
+    logger.setLevel(logging.DEBUG)
+    logs = []
+
+    class ListHandler(logging.Handler):
+        def emit(self, record):
+            logs.append(record.getMessage())
+
+    handler = ListHandler()
+    logger.addHandler(handler)
+    logger._log_history = logs
+    return logger
 
 
 @pytest.fixture
