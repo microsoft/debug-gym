@@ -365,43 +365,30 @@ class OpenAILLM(LLM):
         exception_full_name = (
             f"{exception.__class__.__module__}.{exception.__class__.__name__}"
         )
-        if isinstance(exception, KeyboardInterrupt):
-            return False
 
-        # Look for error code that shouldn't be retry.
-        match exception_full_name:
-            case "openai.APIStatusError":
-                if "'status': 429" in exception.message:  # Rate Limit Exceeded
-                    self.logger.debug(
-                        f"Error calling {self.model_name}: {exception_full_name!r} {exception.message}"
-                    )
-                    return True
-                elif "'status': 504" in exception.message:  # Gateway Timeout
-                    self.logger.debug(
-                        f"Error calling {self.model_name}: {exception_full_name!r} {exception.message}"
-                    )
-                    return True
-                elif (
+        is_error = exception_full_name in rate_limit_errors
+        logger = self.logger.debug
+
+        # Ignore error that are not rate limit errors
+        if exception_full_name == "openai.APIStatusError":
+            if not (
+                "'status': 429" in exception.message  # Rate Limit Exceeded
+                or "'status': 504" in exception.message  # Gateway Timeout
+                or (  # A previous prompt was too large
                     "'status': 413" in exception.message
                     and "A previous prompt was too large." in exception.message
-                ):  # A previous prompt was too large.
-                    self.logger.debug(
-                        f"Error calling {self.model_name}: {exception_full_name!r} {exception.message}"
-                    )
-                    return True
-                else:
-                    self.logger.warning(
-                        f"Error calling {self.model_name}: {exception_full_name!r} {exception.message}"
-                    )
-                    return False
-            case _:
-                self.logger.debug(
-                    f"Error calling {self.model_name}: {exception_full_name!r} {
-                        exception.message if hasattr(exception, 'message') else exception
-                    }"
                 )
+            ):
+                is_error = False
+                logger = self.logger.warning
 
-        return exception_full_name in rate_limit_errors
+        logger(
+            f"Error calling {self.model_name}: {exception_full_name!r} {
+                exception.message if hasattr(exception, 'message') else exception
+            }"
+        )
+
+        return is_error
 
     def generate(self, messages, **kwargs):
         response = retry_on_rate_limit(

@@ -1,6 +1,5 @@
 import json
-import logging
-from unittest.mock import AsyncMock, MagicMock, mock_open, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from openai import RateLimitError
@@ -16,7 +15,6 @@ from debug_gym.agents.llm_api import (
     load_llm_config,
     retry_on_rate_limit,
 )
-from debug_gym.logger import DebugGymLogger
 
 
 @pytest.fixture
@@ -482,3 +480,61 @@ def test_retry_on_rate_limit_skip_keyboard_interrupt():
     mock_func.assert_called_once_with("test_arg")
     # The error checker should never be called for KeyboardInterrupt
     mock_is_rate_limit_error.assert_not_called()
+
+
+def create_fake_exception(module: str, classname: str, message: str):
+    exc_type = type(classname, (Exception,), {})
+    exc = exc_type(message)
+    exc.message = message
+    exc.__class__.__module__ = module
+    return exc
+
+
+@patch(
+    "debug_gym.agents.llm_api.load_llm_config",
+    return_value={
+        "openai": {
+            "model": "openai",
+            "context_limit": 4096,
+            "api_key": "fake",
+            "endpoint": "fake",
+            "api_version": "1",
+            "tags": ["openai"],
+        }
+    },
+)
+def test_is_rate_limit_error_status_429(logger_mock, llm_config_mock):
+    openai_llm = OpenAILLM("openai", logger=logger_mock)
+
+    exc = create_fake_exception(
+        "openai", "APIStatusError", "Error occurred: 'status': 429 rate limit"
+    )
+    assert openai_llm.is_rate_limit_error(exc) is True
+
+    exc = create_fake_exception(
+        "openai", "APIStatusError", "Encountered error: 'status': 504 gateway timeout"
+    )
+    assert openai_llm.is_rate_limit_error(exc) is True
+
+    exc = create_fake_exception(
+        "openai",
+        "APIStatusError",
+        "Failure: 'status': 413 A previous prompt was too large. Please shorten input.",
+    )
+    assert openai_llm.is_rate_limit_error(exc) is True
+
+    exc = create_fake_exception(
+        "openai", "APIStatusError", "Error: 'status': 500 internal server error"
+    )
+    assert openai_llm.is_rate_limit_error(exc) is False
+
+    exc = create_fake_exception(
+        "openai", "PermissionDeniedError", "Permission denied error"
+    )
+    assert openai_llm.is_rate_limit_error(exc) is True
+
+    exc = create_fake_exception("openai", "SomeOtherError", "Some other error")
+    assert openai_llm.is_rate_limit_error(exc) is False
+
+    exc = KeyboardInterrupt()  # KeyboardInterrupt should not be retried
+    assert openai_llm.is_rate_limit_error(exc) is False
