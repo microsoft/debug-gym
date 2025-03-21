@@ -99,7 +99,7 @@ def retry_on_rate_limit(
     Returns:
         The result of the function call
     """
-    retry_decorator = retry(
+    retry_function = retry(
         retry=(
             retry_if_not_exception_type(KeyboardInterrupt)
             & retry_if_exception(is_rate_limit_error_func)
@@ -107,7 +107,7 @@ def retry_on_rate_limit(
         wait=wait_random_exponential(multiplier=multiplier, max=max_wait),
         stop=stop_after_attempt(max_attempts),
     )
-    return retry_decorator(func)
+    return retry_function(func)
 
 
 @dataclass
