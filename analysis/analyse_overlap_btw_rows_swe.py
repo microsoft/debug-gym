@@ -183,6 +183,99 @@ def plot_overlap_winning_games_between_agents(df_dict, figsize=(12, 7)):
     plt.show()
 
 
+def plot_overlap_between_agents(df_dict, figsize=(12, 7)):
+    """
+    There are three agents: rewrite, pdb, and seq. Each agent has 3 runs (seeds 0, 1, 2).
+    Because both the pdb and seq agents are developed based on the rewrite agent.
+    We want to understand when the rewrite agent is able to solve a task (win at least once out of 3 runs), what is the probability that the pdb and seq agents are also able to solve the same task (win at least once out of 3 runs).
+    Creates a grouped bar plot showing it.
+    Args:
+        df_dict (dict): Dictionary mapping model names to their DataFrames with averaged results
+        figsize (tuple): Figure size (width, height)
+    """
+    all_data = []
+    all_llms = set()
+    for model_name, df in df_dict.items():
+        # extract the index of games that are won by this agent at least once, twice, or all three times
+        # get the index of games won by this agent (across different seeds)
+        won_games = (
+            df[df["success"] == True].groupby("task").size().reset_index(name="count")
+        )
+        # won_at_least_once
+        task_name_won_at_least_once = won_games[won_games["count"] >= 1].task.unique()
+        # add to all_data
+        if model_name.split("_")[-1] not in all_llms:
+            all_llms.add(model_name.split("_")[-1])
+        all_data.append(
+            {
+                "agent": model_name.split("_")[0],
+                "llm": model_name.split("_")[-1],
+                "indices_won_at_least_once": task_name_won_at_least_once,
+            }
+        )
+
+    new_data = []
+    for _llm in ["llama33-70b", "4o", "4o-mini", "o1", "o3-mini", "claude37"]:
+        # for _llm in ["o3-mini", "claude37"]:
+        _indices_rewrite, _indices_pdb, _indices_seq = None, None, None
+        for _data in all_data:
+            if _data["llm"] != _llm:
+                continue
+            if _data["agent"] == "rewrite":
+                _indices_rewrite = _data["indices_won_at_least_once"]
+            elif _data["agent"] == "pdb":
+                _indices_pdb = _data["indices_won_at_least_once"]
+            elif _data["agent"] == "seq":
+                _indices_seq = _data["indices_won_at_least_once"]
+        # get the intersection between agents
+        _indices_rewrite_pdb = set.intersection(
+            set(_indices_rewrite), set(_indices_pdb)
+        )
+        _indices_rewrite_seq = set.intersection(
+            set(_indices_rewrite), set(_indices_seq)
+        )
+        new_data.append(
+            {
+                "llm": _llm,
+                "debug/rewrite": len(_indices_rewrite_pdb) / len(_indices_rewrite),
+                "debug(5)/rewrite": len(_indices_rewrite_seq) / len(_indices_rewrite),
+            }
+        )
+    # create a dataframe from new_data
+    df = pd.DataFrame(new_data)
+    # melt the dataframe to long format
+
+    # melt the dataframe to long format
+    df = pd.melt(df, id_vars=["llm"], value_vars=["debug/rewrite", "debug(5)/rewrite"])
+    # rename the columns
+    df.columns = ["llm", "won", "count"]
+    # import pdb; pdb.set_trace()
+    # create a grouped bar plot
+    palette = sns.color_palette("Set2")
+    # set color
+    sns.set_palette(palette)
+    plt.figure(figsize=figsize)
+    sns.barplot(data=df, x="llm", y="count", hue="won")
+    plt.xlabel("LLM backbone")
+    plt.ylabel("Proportion")
+    plt.yticks(
+        np.arange(0, 1.1, 0.2),
+        [
+            "0",
+            "20%",
+            "40%",
+            "60%",
+            "80%",
+            "100%",
+        ],
+    )  # Set y-ticks for the first subplot
+    plt.legend()
+    # add grid
+    plt.grid(True, alpha=0.3)
+    plt.show()
+    # import pdb; pdb.set_trace()
+
+
 # Example usage:
 model_paths = [
     "../exps/swe-bench/rewrite_llama33-70b",
@@ -213,4 +306,4 @@ for _path in tqdm(model_paths):
         _path + "/" + _name, seeds=[0, 1, 2]
     )
 # Plot comparison
-plot_overlap_winning_games_between_agents(results_dict)
+plot_overlap_between_agents(results_dict)

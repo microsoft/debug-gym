@@ -57,6 +57,13 @@ def parse_line_numbers(line_number_string):
     return [head, tail]
 
 
+def is_comment(line):
+    line = line.strip()
+    if line.startswith("#"):
+        return True
+    return False
+
+
 def parse_action(action_string):
     action_string = action_string.split("```rewrite", 1)[1].strip()
     new_code = action_string.split("<c>", 1)[1].split("</c>", 1)[0]
@@ -81,8 +88,9 @@ def parse_action(action_string):
     new_code = clean_code(new_code)  # str
     new_code_lines = new_code.split("\n")
     new_code_length = len(new_code_lines)
+    _comment = np.sum([float(is_comment(line)) for line in new_code_lines])
     _to = new_code_length
-    return _from, _to
+    return _from, _to, _comment
 
 
 def analyze_froggy_results(model_name):
@@ -112,6 +120,7 @@ def analyze_froggy_results(model_name):
                 # Count rewrite commands
                 _from_list = []
                 _to_list = []
+                _comment_list = []
                 episode_length = 0
                 for step in data.get("log", []):
                     episode_length += 1
@@ -119,9 +128,10 @@ def analyze_froggy_results(model_name):
                         break
                     if step.get("action") and "```rewrite" in step["action"]:
                         try:
-                            _from, _to = parse_action(step["action"])
+                            _from, _to, _comment = parse_action(step["action"])
                             _from_list.append(_from)
                             _to_list.append(_to)
+                            _comment_list.append(_comment)
                         except:
                             continue
                 results.append(
@@ -130,6 +140,7 @@ def analyze_froggy_results(model_name):
                         "success": success,
                         "_from": _from_list,
                         "_to": _to_list,
+                        "comment": _comment_list,
                     }
                 )
 
@@ -175,116 +186,6 @@ agent_name_map = {
 }
 
 
-def plot_rewrite_length(df_dict, figsize=(12, 7)):
-    """
-    Creates a grouped bar chart showing how many lines of code the rewrite tool tries to rewrite (from).
-    Args:
-        df_dict (dict): Dictionary mapping model names to their DataFrames with averaged results
-        figsize (tuple): Figure size (width, height)
-    """
-
-    all_data = []
-    # Create plot for each model
-    for model_name, df in df_dict.items():
-        # ignore the data points where the agent failed
-        if ONLY_SUCCESS:
-            df = df[df["success"]]
-        for agent in ["rewrite", "pdb", "seq"]:
-            if agent not in model_name:
-                continue
-            # df["_from"] is a list of lists, so we need to flatten it
-            _from = [item for sublist in df["_from"] for item in sublist]
-            _to = [item for sublist in df["_to"] for item in sublist]
-            # import pdb; pdb.set_trace()
-            rewrite_from_mean = np.mean(_from)
-            rewrite_to_mean = np.mean(_to)
-            # rewrite_from_std = np.std(_from)
-            all_data.append(
-                [
-                    model_name,
-                    model_name[len(agent) + 1 :],
-                    agent_name_map[agent],
-                    float(round(rewrite_from_mean, 2)),
-                    float(round(rewrite_to_mean, 2)),
-                ]
-            )
-    # all_data = np.array(all_data)
-    print(all_data)
-    # convert to DataFrame
-    all_data = pd.DataFrame(
-        all_data, columns=["name", "model", "agent", "rewrite from", "rewrite to"]
-    )
-
-    f, (ax1, ax2) = plt.subplots(ncols=1, nrows=2, sharex=True)
-    sns.barplot(
-        data=all_data,
-        x="name",
-        y="rewrite from",
-        hue="agent",
-        palette="Set2",
-        ax=ax1,
-    )
-    sns.barplot(
-        data=all_data,
-        x="name",
-        y="rewrite to",
-        hue="agent",
-        palette="Set2",
-        ax=ax2,
-    )
-
-    ax1.set_ylim(0, 20)
-    ax2.set_ylim(0, 15)
-    ax1.set_yticks(np.arange(0, 21, 5))  # Set y-ticks for the first subplot
-    ax2.set_yticks(np.arange(0, 21, 5))  # Set y-ticks for the second subplot
-    # add grid lines
-    ax1.grid(True, alpha=0.3)
-    ax2.grid(True, alpha=0.3)
-
-    ax1.set_ylabel("# removed lines")
-    ax2.set_ylabel("# added lines")
-    ax2.get_legend().remove()
-    # remove ax1 legend title
-    ax1.get_legend().set_title("")
-    # remove x label from both subplots
-    ax1.set_xlabel("")
-    ax2.set_xlabel("Backbone LLM")
-    plt.xticks(rotation=90)
-    # custom x ticks
-    plt.xticks(
-        np.arange(len(all_data)),
-        [
-            "llama33-70b",
-            "4o",
-            "4o-mini",
-            "o1",
-            "o3-mini",
-            "claude37",
-            "llama33-70b",
-            "4o",
-            "4o-mini",
-            "o1",
-            "o3-mini",
-            "claude37",
-            "llama33-70b",
-            "4o",
-            "4o-mini",
-            "o1",
-            "o3-mini",
-            "claude37",
-        ],
-    )
-    # # cutsom legend with same three colors as above
-    # plt.legend(
-    #     ["rewrite", "debug", "second-chance"],
-    #     loc="upper left",
-    #     bbox_to_anchor=(1, 1),
-    # )
-    plt.grid(True, alpha=0.3)
-    plt.tight_layout()
-    plt.show()
-
-
 def plot_rewrite_length_grouped(df_dict, figsize=(12, 7)):
     """
     Creates a grouped bar chart showing how many lines of code the rewrite tool tries to remove and add.
@@ -306,10 +207,11 @@ def plot_rewrite_length_grouped(df_dict, figsize=(12, 7)):
             # df["_from"] is a list of lists, so we need to flatten it
             _from = [item for sublist in df["_from"] for item in sublist]
             _to = [item for sublist in df["_to"] for item in sublist]
+            _comment = [item for sublist in df["comment"] for item in sublist]
             # import pdb; pdb.set_trace()
             rewrite_from_mean = np.mean(_from)
             rewrite_to_mean = np.mean(_to)
-            # rewrite_from_std = np.std(_from)
+            rewrite_comment_mean = np.mean(_comment)
             _tmp_data.append(
                 [
                     model_name,
@@ -317,6 +219,7 @@ def plot_rewrite_length_grouped(df_dict, figsize=(12, 7)):
                     agent_name_map[agent],
                     float(round(rewrite_from_mean, 2)),
                     float(round(rewrite_to_mean, 2)),
+                    float(round(rewrite_comment_mean, 2)),
                 ]
             )
         all_data.append(_tmp_data)
@@ -324,12 +227,17 @@ def plot_rewrite_length_grouped(df_dict, figsize=(12, 7)):
     print(all_data)
     # convert to DataFrame
     all_data = [
-        pd.DataFrame(item, columns=["name", "model", "agent", "removed", "added"])
+        pd.DataFrame(
+            item, columns=["name", "model", "agent", "deleted", "added", "comment"]
+        )
         for item in all_data
     ]
     # melt the DataFrame to long format
     all_data = [
-        item.melt(id_vars=["name", "model", "agent"], value_vars=["removed", "added"])
+        item.melt(
+            id_vars=["name", "model", "agent"],
+            value_vars=["deleted", "added", "comment"],
+        )
         for item in all_data
     ]
     all_data = [
@@ -357,7 +265,7 @@ def plot_rewrite_length_grouped(df_dict, figsize=(12, 7)):
         y="lines",
         hue="rewrite type",
         palette="Set2",
-        hue_order=["removed", "added"],
+        hue_order=["deleted", "added", "comment"],
         dodge=True,
         edgecolor="black",
         linewidth=0.5,
@@ -392,7 +300,7 @@ def plot_rewrite_length_grouped(df_dict, figsize=(12, 7)):
         y="lines",
         hue="rewrite type",
         palette="Set2",
-        hue_order=["removed", "added"],
+        hue_order=["deleted", "added", "comment"],
         dodge=True,
         edgecolor="black",
         linewidth=0.5,
@@ -424,7 +332,7 @@ def plot_rewrite_length_grouped(df_dict, figsize=(12, 7)):
         y="lines",
         hue="rewrite type",
         palette="Set2",
-        hue_order=["removed", "added"],
+        hue_order=["deleted", "added", "comment"],
         dodge=True,
         edgecolor="black",
         linewidth=0.5,
