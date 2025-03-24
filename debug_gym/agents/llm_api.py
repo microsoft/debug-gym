@@ -77,7 +77,6 @@ class LLMConfig:
     api_key: Optional[str] = None
     endpoint: Optional[str] = None
     tokenizer: Optional[str] = None
-    max_tokens: Optional[int] = None
     reasoning_end_token: Optional[str] = None
     system_prompt_support: bool = True
     ignore_kwargs: List[str] = None
@@ -85,6 +84,8 @@ class LLMConfig:
     # Azure OpenAI specific fields
     api_version: Optional[str] = None
     scope: Optional[str] = None
+    # Custom parameters to pass to generate
+    generate_kwargs: dict = None
 
     def __post_init__(self):
         # Set tokenizer to model if not specified
@@ -95,6 +96,8 @@ class LLMConfig:
             self.ignore_kwargs = []
         if self.tags is None:
             self.tags = []
+        if self.generate_kwargs is None:
+            self.generate_kwargs = {}
 
 
 @dataclass
@@ -223,10 +226,11 @@ class LLM(ABC):
         """
         from debug_gym.agents.utils import trim_prompt_messages
 
-        # set max tokens if not provided
-        kwargs["max_tokens"] = kwargs.get(
-            "max_tokens", self.config.max_tokens or NOT_GIVEN  # OpenAI
-        )
+        # Add custom generation parameters from config
+        for key, value in self.config.generate_kwargs.items():
+            # Only set if not already specified in the call
+            if key not in kwargs:
+                kwargs[key] = value
 
         # replace system prompt by user prompt if not supported
         if not self.config.system_prompt_support:
@@ -352,39 +356,18 @@ class AnthropicLLM(LLM):
                     "content": "Your answer is: ",
                 }
             ]
-
-        if "thinking" in self.config.tags:
-            kwargs["max_tokens"] = 20000
-            kwargs["temperature"] = 1.0
-
-            response = (
-                retry_on_rate_limit(
-                    self.client.messages.create, self.is_rate_limit_error
-                )(
-                    model=self.config.model,
-                    thinking={"type": "enabled", "budget_tokens": 16000},
-                    system=system_prompt,
-                    messages=user_assistant_prompt,
-                    **kwargs,
-                )
-                .content[1]
-                .text
+        # if thinking is enabled, the first message is the thought,
+        # the last messages `content[-1]` is the response in any mode
+        response = (
+            retry_on_rate_limit(self.client.messages.create, self.is_rate_limit_error)(
+                model=self.config.model,
+                system=system_prompt,
+                messages=user_assistant_prompt,
+                **kwargs,
             )
-        else:
-            kwargs["max_tokens"] = 8192
-            response = (
-                retry_on_rate_limit(
-                    self.client.messages.create, self.is_rate_limit_error
-                )(
-                    model=self.config.model,
-                    system=system_prompt,
-                    messages=user_assistant_prompt,
-                    **kwargs,
-                )
-                .content[0]
-                .text
-            )
-
+            .content[-1]
+            .text
+        )
         response = response.strip()
         # only keep the content between the two ```.
         p = re.compile(r"```(.*?)```", re.DOTALL)
@@ -474,6 +457,8 @@ class OpenAILLM(LLM):
         return is_error
 
     def generate(self, messages, **kwargs):
+        # set max tokens if not provided
+        kwargs["max_tokens"] = kwargs.get("max_tokens", NOT_GIVEN)
         response = retry_on_rate_limit(
             self.client.chat.completions.create, self.is_rate_limit_error
         )(

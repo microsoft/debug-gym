@@ -45,7 +45,6 @@ def test_is_rate_limit_error(openai_llm):
         {
             "openai": {
                 "model": "openai",
-                "max_tokens": 100,
                 "tokenizer": "gpt-4o",
                 "context_limit": 4,
                 "api_key": "test-api-key",
@@ -135,7 +134,6 @@ def test_human(build_env_info):
         {
             "gpt-4o-mini-azure": {
                 "model": "gpt-4o-mini_2024-07-18",
-                "max_tokens": 100,
                 "tokenizer": "gpt-4o-mini",
                 "context_limit": 4,
                 "api_key": "test-api-key",
@@ -145,7 +143,6 @@ def test_human(build_env_info):
             },
             "gpt-4o-mini": {
                 "model": "gpt-4o-mini_2024-07-18",
-                "max_tokens": 100,
                 "tokenizer": "gpt-4o-mini",
                 "context_limit": 4,
                 "api_key": "test-api-key",
@@ -155,7 +152,6 @@ def test_human(build_env_info):
             },
             "claude-3.7": {
                 "model": "claude-3-7-sonnet-20250219",
-                "max_tokens": 100,
                 "tokenizer": "claude-3-7-sonnet-20250219",
                 "context_limit": 4,
                 "api_key": "test-api-key",
@@ -229,6 +225,10 @@ anthropic_config = {
         "api_key": "test-api-key",
         "context_limit": 128,
         "tags": ["anthropic"],
+        "generate_kwargs": {
+            "max_tokens": 20000,
+            "temperature": 1,
+        },
     }
 }
 
@@ -240,6 +240,11 @@ anthropic_thinking_config = {
         "api_key": "test-api-key",
         "context_limit": 128,
         "tags": ["anthropic", "thinking"],
+        "generate_kwargs": {
+            "max_tokens": 20000,
+            "temperature": 1,
+            "thinking": {"type": "enabled", "budget_tokens": 16000},
+        },
     }
 }
 
@@ -272,7 +277,7 @@ def test_query_anthropic_model_basic(mock_llm_config, logger_mock):
 
     llm.client.messages.create.assert_called_once()
     assert llm.client.messages.create.call_args[1]["model"] == "claude-3-opus-20240229"
-    assert llm.client.messages.create.call_args[1]["max_tokens"] == 8192
+    assert llm.client.messages.create.call_args[1]["max_tokens"] == 20000
     assert len(llm.client.messages.create.call_args[1]["messages"]) == 1
 
 
@@ -452,7 +457,10 @@ def test_query_anthropic_model_unknown_role(mock_llm_config, logger_mock):
     LLMConfigRegistry,
     "from_file",
     return_value=LLMConfigRegistry.register_all(
-        {"test-anthropic": anthropic_config["test-anthropic"] | {"max_tokens": 4000}}
+        {
+            "test-anthropic": anthropic_config["test-anthropic"]
+            | {"generate_kwargs": {"max_tokens": 4000}}
+        }
     ),
 )
 def test_query_anthropic_model_max_tokens_from_config(mock_llm_config, logger_mock):
@@ -464,7 +472,7 @@ def test_query_anthropic_model_max_tokens_from_config(mock_llm_config, logger_mo
     llm.count_tokens = MagicMock(return_value=10)
     messages = [{"role": "user", "content": "Test message"}]
     llm(messages)
-    assert llm.client.messages.create.call_args[1]["max_tokens"] == 8192
+    assert llm.client.messages.create.call_args[1]["max_tokens"] == 4000
 
 
 @patch.object(
@@ -584,12 +592,11 @@ def test_is_rate_limit_error_status_429(logger_mock, llm_config_mock):
 @pytest.fixture
 def basic_config():
     return LLMConfig(
-        model="test-model",
+        model="llm-mock",
         context_limit=4,
         api_key="test-api-key",
         endpoint="https://test-endpoint",
         tokenizer="test-tokenizer",
-        max_tokens=100,
         reasoning_end_token="<END>",
         system_prompt_support=True,
         ignore_kwargs=["temperature", "top_p"],
@@ -600,10 +607,10 @@ def basic_config():
 
 
 def test_llm_config_initialization():
-    config = LLMConfig(model="test-model", context_limit=4)
-    assert config.model == "test-model"
+    config = LLMConfig(model="llm-mock", context_limit=4)
+    assert config.model == "llm-mock"
     assert config.context_limit == 4
-    assert config.tokenizer == "test-model"  # Default to model when tokenizer is None
+    assert config.tokenizer == "llm-mock"  # Default to model when tokenizer is None
     assert config.ignore_kwargs == []  # Default empty list
     assert config.tags == []  # Default empty list
 
@@ -612,7 +619,6 @@ def test_llm_config_optional_fields(basic_config):
     assert basic_config.api_key == "test-api-key"
     assert basic_config.endpoint == "https://test-endpoint"
     assert basic_config.tokenizer == "test-tokenizer"
-    assert basic_config.max_tokens == 100
     assert basic_config.reasoning_end_token == "<END>"
     assert basic_config.system_prompt_support is True
     assert basic_config.ignore_kwargs == ["temperature", "top_p"]
@@ -698,3 +704,142 @@ def test_token_usage_initialization():
     token_usage = TokenUsage(prompt=10, response=20)
     assert token_usage.prompt == 10
     assert token_usage.response == 20
+
+
+@patch.object(
+    LLMConfigRegistry,
+    "from_file",
+    return_value=LLMConfigRegistry.register_all(
+        {
+            "llm-mock": {
+                "model": "llm-mock",
+                "context_limit": 4,
+                "tokenizer": "test-tokenizer",
+                "tags": [],
+                "generate_kwargs": {
+                    "temperature": 0.7,
+                    "max_tokens": 100,
+                    "thinking": {
+                        "type": "enabled",
+                        "budget_tokens": 10,
+                    },
+                },
+            }
+        }
+    ),
+)
+def test_llm_call_with_generate_kwargs(mock_llm_config, logger_mock, llm_class_mock):
+    messages = [{"role": "user", "content": "Hello"}]
+    llm_mock = llm_class_mock("llm-mock", logger=logger_mock)
+    llm_response = llm_mock(messages)
+
+    # Check that generate_kwargs were passed to generate
+    assert llm_mock.called_kwargs["temperature"] == 0.7
+    assert llm_mock.called_kwargs["max_tokens"] == 100
+    assert llm_mock.called_kwargs["thinking"]["type"] == "enabled"
+    assert llm_mock.called_kwargs["thinking"]["budget_tokens"] == 10
+    assert llm_response.response == "Test response"
+
+
+@patch.object(
+    LLMConfigRegistry,
+    "from_file",
+    return_value=LLMConfigRegistry.register_all(
+        {
+            "llm-mock": {
+                "model": "llm-mock",
+                "context_limit": 4,
+                "tokenizer": "test-tokenizer",
+                "generate_kwargs": {"temperature": 0.7},
+                "tags": [],
+            }
+        }
+    ),
+)
+def test_llm_call_override_generate_kwargs(
+    mock_llm_config, logger_mock, llm_class_mock
+):
+    messages = [{"role": "user", "content": "Hello"}]
+    llm_mock = llm_class_mock("llm-mock", logger=logger_mock)
+    # Override the temperature from config
+    llm_response = llm_mock(messages, temperature=0.2)
+    # Check that the override worked: 0.2 from kwargs, not 0.7 from config
+    assert llm_mock.called_kwargs["temperature"] == 0.2
+
+
+@patch.object(
+    LLMConfigRegistry,
+    "from_file",
+    return_value=LLMConfigRegistry.register_all(
+        {
+            "llm-mock": {
+                "model": "llm-mock",
+                "context_limit": 4,
+                "tokenizer": "test-tokenizer",
+                "ignore_kwargs": ["temperature"],
+                "tags": [],
+            }
+        }
+    ),
+)
+def test_llm_call_ignore_kwargs(mock_llm_config, logger_mock, llm_class_mock):
+    messages = [{"role": "user", "content": "Hello"}]
+    llm_mock = llm_class_mock("llm-mock", logger=logger_mock)
+    llm_response = llm_mock(messages, temperature=0.7, max_tokens=10)
+    assert "temperature" not in llm_mock.called_kwargs
+    assert llm_mock.called_kwargs["max_tokens"] == 10
+
+
+@patch.object(
+    LLMConfigRegistry,
+    "from_file",
+    return_value=LLMConfigRegistry.register_all(
+        {
+            "llm-mock": {
+                "model": "llm-mock",
+                "context_limit": 4,
+                "tokenizer": "test-tokenizer",
+                "system_prompt_support": False,
+                "tags": [],
+            }
+        }
+    ),
+)
+def test_llm_call_system_prompt_not_supported(
+    mock_llm_config, logger_mock, llm_class_mock
+):
+    messages = [
+        {"role": "system", "content": "You are a helpful assistant"},
+        {"role": "user", "content": "Hello"},
+    ]
+    llm_mock = llm_class_mock("llm-mock", logger=logger_mock)
+    llm_response = llm_mock(messages)
+    assert llm_mock.called_messages[0]["role"] == "user"
+    assert (
+        llm_mock.called_messages[0]["content"] == "You are a helpful assistant\n\nHello"
+    )
+
+
+@patch.object(
+    LLMConfigRegistry,
+    "from_file",
+    return_value=LLMConfigRegistry.register_all(
+        {
+            "llm-mock": {
+                "model": "llm-mock",
+                "context_limit": 1,  # 1000 tokens
+                "tokenizer": "test-tokenizer",
+                "tags": [],
+            }
+        }
+    ),
+)
+def test_llm_call_with_too_long_prompt(mock_llm_config, logger_mock, llm_class_mock):
+    # Create a message that's longer than context_limit (1000)
+    long_text = "x" * 2000
+    messages = [{"role": "user", "content": long_text}]
+    llm_mock = llm_class_mock("llm-mock", logger=logger_mock)
+    llm_response = llm_mock(messages)
+    assert llm_mock.called_messages[0]["role"] == "user"
+    assert len(llm_mock.called_messages[0]["content"]) == 999
+    assert llm_response.response == "Test response"
