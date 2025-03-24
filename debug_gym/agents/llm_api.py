@@ -43,6 +43,29 @@ logging.getLogger("azure.core.pipeline.policies.http_logging_policy").setLevel(
 )
 
 
+def retry_on_rate_limit(
+    func, is_rate_limit_error_func, multiplier=1, max_wait=40, max_attempts=100
+):
+    """Executes a function with retry logic for rate limits. Never retries on KeyboardInterrupt.
+    Args:
+        func: The function to execute with retries
+        is_rate_limit_error_func: Function that checks if an exception is a rate limit error
+        *args, **kwargs: Arguments to pass to the function
+
+    Returns:
+        The result of the function call
+    """
+    retry_function = retry(
+        retry=(
+            retry_if_not_exception_type(KeyboardInterrupt)
+            & retry_if_exception(is_rate_limit_error_func)
+        ),
+        wait=wait_random_exponential(multiplier=multiplier, max=max_wait),
+        stop=stop_after_attempt(max_attempts),
+    )
+    return retry_function(func)
+
+
 @dataclass
 class LLMConfig:
     """Configuration dataclass for LLM models"""
@@ -93,17 +116,19 @@ class LLMConfigRegistry:
             )
         return self.configs[model_name]
 
-    def register(self, model_name: str, config: LLMConfig) -> None:
-        """Register a new model configuration"""
-        self.configs[model_name] = config
+    def register(self, model_name: str, config: dict) -> LLMConfig:
+        """Register a new model configuration from a dictionary"""
+        llm_config = LLMConfig(**config)
+        self.configs[model_name] = llm_config
+        return llm_config
 
     @classmethod
     def register_all(cls, configs: dict) -> None:
-        """Register multiple model configurations"""
+        """Register multiple model configurations from a dictionary"""
         registry = cls()
         # Convert each model configuration to LLMConfig objects
         for model_name, model_config in configs.items():
-            registry.register(model_name, LLMConfig(**model_config))
+            registry.register(model_name, model_config)
         return registry
 
     @classmethod
@@ -125,33 +150,6 @@ class LLMConfigRegistry:
     def __contains__(self, model_name: str) -> bool:
         """Check if a model name exists in the registry"""
         return model_name in self.configs
-
-
-def load_llm_config(config_file_path: str | None = None) -> LLMConfigRegistry:
-    return LLMConfigRegistry.from_file(config_file_path)
-
-
-def retry_on_rate_limit(
-    func, is_rate_limit_error_func, multiplier=1, max_wait=40, max_attempts=100
-):
-    """Executes a function with retry logic for rate limits. Never retries on KeyboardInterrupt.
-    Args:
-        func: The function to execute with retries
-        is_rate_limit_error_func: Function that checks if an exception is a rate limit error
-        *args, **kwargs: Arguments to pass to the function
-
-    Returns:
-        The result of the function call
-    """
-    retry_function = retry(
-        retry=(
-            retry_if_not_exception_type(KeyboardInterrupt)
-            & retry_if_exception(is_rate_limit_error_func)
-        ),
-        wait=wait_random_exponential(multiplier=multiplier, max=max_wait),
-        stop=stop_after_attempt(max_attempts),
-    )
-    return retry_function(func)
 
 
 @dataclass
@@ -186,7 +184,7 @@ class LLM(ABC):
 
     def __init__(self, model_name: str, logger: DebugGymLogger | None = None):
         self.logger = logger or DebugGymLogger("debug-gym")
-        config_registry = load_llm_config()
+        config_registry = LLMConfigRegistry.from_file()
         if model_name not in config_registry:
             raise ValueError(f"Model {model_name} not found in llm.cfg")
         self.model_name = model_name
@@ -403,8 +401,11 @@ class OpenAILLM(LLM):
     @property
     def client(self):
         if getattr(self, "_client", None) is None:
-            assert self.config.api_key is not None, "API key is required for OpenAI."
-            assert self.config.endpoint is not None, "Endpoint is required for OpenAI."
+            if self.config.api_key is None or self.config.endpoint is None:
+                raise ValueError(
+                    f"OpenAI API key and endpoint are required. If you are using "
+                    "Azure OpenAI, please add the `azure openai` tag to the config."
+                )
             self._client = OpenAI(
                 api_key=self.config.api_key,
                 base_url=self.config.endpoint,
@@ -580,7 +581,7 @@ def instantiate_llm(config: dict, logger: DebugGymLogger | None = None) -> LLM:
     if llm_name == "human":
         return Human(llm_name, logger=logger)
 
-    llm_config = load_llm_config()
+    llm_config = LLMConfigRegistry.from_file()
     tags = llm_config[llm_name].tags
     if "azure openai" in tags:
         klass = AzureOpenAILLM

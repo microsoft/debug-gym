@@ -14,7 +14,6 @@ from debug_gym.agents.llm_api import (
     OpenAILLM,
     TokenUsage,
     instantiate_llm,
-    load_llm_config,
     retry_on_rate_limit,
 )
 
@@ -95,13 +94,13 @@ def llm_config_mock(tmp_path, monkeypatch):
 
 
 def test_load_llm_config(llm_config_mock):
-    config = load_llm_config()
+    config = LLMConfigRegistry.from_file()
     assert "test_model" in config
 
 
 def test_load_llm_config_not_found(tmp_path):
     with pytest.raises(FileNotFoundError):
-        load_llm_config(str(tmp_path / "llm.cfg"))
+        LLMConfigRegistry.from_file(str(tmp_path / "llm.cfg"))
 
 
 @pytest.fixture
@@ -648,7 +647,7 @@ def test_llm_config_registry_get():
 
 def test_llm_config_registry_register():
     registry = LLMConfigRegistry()
-    registry.register("model1", LLMConfig(model="model1", context_limit=4))
+    registry.register("model1", {"model": "model1", "context_limit": 4})
     assert "model1" in registry.configs
     assert registry.configs["model1"].model == "model1"
 
