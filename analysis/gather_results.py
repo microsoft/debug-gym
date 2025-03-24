@@ -1,13 +1,9 @@
 import json
-import os
 from glob import glob
-from os.path import join as pjoin
 from pathlib import Path
 
 import pandas as pd
 from termcolor import colored
-
-from debug_gym.gym.envs import SWEBenchEnv
 
 
 def map_uuid(input):
@@ -52,18 +48,6 @@ def main(args):
             except Exception as e:
                 print(colored(f"Error reading {log_file}. ({e!r})", "red"))
 
-    # If needed, get the list of all problems.
-    problem_list = None
-    if not args.ignore_missing:
-        # create environment
-        env = SWEBenchEnv(
-            dir_tree_depth=1,
-            run_on_rewrite=True,
-            auto_view_change=True,
-            dataset_id=args.dataset_id,
-        )
-        problem_list = env.dataset.keys()  # all tasks
-
     df = pd.DataFrame(results)
 
     # Group by agent type and uuid
@@ -71,7 +55,7 @@ def main(args):
 
     # Print success rate for each agent
     for agent_type, group in grouped:
-        total = len(group) if args.ignore_missing else len(problem_list)
+        total = len(group)
         nb_successes = group["success"].sum()
         success_rate = nb_successes / total
         print(
@@ -88,14 +72,6 @@ def parse_args():
         "--agents",
         nargs="+",
         help="Agent UUID(s) for which to collect the logs. Default: all agent found in `path`.",
-    )
-    parser.add_argument(
-        "--dataset-id",
-        default="princeton-nlp/SWE-bench_lite",
-        help="SWE-Bench dataset ID to use.",
-    )
-    parser.add_argument(
-        "--ignore-missing", action="store_true", help="Ignore missing experiments"
     )
     parser.add_argument(
         "--show-failed-only",
