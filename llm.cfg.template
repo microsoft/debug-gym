@@ -6,7 +6,10 @@
         "api_key": "[YOUR_API_KEY]",
         "tags": ["gpt-4o", "azure openai", "GCR"],
         "api_version": "2024-09-01-preview",
-        "context_limit": 128
+        "context_limit": 128,
+        "generate_kwargs": {
+            "temperature": 0.5
+        }
     },
     "o1-mini": {
         "model": "o1-mini",
@@ -26,7 +29,10 @@
         "scope": "[YOUR_SCOPE]",
         "tags": ["gpt-4o", "azure openai", "GCR"],
         "api_version": "2024-09-01-preview",
-        "context_limit": 128
+        "context_limit": 128,
+        "generate_kwargs": {
+            "temperature": 0.5
+        }
     },
     "deepseek-r1-distill-qwen-32b": {
         "model": "deepseek-ai/DeepSeek-R1-Distill-Qwen-32B",
@@ -36,13 +42,35 @@
         "tags": ["DeepSeek-R1-Distill-Qwen-32B", "H100"],
         "system_prompt_support": false,
         "context_limit": 128,
-        "reasoning_end_token": "</think>"
+        "reasoning_end_token": "</think>",
+        "generate_kwargs": {
+            "temperature": 0.5
+        }
     },
-    "claude-3.7":{
+    "claude-3.7": {
         "model": "claude-3-7-sonnet-20250219",
         "tokenizer": "claude-3-7-sonnet-20250219",
         "tags": ["anthropic", "claude", "claude-3.7"],
         "context_limit": 100,
         "api_key": "[YOUR_API_KEY]"
+        "generate_kwargs": {
+            "max_tokens": 8192,
+            "temperature": 0.5
+        }
+    },
+    "claude-3.7-thinking": {
+        "model": "claude-3-7-sonnet-20250219",
+        "tokenizer": "claude-3-7-sonnet-20250219",
+        "tags": ["anthropic", "claude", "claude-3.7"],
+        "context_limit": 100,
+        "api_key": "[YOUR_API_KEY]"
+        "generate_kwargs": {
+            "max_tokens": 20000,
+            "temperature": 1,
+            "thinking": {
+                "type": "enabled",
+                "budget_tokens": 16000
+            }
+        }
     }
 }

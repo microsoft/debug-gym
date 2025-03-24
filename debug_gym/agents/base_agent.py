@@ -157,9 +157,7 @@ class BaseAgent:
             )
 
             prompt = self.build_prompt(info)
-            llm_response = self.llm(
-                prompt, info, temperature=self.config["llm_temperature"][0]
-            )
+            llm_response = self.llm(prompt, info)
             if self.llm.reasoning_end_token is not None:
                 llm_response.response = self.parse_reasoning_model_response(
                     llm_response.response,

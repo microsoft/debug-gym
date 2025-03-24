@@ -113,7 +113,6 @@ def agent_setup(tmp_path, open_data):
                 "llm_name": "test-model",
                 "max_steps": 10,
                 "max_rewrite_steps": 5,
-                "llm_temperature": [0.5, 0.7],
                 "use_conversational_prompt": True,
                 "n_rewrites_before_pdb": 2,
                 "reset_prompt_history_after_rewrite": False,
