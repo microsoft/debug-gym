@@ -185,13 +185,22 @@ class LLMResponse:
 
 class LLM(ABC):
 
-    def __init__(self, model_name: str, logger: DebugGymLogger | None = None):
-        self.logger = logger or DebugGymLogger("debug-gym")
-        config_registry = LLMConfigRegistry.from_file()
-        if model_name not in config_registry:
-            raise ValueError(f"Model {model_name} not found in llm.cfg")
+    def __init__(
+        self,
+        model_name: str,
+        logger: DebugGymLogger | None = None,
+        llm_config: LLMConfig | None = None,
+        llm_config_file: str | None = None,
+    ):
         self.model_name = model_name
-        self.config: LLMConfig = config_registry[model_name]
+        self.logger = logger or DebugGymLogger("debug-gym")
+        if llm_config is not None and llm_config_file is not None:
+            logger.warning(
+                "Both llm_config and llm_config_file are provided, using llm_config."
+            )
+        self.config = (
+            llm_config or LLMConfigRegistry.from_file(llm_config_file)[model_name]
+        )
         self.tokenizer_name = self.config.tokenizer
         self.context_length = self.config.context_limit * 1000
         self.reasoning_end_token = self.config.reasoning_end_token
@@ -200,6 +209,39 @@ class LLM(ABC):
             f"Using {self.model_name} with max context length of {
                 self.context_length:,} tokens."
         )
+
+    @classmethod
+    def instantiate(
+        cls,
+        config: dict,
+        logger: DebugGymLogger | None = None,
+        config_file_path: str | None = None,
+    ) -> "LLM":
+        """Creates an instance of the appropriate LLM class based on the configuration.
+
+        Args:
+            config: Dictionary containing the LLM configuration parameters.
+            logger: Optional DebugGymLogger for logging.
+
+        Returns:
+            An instance of the appropriate LLM class.
+        """
+        logger = logger or DebugGymLogger("debug-gym")
+        llm_name = config["llm_name"]
+        if llm_name == "human":
+            return Human(llm_name, logger=logger)
+
+        llm_config = LLMConfigRegistry.from_file(config_file_path)[llm_name]
+
+        tags = llm_config.tags
+        if "azure openai" in tags:
+            klass = AzureOpenAILLM
+        elif "anthropic" in tags:
+            klass = AnthropicLLM
+        else:
+            klass = OpenAILLM
+        llm = klass(llm_name, logger=logger, llm_config=llm_config)
+        return llm
 
     @abstractmethod
     def generate(self, messages, **kwargs) -> str:
@@ -517,7 +559,7 @@ class AzureOpenAILLM(OpenAILLM):
         return kwargs
 
 
-class Human:
+class Human(LLM):
     def __init__(self, model_name=None, logger: DebugGymLogger | None = None):
         self.model_name = model_name or "human"
         self.logger = logger or DebugGymLogger("debug-gym")
@@ -533,6 +575,10 @@ class Human:
 
     def count_tokens(self, text: str) -> int:
         return len(self.tokenize(text))
+
+    def generate(self, messages, **kwargs):
+        # Human overrides the entire __call__ method, so generate is never called
+        pass
 
     def __call__(self, messages, info, *args, **kwargs) -> LLMResponse:
         print_messages(messages, self.logger)
@@ -559,20 +605,3 @@ class Human:
             prompt_token_count=len(prompt_messages),
             response_token_count=len(action),
         )
-
-
-def instantiate_llm(config: dict, logger: DebugGymLogger | None = None) -> LLM:
-    llm_name = config["llm_name"]
-    if llm_name == "human":
-        return Human(llm_name, logger=logger)
-
-    llm_config = LLMConfigRegistry.from_file()
-    tags = llm_config[llm_name].tags
-    if "azure openai" in tags:
-        klass = AzureOpenAILLM
-    elif "anthropic" in tags:
-        klass = AnthropicLLM
-    else:
-        klass = OpenAILLM
-    llm = klass(llm_name, logger=logger)
-    return llm

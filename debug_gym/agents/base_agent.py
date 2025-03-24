@@ -7,7 +7,7 @@ from os.path import join as pjoin
 import numpy as np
 
 from debug_gym.agents.history_tracker import HistoryTracker, build_history_prompt
-from debug_gym.agents.llm_api import instantiate_llm
+from debug_gym.agents.llm_api import LLM
 from debug_gym.agents.utils import trim
 from debug_gym.gym.envs.env import RepoEnv
 from debug_gym.gym.utils import unescape
@@ -39,7 +39,7 @@ class BaseAgent:
         self.config = config
         self.env = env
         self.logger = logger or DebugGymLogger("debug-gym")
-        self.llm = instantiate_llm(self.config, logger=self.logger)
+        self.llm = LLM.instantiate(config=self.config, logger=self.logger)
         self._uuid = self.config.get("uuid", str(uuid.uuid4()))
         self._output_path = pjoin(self.config["output_path"], self._uuid)
 

@@ -5,6 +5,7 @@ import pytest
 from openai import RateLimitError
 
 from debug_gym.agents.llm_api import (
+    LLM,
     AnthropicLLM,
     AzureOpenAILLM,
     Human,
@@ -13,13 +14,12 @@ from debug_gym.agents.llm_api import (
     LLMResponse,
     OpenAILLM,
     TokenUsage,
-    instantiate_llm,
     retry_on_rate_limit,
 )
 
 
 @pytest.fixture
-def openai_llm(logger_mock, llm_config_mock):
+def openai_llm(logger_mock, llm_cfg_mock):
     # Create an instance of AsyncOpenAILLM with a mock configuration
     model_name = "test_model"
     _async_llm = OpenAILLM(model_name, logger=logger_mock)
@@ -71,7 +71,7 @@ def test_llm(mock_llm_config, mock_openai, logger_mock):
 
 
 @pytest.fixture
-def llm_config_mock(tmp_path, monkeypatch):
+def llm_cfg_mock(tmp_path, monkeypatch):
     config_file = tmp_path / "llm.cfg"
     config_file.write_text(
         json.dumps(
@@ -92,7 +92,7 @@ def llm_config_mock(tmp_path, monkeypatch):
     return config_file
 
 
-def test_load_llm_config(llm_config_mock):
+def test_load_llm_config(llm_cfg_mock):
     config = LLMConfigRegistry.from_file()
     assert "test_model" in config
 
@@ -163,25 +163,25 @@ def test_human(build_env_info):
 def test_instantiate_llm(mock_open, logger_mock):
     # tags are used to filter models
     config = {"llm_name": "gpt-4o-mini"}
-    llm = instantiate_llm(config, logger=logger_mock)
+    llm = LLM.instantiate(config, logger=logger_mock)
     assert isinstance(llm, OpenAILLM)
 
     config = {"llm_name": "gpt-4o-mini-azure"}
-    llm = instantiate_llm(config, logger=logger_mock)
+    llm = LLM.instantiate(config, logger=logger_mock)
     assert isinstance(llm, AzureOpenAILLM)
 
     config = {"llm_name": "claude-3.7"}
-    llm = instantiate_llm(config, logger=logger_mock)
+    llm = LLM.instantiate(config, logger=logger_mock)
     assert isinstance(llm, AnthropicLLM)
 
     config = {"llm_name": "human"}
-    llm = instantiate_llm(config, logger=logger_mock)
+    llm = LLM.instantiate(config, logger=logger_mock)
     assert isinstance(llm, Human)
 
     unknown = "unknown"
     config = {"llm_name": unknown}
     with pytest.raises(ValueError, match="Model unknown not found in llm config .+"):
-        instantiate_llm(config, logger=logger_mock)
+        LLM.instantiate(config, logger=logger_mock)
 
 
 def test_llm_response_init_with_prompt_and_response():
@@ -281,13 +281,12 @@ def test_query_anthropic_model_basic(mock_llm_config, logger_mock):
     assert len(llm.client.messages.create.call_args[1]["messages"]) == 1
 
 
-@patch.object(
-    LLMConfigRegistry,
-    "from_file",
-    return_value=LLMConfigRegistry.register_all(anthropic_thinking_config),
-)
-def test_query_anthropic_model_with_thinking(mock_llm_config, logger_mock):
-    llm = AnthropicLLM("test-anthropic-thinking", logger=logger_mock)
+def test_query_anthropic_model_with_thinking(logger_mock):
+    llm = AnthropicLLM(
+        "test-anthropic-thinking",
+        logger=logger_mock,
+        llm_config=LLMConfig(**anthropic_thinking_config["test-anthropic-thinking"]),
+    )
 
     mock_response = MagicMock()
     mock_response.content = [MagicMock(), MagicMock()]
@@ -552,7 +551,7 @@ def create_fake_exception(module: str, classname: str, message: str):
         }
     ),
 )
-def test_is_rate_limit_error_status_429(logger_mock, llm_config_mock):
+def test_is_rate_limit_error_status_429(logger_mock, llm_cfg_mock):
     openai_llm = OpenAILLM("openai", logger=logger_mock)
 
     exc = create_fake_exception(
@@ -843,3 +842,46 @@ def test_llm_call_with_too_long_prompt(mock_llm_config, logger_mock, llm_class_m
     assert llm_mock.called_messages[0]["role"] == "user"
     assert len(llm_mock.called_messages[0]["content"]) == 999
     assert llm_response.response == "Test response"
+
+
+def test_llm_init_with_config(logger_mock, llm_class_mock):
+    llm_config = LLMConfig(
+        model="llm-mock",
+        context_limit=4,
+        api_key="test-api-key",
+        endpoint="https://test-endpoint",
+        tokenizer="test-tokenizer",
+        tags=["test-tag"],
+    )
+    llm = llm_class_mock(
+        model_name="llm-mock", logger=logger_mock, llm_config=llm_config
+    )
+    assert llm.model_name == "llm-mock"
+    assert llm.config == llm_config
+    assert llm.tokenizer_name == "test-tokenizer"
+    assert llm.context_length == 4000
+
+
+def test_llm_init_with_both_config_types(logger_mock, llm_class_mock):
+    llm_config = LLMConfig(
+        model="llm-mock",
+        context_limit=4,
+        api_key="test-api-key",
+        endpoint="https://test-endpoint",
+        tokenizer="test-tokenizer",
+        tags=["test-tag"],
+    )
+    llm = llm_class_mock(
+        model_name="llm-mock",
+        logger=logger_mock,
+        llm_config=llm_config,
+        llm_config_file="llm.cfg",
+    )
+    assert llm.model_name == "llm-mock"
+    assert llm.config == llm_config
+    assert llm.tokenizer_name == "test-tokenizer"
+    assert llm.context_length == 4000
+    assert (
+        "Both llm_config and llm_config_file are provided, using llm_config."
+        in logger_mock._log_history
+    )
