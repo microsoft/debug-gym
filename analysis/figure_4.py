@@ -6,15 +6,16 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
+from tqdm import tqdm
 
 plt.rcParams.update(
     {
-        "font.size": 20,  # Base font size
-        "axes.labelsize": 20,  # Axis labels
-        "axes.titlesize": 20,  # Plot title
-        "xtick.labelsize": 20,  # X-axis tick labels
-        "ytick.labelsize": 20,  # Y-axis tick labels
-        "legend.fontsize": 20,  # Legend text
+        "font.size": 22,  # Base font size
+        "axes.labelsize": 22,  # Axis labels
+        "axes.titlesize": 22,  # Plot title
+        "xtick.labelsize": 22,  # X-axis tick labels
+        "ytick.labelsize": 22,  # Y-axis tick labels
+        "legend.fontsize": 22,  # Legend text
     }
 )
 
@@ -190,15 +191,19 @@ def analyze_froggy_results_with_seeds(base_model_name, seeds=[0, 1, 2]):
 
 
 # Example usage:
-model_names = [
-    "../exps/aider/rewrite_4o/rewrite_4o",
-    "../exps/aider/rewrite_r1-distill-qwen-32b/rewrite_r1-distill-qwen-32b",
+model_paths = [
+    "../exps/aider/rewrite_4o",
+    "../exps/aider/rewrite_r1-distill-qwen-32b",
 ]
 
 # Analyze all models with seed averaging
-results_dict = {
-    name.split("/")[-1]: analyze_froggy_results_with_seeds(name) for name in model_names
-}
+results_dict = {}
+for _path in tqdm(model_paths):
+    _name = _path.split("/")[-1]
+    results_dict[_name] = analyze_froggy_results_with_seeds(
+        _path + "/" + _name, seeds=[0, 1, 2]
+    )
+
 
 # Plot comparison
 plot_multiple_cumulative_success(results_dict)
