@@ -18,41 +18,39 @@ def map_uuid(input):
 
 def main(args):
     # Collect all *.jsonl files in the output directory
-    log_files = glob(str(args.path / "**" / "froggy.jsonl"), recursive=True)
+    for jsonl_name in ["froggy.jsonl", "debug_gym.jsonl"]:
+        log_files = glob(f"{args.path}/**/{jsonl_name}", recursive=True)
+        # Use pandas to read the logs
+        results = []
+        for log_file in sorted(log_files):
+            try:
+                with open(log_file, "r") as f:
+                    data = json.load(f)
 
-    # Use pandas to read the logs
-    results = []
-    for log_file in sorted(log_files):
-        try:
-            with open(log_file, "r") as f:
-                data = json.load(f)
+                result = {
+                    "success": data["success"],
+                    "uuid": map_uuid(data["uuid"]),
+                    "agent_type": data["agent_type"],
+                    "problem": data["problem"],
+                }
+                results.append(result)
 
-            result = {
-                "success": data["success"],
-                "uuid": map_uuid(data["uuid"]),
-                "agent_type": data["agent_type"],
-                "problem": data["problem"],
-            }
-            results.append(result)
+                if args.verbose:
+                    # Print agent_type, uuid, and problem colored by success, and path to the log.
+                    color = "green" if result["success"] else "red"
+                    if args.show_failed_only and result["success"]:
+                        continue
 
-            if args.verbose:
-                # Print agent_type, uuid, and problem colored by success, and path to the log.
-                color = "green" if result["success"] else "red"
-                if args.show_failed_only and result["success"]:
-                    continue
+                    print(
+                        colored(
+                            f"{result['agent_type']} {result['uuid']} {result['problem']}",
+                            color,
+                        ),
+                        f"\t({log_file})",
+                    )
 
-                print(
-                    colored(
-                        f"{result['agent_type']} {result['uuid']} {result['problem']}",
-                        color,
-                    ),
-                    f"\t({log_file})",
-                )
-
-        except Exception as e:
-            print(colored(f"Error reading {log_file}. ({e!r})", "red"))
-
-    # TODO: check for duplicated experiments.
+            except Exception as e:
+                print(colored(f"Error reading {log_file}. ({e!r})", "red"))
 
     # If needed, get the list of all problems.
     problem_list = None
