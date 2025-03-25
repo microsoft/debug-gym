@@ -162,26 +162,20 @@ def test_human(build_env_info):
 )
 def test_instantiate_llm(mock_open, logger_mock):
     # tags are used to filter models
-    config = {"llm_name": "gpt-4o-mini"}
-    llm = LLM.instantiate(config, logger=logger_mock)
+    llm = LLM.instantiate("gpt-4o-mini", logger=logger_mock)
     assert isinstance(llm, OpenAILLM)
 
-    config = {"llm_name": "gpt-4o-mini-azure"}
-    llm = LLM.instantiate(config, logger=logger_mock)
+    llm = LLM.instantiate("gpt-4o-mini-azure", logger=logger_mock)
     assert isinstance(llm, AzureOpenAILLM)
 
-    config = {"llm_name": "claude-3.7"}
-    llm = LLM.instantiate(config, logger=logger_mock)
+    llm = LLM.instantiate("claude-3.7", logger=logger_mock)
     assert isinstance(llm, AnthropicLLM)
 
-    config = {"llm_name": "human"}
-    llm = LLM.instantiate(config, logger=logger_mock)
+    llm = LLM.instantiate("human", logger=logger_mock)
     assert isinstance(llm, Human)
 
-    unknown = "unknown"
-    config = {"llm_name": unknown}
     with pytest.raises(ValueError, match="Model unknown not found in llm config .+"):
-        LLM.instantiate(config, logger=logger_mock)
+        LLM.instantiate("unknown", logger=logger_mock)
 
 
 def test_llm_response_init_with_prompt_and_response():

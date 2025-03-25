@@ -39,7 +39,7 @@ class BaseAgent:
         self.config = config
         self.env = env
         self.logger = logger or DebugGymLogger("debug-gym")
-        self.llm = LLM.instantiate(config=self.config, logger=self.logger)
+        self.llm = LLM.instantiate(self.config["llm_name"], logger=self.logger)
         self._uuid = self.config.get("uuid", str(uuid.uuid4()))
         self._output_path = pjoin(self.config["output_path"], self._uuid)
 

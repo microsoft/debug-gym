@@ -213,25 +213,25 @@ class LLM(ABC):
     @classmethod
     def instantiate(
         cls,
-        config: dict,
+        llm_name: str,
+        llm_config_file_path: str | None = None,
         logger: DebugGymLogger | None = None,
-        config_file_path: str | None = None,
     ) -> "LLM":
         """Creates an instance of the appropriate LLM class based on the configuration.
 
         Args:
-            config: Dictionary containing the LLM configuration parameters.
+            llm_name: Name of the LLM model to instantiate.
+            llm_config_file_path: Optional path to the LLM configuration file.
             logger: Optional DebugGymLogger for logging.
 
         Returns:
             An instance of the appropriate LLM class.
         """
         logger = logger or DebugGymLogger("debug-gym")
-        llm_name = config["llm_name"]
         if llm_name == "human":
             return Human(llm_name, logger=logger)
 
-        llm_config = LLMConfigRegistry.from_file(config_file_path)[llm_name]
+        llm_config = LLMConfigRegistry.from_file(llm_config_file_path)[llm_name]
 
         tags = llm_config.tags
         if "azure openai" in tags:
