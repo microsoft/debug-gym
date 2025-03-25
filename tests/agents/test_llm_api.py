@@ -1,7 +1,7 @@
-import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+import yaml
 from openai import RateLimitError
 
 from debug_gym.agents.llm_api import (
@@ -72,9 +72,9 @@ def test_llm(mock_llm_config, mock_openai, logger_mock):
 
 @pytest.fixture
 def llm_cfg_mock(tmp_path, monkeypatch):
-    config_file = tmp_path / "llm.cfg"
+    config_file = tmp_path / "llm.yaml"
     config_file.write_text(
-        json.dumps(
+        yaml.dump(
             {
                 "test_model": {
                     "model": "test_model",
@@ -99,7 +99,7 @@ def test_load_llm_config(llm_cfg_mock):
 
 def test_load_llm_config_not_found(tmp_path):
     with pytest.raises(FileNotFoundError):
-        LLMConfigRegistry.from_file(str(tmp_path / "llm.cfg"))
+        LLMConfigRegistry.from_file(str(tmp_path / "llm.yaml"))
 
 
 @pytest.fixture
@@ -875,7 +875,7 @@ def test_llm_init_with_both_config_types(logger_mock, llm_class_mock):
         model_name="llm-mock",
         logger=logger_mock,
         llm_config=llm_config,
-        llm_config_file="llm.cfg",
+        llm_config_file="llm.yaml",
     )
     assert llm.model_name == "llm-mock"
     assert llm.config == llm_config

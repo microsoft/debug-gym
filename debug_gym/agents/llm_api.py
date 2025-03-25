@@ -1,4 +1,3 @@
-import json
 import logging
 import os
 import re
@@ -8,6 +7,7 @@ from dataclasses import dataclass
 from typing import List, Optional
 
 import tiktoken
+import yaml
 from openai import NOT_GIVEN, AzureOpenAI, OpenAI
 from tenacity import (
     retry,
@@ -138,10 +138,10 @@ class LLMConfigRegistry:
     def from_file(cls, config_file_path: str | None = None) -> "LLMConfigRegistry":
         """Load the LLM configuration from a JSON file"""
         if config_file_path is None:
-            config_file_path = os.environ.get("LLM_CONFIG_FILE", "llm.cfg")
+            config_file_path = os.environ.get("LLM_CONFIG_FILE", "llm.yaml")
         try:
             with open(config_file_path) as f:
-                raw_llm_config = json.load(f)
+                raw_llm_config = yaml.safe_load(f)
             return cls.register_all(raw_llm_config)
         except FileNotFoundError:
             raise FileNotFoundError(f"Cannot find llm config file: {config_file_path}")
