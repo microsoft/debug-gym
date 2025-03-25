@@ -4,6 +4,7 @@ import re
 import sys
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from pathlib import Path
 from typing import List, Optional
 
 import tiktoken
@@ -41,6 +42,9 @@ logging.getLogger("azure.identity").setLevel(logging.WARNING)
 logging.getLogger("azure.core.pipeline.policies.http_logging_policy").setLevel(
     logging.WARNING
 )
+
+
+DEFAULT_LLM_CONFIG = Path.joinpath(Path.home(), ".config", "debug_gym", "llm.yaml")
 
 
 def retry_on_rate_limit(
@@ -138,7 +142,9 @@ class LLMConfigRegistry:
     def from_file(cls, config_file_path: str | None = None) -> "LLMConfigRegistry":
         """Load the LLM configuration from a JSON file"""
         if config_file_path is None:
-            config_file_path = os.environ.get("LLM_CONFIG_FILE", "llm.yaml")
+            config_file_path = os.environ.get(
+                "LLM_CONFIG_FILE_PATH", DEFAULT_LLM_CONFIG
+            )
         try:
             with open(config_file_path) as f:
                 raw_llm_config = yaml.safe_load(f)

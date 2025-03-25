@@ -18,14 +18,16 @@ To install the development dependencies:
 
 First, make a copy of the template,
 
-    cp llm.template.yaml llm.yaml
+    cp llm.template.yaml ~/.config/debug_gym/llm.yaml
 
-Then, edit llm.yaml with your endpoint and credentials. You can choose one of these authentication methods:
+Then, edit this file with your endpoint and credentials. You can choose one of these authentication methods:
 - For authenticating with an API key, provide `api_key`.
-- For `az login` or Managed Identity authentication, remove `api_key` and include `scope` instead.
+- For `az login` or Managed Identity authentication on Azure, remove `api_key` and include `scope` instead.
 
 > [!WARNING]
 > When using open-sourced LLMs, e.g., via vLLM, you need to correctly setup `HF_TOKEN` required by the tokenizer.
+
+By default, `debug-gym` looks for the LLM config file at `~/.config/debug_gym/llm.yaml`. You can change this behavior by exporting the environment variable `LLM_CONFIG_FILE_PATH` or by setting `llm_config_file_path` in your script config file (see [Running Baselines](#3-running-baselines)).
 
 ---
 
