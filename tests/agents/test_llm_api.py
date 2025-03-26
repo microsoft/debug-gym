@@ -18,25 +18,6 @@ from debug_gym.agents.llm_api import (
 )
 
 
-@pytest.fixture
-def openai_llm(logger_mock, llm_cfg_mock):
-    # Create an instance of AsyncOpenAILLM with a mock configuration
-    model_name = "test_model"
-    _async_llm = OpenAILLM(model_name, logger=logger_mock)
-    return _async_llm
-
-
-def test_is_rate_limit_error(openai_llm):
-    mock_response = MagicMock()
-    mock_response.request = "example"
-    mock_response.body = {"error": "Rate limit exceeded"}
-    # Instantiate the RateLimitError with the mock response
-    exception = RateLimitError(
-        "Rate limit exceeded", response=mock_response, body=mock_response.body
-    )
-    assert openai_llm.is_rate_limit_error(exception) == True
-
-
 @patch("openai.resources.chat.completions.Completions.create")
 @patch.object(
     LLMConfigRegistry,
@@ -88,11 +69,16 @@ def llm_cfg_mock(tmp_path, monkeypatch):
             }
         )
     )
-    monkeypatch.setenv("LLM_CONFIG_FILE", str(config_file))
     return config_file
 
 
 def test_load_llm_config(llm_cfg_mock):
+    config = LLMConfigRegistry.from_file(config_file_path=str(llm_cfg_mock))
+    assert "test_model" in config
+
+
+def test_load_llm_config_from_env_var(llm_cfg_mock, monkeypatch):
+    monkeypatch.setenv("LLM_CONFIG_FILE_PATH", str(llm_cfg_mock))
     config = LLMConfigRegistry.from_file()
     assert "test_model" in config
 
@@ -545,41 +531,44 @@ def create_fake_exception(module: str, classname: str, message: str):
         }
     ),
 )
-def test_is_rate_limit_error_status_429(logger_mock, llm_cfg_mock):
+def test_is_rate_limit_error(llm_config_registry_mock, logger_mock):
     openai_llm = OpenAILLM("openai", logger=logger_mock)
 
-    exc = create_fake_exception(
+    exception = create_fake_exception("openai", "RateLimitError", "Rate limit exceeded")
+    assert openai_llm.is_rate_limit_error(exception) is True
+
+    exception = create_fake_exception(
         "openai", "APIStatusError", "Error occurred: 'status': 429 rate limit"
     )
-    assert openai_llm.is_rate_limit_error(exc) is True
+    assert openai_llm.is_rate_limit_error(exception) is True
 
-    exc = create_fake_exception(
+    exception = create_fake_exception(
         "openai", "APIStatusError", "Encountered error: 'status': 504 gateway timeout"
     )
-    assert openai_llm.is_rate_limit_error(exc) is True
+    assert openai_llm.is_rate_limit_error(exception) is True
 
-    exc = create_fake_exception(
+    exception = create_fake_exception(
         "openai",
         "APIStatusError",
         "Failure: 'status': 413 A previous prompt was too large. Please shorten input.",
     )
-    assert openai_llm.is_rate_limit_error(exc) is True
+    assert openai_llm.is_rate_limit_error(exception) is True
 
-    exc = create_fake_exception(
+    exception = create_fake_exception(
         "openai", "APIStatusError", "Error: 'status': 500 internal server error"
     )
-    assert openai_llm.is_rate_limit_error(exc) is False
+    assert openai_llm.is_rate_limit_error(exception) is False
 
-    exc = create_fake_exception(
+    exception = create_fake_exception(
         "openai", "PermissionDeniedError", "Permission denied error"
     )
-    assert openai_llm.is_rate_limit_error(exc) is True
+    assert openai_llm.is_rate_limit_error(exception) is True
 
-    exc = create_fake_exception("openai", "SomeOtherError", "Some other error")
-    assert openai_llm.is_rate_limit_error(exc) is False
+    exception = create_fake_exception("openai", "SomeOtherError", "Some other error")
+    assert openai_llm.is_rate_limit_error(exception) is False
 
-    exc = KeyboardInterrupt()  # KeyboardInterrupt should not be retried
-    assert openai_llm.is_rate_limit_error(exc) is False
+    exception = KeyboardInterrupt()  # KeyboardInterrupt should not be retried
+    assert openai_llm.is_rate_limit_error(exception) is False
 
 
 @pytest.fixture
