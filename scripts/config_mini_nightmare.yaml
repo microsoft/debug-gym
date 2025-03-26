@@ -23,7 +23,6 @@ base:
 
     # LLM configs
     llm_name: "gpt-4o"
-    llm_temperature: [0.5]  # list of values between 0.0 and 1.0
 
     # Agent configs
     random_seed: 42
@@ -35,12 +34,12 @@ base:
     log_prompt_response_pairs: True
     reset_prompt_history_after_rewrite: True
 
-pdb_agent:
-    tools: ["eval", "pdb", "view", "rewrite"]
-
-rewrite_only:
+rewrite_agent:
     tools: ["eval", "view", "rewrite"]
 
-pdb_after_rewrites:
+debug_agent:
+    tools: ["eval", "pdb", "view", "rewrite"]
+
+debug_5_agent:
     n_rewrites_before_pdb: 5
-    tools: ["eval", "view", "rewrite", "pdb"]
+    tools: ["eval", "pdb", "view", "rewrite"]
