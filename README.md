@@ -1,4 +1,4 @@
-# Debug-Gym: an Interactive Debugging Framework
+# debug-gym: an Interactive Debugging Framework
 
 `debug-gym` is a text-based interactive debugging framework, designed for debugging Python programs. 
 
@@ -33,7 +33,7 @@ Then, edit llm.cfg with your endpoint and credentials. You can choose one of the
 
 The structure of `debug-gym` is as below:
 ```bash
-debug-gym
+debug_gym
 ├── gym
 │   ├── envs
 │   ├── terminal
