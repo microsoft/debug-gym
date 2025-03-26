@@ -2,15 +2,15 @@ from debug_gym.agents.base_agent import BaseAgent, register_agent
 
 
 @register_agent
-class PdbAgent(BaseAgent):
-    name = "pdb_agent"
+class DebugAgent(BaseAgent):
+    name = "debug_agent"
     system_prompt = "Your goal is to debug a Python program to make sure it can pass a set of test functions. You have access to the pdb debugger tools, you can use them to investigate the code, set breakpoints, and print necessary values to identify the bugs. Once you have gained enough information, propose a rewriting patch to fix the bugs. Avoid rewriting the entire code, focus on the bugs only."
     action_prompt = "Based on the instruction, the current code, the last execution output, and the history information, continue your debugging process using pdb commands or to propose a patch using rewrite command. Output a single command, nothing else. Do not repeat your previous commands unless they can provide more information. You must be concise and avoid overthinking."
 
 
 @register_agent
-class PdbAfterRewrites(PdbAgent):
-    name: str = "pdb_after_rewrites"
+class Debug_5_Agent(DebugAgent):
+    name: str = "debug_5_agent"
 
     def run(self, task_name=None, debug=False):
         # remove the pdb tool from the environment

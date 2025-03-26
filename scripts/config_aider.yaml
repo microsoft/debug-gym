@@ -35,12 +35,12 @@ base:
     log_prompt_response_pairs: True
     reset_prompt_history_after_rewrite: True
 
-pdb_agent:
-    tools: ["eval", "pdb", "view", "rewrite"]
-
-rewrite_only:
+rewrite_agent:
     tools: ["eval", "view", "rewrite"]
 
-pdb_after_rewrites:
+debug_agent:
+    tools: ["eval", "pdb", "view", "rewrite"]
+
+debug_5_agent:
     n_rewrites_before_pdb: 5
-    tools: ["eval", "view", "rewrite", "pdb"]
+    tools: ["eval", "pdb", "view", "rewrite"]
