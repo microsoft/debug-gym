@@ -79,7 +79,7 @@ def analyze_froggy_results(model_name):
                         and pdb_command not in pdb_command_mapping
                     ):
                         pdb_command_category["other"] += 1
-                        print("--------", pdb_command)
+                        # print("--------", pdb_command)
                     elif pdb_command in pdb_command_category:
                         pdb_command_category[pdb_command] += 1
                     else:
