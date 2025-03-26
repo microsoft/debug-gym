@@ -155,7 +155,6 @@ def plot_overlap_winning_games_between_agents(df_dict, figsize=(12, 7)):
     df = pd.melt(df, id_vars=["llm"], value_vars=[">= once", ">= twice", "three times"])
     # rename the columns
     df.columns = ["llm", "won", "count"]
-    # import pdb; pdb.set_trace()
     # create a grouped bar plot
     palette = sns.color_palette("Set2")
     # set color
@@ -249,7 +248,6 @@ def plot_overlap_between_agents(df_dict, figsize=(12, 7)):
     df = pd.melt(df, id_vars=["llm"], value_vars=["debug/rewrite", "debug(5)/rewrite"])
     # rename the columns
     df.columns = ["llm", "won", "count"]
-    # import pdb; pdb.set_trace()
     # create a grouped bar plot
     palette = sns.color_palette("Set2")
     # set color

@@ -46,7 +46,6 @@ def parse_line_numbers(line_number_string):
         head = int(line_numbers[0]) - 1  # 1-based to 0-based
         tail = head
     else:
-        # len(line_numbers) == 2:
         # both head and tail are provided
         if int(line_numbers[0]) <= 0 or int(line_numbers[1]) <= 0:
             return None
@@ -223,7 +222,6 @@ def plot_rewrite_length_grouped(df_dict, figsize=(12, 7)):
                 ]
             )
         all_data.append(_tmp_data)
-    # all_data = np.array(all_data)
     print(all_data)
     # convert to DataFrame
     all_data = [

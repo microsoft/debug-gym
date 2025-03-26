@@ -148,13 +148,11 @@ def plot_episode_length(df_dict, figsize=(12, 7)):
                     float(round(episode_length_std, 2)),
                 ]
             )
-    # all_data = np.array(all_data)
     print(all_data)
     # convert to DataFrame
     all_data = pd.DataFrame(
         all_data, columns=["name", "model", "agent", "episode length", "std"]
     )
-    # import pdb; pdb.set_trace()
     # bar chart
     sns.barplot(
         data=all_data, x="name", y="episode length", hue="agent", palette="Set2"
@@ -197,12 +195,6 @@ def plot_episode_length(df_dict, figsize=(12, 7)):
             "claude37",
         ],
     )
-    # # cutsom legend with same three colors as above
-    # plt.legend(
-    #     ["rewrite", "debug", "second-chance"],
-    #     loc="upper left",
-    #     bbox_to_anchor=(1, 1),
-    # )
     plt.grid(True, alpha=0.3)
     plt.tight_layout()
     plt.show()
@@ -236,13 +228,11 @@ def plot_episode_response_tokens(df_dict, figsize=(12, 7)):
                     float(round(response_tokens_std, 2)),
                 ]
             )
-    # all_data = np.array(all_data)
     print(all_data)
     # convert to DataFrame
     all_data = pd.DataFrame(
         all_data, columns=["name", "model", "agent", "response_tokens", "std"]
     )
-    # import pdb; pdb.set_trace()
     # Single bar chart, with broken y-axis (0-1000)
     plt.figure(figsize=figsize)
     sns.barplot(
@@ -339,5 +329,5 @@ for _path in tqdm(model_paths):
     )
 
 # Plot comparison
-# plot_episode_length(results_dict)
-plot_episode_response_tokens(results_dict)
+plot_episode_length(results_dict)
+# plot_episode_response_tokens(results_dict)

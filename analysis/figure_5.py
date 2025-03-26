@@ -75,12 +75,6 @@ def analyze_froggy_results(model_name):
 
     df = pd.DataFrame(results)
 
-    # print("Success rate:", df["success"].mean())
-    # print("Average rewrites:", df["rewrite_count"].mean())
-    # print("Average prompt tokens:", df["prompt_tokens"].mean())
-    # print("Average response tokens:", df["response_tokens"].mean())
-    # print("\nResults by task:")
-    # print(df)
     return df
 
 
@@ -115,10 +109,6 @@ def analyze_froggy_results_with_seeds(base_model_name, seeds=[0, 1, 2]):
         .agg({"success": "mean", "rewrite_count": "mean"})
         .reset_index()
     )
-
-    # print(f"\nAveraged results for {base_model_name}:")
-    # print(f"Success rate: {averaged_df['success'].mean():.2%}")
-    # print(f"Average rewrites: {averaged_df['rewrite_count'].mean():.2f}")
 
     return combined_df
 
@@ -164,7 +154,6 @@ def plot_episode_length(df_dict, figsize=(12, 7)):
     all_data = pd.DataFrame(
         all_data, columns=["name", "model", "agent", "episode length", "std"]
     )
-    # import pdb; pdb.set_trace()
     # bar chart
     sns.barplot(
         data=all_data, x="name", y="episode length", hue="agent", palette="Set2"
@@ -213,12 +202,6 @@ def plot_episode_length(df_dict, figsize=(12, 7)):
             "o3-mini",
         ],
     )
-    # # cutsom legend with same three colors as above
-    # plt.legend(
-    #     ["rewrite", "debug", "second-chance"],
-    #     loc="upper left",
-    #     bbox_to_anchor=(1, 1),
-    # )
     plt.grid(True, alpha=0.3)
     plt.tight_layout()
     plt.show()
@@ -251,13 +234,11 @@ def plot_episode_response_tokens(df_dict, figsize=(12, 7)):
                     float(round(response_tokens_std, 2)),
                 ]
             )
-    # all_data = np.array(all_data)
     print(all_data)
     # convert to DataFrame
     all_data = pd.DataFrame(
         all_data, columns=["name", "model", "agent", "response_tokens", "std"]
     )
-    # import pdb; pdb.set_trace()
     # bar chart, with broken y-axis (0-1000) and (3000-7000)
     f, (ax1, ax2) = plt.subplots(ncols=1, nrows=2, sharex=True)
     sns.barplot(
@@ -299,21 +280,12 @@ def plot_episode_response_tokens(df_dict, figsize=(12, 7)):
 
     ax1.set_ylabel("")
     ax2.set_ylabel("")
-    # then, set a new label on the plot (basically just a piece of text) and move it to where it makes sense (requires trial and error)
-    # f.text(
-    #     0.05,
-    #     0.55,
-    #     "Success response tokens",
-    #     va="center",
-    #     rotation="vertical",
-    # )
     f.subplots_adjust(
         left=0.09, right=0.99, bottom=0.31, top=0.97, hspace=0.08, wspace=0.2
     )
     ax2.get_legend().remove()
     plt.xlabel("Backbone LLM")
     plt.ylabel("Response tokens")
-    # plt.title("Average Response Tokens (Averaged Across 3 Runs)")
     plt.xticks(rotation=90)
     # custom x ticks
     plt.xticks(
@@ -387,5 +359,5 @@ for _path in tqdm(model_paths):
         _path + "/" + _name, seeds=[0, 1, 2]
     )
 # Plot comparison
-# plot_episode_length(results_dict)
-plot_episode_response_tokens(results_dict)
+plot_episode_length(results_dict)
+# plot_episode_response_tokens(results_dict)

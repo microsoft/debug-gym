@@ -81,12 +81,6 @@ def analyze_froggy_results(model_name):
 
     df = pd.DataFrame(results)
 
-    # print("Success rate:", df["success"].mean())
-    # print("Average rewrites:", df["rewrite_count"].mean())
-    # print("Average prompt tokens:", df["prompt_tokens"].mean())
-    # print("Average response tokens:", df["response_tokens"].mean())
-    # print("\nResults by task:")
-    # print(df)
     return df
 
 
@@ -122,10 +116,6 @@ def analyze_froggy_results_with_seeds(base_model_name, seeds=[0, 1, 2]):
         .reset_index()
     )
 
-    # print(f"\nAveraged results for {base_model_name}:")
-    # print(f"Success rate: {averaged_df['success'].mean():.2%}")
-    # print(f"Average rewrites: {averaged_df['rewrite_count'].mean():.2f}")
-
     return combined_df
 
 
@@ -147,7 +137,6 @@ def plot_winning_time_per_game(df_dict, figsize=(12, 7)):
             .reset_index()
         )
         grouped_df["success"] = grouped_df["success"] * 3
-        # import pdb; pdb.set_trace()
         all_data.append([agent_name_map[agent_model.split("_")[0]], grouped_df])
     # ignore tasks where all agent_model failed or succeeded
 

@@ -65,17 +65,9 @@ def analyze_froggy_results(model_name):
                     for tool_key in tool_counter:
                         if step["action"].strip().startswith(tool_key):
                             tool_counter[tool_key] += 1
-                            # if tool_key == "```pdb":
-                            #     if not step.get("obs").strip().startswith("Tool failure"):
-                            #         print("=" * 20)
-                            #         print(jsonl_file, step.get("step_id"))
-                            #         print(step.get("action"))
-                            #         print(step.get("obs"))
                             flag = True
                             break
                     if not flag:
-                        # print("=" * 20)
-                        # print(step.get("action"))
                         tool_counter["other"] += 1
 
                 results.append(
@@ -88,7 +80,6 @@ def analyze_froggy_results(model_name):
                 )
 
     df = pd.DataFrame(results)
-    # import pdb; pdb.set_trace()
     return df
 
 
@@ -140,12 +131,10 @@ def plot_tool_use_categories(df_dict, figsize=(12, 7)):
             "```eval": 0,
             "other": 0,
         }
-        # import pdb; pdb.set_trace()
         tool_call_count = 0
         for _kv in df["tool_counter"].items():
             if _kv[1] == {}:
                 continue
-            # import pdb; pdb.set_trace()
             for k, v in _kv[1].items():
                 tool_call_count += v
                 tool_category_per_model[k] += v
@@ -165,15 +154,12 @@ def plot_tool_use_categories(df_dict, figsize=(12, 7)):
                 tool_category_per_model["other"],
             ]
         )
-    # all_data = np.array(all_data)
     print(all_data)
-    # import pdb; pdb.set_trace()
     # convert to DataFrame
     all_data = pd.DataFrame(
         all_data,
         columns=["name", "model", "view", "listdir", "pdb", "rewrite", "eval", "other"],
     )
-    # import pdb; pdb.set_trace()
     # nice palette
     palette = sns.color_palette("Set2")
     # set color
@@ -210,7 +196,6 @@ def plot_tool_use_categories(df_dict, figsize=(12, 7)):
         ],
     )
 
-    # plt.grid(True, alpha=0.3)
     plt.tight_layout()
     plt.show()
 

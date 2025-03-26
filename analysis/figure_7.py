@@ -79,7 +79,6 @@ def analyze_froggy_results(model_name):
                         and pdb_command not in pdb_command_mapping
                     ):
                         pdb_command_category["other"] += 1
-                        # print("--------", pdb_command)
                     elif pdb_command in pdb_command_category:
                         pdb_command_category[pdb_command] += 1
                     else:
@@ -167,7 +166,6 @@ def plot_pdb_command_categories(df_dict, figsize=(12, 7)):
     all_data = []
     # Create plot for each model
     for model_name, df in df_dict.items():
-        # 4o-mini, 4o, o1, o3-mini
         pdb_category_per_model = {
             "b": 0,
             "c": 0,
@@ -202,14 +200,11 @@ def plot_pdb_command_categories(df_dict, figsize=(12, 7)):
                 pdb_category_per_model["other"],
             ]
         )
-    # all_data = np.array(all_data)
     print(all_data)
-    # import pdb; pdb.set_trace()
     # convert to DataFrame
     all_data = pd.DataFrame(
         all_data, columns=["name", "model", "b", "c", "cl", "p", "n", "l", "other"]
     )
-    # import pdb; pdb.set_trace()
     # nice palette
     palette = sns.color_palette("Set2")
     # set color
@@ -221,7 +216,6 @@ def plot_pdb_command_categories(df_dict, figsize=(12, 7)):
     plt.title("Distribution of PDB command being issued")
     plt.xlabel("Backbone LLM")
     plt.ylabel("Percentage")
-    # plt.legend(title="PDB Command Category")
     plt.xticks(rotation=45)
     # custom x ticks
     plt.xticks(
@@ -237,8 +231,6 @@ def plot_pdb_command_categories(df_dict, figsize=(12, 7)):
             "o3-mini",
         ],
     )
-
-    # plt.grid(True, alpha=0.3)
     plt.tight_layout()
     plt.show()
 
