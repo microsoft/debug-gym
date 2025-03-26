@@ -16,9 +16,12 @@ To install the development dependencies:
 
 **Set your API information in llm.yaml**
 
-First, make a copy of the template,
+First, create an LLM config template by running the `debug-gym-llm-config-template` entrypoint:
 
-    cp llm.template.yaml ~/.config/debug_gym/llm.yaml
+    debug-gym-llm-config-template ~/.config/debug_gym/llm.template.yaml
+
+> [!TIP]
+> Run `debug-gym-llm-config-template --help` for more options. By default, the template is created at `~/.config/debug_gym/llm.template.yaml`, but you can specify any directory.
 
 Then, edit this file with your endpoint and credentials. You can choose one of these authentication methods:
 - For authenticating with an API key, provide `api_key`.

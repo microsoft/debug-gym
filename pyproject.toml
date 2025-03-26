@@ -22,6 +22,8 @@ dependencies = {file = ["requirements.txt"]}
 [tool.setuptools.packages.find]
 exclude = [".*tests.*", "exps/*", "output_*"]
 
+[project.scripts]
+debug-gym-llm-config-template = "debug_gym.entrypoints:copy_llm_config_template"
 
 [project.optional-dependencies]
 dev = [
