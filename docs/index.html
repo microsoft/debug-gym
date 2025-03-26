@@ -161,14 +161,26 @@
   </section>
 <!--End BibTex section -->
 
-<!--Experiments section -->
+<!--Mini Nightmare section -->
 <section class="section" id="Experiments">
-  <div class="container is-max-desktop content">
-    <h2 class="title">Experiments</h2>
-    <pre><code>Experiments Code Here</code></pre>
-  </div>
-</section>
-<!--End Experiments section -->
+    <div class="container is-max-desktop content">
+      <h2 class="title">Mini Nightmare</h2>
+      <div class="content has-text-justified">
+        <p>
+          Mini-nightmare is a collection of ten minimal buggy Python scripts that human developers would find easier to debug if provided with interactive debugging tools. For instance, the <code>shopping_cart</code> problem, which consists of a simple code snippet that aims to implement a shopping cart class. This specific task was created in Python 2, where the round() function adopts an “away from zero” style. However, in Python 3, where we run the debug-gym experiments in, the behavior has been changed to a “ties to even” style. We observe smart debugging traces in trajectories from the agent using Claude 3.7 Sonnet below, showing its use of the pdb tool to test its hypothesis and then import an external library to make sure the rounding is working properly.
+        </p>
+      </div>
+      <div class="columns is-centered">
+        <div class="column is-three-quarters has-text-centered">
+          <figure>
+            <img src="static/images/shopping_cart_mini_nightmare.png" alt="Descriptive Alt Text">
+          </figure>
+        </div>
+      </div>
+    </div>
+  </section>
+  
+<!--Mini Nightmare section -->
 
 
 
