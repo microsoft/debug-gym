@@ -1,12 +1,14 @@
-import json
 import logging
 import os
 import re
 import sys
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from pathlib import Path
+from typing import List, Optional
 
 import tiktoken
+import yaml
 from openai import NOT_GIVEN, AzureOpenAI, OpenAI
 from tenacity import (
     retry,
@@ -42,14 +44,7 @@ logging.getLogger("azure.core.pipeline.policies.http_logging_policy").setLevel(
 )
 
 
-def load_llm_config(config_file_path: str | None = None):
-    if config_file_path is None:
-        config_file_path = os.environ.get("LLM_CONFIG_FILE", "llm.cfg")
-    try:
-        llm_config = json.load(open(config_file_path))
-    except FileNotFoundError:
-        raise FileNotFoundError(f"Cannot find llm config file: {config_file_path}")
-    return llm_config
+DEFAULT_LLM_CONFIG = Path.joinpath(Path.home(), ".config", "debug_gym", "llm.yaml")
 
 
 def retry_on_rate_limit(
@@ -73,6 +68,97 @@ def retry_on_rate_limit(
         stop=stop_after_attempt(max_attempts),
     )
     return retry_function(func)
+
+
+@dataclass
+class LLMConfig:
+    """Configuration dataclass for LLM models"""
+
+    # Required fields
+    model: str
+    context_limit: int
+    # Optional fields
+    api_key: Optional[str] = None
+    endpoint: Optional[str] = None
+    tokenizer: Optional[str] = None
+    reasoning_end_token: Optional[str] = None
+    system_prompt_support: bool = True
+    ignore_kwargs: List[str] = None
+    tags: List[str] = None
+    # Azure OpenAI specific fields
+    api_version: Optional[str] = None
+    scope: Optional[str] = None
+    # Custom parameters to pass to generate
+    generate_kwargs: dict = None
+
+    def __post_init__(self):
+        # Set tokenizer to model if not specified
+        if self.tokenizer is None:
+            self.tokenizer = self.model
+        # Initialize empty lists
+        if self.ignore_kwargs is None:
+            self.ignore_kwargs = []
+        if self.tags is None:
+            self.tags = []
+        if self.generate_kwargs is None:
+            self.generate_kwargs = {}
+
+
+@dataclass
+class LLMConfigRegistry:
+    """Registry holding a collection of LLM configurations"""
+
+    configs: dict[str, LLMConfig] = None
+
+    def __post_init__(self):
+        if self.configs is None:
+            self.configs = {}
+
+    def get(self, model_name: str) -> LLMConfig:
+        """Get a model configuration by name"""
+        if model_name not in self.configs:
+            raise ValueError(
+                f"Model {model_name} not found in llm config registry, please make "
+                "sure the model is registered and the config file is correctly set."
+            )
+        return self.configs[model_name]
+
+    def register(self, model_name: str, config: dict) -> LLMConfig:
+        """Register a new model configuration from a dictionary"""
+        llm_config = LLMConfig(**config)
+        self.configs[model_name] = llm_config
+        return llm_config
+
+    @classmethod
+    def register_all(cls, configs: dict) -> None:
+        """Register multiple model configurations from a dictionary"""
+        registry = cls()
+        # Convert each model configuration to LLMConfig objects
+        for model_name, model_config in configs.items():
+            registry.register(model_name, model_config)
+        return registry
+
+    @classmethod
+    def from_file(cls, config_file_path: str | None = None) -> "LLMConfigRegistry":
+        """Load the LLM configuration from a JSON file"""
+        if config_file_path is None:
+            config_file_path = os.environ.get(
+                "LLM_CONFIG_FILE_PATH", DEFAULT_LLM_CONFIG
+            )
+        try:
+            with open(config_file_path) as f:
+                raw_llm_config = yaml.safe_load(f)
+            return cls.register_all(raw_llm_config)
+        except FileNotFoundError:
+            raise FileNotFoundError(f"Cannot find llm config file: {config_file_path}")
+
+    def __getitem__(self, model_name: str) -> LLMConfig:
+        """Allow dictionary-like access to configurations"""
+        return self.get(model_name)
+
+    def __contains__(self, model_name: str) -> bool:
+        """Check if a model name exists in the registry"""
+        return model_name in self.configs
 
 
 @dataclass
@@ -105,21 +191,63 @@ class LLMResponse:
 
 class LLM(ABC):
 
-    def __init__(self, model_name: str, logger: DebugGymLogger | None = None):
-        self.logger = logger or DebugGymLogger("debug-gym")
-        configs = load_llm_config()
-        if model_name not in configs:
-            raise ValueError(f"Model {model_name} not found in llm.cfg")
+    def __init__(
+        self,
+        model_name: str,
+        logger: DebugGymLogger | None = None,
+        llm_config: LLMConfig | None = None,
+        llm_config_file: str | None = None,
+    ):
         self.model_name = model_name
-        self.config = configs[model_name]
-        self.tokenizer_name = self.config.get("tokenizer", self.config["model"])
-        self.context_length = self.config["context_limit"] * 1000
-        self.reasoning_end_token = self.config.get("reasoning_end_token", None)
+        self.logger = logger or DebugGymLogger("debug-gym")
+        if llm_config is not None and llm_config_file is not None:
+            logger.warning(
+                "Both llm_config and llm_config_file are provided, using llm_config."
+            )
+        self.config = (
+            llm_config or LLMConfigRegistry.from_file(llm_config_file)[model_name]
+        )
+        self.tokenizer_name = self.config.tokenizer
+        self.context_length = self.config.context_limit * 1000
+        self.reasoning_end_token = self.config.reasoning_end_token
 
         self.logger.debug(
             f"Using {self.model_name} with max context length of {
                 self.context_length:,} tokens."
         )
+
+    @classmethod
+    def instantiate(
+        cls,
+        llm_name: str,
+        llm_config_file_path: str | None = None,
+        logger: DebugGymLogger | None = None,
+    ) -> "LLM":
+        """Creates an instance of the appropriate LLM class based on the configuration.
+
+        Args:
+            llm_name: Name of the LLM model to instantiate.
+            llm_config_file_path: Optional path to the LLM configuration file.
+            logger: Optional DebugGymLogger for logging.
+
+        Returns:
+            An instance of the appropriate LLM class.
+        """
+        logger = logger or DebugGymLogger("debug-gym")
+        if llm_name == "human":
+            return Human(llm_name, logger=logger)
+
+        llm_config = LLMConfigRegistry.from_file(llm_config_file_path)[llm_name]
+
+        tags = llm_config.tags
+        if "azure openai" in tags:
+            klass = AzureOpenAILLM
+        elif "anthropic" in tags:
+            klass = AnthropicLLM
+        else:
+            klass = OpenAILLM
+        llm = klass(llm_name, logger=logger, llm_config=llm_config)
+        return llm
 
     @abstractmethod
     def generate(self, messages, **kwargs) -> str:
@@ -146,13 +274,14 @@ class LLM(ABC):
         """
         from debug_gym.agents.utils import trim_prompt_messages
 
-        # set max tokens if not provided
-        kwargs["max_tokens"] = kwargs.get(
-            "max_tokens", self.config.get("max_tokens", NOT_GIVEN)  # OpenAI
-        )
+        # Add custom generation parameters from config
+        for key, value in self.config.generate_kwargs.items():
+            # Only set if not already specified in the call
+            if key not in kwargs:
+                kwargs[key] = value
 
         # replace system prompt by user prompt if not supported
-        if not self.config.get("system_prompt_support", True):
+        if not self.config.system_prompt_support:
             self.logger.debug(
                 "System prompt is not supported by the model, it will be replaced by user prompt."
             )
@@ -161,12 +290,12 @@ class LLM(ABC):
                     messages[i]["role"] = "user"
 
         # ignore specific kwargs that are not supported by the model
-        if "ignore_kwargs" in self.config:
+        if self.config.ignore_kwargs:
             self.logger.debug(
-                f"LLM arguments {", ".join(self.config['ignore_kwargs'])} "
+                f"LLM arguments {", ".join(self.config.ignore_kwargs)} "
                 "are not supported by the model, they will be ignored."
             )
-            for kw in self.config["ignore_kwargs"]:
+            for kw in self.config.ignore_kwargs:
                 if kw in kwargs:
                     del kwargs[kw]
 
@@ -212,7 +341,8 @@ class AnthropicLLM(LLM):
         if getattr(self, "_client", None) is None:
             from anthropic import Anthropic
 
-            self._client = Anthropic(api_key=self.config["api_key"])
+            assert self.config.api_key is not None, "API key is required for Anthropic."
+            self._client = Anthropic(api_key=self.config.api_key)
         return self._client
 
     def tokenize(self, text: str) -> list[str]:
@@ -274,39 +404,18 @@ class AnthropicLLM(LLM):
                     "content": "Your answer is: ",
                 }
             ]
-
-        if "thinking" in self.config.get("tags", []):
-            kwargs["max_tokens"] = 20000
-            kwargs["temperature"] = 1.0
-
-            response = (
-                retry_on_rate_limit(
-                    self.client.messages.create, self.is_rate_limit_error
-                )(
-                    model=self.config["model"],
-                    thinking={"type": "enabled", "budget_tokens": 16000},
-                    system=system_prompt,
-                    messages=user_assistant_prompt,
-                    **kwargs,
-                )
-                .content[1]
-                .text
+        # if thinking is enabled, the first message is the thought,
+        # the last messages `content[-1]` is the response in any mode
+        response = (
+            retry_on_rate_limit(self.client.messages.create, self.is_rate_limit_error)(
+                model=self.config.model,
+                system=system_prompt,
+                messages=user_assistant_prompt,
+                **kwargs,
             )
-        else:
-            kwargs["max_tokens"] = 8192
-            response = (
-                retry_on_rate_limit(
-                    self.client.messages.create, self.is_rate_limit_error
-                )(
-                    model=self.config["model"],
-                    system=system_prompt,
-                    messages=user_assistant_prompt,
-                    **kwargs,
-                )
-                .content[0]
-                .text
-            )
-
+            .content[-1]
+            .text
+        )
         response = response.strip()
         # only keep the content between the two ```.
         p = re.compile(r"```(.*?)```", re.DOTALL)
@@ -323,9 +432,14 @@ class OpenAILLM(LLM):
     @property
     def client(self):
         if getattr(self, "_client", None) is None:
+            if self.config.api_key is None or self.config.endpoint is None:
+                raise ValueError(
+                    f"OpenAI API key and endpoint are required. If you are using "
+                    "Azure OpenAI, please add the `azure openai` tag to the config."
+                )
             self._client = OpenAI(
-                api_key=self.config["api_key"],
-                base_url=self.config["endpoint"],
+                api_key=self.config.api_key,
+                base_url=self.config.endpoint,
                 timeout=None,
             )
         return self._client
@@ -391,10 +505,12 @@ class OpenAILLM(LLM):
         return is_error
 
     def generate(self, messages, **kwargs):
+        # set max tokens if not provided
+        kwargs["max_tokens"] = kwargs.get("max_tokens", NOT_GIVEN)
         response = retry_on_rate_limit(
             self.client.chat.completions.create, self.is_rate_limit_error
         )(
-            model=self.config["model"],
+            model=self.config.model,
             messages=messages,
             **kwargs,
         )
@@ -417,11 +533,11 @@ class AzureOpenAILLM(OpenAILLM):
 
         Raises ValueError: If neither an API key nor a scope is provided in the configuration.
         """
-        api_key = self.config.get("api_key")
-        scope = self.config.get("scope")
+        api_key = self.config.api_key
+        scope = self.config.scope
         kwargs = {
-            "azure_endpoint": self.config["endpoint"],
-            "api_version": self.config["api_version"],
+            "azure_endpoint": self.config.endpoint,
+            "api_version": self.config.api_version,
             "timeout": None,
         }
         if api_key:  # api key
@@ -449,7 +565,7 @@ class AzureOpenAILLM(OpenAILLM):
         return kwargs
 
 
-class Human:
+class Human(LLM):
     def __init__(self, model_name=None, logger: DebugGymLogger | None = None):
         self.model_name = model_name or "human"
         self.logger = logger or DebugGymLogger("debug-gym")
@@ -465,6 +581,10 @@ class Human:
 
     def count_tokens(self, text: str) -> int:
         return len(self.tokenize(text))
+
+    def generate(self, messages, **kwargs):
+        # Human overrides the entire __call__ method, so generate is never called
+        pass
 
     def __call__(self, messages, info, *args, **kwargs) -> LLMResponse:
         print_messages(messages, self.logger)
@@ -491,26 +611,3 @@ class Human:
             prompt_token_count=len(prompt_messages),
             response_token_count=len(action),
         )
-
-
-def instantiate_llm(config: dict, logger: DebugGymLogger | None = None) -> LLM:
-    llm_name = config["llm_name"]
-    if llm_name == "human":
-        return Human(llm_name, logger=logger)
-
-    llm_config = load_llm_config()
-    try:
-        tags = llm_config[llm_name].get("tags", [])
-    except KeyError:
-        raise ValueError(
-            f"Model {llm_name} not found in llm.cfg, please "
-            "make sure the LLM config file is correctly set."
-        )
-    if "azure openai" in tags:
-        klass = AzureOpenAILLM
-    elif "anthropic" in tags:
-        klass = AnthropicLLM
-    else:
-        klass = OpenAILLM
-    llm = klass(llm_name, logger=logger)
-    return llm

@@ -4,6 +4,7 @@ from unittest.mock import MagicMock, mock_open, patch
 
 import pytest
 
+from debug_gym.agents.llm_api import LLM
 from debug_gym.gym.entities import Observation
 from debug_gym.gym.envs.env import EnvInfo
 from debug_gym.logger import DebugGymLogger
@@ -23,6 +24,20 @@ def logger_mock():
     logger.addHandler(handler)
     logger._log_history = logs
     return logger
+
+
+@pytest.fixture
+def llm_class_mock():
+    class LLMMock(LLM):
+        def generate(self, messages, **kwargs):
+            self.called_messages = messages
+            self.called_kwargs = kwargs
+            return "Test response"
+
+        def tokenize(self, text):
+            return [c for c in text]
+
+    return LLMMock
 
 
 @pytest.fixture
@@ -67,7 +82,6 @@ def open_data():
         {
             "test-model": {
                 "model": "test-model",
-                "max_tokens": 100,
                 "tokenizer": "gpt-4o",
                 "context_limit": 4,
                 "api_key": "test-api-key",
@@ -99,7 +113,6 @@ def agent_setup(tmp_path, open_data):
                 "llm_name": "test-model",
                 "max_steps": 10,
                 "max_rewrite_steps": 5,
-                "llm_temperature": [0.5, 0.7],
                 "use_conversational_prompt": True,
                 "n_rewrites_before_pdb": 2,
                 "reset_prompt_history_after_rewrite": False,

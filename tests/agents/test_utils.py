@@ -165,12 +165,10 @@ def test_load_config():
     }
     config_contents["pdb_agent"] = {
         "llm_name": "gpt2",
-        "llm_temperature": [0.5],
     }
     config_contents["rewrite_only"] = {
         "cot_style": "standard",
         "llm_name": "gpt20",
-        "llm_temperature": [0.3],
     }
 
     # write the config file into yaml
@@ -187,7 +185,6 @@ def test_load_config():
             "pdb_agent",
             "-p",
             "base.random_seed=123",
-            "rewrite_only.llm_temperature=[0.8, 0.8]",
             "-v",
             "--debug",
         ],
@@ -199,7 +196,6 @@ def test_load_config():
         "random_seed": 123,
         "max_steps": 100,
         "llm_name": "gpt2",
-        "llm_temperature": [0.5],
     }
     assert _config == expected_config
     assert _args.debug is True
@@ -216,7 +212,6 @@ def test_load_config():
             "-p",
             "base.random_seed=123",
             "rewrite_only.random_seed=456",
-            "rewrite_only.llm_temperature=[0.8, 0.8]",
             "-v",
             "--debug",
         ],
@@ -229,7 +224,6 @@ def test_load_config():
         "max_steps": 100,
         "cot_style": "standard",
         "llm_name": "gpt20",
-        "llm_temperature": [0.8, 0.8],
     }
     assert _config == expected_config
     assert _args.debug is True
