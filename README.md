@@ -75,9 +75,9 @@ We provide the below LLM-based agents, they all have minimal design and serve th
 
 | Agent name | Available Tools | Description |
 | :-: | :-: | :----- |
-| `pdb_agent` | `pdb`, `patcher`, `view`, `eval` | A minimal agent that dumps all available information into its prompt and queries the LLM to generate a command. |
-| `rewrite_only` | `patcher`, `view`, `eval`  | A `pdb_agent` but `pdb` tool is disabled (an agent keeps rewriting). |
-| `pdb_after_rewrite` | `pdb`, `patcher`, `view`, `eval`  | A `pdb_agent`, but `pdb` tool is only enabled after certain amount of rewrites. |
+| `debug_agent` | `pdb`, `patcher`, `view`, `eval` | A minimal agent that dumps all available information into its prompt and queries the LLM to generate a command. |
+| `rewrite_agent` | `patcher`, `view`, `eval`  | A `debug_agent` but `pdb` tool is disabled (an agent keeps rewriting). |
+| `debug_5_agent` | `pdb`, `patcher`, `view`, `eval`  | A `debug_agent`, but `pdb` tool is only enabled after certain amount of rewrites. |
 
 ---
 
@@ -105,9 +105,9 @@ Add `-v`, `--debug` to be verbose, or to enter debug mode.
 
 #### 3.1. Overriding Values in Config
 
-`-p` is a handy way to override values defined in config. For example, the below command will run rewrite_only agent on Aider with human mode (while in config file it specifies gpt-4o).
+`-p` is a handy way to override values defined in config. For example, the below command will run rewrite_agent agent on Aider with human mode (while in config file it specifies gpt-4o).
 
-    python scripts/run.py scripts/config_aider.yaml --agent rewrite_only -v -p rewrite_only.llm_name="human"
+    python scripts/run.py scripts/config_aider.yaml --agent rewrite_agent -v -p rewrite_agent.llm_name="human"
 
 #### 3.2. Debugging a Custom Repository
 
