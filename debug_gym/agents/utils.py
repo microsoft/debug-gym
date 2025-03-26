@@ -1,104 +1,52 @@
 import argparse
-import copy
-import json
 import logging
 import os
-from dataclasses import asdict
 
 import yaml
+from termcolor import colored
 
-from debug_gym.agents.llm_api import LLMResponse
-from debug_gym.gym.envs.env import EnvInfo
-from debug_gym.gym.utils import unescape
+from debug_gym.logger import DebugGymLogger
 
 
-class HistoryTracker:
-    def __init__(self, history_steps: int) -> None:
-        self.history_steps = history_steps
-        self.reset()
-
-    def reset(self) -> None:
-        self.memory: list[EnvInfo] = []
-        self.prompt_response_pairs: list[LLMResponse | None] = []
-
-    def step(
-        self,
-        new_info: EnvInfo,
-        llm_responses: list[LLMResponse] | LLMResponse | None = None,
-    ) -> None:
-        """llm_responses can be None since the initial state does not have prompt and response"""
-        self.memory.append(copy.deepcopy(new_info))
-
-        llm_responses = llm_responses or []
-        if not isinstance(llm_responses, list):
-            llm_responses = [llm_responses]
-        self.prompt_response_pairs.append(copy.deepcopy(llm_responses))
-
-    def get(self):
-        # return the history_steps latest steps
-        return self.memory[-self.history_steps :]
-
-    def get_all(self):
-        return self.memory
-
-    def json(self, game_step=None, include_prompt_response_pairs=False):
-        if len(self.memory) == 0:
-            return {}
-        if game_step is None:
-            # retrieve the most recent step
-            game_step = len(self.memory) - 1
-        if game_step == 0:
-            # initial state
-            json_out = {
-                "step_id": game_step,
-                "action": None,  # env reset
-                "obs": self.memory[0].step_observation.observation,
-            }
-            if include_prompt_response_pairs:
-                json_out["prompt_response_pairs"] = None
+def print_messages(messages: list[dict], logger: DebugGymLogger):
+    """Print messages coloring each role differently.
+    Messages is a list of dictionaries with role and content keys."""
+    for m in messages:
+        if m["role"] == "user":
+            logger.info(colored(f"{m['content']}\n", "cyan"))
+        elif m["role"] == "assistant":
+            logger.info(colored(f"{m['content']}\n", "green"))
+        elif m["role"] == "system":
+            logger.info(colored(f"{m['content']}\n", "yellow"))
         else:
-            json_out = {
-                "step_id": game_step,
-                "action": self.memory[game_step].action,
-                "obs": self.memory[game_step].step_observation.observation,
-            }
-            # prompt_response_pairs could be empty for the initial state
-            prp = self.prompt_response_pairs[game_step]
-
-            if prp and include_prompt_response_pairs:
-                json_out["prompt_response_pairs"] = [
-                    # doesn't include None values
-                    asdict(
-                        p,
-                        dict_factory=lambda x: {k: v for (k, v) in x if v is not None},
-                    )
-                    for p in prp
-                ]
-
-        return json_out
-
-    def score(self):
-        return sum([memory.score for memory in self.memory])
-
-    def __len__(self):
-        return len(self.memory)
-
-    def clone(self):
-        return copy.deepcopy(self)
-
-    def filter_out(self, actions: list[str]):
-        history = HistoryTracker(self.history_steps)
-        for info, llm_response in zip(self.memory, self.prompt_response_pairs):
-            if info.action not in actions:
-                history.step(info, llm_response)
-
-        return history
+            raise ValueError(f"Unknown role: {m['content']}")
 
 
-def trim(text: str, max_length: int, token_counter: callable, where: str = "middle"):
+def merge_messages(messages: list[dict]) -> list[dict]:
+    """Merge consecutive messages with same role into one message."""
+    messages_out = []
+    to_merge = []
 
+    def merge():
+        content = "\n\n".join(m["content"] for m in to_merge if m["content"])
+        if content:
+            messages_out.append({"role": current_role, "content": content})
+
+    current_role = None
+    for message in messages:
+        if current_role == message["role"]:
+            to_merge.append(message)
+        else:
+            merge()  # merge the previous messages
+            current_role = message["role"]
+            to_merge = [message]
+    merge()  # merge the last messages
+    return messages_out
+
+
+def trim(text: str, max_length: int, count_tokens: callable, where: str = "middle"):
     # Get an approximate number of characters per token ratio in the text.
-    nb_tokens = token_counter(text=text)
+    nb_tokens = count_tokens(text=text)
     if nb_tokens == 0:
         return text
 
@@ -128,12 +76,12 @@ def trim(text: str, max_length: int, token_counter: callable, where: str = "midd
 
 
 def trim_prompt_messages(
-    messages: list[dict], context_length: int, token_counter: callable
+    messages: list[dict], context_length: int, count_tokens: callable
 ):
     # Trim message content to context length
     # messages: list of dict, each dict has keys "content" and "role"
     # context_length: int, maximum number of tokens
-    # token_counter: function, count the number of tokens in a string
+    # count_tokens: function, count the number of tokens in a string
     # messages should not be empty
     assert len(messages) > 0, "messages should not be empty"
     # all messages should be dictionaries with keys "content" and "role"
@@ -150,7 +98,7 @@ def trim_prompt_messages(
     # context_length should be non-negative
     assert context_length >= 0, "context_length should be non-negative"
 
-    message_lengths = [token_counter(text=item["content"]) for item in messages]
+    message_lengths = [count_tokens(item["content"]) for item in messages]
     total_length = sum(message_lengths)
     if total_length <= context_length:
         return messages
@@ -163,7 +111,7 @@ def trim_prompt_messages(
 
     assert (
         new_length <= context_length
-    ), f"The system message execeeds: {new_length} > {context_length}!"
+    ), f"The system message exceeds: {new_length} > {context_length}!"
 
     new_messages.append(dict(messages[-1]))
     new_length += message_lengths[-1]
@@ -173,7 +121,7 @@ def trim_prompt_messages(
         new_messages[-1]["content"] = trim(
             new_messages[-1]["content"],
             token_space_remaining,
-            token_counter=token_counter,
+            count_tokens=count_tokens,
             where="middle",
         )
     else:
@@ -189,92 +137,6 @@ def trim_prompt_messages(
             new_length += message_lengths[i]
 
     return new_messages
-
-
-def build_history_conversation(
-    history: HistoryTracker, reset_prompt_history_after_rewrite: bool = False
-):
-    _history = history.get()
-    # Find the latest rewrite step
-    if len(_history) == 0 or reset_prompt_history_after_rewrite is False:
-        latest_rewrite_step = 0
-    else:
-        for i in range(len(_history)):
-            if _history[i].rewrite_counter == _history[-1].rewrite_counter:
-                latest_rewrite_step = i
-                break
-    _messages = []
-    for history_info in _history[latest_rewrite_step:]:
-        if history_info.action is not None:
-            _messages.append({"role": "assistant", "content": f"{history_info.action}"})
-        _messages.append(
-            {"role": "user", "content": f"{history_info.step_observation.observation}"}
-        )
-    return _messages
-
-
-def build_history_non_conversation(
-    history: HistoryTracker, reset_prompt_history_after_rewrite: bool = False
-):
-    _history = history.get()
-    # Find the latest rewrite step
-    if len(_history) == 0 or reset_prompt_history_after_rewrite is False:
-        latest_rewrite_step = 0
-    else:
-        for i in range(len(_history)):
-            if _history[i].rewrite_counter == _history[-1].rewrite_counter:
-                latest_rewrite_step = i
-                break
-    _history_prompt = []
-    _history = _history[latest_rewrite_step:]
-    for _i, history_info in enumerate(_history):
-        _m = {
-            "step": _i,
-            "command": (None if history_info.action is None else history_info.action),
-            "stdout": history_info.step_observation.observation,
-        }
-        _history_prompt.append(_m)
-    return _history_prompt
-
-
-def build_history_prompt(
-    history: HistoryTracker,
-    use_conversational_prompt: bool = True,
-    reset_prompt_history_after_rewrite: bool = False,
-):
-    messages = []
-    if use_conversational_prompt is True:
-        conversation_history = build_history_conversation(
-            history, reset_prompt_history_after_rewrite
-        )
-        if len(conversation_history) == 0:
-            messages.append(
-                {
-                    "role": "user",
-                    "content": "No history of command and terminal outputs.",
-                }
-            )
-        else:
-            messages.append(
-                {
-                    "role": "user",
-                    "content": f"History of command and terminal outputs (the last {(len(conversation_history) + 1) // 2} steps):",
-                }
-            )
-            messages.extend(conversation_history)
-    else:
-        history_prompt = build_history_non_conversation(
-            history, reset_prompt_history_after_rewrite
-        )
-        if len(history_prompt) == 0:
-            prompt = ["No history of command and terminal outputs."]
-        else:
-            prompt = [
-                f"History of command and terminal outputs (the last {len(history_prompt)} steps):"
-            ]
-            prompt += ["\n" + unescape(json.dumps(history_prompt, indent=4)) + "\n"]
-        messages.append({"role": "user", "content": "\n".join(prompt)})
-    return messages
 
 
 def load_config():
