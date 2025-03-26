@@ -1,6 +1,6 @@
 # debug-gym: an Interactive Debugging Framework
 
-`debug-gym` is a text-based interactive debugging framework, designed for debugging Python programs. 
+`debug-gym` is a text-based interactive debugging framework, designed for debugging Python programs.
 
 [[Technical Report](https://arxiv.org/)] [[Project Page](https://arxiv.org/)]
 
@@ -14,18 +14,20 @@ To install the development dependencies:
 
     pip install -e '.[dev]'
 
-**Set your API information in llm.cfg**
+**Set your API information in llm.yaml**
 
 First, make a copy of the template,
 
-    cp llm.cfg.template llm.cfg
+    cp llm.template.yaml ~/.config/debug_gym/llm.yaml
 
-Then, edit llm.cfg with your endpoint and credentials. You can choose one of these authentication methods:
+Then, edit this file with your endpoint and credentials. You can choose one of these authentication methods:
 - For authenticating with an API key, provide `api_key`.
-- For `az login` or Managed Identity authentication, remove `api_key` and include `scope` instead.
+- For `az login` or Managed Identity authentication on Azure, remove `api_key` and include `scope` instead.
 
 > [!WARNING]
 > When using open-sourced LLMs, e.g., via vLLM, you need to correctly setup `HF_TOKEN` required by the tokenizer.
+
+By default, `debug-gym` looks for the LLM config file at `~/.config/debug_gym/llm.yaml`. You can change this behavior by exporting the environment variable `LLM_CONFIG_FILE_PATH` or by setting `llm_config_file_path` in your script config file (see [Running Baselines](#3-running-baselines)).
 
 ---
 
@@ -43,8 +45,8 @@ debug_gym
 
 `debug_gym.gym` is a simulation environment. Given a code repository, an agent can iteratively interact with a set of tools, such as `pdb`, that are designed for investigate the code. Once gathered enough information, the agent can propose a patch that rewrites certain lines of the code. The terminal will subsequently execute the new code against a set of test cases.
 
-`debug_gym.agents` are LLM-based debugging agents that use `debug_gym.gym` to interact with code repositories to seek necessary information and thus fix potential bugs. At an interaction step, the agent takes a text observation that describes the environment states and tool states as input, it is expected to generate a command, subsequently, the environment will provide a new text observation in response, describing the state change caused by that command. 
- 
+`debug_gym.agents` are LLM-based debugging agents that use `debug_gym.gym` to interact with code repositories to seek necessary information and thus fix potential bugs. At an interaction step, the agent takes a text observation that describes the environment states and tool states as input, it is expected to generate a command, subsequently, the environment will provide a new text observation in response, describing the state change caused by that command.
+
 ---
 
 #### 2.1. Environment and Tools
@@ -69,7 +71,7 @@ Users can include a `.debugignore` file in the repository to specify files and d
 
 #### 2.2. Agents
 
-We provide the below LLM-based agents, they all have minimal design and serve the purpose of demonstrating the `debug-gym` APIs. 
+We provide the below LLM-based agents, they all have minimal design and serve the purpose of demonstrating the `debug-gym` APIs.
 
 | Agent name | Available Tools | Description |
 | :-: | :-: | :----- |
@@ -116,7 +118,7 @@ As an example, we provide a buggy pytorch code repository in `data/pytorch`.
     python scripts/run.py scripts/config.yaml --agent <agent name>
 
 #### 3.3. Design Your Own Tool
-`debug-gym`'s modular design makes it extensible. Users are encouraged to extend `debug-gym` to their specific usecases, for example by creating new tools that diversify an agent's action and observation spaces. For detailed instruction on designing new tools that are `debug-gym`-compatible, please refer to the [Technical Report](https://arxiv.org/). 
+`debug-gym`'s modular design makes it extensible. Users are encouraged to extend `debug-gym` to their specific usecases, for example by creating new tools that diversify an agent's action and observation spaces. For detailed instruction on designing new tools that are `debug-gym`-compatible, please refer to the [Technical Report](https://arxiv.org/).
 
 ## Citation
 ```

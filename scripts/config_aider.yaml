@@ -23,7 +23,6 @@ base:
 
     # LLM configs
     llm_name: "gpt-4o"
-    llm_temperature: [0.5]  # list of values between 0.0 and 1.0
 
     # Agent configs
     random_seed: 42

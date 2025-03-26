@@ -1,7 +1,3 @@
-from pathlib import Path
-
-import pytest
-
 from debug_gym.utils import strip_ansi
 
 
