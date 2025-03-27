@@ -4,11 +4,10 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "debug-gym"
-version = "0.0.1"
 description = "debug-gym - interactive debugging environment"
 readme = "README.md"
 requires-python = ">=3.12"
-dynamic = ["dependencies"]
+dynamic = ["dependencies", "version"]
 
 classifiers = [
     "Programming Language :: Python :: 3",
@@ -18,6 +17,7 @@ classifiers = [
 
 [tool.setuptools.dynamic]
 dependencies = {file = ["requirements.txt"]}
+version = {attr = "debug_gym.__version__"}
 
 [tool.setuptools.packages.find]
 exclude = [".*tests.*", "exps/*", "output_*"]
