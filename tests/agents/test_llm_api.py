@@ -2,7 +2,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 import yaml
-from openai import RateLimitError
 
 from debug_gym.agents.llm_api import (
     LLM,
