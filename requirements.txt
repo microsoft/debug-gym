@@ -3,9 +3,13 @@ openai
 azure-identity
 tenacity
 pyyaml
-rich
+pytest
+tqdm
 gitignore_parser
 termcolor
 transformers
 tiktoken
 docker
+swebench==2.1.7
+prompt_toolkit
+anthropic

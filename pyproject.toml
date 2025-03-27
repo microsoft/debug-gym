@@ -3,9 +3,9 @@ requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "froggy"
+name = "debug-gym"
 version = "0.0.1"
-description = "froggy - interactive coding agent"
+description = "debug-gym - interactive debugging environment"
 readme = "README.md"
 requires-python = ">=3.12"
 dynamic = ["dependencies"]
@@ -19,12 +19,14 @@ classifiers = [
 [tool.setuptools.dynamic]
 dependencies = {file = ["requirements.txt"]}
 
-[tool.setuptools.packages]
-find = {}
+[tool.setuptools.packages.find]
+exclude = [".*tests.*", "exps/*", "output_*"]
+
 
 [project.optional-dependencies]
 dev = [
     "pytest",
     "pytest-xdist",
     "pytest-cov",
+    "pytest-asyncio",
 ]

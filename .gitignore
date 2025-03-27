@@ -1,3 +1,5 @@
+exps/
+
 .DS_Store
 
 # Byte-compiled / optimized / DLL files
@@ -180,3 +182,4 @@ logs/
 vscode/out
 vscode/node_modules
 vscode/package-lock.json
+.vscode
