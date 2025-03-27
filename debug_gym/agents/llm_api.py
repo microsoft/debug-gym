@@ -45,6 +45,78 @@ logging.getLogger("azure.core.pipeline.policies.http_logging_policy").setLevel(
 
 
 DEFAULT_LLM_CONFIG = Path.joinpath(Path.home(), ".config", "debug_gym", "llm.yaml")
+LLM_API_KEY_PLACEHOLDER = "[YOUR_API_KEY]"
+LLM_ENDPOINT_PLACEHOLDER = "[YOUR_ENDPOINT]"
+LLM_SCOPE_PLACEHOLDER = "[YOUR_SCOPE]"
+LLM_CONFIG_TEMPLATE = f"""# Please edit this file replacing the placeholders with your own values.
+gpt-4o:
+  model: gpt-4o
+  tokenizer: gpt-4o
+  endpoint: "{LLM_ENDPOINT_PLACEHOLDER}"
+  api_key: "{LLM_API_KEY_PLACEHOLDER}"
+  tags: [gpt-4o, azure openai, GCR]
+  api_version: "2024-09-01-preview"
+  context_limit: 128
+  generate_kwargs:
+    temperature: 0.5
+
+o1-mini:
+  model: o1-mini
+  tokenizer: gpt-4o
+  endpoint: "{LLM_ENDPOINT_PLACEHOLDER}"
+  api_key: "{LLM_API_KEY_PLACEHOLDER}"
+  tags: [gpt-4o, azure openai, GCR]
+  api_version: "2024-09-01-preview"
+  context_limit: 128
+  system_prompt_support: false
+  ignore_kwargs: [temperature, top_p, presence_penalty, frequency_penalty, logprobs, top_logprobs, logit_bias, max_tokens]
+
+gpt-4o-az-login:
+  model: gpt-4o
+  tokenizer: gpt-4o
+  endpoint: "{LLM_ENDPOINT_PLACEHOLDER}"
+  scope: "{LLM_SCOPE_PLACEHOLDER}"
+  tags: [gpt-4o, azure openai, GCR]
+  api_version: "2024-09-01-preview"
+  context_limit: 128
+  generate_kwargs:
+    temperature: 0.5
+
+deepseek-r1-distill-qwen-32b:
+  model: deepseek-ai/DeepSeek-R1-Distill-Qwen-32B
+  tokenizer: Qwen/Qwen2.5-32B
+  endpoint: "{LLM_ENDPOINT_PLACEHOLDER}"
+  api_key: "{LLM_API_KEY_PLACEHOLDER}"
+  tags: [DeepSeek-R1-Distill-Qwen-32B, H100]
+  system_prompt_support: false
+  context_limit: 128
+  reasoning_end_token: "</think>"
+  generate_kwargs:
+    temperature: 0.5
+
+claude-3.7:
+  model: claude-3-7-sonnet-20250219
+  tokenizer: claude-3-7-sonnet-20250219
+  tags: [anthropic, claude, claude-3.7]
+  context_limit: 100
+  api_key: "{LLM_API_KEY_PLACEHOLDER}"
+  generate_kwargs:
+    max_tokens: 8192
+    temperature: 0.5
+
+claude-3.7-thinking:
+  model: claude-3-7-sonnet-20250219
+  tokenizer: claude-3-7-sonnet-20250219
+  tags: [anthropic, claude, claude-3.7]
+  context_limit: 100
+  api_key: "{LLM_API_KEY_PLACEHOLDER}"
+  generate_kwargs:
+    max_tokens: 20000
+    temperature: 1
+    thinking:
+      type: enabled
+      budget_tokens: 16000
+"""
 
 
 def retry_on_rate_limit(
@@ -118,7 +190,7 @@ class LLMConfigRegistry:
         """Get a model configuration by name"""
         if model_name not in self.configs:
             raise ValueError(
-                f"Model {model_name} not found in llm config registry, please make "
+                f"Model {model_name} not found in llm config registry. Please make "
                 "sure the model is registered and the config file is correctly set."
             )
         return self.configs[model_name]
@@ -341,7 +413,10 @@ class AnthropicLLM(LLM):
         if getattr(self, "_client", None) is None:
             from anthropic import Anthropic
 
-            assert self.config.api_key is not None, "API key is required for Anthropic."
+            if self.config.api_key in [LLM_API_KEY_PLACEHOLDER, None]:
+                raise ValueError(
+                    f"API key is required for Anthropic. Please add it to the config."
+                )
             self._client = Anthropic(api_key=self.config.api_key)
         return self._client
 
@@ -432,10 +507,13 @@ class OpenAILLM(LLM):
     @property
     def client(self):
         if getattr(self, "_client", None) is None:
-            if self.config.api_key is None or self.config.endpoint is None:
+            if self.config.api_key in [
+                LLM_API_KEY_PLACEHOLDER,
+                None,
+            ] or self.config.endpoint in [LLM_ENDPOINT_PLACEHOLDER, None]:
                 raise ValueError(
-                    f"OpenAI API key and endpoint are required. If you are using "
-                    "Azure OpenAI, please add the `azure openai` tag to the config."
+                    f"OpenAI API key and endpoint are required. Please add them to the config. "
+                    "If using Azure OpenAI, please add `azure openai` to the tags."
                 )
             self._client = OpenAI(
                 api_key=self.config.api_key,
@@ -540,9 +618,9 @@ class AzureOpenAILLM(OpenAILLM):
             "api_version": self.config.api_version,
             "timeout": None,
         }
-        if api_key:  # api key
+        if api_key not in [LLM_API_KEY_PLACEHOLDER, None]:  # api key
             kwargs["api_key"] = api_key
-        elif scope:  # az login
+        elif scope not in [LLM_SCOPE_PLACEHOLDER, None]:  # az login
             from azure.identity import (
                 AzureCliCredential,
                 ChainedTokenCredential,
@@ -560,7 +638,8 @@ class AzureOpenAILLM(OpenAILLM):
             kwargs["azure_ad_token_provider"] = credential
         else:
             raise ValueError(
-                "Invalid LLM configuration. Please provide an `api_key or `scope` in the configuration."
+                "Invalid LLM configuration for AzureOpenAI. "
+                "Please provide an `api_key or `scope` in the configuration."
             )
         return kwargs
 

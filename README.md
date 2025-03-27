@@ -1,8 +1,8 @@
-# debug-gym: an Interactive Debugging Framework
+# debug-gym: A Text-Based Environment for Interactive Debugging
 
 `debug-gym` is a text-based interactive debugging framework, designed for debugging Python programs.
 
-[[Technical Report](https://arxiv.org/)] [[Project Page](https://arxiv.org/)]
+[[Technical Report](https://arxiv.org/)] [[Project Page](https://aka.ms/debug-gym/)]
 
 ## 1. Installation
 
@@ -16,9 +16,12 @@ To install the development dependencies:
 
 **Set your API information in llm.yaml**
 
-First, make a copy of the template,
+First, create an LLM config template by running the `debug-gym-init-llm-config` entrypoint:
 
-    cp llm.template.yaml ~/.config/debug_gym/llm.yaml
+    python -m debug_gym.init_llm_config ~/.config/debug_gym
+
+> [!TIP]
+> Run `debug-gym-init-llm-config --help` for more options. By default, the template is created at `~/.config/debug_gym/llm.yaml`, but you can specify any directory.
 
 Then, edit this file with your endpoint and credentials. You can choose one of these authentication methods:
 - For authenticating with an API key, provide `api_key`.
@@ -146,3 +149,9 @@ trademarks or logos is subject to and must follow
 [Microsoft's Trademark & Brand Guidelines](https://www.microsoft.com/en-us/legal/intellectualproperty/trademarks/usage/general).
 Use of Microsoft trademarks or logos in modified versions of this project must not cause confusion or imply Microsoft sponsorship.
 Any use of third-party trademarks or logos are subject to those third-party's policies.
+
+## Privacy
+This framework does not collect user's personal data. For more information about Microsoft's privacy policies. Please see [Microsoft Privacy Statement](https://www.microsoft.com/en-ca/privacy/privacystatement).
+
+## Responsible AI
+Please see our [Responsible AI Statement](https://github.com/microsoft/debug-gym/blob/main/RESPONSIBLE_AI.md).
