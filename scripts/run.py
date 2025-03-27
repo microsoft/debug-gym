@@ -42,6 +42,7 @@ def run_agent(args, problem, config):
                 return success
 
         env = create_env(config, task_logger)
+        add_tools(env, config, task_logger)
         agent = create_agent(
             config["agent_type"],
             config=config,
@@ -78,19 +79,17 @@ def run_agent(args, problem, config):
     return success
 
 
-def create_env(config: dict, logger: DebugGymLogger, skip_tools: bool = False):
+def create_env(config: dict, logger: DebugGymLogger):
     terminal = select_terminal(config.get("terminal"), logger)
     env_class = select_env(config.get("benchmark"))
     env = env_class(**config["env_kwargs"], terminal=terminal, logger=logger)
+    return env
 
-    if skip_tools is True:
-        # skip adding tools
-        return env
 
-    # import tools to the environment
+def add_tools(env, config: dict, logger: DebugGymLogger):
+    """Add tools to the environment"""
     for tool in config["tools"]:
         kwargs = {}
-
         if tool == "pdb":
             kwargs["persistent_breakpoints"] = config["persistent_breakpoints"]
             kwargs["auto_list"] = config["auto_list"]
@@ -98,8 +97,6 @@ def create_env(config: dict, logger: DebugGymLogger, skip_tools: bool = False):
         tool_instantiated = Toolbox.get_tool(tool, **kwargs)
         env.add_tool(tool_instantiated)
         logger.debug(f"Adding tool to toolbox: {tool_instantiated.__class__.__name__}")
-
-    return env
 
 
 def main():
@@ -112,7 +109,7 @@ def main():
     # Figure out which problems to solve.
     problems = config.get("problems", ["custom"])
     if problems == "all" and "benchmark" in config:
-        env = create_env(config, logger=logger, skip_tools=True)
+        env = create_env(config, logger=logger)
         problems = list(env.dataset.keys())  # all tasks
 
     num_workers = int(os.environ.get("DEBUG_GYM_WORKERS", 1))
