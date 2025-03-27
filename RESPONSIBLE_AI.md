@@ -1,7 +1,5 @@
 # debug-gym 
 
-## OVERVIEW 
-
 `debug-gym` is a research framework that enables users to equip their debugging agents with interactive debugging tools to boost their debugging ability. `debug-gym` is designed to be easily extensible so users can design and customize their own tools for their specific use cases.  
 
 ### WHAT CAN DEBUG-GYM DO 
