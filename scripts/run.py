@@ -78,10 +78,14 @@ def run_agent(args, problem, config):
     return success
 
 
-def create_env(config: dict, logger: DebugGymLogger):
+def create_env(config: dict, logger: DebugGymLogger, skip_tools: bool = False):
     terminal = select_terminal(config.get("terminal"), logger)
     env_class = select_env(config.get("benchmark"))
     env = env_class(**config["env_kwargs"], terminal=terminal, logger=logger)
+
+    if skip_tools is True:
+        # skip adding tools
+        return env
 
     # import tools to the environment
     for tool in config["tools"]:
@@ -108,7 +112,7 @@ def main():
     # Figure out which problems to solve.
     problems = config.get("problems", ["custom"])
     if problems == "all" and "benchmark" in config:
-        env = create_env(config, logger=logger)
+        env = create_env(config, logger=logger, skip_tools=True)
         problems = list(env.dataset.keys())  # all tasks
 
     num_workers = int(os.environ.get("DEBUG_GYM_WORKERS", 1))
