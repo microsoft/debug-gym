@@ -23,7 +23,7 @@ dependencies = {file = ["requirements.txt"]}
 exclude = [".*tests.*", "exps/*", "output_*"]
 
 [project.scripts]
-debug-gym-llm-config-template = "debug_gym.entrypoints:copy_llm_config_template"
+debug-gym-init-llm-config = "debug_gym.entrypoints:init_llm_config"
 
 [project.optional-dependencies]
 dev = [

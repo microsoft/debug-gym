@@ -2,7 +2,8 @@ from pathlib import Path
 
 import pytest
 
-from debug_gym.entrypoints import LLM_CONFIG_TEMPLATE, copy_llm_config_template
+from debug_gym.agents.llm_api import LLM_CONFIG_TEMPLATE
+from debug_gym.entrypoints import init_llm_config
 
 
 @pytest.fixture
@@ -10,44 +11,42 @@ def mock_argv(monkeypatch):
     """Fixture to mock sys.argv with different values in tests."""
 
     def _set_argv(args):
-        monkeypatch.setattr("sys.argv", ["copy_llm_config_template"] + args)
+        monkeypatch.setattr("sys.argv", ["init_llm_config"] + args)
 
     return _set_argv
 
 
-def test_copy_llm_config_template_dest_default(
-    tmp_path, mock_argv, monkeypatch, capsys
-):
+def test_init_llm_config_dest_default(tmp_path, mock_argv, monkeypatch, capsys):
     expected_path = Path(tmp_path) / ".config" / "debug_gym"
     # Mock home directory to use tmp_path
     monkeypatch.setattr(Path, "home", lambda: Path(tmp_path))
     mock_argv([])
-    copy_llm_config_template()
+    init_llm_config()
     template_file = expected_path / "llm.yaml"
     assert template_file.exists()
     assert template_file.read_text() == LLM_CONFIG_TEMPLATE
     assert f"LLM config template created" in capsys.readouterr().out
 
 
-def test_copy_llm_config_template_with_dest_positional(tmp_path, mock_argv, capsys):
+def test_init_llm_config_with_dest_positional(tmp_path, mock_argv, capsys):
     mock_argv([str(tmp_path)])
-    copy_llm_config_template()
+    init_llm_config()
     template_path = tmp_path / "llm.yaml"
     assert template_path.exists()
     assert template_path.read_text() == LLM_CONFIG_TEMPLATE
     assert f"LLM config template created" in capsys.readouterr().out
 
 
-def test_copy_llm_config_template_with_dest_named(tmp_path, mock_argv, capsys):
+def test_init_llm_config_with_dest_named(tmp_path, mock_argv, capsys):
     mock_argv(["--dest", str(tmp_path)])
-    copy_llm_config_template()
+    init_llm_config()
     template_path = tmp_path / "llm.yaml"
     assert template_path.exists()
     assert template_path.read_text() == LLM_CONFIG_TEMPLATE
     assert f"LLM config template created" in capsys.readouterr().out
 
 
-def test_copy_llm_config_template_override(tmp_path, monkeypatch, mock_argv, capsys):
+def test_init_llm_config_override(tmp_path, monkeypatch, mock_argv, capsys):
     monkeypatch.setattr("debug_gym.entrypoints.LLM_CONFIG_TEMPLATE", "initial content")
 
     destination = tmp_path / "destination"
@@ -55,16 +54,16 @@ def test_copy_llm_config_template_override(tmp_path, monkeypatch, mock_argv, cap
     destination_file = destination / "llm.yaml"
 
     mock_argv(["--dest", str(destination)])
-    copy_llm_config_template()  # First copy should work
+    init_llm_config()  # First copy should work
     assert destination_file.read_text() == "initial content"
     assert f"LLM config template created" in capsys.readouterr().out
 
     monkeypatch.setattr("debug_gym.entrypoints.LLM_CONFIG_TEMPLATE", "new content")
-    copy_llm_config_template()  # No force, should not override
+    init_llm_config()  # No force, should not override
     assert destination_file.read_text() == "initial content"
     assert f"LLM config template already exists" in capsys.readouterr().out
 
     mock_argv(["--dest", str(destination), "--force"])
-    copy_llm_config_template()  # Force override
+    init_llm_config()  # Force override
     assert destination_file.read_text() == "new content"
     assert f"LLM config template overridden" in capsys.readouterr().out
