@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 
 from debug_gym.agents.llm_api import LLM_CONFIG_TEMPLATE
-from debug_gym.entrypoints import init_llm_config
+from debug_gym.init_llm_config import init_llm_config
 
 
 @pytest.fixture
@@ -47,7 +47,8 @@ def test_init_llm_config_with_dest_named(tmp_path, mock_argv, capsys):
 
 
 def test_init_llm_config_override(tmp_path, monkeypatch, mock_argv, capsys):
-    monkeypatch.setattr("debug_gym.entrypoints.LLM_CONFIG_TEMPLATE", "initial content")
+    llm_template_path = "debug_gym.init_llm_config.LLM_CONFIG_TEMPLATE"
+    monkeypatch.setattr(llm_template_path, "config")
 
     destination = tmp_path / "destination"
     # os.makedirs(destination, exist_ok=True)
@@ -55,15 +56,15 @@ def test_init_llm_config_override(tmp_path, monkeypatch, mock_argv, capsys):
 
     mock_argv(["--dest", str(destination)])
     init_llm_config()  # First copy should work
-    assert destination_file.read_text() == "initial content"
+    assert destination_file.read_text() == "config"
     assert f"LLM config template created" in capsys.readouterr().out
 
-    monkeypatch.setattr("debug_gym.entrypoints.LLM_CONFIG_TEMPLATE", "new content")
+    monkeypatch.setattr(llm_template_path, "new config")
     init_llm_config()  # No force, should not override
-    assert destination_file.read_text() == "initial content"
+    assert destination_file.read_text() == "config"
     assert f"LLM config template already exists" in capsys.readouterr().out
 
     mock_argv(["--dest", str(destination), "--force"])
     init_llm_config()  # Force override
-    assert destination_file.read_text() == "new content"
+    assert destination_file.read_text() == "new config"
     assert f"LLM config template overridden" in capsys.readouterr().out

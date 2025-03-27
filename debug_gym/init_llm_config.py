@@ -48,3 +48,7 @@ def init_llm_config(dest_dir: str = None):
         print(f"LLM config template already exists at `{destination}`.")
 
     print("Please edit the file to configure your LLM settings.")
+
+
+if __name__ == "__main__":
+    init_llm_config()

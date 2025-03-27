@@ -18,7 +18,7 @@ To install the development dependencies:
 
 First, create an LLM config template by running the `debug-gym-init-llm-config` entrypoint:
 
-    debug-gym-init-llm-config ~/.config/debug_gym
+    python -m debug_gym.init_llm_config ~/.config/debug_gym
 
 > [!TIP]
 > Run `debug-gym-init-llm-config --help` for more options. By default, the template is created at `~/.config/debug_gym/llm.yaml`, but you can specify any directory.

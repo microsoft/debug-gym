@@ -22,9 +22,6 @@ dependencies = {file = ["requirements.txt"]}
 [tool.setuptools.packages.find]
 exclude = [".*tests.*", "exps/*", "output_*"]
 
-[project.scripts]
-debug-gym-init-llm-config = "debug_gym.entrypoints:init_llm_config"
-
 [project.optional-dependencies]
 dev = [
     "pytest",
