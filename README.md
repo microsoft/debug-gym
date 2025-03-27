@@ -1,8 +1,8 @@
-# debug-gym: an Interactive Debugging Framework
+# debug-gym: A Text-Based Environment for Interactive Debugging
 
 `debug-gym` is a text-based interactive debugging framework, designed for debugging Python programs.
 
-[[Technical Report](https://arxiv.org/)] [[Project Page](https://arxiv.org/)]
+[[Technical Report](https://arxiv.org/)] [[Project Page](https://aka.ms/debug-gym/)]
 
 ## 1. Installation
 
@@ -146,3 +146,6 @@ trademarks or logos is subject to and must follow
 [Microsoft's Trademark & Brand Guidelines](https://www.microsoft.com/en-us/legal/intellectualproperty/trademarks/usage/general).
 Use of Microsoft trademarks or logos in modified versions of this project must not cause confusion or imply Microsoft sponsorship.
 Any use of third-party trademarks or logos are subject to those third-party's policies.
+
+## Privacy
+This framework does not collect user's personal data. For more information about Microsoft's privacy policies, please see Please see [Microsoft Privacy Statement](https://www.microsoft.com/en-ca/privacy/privacystatement).
