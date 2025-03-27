@@ -148,4 +148,7 @@ Use of Microsoft trademarks or logos in modified versions of this project must n
 Any use of third-party trademarks or logos are subject to those third-party's policies.
 
 ## Privacy
-This framework does not collect user's personal data. For more information about Microsoft's privacy policies, please see Please see [Microsoft Privacy Statement](https://www.microsoft.com/en-ca/privacy/privacystatement).
+This framework does not collect user's personal data. For more information about Microsoft's privacy policies. Please see [Microsoft Privacy Statement](https://www.microsoft.com/en-ca/privacy/privacystatement).
+
+## Responsible AI
+Please see our [Responsible AI Statement](https://github.com/microsoft/debug-gym/blob/main/RESPONSIBLE_AI.md).
