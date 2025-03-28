@@ -1,5 +1,5 @@
 from debug_gym.agents.base_agent import BaseAgent, register_agent
-
+from debug_gym.agents.llm_api import LLM
 
 @register_agent
 class DebugAgent(BaseAgent):
@@ -66,5 +66,69 @@ class Debug_5_Agent(DebugAgent):
                     f"Score: {info.score}/{info.max_score} ({info.score/info.max_score:.1%})"
                 )
                 break
+
+        return info.done
+
+@register_agent
+class DebugHumanInTheLoop(DebugAgent):
+    name: str = "pdb_hitl"
+
+    def run(self, task_name=None, debug=False):
+        # instantiate the human in the loop
+        self.hitl = LLM.instantiate(llm_name="human", llm_config_file_path=self.config.get("llm_config_file_path"), logger=self.logger)
+
+        self.history.reset()
+        info = self.env.reset(options={"task_name": task_name})
+        # initial state does not have prompt and response
+        self.history.step(info, None)
+
+        if info.done is True:
+            # msg = "Environment started with entrypoint passing without errors."
+            return True
+
+        highscore = info.score
+
+        for step in self.logger.tqdm(range(self.config["max_steps"])):
+            highscore = max(highscore, info.score)
+            self.logger.info(
+                f"Score: {info.score}/{info.max_score} ({info.score/info.max_score:.1%}) [Best: {highscore}]"
+            )
+
+            prompt = self.build_prompt(info)
+
+            llm_response = self.llm(prompt, info)
+
+            if debug:
+                breakpoint()
+
+            # make a copy of the env for the human in the loop
+            self.hitl_env = self.env.clone()
+            hitl_info = self.hitl_env.reset(options={"task_name": task_name})
+            # replay the history up to the current step
+            for step in self.history.get_all():
+                if step.done:
+                    break
+                hitl_info = self.hitl_env.step(step.action)
+
+            info = self.env.step(llm_response.response)
+
+            self.history.step(info, llm_response)
+
+            if info.done or info.rewrite_counter >= self.config["max_rewrite_steps"]:
+                self.logger.info(
+                    f"Score (llm): {info.score}/{info.max_score} ({info.score/info.max_score:.1%})"
+                )
+                break
+
+            # call the human in the loop
+            hitl_response = self.hitl(prompt, hitl_info)
+            hitl_info = self.hitl_env.step(hitl_response.response)
+
+            if hitl_info.done or hitl_info.rewrite_counter >= self.config["max_rewrite_steps"]:
+                self.logger.info(
+                    f"Score (human): {hitl_info.score}/{hitl_info.max_score} ({hitl_info.score/hitl_info.max_score:.1%})"
+                )
+                break
+
 
         return info.done
