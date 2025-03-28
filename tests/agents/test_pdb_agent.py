@@ -1,19 +1,19 @@
 from unittest.mock import MagicMock, patch, call
 
-from debug_gym.agents.llm_api import LLMResponse, TokenUsage, Human
-from debug_gym.agents.pdb_agent import PdbHumanInTheLoop, PdbAfterRewrites, PdbAgent
-from debug_gym.agents.rewrite_agent import RewriteOnly
+from debug_gym.agents.debug_agent import Debug_5_Agent, DebugAgent, PdbHumanInTheLoop
+from debug_gym.agents.llm_api import LLMResponse, TokenUsage
+from debug_gym.agents.rewrite_agent import RewriteAgent
 
 
 def test_build_question_prompt(agent_setup):
-    agent, _, _, _ = next(agent_setup(PdbAgent))
+    agent, _, _, _ = next(agent_setup(DebugAgent))
     messages = agent.build_question_prompt()
     assert len(messages) == 1
     assert "continue your debugging" in messages[0]["content"]
 
 
 def test_build_prompt(agent_setup, build_env_info):
-    agent, _, _, _ = next(agent_setup(PdbAgent))
+    agent, _, _, _ = next(agent_setup(DebugAgent))
     info = build_env_info(
         instructions="Test instructions",
         dir_tree="Test dir tree",
@@ -26,7 +26,7 @@ def test_build_prompt(agent_setup, build_env_info):
 
 
 def test_run(agent_setup, build_env_info):
-    agent, env, llm, _ = next(agent_setup(PdbAgent))
+    agent, env, llm, _ = next(agent_setup(DebugAgent))
     env.reset.return_value = build_env_info(
         done=False,
         score=0,
@@ -52,8 +52,8 @@ def test_run(agent_setup, build_env_info):
     assert result
 
 
-def test_build_system_prompt_no_pdb(agent_setup, build_env_info):
-    agent, _, _, _ = next(agent_setup(RewriteOnly))
+def test_build_system_prompt_rewrite_agent(agent_setup, build_env_info):
+    agent, _, _, _ = next(agent_setup(RewriteAgent))
     info = build_env_info(
         instructions="Test instructions",
         dir_tree="Test dir tree",
@@ -66,15 +66,15 @@ def test_build_system_prompt_no_pdb(agent_setup, build_env_info):
     assert "Overall task" in messages[0]["content"]
 
 
-def test_build_question_prompt_no_pdb(agent_setup):
-    agent, _, _, _ = next(agent_setup(RewriteOnly))
+def test_build_question_prompt_rewrite_agent(agent_setup):
+    agent, _, _, _ = next(agent_setup(RewriteAgent))
     messages = agent.build_question_prompt()
     assert len(messages) == 1
     assert "continue your debugging" in messages[0]["content"]
 
 
-def test_run_pdb_after_rewrites(agent_setup, build_env_info):
-    agent, env, llm, _ = next(agent_setup(PdbAfterRewrites))
+def test_run_debug_5_agent(agent_setup, build_env_info):
+    agent, env, llm, _ = next(agent_setup(Debug_5_Agent))
     env.reset.return_value = build_env_info(
         done=False,
         score=0,

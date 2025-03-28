@@ -1,8 +1,8 @@
-# Debug-Gym: an Interactive Debugging Framework
+# debug-gym: A Text-Based Environment for Interactive Debugging
 
-`debug-gym` is a text-based interactive debugging framework, designed for debugging Python programs. 
+`debug-gym` is a text-based interactive debugging framework, designed for debugging Python programs.
 
-[[Technical Report](https://arxiv.org/)] [[Project Page](https://arxiv.org/)]
+[[Technical Report](https://arxiv.org/abs/2503.21557)] [[Project Page](https://aka.ms/debug-gym/)]
 
 ## 1. Installation
 
@@ -14,18 +14,23 @@ To install the development dependencies:
 
     pip install -e '.[dev]'
 
-**Set your API information in llm.cfg**
+**Set your API information in llm.yaml**
 
-First, make a copy of the template,
+First, create an LLM config template by running the `debug-gym-init-llm-config` entrypoint:
 
-    cp llm.cfg.template llm.cfg
+    python -m debug_gym.init_llm_config ~/.config/debug_gym
 
-Then, edit llm.cfg with your endpoint and credentials. You can choose one of these authentication methods:
+> [!TIP]
+> Run `debug-gym-init-llm-config --help` for more options. By default, the template is created at `~/.config/debug_gym/llm.yaml`, but you can specify any directory.
+
+Then, edit this file with your endpoint and credentials. You can choose one of these authentication methods:
 - For authenticating with an API key, provide `api_key`.
-- For `az login` or Managed Identity authentication, remove `api_key` and include `scope` instead.
+- For `az login` or Managed Identity authentication on Azure, remove `api_key` and include `scope` instead.
 
 > [!WARNING]
 > When using open-sourced LLMs, e.g., via vLLM, you need to correctly setup `HF_TOKEN` required by the tokenizer.
+
+By default, `debug-gym` looks for the LLM config file at `~/.config/debug_gym/llm.yaml`. You can change this behavior by exporting the environment variable `LLM_CONFIG_FILE_PATH` or by setting `llm_config_file_path` in your script config file (see [Running Baselines](#3-running-baselines)).
 
 ---
 
@@ -33,7 +38,7 @@ Then, edit llm.cfg with your endpoint and credentials. You can choose one of the
 
 The structure of `debug-gym` is as below:
 ```bash
-debug-gym
+debug_gym
 ├── gym
 │   ├── envs
 │   ├── terminal
@@ -43,8 +48,8 @@ debug-gym
 
 `debug_gym.gym` is a simulation environment. Given a code repository, an agent can iteratively interact with a set of tools, such as `pdb`, that are designed for investigate the code. Once gathered enough information, the agent can propose a patch that rewrites certain lines of the code. The terminal will subsequently execute the new code against a set of test cases.
 
-`debug_gym.agents` are LLM-based debugging agents that use `debug_gym.gym` to interact with code repositories to seek necessary information and thus fix potential bugs. At an interaction step, the agent takes a text observation that describes the environment states and tool states as input, it is expected to generate a command, subsequently, the environment will provide a new text observation in response, describing the state change caused by that command. 
- 
+`debug_gym.agents` are LLM-based debugging agents that use `debug_gym.gym` to interact with code repositories to seek necessary information and thus fix potential bugs. At an interaction step, the agent takes a text observation that describes the environment states and tool states as input, it is expected to generate a command, subsequently, the environment will provide a new text observation in response, describing the state change caused by that command.
+
 ---
 
 #### 2.1. Environment and Tools
@@ -69,13 +74,13 @@ Users can include a `.debugignore` file in the repository to specify files and d
 
 #### 2.2. Agents
 
-We provide the below LLM-based agents, they all have minimal design and serve the purpose of demonstrating the `debug-gym` APIs. 
+We provide the below LLM-based agents, they all have minimal design and serve the purpose of demonstrating the `debug-gym` APIs.
 
 | Agent name | Available Tools | Description |
 | :-: | :-: | :----- |
-| `pdb_agent` | `pdb`, `patcher`, `view`, `eval` | A minimal agent that dumps all available information into its prompt and queries the LLM to generate a command. |
-| `rewrite_only` | `patcher`, `view`, `eval`  | A `pdb_agent` but `pdb` tool is disabled (an agent keeps rewriting). |
-| `pdb_after_rewrite` | `pdb`, `patcher`, `view`, `eval`  | A `pdb_agent`, but `pdb` tool is only enabled after certain amount of rewrites. |
+| `debug_agent` | `pdb`, `patcher`, `view`, `eval` | A minimal agent that dumps all available information into its prompt and queries the LLM to generate a command. |
+| `rewrite_agent` | `patcher`, `view`, `eval`  | A `debug_agent` but `pdb` tool is disabled (an agent keeps rewriting). |
+| `debug_5_agent` | `pdb`, `patcher`, `view`, `eval`  | A `debug_agent`, but `pdb` tool is only enabled after certain amount of rewrites. |
 
 ---
 
@@ -103,9 +108,9 @@ Add `-v`, `--debug` to be verbose, or to enter debug mode.
 
 #### 3.1. Overriding Values in Config
 
-`-p` is a handy way to override values defined in config. For example, the below command will run rewrite_only agent on Aider with human mode (while in config file it specifies gpt-4o).
+`-p` is a handy way to override values defined in config. For example, the below command will run rewrite_agent agent on Aider with human mode (while in config file it specifies gpt-4o).
 
-    python scripts/run.py scripts/config_aider.yaml --agent rewrite_only -v -p rewrite_only.llm_name="human"
+    python scripts/run.py scripts/config_aider.yaml --agent rewrite_agent -v -p rewrite_agent.llm_name="human"
 
 #### 3.2. Debugging a Custom Repository
 
@@ -116,11 +121,17 @@ As an example, we provide a buggy pytorch code repository in `data/pytorch`.
     python scripts/run.py scripts/config.yaml --agent <agent name>
 
 #### 3.3. Design Your Own Tool
-`debug-gym`'s modular design makes it extensible. Users are encouraged to extend `debug-gym` to their specific usecases, for example by creating new tools that diversify an agent's action and observation spaces. For detailed instruction on designing new tools that are `debug-gym`-compatible, please refer to the [Technical Report](https://arxiv.org/). 
+`debug-gym`'s modular design makes it extensible. Users are encouraged to extend `debug-gym` to their specific usecases, for example by creating new tools that diversify an agent's action and observation spaces. For detailed instruction on designing new tools that are `debug-gym`-compatible, please refer to the [Technical Report](https://arxiv.org/abs/2503.21557).
 
 ## Citation
 ```
-tbd
+@article{yuan2025debuggym,
+  title={debug-gym: A Text-Based Environment for Interactive Debugging},
+  author={Xingdi Yuan, Morgane M Moss, Charbel El Feghali, Chinmay Singh, Darya Moldavskaya, Drew MacPhee, Lucas Caccia, Matheus Pereira, Minseon Kim, Alessandro Sordoni, Marc-Alexandre C\^ot\'e},
+  journal={arXiv preprint arXiv:2503.21557},
+  year={2025},
+  url={https://arxiv.org/abs/2503.21557}
+}
 ```
 
 ## Contributing
@@ -144,3 +155,9 @@ trademarks or logos is subject to and must follow
 [Microsoft's Trademark & Brand Guidelines](https://www.microsoft.com/en-us/legal/intellectualproperty/trademarks/usage/general).
 Use of Microsoft trademarks or logos in modified versions of this project must not cause confusion or imply Microsoft sponsorship.
 Any use of third-party trademarks or logos are subject to those third-party's policies.
+
+## Privacy
+This framework does not collect user's personal data. For more information about Microsoft's privacy policies. Please see [Microsoft Privacy Statement](https://www.microsoft.com/en-ca/privacy/privacystatement).
+
+## Responsible AI
+Please see our [Responsible AI Statement](https://github.com/microsoft/debug-gym/blob/main/RESPONSIBLE_AI.md).

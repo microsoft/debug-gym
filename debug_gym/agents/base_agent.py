@@ -6,8 +6,9 @@ from os.path import join as pjoin
 
 import numpy as np
 
-from debug_gym.agents.llm_api import instantiate_llm
-from debug_gym.agents.utils import HistoryTracker, build_history_prompt, trim
+from debug_gym.agents.history_tracker import HistoryTracker, build_history_prompt
+from debug_gym.agents.llm_api import LLM
+from debug_gym.agents.utils import trim
 from debug_gym.gym.envs.env import RepoEnv
 from debug_gym.gym.utils import unescape
 from debug_gym.logger import DebugGymLogger
@@ -38,7 +39,11 @@ class BaseAgent:
         self.config = config
         self.env = env
         self.logger = logger or DebugGymLogger("debug-gym")
-        self.llm = instantiate_llm(self.config, logger=self.logger)
+        self.llm = LLM.instantiate(
+            llm_name=self.config["llm_name"],
+            llm_config_file_path=self.config.get("llm_config_file_path"),
+            logger=self.logger,
+        )
         self._uuid = self.config.get("uuid", str(uuid.uuid4()))
         self._output_path = pjoin(self.config["output_path"], self._uuid)
 
@@ -71,18 +76,18 @@ class BaseAgent:
             system_prompt = unescape(
                 json.dumps(system_prompt, indent=2, sort_keys=True)
             )
-            return self.llm.context_length - self.llm.token_counter(text=system_prompt)
+            return self.llm.context_length - self.llm.count_tokens(system_prompt)
 
         system_prompt = {}
         system_prompt["Overall task"] = self.system_prompt
         system_prompt["Instructions"] = info.instructions
-        if self.llm.context_length is not None and self.llm.token_counter is not None:
+        if self.llm.context_length is not None and self.llm.count_tokens is not None:
             system_prompt["Repo directory tree"] = trim(
                 info.dir_tree,
                 min(
                     int(0.1 * self.llm.context_length), calc_tokens_left(system_prompt)
                 ),
-                token_counter=self.llm.token_counter,
+                count_tokens=self.llm.count_tokens,
                 where="end",
             )
         else:
@@ -95,7 +100,7 @@ class BaseAgent:
             )
             if (
                 self.llm.context_length is not None
-                and self.llm.token_counter is not None
+                and self.llm.count_tokens is not None
             ):
                 system_prompt["Current code in view"]["Content"] = trim(
                     system_prompt["Current code in view"]["Content"],
@@ -103,17 +108,17 @@ class BaseAgent:
                         int(0.8 * self.llm.context_length),
                         calc_tokens_left(system_prompt),
                     ),
-                    token_counter=self.llm.token_counter,
+                    count_tokens=self.llm.count_tokens,
                     where="end",
                 )
 
-        if self.llm.context_length is not None and self.llm.token_counter is not None:
+        if self.llm.context_length is not None and self.llm.count_tokens is not None:
             system_prompt["Last evaluation output"] = trim(
                 info.eval_observation.observation,
                 min(
                     int(0.8 * self.llm.context_length), calc_tokens_left(system_prompt)
                 ),
-                token_counter=self.llm.token_counter,
+                count_tokens=self.llm.count_tokens,
                 where="middle",
             )
         else:
@@ -156,9 +161,7 @@ class BaseAgent:
             )
 
             prompt = self.build_prompt(info)
-            llm_response = self.llm(
-                prompt, info, temperature=self.config["llm_temperature"][0]
-            )
+            llm_response = self.llm(prompt, info)
             if self.llm.reasoning_end_token is not None:
                 llm_response.response = self.parse_reasoning_model_response(
                     llm_response.response,

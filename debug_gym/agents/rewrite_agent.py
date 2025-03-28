@@ -2,8 +2,8 @@ from debug_gym.agents.base_agent import BaseAgent, register_agent
 
 
 @register_agent
-class RewriteOnly(BaseAgent):
-    name: str = "rewrite_only"
+class RewriteAgent(BaseAgent):
+    name: str = "rewrite_agent"
     system_prompt: str = (
         "Your goal is to debug a Python program to make sure it can pass a set of test functions. You need to propose a rewriting patch to fix the bugs. Avoid rewriting the entire code, focus on the bugs only."
     )

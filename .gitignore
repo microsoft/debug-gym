@@ -184,3 +184,4 @@ logs/
 vscode/out
 vscode/node_modules
 vscode/package-lock.json
+.vscode
