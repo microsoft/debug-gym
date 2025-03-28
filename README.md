@@ -6,13 +6,28 @@
 
 ## 1. Installation
 
+It's recommended to create and activate a conda or virtual environment. `debug-gym` requires `Python>=3.12`:
+
     conda create -n debug-gym python=3.12
     conda activate debug-gym
-    pip install -e .
 
-To install the development dependencies:
+Then, install `debug-gym` directly from PyPI:
 
-    pip install -e '.[dev]'
+    pip install debug-gym
+
+Alternatively, clone the repository and install locally:
+
+```bash
+git clone https://github.com/microsoft/debug-gym
+cd debug-gym
+pip install -e .
+```
+
+To install development dependencies, run:
+
+```bash
+pip install -e '.[dev]'
+```
 
 **Set your API information in llm.yaml**
 
