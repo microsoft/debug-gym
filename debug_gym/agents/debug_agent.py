@@ -1,5 +1,5 @@
 from debug_gym.agents.base_agent import BaseAgent, register_agent
-from debug_gym.agents.llm_api import instantiate_llm
+from debug_gym.agents.llm_api import LLM
 
 @register_agent
 class DebugAgent(BaseAgent):
@@ -70,14 +70,12 @@ class Debug_5_Agent(DebugAgent):
         return info.done
 
 @register_agent
-class PdbHumanInTheLoop(PdbAgent):
+class DebugHumanInTheLoop(DebugAgent):
     name: str = "pdb_hitl"
 
     def run(self, task_name=None, debug=False):
         # instantiate the human in the loop
-        hitl_config = self.config.copy()
-        hitl_config["llm_name"] = "human"
-        self.hitl = instantiate_llm(hitl_config, logger=self.logger)
+        self.hitl = LLM.instantiate(llm_name="human", llm_config_file_path=self.config.get("llm_config_file_path"), logger=self.logger)
 
         self.history.reset()
         info = self.env.reset(options={"task_name": task_name})
@@ -98,9 +96,7 @@ class PdbHumanInTheLoop(PdbAgent):
 
             prompt = self.build_prompt(info)
 
-            llm_response = self.llm(
-                prompt, info, temperature=self.config["llm_temperature"][0]
-            )
+            llm_response = self.llm(prompt, info)
 
             if debug:
                 breakpoint()
@@ -125,9 +121,7 @@ class PdbHumanInTheLoop(PdbAgent):
                 break
 
             # call the human in the loop
-            hitl_response = self.hitl(
-                prompt, hitl_info, temperature=self.config["llm_temperature"][0]
-            )
+            hitl_response = self.hitl(prompt, hitl_info)
             hitl_info = self.hitl_env.step(hitl_response.response)
 
             if hitl_info.done or hitl_info.rewrite_counter >= self.config["max_rewrite_steps"]:

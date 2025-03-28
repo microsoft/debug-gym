@@ -1,7 +1,7 @@
 from unittest.mock import MagicMock, patch, call
 
-from debug_gym.agents.debug_agent import Debug_5_Agent, DebugAgent, PdbHumanInTheLoop
-from debug_gym.agents.llm_api import LLMResponse, TokenUsage
+from debug_gym.agents.debug_agent import Debug_5_Agent, DebugAgent, DebugHumanInTheLoop
+from debug_gym.agents.llm_api import LLMResponse, TokenUsage, Human
 from debug_gym.agents.rewrite_agent import RewriteAgent
 
 
@@ -104,7 +104,7 @@ def test_run_debug_5_agent(agent_setup, build_env_info):
 
 @patch.object(Human, '__call__', return_value=LLMResponse("Prompt", "```pdb c```", TokenUsage(2, 4)))
 def test_human_in_the_loop(human, agent_setup, build_env_info):
-    agent, env, llm, history = next(agent_setup(PdbHumanInTheLoop))
+    agent, env, llm, history = next(agent_setup(DebugHumanInTheLoop))
     env.reset.return_value = build_env_info(
         done=False,
         score=0,
