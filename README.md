@@ -17,17 +17,14 @@ Then, install `debug-gym` directly from PyPI:
 
 Alternatively, clone the repository and install locally:
 
-```bash
-git clone https://github.com/microsoft/debug-gym
-cd debug-gym
-pip install -e .
-```
+    git clone https://github.com/microsoft/debug-gym
+    cd debug-gym
+    pip install -e .
 
 To install development dependencies, run:
 
-```bash
-pip install -e '.[dev]'
-```
+    pip install -e '.[dev]'
+
 
 **Set your API information in llm.yaml**
 
