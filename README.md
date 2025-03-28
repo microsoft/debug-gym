@@ -125,7 +125,13 @@ As an example, we provide a buggy pytorch code repository in `data/pytorch`.
 
 ## Citation
 ```
-tbd
+@article{yuan2025debuggym,
+  title={debug-gym: A Text-Based Environment for Interactive Debugging},
+  author={Xingdi Yuan, Morgane M Moss, Charbel El Feghali, Chinmay Singh, Darya Moldavskaya, Drew MacPhee, Lucas Caccia, Matheus Pereira, Minseon Kim, Alessandro Sordoni, Marc-Alexandre C\^ot\'e},
+  journal={arXiv preprint arXiv:2503.21557},
+  year={2025},
+  url={https://arxiv.org/abs/2503.21557}
+}
 ```
 
 ## Contributing
