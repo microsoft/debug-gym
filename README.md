@@ -2,7 +2,7 @@
 
 `debug-gym` is a text-based interactive debugging framework, designed for debugging Python programs.
 
-[[Technical Report](https://arxiv.org/)] [[Project Page](https://aka.ms/debug-gym/)]
+[[Technical Report](https://arxiv.org/abs/2503.21557)] [[Project Page](https://aka.ms/debug-gym/)]
 
 ## 1. Installation
 
@@ -121,11 +121,17 @@ As an example, we provide a buggy pytorch code repository in `data/pytorch`.
     python scripts/run.py scripts/config.yaml --agent <agent name>
 
 #### 3.3. Design Your Own Tool
-`debug-gym`'s modular design makes it extensible. Users are encouraged to extend `debug-gym` to their specific usecases, for example by creating new tools that diversify an agent's action and observation spaces. For detailed instruction on designing new tools that are `debug-gym`-compatible, please refer to the [Technical Report](https://arxiv.org/).
+`debug-gym`'s modular design makes it extensible. Users are encouraged to extend `debug-gym` to their specific usecases, for example by creating new tools that diversify an agent's action and observation spaces. For detailed instruction on designing new tools that are `debug-gym`-compatible, please refer to the [Technical Report](https://arxiv.org/abs/2503.21557).
 
 ## Citation
 ```
-tbd
+@article{yuan2025debuggym,
+  title={debug-gym: A Text-Based Environment for Interactive Debugging},
+  author={Xingdi Yuan, Morgane M Moss, Charbel El Feghali, Chinmay Singh, Darya Moldavskaya, Drew MacPhee, Lucas Caccia, Matheus Pereira, Minseon Kim, Alessandro Sordoni, Marc-Alexandre C\^ot\'e},
+  journal={arXiv preprint arXiv:2503.21557},
+  year={2025},
+  url={https://arxiv.org/abs/2503.21557}
+}
 ```
 
 ## Contributing
