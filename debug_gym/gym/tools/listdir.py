@@ -9,47 +9,50 @@ from debug_gym.gym.tools.toolbox import Toolbox
 @Toolbox.register()
 class ListdirTool(EnvironmentTool):
     name: str = "listdir"
+    examples = [
+        """listdir(path=None, depth=None) to list the contents of the working directory.""",
+        """listdir(path="src/util", depth=None) to list the contents of the 'util' subdirectory within the 'src' subdirectory.""",
+        """listdir(path="src", depth=2) to list the contents of the 'src' subdirectory up to a depth of 2.""",
+    ]
 
     @property
-    def instructions(self):
+    def tool_description(self):
         assert hasattr(self, "environment")
-        instruction = {
-            "template": "```listdir <path/to/subdirectory> <depth>```",
-            "description": f"List the file and folder contents of a subdirectory within the working directory, up to a specified 'depth' (default depth is {self.environment.dir_tree_depth}).",
-            "examples": [
-                f"```listdir``` to list the contents of the working directory.",
-                f"```listdir src/util``` to list the contents of the 'util' subdirectory within the 'src' subdirectory.",
-                f"```listdir src 2``` to list the contents of the 'src' subdirectory up to a depth of 2.",
-            ],
+        tool_description = {
+            "type": "function",
+            "function": {
+                "name": "listdir",
+                "description": f"List the file and folder contents of a subdirectory within the working directory, up to a specified 'depth' (default depth is {self.environment.dir_tree_depth})."
+                + "\nExamples (for demonstration purposes only, you need to adjust the tool calling format according to your specific syntax):\n"
+                + "\n".join(self.examples),
+                "strict": True,
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "path": {
+                            "type": ["string", "null"],
+                            "description": "The path to the subdirectory within the working directory. If None, the current working directory will be used.",
+                        },
+                        "depth": {
+                            "type": ["number", "null"],
+                            "description": "The maximum depth to which the directory tree should be explored. If None, the default depth will be used.",
+                        },
+                    },
+                    "required": ["path", "depth"],
+                    "additionalProperties": False,
+                },
+            },
         }
-        return instruction
+        return tool_description
 
-    def use(self, tool_args) -> Observation:
+    def use(self, path: str = ".", depth: int = None) -> Observation:
+        if depth is None:
+            depth = self.environment.dir_tree_depth
+        if depth <= 0:
+            return Observation(self.name, f"Depth must be 1 or greater: {depth}")
         try:
-            listdir_path, depth = self.parse_args(tool_args)
-            startpath = pjoin(self.environment.working_dir, listdir_path)
-            obs = self.environment.directory_tree(root=startpath, max_depth=depth)
+            startpath = pjoin(self.environment.working_dir, path)
+            result = self.environment.directory_tree(root=startpath, max_depth=depth)
         except ValueError as e:
-            obs = str(e)
-        return Observation(self.name, obs)
-
-    def parse_args(self, tool_args):
-        depth = None
-        if tool_args == "":
-            # e.g., ```listdir```
-            listdir_path = "."
-        else:
-            arg_list = tool_args.split(" ")
-            if len(arg_list) == 1:
-                # e.g., ```listdir src```
-                listdir_path = arg_list[0].strip()
-            elif len(arg_list) == 2:
-                # e.g., ```listdir src depth```
-                listdir_path = arg_list[0].strip()
-                depth = int(arg_list[1].strip())
-                if depth <= 0:
-                    raise ValueError(f"Depth must be 1 or greater: {depth}")
-            else:
-                raise ValueError(f"Invalid action (too many arguments): {tool_args}")
-
-        return listdir_path, depth
+            Observation(self.name, f"Depth must be 1 or greater: {str(e)}")
+        return Observation(self.name, result)
