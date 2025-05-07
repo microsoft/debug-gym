@@ -148,14 +148,7 @@ def test_build_history_prompt(build_env_info):
 
     # test with empty history
     ht = HistoryTracker(history_steps=3)
-    # use_conversational_prompt is False
-    messages = build_history_prompt(ht, use_conversational_prompt=False)
-    expected = [
-        {"role": "user", "content": "No history of command and terminal outputs."}
-    ]
-    assert messages == expected
-    # use_conversational_prompt is True
-    messages = build_history_prompt(ht, use_conversational_prompt=True)
+    messages = build_history_prompt(ht)
     expected = [
         {"role": "user", "content": "No history of command and terminal outputs."}
     ]
@@ -187,39 +180,8 @@ def test_build_history_prompt(build_env_info):
     ht.step(env_info_4)
     ht.step(env_info_5)
 
-    # use_conversational_prompt is False
     # reset_prompt_history_after_rewrite is False
-    messages = build_history_prompt(
-        ht, use_conversational_prompt=False, reset_prompt_history_after_rewrite=False
-    )
-    expected = [f"History of command and terminal outputs (the last 3 steps):"]
-    history_messages = [
-        {"step": 0, "command": "action3", "stdout": "obs3"},
-        {"step": 1, "command": "action4", "stdout": "obs4"},
-        {"step": 2, "command": "action5", "stdout": "obs5"},
-    ]
-    expected += ["\n" + unescape(json.dumps(history_messages, indent=4)) + "\n"]
-    expected = [{"role": "user", "content": "\n".join(expected)}]
-    assert messages == expected
-
-    # reset_prompt_history_after_rewrite is True
-    messages = build_history_prompt(
-        ht, use_conversational_prompt=False, reset_prompt_history_after_rewrite=True
-    )
-    expected = [f"History of command and terminal outputs (the last 2 steps):"]
-    history_messages = [
-        {"step": 0, "command": "action4", "stdout": "obs4"},
-        {"step": 1, "command": "action5", "stdout": "obs5"},
-    ]
-    expected += ["\n" + unescape(json.dumps(history_messages, indent=4)) + "\n"]
-    expected = [{"role": "user", "content": "\n".join(expected)}]
-    assert messages == expected
-
-    # use_conversational_prompt is True
-    # reset_prompt_history_after_rewrite is False
-    messages = build_history_prompt(
-        ht, use_conversational_prompt=True, reset_prompt_history_after_rewrite=False
-    )
+    messages = build_history_prompt(ht, reset_prompt_history_after_rewrite=False)
     expected = [
         {
             "role": "user",
@@ -237,9 +199,7 @@ def test_build_history_prompt(build_env_info):
     expected += history_messages
     assert messages == expected
     # reset_prompt_history_after_rewrite is True
-    messages = build_history_prompt(
-        ht, use_conversational_prompt=True, reset_prompt_history_after_rewrite=True
-    )
+    messages = build_history_prompt(ht, reset_prompt_history_after_rewrite=True)
     expected = [
         {
             "role": "user",

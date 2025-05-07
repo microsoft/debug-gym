@@ -112,65 +112,27 @@ def build_history_conversation(
     return _messages
 
 
-def build_history_non_conversation(
-    history: HistoryTracker, reset_prompt_history_after_rewrite: bool = False
-):
-    _history = history.get()
-    # Find the latest rewrite step
-    if len(_history) == 0 or reset_prompt_history_after_rewrite is False:
-        latest_rewrite_step = 0
-    else:
-        for i in range(len(_history)):
-            if _history[i].rewrite_counter == _history[-1].rewrite_counter:
-                latest_rewrite_step = i
-                break
-    _history_prompt = []
-    _history = _history[latest_rewrite_step:]
-    for _i, history_info in enumerate(_history):
-        _m = {
-            "step": _i,
-            "command": (None if history_info.action is None else history_info.action),
-            "stdout": history_info.step_observation.observation,
-        }
-        _history_prompt.append(_m)
-    return _history_prompt
-
-
 def build_history_prompt(
     history: HistoryTracker,
-    use_conversational_prompt: bool = True,
     reset_prompt_history_after_rewrite: bool = False,
 ):
     messages = []
-    if use_conversational_prompt is True:
-        conversation_history = build_history_conversation(
-            history, reset_prompt_history_after_rewrite
+    conversation_history = build_history_conversation(
+        history, reset_prompt_history_after_rewrite
+    )
+    if len(conversation_history) == 0:
+        messages.append(
+            {
+                "role": "user",
+                "content": "No history of command and terminal outputs.",
+            }
         )
-        if len(conversation_history) == 0:
-            messages.append(
-                {
-                    "role": "user",
-                    "content": "No history of command and terminal outputs.",
-                }
-            )
-        else:
-            messages.append(
-                {
-                    "role": "user",
-                    "content": f"History of command and terminal outputs (the last {(len(conversation_history) + 1) // 2} steps):",
-                }
-            )
-            messages.extend(conversation_history)
     else:
-        history_prompt = build_history_non_conversation(
-            history, reset_prompt_history_after_rewrite
+        messages.append(
+            {
+                "role": "user",
+                "content": f"History of command and terminal outputs (the last {(len(conversation_history) + 1) // 2} steps):",
+            }
         )
-        if len(history_prompt) == 0:
-            prompt = ["No history of command and terminal outputs."]
-        else:
-            prompt = [
-                f"History of command and terminal outputs (the last {len(history_prompt)} steps):"
-            ]
-            prompt += ["\n" + unescape(json.dumps(history_prompt, indent=4)) + "\n"]
-        messages.append({"role": "user", "content": "\n".join(prompt)})
+        messages.extend(conversation_history)
     return messages

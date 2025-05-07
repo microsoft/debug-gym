@@ -58,7 +58,6 @@ class BaseAgent:
     def build_history_prompt(self):
         messages = build_history_prompt(
             self.history.filter_out(actions=["eval", None]),
-            self.config["use_conversational_prompt"],
             self.config["reset_prompt_history_after_rewrite"],
         )
         return messages
