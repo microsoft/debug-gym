@@ -14,7 +14,7 @@ class ViewTool(EnvironmentTool):
         """view(path="main.py") to navigate to a file called 'main.py' in the root.""",
         """view(path="src/util.py") to navigate to a file called 'util.py' in a subdirectory called 'src'.""",
     ]
-    tool_description = {
+    tool_instructions = {
         "type": "function",
         "function": {
             "name": "view",

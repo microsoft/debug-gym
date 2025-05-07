@@ -13,7 +13,7 @@ class RewriteTool(EnvironmentTool):
         """rewrite(path=None, start=10, end=20, new_code="    print('hello')\\n    print('hi again')") will replace the chunk of code between line number 10 and 20 in the current file by the two lines provided, both with indents ahead (in this case, 4 spaces).""",
         """rewrite(path='code/utils.py', start=4, end=6, new_code="        print('buongiorno')") will replace the chunk of code between line number 4 and 6 in the file code/utils.py by the single line provided, with the indent ahead (in this case, 8 spaces).""",
     ]
-    tool_description = {
+    tool_instructions = {
         "type": "function",
         "function": {
             "name": "rewrite",

@@ -16,9 +16,9 @@ class ListdirTool(EnvironmentTool):
     ]
 
     @property
-    def tool_description(self):
+    def tool_instructions(self):
         assert hasattr(self, "environment")
-        tool_description = {
+        tool_instructions = {
             "type": "function",
             "function": {
                 "name": "listdir",
@@ -43,7 +43,7 @@ class ListdirTool(EnvironmentTool):
                 },
             },
         }
-        return tool_description
+        return tool_instructions
 
     def use(self, path: str = ".", depth: int = None) -> Observation:
         if depth is None:

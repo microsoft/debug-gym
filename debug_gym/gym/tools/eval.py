@@ -6,7 +6,7 @@ from debug_gym.gym.tools.toolbox import Toolbox
 @Toolbox.register()
 class EvalTool(EnvironmentTool):
     name: str = "eval"
-    tool_description = {
+    tool_instructions = {
         "type": "function",
         "function": {
             "name": "eval",

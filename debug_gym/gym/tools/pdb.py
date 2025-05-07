@@ -17,7 +17,7 @@ class PDBTool(EnvironmentTool):
         """pdb(command="cl src/code.py:26") to clear the breakpoint at line 26 in the file src/code.py.""",
         """pdb(command="c") to continue the execution until the next breakpoint.""",
     ]
-    tool_description = {
+    tool_instructions = {
         "type": "function",
         "function": {
             "name": "pdb",

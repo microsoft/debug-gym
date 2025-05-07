@@ -77,7 +77,7 @@ class TooledEnv:
 
     @property
     def tool_names(self):
-        return ", ".join([f"```{t.name}```" for t in self.tools.values()])
+        return ", ".join([t.name for t in self.tools.values()])
 
     def add_tool(self, tool):
         if tool.name in self.tools:
@@ -106,7 +106,7 @@ class TooledEnv:
 
     @property
     def tool_instructions(self):
-        return {name: tool.instructions for name, tool in self.tools.items()}
+        return [tool.tool_instructions for _, tool in self.tools.values()]
 
     def clear_all_observations(self):
         self.all_observations = []
