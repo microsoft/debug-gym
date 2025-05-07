@@ -6,12 +6,21 @@ from debug_gym.gym.tools.toolbox import Toolbox
 @Toolbox.register()
 class EvalTool(EnvironmentTool):
     name: str = "eval"
-    instructions = {
-        "template": "```eval```",
-        "description": "Evaluate the current code against pre-defined test cases.",
+    tool_description = {
+        "type": "function",
+        "function": {
+            "name": "eval",
+            "description": "Evaluate the current code against pre-defined test cases.",
+            "strict": True,
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": False,
+            },
+        },
     }
 
-    def use(self, tool_args, **kwargs) -> Observation:
+    def use(self, **kwargs) -> Observation:
         eval_output = self.environment.eval(**kwargs)
         return Observation(self.name, eval_output.output)
 
