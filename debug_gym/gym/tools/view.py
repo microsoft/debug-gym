@@ -10,20 +10,37 @@ from debug_gym.gym.utils import is_subdirectory
 @Toolbox.register()
 class ViewTool(EnvironmentTool):
     name: str = "view"
-    instructions = {
-        "template": "```view <path/to/file.py>```",
-        "description": "Specify a file path to set as current working file. The file path should be relative to the root directory of the repository.",
-        "examples": [
-            "```view main.py``` to navigate to a file called 'main.py' in the root",
-            "```view src/util.py``` to navigate to a file called 'util.py' in a subdirectory called 'src'",
-        ],
+    examples = [
+        """view(path="main.py") to navigate to a file called 'main.py' in the root.""",
+        """view(path="src/util.py") to navigate to a file called 'util.py' in a subdirectory called 'src'.""",
+    ]
+    tool_description = {
+        "type": "function",
+        "function": {
+            "name": "view",
+            "description": "Specify a file path to set as current working file. The file path should be relative to the root directory of the repository."
+            + "\nExamples (for demonstration purposes only, you need to adjust the tool calling format according to your specific syntax):\n"
+            + "\n".join(examples),
+            "strict": True,
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "path": {
+                        "type": ["string"],
+                        "description": "The path to the file to be viewed. The path should be relative to the root directory of the repository.",
+                    },
+                },
+                "required": ["path"],
+                "additionalProperties": False,
+            },
+        },
     }
 
     def is_editable(self, filepath):
         return filepath in self.environment.editable_files
 
-    def use(self, tool_args) -> Observation:
-        new_file = tool_args
+    def use(self, path: str) -> Observation:
+        new_file = path.strip()
         if new_file == "":
             obs = [
                 "Invalid file path. Please specify a file path.",
