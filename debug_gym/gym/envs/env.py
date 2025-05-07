@@ -94,7 +94,7 @@ class TooledEnv:
 
     def get_triggered_tools(self, action):
         try:
-            tool_name, tool_args = parse_action(action)
+            tool_name, tool_kwargs = parse_action(action)
         except Exception as e:
             # parse error
             return str(e), None
@@ -102,7 +102,7 @@ class TooledEnv:
             # failed to find tool
             return f"Unregistered tool: {tool_name}", None
         tool = self.tools[tool_name]
-        return None, [tool, tool_args]
+        return None, [tool, tool_kwargs]
 
     @property
     def tool_instructions(self):
@@ -456,9 +456,10 @@ class RepoEnv(TooledEnv):
         if message:
             self.step_observation = Observation("env", message)
         else:
-            triggered_tool, tool_args = tool_info
+            triggered_tool, tool_kwargs = tool_info
             try:
-                self.step_observation = triggered_tool(tool_args)
+                # tool_kwargs is a dict, so we need to unpack it
+                self.step_observation = triggered_tool(**tool_kwargs)
             except BaseException as e:
                 error_message = (
                     f"Error while using tool {triggered_tool.name} "
