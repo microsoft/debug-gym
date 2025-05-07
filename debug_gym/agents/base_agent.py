@@ -2,6 +2,7 @@ import json
 import os
 import subprocess
 import uuid
+from collections import OrderedDict
 from os.path import join as pjoin
 
 import numpy as np
@@ -73,11 +74,11 @@ class BaseAgent:
     def build_system_prompt(self, info):
         def calc_tokens_left(system_prompt: dict):
             system_prompt = unescape(
-                json.dumps(system_prompt, indent=2, sort_keys=True)
+                json.dumps(system_prompt, indent=2, sort_keys=False)
             )
             return self.llm.context_length - self.llm.count_tokens(system_prompt)
 
-        system_prompt = {}
+        system_prompt = OrderedDict()
         system_prompt["Overall task"] = self.system_prompt
         system_prompt["Instructions"] = info.instructions
         if self.llm.context_length is not None and self.llm.count_tokens is not None:
@@ -122,7 +123,7 @@ class BaseAgent:
             )
         else:
             system_prompt["Last evaluation output"] = info.eval_observation.observation
-        system_prompt = unescape(json.dumps(system_prompt, indent=2, sort_keys=True))
+        system_prompt = unescape(json.dumps(system_prompt, indent=2, sort_keys=False))
         messages = [
             {
                 "role": "system",
