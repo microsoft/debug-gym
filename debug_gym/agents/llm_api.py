@@ -339,6 +339,18 @@ class LLM(ABC):
         """Count the number of tokens in a list of messages."""
         return sum(self.count_tokens(msg["content"]) for msg in messages)
 
+    def define_tools(self, tool_instructions: list[dict]) -> list[dict]:
+        """tool_instructions is a list of dictionaries with the following keys:
+        - name: str, the name of the tool
+        - description: str, the description of the tool
+        - arguments: dict, the arguments of the tool
+        This method translates the tool instructions into a format that is specifically defined by each LLM.
+        The method should be overridden by subclasses.
+        """
+        raise NotImplementedError(
+            "The define_tools method should be overridden by subclasses."
+        )
+
     def __call__(self, messages, *args, **kwargs) -> LLMResponse:
         """Prepares messages and kwargs, then call `generate` which
         should be implemented by subclasses. Returns an LLMResponse object
@@ -455,6 +467,29 @@ class AnthropicLLM(LLM):
         )
         return exception_full_name in rate_limit_errors
 
+    def define_tools(self, tool_instructions: list[dict]) -> list[dict]:
+        """tool_instructions is a list of dictionaries with the following keys:
+        - name: str, the name of the tool
+        - description: str, the description of the tool
+        - arguments: dict, the arguments of the tool
+        This method translates the tool instructions into a format that is specifically defined by each LLM.
+        Anthropic function calling format: https://docs.anthropic.com/en/docs/build-with-claude/tool-use/overview
+        """
+        output = []
+        for tool in tool_instructions:
+            _tool = {}
+            _tool["name"] = tool["name"]
+            _tool["description"] = tool["description"]
+            _tool["strict"] = True
+            _tool["input_schema"] = {
+                "type": "object",
+                "properties": tool["arguments"],
+            }
+            if len(tool["arguments"]) > 0:
+                _tool["input_schema"]["required"] = list(tool["arguments"].keys())
+            output.append(_tool)
+        return output
+
     def generate(self, messages, **kwargs):
         system_prompt = " "  # weird exceptions sometimes if empty
         user_assistant_prompt = []
@@ -492,13 +527,6 @@ class AnthropicLLM(LLM):
             .text
         )
         response = response.strip()
-        # only keep the content between the two ```.
-        p = re.compile(r"```(.*?)```", re.DOTALL)
-        if p.search(response) is not None:
-            # ```...```
-            response = p.search(response).group(0)
-        else:
-            response = ""
         return response
 
 
@@ -581,6 +609,32 @@ class OpenAILLM(LLM):
         )
 
         return is_error
+
+    def define_tools(self, tool_instructions: list[dict]) -> list[dict]:
+        """tool_instructions is a list of dictionaries with the following keys:
+        - name: str, the name of the tool
+        - description: str, the description of the tool
+        - arguments: dict, the arguments of the tool
+        This method translates the tool instructions into a format that is specifically defined by each LLM.
+        OpenAI function calling format: https://platform.openai.com/docs/guides/function-calling
+        """
+        output = []
+        for tool in tool_instructions:
+            _tool = {"type": "function", "function": {}}
+            _tool["function"]["name"] = tool["name"]
+            _tool["function"]["description"] = tool["description"]
+            _tool["function"]["strict"] = True
+            _tool["function"]["parameters"] = {
+                "type": "object",
+                "properties": tool["arguments"],
+                "additionalProperties": False,
+            }
+            if len(tool["arguments"]) > 0:
+                _tool["function"]["parameters"]["required"] = list(
+                    tool["arguments"].keys()
+                )
+            output.append(_tool)
+        return output
 
     def generate(self, messages, **kwargs):
         # set max tokens if not provided
