@@ -630,8 +630,8 @@ class AzureOpenAILLM(OpenAILLM):
 
             credential = get_bearer_token_provider(
                 ChainedTokenCredential(
-                    ManagedIdentityCredential(),
                     AzureCliCredential(),
+                    ManagedIdentityCredential(),
                 ),
                 scope,
             )
