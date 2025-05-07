@@ -106,7 +106,19 @@ class TooledEnv:
 
     @property
     def tool_instructions(self):
-        return [tool.tool_instructions for _, tool in self.tools.values()]
+        return [tool.tool_instructions for tool in self.tools.values()]
+
+    @property
+    def tool_instructions_lite(self):
+        # only names and descriptions
+        # used in system prompt
+        return [
+            {
+                "name": tool.tool_instructions.function.name,
+                "description": tool.tool_instructions.function.description,
+            }
+            for tool in self.tools.values()
+        ]
 
     def clear_all_observations(self):
         self.all_observations = []
@@ -247,8 +259,7 @@ class RepoEnv(TooledEnv):
     @property
     def instructions(self):
         _instruction = {
-            "Available tools to solve the problem": self.tool_instructions,
-            "Available commands": self.tool_names,
+            "Available tools to solve the problem": self.tool_instructions_lite,
         }
         return _instruction
 

@@ -136,11 +136,15 @@ class BaseAgent:
         messages.append({"role": "user", "content": self.action_prompt})
         return messages
 
+    def build_tool_prompt(self, info):
+        return info.tools
+
     def build_prompt(self, info):
         messages = self.build_system_prompt(info)
         messages.extend(self.build_history_prompt())
         messages.extend(self.build_question_prompt())
-        return messages
+        tools = self.build_tool_prompt(info)
+        return messages, tools
 
     def run(self, task_name=None, debug=False):
         self.history.reset()
@@ -159,8 +163,8 @@ class BaseAgent:
                 f"Score: {info.score}/{info.max_score} ({info.score/info.max_score:.1%}) [Best: {highscore}]"
             )
 
-            prompt = self.build_prompt(info)
-            llm_response = self.llm(prompt, info)
+            messages, tools = self.build_prompt(info)
+            llm_response = self.llm(messages, tools, info)
             if self.llm.reasoning_end_token is not None:
                 llm_response.response = self.parse_reasoning_model_response(
                     llm_response.response,
