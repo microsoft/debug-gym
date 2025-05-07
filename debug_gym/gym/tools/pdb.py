@@ -11,15 +11,32 @@ from debug_gym.gym.utils import get_code_length
 @Toolbox.register()
 class PDBTool(EnvironmentTool):
     name: str = "pdb"
-    instructions = {
-        "template": "```pdb <command>```",
-        "description": "An interface to the Python debugger PDB. Send a command to the PDB terminal. The command should be a valid PDB command.",
-        "examples": [
-            "```pdb p x``` to print the value of the variable x in the current context.",
-            "```pdb b 42``` to set a breakpoint at line 42 in the current file.",
-            "```pdb cl src/code.py:26``` to clear the breakpoint at line 26 in the file src/code.py.",
-            "```pdb c``` to continue the execution until the next breakpoint.",
-        ],
+    examples = [
+        """pdb(command="p x") to print the value of the variable x in the current context.""",
+        """pdb(command="b 42") to set a breakpoint at line 42 in the current file.""",
+        """pdb(command="cl src/code.py:26") to clear the breakpoint at line 26 in the file src/code.py.""",
+        """pdb(command="c") to continue the execution until the next breakpoint.""",
+    ]
+    tool_description = {
+        "type": "function",
+        "function": {
+            "name": "pdb",
+            "description": "An interface to the Python debugger PDB. Send a command to the PDB terminal. The command should be a valid PDB command."
+            + "\nExamples (for demonstration purposes only, you need to adjust the tool calling format according to your specific syntax):\n"
+            + "\n".join(examples),
+            "strict": True,
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "command": {
+                        "type": ["string"],
+                        "description": "The command to be sent to the PDB terminal. The command should be a valid PDB command. See https://docs.python.org/3/library/pdb.html for more information.",
+                    },
+                },
+                "required": ["command"],
+                "additionalProperties": False,
+            },
+        },
     }
 
     def __init__(
@@ -87,8 +104,7 @@ class PDBTool(EnvironmentTool):
         self.close_pdb()
         return self.start_pdb()
 
-    def use(self, tool_args) -> Observation:
-        command = tool_args
+    def use(self, command: str) -> Observation:
         _warning = ""
         if (
             command == ""
@@ -173,7 +189,7 @@ class PDBTool(EnvironmentTool):
                 if '"""The pytest entry point."""' not in obs:
                     obs += f"\nlist .\n" + self.interact_with_pdb("l .")
         else:
-            obs = "\n".join([f"Invalid tool arguments: {tool_args}", _warning, output])
+            obs = "\n".join([f"Invalid tool arguments: {command}", _warning, output])
 
         if self.pdb_is_running:
             # read the current frame info, find the current file, so we can change view to that file.
