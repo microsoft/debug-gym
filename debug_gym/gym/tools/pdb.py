@@ -17,25 +17,15 @@ class PDBTool(EnvironmentTool):
         """pdb(command="cl src/code.py:26") to clear the breakpoint at line 26 in the file src/code.py.""",
         """pdb(command="c") to continue the execution until the next breakpoint.""",
     ]
-    tool_instructions = {
-        "type": "function",
-        "function": {
-            "name": "pdb",
-            "description": "An interface to the Python debugger PDB. Send a command to the PDB terminal. The command should be a valid PDB command."
-            + "\nExamples (for demonstration purposes only, you need to adjust the tool calling format according to your specific syntax):\n"
-            + "\n".join(examples),
-            "strict": True,
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "command": {
-                        "type": ["string"],
-                        "description": "The command to be sent to the PDB terminal. The command should be a valid PDB command. See https://docs.python.org/3/library/pdb.html for more information.",
-                    },
-                },
-                "required": ["command"],
-                "additionalProperties": False,
-            },
+    description = (
+        "An interface to the Python debugger PDB. Send a command to the PDB terminal. The command should be a valid PDB command."
+        + "\nExamples (for demonstration purposes only, you need to adjust the tool calling format according to your specific syntax):"
+        + "\n".join(examples)
+    )
+    arguments = {
+        "command": {
+            "type": ["string"],
+            "description": "The command to be sent to the PDB terminal. The command should be a valid PDB command. See https://docs.python.org/3/library/pdb.html for more information.",
         },
     }
 

@@ -13,37 +13,27 @@ class RewriteTool(EnvironmentTool):
         """rewrite(path=None, start=10, end=20, new_code="    print('hello')\\n    print('hi again')") will replace the chunk of code between line number 10 and 20 in the current file by the two lines provided, both with indents ahead (in this case, 4 spaces).""",
         """rewrite(path='code/utils.py', start=4, end=6, new_code="        print('buongiorno')") will replace the chunk of code between line number 4 and 6 in the file code/utils.py by the single line provided, with the indent ahead (in this case, 8 spaces).""",
     ]
-    tool_instructions = {
-        "type": "function",
-        "function": {
-            "name": "rewrite",
-            "description": "Rewrite the content of the specified file path, between lines [start, end], with the new code. Line numbers are 1-based. When file path is None, it's assumed to rewrite the current file. When start and end are None, it's assumed to rewrite the whole file. When start is provided and end is None, it's assumed to rewrite a single line (start). The new code should be valid python code include proper indentation (can be determined from context)."
-            + "\nExamples (for demonstration purposes only, you need to adjust the tool calling format according to your specific syntax):\n"
-            + "\n".join(examples),
-            "strict": True,
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "path": {
-                        "type": ["string", "null"],
-                        "description": "A file path to be rewritten. If None, the current file will be used.",
-                    },
-                    "start": {
-                        "type": ["number", "null"],
-                        "description": "The starting line number to be rewritten. If None, the whole file will be rewritten.",
-                    },
-                    "end": {
-                        "type": ["number", "null"],
-                        "description": "The ending line number to be rewritten. If None, end is the same as start.",
-                    },
-                    "new_code": {
-                        "type": "string",
-                        "description": "The new code to be inserted. The new code should be valid python code include proper indentation (can be determined from context).",
-                    },
-                },
-                "required": ["path", "start", "end", "new_code"],
-                "additionalProperties": False,
-            },
+    description = (
+        "Rewrite the content of the specified file path, between lines [start, end], with the new code. Line numbers are 1-based. When file path is None, it's assumed to rewrite the current file. When start and end are None, it's assumed to rewrite the whole file. When start is provided and end is None, it's assumed to rewrite a single line (start). The new code should be valid python code include proper indentation (can be determined from context)."
+        + "\nExamples (for demonstration purposes only, you need to adjust the tool calling format according to your specific syntax):"
+        + "\n".join(examples)
+    )
+    arguments = {
+        "path": {
+            "type": ["string", "null"],
+            "description": "A file path to be rewritten. If None, the current file will be used.",
+        },
+        "start": {
+            "type": ["number", "null"],
+            "description": "The starting line number to be rewritten. If None, the whole file will be rewritten.",
+        },
+        "end": {
+            "type": ["number", "null"],
+            "description": "The ending line number to be rewritten. If None, end is the same as start.",
+        },
+        "new_code": {
+            "type": "string",
+            "description": "The new code to be inserted. The new code should be valid python code include proper indentation (can be determined from context).",
         },
     }
 

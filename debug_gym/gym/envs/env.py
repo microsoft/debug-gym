@@ -106,7 +106,14 @@ class TooledEnv:
 
     @property
     def tool_instructions(self):
-        return [tool.tool_instructions for tool in self.tools.values()]
+        return [
+            {
+                "name": tool.name,
+                "description": tool.description,
+                "arguments": tool.arguments,
+            }
+            for tool in self.tools.values()
+        ]
 
     @property
     def tool_instructions_lite(self):
@@ -114,8 +121,8 @@ class TooledEnv:
         # used in system prompt
         return [
             {
-                "name": tool.tool_instructions.function.name,
-                "description": tool.tool_instructions.function.description,
+                "name": tool.name,
+                "description": tool.description,
             }
             for tool in self.tools.values()
         ]

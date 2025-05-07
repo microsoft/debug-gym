@@ -14,25 +14,15 @@ class ViewTool(EnvironmentTool):
         """view(path="main.py") to navigate to a file called 'main.py' in the root.""",
         """view(path="src/util.py") to navigate to a file called 'util.py' in a subdirectory called 'src'.""",
     ]
-    tool_instructions = {
-        "type": "function",
-        "function": {
-            "name": "view",
-            "description": "Specify a file path to set as current working file. The file path should be relative to the root directory of the repository."
-            + "\nExamples (for demonstration purposes only, you need to adjust the tool calling format according to your specific syntax):\n"
-            + "\n".join(examples),
-            "strict": True,
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "path": {
-                        "type": ["string"],
-                        "description": "The path to the file to be viewed. The path should be relative to the root directory of the repository.",
-                    },
-                },
-                "required": ["path"],
-                "additionalProperties": False,
-            },
+    description = (
+        "Specify a file path to set as current working file. The file path should be relative to the root directory of the repository."
+        + "\nExamples (for demonstration purposes only, you need to adjust the tool calling format according to your specific syntax):\n"
+        + "\n".join(examples)
+    )
+    arguments = {
+        "path": {
+            "type": ["string"],
+            "description": "The path to the file to be viewed. The path should be relative to the root directory of the repository.",
         },
     }
 

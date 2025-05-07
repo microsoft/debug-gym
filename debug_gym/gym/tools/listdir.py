@@ -14,36 +14,26 @@ class ListdirTool(EnvironmentTool):
         """listdir(path="src/util", depth=None) to list the contents of the 'util' subdirectory within the 'src' subdirectory.""",
         """listdir(path="src", depth=2) to list the contents of the 'src' subdirectory up to a depth of 2.""",
     ]
+    arguments = {
+        "path": {
+            "type": ["string", "null"],
+            "description": "The path to the subdirectory within the working directory. If None, the current working directory will be used.",
+        },
+        "depth": {
+            "type": ["number", "null"],
+            "description": "The maximum depth to which the directory tree should be explored. If None, the default depth will be used.",
+        },
+    }
 
     @property
-    def tool_instructions(self):
+    def description(self):
         assert hasattr(self, "environment")
-        tool_instructions = {
-            "type": "function",
-            "function": {
-                "name": "listdir",
-                "description": f"List the file and folder contents of a subdirectory within the working directory, up to a specified 'depth' (default depth is {self.environment.dir_tree_depth})."
-                + "\nExamples (for demonstration purposes only, you need to adjust the tool calling format according to your specific syntax):\n"
-                + "\n".join(self.examples),
-                "strict": True,
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "path": {
-                            "type": ["string", "null"],
-                            "description": "The path to the subdirectory within the working directory. If None, the current working directory will be used.",
-                        },
-                        "depth": {
-                            "type": ["number", "null"],
-                            "description": "The maximum depth to which the directory tree should be explored. If None, the default depth will be used.",
-                        },
-                    },
-                    "required": ["path", "depth"],
-                    "additionalProperties": False,
-                },
-            },
-        }
-        return tool_instructions
+        description = (
+            f"List the file and folder contents of a subdirectory within the working directory, up to a specified 'depth' (default depth is {self.environment.dir_tree_depth}). The path should be relative to the working directory. If no path is provided, the current working directory will be used. If no depth is provided, the default depth will be used."
+            + "\nExamples (for demonstration purposes only, you need to adjust the tool calling format according to your specific syntax):\n"
+            + "\n".join(self.examples)
+        )
+        return description
 
     def use(self, path: str = ".", depth: int = None) -> Observation:
         if depth is None:
