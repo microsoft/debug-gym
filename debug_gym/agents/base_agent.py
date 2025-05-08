@@ -166,11 +166,6 @@ class BaseAgent:
 
             messages, tools = self.build_prompt(info)
             llm_response = self.llm(messages, tools, info)
-            if self.llm.reasoning_end_token is not None:
-                llm_response.response = self.parse_reasoning_model_response(
-                    llm_response.response,
-                    reasoning_end_token=self.llm.reasoning_end_token,
-                )
 
             if debug:
                 breakpoint()

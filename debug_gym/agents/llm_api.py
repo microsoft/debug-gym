@@ -331,9 +331,25 @@ class LLM(ABC):
         """Abstract method to tokenize a text."""
         pass
 
-    def count_tokens(self, text: str) -> int:
+    def count_tokens(self, text: str | dict) -> int:
         """Count the number of tokens in a text."""
-        return len(self.tokenize(text))
+        if isinstance(text, str):
+            return len(self.tokenize(text))
+        elif isinstance(text, dict):
+            count = 0
+            for item in text.values():
+                if isinstance(item, str):
+                    count += len(self.tokenize(item))
+                elif isinstance(item, list):
+                    for sub_item in item:
+                        if isinstance(sub_item, str):
+                            count += len(self.tokenize(sub_item))
+            return count
+        else:
+            raise ValueError(
+                f"Unsupported type for token counting: {type(text)}. "
+                "Expected str or dict."
+            )
 
     def count_messages_tokens(self, messages: list[dict]) -> int:
         """Count the number of tokens in a list of messages."""
@@ -409,11 +425,15 @@ class LLM(ABC):
 
         print_messages(messages, self.logger)
 
-        response = self.generate(messages, **kwargs)
+        response = self.generate(messages, tools, **kwargs)
 
         if response is None:
-            response = ""
-        response = response.strip()
+            # for error analysis purposes
+            response = {
+                "id": "empty_tool_response",
+                "name": "empty_tool_response",
+                "arguments": {},
+            }
 
         self.logger.info(colored(response, "green"))
 
