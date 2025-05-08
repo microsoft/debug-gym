@@ -161,16 +161,28 @@ def test_build_history_prompt(build_env_info):
         step_observation="obs1", action=None, score=1, rewrite_counter=0
     )
     env_info_2 = build_env_info(
-        step_observation="obs2", action="action2", score=2, rewrite_counter=0
+        step_observation="obs2",
+        action={"id": "2", "name": "action2", "arguments": {"a2_args": "a2_args"}},
+        score=2,
+        rewrite_counter=0,
     )
     env_info_3 = build_env_info(
-        step_observation="obs3", action="action3", score=3, rewrite_counter=0
+        step_observation="obs3",
+        action={"id": "3", "name": "action3", "arguments": {}},
+        score=3,
+        rewrite_counter=0,
     )
     env_info_4 = build_env_info(
-        step_observation="obs4", action="action4", score=4, rewrite_counter=1
+        step_observation="obs4",
+        action={"id": "4", "name": "action4", "arguments": {"a4_args": "a4_args"}},
+        score=4,
+        rewrite_counter=1,
     )
     env_info_5 = build_env_info(
-        step_observation="obs5", action="action5", score=5, rewrite_counter=1
+        step_observation="obs5",
+        action={"id": "5", "name": "action5", "arguments": {}},
+        score=5,
+        rewrite_counter=1,
     )
 
     # push some steps
@@ -189,11 +201,14 @@ def test_build_history_prompt(build_env_info):
         }
     ]
     history_messages = [
-        {"role": "assistant", "content": "action3"},
+        {"role": "tool", "content": "{'id': '3', 'name': 'action3', 'arguments': {}}"},
         {"role": "user", "content": "obs3"},
-        {"role": "assistant", "content": "action4"},
+        {
+            "role": "tool",
+            "content": "{'id': '4', 'name': 'action4', 'arguments': {'a4_args': 'a4_args'}}",
+        },
         {"role": "user", "content": "obs4"},
-        {"role": "assistant", "content": "action5"},
+        {"role": "tool", "content": "{'id': '5', 'name': 'action5', 'arguments': {}}"},
         {"role": "user", "content": "obs5"},
     ]
     expected += history_messages
@@ -207,9 +222,12 @@ def test_build_history_prompt(build_env_info):
         }
     ]
     history_messages = [
-        {"role": "assistant", "content": "action4"},
+        {
+            "role": "tool",
+            "content": "{'id': '4', 'name': 'action4', 'arguments': {'a4_args': 'a4_args'}}",
+        },
         {"role": "user", "content": "obs4"},
-        {"role": "assistant", "content": "action5"},
+        {"role": "tool", "content": "{'id': '5', 'name': 'action5', 'arguments': {}}"},
         {"role": "user", "content": "obs5"},
     ]
     expected += history_messages

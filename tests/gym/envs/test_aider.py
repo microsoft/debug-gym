@@ -22,7 +22,7 @@ def env_info():
         max_score=10,
         done=False,
         rewrite_counter=0,
-        tools={},
+        tools=[],
     )
 
 
@@ -52,7 +52,6 @@ def test_instructions(aider_env):
     expected_instructions = {
         "Problem description": "Test instructions",
         "Available tools to solve the problem": aider_env.tool_instructions,
-        "Available commands": aider_env.tool_names,
     }
     assert aider_env.instructions == expected_instructions
 

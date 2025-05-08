@@ -466,7 +466,7 @@ class RepoEnv(TooledEnv):
         patch = result.stdout.replace(str(self.working_dir), str(self.path))
         return patch
 
-    def step(self, action: str):
+    def step(self, action: dict) -> EnvInfo:
         # given action, return new obs, and update infos
         # the action space is composed of a few smaller action spaces
         self.clear_all_observations()
