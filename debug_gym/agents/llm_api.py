@@ -696,7 +696,7 @@ class OpenAILLM(LLM):
             "arguments": json.loads(response.function.arguments),
         }
 
-    def generate(self, messages, **kwargs):
+    def generate(self, messages, tools, **kwargs):
         # set max tokens if not provided
         kwargs["max_tokens"] = kwargs.get("max_tokens", NOT_GIVEN)
         response = retry_on_rate_limit(
@@ -704,6 +704,7 @@ class OpenAILLM(LLM):
         )(
             model=self.config.model,
             messages=messages,
+            tools=self.define_tools(tools),
             **kwargs,
         )
         response = response.choices[0].message.tool_calls[
