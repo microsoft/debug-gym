@@ -131,7 +131,7 @@ def test_human(build_env_info):
             "view": {"template": "```<path/to/file.py>```"},
         }
     )
-    llm_response = human(messages, env_info)
+    llm_response = human(messages, env_info.tools)
     # human only uses the messages content
     assert llm_response.prompt == "Hello"
     assert llm_response.response == "User input"
