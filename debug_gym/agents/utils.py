@@ -16,6 +16,8 @@ def print_messages(messages: list[dict], logger: DebugGymLogger):
             logger.info(colored(f"{m['content']}\n", "cyan"))
         elif m["role"] == "assistant":
             logger.info(colored(f"{m['content']}\n", "green"))
+        elif m["role"] == "tool":
+            logger.info(colored(f"{m['content']}\n", "magenta"))
         elif m["role"] == "system":
             logger.info(colored(f"{m['content']}\n", "yellow"))
         else:

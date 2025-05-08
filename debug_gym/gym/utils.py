@@ -201,22 +201,3 @@ def extract_reward_from_pytest_output(output):
         return int(match.group(1))
 
     return 0
-
-
-def parse_action(action_json):
-    # action_json is a json object output from LLM (completion.choices[0].message.tool_calls),
-    # it is a list that may contain multiple tool calls, e.g.,
-    # [{
-    #     "id": "call_12345xyz",
-    #     "type": "function",
-    #     "function": {
-    #        "name": "get_weather",
-    #        "arguments": "{\"latitude\":48.8566,\"longitude\":2.3522}"
-    #     }
-    # }]
-    # we only care about the first action
-    assert isinstance(action_json, list), "action_json should be a list"
-    action_json = action_json[0]
-    selected_tool = action_json.function.name
-    tool_kwargs = json.loads(action_json.function.arguments)
-    return selected_tool, tool_kwargs

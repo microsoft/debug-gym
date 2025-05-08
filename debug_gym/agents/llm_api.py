@@ -1,6 +1,6 @@
+import json
 import logging
 import os
-import re
 import sys
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
@@ -351,7 +351,15 @@ class LLM(ABC):
             "The define_tools method should be overridden by subclasses."
         )
 
-    def __call__(self, messages, *args, **kwargs) -> LLMResponse:
+    def parse_tool_response(self, response) -> dict:
+        """Parse the tool response from different LLMs and return it as a dictionary.
+        The method should be overridden by subclasses.
+        """
+        raise NotImplementedError(
+            "The parse_tool_response method should be overridden by subclasses."
+        )
+
+    def __call__(self, messages, tools, *args, **kwargs) -> LLMResponse:
         """Prepares messages and kwargs, then call `generate` which
         should be implemented by subclasses. Returns an LLMResponse object
         with the prompt, response and token usage.
@@ -490,7 +498,18 @@ class AnthropicLLM(LLM):
             output.append(_tool)
         return output
 
-    def generate(self, messages, **kwargs):
+    def parse_tool_response(self, response) -> dict:
+        """Parse the tool response from different LLMs and return it as a dictionary.
+        An example of the Anthropic tool response is:
+        ToolUseBlock(id='toolu_staging_01FMRQ9pZniZqFUGQwTcFU4N', input={'positive_score': 0.9, 'negative_score': 0.0, 'neutral_score': 0.1}, name='print_sentiment_scores', type='tool_use')
+        """
+        return {
+            "id": response.id,
+            "name": response.name,
+            "arguments": response.input,
+        }
+
+    def generate(self, messages, tools, **kwargs):
         system_prompt = " "  # weird exceptions sometimes if empty
         user_assistant_prompt = []
         for message in messages:
@@ -498,7 +517,7 @@ class AnthropicLLM(LLM):
                 continue
             if message["role"] == "system":
                 system_prompt = message["content"]
-            elif message["role"] in ["user", "assistant"]:
+            elif message["role"] in ["user", "assistant", "tool"]:
                 user_assistant_prompt.append(
                     {
                         "role": message["role"],
@@ -516,17 +535,20 @@ class AnthropicLLM(LLM):
             ]
         # if thinking is enabled, the first message is the thought,
         # the last messages `content[-1]` is the response in any mode
-        response = (
-            retry_on_rate_limit(self.client.messages.create, self.is_rate_limit_error)(
-                model=self.config.model,
-                system=system_prompt,
-                messages=user_assistant_prompt,
-                **kwargs,
-            )
-            .content[-1]
-            .text
-        )
-        response = response.strip()
+        response = retry_on_rate_limit(
+            self.client.messages.create, self.is_rate_limit_error
+        )(
+            model=self.config.model,
+            system=system_prompt,
+            messages=user_assistant_prompt,
+            tools=self.define_tools(tools),
+            tool_choice={"type": "any"},  # has to call a tool, but can be any
+            **kwargs,
+        ).content[
+            -1
+        ]
+        assert response.type == "tool_use"
+        response = self.parse_tool_response(response)
         return response
 
 
@@ -636,6 +658,24 @@ class OpenAILLM(LLM):
             output.append(_tool)
         return output
 
+    def parse_tool_response(self, response) -> dict:
+        """Parse the tool response from different LLMs and return it as a dictionary.
+        An example of the OpenAI tool response is:
+        {
+            "id": "call_12345xyz",
+            "type": "function",
+            "function": {
+                "name": "get_weather",
+                "arguments": "{\"latitude\":48.8566,\"longitude\":2.3522}"
+            }
+        }
+        """
+        return {
+            "id": response.id,
+            "name": response.function.name,
+            "arguments": json.loads(response.function.arguments),
+        }
+
     def generate(self, messages, **kwargs):
         # set max tokens if not provided
         kwargs["max_tokens"] = kwargs.get("max_tokens", NOT_GIVEN)
@@ -646,7 +686,12 @@ class OpenAILLM(LLM):
             messages=messages,
             **kwargs,
         )
-        return response.choices[0].message.content
+        response = response.choices[0].message.tool_calls[
+            0
+        ]  # LLM may select multiple tool calls, we only care about the first action
+        assert response.type == "function"
+        response = self.parse_tool_response(response)
+        return response
 
 
 class AzureOpenAILLM(OpenAILLM):

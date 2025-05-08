@@ -13,7 +13,7 @@ import numpy as np
 
 from debug_gym.gym.entities import EvalOutput, Event, Observation
 from debug_gym.gym.terminal import Terminal
-from debug_gym.gym.utils import _walk, make_file_matcher, parse_action, show_line_number
+from debug_gym.gym.utils import _walk, make_file_matcher, show_line_number
 from debug_gym.logger import DebugGymLogger
 
 
@@ -94,7 +94,8 @@ class TooledEnv:
 
     def get_triggered_tools(self, action):
         try:
-            tool_name, tool_kwargs = parse_action(action)
+            tool_name = action["name"]
+            tool_kwargs = action["arguments"]
         except Exception as e:
             # parse error
             return str(e), None

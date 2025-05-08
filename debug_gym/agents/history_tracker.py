@@ -104,7 +104,7 @@ def build_history_conversation(
     _messages = []
     for history_info in _history[latest_rewrite_step:]:
         if history_info.action is not None:
-            _messages.append({"role": "assistant", "content": f"{history_info.action}"})
+            _messages.append({"role": "tool", "content": f"{history_info.action}"})
         _messages.append(
             {"role": "user", "content": f"{history_info.step_observation.observation}"}
         )
