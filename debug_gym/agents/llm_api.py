@@ -243,18 +243,21 @@ class TokenUsage:
 class LLMResponse:
     prompt: list[dict] | str  # either a string or a list of messages.
     response: str
+    tool: dict  # make this a Tool object
     token_usage: TokenUsage | None = None
 
     def __init__(
         self,
         prompt: list[dict] | str,
         response: str,
+        tool: dict,
         prompt_token_count: int = None,
         response_token_count: int = None,
         token_usage: TokenUsage = None,
     ):
         self.prompt = prompt
         self.response = response
+        self.tool = tool
         if prompt_token_count is not None and response_token_count is not None:
             self.token_usage = TokenUsage(prompt_token_count, response_token_count)
         else:
@@ -353,7 +356,7 @@ class LLM(ABC):
 
     def count_messages_tokens(self, messages: list[dict]) -> int:
         """Count the number of tokens in a list of messages."""
-        return sum(self.count_tokens(msg["content"]) for msg in messages)
+        return sum(self.count_tokens(msg.get("content", "")) for msg in messages)
 
     def define_tools(self, tool_instructions: list[dict]) -> list[dict]:
         """tool_instructions is a list of dictionaries with the following keys:
@@ -425,23 +428,28 @@ class LLM(ABC):
 
         print_messages(messages, self.logger)
 
-        response = self.generate(messages, tools, **kwargs)
+        response, tool, prompt_tokens, completion_tokens = self.generate(
+            messages, tools, **kwargs
+        )
 
-        if response is None:
+        if tool is None:
             # for error analysis purposes
-            response = {
+            tool = {
                 "id": "empty_tool_response",
                 "name": "empty_tool_response",
                 "arguments": {},
             }
 
-        self.logger.info(colored(response, "green"))
+        self.logger.info(colored(tool, "green"))
 
         llm_response = LLMResponse(
             prompt=messages,
             response=response,
-            prompt_token_count=self.count_messages_tokens(messages),
-            response_token_count=self.count_tokens(response),
+            tool=tool,
+            # prompt_token_count=self.count_messages_tokens(messages),
+            # response_token_count=self.count_tokens(response),
+            prompt_token_count=prompt_tokens,
+            response_token_count=completion_tokens,
         )
         return llm_response
 
@@ -708,12 +716,14 @@ class OpenAILLM(LLM):
             tool_choice="required",
             **kwargs,
         )
-        response = response.choices[0].message.tool_calls[
-            0
-        ]  # LLM may select multiple tool calls, we only care about the first action
-        assert response.type == "function"
-        response = self.parse_tool_response(response)
-        return response
+        # LLM may select multiple tool calls, we only care about the first action
+        tool_call = response.choices[0].message.tool_calls[0]
+        assert tool_call.type == "function"
+        tool = self.parse_tool_response(tool_call)
+        message = response.choices[0].message
+        prompt_tokens = response.usage.prompt_tokens
+        completion_tokens = response.usage.completion_tokens
+        return message, tool, prompt_tokens, completion_tokens
 
 
 class AzureOpenAILLM(OpenAILLM):

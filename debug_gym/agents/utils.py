@@ -15,7 +15,7 @@ def print_messages(messages: list[dict], logger: DebugGymLogger):
         if m["role"] == "user":
             logger.info(colored(f"{m['content']}\n", "cyan"))
         elif m["role"] == "assistant":
-            logger.info(colored(f"{m['content']}\n", "green"))
+            logger.info(colored(f"{m['tool_calls']}\n", "green"))
         elif m["role"] == "tool":
             logger.info(colored(f"{m['content']}\n", "magenta"))
         elif m["role"] == "system":
@@ -30,6 +30,11 @@ def merge_messages(messages: list[dict]) -> list[dict]:
     to_merge = []
 
     def merge():
+        if (
+            len(to_merge) == 1
+        ):  # temporary fix, should merge any kind of messages, not just "content"
+            messages_out.append(to_merge[0])
+            return
         content = "\n\n".join(m["content"] for m in to_merge if m["content"])
         if content:
             messages_out.append({"role": current_role, "content": content})

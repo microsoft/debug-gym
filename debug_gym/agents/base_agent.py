@@ -166,7 +166,7 @@ class BaseAgent:
             if debug:
                 breakpoint()
 
-            info = self.env.step(llm_response.response)
+            info = self.env.step(llm_response.tool)
             self.history.step(info, llm_response)
 
             if info.done or info.rewrite_counter >= self.config["max_rewrite_steps"]:

@@ -102,11 +102,23 @@ def build_history_conversation(
                 latest_rewrite_step = i
                 break
     _messages = []
-    for history_info in _history[latest_rewrite_step:]:
+    for history_info, response in zip(
+        _history[latest_rewrite_step:], history.prompt_response_pairs
+    ):
         if history_info.action is not None:
-            _messages.append({"role": "assistant", "content": f"{history_info.action}"})
+            _messages.append(
+                {
+                    "role": response[0].response.role,  # "assistant"
+                    "tool_calls": [response[0].response.tool_calls[0]],
+                }
+            )
         _messages.append(
-            {"role": "tool", "content": f"{history_info.step_observation.observation}"}
+            {
+                "role": "tool",
+                "tool_call_id": history_info.action["id"],
+                "name": history_info.action["name"],
+                "content": f"{history_info.step_observation.observation}",
+            }
         )
     return _messages
 

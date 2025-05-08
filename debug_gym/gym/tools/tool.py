@@ -35,10 +35,10 @@ class EnvironmentTool(ABC):
         self.history = []
 
     @track_history
-    def __call__(self, action=None, **kwargs) -> Observation:
+    def __call__(self, *args, **kwargs) -> Observation:
         """Forwards `tool()` to the tool.use() method and
         tracks the history of tool usage."""
-        return self.use(action, **kwargs)
+        return self.use(*args, **kwargs)
 
     def register(self, environment):
         from debug_gym.gym.envs.env import RepoEnv
