@@ -5,7 +5,7 @@ import sys
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 import tiktoken
 import yaml
@@ -322,7 +322,7 @@ class LLM(ABC):
         return llm
 
     @abstractmethod
-    def generate(self, messages, **kwargs) -> str:
+    def generate(self, messages, tools, **kwargs) -> str:
         """Generate a response given some messages and return it as a string."""
         pass
 
@@ -781,13 +781,13 @@ class Human(LLM):
     def count_tokens(self, text: str) -> int:
         return len(self.tokenize(text))
 
-    def generate(self, messages, **kwargs):
+    def generate(self, messages, tools, **kwargs):
         # Human overrides the entire __call__ method, so generate is never called
         pass
 
-    def __call__(self, messages, info, *args, **kwargs) -> LLMResponse:
+    def __call__(self, messages, tools, *args, **kwargs) -> LLMResponse:
         print_messages(messages, self.logger)
-        available_commands = [t["template"] for t in info.tools.values()]
+        available_commands = [t["template"] for t in tools.values()]
         if prompt_toolkit_available:
             actions_completer = WordCompleter(
                 available_commands, ignore_case=True, sentence=True

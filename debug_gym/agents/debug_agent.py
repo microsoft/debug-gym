@@ -33,8 +33,9 @@ class Debug_5_Agent(DebugAgent):
             self.logger.info(
                 f"Score: {info.score}/{info.max_score} ({info.score/info.max_score:.1%}) [Best: {highscore}]"
             )
-            messages, tools = self.build_prompt(info)
-            llm_response = self.llm(messages, tools, info)
+
+            messages = self.build_prompt(info)
+            llm_response = self.llm(messages, info.tools)
 
             if debug:
                 breakpoint()

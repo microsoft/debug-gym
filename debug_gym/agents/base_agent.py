@@ -137,15 +137,11 @@ class BaseAgent:
         messages.append({"role": "user", "content": self.action_prompt})
         return messages
 
-    def build_tool_prompt(self, info):
-        return info.tools
-
     def build_prompt(self, info):
         messages = self.build_system_prompt(info)
         messages.extend(self.build_history_prompt())
         messages.extend(self.build_question_prompt())
-        tools = self.build_tool_prompt(info)
-        return messages, tools
+        return messages
 
     def run(self, task_name=None, debug=False):
         self.history.reset()
@@ -164,8 +160,8 @@ class BaseAgent:
                 f"Score: {info.score}/{info.max_score} ({info.score/info.max_score:.1%}) [Best: {highscore}]"
             )
 
-            messages, tools = self.build_prompt(info)
-            llm_response = self.llm(messages, tools, info)
+            messages = self.build_prompt(info)
+            llm_response = self.llm(messages, info.tools)
 
             if debug:
                 breakpoint()
