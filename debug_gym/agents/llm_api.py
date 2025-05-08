@@ -705,6 +705,7 @@ class OpenAILLM(LLM):
             model=self.config.model,
             messages=messages,
             tools=self.define_tools(tools),
+            tool_choice="required",
             **kwargs,
         )
         response = response.choices[0].message.tool_calls[
