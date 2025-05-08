@@ -67,12 +67,18 @@ def test_get_triggered_tools(env_mock):
     tool2.name = "tool2"
     env_mock.add_tool(tool1)
     env_mock.add_tool(tool2)
-    _, triggered_tool = env_mock.get_triggered_tools("```tool1 arg1 arg2```")
-    assert triggered_tool == [tool1, "arg1 arg2"]
-    _, triggered_tool = env_mock.get_triggered_tools("```tool2```")
-    assert triggered_tool == [tool2, ""]
+    _, triggered_tool = env_mock.get_triggered_tools(
+        {"name": "tool1", "arguments": {"arg1": "abc", "arg2": 4}, "id": "123"}
+    )
+    assert triggered_tool == [tool1, {"arg1": "abc", "arg2": 4}]
+    _, triggered_tool = env_mock.get_triggered_tools(
+        {"name": "tool2", "arguments": {}, "id": "234"}
+    )
+    assert triggered_tool == [tool2, {}]
     # Test with invalid action
-    error, triggered_tool = env_mock.get_triggered_tools("```tool3```")
+    error, triggered_tool = env_mock.get_triggered_tools(
+        {"name": "tool3", "arguments": {}, "id": "345"}
+    )
     assert error == "Unregistered tool: tool3"
     assert triggered_tool is None
 
@@ -84,22 +90,70 @@ def test_tool_names(env_mock):
     tool2.name = "tool2"
     env_mock.add_tool(tool1)
     env_mock.add_tool(tool2)
-    assert env_mock.tool_names == "```tool1```, ```tool2```"
+    assert env_mock.tool_names == "tool1, tool2"
 
 
 def test_tool_instructions(env_mock):
     tool1 = MagicMock()
     tool1.name = "tool1"
-    tool1.instructions = "instructions1"
+    tool1.description = "instructions1"
+    tool1.arguments = {
+        "command 1": {
+            "type": ["string"],
+            "description": "command 1 description",
+        },
+    }
     tool2 = MagicMock()
     tool2.name = "tool2"
-    tool2.instructions = "instructions2"
+    tool2.description = "instructions2"
+    tool2.arguments = {}
     env_mock.add_tool(tool1)
     env_mock.add_tool(tool2)
-    assert env_mock.tool_instructions == {
-        "tool1": "instructions1",
-        "tool2": "instructions2",
+    assert env_mock.tool_instructions == [
+        {
+            "name": "tool1",
+            "description": "instructions1",
+            "arguments": {
+                "command 1": {
+                    "type": ["string"],
+                    "description": "command 1 description",
+                },
+            },
+        },
+        {
+            "name": "tool2",
+            "description": "instructions2",
+            "arguments": {},
+        },
+    ]
+
+
+def test_tool_instructions_lite(env_mock):
+    tool1 = MagicMock()
+    tool1.name = "tool1"
+    tool1.description = "instructions1"
+    tool1.arguments = {
+        "command 1": {
+            "type": ["string"],
+            "description": "command 1 description",
+        },
     }
+    tool2 = MagicMock()
+    tool2.name = "tool2"
+    tool2.description = "instructions2"
+    tool2.arguments = {}
+    env_mock.add_tool(tool1)
+    env_mock.add_tool(tool2)
+    assert env_mock.tool_instructions_lite == [
+        {
+            "name": "tool1",
+            "description": "instructions1",
+        },
+        {
+            "name": "tool2",
+            "description": "instructions2",
+        },
+    ]
 
 
 @patch("tempfile.TemporaryDirectory")
@@ -157,21 +211,38 @@ def test_cleanup_workspace(mock_tempdir):
 def test_instructions():
     tool1 = MagicMock()
     tool1.name = "tool1"
-    tool1.instructions = "instructions1"
+    tool1.description = "instructions1"
+    tool1.arguments = {
+        "command 1": {
+            "type": ["string"],
+            "description": "command 1 description",
+        },
+    }
     tool2 = MagicMock()
     tool2.name = "tool2"
-    tool2.instructions = "instructions2"
+    tool2.description = "instructions2"
+    tool2.arguments = {
+        "command 2": {
+            "type": ["string"],
+            "description": "command 2 description",
+        },
+    }
 
     env = RepoEnv()
     env.add_tool(tool1)
     env.add_tool(tool2)
 
     expected_instructions = {
-        "Available tools to solve the problem": {
-            "tool1": "instructions1",
-            "tool2": "instructions2",
-        },
-        "Available commands": "```tool1```, ```tool2```",
+        "Available tools to solve the problem": [
+            {
+                "name": "tool1",
+                "description": "instructions1",
+            },
+            {
+                "name": "tool2",
+                "description": "instructions2",
+            },
+        ],
     }
 
     instructions = env.instructions
@@ -261,13 +332,13 @@ def test_step(
 
     env = RepoEnv(path=".")
     env.last_eval = EvalOutput(success=False, output="1 failed, 0 passed")
-    mock_get_triggered_tools.return_value = [mock_pdb_tool]
-    mock_get_triggered_tools.return_value = None, [mock_pdb_tool, "b 10"]
+    mock_get_triggered_tools.return_value = None, [mock_pdb_tool, {"command": "b 10"}]
+    infos = env.step({"id": "123", "name": "pdb", "arguments": {"command": "b 10"}})
 
-    infos = env.step("```pdb b 10```")
-
-    mock_get_triggered_tools.assert_called_once_with("```pdb b 10```")
-    mock_pdb_tool.assert_called_once_with("b 10")
+    mock_get_triggered_tools.assert_called_once_with(
+        {"id": "123", "name": "pdb", "arguments": {"command": "b 10"}}
+    )
+    mock_pdb_tool.assert_called_once_with(command="b 10")
     assert infos.step_observation == observation
     assert infos.score == 0
     assert not infos.done
@@ -328,14 +399,13 @@ def test_reset(
         current_breakpoints="No breakpoints are set.",
         action=None,
         instructions={
-            "Available tools to solve the problem": {},
-            "Available commands": "",
+            "Available tools to solve the problem": [],
         },
         score=0,
         max_score=1,
         done=False,
         rewrite_counter=0,
-        tools={},
+        tools=[],
     )
 
 

@@ -1,11 +1,11 @@
+import json
 import logging
 import os
-import re
 import sys
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 import tiktoken
 import yaml
@@ -322,7 +322,7 @@ class LLM(ABC):
         return llm
 
     @abstractmethod
-    def generate(self, messages, **kwargs) -> str:
+    def generate(self, messages, tools, **kwargs) -> str:
         """Generate a response given some messages and return it as a string."""
         pass
 
@@ -331,15 +331,51 @@ class LLM(ABC):
         """Abstract method to tokenize a text."""
         pass
 
-    def count_tokens(self, text: str) -> int:
+    def count_tokens(self, text: str | dict) -> int:
         """Count the number of tokens in a text."""
-        return len(self.tokenize(text))
+        if isinstance(text, str):
+            return len(self.tokenize(text))
+        elif isinstance(text, dict):
+            count = 0
+            for item in text.values():
+                if isinstance(item, str):
+                    count += len(self.tokenize(item))
+                elif isinstance(item, list):
+                    for sub_item in item:
+                        if isinstance(sub_item, str):
+                            count += len(self.tokenize(sub_item))
+            return count
+        else:
+            raise ValueError(
+                f"Unsupported type for token counting: {type(text)}. "
+                "Expected str or dict."
+            )
 
     def count_messages_tokens(self, messages: list[dict]) -> int:
         """Count the number of tokens in a list of messages."""
         return sum(self.count_tokens(msg["content"]) for msg in messages)
 
-    def __call__(self, messages, *args, **kwargs) -> LLMResponse:
+    def define_tools(self, tool_instructions: list[dict]) -> list[dict]:
+        """tool_instructions is a list of dictionaries with the following keys:
+        - name: str, the name of the tool
+        - description: str, the description of the tool
+        - arguments: dict, the arguments of the tool
+        This method translates the tool instructions into a format that is specifically defined by each LLM.
+        The method should be overridden by subclasses.
+        """
+        raise NotImplementedError(
+            "The define_tools method should be overridden by subclasses."
+        )
+
+    def parse_tool_response(self, response) -> dict:
+        """Parse the tool response from different LLMs and return it as a dictionary.
+        The method should be overridden by subclasses.
+        """
+        raise NotImplementedError(
+            "The parse_tool_response method should be overridden by subclasses."
+        )
+
+    def __call__(self, messages, tools, *args, **kwargs) -> LLMResponse:
         """Prepares messages and kwargs, then call `generate` which
         should be implemented by subclasses. Returns an LLMResponse object
         with the prompt, response and token usage.
@@ -389,11 +425,15 @@ class LLM(ABC):
 
         print_messages(messages, self.logger)
 
-        response = self.generate(messages, **kwargs)
+        response = self.generate(messages, tools, **kwargs)
 
         if response is None:
-            response = ""
-        response = response.strip()
+            # for error analysis purposes
+            response = {
+                "id": "empty_tool_response",
+                "name": "empty_tool_response",
+                "arguments": {},
+            }
 
         self.logger.info(colored(response, "green"))
 
@@ -455,7 +495,41 @@ class AnthropicLLM(LLM):
         )
         return exception_full_name in rate_limit_errors
 
-    def generate(self, messages, **kwargs):
+    def define_tools(self, tool_instructions: list[dict]) -> list[dict]:
+        """tool_instructions is a list of dictionaries with the following keys:
+        - name: str, the name of the tool
+        - description: str, the description of the tool
+        - arguments: dict, the arguments of the tool
+        This method translates the tool instructions into a format that is specifically defined by each LLM.
+        Anthropic function calling format: https://docs.anthropic.com/en/docs/build-with-claude/tool-use/overview
+        """
+        output = []
+        for tool in tool_instructions:
+            _tool = {}
+            _tool["name"] = tool["name"]
+            _tool["description"] = tool["description"]
+            _tool["strict"] = True
+            _tool["input_schema"] = {
+                "type": "object",
+                "properties": tool["arguments"],
+            }
+            if len(tool["arguments"]) > 0:
+                _tool["input_schema"]["required"] = list(tool["arguments"].keys())
+            output.append(_tool)
+        return output
+
+    def parse_tool_response(self, response) -> dict:
+        """Parse the tool response from different LLMs and return it as a dictionary.
+        An example of the Anthropic tool response is:
+        ToolUseBlock(id='toolu_staging_01FMRQ9pZniZqFUGQwTcFU4N', input={'positive_score': 0.9, 'negative_score': 0.0, 'neutral_score': 0.1}, name='print_sentiment_scores', type='tool_use')
+        """
+        return {
+            "id": response.id,
+            "name": response.name,
+            "arguments": response.input,
+        }
+
+    def generate(self, messages, tools, **kwargs):
         system_prompt = " "  # weird exceptions sometimes if empty
         user_assistant_prompt = []
         for message in messages:
@@ -463,7 +537,7 @@ class AnthropicLLM(LLM):
                 continue
             if message["role"] == "system":
                 system_prompt = message["content"]
-            elif message["role"] in ["user", "assistant"]:
+            elif message["role"] in ["user", "assistant", "tool"]:
                 user_assistant_prompt.append(
                     {
                         "role": message["role"],
@@ -481,24 +555,20 @@ class AnthropicLLM(LLM):
             ]
         # if thinking is enabled, the first message is the thought,
         # the last messages `content[-1]` is the response in any mode
-        response = (
-            retry_on_rate_limit(self.client.messages.create, self.is_rate_limit_error)(
-                model=self.config.model,
-                system=system_prompt,
-                messages=user_assistant_prompt,
-                **kwargs,
-            )
-            .content[-1]
-            .text
-        )
-        response = response.strip()
-        # only keep the content between the two ```.
-        p = re.compile(r"```(.*?)```", re.DOTALL)
-        if p.search(response) is not None:
-            # ```...```
-            response = p.search(response).group(0)
-        else:
-            response = ""
+        response = retry_on_rate_limit(
+            self.client.messages.create, self.is_rate_limit_error
+        )(
+            model=self.config.model,
+            system=system_prompt,
+            messages=user_assistant_prompt,
+            tools=self.define_tools(tools),
+            tool_choice={"type": "any"},  # has to call a tool, but can be any
+            **kwargs,
+        ).content[
+            -1
+        ]
+        assert response.type == "tool_use"
+        response = self.parse_tool_response(response)
         return response
 
 
@@ -582,7 +652,51 @@ class OpenAILLM(LLM):
 
         return is_error
 
-    def generate(self, messages, **kwargs):
+    def define_tools(self, tool_instructions: list[dict]) -> list[dict]:
+        """tool_instructions is a list of dictionaries with the following keys:
+        - name: str, the name of the tool
+        - description: str, the description of the tool
+        - arguments: dict, the arguments of the tool
+        This method translates the tool instructions into a format that is specifically defined by each LLM.
+        OpenAI function calling format: https://platform.openai.com/docs/guides/function-calling
+        """
+        output = []
+        for tool in tool_instructions:
+            _tool = {"type": "function", "function": {}}
+            _tool["function"]["name"] = tool["name"]
+            _tool["function"]["description"] = tool["description"]
+            _tool["function"]["strict"] = True
+            _tool["function"]["parameters"] = {
+                "type": "object",
+                "properties": tool["arguments"],
+                "additionalProperties": False,
+            }
+            if len(tool["arguments"]) > 0:
+                _tool["function"]["parameters"]["required"] = list(
+                    tool["arguments"].keys()
+                )
+            output.append(_tool)
+        return output
+
+    def parse_tool_response(self, response) -> dict:
+        """Parse the tool response from different LLMs and return it as a dictionary.
+        An example of the OpenAI tool response is:
+        {
+            "id": "call_12345xyz",
+            "type": "function",
+            "function": {
+                "name": "get_weather",
+                "arguments": "{\"latitude\":48.8566,\"longitude\":2.3522}"
+            }
+        }
+        """
+        return {
+            "id": response.id,
+            "name": response.function.name,
+            "arguments": json.loads(response.function.arguments),
+        }
+
+    def generate(self, messages, tools, **kwargs):
         # set max tokens if not provided
         kwargs["max_tokens"] = kwargs.get("max_tokens", NOT_GIVEN)
         response = retry_on_rate_limit(
@@ -590,9 +704,16 @@ class OpenAILLM(LLM):
         )(
             model=self.config.model,
             messages=messages,
+            tools=self.define_tools(tools),
+            tool_choice="required",
             **kwargs,
         )
-        return response.choices[0].message.content
+        response = response.choices[0].message.tool_calls[
+            0
+        ]  # LLM may select multiple tool calls, we only care about the first action
+        assert response.type == "function"
+        response = self.parse_tool_response(response)
+        return response
 
 
 class AzureOpenAILLM(OpenAILLM):
@@ -661,13 +782,13 @@ class Human(LLM):
     def count_tokens(self, text: str) -> int:
         return len(self.tokenize(text))
 
-    def generate(self, messages, **kwargs):
+    def generate(self, messages, tools, **kwargs):
         # Human overrides the entire __call__ method, so generate is never called
         pass
 
-    def __call__(self, messages, info, *args, **kwargs) -> LLMResponse:
+    def __call__(self, messages, tools, *args, **kwargs) -> LLMResponse:
         print_messages(messages, self.logger)
-        available_commands = [t["template"] for t in info.tools.values()]
+        available_commands = [t["template"] for t in tools.values()]
         if prompt_toolkit_available:
             actions_completer = WordCompleter(
                 available_commands, ignore_case=True, sentence=True

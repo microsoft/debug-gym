@@ -23,7 +23,7 @@ def env_info():
         max_score=10,
         done=False,
         rewrite_counter=0,
-        tools={},
+        tools=[],
     )
 
 
@@ -51,7 +51,6 @@ def test_instructions(mini_nightmare_env):
     expected_instructions = {
         "Problem description": "Test instructions",
         "Available tools to solve the problem": mini_nightmare_env.tool_instructions,
-        "Available commands": mini_nightmare_env.tool_names,
     }
     assert mini_nightmare_env.instructions == expected_instructions
 

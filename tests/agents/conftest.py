@@ -29,8 +29,9 @@ def logger_mock():
 @pytest.fixture
 def llm_class_mock():
     class LLMMock(LLM):
-        def generate(self, messages, **kwargs):
+        def generate(self, messages, tools, **kwargs):
             self.called_messages = messages
+            self.called_tools = tools
             self.called_kwargs = kwargs
             return "Test response"
 
@@ -55,7 +56,7 @@ def build_env_info():
         max_score=10,
         done=False,
         rewrite_counter=0,
-        tools=None,
+        tools=[],
     ):
         return EnvInfo(
             step_observation=Observation("tool", step_observation),
@@ -70,7 +71,7 @@ def build_env_info():
             max_score=max_score,
             done=done,
             rewrite_counter=rewrite_counter,
-            tools=tools if tools is not None else {},
+            tools=tools if tools is not None else [],
         )
 
     return _env_info

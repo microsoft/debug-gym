@@ -13,7 +13,7 @@ import numpy as np
 
 from debug_gym.gym.entities import EvalOutput, Event, Observation
 from debug_gym.gym.terminal import Terminal
-from debug_gym.gym.utils import _walk, make_file_matcher, parse_action, show_line_number
+from debug_gym.gym.utils import _walk, make_file_matcher, show_line_number
 from debug_gym.logger import DebugGymLogger
 
 
@@ -77,7 +77,7 @@ class TooledEnv:
 
     @property
     def tool_names(self):
-        return ", ".join([f"```{t.name}```" for t in self.tools.values()])
+        return ", ".join([t.name for t in self.tools.values()])
 
     def add_tool(self, tool):
         if tool.name in self.tools:
@@ -94,7 +94,8 @@ class TooledEnv:
 
     def get_triggered_tools(self, action):
         try:
-            tool_name, tool_args = parse_action(action)
+            tool_name = action["name"]
+            tool_kwargs = action["arguments"]
         except Exception as e:
             # parse error
             return str(e), None
@@ -102,11 +103,30 @@ class TooledEnv:
             # failed to find tool
             return f"Unregistered tool: {tool_name}", None
         tool = self.tools[tool_name]
-        return None, [tool, tool_args]
+        return None, [tool, tool_kwargs]
 
     @property
     def tool_instructions(self):
-        return {name: tool.instructions for name, tool in self.tools.items()}
+        return [
+            {
+                "name": tool.name,
+                "description": tool.description,
+                "arguments": tool.arguments,
+            }
+            for tool in self.tools.values()
+        ]
+
+    @property
+    def tool_instructions_lite(self):
+        # only names and descriptions
+        # used in system prompt
+        return [
+            {
+                "name": tool.name,
+                "description": tool.description,
+            }
+            for tool in self.tools.values()
+        ]
 
     def clear_all_observations(self):
         self.all_observations = []
@@ -247,8 +267,7 @@ class RepoEnv(TooledEnv):
     @property
     def instructions(self):
         _instruction = {
-            "Available tools to solve the problem": self.tool_instructions,
-            "Available commands": self.tool_names,
+            "Available tools to solve the problem": self.tool_instructions_lite,
         }
         return _instruction
 
@@ -447,7 +466,7 @@ class RepoEnv(TooledEnv):
         patch = result.stdout.replace(str(self.working_dir), str(self.path))
         return patch
 
-    def step(self, action: str):
+    def step(self, action: dict) -> EnvInfo:
         # given action, return new obs, and update infos
         # the action space is composed of a few smaller action spaces
         self.clear_all_observations()
@@ -456,9 +475,10 @@ class RepoEnv(TooledEnv):
         if message:
             self.step_observation = Observation("env", message)
         else:
-            triggered_tool, tool_args = tool_info
+            triggered_tool, tool_kwargs = tool_info
             try:
-                self.step_observation = triggered_tool(tool_args)
+                # tool_kwargs is a dict, so we need to unpack it
+                self.step_observation = triggered_tool(**tool_kwargs)
             except BaseException as e:
                 error_message = (
                     f"Error while using tool {triggered_tool.name} "

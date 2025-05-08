@@ -148,14 +148,7 @@ def test_build_history_prompt(build_env_info):
 
     # test with empty history
     ht = HistoryTracker(history_steps=3)
-    # use_conversational_prompt is False
-    messages = build_history_prompt(ht, use_conversational_prompt=False)
-    expected = [
-        {"role": "user", "content": "No history of command and terminal outputs."}
-    ]
-    assert messages == expected
-    # use_conversational_prompt is True
-    messages = build_history_prompt(ht, use_conversational_prompt=True)
+    messages = build_history_prompt(ht)
     expected = [
         {"role": "user", "content": "No history of command and terminal outputs."}
     ]
@@ -168,16 +161,28 @@ def test_build_history_prompt(build_env_info):
         step_observation="obs1", action=None, score=1, rewrite_counter=0
     )
     env_info_2 = build_env_info(
-        step_observation="obs2", action="action2", score=2, rewrite_counter=0
+        step_observation="obs2",
+        action={"id": "2", "name": "action2", "arguments": {"a2_args": "a2_args"}},
+        score=2,
+        rewrite_counter=0,
     )
     env_info_3 = build_env_info(
-        step_observation="obs3", action="action3", score=3, rewrite_counter=0
+        step_observation="obs3",
+        action={"id": "3", "name": "action3", "arguments": {}},
+        score=3,
+        rewrite_counter=0,
     )
     env_info_4 = build_env_info(
-        step_observation="obs4", action="action4", score=4, rewrite_counter=1
+        step_observation="obs4",
+        action={"id": "4", "name": "action4", "arguments": {"a4_args": "a4_args"}},
+        score=4,
+        rewrite_counter=1,
     )
     env_info_5 = build_env_info(
-        step_observation="obs5", action="action5", score=5, rewrite_counter=1
+        step_observation="obs5",
+        action={"id": "5", "name": "action5", "arguments": {}},
+        score=5,
+        rewrite_counter=1,
     )
 
     # push some steps
@@ -187,39 +192,8 @@ def test_build_history_prompt(build_env_info):
     ht.step(env_info_4)
     ht.step(env_info_5)
 
-    # use_conversational_prompt is False
     # reset_prompt_history_after_rewrite is False
-    messages = build_history_prompt(
-        ht, use_conversational_prompt=False, reset_prompt_history_after_rewrite=False
-    )
-    expected = [f"History of command and terminal outputs (the last 3 steps):"]
-    history_messages = [
-        {"step": 0, "command": "action3", "stdout": "obs3"},
-        {"step": 1, "command": "action4", "stdout": "obs4"},
-        {"step": 2, "command": "action5", "stdout": "obs5"},
-    ]
-    expected += ["\n" + unescape(json.dumps(history_messages, indent=4)) + "\n"]
-    expected = [{"role": "user", "content": "\n".join(expected)}]
-    assert messages == expected
-
-    # reset_prompt_history_after_rewrite is True
-    messages = build_history_prompt(
-        ht, use_conversational_prompt=False, reset_prompt_history_after_rewrite=True
-    )
-    expected = [f"History of command and terminal outputs (the last 2 steps):"]
-    history_messages = [
-        {"step": 0, "command": "action4", "stdout": "obs4"},
-        {"step": 1, "command": "action5", "stdout": "obs5"},
-    ]
-    expected += ["\n" + unescape(json.dumps(history_messages, indent=4)) + "\n"]
-    expected = [{"role": "user", "content": "\n".join(expected)}]
-    assert messages == expected
-
-    # use_conversational_prompt is True
-    # reset_prompt_history_after_rewrite is False
-    messages = build_history_prompt(
-        ht, use_conversational_prompt=True, reset_prompt_history_after_rewrite=False
-    )
+    messages = build_history_prompt(ht, reset_prompt_history_after_rewrite=False)
     expected = [
         {
             "role": "user",
@@ -227,19 +201,20 @@ def test_build_history_prompt(build_env_info):
         }
     ]
     history_messages = [
-        {"role": "assistant", "content": "action3"},
+        {"role": "tool", "content": "{'id': '3', 'name': 'action3', 'arguments': {}}"},
         {"role": "user", "content": "obs3"},
-        {"role": "assistant", "content": "action4"},
+        {
+            "role": "tool",
+            "content": "{'id': '4', 'name': 'action4', 'arguments': {'a4_args': 'a4_args'}}",
+        },
         {"role": "user", "content": "obs4"},
-        {"role": "assistant", "content": "action5"},
+        {"role": "tool", "content": "{'id': '5', 'name': 'action5', 'arguments': {}}"},
         {"role": "user", "content": "obs5"},
     ]
     expected += history_messages
     assert messages == expected
     # reset_prompt_history_after_rewrite is True
-    messages = build_history_prompt(
-        ht, use_conversational_prompt=True, reset_prompt_history_after_rewrite=True
-    )
+    messages = build_history_prompt(ht, reset_prompt_history_after_rewrite=True)
     expected = [
         {
             "role": "user",
@@ -247,9 +222,12 @@ def test_build_history_prompt(build_env_info):
         }
     ]
     history_messages = [
-        {"role": "assistant", "content": "action4"},
+        {
+            "role": "tool",
+            "content": "{'id': '4', 'name': 'action4', 'arguments': {'a4_args': 'a4_args'}}",
+        },
         {"role": "user", "content": "obs4"},
-        {"role": "assistant", "content": "action5"},
+        {"role": "tool", "content": "{'id': '5', 'name': 'action5', 'arguments': {}}"},
         {"role": "user", "content": "obs5"},
     ]
     expected += history_messages
