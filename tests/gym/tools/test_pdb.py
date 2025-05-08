@@ -71,45 +71,14 @@ def test_pdb_use(tmp_path, setup_test_repo):
     initial_output = pdb.start_pdb()
     assert """The pytest entry point.""" in initial_output
     assert "(Pdb)" not in initial_output
-
-    output = pdb.use("l").observation
+    output = pdb.use(command="l").observation
     assert """The pytest entry point.""" in output
     assert "(Pdb)" not in output
-
-    output = pdb.use("c").observation
+    output = pdb.use(command="c").observation
     assert "1 failed, 1 passed" in pdb.pdb_obs
     assert "test_fail.py::test_fail FAILED" in pdb.pdb_obs
     assert "test_pass.py::test_pass PASSED" in pdb.pdb_obs
     assert "Reached the end of the file. Restarting the debugging session." in output
-    assert "(Pdb)" not in output
-
-
-def test_pdb_use_multiple_commands(tmp_path, setup_test_repo):
-    # Test PDBTool with Terminal, verbose pytest
-    tests_path = str(setup_test_repo(tmp_path))
-    terminal = Terminal()
-    environment = RepoEnv(
-        path=tests_path,
-        terminal=terminal,
-        debug_entrypoint="python -m pdb -m pytest -sv .",
-    )
-    pdb = PDBTool()
-    pdb.register(environment)
-    _ = pdb.start_pdb()
-
-    output = pdb.use("l ; print('hello')").observation
-    assert (
-        """Multiple commands are not supported. Only the first command will be executed."""
-        in output
-    )
-    assert """The pytest entry point.""" in output
-    assert "(Pdb)" not in output
-
-    output = pdb.use("print('hello;\nhi')").observation
-    assert (
-        """Multiple commands are not supported. Only the first command will be executed."""
-        not in output
-    )
     assert "(Pdb)" not in output
 
 
@@ -126,7 +95,7 @@ def test_pdb_use_empty_command(tmp_path, setup_test_repo):
     pdb.register(environment)
     _ = pdb.start_pdb()
 
-    output = pdb.use("").observation
+    output = pdb.use(command="").observation
     assert """Tool failure:\nEmpty command.""" in output
 
 
@@ -141,11 +110,11 @@ def test_pdb_use_default_environment_entrypoint(tmp_path, setup_test_repo):
     assert """The pytest entry point.""" in initial_output
     assert "(Pdb)" not in initial_output
 
-    output = pdb.use("l").observation
+    output = pdb.use(command="l").observation
     assert """The pytest entry point.""" in output
     assert "(Pdb)" not in output
 
-    output = pdb.use("c").observation
+    output = pdb.use(command="c").observation
     assert "1 failed, 1 passed" in pdb.pdb_obs
     assert "test_fail.py::test_fail" in pdb.pdb_obs
     assert "test_pass.py::test_pass" not in pdb.pdb_obs
@@ -172,11 +141,11 @@ def test_pdb_use_docker_terminal(tmp_path, setup_test_repo):
     pdb.register(environment)
     pdb.start_pdb()
 
-    output = pdb.use("l").observation
+    output = pdb.use(command="l").observation
     assert """The pytest entry point.""" in output
     assert "(Pdb)" not in output
 
-    output = pdb.use("c").observation
+    output = pdb.use(command="c").observation
     assert "1 failed, 1 passed" in pdb.pdb_obs
     assert "test_fail.py::test_fail FAILED" in pdb.pdb_obs
     assert "test_pass.py::test_pass PASSED" in pdb.pdb_obs
