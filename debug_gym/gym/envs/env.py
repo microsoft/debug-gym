@@ -266,9 +266,7 @@ class RepoEnv(TooledEnv):
 
     @property
     def instructions(self):
-        _instruction = {
-            "Available tools to solve the problem": self.tool_instructions_lite,
-        }
+        _instruction = {}
         return _instruction
 
     def display_files(self):
