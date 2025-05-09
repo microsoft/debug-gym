@@ -465,6 +465,21 @@ class AnthropicLLM(LLM):
         raise NotImplementedError("Tokenization is not supported by Anthropic.")
 
     def count_tokens(self, text: str) -> list[str]:
+        """Count the number of tokens in a text using the Anthropic API.
+        Dump content to JSON for cases such as:
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "tool_result",
+                        "tool_use_id": "id123",
+                        "content": "results",
+                    }
+                ],
+            }
+        """
+        if not isinstance(text, str):
+            text = json.dumps(text)
         messages = [{"role": "user", "content": [{"type": "text", "text": text}]}]
         try:
             response = self.client.beta.messages.count_tokens(
@@ -576,10 +591,8 @@ class AnthropicLLM(LLM):
             response=response,
             tool=tool,
             prompt_token_count=self.count_messages_tokens(messages),
-            response_token_count=0,
-            # response_token_count=self.count_tokens(
-            #     json.dumps(tool)  # just an approximative count
-            # ),
+            # just an approximation of the response tokens
+            response_token_count=self.count_tokens(tool),
         )
 
         return llm_response
