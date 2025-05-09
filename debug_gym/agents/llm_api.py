@@ -325,7 +325,7 @@ class LLM(ABC):
         return llm
 
     @abstractmethod
-    def generate(self, messages, tools, **kwargs) -> str:
+    def generate(self, messages, tools, **kwargs) -> LLMResponse:
         """Generate a response given some messages and return it as a string."""
         pass
 
@@ -428,29 +428,22 @@ class LLM(ABC):
 
         print_messages(messages, self.logger)
 
-        response, tool, prompt_tokens, completion_tokens = self.generate(
-            messages, tools, **kwargs
-        )
+        llm_response = self.generate(messages, tools, **kwargs)
 
-        if tool is None:
+        if llm_response.tool is None:
             # for error analysis purposes
             tool = {
                 "id": "empty_tool_response",
                 "name": "empty_tool_response",
                 "arguments": {},
             }
+            llm_response.tool = tool
+            self.logger.warning(
+                "Tool response is empty. The model may not have called a tool."
+            )
 
-        self.logger.info(colored(tool, "green"))
+        self.logger.info(colored(llm_response.tool, "green"))
 
-        llm_response = LLMResponse(
-            prompt=messages,
-            response=response,
-            tool=tool,
-            # prompt_token_count=self.count_messages_tokens(messages),
-            # response_token_count=self.count_tokens(response),
-            prompt_token_count=prompt_tokens,
-            response_token_count=completion_tokens,
-        )
         return llm_response
 
 
@@ -516,7 +509,6 @@ class AnthropicLLM(LLM):
             _tool = {}
             _tool["name"] = tool["name"]
             _tool["description"] = tool["description"]
-            _tool["strict"] = True
             _tool["input_schema"] = {
                 "type": "object",
                 "properties": tool["arguments"],
@@ -537,7 +529,7 @@ class AnthropicLLM(LLM):
             "arguments": response.input,
         }
 
-    def generate(self, messages, tools, **kwargs):
+    def generate(self, messages, tools, **kwargs) -> LLMResponse:
         system_prompt = " "  # weird exceptions sometimes if empty
         user_assistant_prompt = []
         for message in messages:
@@ -575,9 +567,18 @@ class AnthropicLLM(LLM):
         ).content[
             -1
         ]
+
         assert response.type == "tool_use"
-        response = self.parse_tool_response(response)
-        return response
+
+        llm_response = LLMResponse(
+            prompt=messages,
+            response=response,
+            tool=self.parse_tool_response(response),
+            prompt_token_count=self.count_messages_tokens(messages),
+            response_token_count=self.count_tokens(response),
+        )
+
+        return llm_response
 
 
 class OpenAILLM(LLM):
@@ -704,7 +705,7 @@ class OpenAILLM(LLM):
             "arguments": json.loads(response.function.arguments),
         }
 
-    def generate(self, messages, tools, **kwargs):
+    def generate(self, messages, tools, **kwargs) -> LLMResponse:
         # set max tokens if not provided
         kwargs["max_tokens"] = kwargs.get("max_tokens", NOT_GIVEN)
         response = retry_on_rate_limit(
@@ -718,12 +719,17 @@ class OpenAILLM(LLM):
         )
         # LLM may select multiple tool calls, we only care about the first action
         tool_call = response.choices[0].message.tool_calls[0]
+
         assert tool_call.type == "function"
-        tool = self.parse_tool_response(tool_call)
-        message = response.choices[0].message
-        prompt_tokens = response.usage.prompt_tokens
-        completion_tokens = response.usage.completion_tokens
-        return message, tool, prompt_tokens, completion_tokens
+
+        llm_response = LLMResponse(
+            prompt=messages,
+            response=response.choices[0].message,
+            tool=self.parse_tool_response(tool_call),
+            prompt_token_count=response.usage.prompt_tokens,
+            response_token_count=response.usage.completion_tokens,
+        )
+        return llm_response
 
 
 class AzureOpenAILLM(OpenAILLM):
@@ -792,7 +798,7 @@ class Human(LLM):
     def count_tokens(self, text: str) -> int:
         return len(self.tokenize(text))
 
-    def generate(self, messages, tools, **kwargs):
+    def generate(self, messages, tools, **kwargs) -> LLMResponse:
         # Human overrides the entire __call__ method, so generate is never called
         pass
 
