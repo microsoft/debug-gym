@@ -1,5 +1,4 @@
 import copy
-import json
 from dataclasses import asdict
 
 from debug_gym.agents.llm_api import LLMResponse
@@ -105,21 +104,49 @@ def build_history_conversation(
     for history_info, response in zip(
         _history[latest_rewrite_step:], history.prompt_response_pairs
     ):
-        if history_info.action is not None:
+        if hasattr(response[0].response, "role"):  # GPT
+            if history_info.action is not None:
+                _messages.append(
+                    {
+                        "role": response[0].response.role,  # "assistant"
+                        "tool_calls": [response[0].response.tool_calls[0]],
+                    }
+                )
             _messages.append(
                 {
-                    "role": response[0].response.role,  # "assistant"
-                    "tool_calls": [response[0].response.tool_calls[0]],
+                    "role": "tool",
+                    "tool_call_id": history_info.action["id"],
+                    "name": history_info.action["name"],
+                    "content": f"{history_info.step_observation.observation}",
                 }
             )
-        _messages.append(
-            {
-                "role": "tool",
-                "tool_call_id": history_info.action["id"],
-                "name": history_info.action["name"],
-                "content": f"{history_info.step_observation.observation}",
-            }
-        )
+        else:  # Claude
+            if history_info.action is not None:
+                _messages.append(
+                    {
+                        "role": "assistant",  # "assistant"
+                        "content": [
+                            {
+                                "type": "tool_use",
+                                "id": history_info.action["id"],
+                                "name": history_info.action["name"],
+                                "input": history_info.action["arguments"],
+                            }
+                        ],
+                    }
+                )
+            _messages.append(
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "tool_result",
+                            "tool_use_id": history_info.action["id"],
+                            "content": f"{history_info.step_observation.observation}",
+                        }
+                    ],
+                }
+            )
     return _messages
 
 

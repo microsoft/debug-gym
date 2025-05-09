@@ -15,7 +15,7 @@ def print_messages(messages: list[dict], logger: DebugGymLogger):
         if m["role"] == "user":
             logger.info(colored(f"{m['content']}\n", "cyan"))
         elif m["role"] == "assistant":
-            logger.info(colored(f"{m['tool_calls']}\n", "green"))
+            logger.info(colored(f"{m}\n", "green"))
         elif m["role"] == "tool":
             logger.info(colored(f"{m['content']}\n", "magenta"))
         elif m["role"] == "system":
@@ -30,14 +30,19 @@ def merge_messages(messages: list[dict]) -> list[dict]:
     to_merge = []
 
     def merge():
-        if (
-            len(to_merge) == 1
-        ):  # temporary fix, should merge any kind of messages, not just "content"
-            messages_out.append(to_merge[0])
-            return
-        content = "\n\n".join(m["content"] for m in to_merge if m["content"])
-        if content:
-            messages_out.append({"role": current_role, "content": content})
+        # temporary fix, should merge any kind of messages, not just "content"
+        try:
+            if len(to_merge) == 1:
+                messages_out.append(to_merge[0])
+                return
+            content = "\n\n".join(m["content"] for m in to_merge if m["content"])
+            if content:
+                messages_out.append({"role": current_role, "content": content})
+        except BaseException as e:
+            print(f"Error merging messages {to_merge}: {e}")
+            # If there is an error, just append the first message
+            # add all messages
+            messages_out.extend(to_merge)
 
     current_role = None
     for message in messages:

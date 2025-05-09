@@ -570,12 +570,16 @@ class AnthropicLLM(LLM):
 
         assert response.type == "tool_use"
 
+        tool = self.parse_tool_response(response)
         llm_response = LLMResponse(
             prompt=messages,
             response=response,
-            tool=self.parse_tool_response(response),
+            tool=tool,
             prompt_token_count=self.count_messages_tokens(messages),
-            response_token_count=self.count_tokens(response),
+            response_token_count=0,
+            # response_token_count=self.count_tokens(
+            #     json.dumps(tool)  # just an approximative count
+            # ),
         )
 
         return llm_response

@@ -225,8 +225,8 @@ class BaseAgent:
             )
             jsonl_output["log"].append(step_json)
         os.makedirs(pjoin(self._output_path, task_name), exist_ok=True)
-        with open(pjoin(self._output_path, task_name, "debug_gym.jsonl"), "w") as f:
-            json.dump(jsonl_output, f, indent=4)
+        # with open(pjoin(self._output_path, task_name, "debug_gym.jsonl"), "w") as f:
+        #     json.dump(jsonl_output, f, indent=4)
 
         self.logger.debug(
             f"Log saved in {pjoin(self._output_path, task_name, 'debug_gym.jsonl')}"
