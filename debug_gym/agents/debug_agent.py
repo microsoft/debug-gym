@@ -51,7 +51,7 @@ class Debug_5_Agent(DebugAgent):
                 self.env.tools["pdb"].start_pdb()
                 # update info tools related fields after adding pdb so it's included when building the next prompt
                 info.instructions = self.env.instructions
-                info.tools = self.env.tool_instructions
+                info.tools = self.env.tools
 
             self.history.step(info, llm_response)
 

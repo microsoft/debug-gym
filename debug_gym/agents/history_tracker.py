@@ -20,7 +20,7 @@ class HistoryTracker:
         llm_responses: list[LLMResponse] | LLMResponse | None = None,
     ) -> None:
         """llm_responses can be None since the initial state does not have prompt and response"""
-        self.memory.append(copy.deepcopy(new_info))
+        self.memory.append(new_info)  # was deepcopy needed?
 
         llm_responses = llm_responses or []
         if not isinstance(llm_responses, list):
@@ -29,7 +29,10 @@ class HistoryTracker:
 
     def get(self):
         # return the history_steps latest steps
-        return self.memory[-self.history_steps :]
+        return (
+            self.memory[-self.history_steps :],
+            self.prompt_response_pairs[-self.history_steps :],
+        )
 
     def get_all(self):
         return self.memory
@@ -91,7 +94,7 @@ class HistoryTracker:
 def build_history_conversation(
     history: HistoryTracker, reset_prompt_history_after_rewrite: bool = False
 ):
-    _history = history.get()
+    _history, _prompt_response_pairs = history.get()
     # Find the latest rewrite step
     if len(_history) == 0 or reset_prompt_history_after_rewrite is False:
         latest_rewrite_step = 0
@@ -102,47 +105,47 @@ def build_history_conversation(
                 break
     _messages = []
     for history_info, response in zip(
-        _history[latest_rewrite_step:], history.prompt_response_pairs
+        _history[latest_rewrite_step:], _prompt_response_pairs[latest_rewrite_step:]
     ):
         if hasattr(response[0].response, "role"):  # GPT
-            if history_info.action is not None:
-                _messages.append(
-                    {
-                        "role": response[0].response.role,  # "assistant"
-                        "tool_calls": [response[0].response.tool_calls[0]],
-                    }
-                )
+            _messages.append(
+                {
+                    "role": "assistant",
+                    "tool_calls": [
+                        response[0].response.tool_calls[0]
+                    ],  # ChatCompletionMessageToolCall(id='call_jFkY53qCEQLKDXQqdDd7AZyL', function=Function(arguments='{"command":"b 13"}', name='pdb'), type='function')
+                }
+            )
             _messages.append(
                 {
                     "role": "tool",
-                    "tool_call_id": history_info.action["id"],
-                    "name": history_info.action["name"],
-                    "content": f"{history_info.step_observation.observation}",
+                    "tool_call_id": history_info.action.id,  # 'call_jFkY53qCEQLKDXQqdDd7AZyL'
+                    "name": history_info.action.name,  # 'pdb'
+                    "content": f"{history_info.step_observation.observation}",  # 'Breakpoint 1 at /tmp/RepoEnv-9uqllb7j/hangman.py:13\nlist .\n1  ->\t"""The pytest entry point."""\r\n  2  \t\r\n  3  \tfrom __future__ import annotations\r\n  4  \t\r\n  5  \timport pytest\r\n  6  \t\r\n  7  \t\r\n  8  \tif __name__ == "__main__":\r\n  9  \t    raise SystemExit(pytest.console_main())\r\n[EOF]'
                 }
             )
         else:  # Claude
-            if history_info.action is not None:
-                _messages.append(
-                    {
-                        "role": "assistant",  # "assistant"
-                        "content": [
-                            {
-                                "type": "tool_use",
-                                "id": history_info.action["id"],
-                                "name": history_info.action["name"],
-                                "input": history_info.action["arguments"],
-                            }
-                        ],
-                    }
-                )
+            _messages.append(
+                {
+                    "role": "assistant",  # "assistant"
+                    "content": [
+                        {
+                            "type": "tool_use",
+                            "id": history_info.action.id,  # 'toolu_01SdR84CsnTKRpdH4zwFjvGj'
+                            "name": history_info.action.name,  # 'view'
+                            "input": history_info.action.arguments,  # {'path': 'hangman_test.py'}
+                        }
+                    ],
+                }
+            )
             _messages.append(
                 {
                     "role": "user",
                     "content": [
                         {
                             "type": "tool_result",
-                            "tool_use_id": history_info.action["id"],
-                            "content": f"{history_info.step_observation.observation}",
+                            "tool_use_id": history_info.action.id,  # 'toolu_01SdR84CsnTKRpdH4zwFjvGj'
+                            "content": f"{history_info.step_observation.observation}",  # 'Viewing `hangman_test.py`. The file is read-only, it is not editable.'
                         }
                     ],
                 }

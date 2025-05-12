@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from functools import wraps
+from typing import Any, Dict
 
 from debug_gym.gym.entities import Event, Observation
 
@@ -23,6 +24,22 @@ def track_history(func):
         return observation
 
     return wrapper
+
+
+@dataclass
+class ToolCall:
+    id: str
+    name: str
+    arguments: Dict[str, Any]
+
+    def to_dict(self):
+        return {"id": self.id, "name": self.name, "arguments": self.arguments}
+
+    def __str__(self):
+        return str(self.to_dict())
+
+    def __repr__(self):
+        return str(self)
 
 
 class EnvironmentTool(ABC):

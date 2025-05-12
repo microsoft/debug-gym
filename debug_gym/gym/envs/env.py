@@ -13,6 +13,7 @@ import numpy as np
 
 from debug_gym.gym.entities import EvalOutput, Event, Observation
 from debug_gym.gym.terminal import Terminal
+from debug_gym.gym.tools.tool import EnvironmentTool
 from debug_gym.gym.utils import _walk, make_file_matcher, show_line_number
 from debug_gym.logger import DebugGymLogger
 
@@ -32,7 +33,7 @@ class EnvInfo:
     max_score: int
     done: bool
     rewrite_counter: int
-    tools: dict  # TODO: return some tool dataclass
+    tools: dict[str, EnvironmentTool]
 
 
 class EventHooks:
