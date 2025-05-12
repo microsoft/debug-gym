@@ -21,6 +21,7 @@ from termcolor import colored
 from transformers import AutoTokenizer
 
 from debug_gym.agents.utils import merge_messages, print_messages
+from debug_gym.gym.envs.env import EnvInfo
 from debug_gym.gym.tools.tool import EnvironmentTool, ToolCall
 from debug_gym.logger import DebugGymLogger
 
@@ -377,6 +378,17 @@ class LLM(ABC):
             "The parse_tool_call_response method should be overridden by subclasses."
         )
 
+    # TODO: abstract method?
+    def format_tool_call_history(
+        self, history_info: EnvInfo, response: LLMResponse
+    ) -> list[dict]:
+        """Format the tool call history for different LLMs.
+        The method should be overridden by subclasses.
+        """
+        raise NotImplementedError(
+            "The format_tool_call_history method should be overridden by subclasses."
+        )
+
     def __call__(self, messages, tools, *args, **kwargs) -> LLMResponse:
         """Prepares messages and kwargs, then call `generate` which
         should be implemented by subclasses. Returns an LLMResponse object
@@ -547,6 +559,34 @@ class AnthropicLLM(LLM):
             name=response.name,
             arguments=response.input,
         )
+
+    def format_tool_call_history(
+        self, history_info: EnvInfo, response: LLMResponse
+    ) -> list[dict]:
+        _messages = [
+            {
+                "role": "assistant",  # "assistant"
+                "content": [
+                    {
+                        "type": "tool_use",
+                        "id": history_info.action.id,  # 'toolu_01SdR84CsnTKRpdH4zwFjvGj'
+                        "name": history_info.action.name,  # 'view'
+                        "input": history_info.action.arguments,  # {'path': 'hangman_test.py'}
+                    }
+                ],
+            },
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "tool_result",
+                        "tool_use_id": history_info.action.id,  # 'toolu_01SdR84CsnTKRpdH4zwFjvGj'
+                        "content": f"{history_info.step_observation.observation}",  # 'Viewing `hangman_test.py`. The file is read-only, it is not editable.'
+                    }
+                ],
+            },
+        ]
+        return _messages
 
     def generate(self, messages, tools, **kwargs) -> LLMResponse:
         system_prompt = " "  # weird exceptions sometimes if empty
@@ -720,6 +760,25 @@ class OpenAILLM(LLM):
             name=response.function.name,
             arguments=json.loads(response.function.arguments),
         )
+
+    def format_tool_call_history(
+        self, history_info: EnvInfo, response: LLMResponse
+    ) -> list[dict]:
+        _messages = [
+            {
+                "role": "assistant",
+                "tool_calls": [
+                    response[0].response.tool_calls[0]
+                ],  # ChatCompletionMessageToolCall(id='call_jFkY53qCEQLKDXQqdDd7AZyL', function=Function(arguments='{"command":"b 13"}', name='pdb'), type='function')
+            },
+            {
+                "role": "tool",
+                "tool_call_id": history_info.action.id,  # 'call_jFkY53qCEQLKDXQqdDd7AZyL'
+                "name": history_info.action.name,  # 'pdb'
+                "content": f"{history_info.step_observation.observation}",  # 'Breakpoint 1 at /tmp/RepoEnv-9uqllb7j/hangman.py:13\nlist .\n1  ->\t"""The pytest entry point."""\r\n  2  \t\r\n  3  \tfrom __future__ import annotations\r\n  4  \t\r\n  5  \timport pytest\r\n  6  \t\r\n  7  \t\r\n  8  \tif __name__ == "__main__":\r\n  9  \t    raise SystemExit(pytest.console_main())\r\n[EOF]'
+            },
+        ]
+        return _messages
 
     def generate(self, messages, tools, **kwargs) -> LLMResponse:
         # set max tokens if not provided

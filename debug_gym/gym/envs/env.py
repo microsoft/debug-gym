@@ -71,40 +71,44 @@ class EventHooks:
 
 class TooledEnv:
     def __init__(self):
-        self.tools = {}
+        self._tools = {}
         self.event_hooks = EventHooks()
         self.event_queue = []
         self.all_observations = []
 
     @property
     def tool_names(self):
-        return ", ".join([t.name for t in self.tools.values()])
+        return ", ".join([t.name for t in self._tools.values()])
 
     def add_tool(self, tool):
-        if tool.name in self.tools:
+        if tool.name in self._tools:
             raise ValueError(f"Tool {tool.name} already exists!")
 
-        self.tools[tool.name] = tool
+        self._tools[tool.name] = tool
         tool.register(self)
 
     def has_tool(self, tool_name):
-        return tool_name in self.tools
+        return tool_name in self._tools
 
     def get_tool(self, tool_name):
-        return self.tools[tool_name]
+        return self._tools[tool_name]
 
     def get_triggered_tools(self, action):
         try:
-            tool_name = action["name"]
-            tool_kwargs = action["arguments"]
+            tool_name = action.name
+            tool_kwargs = action.arguments
         except Exception as e:
             # parse error
             return str(e), None
-        if tool_name not in self.tools:
+        if tool_name not in self._tools:
             # failed to find tool
             return f"Unregistered tool: {tool_name}", None
-        tool = self.tools[tool_name]
+        tool = self._tools[tool_name]
         return None, [tool, tool_kwargs]
+
+    @property
+    def tools(self):
+        return self._tools.values()
 
     @property
     def tool_instructions(self):
@@ -329,7 +333,7 @@ class RepoEnv(TooledEnv):
             max_score=self.max_score,
             instructions=self.instructions,
             rewrite_counter=self.rewrite_counter,
-            tools=self.tool_instructions,
+            tools=self.tools,
         )
         return self.infos
 
@@ -508,7 +512,7 @@ class RepoEnv(TooledEnv):
             max_score=self.max_score,
             done=self.done,
             rewrite_counter=self.rewrite_counter,
-            tools=self.tool_instructions,
+            tools=self.tools,
         )
 
         return self.infos
