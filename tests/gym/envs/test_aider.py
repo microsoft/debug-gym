@@ -49,10 +49,7 @@ def aider_env(
 
 def test_instructions(aider_env):
     aider_env.current_sample = {"instructions": "Test instructions"}
-    expected_instructions = {
-        "Problem description": "Test instructions",
-        "Available tools to solve the problem": aider_env.tool_instructions,
-    }
+    expected_instructions = {"Problem description": "Test instructions"}
     assert aider_env.instructions == expected_instructions
 
 

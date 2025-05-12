@@ -104,10 +104,7 @@ def test_clone_repo(tmp_path, get_swe_env):
 def test_instructions(get_swe_env):
     swe_env = get_swe_env()
     swe_env.ds_row = {"problem_statement": "Test problem statement"}
-    expected_instructions = {
-        "Problem description": "Test problem statement",
-        "Available tools to solve the problem": swe_env.tool_instructions,
-    }
+    expected_instructions = {"Problem description": "Test problem statement"}
     assert swe_env.instructions == expected_instructions
 
 

@@ -108,30 +108,7 @@ class TooledEnv:
 
     @property
     def tools(self):
-        return self._tools.values()
-
-    @property
-    def tool_instructions(self):
-        return [
-            {
-                "name": tool.name,
-                "description": tool.description,
-                "arguments": tool.arguments,
-            }
-            for tool in self.tools.values()
-        ]
-
-    @property
-    def tool_instructions_lite(self):
-        # only names and descriptions
-        # used in system prompt
-        return [
-            {
-                "name": tool.name,
-                "description": tool.description,
-            }
-            for tool in self.tools.values()
-        ]
+        return list(self._tools.values())
 
     def clear_all_observations(self):
         self.all_observations = []

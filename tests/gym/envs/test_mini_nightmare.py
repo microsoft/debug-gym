@@ -48,10 +48,7 @@ def mini_nightmare_env(mock_open, mock_tempdir, mock_exists, tmp_path):
 
 def test_instructions(mini_nightmare_env):
     mini_nightmare_env.current_sample = {"instructions": "Test instructions"}
-    expected_instructions = {
-        "Problem description": "Test instructions",
-        "Available tools to solve the problem": mini_nightmare_env.tool_instructions,
-    }
+    expected_instructions = {"Problem description": "Test instructions"}
     assert mini_nightmare_env.instructions == expected_instructions
 
 

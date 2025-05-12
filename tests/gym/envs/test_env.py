@@ -208,7 +208,7 @@ def test_cleanup_workspace(mock_tempdir):
     mock_tempdir_instance.cleanup.assert_called_once()
 
 
-def test_instructions():
+def test_env_tools():
     tool1 = MagicMock()
     tool1.name = "tool1"
     tool1.description = "instructions1"
@@ -232,21 +232,7 @@ def test_instructions():
     env.add_tool(tool1)
     env.add_tool(tool2)
 
-    expected_instructions = {
-        "Available tools to solve the problem": [
-            {
-                "name": "tool1",
-                "description": "instructions1",
-            },
-            {
-                "name": "tool2",
-                "description": "instructions2",
-            },
-        ],
-    }
-
-    instructions = env.instructions
-    assert instructions == expected_instructions
+    assert env.tools == [tool1, tool2]
 
 
 @pytest.fixture
@@ -398,9 +384,7 @@ def test_reset(
         current_code_with_line_number="You are currently not working in a file. You can use ```view path/to/file.py``` to navigate to a file first.",
         current_breakpoints="No breakpoints are set.",
         action=None,
-        instructions={
-            "Available tools to solve the problem": [],
-        },
+        instructions={},
         score=0,
         max_score=1,
         done=False,
