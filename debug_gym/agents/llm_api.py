@@ -569,9 +569,11 @@ class AnthropicLLM(LLM):
                 "content": [
                     {
                         "type": "tool_use",
-                        "id": history_info.action.id,  # 'toolu_01SdR84CsnTKRpdH4zwFjvGj'
-                        "name": history_info.action.name,  # 'view'
-                        "input": history_info.action.arguments,  # {'path': 'hangman_test.py'}
+                        "id": response[0].tool.id,  # 'toolu_01SdR84CsnTKRpdH4zwFjvGj'
+                        "name": response[0].tool.name,  # 'view'
+                        "input": response[
+                            0
+                        ].tool.arguments,  # {'path': 'hangman_test.py'}
                     }
                 ],
             },
