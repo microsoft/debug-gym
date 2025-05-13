@@ -357,8 +357,9 @@ class LLM(ABC):
             )
 
     def count_messages_tokens(self, messages: list[dict]) -> int:
-        """Count the number of tokens in a list of messages."""
-        return sum(self.count_tokens(msg.get("content", "")) for msg in messages)
+        """Roughly estimate tokens count in a list of messages.
+        Don't use this for exact token counting, it is not accurate."""
+        return sum(self.count_tokens(msg.get("content", str(msg))) for msg in messages)
 
     # TODO: abstract method?
     def define_tools(self, tool_call_list: dict[str, EnvironmentTool]) -> list[dict]:
@@ -493,7 +494,7 @@ class AnthropicLLM(LLM):
             text = str(text)  # json.dumps(text)
         messages = [{"role": "user", "content": [{"type": "text", "text": text}]}]
         try:
-            response = self.client.beta.messages.count_tokens(
+            response = self.client.messages.count_tokens(
                 model=self.tokenizer_name, messages=messages
             )
             return response.input_tokens
@@ -625,20 +626,16 @@ class AnthropicLLM(LLM):
             tools=self.define_tools(tools),
             tool_choice={"type": "any"},  # has to call a tool, but can be any
             **kwargs,
-        ).content[
-            -1
-        ]
+        )
+        tool_use_block = response.content[-1]
+        assert tool_use_block.type == "tool_use"
 
-        assert response.type == "tool_use"
-
-        tool = self.parse_tool_call_response(response)
         llm_response = LLMResponse(
             prompt=messages,
             response=response,
-            tool=tool,
-            prompt_token_count=self.count_messages_tokens(messages),
-            # just an approximation of the response tokens
-            response_token_count=self.count_tokens(tool),
+            tool=self.parse_tool_call_response(tool_use_block),
+            prompt_token_count=response.usage.input_tokens,
+            response_token_count=response.usage.output_tokens,
         )
 
         return llm_response
