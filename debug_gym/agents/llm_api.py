@@ -358,8 +358,9 @@ class LLM(ABC):
 
     def count_messages_tokens(self, messages: list[dict]) -> int:
         """Roughly estimate tokens count in a list of messages.
+        Complex messages are dumped to a string and tokenized.
         Don't use this for exact token counting, it is not accurate."""
-        return sum(self.count_tokens(msg.get("content", str(msg))) for msg in messages)
+        return sum(self.count_tokens(str(msg.get("content", msg))) for msg in messages)
 
     # TODO: abstract method?
     def define_tools(self, tool_call_list: dict[str, EnvironmentTool]) -> list[dict]:
@@ -490,8 +491,6 @@ class AnthropicLLM(LLM):
                 ],
             }
         """
-        if not isinstance(text, str):
-            text = str(text)  # json.dumps(text)
         messages = [{"role": "user", "content": [{"type": "text", "text": text}]}]
         try:
             response = self.client.messages.count_tokens(
