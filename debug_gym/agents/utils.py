@@ -91,16 +91,12 @@ def trim_prompt_messages(
     messages: list[dict], context_length: int, count_tokens: callable
 ):
     # Trim message content to context length
-    # messages: list of dict, each dict has keys "content" and "role"
+    # messages: list of dict, each dict has keys "role" and either "content" or "tool_calls"
     # context_length: int, maximum number of tokens
     # count_tokens: function, count the number of tokens in a string
     # messages should not be empty
     assert len(messages) > 0, "messages should not be empty"
-    # all messages should be dictionaries with keys "content" and "role"
-    assert all(
-        isinstance(item, dict) and "content" in item and "role" in item
-        for item in messages
-    ), 'all messages should be dictionaries with keys "content" and "role"'
+
     # the last message should be from the user
     assert messages[-1]["role"] == "user", "the last message should be from the user"
     # if two consecutive messages are from the same role, they should be merged
@@ -110,7 +106,11 @@ def trim_prompt_messages(
     # context_length should be non-negative
     assert context_length >= 0, "context_length should be non-negative"
 
-    message_lengths = [count_tokens(item["content"]) for item in messages]
+    def get_item(item):
+        """From a message, gets it's content, tool_calls, or return the item itself as str."""
+        return str(item.get("content", item.get("tool_calls", item)))
+
+    message_lengths = [count_tokens(get_item(item)) for item in messages]
     total_length = sum(message_lengths)
     if total_length <= context_length:
         return messages
