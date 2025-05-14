@@ -40,7 +40,7 @@ class Debug_5_Agent(DebugAgent):
             if debug:
                 breakpoint()
 
-            info = self.env.step(llm_response.response)
+            info = self.env.step(llm_response.tool)
 
             # re-introduce pdb tool at the right time
             if (
