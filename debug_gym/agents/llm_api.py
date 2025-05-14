@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional
 
+import openai
 import tiktoken
 import yaml
 from openai import NOT_GIVEN, AzureOpenAI, OpenAI
@@ -266,6 +267,12 @@ class LLMResponse:
             self.token_usage = token_usage
 
 
+class ContextLengthExceededError(Exception):
+    """Exception raised when the context length of an LLM request is exceeded."""
+
+    pass
+
+
 class LLM(ABC):
 
     def __init__(
@@ -328,7 +335,9 @@ class LLM(ABC):
 
     @abstractmethod
     def generate(self, messages, tools, **kwargs) -> LLMResponse:
-        """Generate a response given some messages and return it as a string."""
+        """Generate a response given some messages and return it as an LLMResponse object.
+        Raises ContextLengthExceededError if the context length is exceeded.
+        The method should be overridden by subclasses."""
         pass
 
     @abstractmethod
@@ -426,22 +435,30 @@ class LLM(ABC):
         # merge consecutive messages with same role
         messages = merge_messages(messages)
 
-        messages_length = self.count_messages_tokens(messages)
-        self.logger.debug(f"Prompt size is {messages_length:,} tokens.")
+        def generate_with_drop_message_and_retry(messages, tools, **kwargs):
+            """Generate a response. If context length is exceeded, apply trim_prompt_messages and retry."""
+            if not messages:
+                raise ValueError("No messages provided for generation.")
+            try:
+                llm_response = self.generate(messages, tools, **kwargs)
+            except ContextLengthExceededError:
+                self.logger.info(
+                    f"Prompt is too long. {self.model_name} only allows for {self.context_length:,} tokens."
+                )
+                messages = trim_prompt_messages(
+                    messages, self.context_length, self.count_tokens
+                )
+                llm_response = self.generate_with_drop_message_and_retry(
+                    messages, tools, **kwargs
+                )
+                self.logger.info(
+                    f"Prompt truncated to {llm_response.token_usage.prompt:,} tokens."
+                )
 
-        if messages_length > self.context_length:
-            self.logger.info(
-                f"Prompt is too long. {self.model_name} only allows for {self.context_length:,} tokens."
-            )
-            messages = trim_prompt_messages(
-                messages, self.context_length, self.count_tokens
-            )
-            messages_length = self.count_messages_tokens(messages)
-            self.logger.info(f"Prompt truncated to {messages_length:,} tokens.")
+            print_messages(messages, self.logger)
+            return llm_response
 
-        print_messages(messages, self.logger)
-
-        llm_response = self.generate(messages, tools, **kwargs)
+        llm_response = generate_with_drop_message_and_retry(messages, tools, **kwargs)
 
         if llm_response.tool is None:
             # for error analysis purposes
@@ -469,7 +486,7 @@ class AnthropicLLM(LLM):
 
             if self.config.api_key in [LLM_API_KEY_PLACEHOLDER, None]:
                 raise ValueError(
-                    f"API key is required for Anthropic. Please add it to the config."
+                    "API key is required for Anthropic. Please add it to the config."
                 )
             self._client = Anthropic(api_key=self.config.api_key)
         return self._client
@@ -616,16 +633,21 @@ class AnthropicLLM(LLM):
             ]
         # if thinking is enabled, the first message is the thought,
         # the last messages `content[-1]` is the response in any mode
-        response = retry_on_rate_limit(
-            self.client.messages.create, self.is_rate_limit_error
-        )(
-            model=self.config.model,
-            system=system_prompt,
-            messages=user_assistant_prompt,
-            tools=self.define_tools(tools),
-            tool_choice={"type": "any"},  # has to call a tool, but can be any
-            **kwargs,
-        )
+        try:
+            response = retry_on_rate_limit(
+                self.client.messages.create, self.is_rate_limit_error
+            )(
+                model=self.config.model,
+                system=system_prompt,
+                messages=user_assistant_prompt,
+                tools=self.define_tools(tools),
+                tool_choice={"type": "any"},  # has to call a tool, but can be any
+                **kwargs,
+            )
+        except anthropic.BadRequestError as e:
+            if "prompt is too long" in e.message:
+                raise ContextLengthExceededError
+
         tool_use_block = response.content[-1]
         assert tool_use_block.type == "tool_use"
 
@@ -781,15 +803,20 @@ class OpenAILLM(LLM):
     def generate(self, messages, tools, **kwargs) -> LLMResponse:
         # set max tokens if not provided
         kwargs["max_tokens"] = kwargs.get("max_tokens", NOT_GIVEN)
-        response = retry_on_rate_limit(
-            self.client.chat.completions.create, self.is_rate_limit_error
-        )(
-            model=self.config.model,
-            messages=messages,
-            tools=self.define_tools(tools),
-            tool_choice="required",
-            **kwargs,
-        )
+        try:
+            response = retry_on_rate_limit(
+                self.client.chat.completions.create, self.is_rate_limit_error
+            )(
+                model=self.config.model,
+                messages=messages,
+                tools=self.define_tools(tools),
+                tool_choice="required",
+                **kwargs,
+            )
+        except openai.BadRequestError as e:
+            if e.code == "context_length_exceeded":
+                raise ContextLengthExceededError
+
         # LLM may select multiple tool calls, we only care about the first action
         tool_call = response.choices[0].message.tool_calls[0]
 
