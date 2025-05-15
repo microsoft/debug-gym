@@ -25,7 +25,7 @@ def test_rewrite(mock_environment):
         "end": None,
         "new_code": "    print(f'Hello, {name}!')",
     }
-    result = patcher.use(**patch)
+    result = patcher.use(mock_environment, **patch)
 
     assert result.observation == "Rewriting done."
     assert patcher.rewrite_success
@@ -44,7 +44,7 @@ def test_rewrite_with_file_path(mock_environment):
         "end": None,
         "new_code": "    print(f'Hello, {name}!')",
     }
-    result = patcher.use(**patch)
+    result = patcher.use(mock_environment, **patch)
 
     assert result.observation == "Rewriting done."
     assert patcher.rewrite_success
@@ -64,7 +64,7 @@ def test_rewrite_invalid_file(mock_environment):
         "end": None,
         "new_code": "    print(f'Hello, {name}!')",
     }
-    result = patcher.use(**patch)
+    result = patcher.use(mock_environment, **patch)
 
     assert (
         result.observation
@@ -83,7 +83,7 @@ def test_rewrite_invalid_line_number(mock_environment):
         "end": None,
         "new_code": "    print(f'Hello, {name}!')",
     }
-    result = patcher.use(**patch)
+    result = patcher.use(mock_environment, **patch)
 
     assert (
         result.observation
@@ -102,7 +102,7 @@ def test_rewrite_invalid_line_number_2(mock_environment):
         "end": 4,
         "new_code": "    print(f'Hello, {name}!')",
     }
-    result = patcher.use(**patch)
+    result = patcher.use(mock_environment, **patch)
 
     assert (
         result.observation
