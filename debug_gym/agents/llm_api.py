@@ -647,8 +647,10 @@ class AnthropicLLM(LLM):
                 **kwargs,
             )
         except anthropic.BadRequestError as e:
+            # Handle specific error for context length exceeded, otherwise just propagate the error
             if "prompt is too long" in e.message:
                 raise ContextLengthExceededError
+            raise
 
         # messages are either of type `text` or `tool_use`
         # https://docs.anthropic.com/en/docs/build-with-claude/tool-use/implement-tool-use#handling-results-from-client-tools
@@ -828,8 +830,10 @@ class OpenAILLM(LLM):
                 **kwargs,
             )
         except openai.BadRequestError as e:
+            # Handle specific error for context length exceeded, otherwise just propagate the error
             if e.code == "context_length_exceeded":
                 raise ContextLengthExceededError
+            raise
 
         # LLM may select multiple tool calls, we only care about the first action
         tool_call = response.choices[0].message.tool_calls[0]
