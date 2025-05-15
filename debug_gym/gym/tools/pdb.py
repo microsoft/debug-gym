@@ -41,6 +41,18 @@ class PDBTool(EnvironmentTool):
         self.current_frame_file = None
         self._session: ShellSession = None
 
+    def __deepcopy__(self, memo):
+        """Create a deep copy of the PDBTool instance with _session set to None."""
+        result = type(self).__new__(self.__class__)
+        memo[id(self)] = result
+        # Copy all attributes except _session
+        for k, v in self.__dict__.items():
+            if k == "_session":
+                setattr(result, k, None)
+            else:
+                setattr(result, k, copy.deepcopy(v, memo))
+        return result
+
     @property
     def pdb_is_running(self):
         return self._session is not None and self._session.is_running

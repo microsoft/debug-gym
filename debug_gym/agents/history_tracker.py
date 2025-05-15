@@ -20,8 +20,7 @@ class HistoryTracker:
         llm_responses: list[LLMResponse] | LLMResponse | None = None,
     ) -> None:
         """llm_responses can be None since the initial state does not have prompt and response"""
-        self.memory.append(new_info)  # was deepcopy needed?
-
+        self.memory.append(copy.deepcopy(new_info))
         llm_responses = llm_responses or []
         if not isinstance(llm_responses, list):
             llm_responses = [llm_responses]
