@@ -1,5 +1,4 @@
 from os.path import join as pjoin
-from pathlib import Path
 
 from debug_gym.gym.entities import Observation
 from debug_gym.gym.tools.tool import EnvironmentTool

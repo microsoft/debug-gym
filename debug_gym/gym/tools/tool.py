@@ -35,15 +35,6 @@ class ToolCall:
     name: str
     arguments: Dict[str, Any]
 
-    def to_dict(self):
-        return {"id": self.id, "name": self.name, "arguments": self.arguments}
-
-    def __str__(self):
-        return str(self.to_dict())
-
-    def __repr__(self):
-        return str(self)
-
 
 class EnvironmentTool(ABC):
     name: str = None

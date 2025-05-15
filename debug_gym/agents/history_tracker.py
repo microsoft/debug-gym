@@ -54,7 +54,7 @@ class HistoryTracker:
         else:
             json_out = {
                 "step_id": game_step,
-                "action": self.memory[game_step].action,
+                "action": asdict(self.memory[game_step].action),
                 "obs": self.memory[game_step].step_observation.observation,
             }
             # prompt_response_pairs could be empty for the initial state
