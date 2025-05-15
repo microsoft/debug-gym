@@ -30,14 +30,24 @@ def merge_messages(messages: list[dict]) -> list[dict]:
     to_merge = []
 
     def merge():
-        # temporary fix, should merge any kind of messages, not just "content"
         try:
             if len(to_merge) == 1:
                 messages_out.append(to_merge[0])
                 return
-            content = "\n\n".join(m["content"] for m in to_merge if m["content"])
-            if content:
-                messages_out.append({"role": current_role, "content": content})
+            content = [m["content"] for m in to_merge if m["content"]]
+            if any(isinstance(c, list) for c in content):  # tool call anthropic
+                merged = []
+                for c in content:
+                    if isinstance(c, list):
+                        merged.extend(c)
+                    elif isinstance(c, str):
+                        merged.append({"type": "text", "text": c})
+                    else:
+                        raise ValueError(f"Unknown content type for message: {c}")
+            else:
+                merged = "\n\n".join(content)
+            if merged:
+                messages_out.append({"role": current_role, "content": merged})
         except BaseException as e:
             print(f"Error merging messages {to_merge}: {e}")
             # If there is an error, just append the first message
