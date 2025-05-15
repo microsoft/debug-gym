@@ -2,12 +2,12 @@ import pytest
 
 from debug_gym.gym.entities import Observation
 from debug_gym.gym.envs.env import Event, RepoEnv
-from debug_gym.gym.tools.tool import EnvironmentTool, Record, track_history
+from debug_gym.gym.tools.tool import EnvironmentTool, Record
 from debug_gym.gym.tools.toolbox import Toolbox
 
 
 class FakeTool(EnvironmentTool):
-    def use(self, action):
+    def use(self, env, action):
         return Observation("FakeTool", action)
 
 
@@ -15,7 +15,8 @@ def test_register_valid_environment():
     tool = FakeTool()
     env = RepoEnv()
     tool.register(env)
-    assert tool.environment == env
+    # every tool listen to ENV_RESET event to track history
+    assert tool in env.event_hooks.event_listeners[Event.ENV_RESET]
 
 
 def test_register_invalid_environment():
@@ -64,12 +65,13 @@ def test_auto_subscribe(monkeypatch):
 
 def test_track_history():
     tool = FakeTool()
+    env = RepoEnv()
 
     assert hasattr(tool, "history")
     assert isinstance(tool.history, list)
     assert len(tool.history) == 0
 
-    tool(action="first")
+    tool(env, action="first")
     assert len(tool.history) == 1
     assert tool.history[0] == Record(
         args=(),
@@ -77,7 +79,7 @@ def test_track_history():
         observation=Observation("FakeTool", "first"),
     )
 
-    tool(action="second")
+    tool(env, action="second")
     assert len(tool.history) == 2
     assert tool.history[1] == Record(
         args=(),
