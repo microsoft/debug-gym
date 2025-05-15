@@ -608,6 +608,8 @@ class AnthropicLLM(LLM):
         return _messages
 
     def generate(self, messages, tools, **kwargs) -> LLMResponse:
+        import anthropic
+
         system_prompt = " "  # weird exceptions sometimes if empty
         user_assistant_prompt = []
         for message in messages:
