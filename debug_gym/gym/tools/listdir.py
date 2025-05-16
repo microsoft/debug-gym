@@ -41,5 +41,5 @@ class ListdirTool(EnvironmentTool):
             startpath = pjoin(environment.working_dir, path)
             result = environment.directory_tree(root=startpath, max_depth=depth)
         except ValueError as e:
-            Observation(self.name, f"Depth must be 1 or greater: {str(e)}")
+            return Observation(self.name, f"Depth must be 1 or greater: {str(e)}")
         return Observation(self.name, result)

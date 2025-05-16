@@ -1,5 +1,4 @@
 import codecs
-import json
 import os
 import re
 from os.path import join as pjoin
