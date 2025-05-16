@@ -21,7 +21,7 @@ from tenacity import (
 from termcolor import colored
 from transformers import AutoTokenizer
 
-from debug_gym.agents.utils import merge_messages, print_messages
+from debug_gym.agents.utils import print_messages
 from debug_gym.gym.envs.env import EnvInfo
 from debug_gym.gym.tools.tool import EnvironmentTool, ToolCall
 from debug_gym.logger import DebugGymLogger
@@ -409,9 +409,6 @@ class LLM(ABC):
             for kw in self.config.ignore_kwargs:
                 if kw in kwargs:
                     del kwargs[kw]
-
-        # merge consecutive messages with same role
-        messages = merge_messages(messages)
 
         def generate_with_drop_message_and_retry(messages, tools, **kwargs):
             """Generate a response. If context length is exceeded, apply trim_prompt_messages and retry."""
