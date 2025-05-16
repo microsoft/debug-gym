@@ -84,7 +84,7 @@ class HistoryTracker:
     def filter_out(self, actions: list[str]):
         history = HistoryTracker(self.history_steps)
         for info, llm_response in zip(self.memory, self.prompt_response_pairs):
-            if info.action not in actions:
+            if getattr(info.action, "name", None) not in actions:
                 history.step(info, llm_response)
         return history
 
