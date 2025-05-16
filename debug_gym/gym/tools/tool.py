@@ -61,6 +61,17 @@ class EnvironmentTool(ABC):
             if hasattr(self, event.handler_name):
                 environment.event_hooks.subscribe(event, self)
 
+    def unregister(self, environment):
+        from debug_gym.gym.envs.env import RepoEnv
+
+        if not isinstance(environment, RepoEnv):
+            raise ValueError("The environment must be a RepoEnv instance.")
+
+        # Unsubscribe from all events
+        for event in Event:
+            if hasattr(self, event.handler_name):
+                environment.event_hooks.unsubscribe(event, self)
+
     @abstractmethod
     def use(self, environment, action) -> Observation:
         """This method is invoked directly by `tool()` or by event handlers,

@@ -44,6 +44,8 @@ class EventHooks:
             raise ValueError(f"Unknown event type: {event}")
         if not hasattr(tool, event.handler_name):
             raise ValueError(f"Tool does not implement method {event.handler_name}")
+        if tool in self.event_listeners[event]:
+            raise ValueError(f"Tool already subscribed to event: {event}")
         self.event_listeners[event].append(tool)
 
     def unsubscribe(self, event: Event, tool):
@@ -93,6 +95,13 @@ class TooledEnv:
 
     def get_tool(self, tool_name):
         return self._tools[tool_name]
+
+    def remove_tool(self, tool_name):
+        if tool_name not in self._tools:
+            raise ValueError(f"Tool {tool_name} not found!")
+        removed_tool = self._tools.pop(tool_name)
+        removed_tool.unregister(self)  # Unsubscribe from all events
+        return removed_tool
 
     def get_triggered_tools(self, action):
         try:
