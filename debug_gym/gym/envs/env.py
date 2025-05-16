@@ -32,7 +32,7 @@ class EnvInfo:
     max_score: int
     done: bool
     rewrite_counter: int
-    tools: dict[str, EnvironmentTool]
+    tools: list[EnvironmentTool]
 
 
 class EventHooks:
