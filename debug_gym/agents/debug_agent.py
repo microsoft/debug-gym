@@ -14,8 +14,7 @@ class Debug_5_Agent(DebugAgent):
 
     def run(self, task_name=None, debug=False):
         # remove the pdb tool from the environment
-        assert "pdb" in self.env.tools, "pdb not found in env tools"
-        pdb_tool = self.env.tools.pop("pdb")
+        pdb_tool = self.env.remove_tool("pdb")
 
         self.history.reset()
         info = self.env.reset(options={"task_name": task_name})
@@ -48,7 +47,7 @@ class Debug_5_Agent(DebugAgent):
                 and pdb_tool.name not in self.env.tools
             ):
                 self.env.add_tool(pdb_tool)
-                self.env.tools["pdb"].start_pdb()
+                pdb_tool.start_pdb()
                 # update info tools related fields after adding pdb so it's included when building the next prompt
                 info.instructions = self.env.instructions
                 info.tools = self.env.tools

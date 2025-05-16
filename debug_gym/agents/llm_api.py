@@ -345,33 +345,11 @@ class LLM(ABC):
         """Abstract method to tokenize a text."""
         pass
 
-    def count_tokens(self, text: str | dict) -> int:
+    def count_tokens(self, text: str) -> int:
         """Count the number of tokens in a text."""
-        if isinstance(text, str):
-            return len(self.tokenize(text))
-        elif isinstance(text, dict):
-            count = 0
-            for item in text.values():
-                if isinstance(item, str):
-                    count += len(self.tokenize(item))
-                elif isinstance(item, list):
-                    for sub_item in item:
-                        if isinstance(sub_item, str):
-                            count += len(self.tokenize(sub_item))
-            return count
-        else:
-            raise ValueError(
-                f"Unsupported type for token counting: {type(text)}. "
-                "Expected str or dict."
-            )
+        return len(self.tokenize(text))
 
-    def count_messages_tokens(self, messages: list[dict]) -> int:
-        """Roughly estimate tokens count in a list of messages.
-        Complex messages are dumped to a string and tokenized.
-        Don't use this for exact token counting, it is not accurate."""
-        return sum(self.count_tokens(str(msg.get("content", msg))) for msg in messages)
-
-    # TODO: abstract method?
+    @abstractmethod
     def define_tools(self, tool_call_list: dict[str, EnvironmentTool]) -> list[dict]:
         """Translates the list of tools into a format that is specifically defined by each LLM.
         The method should be overridden by subclasses.
@@ -380,7 +358,7 @@ class LLM(ABC):
             "The define_tools method should be overridden by subclasses."
         )
 
-    # TODO: abstract method?
+    @abstractmethod
     def parse_tool_call_response(self, response) -> ToolCall:
         """Parse the tool response from different LLMs and return it as a ToolCall object.
         The method should be overridden by subclasses.
@@ -389,7 +367,7 @@ class LLM(ABC):
             "The parse_tool_call_response method should be overridden by subclasses."
         )
 
-    # TODO: abstract method?
+    @abstractmethod
     def format_tool_call_history(
         self, history_info: EnvInfo, response: LLMResponse
     ) -> list[dict]:
@@ -494,7 +472,7 @@ class AnthropicLLM(LLM):
     def tokenize(self, text: str) -> list[str]:
         raise NotImplementedError("Tokenization is not supported by Anthropic.")
 
-    def count_tokens(self, text: str) -> list[str]:
+    def count_tokens(self, text: str) -> int:
         """Count the number of tokens in a text using the Anthropic API.
         Dump content to JSON for cases such as:
             {
@@ -633,9 +611,9 @@ class AnthropicLLM(LLM):
                     "content": "Your answer is: ",
                 }
             ]
-        # if thinking is enabled, the first message is the thought,
-        # the last messages `content[-1]` is the response in any mode
+
         try:
+            # https://docs.anthropic.com/en/docs/agents-and-tools/tool-use/overview
             response = retry_on_rate_limit(
                 self.client.messages.create, self.is_rate_limit_error
             )(
@@ -643,7 +621,9 @@ class AnthropicLLM(LLM):
                 system=system_prompt,
                 messages=user_assistant_prompt,
                 tools=self.define_tools(tools),
-                tool_choice={"type": "any"},  # has to call a tool, but can be any
+                tool_choice={
+                    "type": "any",  # has to call a tool, but can be any
+                },
                 **kwargs,
             )
         except anthropic.BadRequestError as e:
@@ -654,15 +634,17 @@ class AnthropicLLM(LLM):
 
         # messages are either of type `text` or `tool_use`
         # https://docs.anthropic.com/en/docs/build-with-claude/tool-use/implement-tool-use#handling-results-from-client-tools
-        # TODO: check if multiple text messages are returned, for now it concatenates them
+
         tool_use_block = [r for r in response.content if r.type == "tool_use"]
         assert tool_use_block, "No tool use found in response."
         tool_use_block = tool_use_block[0]  # Select first tool called
+        # select the first text message if there's any
         text_messages = [r.text for r in response.content if r.type == "text"]
+        text_messages = text_messages[0] if text_messages else ""
 
         llm_response = LLMResponse(
             prompt=messages,
-            response="\n".join(text_messages),
+            response=text_messages,
             tool=self.parse_tool_call_response(tool_use_block),
             prompt_token_count=response.usage.input_tokens,
             response_token_count=response.usage.output_tokens,
@@ -837,7 +819,6 @@ class OpenAILLM(LLM):
 
         # LLM may select multiple tool calls, we only care about the first action
         tool_call = response.choices[0].message.tool_calls[0]
-
         assert tool_call.type == "function"
 
         llm_response = LLMResponse(
@@ -915,6 +896,15 @@ class Human(LLM):
 
     def count_tokens(self, text: str) -> int:
         return len(self.tokenize(text))
+
+    def define_tools(self, tool_call_list):
+        pass
+
+    def parse_tool_call_response(self, response):
+        pass
+
+    def format_tool_call_history(self, history_info, response):
+        pass
 
     def generate(self, messages, tools, **kwargs) -> LLMResponse:
         # Human overrides the entire __call__ method, so generate is never called

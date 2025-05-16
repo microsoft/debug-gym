@@ -15,7 +15,9 @@ def print_messages(messages: list[dict], logger: DebugGymLogger):
         if m["role"] == "user":
             logger.info(colored(f"{m['content']}\n", "cyan"))
         elif m["role"] == "assistant":
-            logger.info(colored(f"{m}\n", "green"))
+            logger.info(
+                colored(f"{m.get('content', m.get('tool_calls', m))}\n", "green")
+            )
         elif m["role"] == "tool":
             logger.info(colored(f"{m['content']}\n", "magenta"))
         elif m["role"] == "system":
@@ -109,10 +111,7 @@ def trim_prompt_messages(
 
     # the last message should be from the user
     assert messages[-1]["role"] == "user", "the last message should be from the user"
-    # if two consecutive messages are from the same role, they should be merged
-    assert all(
-        messages[i]["role"] != messages[i + 1]["role"] for i in range(len(messages) - 1)
-    ), "if two consecutive messages are from the same role, they should be merged first"
+
     # context_length should be non-negative
     assert context_length >= 0, "context_length should be non-negative"
 

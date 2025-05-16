@@ -7,6 +7,7 @@ import pytest
 from debug_gym.gym.entities import EvalOutput, Event, Observation
 from debug_gym.gym.envs.env import EnvInfo, EventHooks, RepoEnv, TooledEnv
 from debug_gym.gym.terminal import Terminal
+from debug_gym.gym.tools.tool import ToolCall
 
 
 @pytest.fixture
@@ -33,8 +34,8 @@ def test_add_tool(env_mock):
     tool = MagicMock()
     tool.name = "tool1"
     env_mock.add_tool(tool)
-    assert "tool1" in env_mock.tools
-    assert env_mock.tools["tool1"] == tool
+    assert tool in env_mock.tools
+    assert env_mock.get_tool("tool1") == tool
 
 
 def test_add_tool_existing(env_mock):
@@ -60,6 +61,21 @@ def test_get_tool(env_mock):
     assert env_mock.get_tool("tool1") == tool
 
 
+def test_remove_tool(env_mock):
+    tool = MagicMock()
+    tool.name = "tool1"
+    env_mock.add_tool(tool)
+    removed = env_mock.remove_tool("tool1")
+    assert removed == tool
+    assert tool not in env_mock.tools
+    assert not env_mock.has_tool("tool1")
+    with pytest.raises(KeyError):
+        assert env_mock.get_tool("tool1") is None
+    # Test removing a non-existing tool
+    with pytest.raises(ValueError):
+        env_mock.remove_tool("tool2")
+
+
 def test_get_triggered_tools(env_mock):
     tool1 = MagicMock()
     tool1.name = "tool1"
@@ -68,16 +84,16 @@ def test_get_triggered_tools(env_mock):
     env_mock.add_tool(tool1)
     env_mock.add_tool(tool2)
     _, triggered_tool = env_mock.get_triggered_tools(
-        {"name": "tool1", "arguments": {"arg1": "abc", "arg2": 4}, "id": "123"}
+        ToolCall(id="123", name="tool1", arguments={"arg1": "abc", "arg2": 4})
     )
     assert triggered_tool == [tool1, {"arg1": "abc", "arg2": 4}]
     _, triggered_tool = env_mock.get_triggered_tools(
-        {"name": "tool2", "arguments": {}, "id": "234"}
+        ToolCall(id="234", name="tool2", arguments={})
     )
     assert triggered_tool == [tool2, {}]
     # Test with invalid action
     error, triggered_tool = env_mock.get_triggered_tools(
-        {"name": "tool3", "arguments": {}, "id": "345"}
+        ToolCall(id="345", name="tool3", arguments={})
     )
     assert error == "Unregistered tool: tool3"
     assert triggered_tool is None
@@ -91,69 +107,6 @@ def test_tool_names(env_mock):
     env_mock.add_tool(tool1)
     env_mock.add_tool(tool2)
     assert env_mock.tool_names == "tool1, tool2"
-
-
-def test_tool_instructions(env_mock):
-    tool1 = MagicMock()
-    tool1.name = "tool1"
-    tool1.description = "instructions1"
-    tool1.arguments = {
-        "command 1": {
-            "type": ["string"],
-            "description": "command 1 description",
-        },
-    }
-    tool2 = MagicMock()
-    tool2.name = "tool2"
-    tool2.description = "instructions2"
-    tool2.arguments = {}
-    env_mock.add_tool(tool1)
-    env_mock.add_tool(tool2)
-    assert env_mock.tool_instructions == [
-        {
-            "name": "tool1",
-            "description": "instructions1",
-            "arguments": {
-                "command 1": {
-                    "type": ["string"],
-                    "description": "command 1 description",
-                },
-            },
-        },
-        {
-            "name": "tool2",
-            "description": "instructions2",
-            "arguments": {},
-        },
-    ]
-
-
-def test_tool_instructions_lite(env_mock):
-    tool1 = MagicMock()
-    tool1.name = "tool1"
-    tool1.description = "instructions1"
-    tool1.arguments = {
-        "command 1": {
-            "type": ["string"],
-            "description": "command 1 description",
-        },
-    }
-    tool2 = MagicMock()
-    tool2.name = "tool2"
-    tool2.description = "instructions2"
-    tool2.arguments = {}
-    env_mock.add_tool(tool1)
-    env_mock.add_tool(tool2)
-    assert env_mock.tool_instructions_lite == [
-        {
-            "name": "tool1",
-            "description": "instructions1",
-        },
-        {
-            "name": "tool2",
-            "description": "instructions2",
-        },
-    ]
 
 
 @patch("tempfile.TemporaryDirectory")
@@ -324,7 +277,7 @@ def test_step(
     mock_get_triggered_tools.assert_called_once_with(
         {"id": "123", "name": "pdb", "arguments": {"command": "b 10"}}
     )
-    mock_pdb_tool.assert_called_once_with(command="b 10")
+    mock_pdb_tool.assert_called_once_with(env, command="b 10")
     assert infos.step_observation == observation
     assert infos.score == 0
     assert not infos.done
@@ -457,6 +410,10 @@ def test_event_hooks_subscribe():
     subscriber = ToolMock()
     event_hooks.subscribe(Event.ENV_START, subscriber)
     assert subscriber in event_hooks.event_listeners[Event.ENV_START]
+    with pytest.raises(
+        ValueError, match=f"Tool already subscribed to event: {Event.ENV_START}"
+    ):
+        event_hooks.subscribe(Event.ENV_START, subscriber)
 
 
 def test_event_hooks_subscribe_invalid_subscriber():
@@ -498,7 +455,8 @@ def test_event_hooks_notify():
     an_observation = Observation("mock", "observation")
     subscriber.on_env_start.return_value = an_observation
     event_hooks.subscribe(Event.ENV_START, subscriber)
-    observations = event_hooks.notify(Event.ENV_START)
+    env = None
+    observations = event_hooks.notify(env, Event.ENV_START)
     assert observations == [an_observation]
     subscriber.on_env_start.assert_called_once()
 
@@ -549,7 +507,7 @@ def test_queue_and_process_events():
 
     # Verify notify was called with correct args
     expected_calls = [
-        call(event=Event.ENV_START, source="source1", arg1="val1"),
-        call(event=Event.ENV_RESET, source="source2", arg2="val2"),
+        call(environment=env, event=Event.ENV_START, source="source1", arg1="val1"),
+        call(environment=env, event=Event.ENV_RESET, source="source2", arg2="val2"),
     ]
     mock.assert_has_calls(expected_calls)

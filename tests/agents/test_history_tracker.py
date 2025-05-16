@@ -1,5 +1,6 @@
 from debug_gym.agents.history_tracker import HistoryTracker, build_history_prompt
 from debug_gym.agents.llm_api import LLMResponse
+from debug_gym.gym.tools.tool import ToolCall
 
 
 def test_history_tracker(build_env_info):
@@ -7,7 +8,7 @@ def test_history_tracker(build_env_info):
 
     # should start empty
     assert len(ht) == 0
-    assert ht.get() == []
+    assert ht.get() == ([], [])
     assert ht.get_all() == []
     assert ht.score() == 0
     assert ht.prompt_response_pairs == []
@@ -16,14 +17,18 @@ def test_history_tracker(build_env_info):
     assert ht.json() == {}
 
     # prepare some data
+    tool_2 = ToolCall(id="2", name="action2", arguments={"a2_args": "a2_args"})
+    tool_3 = ToolCall(id="3", name="action3", arguments={})
+    tool_4 = ToolCall(id="4", name="action4", arguments={"a4_args": "a4_args"})
+    tool_5 = ToolCall(id="5", name="action5", arguments={})
     env_info_1 = build_env_info(step_observation="obs1", action=None, score=1)
-    env_info_2 = build_env_info(step_observation="obs2", action="action2", score=2)
-    env_info_3 = build_env_info(step_observation="obs3", action="action3", score=3)
-    env_info_4 = build_env_info(step_observation="obs4", action="action4", score=4)
-    env_info_5 = build_env_info(step_observation="obs5", action="action5", score=5)
+    env_info_2 = build_env_info(step_observation="obs2", action=tool_2, score=2)
+    env_info_3 = build_env_info(step_observation="obs3", action=tool_3, score=3)
+    env_info_4 = build_env_info(step_observation="obs4", action=tool_4, score=4)
+    env_info_5 = build_env_info(step_observation="obs5", action=tool_5, score=5)
 
     # single prompt format
-    llm_response_2 = LLMResponse("prompt_2_1", "response_2_1")
+    llm_response_2 = LLMResponse("prompt_2_1", "response_2_1", tool_2)
     # list of messages format
     llm_response_3 = LLMResponse(
         prompt=[
@@ -32,8 +37,9 @@ def test_history_tracker(build_env_info):
             {"role": "user", "content": "prompt_3_2"},
         ],
         response="response_3_2",
+        tool=tool_3,
     )
-    llm_response_4 = LLMResponse("prompt_4_1", "response_4_1", 4321, 1234)
+    llm_response_4 = LLMResponse("prompt_4_1", "response_4_1", tool_4, 4321, 1234)
     llm_response_5 = LLMResponse(
         prompt=[
             {"role": "user", "content": "prompt_5_1"},
@@ -41,6 +47,7 @@ def test_history_tracker(build_env_info):
             {"role": "user", "content": "prompt_5_2"},
         ],
         response="response_5_2",
+        tool=tool_5,
     )
 
     # push some steps and prompt-response pairs
@@ -55,31 +62,38 @@ def test_history_tracker(build_env_info):
     assert ht.get_all() == [env_info_1, env_info_2, env_info_3, env_info_4, env_info_5]
 
     # get should return the last 3 steps
-    assert ht.get() == [env_info_3, env_info_4, env_info_5]
+    env_infos, llm_responses = ht.get()
+    assert env_infos == [env_info_3, env_info_4, env_info_5]
+    assert llm_responses == [[llm_response_3], [llm_response_4], [llm_response_5]]
 
     # json should return the last step by default
     assert ht.json() == {
         "step_id": 4,
-        "action": "action5",
+        "action": {"id": "5", "name": "action5", "arguments": {}},
         "obs": "obs5",
     }
 
     # json should return the speficied step
     assert ht.json(2) == {
         "step_id": 2,
-        "action": "action3",
+        "action": {"id": "3", "name": "action3", "arguments": {}},
         "obs": "obs3",
     }
 
     # output token_usage if it exists
     assert ht.json(3, include_prompt_response_pairs=True) == {
         "step_id": 3,
-        "action": "action4",
+        "action": {"id": "4", "name": "action4", "arguments": {"a4_args": "a4_args"}},
         "obs": "obs4",
         "prompt_response_pairs": [
             {
                 "prompt": "prompt_4_1",
                 "response": "response_4_1",
+                "tool": {
+                    "id": "4",
+                    "name": "action4",
+                    "arguments": {"a4_args": "a4_args"},
+                },
                 "token_usage": {"prompt": 4321, "response": 1234},
             }
         ],
@@ -88,7 +102,7 @@ def test_history_tracker(build_env_info):
     # json should return also the prompt-response pairs if include_prompt_response_pairs is True
     assert ht.json(2, include_prompt_response_pairs=True) == {
         "step_id": 2,
-        "action": "action3",
+        "action": {"id": "3", "name": "action3", "arguments": {}},
         "obs": "obs3",
         "prompt_response_pairs": [
             {
@@ -98,6 +112,7 @@ def test_history_tracker(build_env_info):
                     {"role": "user", "content": "prompt_3_2"},
                 ],
                 "response": "response_3_2",
+                "tool": {"id": "3", "name": "action3", "arguments": {}},
             }
         ],
     }
@@ -126,13 +141,13 @@ def test_history_tracker(build_env_info):
     # test filtering out
     ht_filtered = ht.filter_out(actions=["action2", "action4"])
     for step in ht_filtered.get_all():
-        assert step.action not in ["action2", "action4"]
-        assert step.action in [None, "action3", "action5"]
+        assert step.action not in [tool_2, tool_4]
+        assert step.action in [None, tool_3, tool_5]
 
     # should reset properly
     ht.reset()
     assert len(ht) == 0
-    assert ht.get() == []
+    assert ht.get() == ([], [])
     assert ht.get_all() == []
     assert ht.score() == 0
     assert ht.prompt_response_pairs == []
@@ -141,14 +156,10 @@ def test_history_tracker(build_env_info):
     assert ht.json() == {}
 
 
-def test_build_history_prompt(build_env_info):
-    import json
-
-    from debug_gym.gym.utils import unescape
-
+def test_build_history_prompt(build_env_info, llm_mock):
     # test with empty history
     ht = HistoryTracker(history_steps=3)
-    messages = build_history_prompt(ht)
+    messages = build_history_prompt(ht, llm_mock)
     expected = [
         {"role": "user", "content": "No history of command and terminal outputs."}
     ]
@@ -186,49 +197,52 @@ def test_build_history_prompt(build_env_info):
     )
 
     # push some steps
-    ht.step(env_info_1)
-    ht.step(env_info_2)
-    ht.step(env_info_3)
-    ht.step(env_info_4)
-    ht.step(env_info_5)
+    ht.step(env_info_1, None)
+    ht.step(env_info_2, None)
+    ht.step(env_info_3, None)
+    ht.step(env_info_4, None)
+    ht.step(env_info_5, None)
 
     # reset_prompt_history_after_rewrite is False
-    messages = build_history_prompt(ht, reset_prompt_history_after_rewrite=False)
-    expected = [
-        {
-            "role": "user",
-            "content": "History of command and terminal outputs (the last 3 steps):",
-        }
-    ]
-    history_messages = [
-        {"role": "tool", "content": "{'id': '3', 'name': 'action3', 'arguments': {}}"},
-        {"role": "user", "content": "obs3"},
-        {
-            "role": "tool",
-            "content": "{'id': '4', 'name': 'action4', 'arguments': {'a4_args': 'a4_args'}}",
-        },
-        {"role": "user", "content": "obs4"},
-        {"role": "tool", "content": "{'id': '5', 'name': 'action5', 'arguments': {}}"},
-        {"role": "user", "content": "obs5"},
-    ]
-    expected += history_messages
-    assert messages == expected
-    # reset_prompt_history_after_rewrite is True
-    messages = build_history_prompt(ht, reset_prompt_history_after_rewrite=True)
+    messages = build_history_prompt(
+        ht, llm_mock, reset_prompt_history_after_rewrite=False
+    )
+
     expected = [
         {
             "role": "user",
             "content": "History of command and terminal outputs (the last 2 steps):",
-        }
-    ]
-    history_messages = [
-        {
-            "role": "tool",
-            "content": "{'id': '4', 'name': 'action4', 'arguments': {'a4_args': 'a4_args'}}",
         },
-        {"role": "user", "content": "obs4"},
-        {"role": "tool", "content": "{'id': '5', 'name': 'action5', 'arguments': {}}"},
-        {"role": "user", "content": "obs5"},
+        {"role": "role", "content": {"id": "3", "name": "action3", "arguments": {}}},
+        {
+            "role": "role",
+            "content": {
+                "id": "4",
+                "name": "action4",
+                "arguments": {"a4_args": "a4_args"},
+            },
+        },
+        {"role": "role", "content": {"id": "5", "name": "action5", "arguments": {}}},
     ]
-    expected += history_messages
+    assert messages == expected
+
+    # reset_prompt_history_after_rewrite is True
+    messages = build_history_prompt(
+        ht, llm_mock, reset_prompt_history_after_rewrite=True
+    )
+    expected = [
+        {
+            "role": "user",
+            "content": "History of command and terminal outputs (the last 1 steps):",
+        },
+        {
+            "role": "role",
+            "content": {
+                "id": "4",
+                "name": "action4",
+                "arguments": {"a4_args": "a4_args"},
+            },
+        },
+        {"role": "role", "content": {"id": "5", "name": "action5", "arguments": {}}},
+    ]
     assert messages == expected

@@ -86,3 +86,48 @@ def test_track_history():
         kwargs={"action": "second"},
         observation=Observation("FakeTool", "second"),
     )
+
+
+def test_unregister():
+    tool = FakeTool()
+    env = RepoEnv()
+    tool.register(env)
+
+    # Verify tool is registered
+    assert tool in env.event_hooks.event_listeners[Event.ENV_RESET]
+
+    # Unregister tool
+    tool.unregister(env)
+
+    # Verify tool is no longer listening to events
+    assert tool not in env.event_hooks.event_listeners[Event.ENV_RESET]
+
+
+def test_unregister_invalid_environment():
+    tool = FakeTool()
+    with pytest.raises(ValueError, match="The environment must be a RepoEnv instance."):
+        tool.unregister(object())
+
+
+def test_unregister_with_multiple_handlers():
+    class ToolWithMultipleHandlers(FakeTool):
+        def on_env_reset(self, environment, **kwargs):
+            return "Handler for Event.ENV_RESET"
+
+        def on_env_step(self, environment, **kwargs):
+            return "Handler for Event.ENV_STEP"
+
+    tool = ToolWithMultipleHandlers()
+    env = RepoEnv()
+    tool.register(env)
+
+    # Verify tool is registered for both events
+    assert tool in env.event_hooks.event_listeners[Event.ENV_RESET]
+    assert tool in env.event_hooks.event_listeners[Event.ENV_STEP]
+
+    # Unregister tool
+    tool.unregister(env)
+
+    # Verify tool is no longer listening to any events
+    assert tool not in env.event_hooks.event_listeners[Event.ENV_RESET]
+    assert tool not in env.event_hooks.event_listeners[Event.ENV_STEP]
