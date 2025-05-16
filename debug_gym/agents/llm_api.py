@@ -345,10 +345,9 @@ class LLM(ABC):
         """Abstract method to tokenize a text."""
         pass
 
-    @abstractmethod
     def count_tokens(self, text: str) -> int:
         """Count the number of tokens in a text."""
-        pass
+        return len(self.tokenize(text))
 
     @abstractmethod
     def define_tools(self, tool_call_list: dict[str, EnvironmentTool]) -> list[dict]:
@@ -896,6 +895,15 @@ class Human(LLM):
 
     def count_tokens(self, text: str) -> int:
         return len(self.tokenize(text))
+
+    def define_tools(self, tool_call_list):
+        pass
+
+    def parse_tool_call_response(self, response):
+        pass
+
+    def format_tool_call_history(self, history_info, response):
+        pass
 
     def generate(self, messages, tools, **kwargs) -> LLMResponse:
         # Human overrides the entire __call__ method, so generate is never called

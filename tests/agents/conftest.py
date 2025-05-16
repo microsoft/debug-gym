@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, mock_open, patch
 
 import pytest
 
-from debug_gym.agents.llm_api import LLM
+from debug_gym.agents.llm_api import LLM, LLMConfigRegistry
 from debug_gym.gym.entities import Observation
 from debug_gym.gym.envs.env import EnvInfo
 from debug_gym.logger import DebugGymLogger
@@ -38,7 +38,44 @@ def llm_class_mock():
         def tokenize(self, text):
             return [c for c in text]
 
+        def define_tools(self, tool_call_list):
+            return tool_call_list
+
+        def parse_tool_call_response(self, response):
+            return response
+
+        def format_tool_call_history(self, history_info, response):
+            return [{"role": "role", "content": history_info.action}]
+
     return LLMMock
+
+
+@pytest.fixture
+@patch.object(
+    LLMConfigRegistry,
+    "from_file",
+    return_value=LLMConfigRegistry.register_all(
+        {
+            "llm-mock": {
+                "model": "llm-mock",
+                "context_limit": 4,
+                "tokenizer": "test-tokenizer",
+                "tags": [],
+                "generate_kwargs": {
+                    "temperature": 0.7,
+                    "max_tokens": 100,
+                    "thinking": {
+                        "type": "enabled",
+                        "budget_tokens": 10,
+                    },
+                },
+            }
+        }
+    ),
+)
+def llm_mock(mock_llm_config, logger_mock, llm_class_mock):
+    llm = llm_class_mock("llm-mock", logger=logger_mock)
+    return llm
 
 
 @pytest.fixture

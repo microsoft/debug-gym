@@ -12,7 +12,7 @@ import numpy as np
 
 from debug_gym.gym.entities import EvalOutput, Event, Observation
 from debug_gym.gym.terminal import Terminal
-from debug_gym.gym.tools.tool import EnvironmentTool
+from debug_gym.gym.tools.tool import EnvironmentTool, ToolCall
 from debug_gym.gym.utils import _walk, make_file_matcher, show_line_number
 from debug_gym.logger import DebugGymLogger
 
@@ -26,7 +26,7 @@ class EnvInfo:
     dir_tree: str
     current_code_with_line_number: dict | str
     current_breakpoints: str
-    action: str
+    action: ToolCall | None
     instructions: dict
     score: int
     max_score: int
@@ -103,7 +103,7 @@ class TooledEnv:
         removed_tool.unregister(self)  # Unsubscribe from all events
         return removed_tool
 
-    def get_triggered_tools(self, action):
+    def get_triggered_tools(self, action: ToolCall):
         try:
             tool_name = action.name
             tool_kwargs = action.arguments
@@ -458,7 +458,7 @@ class RepoEnv(TooledEnv):
         patch = result.stdout.replace(str(self.working_dir), str(self.path))
         return patch
 
-    def step(self, action: dict) -> EnvInfo:
+    def step(self, action: ToolCall) -> EnvInfo:
         # given action, return new obs, and update infos
         # the action space is composed of a few smaller action spaces
         self.clear_all_observations()
