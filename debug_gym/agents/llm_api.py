@@ -10,7 +10,7 @@ from typing import List, Optional
 import openai
 import tiktoken
 import yaml
-from openai import NOT_GIVEN, AzureOpenAI, OpenAI
+from openai import NOT_GIVEN, AzureOpenAI, OpenAI, PermissionDeniedError
 from tenacity import (
     retry,
     retry_if_exception,
@@ -833,14 +833,14 @@ class AzureOpenAILLM(OpenAILLM):
     @property
     def client(self):
         if getattr(self, "_client", None) is None:
-            kwargs = self._get_azure_oai_kwargs()
-            self._client = AzureOpenAI(**kwargs)
+            self._client = self._get_azure_oai_client()
         return self._client
 
-    def _get_azure_oai_kwargs(self):
+    def _get_azure_oai_client(self):
         """
-        Returns a dictionary of keyword arguments required for connecting to Azure OpenAI.
-        This will either use an API key or AzureCliCredential (az login).
+        Returns the Azure OpenAI client. This will use either an API key or Azure Identity.
+        If the first attempt with Default and Managed Identity credentials fails,
+        try again using only CliCredential (az login).
 
         Raises ValueError: If neither an API key nor a scope is provided in the configuration.
         """
@@ -853,28 +853,43 @@ class AzureOpenAILLM(OpenAILLM):
         }
         if api_key not in [LLM_API_KEY_PLACEHOLDER, None]:  # api key
             kwargs["api_key"] = api_key
+            aoai_client = AzureOpenAI(**kwargs)
         elif scope not in [LLM_SCOPE_PLACEHOLDER, None]:  # az login
             from azure.identity import (
                 AzureCliCredential,
                 ChainedTokenCredential,
+                DefaultAzureCredential,
                 ManagedIdentityCredential,
                 get_bearer_token_provider,
             )
 
             credential = get_bearer_token_provider(
                 ChainedTokenCredential(
-                    AzureCliCredential(),
+                    DefaultAzureCredential(),
                     ManagedIdentityCredential(),
+                    AzureCliCredential(),
                 ),
                 scope,
             )
             kwargs["azure_ad_token_provider"] = credential
+            aoai_client = AzureOpenAI(**kwargs)
+            try:
+                aoai_client.models.list()  # test the connection
+            except PermissionDeniedError:
+                # if auth works but permission denied, try AzureCliCredential
+                self.logger.warning(
+                    "Permission denied for DefaultAzureCredential. Trying AzureCliCredential."
+                )
+                kwargs["azure_ad_token_provider"] = get_bearer_token_provider(
+                    AzureCliCredential(), scope
+                )
+                aoai_client = AzureOpenAI(**kwargs)
         else:
             raise ValueError(
                 "Invalid LLM configuration for AzureOpenAI. "
                 "Please provide an `api_key or `scope` in the configuration."
             )
-        return kwargs
+        return aoai_client
 
 
 class Human(LLM):
