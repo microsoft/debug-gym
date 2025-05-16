@@ -647,15 +647,22 @@ class AnthropicLLM(LLM):
                 **kwargs,
             )
         except anthropic.BadRequestError as e:
+            # Handle specific error for context length exceeded, otherwise just propagate the error
             if "prompt is too long" in e.message:
                 raise ContextLengthExceededError
+            raise
 
-        tool_use_block = response.content[-1]
-        assert tool_use_block.type == "tool_use"
+        # messages are either of type `text` or `tool_use`
+        # https://docs.anthropic.com/en/docs/build-with-claude/tool-use/implement-tool-use#handling-results-from-client-tools
+        # TODO: check if multiple text messages are returned, for now it concatenates them
+        tool_use_block = [r for r in response.content if r.type == "tool_use"]
+        assert tool_use_block, "No tool use found in response."
+        tool_use_block = tool_use_block[0]  # Select first tool called
+        text_messages = [r.text for r in response.content if r.type == "text"]
 
         llm_response = LLMResponse(
             prompt=messages,
-            response=response,
+            response="\n".join(text_messages),
             tool=self.parse_tool_call_response(tool_use_block),
             prompt_token_count=response.usage.input_tokens,
             response_token_count=response.usage.output_tokens,
@@ -790,14 +797,21 @@ class OpenAILLM(LLM):
             {
                 "role": "assistant",
                 "tool_calls": [
-                    response[0].response.tool_calls[0]
-                ],  # ChatCompletionMessageToolCall(id='call_jFkY53qCEQLKDXQqdDd7AZyL', function=Function(arguments='{"command":"b 13"}', name='pdb'), type='function')
+                    {
+                        "id": response[0].tool.id,
+                        "type": "function",
+                        "function": {
+                            "name": response[0].tool.name,
+                            "arguments": str(response[0].tool.arguments),
+                        },
+                    },
+                ],
             },
             {
                 "role": "tool",
-                "tool_call_id": history_info.action.id,  # 'call_jFkY53qCEQLKDXQqdDd7AZyL'
-                "name": history_info.action.name,  # 'pdb'
-                "content": f"{history_info.step_observation.observation}",  # 'Breakpoint 1 at /tmp/RepoEnv-9uqllb7j/hangman.py:13\nlist .\n1  ->\t"""The pytest entry point."""\r\n  2  \t\r\n  3  \tfrom __future__ import annotations\r\n  4  \t\r\n  5  \timport pytest\r\n  6  \t\r\n  7  \t\r\n  8  \tif __name__ == "__main__":\r\n  9  \t    raise SystemExit(pytest.console_main())\r\n[EOF]'
+                "tool_call_id": history_info.action.id,
+                "name": history_info.action.name,
+                "content": f"{history_info.step_observation.observation}",
             },
         ]
         return _messages
@@ -816,8 +830,10 @@ class OpenAILLM(LLM):
                 **kwargs,
             )
         except openai.BadRequestError as e:
+            # Handle specific error for context length exceeded, otherwise just propagate the error
             if e.code == "context_length_exceeded":
                 raise ContextLengthExceededError
+            raise
 
         # LLM may select multiple tool calls, we only care about the first action
         tool_call = response.choices[0].message.tool_calls[0]
@@ -826,7 +842,7 @@ class OpenAILLM(LLM):
 
         llm_response = LLMResponse(
             prompt=messages,
-            response=response.choices[0].message,
+            response=response.choices[0].message.content,
             tool=self.parse_tool_call_response(tool_call),
             prompt_token_count=response.usage.prompt_tokens,
             response_token_count=response.usage.completion_tokens,

@@ -49,7 +49,9 @@ class EventHooks:
     def unsubscribe(self, event: Event, tool):
         self.event_listeners[event].remove(tool)
 
-    def notify(self, event: Event, source=None, **kwargs) -> list[Observation]:
+    def notify(
+        self, environment, event: Event, source=None, **kwargs
+    ) -> list[Observation]:
         """Notify all tools that are subscribed to the event.
         Returns a list of observations from all tools that are triggered by the event.
         If error occurs while handling the event, an error observation is returned.
@@ -59,7 +61,7 @@ class EventHooks:
             if tool == source:
                 continue  # skip the source tool to avoid infinite loop
             try:
-                observation = getattr(tool, event.handler_name)(**kwargs)
+                observation = getattr(tool, event.handler_name)(environment, **kwargs)
                 if observation:
                     observations.append(observation)
             except Exception as e:
@@ -123,7 +125,9 @@ class TooledEnv:
         """Process all queued events and handle their observations."""
         while self.event_queue:
             event, source, kwargs = self.event_queue.pop(0)
-            observations = self.event_hooks.notify(event=event, source=source, **kwargs)
+            observations = self.event_hooks.notify(
+                environment=self, event=event, source=source, **kwargs
+            )
             self.all_observations.extend(observations)
         return self.all_observations
 
@@ -457,7 +461,7 @@ class RepoEnv(TooledEnv):
             triggered_tool, tool_kwargs = tool_info
             try:
                 # tool_kwargs is a dict, so we need to unpack it
-                self.step_observation = triggered_tool(**tool_kwargs)
+                self.step_observation = triggered_tool(self, **tool_kwargs)
             except BaseException as e:
                 error_message = (
                     f"Error while using tool {triggered_tool.name} "

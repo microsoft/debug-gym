@@ -37,15 +37,15 @@ class RewriteTool(EnvironmentTool):
         },
     }
 
-    def _rewrite_file(self, file_path, start, end, new_code):
+    def _rewrite_file(self, environment, file_path, start, end, new_code):
         assert file_path is not None, "No file is currently open."
-        if file_path.startswith(str(self.environment.working_dir)):
-            file_path = file_path[len(str(self.environment.working_dir)) + 1 :]
+        if file_path.startswith(str(environment.working_dir)):
+            file_path = file_path[len(str(environment.working_dir)) + 1 :]
         assert (
-            file_path in self.environment.all_files
+            file_path in environment.all_files
         ), f"File {file_path} does not exist or is not in the current repository."
         assert (
-            file_path in self.environment.editable_files
+            file_path in environment.editable_files
         ), f"File {file_path} is not editable."
 
         new_code = clean_code(new_code)  # str
@@ -55,58 +55,73 @@ class RewriteTool(EnvironmentTool):
         )  # number of lines in the newly generated code
         if start is None:
             # no line number is provided, rewrite the whole code
-            self.environment.overwrite_file(filepath=file_path, content=new_code)
-            if file_path == self.environment.current_file:
-                self.environment.load_current_file(file_path)
+            environment.overwrite_file(filepath=file_path, content=new_code)
+            if file_path == environment.current_file:
+                environment.load_current_file(file_path)
         else:
             # rewrite the code given the provided line numbers
-            full_code_lines = self.environment.load_file(file_path).split("\n")
+            full_code_lines = environment.load_file(file_path).split("\n")
             if start >= len(full_code_lines):
                 # if start exceeds the number of lines in the file, append the new code to the end of the file
                 full_code_lines.extend(new_code_lines)
             else:
                 # rewrite the code
                 full_code_lines[start : end + 1] = new_code_lines  # list
-            self.environment.overwrite_file(
+            environment.overwrite_file(
                 filepath=file_path, content="\n".join(full_code_lines)
             )
-            if file_path == self.environment.current_file:
-                self.environment.load_current_file(file_path)
+            if file_path == environment.current_file:
+                environment.load_current_file(file_path)
         return new_code_length
 
-    def fail(self, message: str) -> Observation:
+    def fail(self, environment, message: str) -> Observation:
         self.rewrite_success = False
         message = "\n".join([message, "Rewrite failed."])
-        self.queue_event(Event.REWRITE_FAIL, message=message)
+        self.queue_event(
+            environment=environment,
+            event=Event.REWRITE_FAIL,
+            message=message,
+        )
         return Observation(self.name, message)
 
     def use(
-        self, path: str = None, start: int = None, end: int = None, new_code: str = ""
+        self,
+        environment,
+        path: str = None,
+        start: int = None,
+        end: int = None,
+        new_code: str = "",
     ) -> Observation:
         self.rewrite_success = False
         if path is None:
             # by default, rewrite the current file
-            path = self.environment.current_file
+            path = environment.current_file
         if start is not None:
             if end is None:
                 # only start is provided (rewrite that line)
                 end = start
             if start > end:
                 return self.fail(
-                    "Invalid line number range, start should be less than or equal to end."
+                    environment,
+                    "Invalid line number range, start should be less than or equal to end.",
                 )
             if start <= 0 or end <= 0:
-                return self.fail("Invalid line number, line numbers are 1-based.")
+                return self.fail(
+                    environment, "Invalid line number, line numbers are 1-based."
+                )
             start, end = start - 1, end - 1  # 1-based to 0-based
         try:
-            new_code_length = self._rewrite_file(path, start, end, new_code)
+            new_code_length = self._rewrite_file(
+                environment, path, start, end, new_code
+            )
         except Exception as e:
-            return self.fail(f"Error while rewriting the file: {str(e)}")
+            return self.fail(environment, f"Error while rewriting the file: {str(e)}")
 
         self.rewrite_success = True
         message = "Rewriting done."
         self.queue_event(
-            Event.REWRITE_SUCCESS,
+            environment=environment,
+            event=Event.REWRITE_SUCCESS,
             message=message,
             file=path,
             # converting head/tail back to 1-based index for breakpoint management

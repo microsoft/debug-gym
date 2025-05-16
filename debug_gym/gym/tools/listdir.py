@@ -1,5 +1,4 @@
 from os.path import join as pjoin
-from pathlib import Path
 
 from debug_gym.gym.entities import Observation
 from debug_gym.gym.tools.tool import EnvironmentTool
@@ -14,6 +13,13 @@ class ListdirTool(EnvironmentTool):
         """listdir(path="src/util", depth=None) to list the contents of the 'util' subdirectory within the 'src' subdirectory.""",
         """listdir(path="src", depth=2) to list the contents of the 'src' subdirectory up to a depth of 2.""",
     ]
+    description = (
+        "List the file and folder contents of a subdirectory within the working directory, up to a specified 'depth' (default depth is 1). "
+        "The path should be relative to the working directory. If no path is provided, the current working directory will be used. "
+        "If no depth is provided, the default depth will be used."
+        "\nExamples (for demonstration purposes only, you need to adjust the tool calling format according to your specific syntax):\n"
+        f"{'\n'.join(examples)}"
+    )
     arguments = {
         "path": {
             "type": ["string", "null"],
@@ -21,28 +27,19 @@ class ListdirTool(EnvironmentTool):
         },
         "depth": {
             "type": ["number", "null"],
-            "description": "The maximum depth to which the directory tree should be explored. If None, the default depth will be used.",
+            "description": "The maximum depth to which the directory tree should be explored. Default depth is 1.",
         },
     }
 
-    @property
-    def description(self):
-        assert hasattr(self, "environment")
-        description = (
-            f"List the file and folder contents of a subdirectory within the working directory, up to a specified 'depth' (default depth is {self.environment.dir_tree_depth}). The path should be relative to the working directory. If no path is provided, the current working directory will be used. If no depth is provided, the default depth will be used."
-            + "\nExamples (for demonstration purposes only, you need to adjust the tool calling format according to your specific syntax):\n"
-            + "\n".join(self.examples)
-        )
-        return description
-
-    def use(self, path: str = ".", depth: int = None) -> Observation:
-        if depth is None:
-            depth = self.environment.dir_tree_depth
+    def use(self, environment, path: str = ".", depth: int = 1) -> Observation:
+        # TODO: reimplement dir_tree_depth via ListdirTool __init__
+        # if depth is None:
+        #     depth = environment.dir_tree_depth
         if depth <= 0:
             return Observation(self.name, f"Depth must be 1 or greater: {depth}")
         try:
-            startpath = pjoin(self.environment.working_dir, path)
-            result = self.environment.directory_tree(root=startpath, max_depth=depth)
+            startpath = pjoin(environment.working_dir, path)
+            result = environment.directory_tree(root=startpath, max_depth=depth)
         except ValueError as e:
             Observation(self.name, f"Depth must be 1 or greater: {str(e)}")
         return Observation(self.name, result)
