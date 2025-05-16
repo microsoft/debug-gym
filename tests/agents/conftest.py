@@ -4,9 +4,10 @@ from unittest.mock import MagicMock, mock_open, patch
 
 import pytest
 
-from debug_gym.agents.llm_api import LLM, LLMConfigRegistry
+from debug_gym.agents.llm_api import LLM, LLMConfigRegistry, LLMResponse
 from debug_gym.gym.entities import Observation
 from debug_gym.gym.envs.env import EnvInfo
+from debug_gym.gym.tools.tool import ToolCall
 from debug_gym.logger import DebugGymLogger
 
 
@@ -33,7 +34,17 @@ def llm_class_mock():
             self.called_messages = messages
             self.called_tools = tools
             self.called_kwargs = kwargs
-            return "Test response"
+            return LLMResponse(
+                prompt="Prompt",
+                response="Test response",
+                tool=ToolCall(
+                    id="tool_id",
+                    name="tool_name",
+                    arguments={"arg1": "value1", "arg2": "value2"},
+                ),
+                prompt_token_count=10,
+                response_token_count=20,
+            )
 
         def tokenize(self, text):
             return [c for c in text]
