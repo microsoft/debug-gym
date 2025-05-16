@@ -163,10 +163,8 @@ def agent_setup(tmp_path, open_data):
             llm.reasoning_end_token = None
             llm.context_length = 4096
             llm.count_tokens = _length
-            history = MagicMock()
             agent = agent_class(config_dict, env)
             agent.llm = llm
-            agent.history = history
-            yield agent, env, llm, history
+            yield agent, env, llm
 
     return _agent_setup
