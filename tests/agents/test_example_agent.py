@@ -6,14 +6,14 @@ from debug_gym.agents.rewrite_agent import RewriteAgent
 
 
 def test_build_question_prompt(agent_setup):
-    agent, _, _, _ = next(agent_setup(DebugAgent))
+    agent, _, _ = next(agent_setup(DebugAgent))
     messages = agent.build_question_prompt()
     assert len(messages) == 1
     assert "continue your debugging" in messages[0]["content"]
 
 
 def test_build_prompt(agent_setup, build_env_info):
-    agent, _, _, _ = next(agent_setup(DebugAgent))
+    agent, _, _ = next(agent_setup(DebugAgent))
     info = build_env_info(
         instructions="Test instructions",
         dir_tree="Test dir tree",
@@ -26,7 +26,7 @@ def test_build_prompt(agent_setup, build_env_info):
 
 
 def test_run(agent_setup, build_env_info):
-    agent, env, llm, _ = next(agent_setup(DebugAgent))
+    agent, env, llm = next(agent_setup(DebugAgent))
     env.reset.return_value = build_env_info(
         done=False,
         score=0,
@@ -53,7 +53,7 @@ def test_run(agent_setup, build_env_info):
 
 
 def test_build_system_prompt_rewrite_agent(agent_setup, build_env_info):
-    agent, _, _, _ = next(agent_setup(RewriteAgent))
+    agent, _, _ = next(agent_setup(RewriteAgent))
     info = build_env_info(
         instructions="Test instructions",
         dir_tree="Test dir tree",
@@ -67,14 +67,14 @@ def test_build_system_prompt_rewrite_agent(agent_setup, build_env_info):
 
 
 def test_build_question_prompt_rewrite_agent(agent_setup):
-    agent, _, _, _ = next(agent_setup(RewriteAgent))
+    agent, _, _ = next(agent_setup(RewriteAgent))
     messages = agent.build_question_prompt()
     assert len(messages) == 1
     assert "continue your debugging" in messages[0]["content"]
 
 
 def test_run_debug_5_agent(agent_setup, build_env_info):
-    agent, env, llm, _ = next(agent_setup(Debug_5_Agent))
+    agent, env, llm = next(agent_setup(Debug_5_Agent))
     env.reset.return_value = build_env_info(
         done=False,
         score=0,

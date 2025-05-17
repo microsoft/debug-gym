@@ -15,7 +15,11 @@ def print_messages(messages: list[dict], logger: DebugGymLogger):
         if m["role"] == "user":
             logger.info(colored(f"{m['content']}\n", "cyan"))
         elif m["role"] == "assistant":
-            logger.info(colored(f"{m['content']}\n", "green"))
+            logger.info(
+                colored(f"{m.get('content', m.get('tool_calls', m))}\n", "green")
+            )
+        elif m["role"] == "tool":
+            logger.info(colored(f"{m['content']}\n", "magenta"))
         elif m["role"] == "system":
             logger.info(colored(f"{m['content']}\n", "yellow"))
         else:
@@ -28,9 +32,29 @@ def merge_messages(messages: list[dict]) -> list[dict]:
     to_merge = []
 
     def merge():
-        content = "\n\n".join(m["content"] for m in to_merge if m["content"])
-        if content:
-            messages_out.append({"role": current_role, "content": content})
+        try:
+            if len(to_merge) == 1:
+                messages_out.append(to_merge[0])
+                return
+            content = [m["content"] for m in to_merge if m["content"]]
+            if any(isinstance(c, list) for c in content):  # tool call anthropic
+                merged = []
+                for c in content:
+                    if isinstance(c, list):
+                        merged.extend(c)
+                    elif isinstance(c, str):
+                        merged.append({"type": "text", "text": c})
+                    else:
+                        raise ValueError(f"Unknown content type for message: {c}")
+            else:
+                merged = "\n\n".join(content)
+            if merged:
+                messages_out.append({"role": current_role, "content": merged})
+        except BaseException as e:
+            print(f"Error merging messages {to_merge}: {e}")
+            # If there is an error, just append the first message
+            # add all messages
+            messages_out.extend(to_merge)
 
     current_role = None
     for message in messages:
@@ -79,26 +103,23 @@ def trim_prompt_messages(
     messages: list[dict], context_length: int, count_tokens: callable
 ):
     # Trim message content to context length
-    # messages: list of dict, each dict has keys "content" and "role"
+    # messages: list of dict, each dict has keys "role" and either "content" or "tool_calls"
     # context_length: int, maximum number of tokens
     # count_tokens: function, count the number of tokens in a string
     # messages should not be empty
     assert len(messages) > 0, "messages should not be empty"
-    # all messages should be dictionaries with keys "content" and "role"
-    assert all(
-        isinstance(item, dict) and "content" in item and "role" in item
-        for item in messages
-    ), 'all messages should be dictionaries with keys "content" and "role"'
+
     # the last message should be from the user
     assert messages[-1]["role"] == "user", "the last message should be from the user"
-    # if two consecutive messages are from the same role, they should be merged
-    assert all(
-        messages[i]["role"] != messages[i + 1]["role"] for i in range(len(messages) - 1)
-    ), "if two consecutive messages are from the same role, they should be merged first"
+
     # context_length should be non-negative
     assert context_length >= 0, "context_length should be non-negative"
 
-    message_lengths = [count_tokens(item["content"]) for item in messages]
+    def get_item(item):
+        """From a message, gets it's content, tool_calls, or return the item itself as str."""
+        return str(item.get("content", item.get("tool_calls", item)))
+
+    message_lengths = [count_tokens(get_item(item)) for item in messages]
     total_length = sum(message_lengths)
     if total_length <= context_length:
         return messages

@@ -12,4 +12,4 @@ tiktoken
 docker
 swebench==2.1.7
 prompt_toolkit
-anthropic
+anthropic>=0.49.0

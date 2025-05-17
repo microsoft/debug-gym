@@ -52,28 +52,10 @@ def test_trim_prompt_messages():
     with pytest.raises(Exception, match="messages should not be empty"):
         trim_prompt_messages([], 5, count_tokens)
 
-    with pytest.raises(
-        Exception,
-        match='all messages should be dictionaries with keys "content" and "role"',
-    ):
-        messages = [{"role": "system", "key": "System message"}]
-        trim_prompt_messages(messages, 20, count_tokens)
-
     with pytest.raises(Exception, match="the last message should be from the user"):
         messages = [
             {"role": "system", "content": "System message"},
             {"role": "assistant", "content": "Assistant message"},
-        ]
-        trim_prompt_messages(messages, 20, count_tokens)
-
-    with pytest.raises(
-        Exception,
-        match="if two consecutive messages are from the same role, they should be merged first",
-    ):
-        messages = [
-            {"role": "system", "content": "System message 1"},
-            {"role": "system", "content": "System message 2"},
-            {"role": "user", "content": "User message"},
         ]
         trim_prompt_messages(messages, 20, count_tokens)
 

@@ -2,6 +2,7 @@ import json
 import os
 import subprocess
 import uuid
+from collections import OrderedDict
 from os.path import join as pjoin
 
 import numpy as np
@@ -58,7 +59,7 @@ class BaseAgent:
     def build_history_prompt(self):
         messages = build_history_prompt(
             self.history.filter_out(actions=["eval", None]),
-            self.config["use_conversational_prompt"],
+            self.llm,
             self.config["reset_prompt_history_after_rewrite"],
         )
         return messages
@@ -74,11 +75,11 @@ class BaseAgent:
     def build_system_prompt(self, info):
         def calc_tokens_left(system_prompt: dict):
             system_prompt = unescape(
-                json.dumps(system_prompt, indent=2, sort_keys=True)
+                json.dumps(system_prompt, indent=2, sort_keys=False)
             )
             return self.llm.context_length - self.llm.count_tokens(system_prompt)
 
-        system_prompt = {}
+        system_prompt = OrderedDict()
         system_prompt["Overall task"] = self.system_prompt
         system_prompt["Instructions"] = info.instructions
         if self.llm.context_length is not None and self.llm.count_tokens is not None:
@@ -123,7 +124,7 @@ class BaseAgent:
             )
         else:
             system_prompt["Last evaluation output"] = info.eval_observation.observation
-        system_prompt = unescape(json.dumps(system_prompt, indent=2, sort_keys=True))
+        system_prompt = unescape(json.dumps(system_prompt, indent=2, sort_keys=False))
         messages = [
             {
                 "role": "system",
@@ -160,18 +161,13 @@ class BaseAgent:
                 f"Score: {info.score}/{info.max_score} ({info.score/info.max_score:.1%}) [Best: {highscore}]"
             )
 
-            prompt = self.build_prompt(info)
-            llm_response = self.llm(prompt, info)
-            if self.llm.reasoning_end_token is not None:
-                llm_response.response = self.parse_reasoning_model_response(
-                    llm_response.response,
-                    reasoning_end_token=self.llm.reasoning_end_token,
-                )
+            messages = self.build_prompt(info)
+            llm_response = self.llm(messages, info.tools)
 
             if debug:
                 breakpoint()
 
-            info = self.env.step(llm_response.response)
+            info = self.env.step(llm_response.tool)
             self.history.step(info, llm_response)
 
             if info.done or info.rewrite_counter >= self.config["max_rewrite_steps"]:

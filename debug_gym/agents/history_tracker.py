@@ -1,10 +1,8 @@
 import copy
-import json
 from dataclasses import asdict
 
-from debug_gym.agents.llm_api import LLMResponse
+from debug_gym.agents.llm_api import LLM, LLMResponse
 from debug_gym.gym.envs.env import EnvInfo
-from debug_gym.gym.utils import unescape
 
 
 class HistoryTracker:
@@ -23,7 +21,6 @@ class HistoryTracker:
     ) -> None:
         """llm_responses can be None since the initial state does not have prompt and response"""
         self.memory.append(copy.deepcopy(new_info))
-
         llm_responses = llm_responses or []
         if not isinstance(llm_responses, list):
             llm_responses = [llm_responses]
@@ -31,7 +28,10 @@ class HistoryTracker:
 
     def get(self):
         # return the history_steps latest steps
-        return self.memory[-self.history_steps :]
+        return (
+            self.memory[-self.history_steps :],
+            self.prompt_response_pairs[-self.history_steps :],
+        )
 
     def get_all(self):
         return self.memory
@@ -54,7 +54,7 @@ class HistoryTracker:
         else:
             json_out = {
                 "step_id": game_step,
-                "action": self.memory[game_step].action,
+                "action": asdict(self.memory[game_step].action),
                 "obs": self.memory[game_step].step_observation.observation,
             }
             # prompt_response_pairs could be empty for the initial state
@@ -84,16 +84,15 @@ class HistoryTracker:
     def filter_out(self, actions: list[str]):
         history = HistoryTracker(self.history_steps)
         for info, llm_response in zip(self.memory, self.prompt_response_pairs):
-            if info.action not in actions:
+            if getattr(info.action, "name", None) not in actions:
                 history.step(info, llm_response)
-
         return history
 
 
 def build_history_conversation(
-    history: HistoryTracker, reset_prompt_history_after_rewrite: bool = False
+    history: HistoryTracker, llm: LLM, reset_prompt_history_after_rewrite: bool = False
 ):
-    _history = history.get()
+    _history, _prompt_response_pairs = history.get()
     # Find the latest rewrite step
     if len(_history) == 0 or reset_prompt_history_after_rewrite is False:
         latest_rewrite_step = 0
@@ -103,74 +102,35 @@ def build_history_conversation(
                 latest_rewrite_step = i
                 break
     _messages = []
-    for history_info in _history[latest_rewrite_step:]:
-        if history_info.action is not None:
-            _messages.append({"role": "assistant", "content": f"{history_info.action}"})
-        _messages.append(
-            {"role": "user", "content": f"{history_info.step_observation.observation}"}
-        )
+    for history_info, response in zip(
+        _history[latest_rewrite_step:], _prompt_response_pairs[latest_rewrite_step:]
+    ):
+        _messages.extend(llm.format_tool_call_history(history_info, response))
     return _messages
-
-
-def build_history_non_conversation(
-    history: HistoryTracker, reset_prompt_history_after_rewrite: bool = False
-):
-    _history = history.get()
-    # Find the latest rewrite step
-    if len(_history) == 0 or reset_prompt_history_after_rewrite is False:
-        latest_rewrite_step = 0
-    else:
-        for i in range(len(_history)):
-            if _history[i].rewrite_counter == _history[-1].rewrite_counter:
-                latest_rewrite_step = i
-                break
-    _history_prompt = []
-    _history = _history[latest_rewrite_step:]
-    for _i, history_info in enumerate(_history):
-        _m = {
-            "step": _i,
-            "command": (None if history_info.action is None else history_info.action),
-            "stdout": history_info.step_observation.observation,
-        }
-        _history_prompt.append(_m)
-    return _history_prompt
 
 
 def build_history_prompt(
     history: HistoryTracker,
-    use_conversational_prompt: bool = True,
+    llm: LLM,
     reset_prompt_history_after_rewrite: bool = False,
 ):
     messages = []
-    if use_conversational_prompt is True:
-        conversation_history = build_history_conversation(
-            history, reset_prompt_history_after_rewrite
+    conversation_history = build_history_conversation(
+        history, llm, reset_prompt_history_after_rewrite
+    )
+    if len(conversation_history) == 0:
+        messages.append(
+            {
+                "role": "user",
+                "content": "No history of command and terminal outputs.",
+            }
         )
-        if len(conversation_history) == 0:
-            messages.append(
-                {
-                    "role": "user",
-                    "content": "No history of command and terminal outputs.",
-                }
-            )
-        else:
-            messages.append(
-                {
-                    "role": "user",
-                    "content": f"History of command and terminal outputs (the last {(len(conversation_history) + 1) // 2} steps):",
-                }
-            )
-            messages.extend(conversation_history)
     else:
-        history_prompt = build_history_non_conversation(
-            history, reset_prompt_history_after_rewrite
+        messages.append(
+            {
+                "role": "user",
+                "content": f"History of command and terminal outputs (the last {(len(conversation_history) + 1) // 2} steps):",
+            }
         )
-        if len(history_prompt) == 0:
-            prompt = ["No history of command and terminal outputs."]
-        else:
-            prompt = [
-                f"History of command and terminal outputs (the last {len(history_prompt)} steps):"
-            ]
-            prompt += ["\n" + unescape(json.dumps(history_prompt, indent=4)) + "\n"]
-        messages.append({"role": "user", "content": "\n".join(prompt)})
+        messages.extend(conversation_history)
     return messages
