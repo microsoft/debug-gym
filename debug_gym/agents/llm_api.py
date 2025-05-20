@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional
 
+import numpy as np
 import openai
 import tiktoken
 import yaml
@@ -557,7 +558,7 @@ class AnthropicLLM(LLM):
     ) -> list[dict]:
         _messages = [
             {
-                "role": "assistant",  # "assistant"
+                "role": "assistant",
                 "content": [
                     {
                         "type": "tool_use",
@@ -777,8 +778,8 @@ class OpenAILLM(LLM):
                 "role": "assistant",
                 "tool_calls": [
                     {
-                        "id": response[0].tool.id,
                         "type": "function",
+                        "id": response[0].tool.id,
                         "function": {
                             "name": response[0].tool.name,
                             "arguments": str(response[0].tool.arguments),
@@ -909,14 +910,50 @@ class Human(LLM):
     def count_tokens(self, text: str) -> int:
         return len(self.tokenize(text))
 
-    def define_tools(self, tool_call_list):
-        pass
+    def define_tools(self, tool_call_list: dict[str, EnvironmentTool]) -> list[dict]:
+        available_commands = []
+        for tool in tool_call_list:
+            random_id = "".join(map(str, np.random.randint(0, 10, size=6)))
+            tool_id = f"{tool.name}-{random_id}"
+            template = {
+                "id": tool_id,
+                "name": tool.name,
+                "arguments": {k: "" for k in tool.arguments.keys()},
+            }
+            available_commands.append(template)
+        return available_commands
 
-    def parse_tool_call_response(self, response):
-        pass
+    def parse_tool_call_response(self, response) -> ToolCall:
+        return ToolCall(**json.loads(response))
 
-    def format_tool_call_history(self, history_info, response):
-        pass
+    def format_tool_call_history(
+        self, history_info: EnvInfo, response: LLMResponse
+    ) -> list[dict]:
+        """Anthropic like format for tool call history"""
+        _messages = [
+            {
+                "role": "assistant",
+                "content": [
+                    {
+                        "type": "tool_use",
+                        "id": response[0].tool.id,
+                        "name": response[0].tool.name,
+                        "input": response[0].tool.arguments,
+                    }
+                ],
+            },
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "tool_result",
+                        "tool_use_id": history_info.action.id,
+                        "content": f"{history_info.step_observation.observation}",
+                    }
+                ],
+            },
+        ]
+        return _messages
 
     def generate(self, messages, tools, **kwargs) -> LLMResponse:
         # Human overrides the entire __call__ method, so generate is never called
@@ -924,10 +961,10 @@ class Human(LLM):
 
     def __call__(self, messages, tools, *args, **kwargs) -> LLMResponse:
         print_messages(messages, self.logger)
-        available_commands = [t["template"] for t in tools.values()]
+        available_commands = [json.dumps(t) for t in self.define_tools(tools)]
         if prompt_toolkit_available:
             actions_completer = WordCompleter(
-                available_commands, ignore_case=True, sentence=True
+                available_commands, ignore_case=False, sentence=True
             )
             action = prompt(
                 "\n> ",
@@ -939,11 +976,10 @@ class Human(LLM):
             self.logger.info("\n".join(["Available commands:"] + available_commands))
             action = input("> ")
 
-        prompt_messages = "\n".join([msg["content"] for msg in messages])
-
         return LLMResponse(
-            prompt=prompt_messages,
+            prompt=messages,
             response=action,
-            prompt_token_count=len(prompt_messages),
-            response_token_count=len(action),
+            tool=self.parse_tool_call_response(action),
+            prompt_token_count=self.count_tokens(json.dumps(messages)),
+            response_token_count=self.count_tokens(action),
         )
