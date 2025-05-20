@@ -7,8 +7,8 @@ from filelock import FileLock
 
 from debug_gym.gym.entities import Observation
 from debug_gym.gym.envs import SWEBenchEnv
-from debug_gym.gym.envs.swe_bench import SWEBenchEnv
 from debug_gym.gym.terminal import DockerTerminal
+from debug_gym.gym.tools.tool import ToolCall
 from debug_gym.gym.tools.toolbox import Toolbox
 
 if_docker_running = pytest.mark.skipif(
@@ -116,9 +116,11 @@ def test_reset_and_step(get_swe_env):
     assert "short test summary info" in env_info.step_observation.observation
     assert env_info.score == swe_env.score == 0
     assert env_info.max_score == swe_env.max_score == 1
-    assert env_info.done == swe_env.done == False
+    assert not env_info.done
+    assert not swe_env.done
 
-    env_info = swe_env.step("```listdir```")
+    tool_call = ToolCall(id="listdir_id", name="listdir", arguments={})
+    env_info = swe_env.step(tool_call)
     assert env_info.step_observation == Observation(
         source="env",
         observation="Unregistered tool: listdir",
@@ -127,7 +129,7 @@ def test_reset_and_step(get_swe_env):
     view_tool = Toolbox.get_tool("listdir")
     swe_env.add_tool(view_tool)
 
-    env_info = swe_env.step("```listdir```")
+    env_info = swe_env.step(tool_call)
     assert env_info.step_observation.source == "listdir"
     listdir_start = f"""{swe_env.working_dir}/
 |-- CHANGES.rst
