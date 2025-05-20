@@ -1,3 +1,4 @@
+import json
 from dataclasses import make_dataclass
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -18,6 +19,7 @@ from debug_gym.agents.llm_api import (
 )
 from debug_gym.gym.entities import Observation
 from debug_gym.gym.tools.tool import EnvironmentTool, ToolCall
+from debug_gym.gym.tools.toolbox import Toolbox
 
 
 class Tool1(EnvironmentTool):
@@ -125,22 +127,27 @@ def completion_mock():
     return AsyncMock(return_value=mock_response)
 
 
-@patch("builtins.input", lambda *args, **kwargs: "User input")
+@patch(
+    "builtins.input",
+    lambda *args, **kwargs: json.dumps(
+        {"id": "pdb-123", "name": "pdb", "arguments": "b 10"}
+    ),
+)
 def test_human(build_env_info):
     human = Human()
     messages = [{"role": "user", "content": "Hello"}]
     env_info = build_env_info(
-        tools={
-            "pdb": {"template": "```pdb <command>```"},
-            "view": {"template": "```<path/to/file.py>```"},
-        }
+        action=ToolCall(id="pdb-123", name="pdb", arguments="b 10"),
+        tools=[Toolbox.get_tool("pdb"), Toolbox.get_tool("view")],
     )
     llm_response = human(messages, env_info.tools)
     # human only uses the messages content
-    assert llm_response.prompt == "Hello"
-    assert llm_response.response == "User input"
-    assert llm_response.token_usage.prompt == 5
-    assert llm_response.token_usage.response == 10
+    assert llm_response.prompt == [{"role": "user", "content": "Hello"}]
+    assert (
+        llm_response.response == '{"id": "pdb-123", "name": "pdb", "arguments": "b 10"}'
+    )
+    assert llm_response.token_usage.prompt == 4
+    assert llm_response.token_usage.response == 7
 
 
 @patch.object(
