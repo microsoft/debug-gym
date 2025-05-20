@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from functools import wraps
+from typing import Any, Dict
 
 from debug_gym.gym.entities import Event, Observation
 
@@ -14,15 +15,25 @@ class Record:
 
 def track_history(func):
     @wraps(func)
-    def wrapper(self, *args, **kwargs):
+    def wrapper(self, environment, *args, **kwargs):
+        """Decorator to track the history of tool usage.
+        History does not include the environment instance (first argument).
+        """
         if not hasattr(self, "history"):
             self.history = []
-        observation = func(self, *args, **kwargs)
+        observation = func(self, environment, *args, **kwargs)
         record = Record(args=args, kwargs=kwargs, observation=observation)
         self.history.append(record)
         return observation
 
     return wrapper
+
+
+@dataclass
+class ToolCall:
+    id: str
+    name: str
+    arguments: Dict[str, Any]
 
 
 class EnvironmentTool(ABC):
@@ -31,14 +42,13 @@ class EnvironmentTool(ABC):
     history: list[Record] = None
 
     def __init__(self):
-        self.environment = None
         self.history = []
 
     @track_history
-    def __call__(self, action=None, **kwargs) -> Observation:
+    def __call__(self, *args, **kwargs) -> Observation:
         """Forwards `tool()` to the tool.use() method and
         tracks the history of tool usage."""
-        return self.use(action, **kwargs)
+        return self.use(*args, **kwargs)
 
     def register(self, environment):
         from debug_gym.gym.envs.env import RepoEnv
@@ -46,15 +56,24 @@ class EnvironmentTool(ABC):
         if not isinstance(environment, RepoEnv):
             raise ValueError("The environment must be a RepoEnv instance.")
 
-        self.environment = environment
-
         # Auto-subscribe to events that have handlers
         for event in Event:
             if hasattr(self, event.handler_name):
                 environment.event_hooks.subscribe(event, self)
 
+    def unregister(self, environment):
+        from debug_gym.gym.envs.env import RepoEnv
+
+        if not isinstance(environment, RepoEnv):
+            raise ValueError("The environment must be a RepoEnv instance.")
+
+        # Unsubscribe from all events
+        for event in Event:
+            if hasattr(self, event.handler_name):
+                environment.event_hooks.unsubscribe(event, self)
+
     @abstractmethod
-    def use(self, action) -> Observation:
+    def use(self, environment, action) -> Observation:
         """This method is invoked directly by `tool()` or by event handlers,
         and should be overridden by subclasses. Returns an observation which
         includes the tool's name and the result of the action.
@@ -62,10 +81,10 @@ class EnvironmentTool(ABC):
         """
         pass
 
-    def queue_event(self, event: Event, **kwargs) -> None:
-        self.environment.queue_event(event, source=self, **kwargs)
+    def queue_event(self, environment, event: Event, **kwargs) -> None:
+        environment.queue_event(event, source=self, **kwargs)
 
-    def on_env_reset(self, **kwargs) -> Observation:
+    def on_env_reset(self, environment, **kwargs) -> Observation:
         """Reset the tool state on environment reset.
         Please call `super().on_env_reset()` if subclass overrides this method.
         """
