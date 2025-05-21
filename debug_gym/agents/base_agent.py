@@ -152,6 +152,9 @@ class BaseAgent:
 
         if info.done is True:
             return True
+        self.logger.info(
+            f"Available tools (in LLM's tool calling format):\n{json.dumps(self.llm.define_tools(info.tools))}\n"
+        )
 
         highscore = info.score
 
@@ -213,6 +216,7 @@ class BaseAgent:
         jsonl_output = {
             "problem": task_name,
             "config": self.config,
+            "tools": self.llm.define_tools(self.env.tools),
             "uuid": self._uuid,
             "success": self.env.done,
             "log": [],
