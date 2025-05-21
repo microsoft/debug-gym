@@ -92,9 +92,9 @@ We provide the below LLM-based agents, they all have minimal design and serve th
 
 | Agent name | Available Tools | Description |
 | :-: | :-: | :----- |
-| `debug_agent` | `pdb`, `patcher`, `view`, `eval` | A minimal agent that dumps all available information into its prompt and queries the LLM to generate a command. |
-| `rewrite_agent` | `patcher`, `view`, `eval`  | A `debug_agent` but `pdb` tool is disabled (an agent keeps rewriting). |
-| `debug_5_agent` | `pdb`, `patcher`, `view`, `eval`  | A `debug_agent`, but `pdb` tool is only enabled after certain amount of rewrites. |
+| `debug_agent` | `pdb`, `rewrite`, `view`, `eval` | A minimal agent that dumps all available information into its prompt and queries the LLM to generate a command. |
+| `rewrite_agent` | `rewrite`, `view`, `eval`  | A `debug_agent` but `pdb` tool is disabled (an agent keeps rewriting). |
+| `debug_5_agent` | `pdb`, `rewrite`, `view`, `eval`  | A `debug_agent`, but `pdb` tool is only enabled after certain amount of rewrites. |
 
 ---
 
@@ -119,14 +119,17 @@ Add `-v`, `--debug` to be verbose, or to enter debug mode.
 > [!WARNING]
 > When using --debug, you will need to press `c` to continue after each reasoning step.
 
+#### 3.1 Human Mode
 
-#### 3.1. Overriding Values in Config
+We provide a human mode that enables developers to manually interact with `debug-gym`. To activate this mode, change the `llm_name` field in the `config_*.yaml` to be `"human"`. Once activated, at every step, the environment will expect a command input (in tool calling format). One can use the `Tab` key to get a list of tool calling templates and fill in any necessary arguments.
+
+#### 3.2. Overriding Values in Config
 
 `-p` is a handy way to override values defined in config. For example, the below command will run rewrite_agent agent on Aider with human mode (while in config file it specifies gpt-4o).
 
     python scripts/run.py scripts/config_aider.yaml --agent rewrite_agent -v -p rewrite_agent.llm_name="human"
 
-#### 3.2. Debugging a Custom Repository
+#### 3.3. Debugging a Custom Repository
 
 Modify `scripts/config.yaml`, especially the `env_kwargs` to set the path and entrypoint of the custom repository. We assume there is a `.debugignore` file and a `.debugreadonly` within the repository that labels files/folders that are not seen or not editable, respectively.
 
@@ -134,7 +137,7 @@ As an example, we provide a buggy pytorch code repository in `data/pytorch`.
 
     python scripts/run.py scripts/config.yaml --agent <agent name>
 
-#### 3.3. Design Your Own Tool
+#### 3.4. Design Your Own Tool
 `debug-gym`'s modular design makes it extensible. Users are encouraged to extend `debug-gym` to their specific usecases, for example by creating new tools that diversify an agent's action and observation spaces. For detailed instruction on designing new tools that are `debug-gym`-compatible, please refer to the [Technical Report](https://arxiv.org/abs/2503.21557).
 
 ## Citation

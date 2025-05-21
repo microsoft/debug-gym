@@ -746,7 +746,7 @@ class OpenAILLM(LLM):
                 "properties": tool.arguments,
                 "additionalProperties": False,
             }
-            _function["strict"] = True
+            # _function["strict"] = True  # this is not supported by reasoning models such as o3
             if len(tool.arguments) > 0:
                 _function["parameters"]["required"] = list(tool.arguments.keys())
             output.append(_tool)
@@ -764,6 +764,12 @@ class OpenAILLM(LLM):
             }
         }
         """
+        if response is None:
+            return ToolCall(
+                id="empty_tool_response",
+                name="empty_tool_response",
+                arguments={},
+            )
         return ToolCall(
             id=response.id,
             name=response.function.name,
@@ -816,8 +822,12 @@ class OpenAILLM(LLM):
             raise
 
         # LLM may select multiple tool calls, we only care about the first action
-        tool_call = response.choices[0].message.tool_calls[0]
-        assert tool_call.type == "function"
+        if response.choices[0].message.tool_calls is None:
+            # LLM failed to call a tool
+            tool_call = None
+        else:
+            tool_call = response.choices[0].message.tool_calls[0]
+            assert tool_call.type == "function"
 
         llm_response = LLMResponse(
             prompt=messages,
