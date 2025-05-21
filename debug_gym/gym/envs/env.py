@@ -253,10 +253,13 @@ class RepoEnv(TooledEnv):
     def _prepare_entrypoint(entrypoint):
         entrypoint_list = entrypoint.split()
 
-        if entrypoint_list[0] != "python":
+        if entrypoint_list[0].endswith("uv") and entrypoint_list[1] == "run":
+            entrypoint_list[2] = f"$(which {entrypoint_list[2]})"
+            entrypoint_list = entrypoint_list[:2] + ["python"] + entrypoint_list[2:]
+
+        elif entrypoint_list[0] != "python":
             entrypoint_list[0] = f"$(which {entrypoint_list[0]})"
             entrypoint_list = ["python"] + entrypoint_list
-            entrypoint = entrypoint_list
 
         entrypoint = " ".join(entrypoint_list)
         return entrypoint

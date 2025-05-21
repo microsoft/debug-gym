@@ -450,10 +450,12 @@ class DockerTerminal(Terminal):
             remove=True,
             tty=True,
             stdin_open=True,
+            network_mode="host",
         )
-        container_name = f"debug_gym_{container.name}"
-        container.rename(container_name)
-        container.reload()
+        container_name = container.name
+        # container_name = f"debug_gym_{container.name}"
+        # container.rename(container_name)
+        # container.reload()
         self._run_setup_commands(container)
         self.logger.debug(f"Container {container_name} started successfully.")
         atexit.register(self.clean_up)
