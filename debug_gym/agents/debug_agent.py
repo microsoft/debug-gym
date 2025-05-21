@@ -64,7 +64,7 @@ class Debug_5_Agent(DebugAgent):
 
 @register_agent
 class DebugHumanInTheLoop(DebugAgent):
-    name: str = "pdb_hitl"
+    name: str = "debug_hitl"
 
     def run(self, task_name=None, debug=False):
         # instantiate the human in the loop
@@ -89,7 +89,7 @@ class DebugHumanInTheLoop(DebugAgent):
 
             prompt = self.build_prompt(info)
 
-            llm_response = self.llm(prompt, info)
+            llm_response = self.llm(prompt, info.tools)
 
             if debug:
                 breakpoint()
@@ -114,7 +114,7 @@ class DebugHumanInTheLoop(DebugAgent):
                 break
 
             # call the human in the loop
-            hitl_response = self.hitl(prompt, hitl_info)
+            hitl_response = self.hitl(prompt, hitl_info.tools)
             hitl_info = self.hitl_env.step(hitl_response.response)
 
             if hitl_info.done or hitl_info.rewrite_counter >= self.config["max_rewrite_steps"]:

@@ -102,9 +102,9 @@ def test_run_debug_5_agent(agent_setup, build_env_info):
     result = agent.run(task_name="test_task", debug=False)
     assert result
 
-@patch.object(Human, '__call__', return_value=LLMResponse("Prompt", "```pdb c```", TokenUsage(2, 4)))
+@patch.object(Human, '__call__', return_value=LLMResponse("Prompt", '{"id": "pdb-267437", "name": "pdb", "arguments": {"command": "c"}}', TokenUsage(2, 4)))
 def test_human_in_the_loop(human, agent_setup, build_env_info):
-    agent, env, llm, history = next(agent_setup(DebugHumanInTheLoop))
+    agent, env, llm = next(agent_setup(DebugHumanInTheLoop))
     env.reset.return_value = build_env_info(
         done=False,
         score=0,
@@ -127,7 +127,6 @@ def test_human_in_the_loop(human, agent_setup, build_env_info):
         current_breakpoints="Test breakpoints",
         step_observation="Test last run obs",
     )
-    history.get_all.return_value = [build_env_info(action="```pdb b 10```"), build_env_info(action="```pdb p x```")]
 
     env.clone.return_value = MagicMock()
     llm.return_value = LLMResponse("Prompt", "Expected answer", TokenUsage(2, 4))
@@ -153,11 +152,8 @@ def test_human_in_the_loop(human, agent_setup, build_env_info):
     assert env.step().done is False
 
     # test that llm actions were logged
-    assert history.step.called
-    history.step.assert_has_calls([
-        call(env.reset(options={"task_name": "test_task"}), None),
-        call(env.step(llm().response), llm()),
-    ])
+    _history, _prompt_response_pairs = agent.history.get()
+    assert [[], [llm()]]  == _prompt_response_pairs
 
     # test that env was cloned
     assert env.clone.called
@@ -165,8 +161,7 @@ def test_human_in_the_loop(human, agent_setup, build_env_info):
     
     # assert that cloned env was called with history steps
     env.clone().step.assert_has_calls([
-        call(history.get_all()[0].action),
-        call(history.get_all()[1].action),
+        call(agent.history.get_all()[0].action),
     ])
     
     # test that human action was executed
@@ -174,4 +169,4 @@ def test_human_in_the_loop(human, agent_setup, build_env_info):
     env.clone().step.assert_called_with(human().response)
 
     # ensure that human action was not recorded in history
-    assert call(env.clone().step(), human()) not in history.step.mock_calls
+    assert env.clone().step() not in agent.history.get_all()
