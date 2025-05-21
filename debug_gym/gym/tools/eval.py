@@ -9,8 +9,8 @@ class EvalTool(EnvironmentTool):
     description = "Evaluate the current code against pre-defined test cases."
     arguments = {}
 
-    def use(self, environment, **kwargs) -> Observation:
-        eval_output = environment.eval(**kwargs)
+    def use(self, environment) -> Observation:
+        eval_output = environment.eval()
         return Observation(self.name, eval_output.output)
 
     def on_env_reset(self, environment, **kwargs):
