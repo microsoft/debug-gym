@@ -887,3 +887,60 @@ def test_llm_init_with_both_config_types(logger_mock, llm_class_mock):
         "Both llm_config and llm_config_file are provided, using llm_config."
         in logger_mock._log_history
     )
+
+
+@pytest.fixture
+def example_tools():
+    """
+    Build a deterministic list of tools (Human.define_tools generates random IDs,
+    so we craft a fixed one instead).
+    """
+    return [
+        {
+            "id": "print-001",
+            "name": "print",
+            "arguments": {"msg": ""},
+        },
+        {
+            "id": "sum-002",
+            "name": "sum",
+            "arguments": {"a": "", "b": ""},
+        },
+    ]
+
+
+def test_parse_tool_call_response_valid(logger_mock, example_tools):
+    """A well-formed JSON command that matches one of the declared tools
+    should be converted into a ToolCall instance and no error logged."""
+    human = Human(logger=logger_mock)
+    cmd = json.dumps({"id": "print-001", "name": "print", "arguments": {"msg": "hi"}})
+
+    tool_call = human.parse_tool_call_response(cmd, example_tools)
+    assert tool_call == ToolCall(id="print-001", name="print", arguments={"msg": "hi"})
+
+
+@pytest.mark.parametrize(
+    "bad_command",
+    [
+        "not-json",  # invalid JSON
+        json.dumps(
+            {"id": "print-001", "name": "print", "arguments": {"unknown": "x"}}
+        ),  # wrong args
+        json.dumps(
+            {"id": "non-existent", "name": "print", "arguments": {}}
+        ),  # id not found
+        json.dumps(
+            {"id": "print-001", "name": "unknown", "arguments": {}}
+        ),  # name mismatch
+        json.dumps(
+            {"id": "print-001", "name": "unknown"}
+        ),  # missing ToolCalls arguments
+    ],
+)
+def test_parse_tool_call_response_invalid(logger_mock, example_tools, bad_command):
+    """For malformed or non-matching commands the method should return None"""
+    human = Human(logger=logger_mock)
+
+    result = human.parse_tool_call_response(bad_command, example_tools)
+
+    assert result is None

@@ -923,8 +923,21 @@ class Human(LLM):
             available_commands.append(template)
         return available_commands
 
-    def parse_tool_call_response(self, response) -> ToolCall:
-        return ToolCall(**json.loads(response))
+    def parse_tool_call_response(self, response, all_tools) -> ToolCall:
+        """Parse user input and return a ToolCall object.
+        Validate the input against the available tools."""
+        try:
+            tool_call = ToolCall(**json.loads(response))
+            for t in all_tools:
+                if (
+                    tool_call.id == t["id"]
+                    and tool_call.name == t["name"]
+                    and all([k in t["arguments"] for k in tool_call.arguments])
+                ):
+                    return tool_call
+        except Exception:
+            pass
+        self.logger.error("Invalid action, please try again.")
 
     def format_tool_call_history(
         self, history_info: EnvInfo, response: LLMResponse
@@ -961,25 +974,31 @@ class Human(LLM):
 
     def __call__(self, messages, tools, *args, **kwargs) -> LLMResponse:
         print_messages(messages, self.logger)
-        available_commands = [json.dumps(t) for t in self.define_tools(tools)]
-        if prompt_toolkit_available:
-            actions_completer = WordCompleter(
-                available_commands, ignore_case=False, sentence=True
-            )
-            action = prompt(
-                "\n> ",
-                completer=actions_completer,
-                history=self._history,
-                enable_history_search=True,
-            )
-        else:
-            self.logger.info("\n".join(["Available commands:"] + available_commands))
-            action = input("> ")
+        all_tools = self.define_tools(tools)
+        available_commands = [json.dumps(t) for t in all_tools]
+        tool_call = None
+        while tool_call is None:
+            if prompt_toolkit_available:
+                actions_completer = WordCompleter(
+                    available_commands, ignore_case=False, sentence=True
+                )
+                action = prompt(
+                    "\n> ",
+                    completer=actions_completer,
+                    history=self._history,
+                    enable_history_search=True,
+                )
+            else:
+                self.logger.info(
+                    "\n".join(["Available commands:"] + available_commands)
+                )
+                action = input("> ")
+            tool_call = self.parse_tool_call_response(action, all_tools)
 
         return LLMResponse(
             prompt=messages,
             response=action,
-            tool=self.parse_tool_call_response(action),
+            tool=tool_call,
             prompt_token_count=self.count_tokens(json.dumps(messages)),
             response_token_count=self.count_tokens(action),
         )
