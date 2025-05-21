@@ -5,7 +5,6 @@ import pytest
 
 from debug_gym.agents.utils import (
     load_config,
-    merge_messages,
     print_messages,
     trim,
     trim_prompt_messages,
@@ -20,29 +19,6 @@ def test_print_messages(logger_mock):
     ]
     print_messages(messages, logger_mock)
     assert logger_mock._log_history == ["Hello\n", "Hi\n", "System message\n"]
-
-
-def test_merge_messages():
-    messages = [
-        {"role": "user", "content": "Hello"},
-        {"role": "user", "content": "How are you?"},
-        {"role": "assistant", "content": "Hi"},
-    ]
-    merged = merge_messages(messages)
-    assert len(merged) == 2
-    assert merged[0]["content"] == "Hello\n\nHow are you?"
-
-    # Ignore empty message
-    messages = [
-        {"role": "user", "content": "Hello"},
-        {"role": "user", "content": ""},
-        {"role": "user", "content": "How are you?"},
-        {"role": "user", "content": ""},
-        {"role": "assistant", "content": "Hi"},
-    ]
-    merged = merge_messages(messages)
-    assert len(merged) == 2
-    assert merged[0]["content"] == "Hello\n\nHow are you?"
 
 
 def test_trim_prompt_messages():
