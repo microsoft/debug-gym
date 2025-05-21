@@ -153,7 +153,7 @@ class BaseAgent:
         if info.done is True:
             return True
         self.logger.info(
-            f"Available tools (in LLM's tool calling format):\n{json.dumps(self.llm.define_tools(info.tools))}\n"
+            f"Available tools (in LLM's tool calling format):\n{json.dumps(self.llm.define_tools(info.tools), indent=4)}\n"
         )
 
         highscore = info.score
