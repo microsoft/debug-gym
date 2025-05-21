@@ -241,6 +241,8 @@ class RepoEnv(TooledEnv):
             self.debug_entrypoint = self.debug_entrypoint.replace(
                 "python", "python -m pdb"
             )
+        self.entrypoint = "PYTHONPATH=$PYTHONPATH:$PWD " + self.entrypoint
+        self.debug_entrypoint = "PYTHONPATH=$PYTHONPATH:$PWD " + self.debug_entrypoint
 
     @staticmethod
     def _prepare_entrypoint(entrypoint):
