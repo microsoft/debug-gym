@@ -11,5 +11,6 @@ transformers
 tiktoken
 docker
 swebench==2.1.7
+swesmith
 prompt_toolkit
 anthropic>=0.49.0
