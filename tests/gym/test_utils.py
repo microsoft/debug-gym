@@ -11,7 +11,6 @@ from debug_gym.gym.utils import (
     extract_reward_from_pytest_output,
     is_subdirectory,
     make_file_matcher,
-    parse_action,
     show_line_number,
     str2bool,
 )
@@ -437,25 +436,3 @@ def test_cleanup_pytest_output():
     cleaned_message = cleanup_pytest_output(message)
     expected = "\nSomething else\n"
     assert cleaned_message == expected
-
-
-def test_parse_action():
-    # e.g. ```pdb b src/main.py:42```
-    # e.g., ```listdir```
-    action = "```pdb b src/main.py:42```"
-    tool_name, tool_args = parse_action(action)
-    assert tool_name == "pdb"
-    assert tool_args == "b src/main.py:42"
-
-    action = "```listdir```"
-    tool_name, tool_args = parse_action(action)
-    assert tool_name == "listdir"
-    assert tool_args == ""
-
-    action = "```pdb b 13"
-    with pytest.raises(Exception, match="Syntax error: invalid action syntax."):
-        parse_action(action)
-
-    action = "``````"
-    with pytest.raises(Exception, match="Empty action."):
-        parse_action(action)

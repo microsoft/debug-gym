@@ -4,15 +4,29 @@
 
 [[Technical Report](https://arxiv.org/abs/2503.21557)] [[Project Page](https://aka.ms/debug-gym/)]
 
+The technical report corresponds to [version 1.0.0](https://github.com/microsoft/debug-gym/tree/1.0.0). Please see [CHANGELOG.md](https://github.com/microsoft/debug-gym/blob/main/CHANGELOG.md) for recent updates.
+
 ## 1. Installation
+
+It's recommended to create and activate a conda or virtual environment. `debug-gym` requires `Python>=3.12`:
 
     conda create -n debug-gym python=3.12
     conda activate debug-gym
+
+Then, install `debug-gym` directly from PyPI:
+
+    pip install debug-gym
+
+Alternatively, clone the repository and install locally:
+
+    git clone https://github.com/microsoft/debug-gym
+    cd debug-gym
     pip install -e .
 
-To install the development dependencies:
+To install development dependencies, run:
 
     pip install -e '.[dev]'
+
 
 **Set your API information in llm.yaml**
 

@@ -4,8 +4,8 @@ from debug_gym.agents.llm_api import LLM
 @register_agent
 class DebugAgent(BaseAgent):
     name = "debug_agent"
-    system_prompt = "Your goal is to debug a Python program to make sure it can pass a set of test functions. You have access to the pdb debugger tools, you can use them to investigate the code, set breakpoints, and print necessary values to identify the bugs. Once you have gained enough information, propose a rewriting patch to fix the bugs. Avoid rewriting the entire code, focus on the bugs only."
-    action_prompt = "Based on the instruction, the current code, the last execution output, and the history information, continue your debugging process using pdb commands or to propose a patch using rewrite command. Output a single command, nothing else. Do not repeat your previous commands unless they can provide more information. You must be concise and avoid overthinking."
+    system_prompt = "Your goal is to debug a Python program to make sure it can pass a set of test functions. You have access to a set of tools including the pdb debugger, you can use them to investigate the code, set breakpoints, and print necessary values to identify the bugs. Once you have gained enough information, propose a rewriting patch to fix the bugs. Avoid rewriting the entire code, focus on the bugs only. At every step, you have to use one of the tools via function calling. "
+    action_prompt = "Based on the instruction, the current code, the last execution output, and the history information, continue your debugging process by calling the pdb tool or to propose a patch by calling the rewrite tool. You can only call one tool at a time. Do not repeat your previous action unless they can provide more information. You must be concise and avoid overthinking."
 
 
 @register_agent
@@ -14,8 +14,7 @@ class Debug_5_Agent(DebugAgent):
 
     def run(self, task_name=None, debug=False):
         # remove the pdb tool from the environment
-        assert "pdb" in self.env.tools, "pdb not found in env tools"
-        pdb_tool = self.env.tools.pop("pdb")
+        pdb_tool = self.env.remove_tool("pdb")
 
         self.history.reset()
         info = self.env.reset(options={"task_name": task_name})
@@ -34,19 +33,13 @@ class Debug_5_Agent(DebugAgent):
                 f"Score: {info.score}/{info.max_score} ({info.score/info.max_score:.1%}) [Best: {highscore}]"
             )
 
-            prompt = self.build_prompt(info)
-
-            llm_response = self.llm(prompt, info)
-            if self.llm.reasoning_end_token is not None:
-                llm_response.response = self.parse_reasoning_model_response(
-                    llm_response.response,
-                    reasoning_end_token=self.llm.reasoning_end_token,
-                )
+            messages = self.build_prompt(info)
+            llm_response = self.llm(messages, info.tools)
 
             if debug:
                 breakpoint()
 
-            info = self.env.step(llm_response.response)
+            info = self.env.step(llm_response.tool)
 
             # re-introduce pdb tool at the right time
             if (
@@ -54,10 +47,10 @@ class Debug_5_Agent(DebugAgent):
                 and pdb_tool.name not in self.env.tools
             ):
                 self.env.add_tool(pdb_tool)
-                self.env.tools["pdb"].start_pdb()
+                pdb_tool.start_pdb()
                 # update info tools related fields after adding pdb so it's included when building the next prompt
                 info.instructions = self.env.instructions
-                info.tools = self.env.tool_instructions
+                info.tools = self.env.tools
 
             self.history.step(info, llm_response)
 
