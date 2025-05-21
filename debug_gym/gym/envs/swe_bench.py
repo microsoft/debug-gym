@@ -63,7 +63,7 @@ class SWEBenchEnv(RepoEnv):
         }
 
     def load_dataset(self):
-        self.ds = datasets.load_dataset(self.dataset_id)["test"]
+        self.ds = datasets.load_dataset(self.dataset_id)[self.split]
         self.dataset = {row["instance_id"]: row for row in self.ds.sort("instance_id")}
 
         # To avoid concurrency issues, we will clone all the repos in the dataset.
