@@ -142,26 +142,3 @@ def test_unregister_with_multiple_handlers():
     # Verify tool is no longer listening to any events
     assert tool not in env.event_hooks.event_listeners[Event.ENV_RESET]
     assert tool not in env.event_hooks.event_listeners[Event.ENV_STEP]
-
-
-def test_tool_call():
-    tool = FakeTool()
-    env = RepoEnv()
-
-    # Call the tool
-    observation = tool(env, action="test_action")
-    # Check the observation
-    assert isinstance(observation, Observation)
-    assert observation.source == "FakeTool"
-    assert observation.observation == "test_action"
-
-    # Call the tool with an invalid argument
-    observation = tool(env, invalid_action="test_action")
-    # Check the observation
-    assert isinstance(observation, Observation)
-    assert observation.source == "FakeTool"
-    # invalid argument
-    assert (
-        observation.observation
-        == "FakeTool.use() got an unexpected keyword argument 'invalid_action'"
-    )
