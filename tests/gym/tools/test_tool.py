@@ -7,6 +7,8 @@ from debug_gym.gym.tools.toolbox import Toolbox
 
 
 class FakeTool(EnvironmentTool):
+    name: str = "FakeTool"
+
     def use(self, env, action):
         return Observation("FakeTool", action)
 
@@ -85,6 +87,15 @@ def test_track_history():
         args=(),
         kwargs={"action": "second"},
         observation=Observation("FakeTool", "second"),
+    )
+
+
+def test_unknown_args():
+    tool = FakeTool()
+    env = RepoEnv()
+    obs = tool(env, unknown_arg="unknown_value")
+    assert obs == Observation(
+        "FakeTool", "FakeTool.use() got an unexpected keyword argument 'unknown_arg'"
     )
 
 
