@@ -38,48 +38,6 @@ def print_messages(messages: list[dict], logger: DebugGymLogger):
             raise ValueError(f"Unknown role: {m['content']}")
 
 
-def merge_messages(messages: list[dict]) -> list[dict]:
-    """Merge consecutive messages with same role into one message."""
-    messages_out = []
-    to_merge = []
-
-    def merge():
-        try:
-            if len(to_merge) == 1:
-                messages_out.append(to_merge[0])
-                return
-            content = [m["content"] for m in to_merge if m["content"]]
-            if any(isinstance(c, list) for c in content):  # tool call anthropic
-                merged = []
-                for c in content:
-                    if isinstance(c, list):
-                        merged.extend(c)
-                    elif isinstance(c, str):
-                        merged.append({"type": "text", "text": c})
-                    else:
-                        raise ValueError(f"Unknown content type for message: {c}")
-            else:
-                merged = "\n\n".join(content)
-            if merged:
-                messages_out.append({"role": current_role, "content": merged})
-        except BaseException as e:
-            print(f"Error merging messages {to_merge}: {e}")
-            # If there is an error, just append the first message
-            # add all messages
-            messages_out.extend(to_merge)
-
-    current_role = None
-    for message in messages:
-        if current_role == message["role"]:
-            to_merge.append(message)
-        else:
-            merge()  # merge the previous messages
-            current_role = message["role"]
-            to_merge = [message]
-    merge()  # merge the last messages
-    return messages_out
-
-
 def trim(text: str, max_length: int, count_tokens: callable, where: str = "middle"):
     # Get an approximate number of characters per token ratio in the text.
     nb_tokens = count_tokens(text=text)
