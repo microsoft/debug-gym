@@ -335,7 +335,7 @@ def test_reset(
 |-- file2.txt
 |-- subdir/
   |-- subfile1.txt""",
-        current_code_with_line_number="You are currently not working in a file. You can use ```view path/to/file.py``` to navigate to a file first.",
+        current_code_with_line_number="You are currently not working in a file. You can call the view tool to navigate to a file first.",
         current_breakpoints="No breakpoints are set.",
         action=None,
         instructions={},
