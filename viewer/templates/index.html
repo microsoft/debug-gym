@@ -12,10 +12,37 @@
         .details { border: 1px solid #ccc; padding: 10px; }
         pre { background: #f5f5f5; padding: 10px; white-space: pre-wrap; }
         .nav-buttons { margin: 10px 0; }
+        .file-info {
+            background-color: #f8f9fa;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .change-file-btn {
+            background-color: #6c757d;
+            color: white;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            text-decoration: none;
+        }
+        .change-file-btn:hover {
+            background-color: #545b62;
+        }
     </style>
 </head>
 <body>
     <h1>Debugging Timeline</h1>
+
+    <!-- File Info -->
+    <div class="file-info">
+        <span><strong>Current File:</strong> {{ current_file }}</span>
+        <a href="/change_file" class="change-file-btn">Change File</a>
+    </div>
 
     <!-- Metadata Section -->
     <div class="metadata">
@@ -58,8 +85,9 @@
             if (!data.error) {
                 document.getElementById('step-details').innerHTML = `
                     <h3>Step ${stepId}</h3>
-                    <p><strong>Action:</strong></p><pre>${data.action || 'None'}</pre>
+                    <p><strong>Action:</strong></p><pre>${JSON.stringify(data.action, null, 2) || 'None'}</pre>
                     <p><strong>Observation:</strong></p><pre>${data.obs}</pre>
+                    <p><strong>Rewrite Consumed:</strong></p><pre>${data.rewrite_consumed || 'None'}</pre>
                     <p><strong>Prompt/Response Pairs:</strong></p><pre>${JSON.stringify(data.prompt_response_pairs, null, 2) || 'None'}</pre>
                 `;
             }
