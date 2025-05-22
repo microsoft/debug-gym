@@ -174,6 +174,7 @@ def agent_setup(tmp_path, open_data):
             llm.reasoning_end_token = None
             llm.context_length = 4096
             llm.count_tokens = _length
+            llm.define_tools = lambda x: x
             agent = agent_class(config_dict, env)
             agent.llm = llm
             yield agent, env, llm
