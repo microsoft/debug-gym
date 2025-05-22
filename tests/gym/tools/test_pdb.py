@@ -3,6 +3,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from debug_gym.gym.entities import Event
 from debug_gym.gym.envs.env import RepoEnv
 from debug_gym.gym.terminal import DockerTerminal, Terminal
 from debug_gym.gym.tools.pdb import PDBTool
@@ -67,49 +68,17 @@ def test_pdb_use(tmp_path, setup_test_repo):
         debug_entrypoint="python -m pdb -m pytest -sv .",
     )
     pdb = PDBTool()
-    pdb.register(environment)
-    initial_output = pdb.start_pdb()
+    initial_output = pdb.start_pdb(environment)
     assert """The pytest entry point.""" in initial_output
     assert "(Pdb)" not in initial_output
-
-    output = pdb.use("l").observation
+    output = pdb.use(environment, command="l").observation
     assert """The pytest entry point.""" in output
     assert "(Pdb)" not in output
-
-    output = pdb.use("c").observation
+    output = pdb.use(environment, command="c").observation
     assert "1 failed, 1 passed" in pdb.pdb_obs
     assert "test_fail.py::test_fail FAILED" in pdb.pdb_obs
     assert "test_pass.py::test_pass PASSED" in pdb.pdb_obs
     assert "Reached the end of the file. Restarting the debugging session." in output
-    assert "(Pdb)" not in output
-
-
-def test_pdb_use_multiple_commands(tmp_path, setup_test_repo):
-    # Test PDBTool with Terminal, verbose pytest
-    tests_path = str(setup_test_repo(tmp_path))
-    terminal = Terminal()
-    environment = RepoEnv(
-        path=tests_path,
-        terminal=terminal,
-        debug_entrypoint="python -m pdb -m pytest -sv .",
-    )
-    pdb = PDBTool()
-    pdb.register(environment)
-    _ = pdb.start_pdb()
-
-    output = pdb.use("l ; print('hello')").observation
-    assert (
-        """Multiple commands are not supported. Only the first command will be executed."""
-        in output
-    )
-    assert """The pytest entry point.""" in output
-    assert "(Pdb)" not in output
-
-    output = pdb.use("print('hello;\nhi')").observation
-    assert (
-        """Multiple commands are not supported. Only the first command will be executed."""
-        not in output
-    )
     assert "(Pdb)" not in output
 
 
@@ -123,10 +92,9 @@ def test_pdb_use_empty_command(tmp_path, setup_test_repo):
         debug_entrypoint="python -m pdb -m pytest -sv .",
     )
     pdb = PDBTool()
-    pdb.register(environment)
-    _ = pdb.start_pdb()
+    _ = pdb.start_pdb(environment)
 
-    output = pdb.use("").observation
+    output = pdb.use(environment, command="").observation
     assert """Tool failure:\nEmpty command.""" in output
 
 
@@ -136,16 +104,15 @@ def test_pdb_use_default_environment_entrypoint(tmp_path, setup_test_repo):
     terminal = Terminal()
     environment = RepoEnv(path=tests_path, terminal=terminal)
     pdb = PDBTool()
-    pdb.register(environment)
-    initial_output = pdb.start_pdb()  # "python -m pdb -m pytest -sq ."
+    initial_output = pdb.start_pdb(environment)  # "python -m pdb -m pytest -sq ."
     assert """The pytest entry point.""" in initial_output
     assert "(Pdb)" not in initial_output
 
-    output = pdb.use("l").observation
+    output = pdb.use(environment, command="l").observation
     assert """The pytest entry point.""" in output
     assert "(Pdb)" not in output
 
-    output = pdb.use("c").observation
+    output = pdb.use(environment, command="c").observation
     assert "1 failed, 1 passed" in pdb.pdb_obs
     assert "test_fail.py::test_fail" in pdb.pdb_obs
     assert "test_pass.py::test_pass" not in pdb.pdb_obs
@@ -164,19 +131,18 @@ def test_pdb_use_docker_terminal(tmp_path, setup_test_repo):
         map_host_uid_gid=False,  # run as root
     )
     # no:cacheprovider to avoid .pytest_cache
-    debug_entrypoint = f"python -m pdb -m pytest -p no:cacheprovider -sv ."
+    debug_entrypoint = "python -m pdb -m pytest -p no:cacheprovider -sv ."
     environment = RepoEnv(
         path=tests_path, terminal=terminal, debug_entrypoint=debug_entrypoint
     )
     pdb = PDBTool()
-    pdb.register(environment)
-    pdb.start_pdb()
+    pdb.start_pdb(environment)
 
-    output = pdb.use("l").observation
+    output = pdb.use(environment, command="l").observation
     assert """The pytest entry point.""" in output
     assert "(Pdb)" not in output
 
-    output = pdb.use("c").observation
+    output = pdb.use(environment, command="c").observation
     assert "1 failed, 1 passed" in pdb.pdb_obs
     assert "test_fail.py::test_fail FAILED" in pdb.pdb_obs
     assert "test_pass.py::test_pass PASSED" in pdb.pdb_obs
@@ -197,7 +163,9 @@ def test_register():
     env = RepoEnv()
     pdb_tool = PDBTool()
     pdb_tool.register(env)
-    assert pdb_tool.environment == env
+    # every tool listen to ENV_RESET event to track history
+    assert pdb_tool in env.event_hooks.event_listeners[Event.ENV_RESET]
+    assert pdb_tool in env.event_hooks.event_listeners[Event.REWRITE_SUCCESS]
 
 
 def test_register_invalid_environment():
@@ -213,7 +181,7 @@ def test_breakpoint_add_clear_add_new_breakpoint(
     pdb_message = "Breakpoint 5 at file1.py:25"
     mock_interact_with_pdb.return_value = pdb_message
     pdb_tool, test_repo, env = setup_pdb_repo_env(tmp_path)
-    success, output = pdb_tool.breakpoint_add_clear("b 25")
+    success, output = pdb_tool.breakpoint_add_clear(env, "b 25")
     assert success
     assert output == pdb_message
     expected_state = {"file1.py|||25": "b file1.py:25"} | breakpoints_state
@@ -224,7 +192,7 @@ def test_breakpoint_add_clear_add_existing_breakpoint(
     tmp_path, setup_pdb_repo_env, breakpoints_state
 ):
     pdb_tool, test_repo, env = setup_pdb_repo_env(tmp_path)
-    success, output = pdb_tool.breakpoint_add_clear("b 10")
+    success, output = pdb_tool.breakpoint_add_clear(env, "b 10")
     assert success
     assert output == "Breakpoint already exists at line 10 in file1.py."
     assert env.current_breakpoints_state == breakpoints_state
@@ -237,7 +205,7 @@ def test_breakpoint_add_clear_clear_specific(
     pdb_message = "Deleted breakpoint 2 at file1.py:20"
     mock_interact_with_pdb.return_value = pdb_message
     pdb_tool, test_repo, env = setup_pdb_repo_env(tmp_path)
-    success, output = pdb_tool.breakpoint_add_clear("cl 20")
+    success, output = pdb_tool.breakpoint_add_clear(env, "cl 20")
     expected_state = {
         "file1.py|||10": "b file1.py:10",
         "file1.py|||30": "b file1.py:30",
@@ -252,7 +220,7 @@ def test_breakpoint_add_clear_clear_not_found(
     tmp_path, setup_pdb_repo_env, breakpoints_state
 ):
     pdb_tool, test_repo, env = setup_pdb_repo_env(tmp_path)
-    success, output = pdb_tool.breakpoint_add_clear("cl 8")
+    success, output = pdb_tool.breakpoint_add_clear(env, "cl 8")
     assert success
     assert output == "No breakpoint exists at line 8 in file1.py."
     assert env.current_breakpoints_state == breakpoints_state
@@ -262,7 +230,7 @@ def test_breakpoint_modify_remove(tmp_path, setup_pdb_repo_env):
     # Remove breakpoint at line 20 and move breakpoint at line 30 to line 24
     # TODO: 24 or 25?
     pdb_tool, test_repo, env = setup_pdb_repo_env(tmp_path)
-    pdb_tool.breakpoint_modify("file1.py", 15, 25, 5)
+    pdb_tool.breakpoint_modify(env, "file1.py", 15, 25, 5)
     expected_state = {
         "file1.py|||10": "b file1.py:10",
         "file1.py|||24": "b file1.py:24",
@@ -273,7 +241,7 @@ def test_breakpoint_modify_remove(tmp_path, setup_pdb_repo_env):
 
 def test_breakpoint_modify_move(tmp_path, setup_pdb_repo_env):
     pdb_tool, test_repo, env = setup_pdb_repo_env(tmp_path)
-    pdb_tool.breakpoint_modify("file1.py", 5, 15, 10)
+    pdb_tool.breakpoint_modify(env, "file1.py", 5, 15, 10)
     expected_state = {
         "file2.py|||15": "b file2.py:15",
         "file1.py|||19": "b file1.py:19",
@@ -284,14 +252,14 @@ def test_breakpoint_modify_move(tmp_path, setup_pdb_repo_env):
 
 def test_breakpoint_modify_remove_all(tmp_path, setup_pdb_repo_env):
     pdb_tool, test_repo, env = setup_pdb_repo_env(tmp_path)
-    pdb_tool.breakpoint_modify("file1.py", None, None, 0)
+    pdb_tool.breakpoint_modify(env, "file1.py", None, None, 0)
     expected_state = {"file2.py|||15": "b file2.py:15"}
     assert env.current_breakpoints_state == expected_state
 
 
 def test_breakpoint_modify_no_change(tmp_path, setup_pdb_repo_env):
     pdb_tool, test_repo, env = setup_pdb_repo_env(tmp_path)
-    pdb_tool.breakpoint_modify("file1.py", 25, 35, 5)
+    pdb_tool.breakpoint_modify(env, "file1.py", 25, 35, 5)
     # Test no change for breakpoints before the rewritten code (change line 30)
     expected_state = {
         "file1.py|||10": "b file1.py:10",
@@ -308,7 +276,7 @@ def test_get_current_frame_file(mock_interact_with_pdb, tmp_path, setup_pdb_repo
     mock_interact_with_pdb.return_value = (
         f"somecontext > {fail_test_path}(2)<module>()\n-> some code context"
     )
-    pdb_tool.get_current_frame_file()
+    pdb_tool.get_current_frame_file(env)
     assert str(fail_test_path).endswith(pdb_tool.current_frame_file)
 
 
@@ -323,11 +291,10 @@ def test_pdb_crashing(tmp_path, setup_test_repo):
         debug_entrypoint="python -m pdb -m pytest -s test_fail.py",
     )
     pdb = PDBTool()
-    pdb.register(environment)
 
-    initial_output = pdb.start_pdb()
+    initial_output = pdb.start_pdb(environment)
     assert "The pytest entry point." in initial_output
-    output = pdb.interact_with_pdb("c")
+    output = pdb.interact_with_pdb("c", 5)
     assert "IndentationError" in output
 
 
@@ -344,9 +311,8 @@ def test_pdb_timeout(tmp_path, setup_test_repo):
         debug_entrypoint="python -m pdb -m pytest -sv test_fail.py",
     )
     pdb = PDBTool()
-    pdb.register(environment)
 
-    initial_output = pdb.start_pdb()
+    initial_output = pdb.start_pdb(environment)
     assert "The pytest entry point." in initial_output
     output = pdb.interact_with_pdb("c", timeout=1)
     assert "timed out" in output

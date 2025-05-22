@@ -19,10 +19,15 @@ def test_rewrite(mock_environment):
     patcher = RewriteTool()
     patcher.environment = mock_environment
 
-    patch = "2 <c>    print(f'Hello, {name}!')</c>"
-    result = patcher.use(patch)
+    patch = {
+        "path": None,
+        "start": 2,
+        "end": None,
+        "new_code": "    print(f'Hello, {name}!')",
+    }
+    result = patcher.use(mock_environment, **patch)
 
-    assert result.observation == "Rewriting done."
+    assert result.observation == "Rewrite successful. The file has been modified."
     assert patcher.rewrite_success
     mock_environment.overwrite_file.assert_called_once_with(
         filepath="test.py", content=""
@@ -33,25 +38,19 @@ def test_rewrite_with_file_path(mock_environment):
     patcher = RewriteTool()
     patcher.environment = mock_environment
 
-    patch = "test.py 2 <c>    print(f'Hello, {name}!')</c>"
-    result = patcher.use(patch)
+    patch = {
+        "path": "test.py",
+        "start": 2,
+        "end": None,
+        "new_code": "    print(f'Hello, {name}!')",
+    }
+    result = patcher.use(mock_environment, **patch)
 
-    assert result.observation == "Rewriting done."
+    assert result.observation == "Rewrite successful. The file has been modified."
     assert patcher.rewrite_success
     mock_environment.overwrite_file.assert_called_once_with(
         filepath="test.py", content=""
     )
-
-
-def test_rewrite_invalid_content(mock_environment):
-    patcher = RewriteTool()
-    patcher.environment = mock_environment
-
-    patch = "invalid content"
-    result = patcher.use(patch)
-
-    assert result.observation == "SyntaxError: invalid syntax.\nRewrite failed."
-    assert not patcher.rewrite_success
 
 
 def test_rewrite_invalid_file(mock_environment):
@@ -59,12 +58,17 @@ def test_rewrite_invalid_file(mock_environment):
     patcher.environment = mock_environment
     mock_environment.all_files = ["another_file.py"]
 
-    patch = "test.py 2 <c>    print(f'Hello, {name}!')</c>"
-    result = patcher.use(patch)
+    patch = {
+        "path": "test.py",
+        "start": 2,
+        "end": None,
+        "new_code": "    print(f'Hello, {name}!')",
+    }
+    result = patcher.use(mock_environment, **patch)
 
     assert (
         result.observation
-        == "File test.py does not exist or is not in the current repository.\nRewrite failed."
+        == "Error while rewriting the file: File test.py does not exist or is not in the current repository.\nRewrite failed."
     )
     assert not patcher.rewrite_success
 
@@ -73,8 +77,13 @@ def test_rewrite_invalid_line_number(mock_environment):
     patcher = RewriteTool()
     patcher.environment = mock_environment
 
-    patch = "test.py 0 <c>    print(f'Hello, {name}!')</c>"
-    result = patcher.use(patch)
+    patch = {
+        "path": "test.py",
+        "start": 0,
+        "end": None,
+        "new_code": "    print(f'Hello, {name}!')",
+    }
+    result = patcher.use(mock_environment, **patch)
 
     assert (
         result.observation
@@ -87,11 +96,16 @@ def test_rewrite_invalid_line_number_2(mock_environment):
     patcher = RewriteTool()
     patcher.environment = mock_environment
 
-    patch = "test.py 12:4 <c>    print(f'Hello, {name}!')</c>"
-    result = patcher.use(patch)
+    patch = {
+        "path": "test.py",
+        "start": 12,
+        "end": 4,
+        "new_code": "    print(f'Hello, {name}!')",
+    }
+    result = patcher.use(mock_environment, **patch)
 
     assert (
         result.observation
-        == "Invalid line number range, head should be less than or equal to tail.\nRewrite failed."
+        == "Invalid line number range, start should be less than or equal to end.\nRewrite failed."
     )
     assert not patcher.rewrite_success

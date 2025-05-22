@@ -1,5 +1,8 @@
+import json
+from dataclasses import make_dataclass
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import numpy as np
 import pytest
 import yaml
 
@@ -15,6 +18,26 @@ from debug_gym.agents.llm_api import (
     TokenUsage,
     retry_on_rate_limit,
 )
+from debug_gym.gym.entities import Observation
+from debug_gym.gym.tools.tool import EnvironmentTool, ToolCall
+from debug_gym.gym.tools.toolbox import Toolbox
+
+
+class Tool1(EnvironmentTool):
+    name = "tool 1"
+    description = "The description of tool 1"
+    arguments = {
+        "arg1": {
+            "type": ["string"],
+            "description": "arg1 description",
+        },
+    }
+
+    def use(self, env, action):
+        return Observation("Tool1", action)
+
+
+tools = [Tool1()]
 
 
 @patch("openai.resources.chat.completions.Completions.create")
@@ -38,16 +61,27 @@ from debug_gym.agents.llm_api import (
 def test_llm(mock_llm_config, mock_openai, logger_mock):
     mock_response = MagicMock()
     mock_response.choices = [MagicMock()]
-    mock_response.choices[0].message.content = "Some response from OpenAI"
+    mock_response.choices[0].message.tool_calls = [MagicMock()]
+    mock_response.usage.prompt_tokens = 2
+    mock_response.usage.completion_tokens = 4
+
+    tmp_dict = {"arguments": '{"arg 1":0}', "name": "tool 1"}
+    tmp_dataclass = make_dataclass("tmp", ((k, type(v)) for k, v in tmp_dict.items()))(
+        **tmp_dict
+    )
+    tmp_dict = dict(id="1", function=tmp_dataclass, type="function")
+    mock_response.choices[0].message.tool_calls[0] = make_dataclass(
+        "tmp", ((k, type(v)) for k, v in tmp_dict.items())
+    )(**tmp_dict)
     mock_openai.return_value = mock_response
 
     llm = OpenAILLM(model_name="openai", logger=logger_mock)
     messages = [{"role": "user", "content": "Hello World"}]
-    llm_response = llm(messages)
+    llm_response = llm(messages, tools)
     assert llm_response.prompt == messages
-    assert llm_response.response == "Some response from OpenAI"
+    assert llm_response.tool == ToolCall(id="1", name="tool 1", arguments={"arg 1": 0})
     assert llm_response.token_usage.prompt == 2
-    assert llm_response.token_usage.response == 5
+    assert llm_response.token_usage.response == 4
 
 
 @pytest.fixture
@@ -94,22 +128,30 @@ def completion_mock():
     return AsyncMock(return_value=mock_response)
 
 
-@patch("builtins.input", lambda *args, **kwargs: "User input")
+@patch(
+    "builtins.input",
+    lambda *args, **kwargs: json.dumps(
+        {"id": "pdb-637469", "name": "pdb", "arguments": {"command": "b 10"}}
+    ),
+)
 def test_human(build_env_info):
+    # always generate the same random toolcall id: "pdb-637469"
+    np.random.seed(42)
     human = Human()
     messages = [{"role": "user", "content": "Hello"}]
     env_info = build_env_info(
-        tools={
-            "pdb": {"template": "```pdb <command>```"},
-            "view": {"template": "```<path/to/file.py>```"},
-        }
+        action=ToolCall(id="pdb-637469", name="pdb", arguments="b 10"),
+        tools=[Toolbox.get_tool("pdb"), Toolbox.get_tool("view")],
     )
-    llm_response = human(messages, env_info)
+    llm_response = human(messages, env_info.tools)
     # human only uses the messages content
-    assert llm_response.prompt == "Hello"
-    assert llm_response.response == "User input"
-    assert llm_response.token_usage.prompt == 5
-    assert llm_response.token_usage.response == 10
+    assert llm_response.prompt == [{"role": "user", "content": "Hello"}]
+    assert (
+        llm_response.response
+        == '{"id": "pdb-637469", "name": "pdb", "arguments": {"command": "b 10"}}'
+    )
+    assert llm_response.token_usage.prompt == 4
+    assert llm_response.token_usage.response == 8
 
 
 @patch.object(
@@ -240,19 +282,23 @@ def test_query_anthropic_model_basic(mock_llm_config, logger_mock):
 
     mock_response = MagicMock()
     mock_response.content = [MagicMock()]
-    mock_response.content[0].text = "```python\nprint('Hello World')\n```"
+    tmp_dict = dict(id="1", input={"arg 1": 0}, name="tool 1", type="tool_use")
+    mock_response.content[0] = make_dataclass(
+        "tmp", ((k, type(v)) for k, v in tmp_dict.items())
+    )(**tmp_dict)
+    mock_response.usage.input_tokens = 10
+    mock_response.usage.output_tokens = 10
     llm.client.messages.create = MagicMock(return_value=mock_response)
-    llm.count_tokens = MagicMock(return_value=10)
 
     messages = [{"role": "user", "content": "Write a Hello World program"}]
-    llm_response = llm(messages)
+    llm_response = llm(messages, tools)
 
     assert llm_response.prompt == [
         {"role": "user", "content": "Write a Hello World program"}
     ]
-    assert llm_response.response == "```python\nprint('Hello World')\n```"
-    assert llm_response.token_usage.prompt == 10  # from mock
-    assert llm_response.token_usage.response == 10  # from mock
+    assert llm_response.tool == ToolCall(id="1", name="tool 1", arguments={"arg 1": 0})
+    assert llm_response.token_usage.prompt == 10
+    assert llm_response.token_usage.response == 10
 
     llm.client.messages.create.assert_called_once()
     assert llm.client.messages.create.call_args[1]["model"] == "claude-3-opus-20240229"
@@ -269,19 +315,23 @@ def test_query_anthropic_model_with_thinking(logger_mock):
 
     mock_response = MagicMock()
     mock_response.content = [MagicMock(), MagicMock()]
-    mock_response.content[1].text = "```python\nprint('Hello World')\n```"
+    tmp_dict = dict(id="1", input={"arg 1": 0}, name="tool 1", type="tool_use")
+    mock_response.content[1] = make_dataclass(
+        "tmp", ((k, type(v)) for k, v in tmp_dict.items())
+    )(**tmp_dict)
+    mock_response.usage.input_tokens = 10
+    mock_response.usage.output_tokens = 10
     llm.client.messages.create = MagicMock(return_value=mock_response)
-    llm.count_tokens = MagicMock(return_value=10)
 
     messages = [{"role": "user", "content": "Write a Hello World program"}]
 
-    llm_response = llm(messages)
+    llm_response = llm(messages, tools)
     assert llm_response.prompt == [
         {"role": "user", "content": "Write a Hello World program"}
     ]
-    assert llm_response.response == "```python\nprint('Hello World')\n```"
-    assert llm_response.token_usage.prompt == 10  # from mock
-    assert llm_response.token_usage.response == 10  # from mock
+    assert llm_response.tool == ToolCall(id="1", name="tool 1", arguments={"arg 1": 0})
+    assert llm_response.token_usage.prompt == 10
+    assert llm_response.token_usage.response == 10
 
     llm.client.messages.create.assert_called_once()
     assert llm.client.messages.create.call_args[1]["model"] == "claude-3-opus-20240229"
@@ -291,27 +341,31 @@ def test_query_anthropic_model_with_thinking(logger_mock):
     assert llm.client.messages.create.call_args[1]["thinking"]["budget_tokens"] == 16000
 
 
-# DOES THIS TEST MAKE SENSE?
 @patch.object(
     LLMConfigRegistry,
     "from_file",
     return_value=LLMConfigRegistry.register_all(anthropic_config),
 )
-def test_query_anthropic_model_empty_messages(mock_llm_config, logger_mock):
+def test_query_anthropic_model_no_user_messages(mock_llm_config, logger_mock):
     llm = AnthropicLLM("test-anthropic", logger=logger_mock)
 
     mock_response = MagicMock()
     mock_response.content = [MagicMock()]
-    mock_response.content[0].text = "```sample response```"
+    tmp_dict = dict(id="1", input={"arg 1": 0}, name="tool 1", type="tool_use")
+    mock_response.content[0] = make_dataclass(
+        "tmp", ((k, type(v)) for k, v in tmp_dict.items())
+    )(**tmp_dict)
     llm.client.messages.create = MagicMock(return_value=mock_response)
     llm.count_tokens = MagicMock(return_value=10)
 
-    messages = []
-    llm_response = llm(messages)
+    messages = [{"role": "system", "content": "You are a helpful assistant"}]
+    llm_response = llm(messages, tools)
 
     # Verify default user prompt was added
-    assert llm_response.prompt == []
-    assert llm_response.response == "```sample response```"
+    assert llm_response.prompt == [
+        {"role": "system", "content": "You are a helpful assistant"}
+    ]
+    assert llm_response.tool == ToolCall(id="1", name="tool 1", arguments={"arg 1": 0})
     llm.client.messages.create.assert_called_once()
     assert len(llm.client.messages.create.call_args[1]["messages"]) == 1
     assert llm.client.messages.create.call_args[1]["messages"][0]["role"] == "user"
@@ -331,7 +385,10 @@ def test_query_anthropic_model_with_system_prompt(mock_llm_config, logger_mock):
 
     mock_response = MagicMock()
     mock_response.content = [MagicMock()]
-    mock_response.content[0].text = "```system response```"
+    tmp_dict = dict(id="1", input={"arg 1": 0}, name="tool 1", type="tool_use")
+    mock_response.content[0] = make_dataclass(
+        "tmp", ((k, type(v)) for k, v in tmp_dict.items())
+    )(**tmp_dict)
     llm.client.messages.create = MagicMock(return_value=mock_response)
     llm.count_tokens = MagicMock(return_value=10)
 
@@ -339,10 +396,10 @@ def test_query_anthropic_model_with_system_prompt(mock_llm_config, logger_mock):
         {"role": "system", "content": "You are a helpful coding assistant"},
         {"role": "user", "content": "Help me with Python"},
     ]
-    llm_response = llm(messages)
+    llm_response = llm(messages, tools)
 
     assert llm_response.prompt == messages
-    assert llm_response.response == "```system response```"
+    assert llm_response.tool == ToolCall(id="1", name="tool 1", arguments={"arg 1": 0})
     llm.client.messages.create.assert_called_once()
     assert (
         llm.client.messages.create.call_args[1]["system"]
@@ -361,7 +418,10 @@ def test_query_anthropic_model_with_conversation(mock_llm_config, logger_mock):
     llm = AnthropicLLM("test-anthropic", logger=logger_mock)
     mock_response = MagicMock()
     mock_response.content = [MagicMock()]
-    mock_response.content[0].text = "```response to conversation```"
+    tmp_dict = dict(id="1", input={"arg 1": 0}, name="tool 1", type="tool_use")
+    mock_response.content[0] = make_dataclass(
+        "tmp", ((k, type(v)) for k, v in tmp_dict.items())
+    )(**tmp_dict)
     llm.client.messages.create = MagicMock(return_value=mock_response)
     llm.count_tokens = MagicMock(return_value=10)
 
@@ -372,11 +432,12 @@ def test_query_anthropic_model_with_conversation(mock_llm_config, logger_mock):
         {"role": "assistant", "content": "Hi there! How can I help you?"},
         {"role": "user", "content": "I need help with Python"},
     ]
-    mock_response = llm(messages)
+    mock_response = llm(messages, tools)
 
     # Verify conversation handling
     assert mock_response.prompt == messages
-    assert mock_response.response == "```response to conversation```"
+    assert mock_response.tool == ToolCall(id="1", name="tool 1", arguments={"arg 1": 0})
+    ToolCall(id="1", name="tool 1", arguments={"arg 1": 0})
     llm.client.messages.create.assert_called_once()
     assert (
         llm.client.messages.create.call_args[1]["system"]
@@ -397,7 +458,10 @@ def test_query_anthropic_model_empty_content(mock_llm_config, logger_mock):
     llm = AnthropicLLM("test-anthropic", logger=logger_mock)
     mock_response = MagicMock()
     mock_response.content = [MagicMock()]
-    mock_response.content[0].text = "```response```"
+    tmp_dict = dict(id="1", input={"arg 1": 0}, name="tool 1", type="tool_use")
+    mock_response.content[0] = make_dataclass(
+        "tmp", ((k, type(v)) for k, v in tmp_dict.items())
+    )(**tmp_dict)
     llm.client.messages.create = MagicMock(return_value=mock_response)
     llm.count_tokens = MagicMock(return_value=10)
 
@@ -406,9 +470,8 @@ def test_query_anthropic_model_empty_content(mock_llm_config, logger_mock):
         {"role": "user", "content": ""},  # Empty content should be skipped
         {"role": "user", "content": "Real question"},
     ]
-    result = llm(messages)
-
-    assert result.response == "```response```"
+    result = llm(messages, tools)
+    assert result.tool == ToolCall(id="1", name="tool 1", arguments={"arg 1": 0})
     llm.client.messages.create.assert_called_once()
     assert len(llm.client.messages.create.call_args[1]["messages"]) == 1
     assert (
@@ -427,8 +490,8 @@ def test_query_anthropic_model_unknown_role(mock_llm_config, logger_mock):
     llm.client.messages.create = MagicMock()
     llm.count_tokens = MagicMock(return_value=10)
     messages = [{"role": "unknown", "content": "This has an unknown role"}]
-    with pytest.raises(ValueError, match="Unknown role: .* unknown .*"):
-        llm(messages)
+    with pytest.raises(ValueError, match="Unknown role: unknown"):
+        llm(messages, tools)
 
 
 @patch.object(
@@ -445,29 +508,15 @@ def test_query_anthropic_model_max_tokens_from_config(mock_llm_config, logger_mo
     llm = AnthropicLLM("test-anthropic", logger=logger_mock)
     mock_response = MagicMock()
     mock_response.content = [MagicMock()]
-    mock_response.content[0].text = "```response```"
+    tmp_dict = dict(id="1", input={"arg 1": 0}, name="tool 1", type="tool_use")
+    mock_response.content[0] = make_dataclass(
+        "tmp", ((k, type(v)) for k, v in tmp_dict.items())
+    )(**tmp_dict)
     llm.client.messages.create = MagicMock(return_value=mock_response)
     llm.count_tokens = MagicMock(return_value=10)
     messages = [{"role": "user", "content": "Test message"}]
-    llm(messages)
+    llm(messages, tools)
     assert llm.client.messages.create.call_args[1]["max_tokens"] == 4000
-
-
-@patch.object(
-    LLMConfigRegistry,
-    "from_file",
-    return_value=LLMConfigRegistry.register_all(anthropic_config),
-)
-def test_query_anthropic_model_no_code_block(mock_llm_config, logger_mock):
-    llm = AnthropicLLM("test-anthropic", logger=logger_mock)
-    mock_response = MagicMock()
-    mock_response.content = [MagicMock()]
-    mock_response.content[0].text = "This is a response without any code blocks"
-    llm.client.messages.create = MagicMock(return_value=mock_response)
-    llm.count_tokens = MagicMock(return_value=10)
-    messages = [{"role": "user", "content": "Test message"}]
-    result = llm(messages)
-    assert result.response == ""
 
 
 def test_retry_on_rate_limit_success_after_retry():
@@ -712,7 +761,7 @@ def test_token_usage_initialization():
 def test_llm_call_with_generate_kwargs(mock_llm_config, logger_mock, llm_class_mock):
     messages = [{"role": "user", "content": "Hello"}]
     llm_mock = llm_class_mock("llm-mock", logger=logger_mock)
-    llm_response = llm_mock(messages)
+    llm_response = llm_mock(messages, tools)
 
     # Check that generate_kwargs were passed to generate
     assert llm_mock.called_kwargs["temperature"] == 0.7
@@ -743,7 +792,7 @@ def test_llm_call_override_generate_kwargs(
     messages = [{"role": "user", "content": "Hello"}]
     llm_mock = llm_class_mock("llm-mock", logger=logger_mock)
     # Override the temperature from config
-    llm_response = llm_mock(messages, temperature=0.2)
+    llm_response = llm_mock(messages, tools, temperature=0.2)
     # Check that the override worked: 0.2 from kwargs, not 0.7 from config
     assert llm_mock.called_kwargs["temperature"] == 0.2
 
@@ -766,7 +815,7 @@ def test_llm_call_override_generate_kwargs(
 def test_llm_call_ignore_kwargs(mock_llm_config, logger_mock, llm_class_mock):
     messages = [{"role": "user", "content": "Hello"}]
     llm_mock = llm_class_mock("llm-mock", logger=logger_mock)
-    llm_response = llm_mock(messages, temperature=0.7, max_tokens=10)
+    llm_response = llm_mock(messages, tools, temperature=0.7, max_tokens=10)
     assert "temperature" not in llm_mock.called_kwargs
     assert llm_mock.called_kwargs["max_tokens"] == 10
 
@@ -794,36 +843,11 @@ def test_llm_call_system_prompt_not_supported(
         {"role": "user", "content": "Hello"},
     ]
     llm_mock = llm_class_mock("llm-mock", logger=logger_mock)
-    llm_response = llm_mock(messages)
-    assert llm_mock.called_messages[0]["role"] == "user"
-    assert (
-        llm_mock.called_messages[0]["content"] == "You are a helpful assistant\n\nHello"
-    )
-
-
-@patch.object(
-    LLMConfigRegistry,
-    "from_file",
-    return_value=LLMConfigRegistry.register_all(
-        {
-            "llm-mock": {
-                "model": "llm-mock",
-                "context_limit": 1,  # 1000 tokens
-                "tokenizer": "test-tokenizer",
-                "tags": [],
-            }
-        }
-    ),
-)
-def test_llm_call_with_too_long_prompt(mock_llm_config, logger_mock, llm_class_mock):
-    # Create a message that's longer than context_limit (1000)
-    long_text = "x" * 2000
-    messages = [{"role": "user", "content": long_text}]
-    llm_mock = llm_class_mock("llm-mock", logger=logger_mock)
-    llm_response = llm_mock(messages)
-    assert llm_mock.called_messages[0]["role"] == "user"
-    assert len(llm_mock.called_messages[0]["content"]) == 999
-    assert llm_response.response == "Test response"
+    llm_response = llm_mock(messages, tools)
+    assert llm_mock.called_messages == [
+        {"role": "user", "content": "You are a helpful assistant"},
+        {"role": "user", "content": "Hello"},
+    ]
 
 
 def test_llm_init_with_config(logger_mock, llm_class_mock):
@@ -867,3 +891,60 @@ def test_llm_init_with_both_config_types(logger_mock, llm_class_mock):
         "Both llm_config and llm_config_file are provided, using llm_config."
         in logger_mock._log_history
     )
+
+
+@pytest.fixture
+def example_tools():
+    """
+    Build a deterministic list of tools (Human.define_tools generates random IDs,
+    so we craft a fixed one instead).
+    """
+    return [
+        {
+            "id": "print-001",
+            "name": "print",
+            "arguments": {"msg": ""},
+        },
+        {
+            "id": "sum-002",
+            "name": "sum",
+            "arguments": {"a": "", "b": ""},
+        },
+    ]
+
+
+def test_parse_tool_call_response_valid(logger_mock, example_tools):
+    """A well-formed JSON command that matches one of the declared tools
+    should be converted into a ToolCall instance and no error logged."""
+    human = Human(logger=logger_mock)
+    cmd = json.dumps({"id": "print-001", "name": "print", "arguments": {"msg": "hi"}})
+
+    tool_call = human.parse_tool_call_response(cmd, example_tools)
+    assert tool_call == ToolCall(id="print-001", name="print", arguments={"msg": "hi"})
+
+
+@pytest.mark.parametrize(
+    "bad_command",
+    [
+        "not-json",  # invalid JSON
+        json.dumps(
+            {"id": "print-001", "name": "print", "arguments": {"unknown": "x"}}
+        ),  # wrong args
+        json.dumps(
+            {"id": "non-existent", "name": "print", "arguments": {}}
+        ),  # id not found
+        json.dumps(
+            {"id": "print-001", "name": "unknown", "arguments": {}}
+        ),  # name mismatch
+        json.dumps(
+            {"id": "print-001", "name": "unknown"}
+        ),  # missing ToolCalls arguments
+    ],
+)
+def test_parse_tool_call_response_invalid(logger_mock, example_tools, bad_command):
+    """For malformed or non-matching commands the method should return None"""
+    human = Human(logger=logger_mock)
+
+    result = human.parse_tool_call_response(bad_command, example_tools)
+
+    assert result is None

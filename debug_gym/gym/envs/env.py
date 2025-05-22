@@ -1,5 +1,4 @@
 import atexit
-import glob
 import os
 import shutil
 import subprocess
@@ -13,7 +12,8 @@ import numpy as np
 
 from debug_gym.gym.entities import EvalOutput, Event, Observation
 from debug_gym.gym.terminal import Terminal
-from debug_gym.gym.utils import _walk, make_file_matcher, parse_action, show_line_number
+from debug_gym.gym.tools.tool import EnvironmentTool, ToolCall
+from debug_gym.gym.utils import _walk, make_file_matcher, show_line_number
 from debug_gym.logger import DebugGymLogger
 
 
@@ -26,13 +26,13 @@ class EnvInfo:
     dir_tree: str
     current_code_with_line_number: dict | str
     current_breakpoints: str
-    action: str
+    action: ToolCall | None
     instructions: dict
     score: int
     max_score: int
     done: bool
     rewrite_counter: int
-    tools: dict  # TODO: return some tool dataclass
+    tools: list[EnvironmentTool]
 
 
 class EventHooks:
@@ -44,12 +44,16 @@ class EventHooks:
             raise ValueError(f"Unknown event type: {event}")
         if not hasattr(tool, event.handler_name):
             raise ValueError(f"Tool does not implement method {event.handler_name}")
+        if tool in self.event_listeners[event]:
+            raise ValueError(f"Tool already subscribed to event: {event}")
         self.event_listeners[event].append(tool)
 
     def unsubscribe(self, event: Event, tool):
         self.event_listeners[event].remove(tool)
 
-    def notify(self, event: Event, source=None, **kwargs) -> list[Observation]:
+    def notify(
+        self, environment, event: Event, source=None, **kwargs
+    ) -> list[Observation]:
         """Notify all tools that are subscribed to the event.
         Returns a list of observations from all tools that are triggered by the event.
         If error occurs while handling the event, an error observation is returned.
@@ -59,7 +63,7 @@ class EventHooks:
             if tool == source:
                 continue  # skip the source tool to avoid infinite loop
             try:
-                observation = getattr(tool, event.handler_name)(**kwargs)
+                observation = getattr(tool, event.handler_name)(environment, **kwargs)
                 if observation:
                     observations.append(observation)
             except Exception as e:
@@ -70,43 +74,51 @@ class EventHooks:
 
 class TooledEnv:
     def __init__(self):
-        self.tools = {}
+        self._tools = {}
         self.event_hooks = EventHooks()
         self.event_queue = []
         self.all_observations = []
 
     @property
     def tool_names(self):
-        return ", ".join([f"```{t.name}```" for t in self.tools.values()])
+        return ", ".join([t.name for t in self._tools.values()])
 
     def add_tool(self, tool):
-        if tool.name in self.tools:
+        if tool.name in self._tools:
             raise ValueError(f"Tool {tool.name} already exists!")
 
-        self.tools[tool.name] = tool
+        self._tools[tool.name] = tool
         tool.register(self)
 
     def has_tool(self, tool_name):
-        return tool_name in self.tools
+        return tool_name in self._tools
 
     def get_tool(self, tool_name):
-        return self.tools[tool_name]
+        return self._tools[tool_name]
 
-    def get_triggered_tools(self, action):
+    def remove_tool(self, tool_name):
+        if tool_name not in self._tools:
+            raise ValueError(f"Tool {tool_name} not found!")
+        removed_tool = self._tools.pop(tool_name)
+        removed_tool.unregister(self)  # Unsubscribe from all events
+        return removed_tool
+
+    def get_triggered_tools(self, action: ToolCall):
         try:
-            tool_name, tool_args = parse_action(action)
+            tool_name = action.name
+            tool_kwargs = action.arguments
         except Exception as e:
             # parse error
             return str(e), None
-        if tool_name not in self.tools:
+        if tool_name not in self._tools:
             # failed to find tool
             return f"Unregistered tool: {tool_name}", None
-        tool = self.tools[tool_name]
-        return None, [tool, tool_args]
+        tool = self._tools[tool_name]
+        return None, [tool, tool_kwargs]
 
     @property
-    def tool_instructions(self):
-        return {name: tool.instructions for name, tool in self.tools.items()}
+    def tools(self):
+        return list(self._tools.values())
 
     def clear_all_observations(self):
         self.all_observations = []
@@ -122,9 +134,16 @@ class TooledEnv:
         """Process all queued events and handle their observations."""
         while self.event_queue:
             event, source, kwargs = self.event_queue.pop(0)
-            observations = self.event_hooks.notify(event=event, source=source, **kwargs)
+            observations = self.event_hooks.notify(
+                environment=self, event=event, source=source, **kwargs
+            )
             self.all_observations.extend(observations)
+            self.post_process_event(event, source, kwargs, observations)
         return self.all_observations
+
+    def post_process_event(self, event: Event, source, kwargs, observations):
+        """Post-process the event after it has been handled by the tools."""
+        pass
 
 
 class RepoEnv(TooledEnv):
@@ -227,6 +246,8 @@ class RepoEnv(TooledEnv):
             self.debug_entrypoint = self.debug_entrypoint.replace(
                 "python", "python -m pdb"
             )
+        self.entrypoint = "PYTHONPATH=$PYTHONPATH:$PWD " + self.entrypoint
+        self.debug_entrypoint = "PYTHONPATH=$PYTHONPATH:$PWD " + self.debug_entrypoint
 
     @staticmethod
     def _prepare_entrypoint(entrypoint):
@@ -246,10 +267,7 @@ class RepoEnv(TooledEnv):
 
     @property
     def instructions(self):
-        _instruction = {
-            "Available tools to solve the problem": self.tool_instructions,
-            "Available commands": self.tool_names,
-        }
+        _instruction = {}
         return _instruction
 
     def display_files(self):
@@ -277,7 +295,7 @@ class RepoEnv(TooledEnv):
 
     def reset(self, *, options: dict = None):
         """Resets the environment and returns eval as the initial observation."""
-        self.logger.info(f"Resetting environment")
+        self.logger.info("Resetting environment")
         options = options or {}
 
         self._reset_env_state()
@@ -311,7 +329,7 @@ class RepoEnv(TooledEnv):
             max_score=self.max_score,
             instructions=self.instructions,
             rewrite_counter=self.rewrite_counter,
-            tools=self.tool_instructions,
+            tools=self.tools,
         )
         return self.infos
 
@@ -417,7 +435,7 @@ class RepoEnv(TooledEnv):
 
     def current_code_with_line_number(self):
         if self.current_file is None or self.current_file_content is None:
-            return "You are currently not working in a file. You can use ```view path/to/file.py``` to navigate to a file first."
+            return "You are currently not working in a file. You can call the view tool to navigate to a file first."
 
         output = {
             "File name": self.current_file,
@@ -431,7 +449,7 @@ class RepoEnv(TooledEnv):
         }
         if self.current_breakpoints_state:
             output["Note"] = (
-                "B indicates breakpoint before a certain line of code, this can be changed using pdb commands such as b, cl, etc."
+                "B indicates breakpoint before a certain line of code, this can be changed by calling the pdb tool."
             )
         return output
 
@@ -447,7 +465,7 @@ class RepoEnv(TooledEnv):
         patch = result.stdout.replace(str(self.working_dir), str(self.path))
         return patch
 
-    def step(self, action: str):
+    def step(self, action: ToolCall) -> EnvInfo:
         # given action, return new obs, and update infos
         # the action space is composed of a few smaller action spaces
         self.clear_all_observations()
@@ -456,9 +474,10 @@ class RepoEnv(TooledEnv):
         if message:
             self.step_observation = Observation("env", message)
         else:
-            triggered_tool, tool_args = tool_info
+            triggered_tool, tool_kwargs = tool_info
             try:
-                self.step_observation = triggered_tool(tool_args)
+                # tool_kwargs is a dict, so we need to unpack it
+                self.step_observation = triggered_tool(self, **tool_kwargs)
             except BaseException as e:
                 error_message = (
                     f"Error while using tool {triggered_tool.name} "
@@ -489,10 +508,15 @@ class RepoEnv(TooledEnv):
             max_score=self.max_score,
             done=self.done,
             rewrite_counter=self.rewrite_counter,
-            tools=self.tool_instructions,
+            tools=self.tools,
         )
 
         return self.infos
+
+    def post_process_event(self, event: Event, source, kwargs, observations):
+        """Post-process the event after it has been handled by the tools."""
+        if event in (Event.REWRITE_SUCCESS, Event.REWRITE_FAIL):
+            self.rewrite_counter += 1
 
     def close(self):
         self.cleanup_workspace()

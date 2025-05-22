@@ -5,7 +5,6 @@ import pytest
 
 from debug_gym.agents.utils import (
     load_config,
-    merge_messages,
     print_messages,
     trim,
     trim_prompt_messages,
@@ -22,29 +21,6 @@ def test_print_messages(logger_mock):
     assert logger_mock._log_history == ["Hello\n", "Hi\n", "System message\n"]
 
 
-def test_merge_messages():
-    messages = [
-        {"role": "user", "content": "Hello"},
-        {"role": "user", "content": "How are you?"},
-        {"role": "assistant", "content": "Hi"},
-    ]
-    merged = merge_messages(messages)
-    assert len(merged) == 2
-    assert merged[0]["content"] == "Hello\n\nHow are you?"
-
-    # Ignore empty message
-    messages = [
-        {"role": "user", "content": "Hello"},
-        {"role": "user", "content": ""},
-        {"role": "user", "content": "How are you?"},
-        {"role": "user", "content": ""},
-        {"role": "assistant", "content": "Hi"},
-    ]
-    merged = merge_messages(messages)
-    assert len(merged) == 2
-    assert merged[0]["content"] == "Hello\n\nHow are you?"
-
-
 def test_trim_prompt_messages():
     def count_tokens(text):
         return len(text)
@@ -52,28 +28,10 @@ def test_trim_prompt_messages():
     with pytest.raises(Exception, match="messages should not be empty"):
         trim_prompt_messages([], 5, count_tokens)
 
-    with pytest.raises(
-        Exception,
-        match='all messages should be dictionaries with keys "content" and "role"',
-    ):
-        messages = [{"role": "system", "key": "System message"}]
-        trim_prompt_messages(messages, 20, count_tokens)
-
     with pytest.raises(Exception, match="the last message should be from the user"):
         messages = [
             {"role": "system", "content": "System message"},
             {"role": "assistant", "content": "Assistant message"},
-        ]
-        trim_prompt_messages(messages, 20, count_tokens)
-
-    with pytest.raises(
-        Exception,
-        match="if two consecutive messages are from the same role, they should be merged first",
-    ):
-        messages = [
-            {"role": "system", "content": "System message 1"},
-            {"role": "system", "content": "System message 2"},
-            {"role": "user", "content": "User message"},
         ]
         trim_prompt_messages(messages, 20, count_tokens)
 

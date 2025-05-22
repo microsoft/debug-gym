@@ -7,6 +7,8 @@ import pytest
 from debug_gym.gym.entities import EvalOutput, Event, Observation
 from debug_gym.gym.envs.env import EnvInfo, EventHooks, RepoEnv, TooledEnv
 from debug_gym.gym.terminal import Terminal
+from debug_gym.gym.tools.tool import ToolCall
+from debug_gym.gym.tools.toolbox import Toolbox
 
 
 @pytest.fixture
@@ -33,8 +35,8 @@ def test_add_tool(env_mock):
     tool = MagicMock()
     tool.name = "tool1"
     env_mock.add_tool(tool)
-    assert "tool1" in env_mock.tools
-    assert env_mock.tools["tool1"] == tool
+    assert tool in env_mock.tools
+    assert env_mock.get_tool("tool1") == tool
 
 
 def test_add_tool_existing(env_mock):
@@ -60,6 +62,21 @@ def test_get_tool(env_mock):
     assert env_mock.get_tool("tool1") == tool
 
 
+def test_remove_tool(env_mock):
+    tool = MagicMock()
+    tool.name = "tool1"
+    env_mock.add_tool(tool)
+    removed = env_mock.remove_tool("tool1")
+    assert removed == tool
+    assert tool not in env_mock.tools
+    assert not env_mock.has_tool("tool1")
+    with pytest.raises(KeyError):
+        assert env_mock.get_tool("tool1") is None
+    # Test removing a non-existing tool
+    with pytest.raises(ValueError):
+        env_mock.remove_tool("tool2")
+
+
 def test_get_triggered_tools(env_mock):
     tool1 = MagicMock()
     tool1.name = "tool1"
@@ -67,12 +84,18 @@ def test_get_triggered_tools(env_mock):
     tool2.name = "tool2"
     env_mock.add_tool(tool1)
     env_mock.add_tool(tool2)
-    _, triggered_tool = env_mock.get_triggered_tools("```tool1 arg1 arg2```")
-    assert triggered_tool == [tool1, "arg1 arg2"]
-    _, triggered_tool = env_mock.get_triggered_tools("```tool2```")
-    assert triggered_tool == [tool2, ""]
+    _, triggered_tool = env_mock.get_triggered_tools(
+        ToolCall(id="123", name="tool1", arguments={"arg1": "abc", "arg2": 4})
+    )
+    assert triggered_tool == [tool1, {"arg1": "abc", "arg2": 4}]
+    _, triggered_tool = env_mock.get_triggered_tools(
+        ToolCall(id="234", name="tool2", arguments={})
+    )
+    assert triggered_tool == [tool2, {}]
     # Test with invalid action
-    error, triggered_tool = env_mock.get_triggered_tools("```tool3```")
+    error, triggered_tool = env_mock.get_triggered_tools(
+        ToolCall(id="345", name="tool3", arguments={})
+    )
     assert error == "Unregistered tool: tool3"
     assert triggered_tool is None
 
@@ -84,22 +107,7 @@ def test_tool_names(env_mock):
     tool2.name = "tool2"
     env_mock.add_tool(tool1)
     env_mock.add_tool(tool2)
-    assert env_mock.tool_names == "```tool1```, ```tool2```"
-
-
-def test_tool_instructions(env_mock):
-    tool1 = MagicMock()
-    tool1.name = "tool1"
-    tool1.instructions = "instructions1"
-    tool2 = MagicMock()
-    tool2.name = "tool2"
-    tool2.instructions = "instructions2"
-    env_mock.add_tool(tool1)
-    env_mock.add_tool(tool2)
-    assert env_mock.tool_instructions == {
-        "tool1": "instructions1",
-        "tool2": "instructions2",
-    }
+    assert env_mock.tool_names == "tool1, tool2"
 
 
 @patch("tempfile.TemporaryDirectory")
@@ -154,28 +162,31 @@ def test_cleanup_workspace(mock_tempdir):
     mock_tempdir_instance.cleanup.assert_called_once()
 
 
-def test_instructions():
+def test_env_tools():
     tool1 = MagicMock()
     tool1.name = "tool1"
-    tool1.instructions = "instructions1"
+    tool1.description = "instructions1"
+    tool1.arguments = {
+        "command 1": {
+            "type": ["string"],
+            "description": "command 1 description",
+        },
+    }
     tool2 = MagicMock()
     tool2.name = "tool2"
-    tool2.instructions = "instructions2"
+    tool2.description = "instructions2"
+    tool2.arguments = {
+        "command 2": {
+            "type": ["string"],
+            "description": "command 2 description",
+        },
+    }
 
     env = RepoEnv()
     env.add_tool(tool1)
     env.add_tool(tool2)
 
-    expected_instructions = {
-        "Available tools to solve the problem": {
-            "tool1": "instructions1",
-            "tool2": "instructions2",
-        },
-        "Available commands": "```tool1```, ```tool2```",
-    }
-
-    instructions = env.instructions
-    assert instructions == expected_instructions
+    assert env.tools == [tool1, tool2]
 
 
 @pytest.fixture
@@ -261,13 +272,13 @@ def test_step(
 
     env = RepoEnv(path=".")
     env.last_eval = EvalOutput(success=False, output="1 failed, 0 passed")
-    mock_get_triggered_tools.return_value = [mock_pdb_tool]
-    mock_get_triggered_tools.return_value = None, [mock_pdb_tool, "b 10"]
+    mock_get_triggered_tools.return_value = None, [mock_pdb_tool, {"command": "b 10"}]
+    infos = env.step({"id": "123", "name": "pdb", "arguments": {"command": "b 10"}})
 
-    infos = env.step("```pdb b 10```")
-
-    mock_get_triggered_tools.assert_called_once_with("```pdb b 10```")
-    mock_pdb_tool.assert_called_once_with("b 10")
+    mock_get_triggered_tools.assert_called_once_with(
+        {"id": "123", "name": "pdb", "arguments": {"command": "b 10"}}
+    )
+    mock_pdb_tool.assert_called_once_with(env, command="b 10")
     assert infos.step_observation == observation
     assert infos.score == 0
     assert not infos.done
@@ -324,19 +335,54 @@ def test_reset(
 |-- file2.txt
 |-- subdir/
   |-- subfile1.txt""",
-        current_code_with_line_number="You are currently not working in a file. You can use ```view path/to/file.py``` to navigate to a file first.",
+        current_code_with_line_number="You are currently not working in a file. You can call the view tool to navigate to a file first.",
         current_breakpoints="No breakpoints are set.",
         action=None,
-        instructions={
-            "Available tools to solve the problem": {},
-            "Available commands": "",
-        },
+        instructions={},
         score=0,
         max_score=1,
         done=False,
         rewrite_counter=0,
-        tools={},
+        tools=[],
     )
+
+
+def test_rewrite_counter(env):
+    # env.calculate_score = lambda x: 0
+    env_info = env.reset()
+    assert env.rewrite_counter == 0
+    rewrite_tool = Toolbox.get_tool("rewrite")
+    env.add_tool(rewrite_tool)
+
+    rewrite_call = ToolCall(id="rewrite_id", name="rewrite", arguments={})
+    env_info = env.step(rewrite_call)
+    assert env.rewrite_counter == 1
+    assert env_info.rewrite_counter == 1
+    rewrite_obs = Observation(
+        source="rewrite",
+        observation="Error while rewriting the file: No file is currently open.\nRewrite failed.",
+    )
+    assert env_info.step_observation == rewrite_obs
+    assert env_info.all_observations == [rewrite_obs]
+
+    rewrite_call = ToolCall(
+        id="rewrite_id",
+        name="rewrite",
+        arguments={
+            "path": "file1.txt",
+            "new_code": "print('Hello')",
+        },
+    )
+    env_info = env.step(rewrite_call)
+    assert env.rewrite_counter == 2
+    assert env_info.rewrite_counter == 2
+    rewrite_obs = Observation(
+        source="rewrite", observation="Rewrite successful. The file has been modified."
+    )
+    assert env_info.step_observation == rewrite_obs
+    assert env_info.all_observations == [rewrite_obs]
+    with open(env.working_dir / "file1.txt", "r") as f:
+        assert f.read() == "print('Hello')"
 
 
 def test_overwrite_file(env):
@@ -403,6 +449,10 @@ def test_event_hooks_subscribe():
     subscriber = ToolMock()
     event_hooks.subscribe(Event.ENV_START, subscriber)
     assert subscriber in event_hooks.event_listeners[Event.ENV_START]
+    with pytest.raises(
+        ValueError, match=f"Tool already subscribed to event: {Event.ENV_START}"
+    ):
+        event_hooks.subscribe(Event.ENV_START, subscriber)
 
 
 def test_event_hooks_subscribe_invalid_subscriber():
@@ -444,7 +494,8 @@ def test_event_hooks_notify():
     an_observation = Observation("mock", "observation")
     subscriber.on_env_start.return_value = an_observation
     event_hooks.subscribe(Event.ENV_START, subscriber)
-    observations = event_hooks.notify(Event.ENV_START)
+    env = None
+    observations = event_hooks.notify(env, Event.ENV_START)
     assert observations == [an_observation]
     subscriber.on_env_start.assert_called_once()
 
@@ -495,7 +546,7 @@ def test_queue_and_process_events():
 
     # Verify notify was called with correct args
     expected_calls = [
-        call(event=Event.ENV_START, source="source1", arg1="val1"),
-        call(event=Event.ENV_RESET, source="source2", arg2="val2"),
+        call(environment=env, event=Event.ENV_START, source="source1", arg1="val1"),
+        call(environment=env, event=Event.ENV_RESET, source="source2", arg2="val2"),
     ]
     mock.assert_has_calls(expected_calls)
