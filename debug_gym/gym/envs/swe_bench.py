@@ -18,8 +18,9 @@ from swebench.harness.docker_build import (
     get_env_configs_to_build,
 )
 from swebench.harness.log_parsers import MAP_REPO_TO_PARSER
-from swebench.harness.test_spec import make_test_spec
-from swebench.harness.utils import get_test_directives, load_swebench_dataset
+from swebench.harness.test_spec.python import get_test_directives
+from swebench.harness.test_spec.test_spec import make_test_spec
+from swebench.harness.utils import load_swebench_dataset
 from tqdm import tqdm
 
 from debug_gym.gym.entities import EvalOutput

@@ -7,13 +7,14 @@ from pathlib import Path
 
 import datasets
 import docker
+from swebench.harness.constants import NON_TEST_EXTS
 from swesmith.build_repo.download_images import DOCKER_ORG, TAG
+from swesmith.constants import MAP_REPO_TO_SPECS
+from swesmith.harness.grading import TestStatus
+from swesmith.harness.log_parsers import MAP_REPO_TO_PARSER, parse_log_pytest
+from swesmith.harness.utils import get_test_command
+from swesmith.utils import get_repo_commit_from_image_name
 
-# from swebench.harness.constants import (
-#     MAP_REPO_VERSION_TO_SPECS,
-#     NON_TEST_EXTS,
-#     TestStatus,
-# )
 # from swebench.harness.docker_build import (
 #     build_env_images,
 #     build_instance_image,
@@ -65,10 +66,17 @@ class SWESmithEnv(RepoEnv):
 
     def load_dataset(self):
         self.ds = datasets.load_dataset(self.dataset_id)[self.split]
-        self.dataset = {row["instance_id"]: row for row in self.ds.sort("instance_id")}
+        self.dataset = {
+            instance_id: i for i, instance_id in enumerate(self.ds["instance_id"])
+        }
 
         # To avoid concurrency issues, we will clone all the repos in the dataset.
-        repos = sorted({task["repo"] for task in self.dataset.values()})
+        repos = set(
+            self.ds["repo"]
+        )  # sorted({task["repo"] for task in self.dataset.values()})
+        self.logger.debug(
+            f"Loaded {len(self.ds)} tasks accross {len(repos)} repos from {self.dataset_id}."
+        )
         repo_names = [repo.split("/")[1] for repo in repos]
         missing_repos = [
             repo for repo in repo_names if not Path.exists(SWESmithEnv.CACHE / repo)
@@ -79,85 +87,110 @@ class SWESmithEnv(RepoEnv):
                 self.clone_repo(repo_address=repo)
 
         # Download all images needed for SWE-Smith.
-        self.logger.debug("Pulling all images needed for SWE-Smith...")
         client = docker.from_env()
-        image_names = sorted({task["image_name"] for task in self.dataset.values()})
-        for image_name in tqdm(image_names):
-            tag_name = f"{DOCKER_ORG}/{image_name}:{TAG}"
-            docker_hub_image = tag_name.replace("__", "_1776_")
-            client.images.pull(docker_hub_image)
-            # Rename images via tagging
-            client.images.get(docker_hub_image).tag(tag_name)
+        image_names = set(self.ds["image_name"])
+        tagged_image_names = set(f"{DOCKER_ORG}/{name}:{TAG}" for name in image_names)
+
+        existing_images = set(
+            tag for image in client.images.list() for tag in image.tags
+        )
+        missing_images = tagged_image_names - existing_images
+        if missing_images:
+            self.logger.debug(f"Found {len(missing_images)} missing Docker images.")
+            for image_name in tqdm(missing_images, desc="Pulling images for SWE-Smith"):
+                docker_hub_image = image_name.replace("__", "_1776_")
+                client.images.pull(docker_hub_image)
+                client.images.get(docker_hub_image).tag(
+                    image_name
+                )  # Rename images via tagging
 
     def setup_local_repo(self):
         repo_address = self.ds_row["repo"]
         base_commit = self.ds_row["base_commit"]
-        test_patch = self.ds_row["test_patch"]
+        test_patch = self.ds_row["patch"]
         # TODO: use fail_to_pass and pass_to_pass
-        self.fail_to_pass = literal_eval(self.ds_row["FAIL_TO_PASS"])
-        self.pass_to_pass = literal_eval(self.ds_row["PASS_TO_PASS"])
-        self.test_directives = get_test_directives(self.ds_row)
+        self.fail_to_pass = self.ds_row["FAIL_TO_PASS"]
+        self.pass_to_pass = self.ds_row["PASS_TO_PASS"]
+        self.test_cmd, self.test_directives = get_test_command(self.ds_row)
 
         local_repo_path = SWESmithEnv.CACHE / self.repo_name
         assert local_repo_path.exists()
-        local_branch_path = local_repo_path.parent / self.ds_row["instance_id"]
+        # local_branch_path = local_repo_path.parent / self.ds_row["instance_id"]
 
-        if not local_branch_path.exists():
-            # Duplicate the repo to avoid changing the current branch.
-            self.logger.info(f"Copying {local_repo_path} to {local_branch_path}")
-            shutil.copytree(local_repo_path, local_branch_path, symlinks=True)
+        # if not local_branch_path.exists():
+        #     # Duplicate the repo to avoid changing the current branch.
+        #     self.logger.info(f"Copying {local_repo_path} to {local_branch_path}")
+        #     shutil.copytree(local_repo_path, local_branch_path, symlinks=True)
 
-            # Checkout to base commit.
-            command = f"git -C {local_branch_path} checkout {base_commit} -f"
-            self.logger.info(f"Checking out to {base_commit}")
-            subprocess.run(command.split(), check=True)
+        #     # Checkout to base commit.
+        #     command = f"git -C {local_branch_path} checkout {base_commit} -f"
+        #     self.logger.info(f"Checking out to {base_commit}")
+        #     subprocess.run(command.split(), check=True)
 
-            # Apply test patch
-            if test_patch != "":
-                command = f"git -C {local_branch_path} apply -"
-                subprocess.run(command.split(), input=test_patch, text=True, check=True)
-                self.logger.info("Patch applied successfully.")
+        #     # Apply test patch
+        #     if test_patch != "":
+        #         command = f"git -C {local_branch_path} apply -"
+        #         subprocess.run(command.split(), input=test_patch, text=True, check=True)
+        #         self.logger.info("Patch applied successfully.")
 
-            create_ignore_file(
-                local_branch_path / ".debugignore", patterns=self.ignore_files
-            )
-            create_ignore_file(
-                local_branch_path / ".debugreadonly", patterns=self.test_directives
-            )
-        else:
-            self.logger.debug(
-                f"Local checked out branch {local_branch_path} already exists."
-            )
+        #     create_ignore_file(
+        #         local_branch_path / ".debugignore", patterns=self.ignore_files
+        #     )
+        #     create_ignore_file(
+        #         local_branch_path / ".debugreadonly", patterns=self.test_directives
+        #     )
+        # else:
+        #     self.logger.debug(
+        #         f"Local checked out branch {local_branch_path} already exists."
+        #     )
 
-        entrypoint = " ".join([self.install_configs["test_cmd"], *self.test_directives])
+        entrypoint = " ".join([self.test_cmd, *self.test_directives])
 
-        if (
-            "sphinx" in self.ds_row["instance_id"]
-            or "sympy" in self.ds_row["instance_id"]
-        ):
-            # use pytest instead of `sympy bin/test` and `sphinx tox` so pdb breakpoints work
-            expression = " ".join(self.test_directives)
-            debug_entrypoint = f"python -m pytest {expression}"
-            # Install pytest if not already installed
-            self.install_configs["install"] += " && python -m pip install pytest"
+        # if (
+        #     "sphinx" in self.ds_row["instance_id"]
+        #     or "sympy" in self.ds_row["instance_id"]
+        # ):
+        #     # use pytest instead of `sympy bin/test` and `sphinx tox` so pdb breakpoints work
+        #     expression = " ".join(self.test_directives)
+        #     debug_entrypoint = f"python -m pytest {expression}"
+        #     # Install pytest if not already installed
+        #     self.install_configs["install"] += " && python -m pip install pytest"
 
-            if entrypoint.startswith("PYTHONWARNINGS"):
-                # Move PYTHONWARNINGS from the entrypoint to the session commands
-                export, remaining = entrypoint.split(" ", 1)
-                self.session_commands.append(f"export {export}")
-                entrypoint = remaining
+        #     if entrypoint.startswith("PYTHONWARNINGS"):
+        #         # Move PYTHONWARNINGS from the entrypoint to the session commands
+        #         export, remaining = entrypoint.split(" ", 1)
+        #         self.session_commands.append(f"export {export}")
+        #         entrypoint = remaining
 
         # -s (capture=no) from pytest, allows for debugging with pdb
         # -q (quiet) from pytest, to avoid long pytest output
         debug_entrypoint = entrypoint.replace("pytest", "pytest -sq")
 
         self.setup_workspace(
-            path=local_branch_path,
+            # path=local_branch_path,
+            path=local_repo_path,
             entrypoint=entrypoint,
             debug_entrypoint=debug_entrypoint,
         )
 
-        return local_branch_path, entrypoint
+        # Checkout to base commit.
+        command = f"git -C {self.working_dir} checkout {base_commit} -f"
+        self.logger.info(f"Checking out to {base_commit}")
+        cmd_output = subprocess.run(command.split(), check=True, capture_output=True)
+        self.logger.debug(cmd_output)
+
+        # # Apply test patch
+        # if test_patch != "":
+        #     command = f"git -C {local_branch_path} apply -"
+        #     subprocess.run(command.split(), input=test_patch, text=True, check=True)
+        #     self.logger.info("Patch applied successfully.")
+
+        # create_ignore_file(
+        #     self.working_dir / ".debugignore", patterns=self.ignore_files
+        # )
+        # create_ignore_file(
+        #     self.working_dir / ".debugreadonly", patterns=self.test_directives
+        # )
 
     def setup_task_info(self, task_name):
         if self.instance_ids:
@@ -167,12 +200,17 @@ class SWESmithEnv(RepoEnv):
                     "Please provide a valid task or initialize the environment without instance_ids to load all tasks."
                 )
         self.task_name = task_name
-        self.ds_row = self.dataset[self.task_name]
+        # self.task = self.ds[self.dataset[self.task_name]]
+        self.ds_row = self.ds[self.dataset[self.task_name]]
         self.repo = self.ds_row["repo"]
         self.repo_name = self.repo.split("/")[1]
-        self.version = self.ds_row["version"]
-        self.install_configs = self.get_configs(self.repo, self.version)
+        self.base_commit = self.ds_row["base_commit"]
+        self.branch_name = self.ds_row["instance_id"]
+        self.install_configs = self.get_configs()
         self.gold_patch = self.ds_row["patch"]
+        self.git_apply_args = "--reverse"
+
+        self.base_image = f"{DOCKER_ORG}/{self.ds_row["image_name"]}:{TAG}"
 
     @property
     def patch(self):
@@ -184,7 +222,11 @@ class SWESmithEnv(RepoEnv):
         return patch
 
     def calculate_score(self, eval_output: EvalOutput) -> int:
-        test_status_map = MAP_REPO_TO_PARSER[self.repo](eval_output.output)
+        repo, commit = get_repo_commit_from_image_name(self.ds_row["image_name"])
+        # repo = inst[KEY_INSTANCE_ID].split(".")[0].replace("__", "/")
+        log_parser = MAP_REPO_TO_PARSER.get(repo, parse_log_pytest)
+        # test_status_map = MAP_REPO_TO_PARSER[self.repo](eval_output.output)
+        test_status_map = log_parser(eval_output.output)
         self.logger.debug(f"fail_to_pass: {self.fail_to_pass}")
         self.logger.debug(f"Test status map: {test_status_map}")
         score = sum(
@@ -207,12 +249,12 @@ class SWESmithEnv(RepoEnv):
         self.setup_task_info(options["task_name"])
         self.setup_local_repo()
 
-        spec = make_test_spec(self.ds_row)
-        docker_client = docker.from_env()
-        build_instance_image(spec, docker_client, logger=None, nocache=False)
+        # spec = make_test_spec(self.ds_row)
+        # docker_client = docker.from_env()
+        # build_instance_image(spec, docker_client, logger=None, nocache=False)
 
         # Start the terminal
-        self.terminal.base_image = spec.instance_image_key
+        self.terminal.base_image = self.base_image
 
         self.logger.info(f"Configuring docker container: {self.terminal.container}")
 
@@ -251,41 +293,47 @@ class SWESmithEnv(RepoEnv):
         # Copy the initial code to the working directory.
         self.terminal.run(f"cp -r /testbed/. {self.working_dir}")
 
+        self.terminal.run(f"git fetch origin {self.branch_name}")
+        self.terminal.run(f"git checkout {self.branch_name}")
+
         self.terminal.session_commands.append("source /opt/miniconda3/bin/activate")
         self.terminal.session_commands.append(f"conda activate testbed")
 
         self.run_install()
-        self.run_post_install()
+        # self.run_post_install()
 
         # Apply test patch
-        command = f"git apply -"
-        subprocess.run(
-            command.split(),
-            cwd=self.working_dir,
-            input=self.ds_row["test_patch"],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            check=True,
-        )
+        # command = f"git apply -"
+        # subprocess.run(
+        #     command.split(),
+        #     cwd=self.working_dir,
+        #     input=self.ds_row["test_patch"],
+        #     stdout=subprocess.PIPE,
+        #     stderr=subprocess.PIPE,
+        #     text=True,
+        #     check=True,
+        # )
 
         # Need to recreate those files after copying the initial code.
         create_ignore_file(
             self.working_dir / ".debugignore", patterns=self.ignore_files
         )
 
-        # Get test directives from test patch and remove non-test files
-        test_files = re.findall(r"diff --git a/.* b/(.*)", self.ds_row["test_patch"])
-        test_files = [
-            f for f in test_files if not any(f.endswith(ext) for ext in NON_TEST_EXTS)
-        ]
-        # Add test/ to readonly files if not already present
-        if "test/" not in test_files:
-            test_files.append("test/")
-        create_ignore_file(self.working_dir / ".debugreadonly", patterns=test_files)
+        # # Get test directives from test patch and remove non-test files
+        # test_files = re.findall(r"diff --git a/.* b/(.*)", self.gold_patch)
+        # test_files = [
+        #     f for f in test_files if not any(f.endswith(ext) for ext in NON_TEST_EXTS)
+        # ]
+        # # Add test/ to readonly files if not already present
+        # if "test/" not in test_files:
+        #     test_files.append("test/")
+        # TODO: do we want to add all test/ ?, if so check that the gold_patch is not about fixing a bug in such file.
+        create_ignore_file(
+            self.working_dir / ".debugreadonly", patterns=self.test_directives
+        )
         self._index_files()
 
-        self.terminal.run(f"git config user.name 'SWE-Bench'")
+        self.terminal.run(f"git config user.name 'SWE-Smith'")
         self.terminal.run(f"git config user.email '<>'")
         self.terminal.run(f"git add .debugignore")
         self.terminal.run(f"git commit -am 'Applied test patch'")
@@ -327,27 +375,23 @@ class SWESmithEnv(RepoEnv):
         status, output = self.terminal.run(command, raises=True)
         return status, output
 
-    def prepare_eval_commands(self):
-        """Add eval_cmd to be executed every time the terminal is called"""
-        for eval_cmd in self.install_configs.get("eval_commands", []):
-            self.session_commands.append(eval_cmd)
-
     def run_install(self):
-        install_cmd = self.install_configs.get("install", "")
-        if install_cmd:
+        install_cmds = self.install_configs.get("install", [])
+        if install_cmds:
             self.logger.debug("Running install commands...")
-            install_cmd = install_cmd.replace("--verbose", "").replace("-v", "").strip()
-            self.run_command_with_raise(install_cmd)
+            for install_cmd in install_cmds:
+                install_cmd = (
+                    install_cmd.replace("--verbose", "").replace("-v", "").strip()
+                )
+                self.run_command_with_raise(install_cmd)
 
-    def run_post_install(self):
-        post_install_cmds = self.install_configs.get("post_install", [])
-        if post_install_cmds:
-            self.logger.debug("Running post-install commands...")
-            for post_install_cmd in post_install_cmds:
-                self.run_command_with_raise(post_install_cmd)
+    # def run_post_install(self):
+    #     post_install_cmds = self.install_configs.get("post_install", [])
+    #     if post_install_cmds:
+    #         self.logger.debug("Running post-install commands...")
+    #         for post_install_cmd in post_install_cmds:
+    #             self.run_command_with_raise(post_install_cmd)
 
-    def get_configs(self, repo, version):
-        return MAP_REPO_VERSION_TO_SPECS[repo][version]
-
-    def repo_name(self, repo):
-        return repo.replace("/", "__").replace(" ", "--").replace("'", "")
+    def get_configs(self):
+        repo, commit = get_repo_commit_from_image_name(self.ds_row["image_name"])
+        return MAP_REPO_TO_SPECS[repo][commit]
