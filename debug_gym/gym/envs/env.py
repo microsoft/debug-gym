@@ -534,6 +534,7 @@ class RepoEnv(TooledEnv):
         )
 
         return new_env
+
     def post_process_event(self, event: Event, source, kwargs, observations):
         """Post-process the event after it has been handled by the tools."""
         if event in (Event.REWRITE_SUCCESS, Event.REWRITE_FAIL):
