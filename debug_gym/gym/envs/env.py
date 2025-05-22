@@ -273,7 +273,7 @@ class RepoEnv(TooledEnv):
     def display_files(self):
         msg = (
             "Listing files in the current working directory."
-            " (ro) indicates read-only files."
+            " (read-only) indicates read-only files."
             f" Max depth: {str(self.dir_tree_depth)}.\n"
         )
         msg += self.directory_tree()
@@ -410,8 +410,9 @@ class RepoEnv(TooledEnv):
             if path.is_dir():
                 result[-1] += "/"
 
+            # TODO: Revert this logic to use the readonly patterns, otherwise new files will be read-only
             if str(path.relative_to(self.working_dir)) not in self.editable_files:
-                result[-1] += " (ro)"
+                result[-1] += " (read-only)"
 
         return "\n".join(result)
 
