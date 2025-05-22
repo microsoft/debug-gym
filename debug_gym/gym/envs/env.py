@@ -246,6 +246,10 @@ class RepoEnv(TooledEnv):
 
     @staticmethod
     def _prepare_entrypoint(entrypoint):
+        # Remove PYTHONPATH prefix if present
+        if entrypoint.startswith("PYTHONPATH=$PYTHONPATH:$PWD "):
+            entrypoint = entrypoint[len("PYTHONPATH=$PYTHONPATH:$PWD "):]
+
         entrypoint_list = entrypoint.split()
 
         if entrypoint_list[0] != "python":
