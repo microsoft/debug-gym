@@ -435,7 +435,7 @@ class RepoEnv(TooledEnv):
 
     def current_code_with_line_number(self):
         if self.current_file is None or self.current_file_content is None:
-            return "You are currently not working in a file. You can use ```view path/to/file.py``` to navigate to a file first."
+            return "You are currently not working in a file. You can call the view tool to navigate to a file first."
 
         output = {
             "File name": self.current_file,
@@ -449,7 +449,7 @@ class RepoEnv(TooledEnv):
         }
         if self.current_breakpoints_state:
             output["Note"] = (
-                "B indicates breakpoint before a certain line of code, this can be changed using pdb commands such as b, cl, etc."
+                "B indicates breakpoint before a certain line of code, this can be changed by calling the pdb tool."
             )
         return output
 
