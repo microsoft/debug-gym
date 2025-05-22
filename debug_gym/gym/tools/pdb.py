@@ -120,7 +120,7 @@ class PDBTool(EnvironmentTool):
             splits = re.split("\n|;", command)
             if len(splits) > 1:
                 command = splits[0].strip()
-                _warning += f"Multiple commands are not supported. Only the first command will be executed."
+                _warning += "Multiple commands are not supported. Only the first command will be executed."
 
         success, output = True, ""
         if not self.pdb_is_running:
@@ -128,10 +128,10 @@ class PDBTool(EnvironmentTool):
 
         if not self.pdb_is_running:
             return Observation(self.name, f"Tool failure:\n{output}")
-        elif command == "":
-            # empty command
+        if command == "":  # empty command
             return Observation(self.name, "Tool failure:\nEmpty command.")
-        elif command in ["b", "break"]:
+
+        if command in ["b", "break"]:
             # list all breakpoints
             success, output = True, environment.current_breakpoints()
         elif command in ["cl", "clear"]:
@@ -161,7 +161,7 @@ class PDBTool(EnvironmentTool):
             try:
                 output += self.interact_with_pdb(command, environment.run_timeout)
                 self.pdb_obs = output
-            except:  # TODO: catch specific exceptions
+            except Exception:  # TODO: catch specific exceptions
                 success = False
 
         if success:
