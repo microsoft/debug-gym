@@ -41,7 +41,7 @@ class ViewTool(EnvironmentTool):
         if not is_subdirectory(new_file, environment.working_dir):
             obs = (
                 "Invalid file path. The file path must be inside "
-                f"the root directory: `{environment.working_dir}`.",
+                f"the root directory: `{environment.working_dir}`."
             )
         elif os.path.isfile(pjoin(environment.working_dir, new_file)):
             environment.load_current_file(filepath=new_file)
