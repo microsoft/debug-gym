@@ -21,11 +21,21 @@ def test_history_tracker(build_env_info):
     tool_3 = ToolCall(id="3", name="action3", arguments={})
     tool_4 = ToolCall(id="4", name="action4", arguments={"a4_args": "a4_args"})
     tool_5 = ToolCall(id="5", name="action5", arguments={})
-    env_info_1 = build_env_info(step_observation="obs1", action=None, score=1)
-    env_info_2 = build_env_info(step_observation="obs2", action=tool_2, score=2)
-    env_info_3 = build_env_info(step_observation="obs3", action=tool_3, score=3)
-    env_info_4 = build_env_info(step_observation="obs4", action=tool_4, score=4)
-    env_info_5 = build_env_info(step_observation="obs5", action=tool_5, score=5)
+    env_info_1 = build_env_info(
+        step_observation="obs1", action=None, score=1, rewrite_counter=0
+    )
+    env_info_2 = build_env_info(
+        step_observation="obs2", action=tool_2, score=2, rewrite_counter=0
+    )
+    env_info_3 = build_env_info(
+        step_observation="obs3", action=tool_3, score=3, rewrite_counter=1
+    )
+    env_info_4 = build_env_info(
+        step_observation="obs4", action=tool_4, score=4, rewrite_counter=1
+    )
+    env_info_5 = build_env_info(
+        step_observation="obs5", action=tool_5, score=5, rewrite_counter=2
+    )
 
     # single prompt format
     llm_response_2 = LLMResponse("prompt_2_1", "response_2_1", tool_2)
@@ -71,6 +81,7 @@ def test_history_tracker(build_env_info):
         "step_id": 4,
         "action": {"id": "5", "name": "action5", "arguments": {}},
         "obs": "obs5",
+        "rewrite_consumed": 2,
     }
 
     # json should return the speficied step
@@ -78,6 +89,7 @@ def test_history_tracker(build_env_info):
         "step_id": 2,
         "action": {"id": "3", "name": "action3", "arguments": {}},
         "obs": "obs3",
+        "rewrite_consumed": 1,
     }
 
     # output token_usage if it exists
@@ -97,6 +109,7 @@ def test_history_tracker(build_env_info):
                 "token_usage": {"prompt": 4321, "response": 1234},
             }
         ],
+        "rewrite_consumed": 1,
     }
 
     # json should return also the prompt-response pairs if include_prompt_response_pairs is True
@@ -115,6 +128,7 @@ def test_history_tracker(build_env_info):
                 "tool": {"id": "3", "name": "action3", "arguments": {}},
             }
         ],
+        "rewrite_consumed": 1,
     }
 
     # for 0-th step, prompt-response pairs should be None
@@ -123,6 +137,7 @@ def test_history_tracker(build_env_info):
         "action": None,
         "obs": "obs1",
         "prompt_response_pairs": None,
+        "rewrite_consumed": 0,
     }
 
     # score should return the sum of the scores

@@ -48,6 +48,7 @@ class HistoryTracker:
                 "step_id": game_step,
                 "action": None,  # env reset
                 "obs": self.memory[0].step_observation.observation,
+                "rewrite_consumed": 0,
             }
             if include_prompt_response_pairs:
                 json_out["prompt_response_pairs"] = None
@@ -56,6 +57,7 @@ class HistoryTracker:
                 "step_id": game_step,
                 "action": asdict(self.memory[game_step].action),
                 "obs": self.memory[game_step].step_observation.observation,
+                "rewrite_consumed": self.memory[game_step].rewrite_counter,
             }
             # prompt_response_pairs could be empty for the initial state
             prp = self.prompt_response_pairs[game_step]
