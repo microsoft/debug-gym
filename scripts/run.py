@@ -105,7 +105,7 @@ def main():
     problems = config.get("problems", ["custom"])
     if problems == "all" and "benchmark" in config:
         env = create_env(config, logger=logger)
-        problems = list(env.dataset.keys())  # all tasks
+        problems = sorted(env.dataset.keys())  # all tasks
 
     num_workers = int(os.environ.get("DEBUG_GYM_WORKERS", 1))
     logger.warning(f"Running with {num_workers} workers")
