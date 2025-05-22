@@ -138,7 +138,12 @@ class TooledEnv:
                 environment=self, event=event, source=source, **kwargs
             )
             self.all_observations.extend(observations)
+            self.post_process_event(event, source, kwargs, observations)
         return self.all_observations
+
+    def post_process_event(self, event: Event, source, kwargs, observations):
+        """Post-process the event after it has been handled by the tools."""
+        pass
 
 
 class RepoEnv(TooledEnv):
@@ -290,7 +295,7 @@ class RepoEnv(TooledEnv):
 
     def reset(self, *, options: dict = None):
         """Resets the environment and returns eval as the initial observation."""
-        self.logger.info(f"Resetting environment")
+        self.logger.info("Resetting environment")
         options = options or {}
 
         self._reset_env_state()
@@ -507,6 +512,11 @@ class RepoEnv(TooledEnv):
         )
 
         return self.infos
+
+    def post_process_event(self, event: Event, source, kwargs, observations):
+        """Post-process the event after it has been handled by the tools."""
+        if event in (Event.REWRITE_SUCCESS, Event.REWRITE_FAIL):
+            self.rewrite_counter += 1
 
     def close(self):
         self.cleanup_workspace()

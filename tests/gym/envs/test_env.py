@@ -8,6 +8,7 @@ from debug_gym.gym.entities import EvalOutput, Event, Observation
 from debug_gym.gym.envs.env import EnvInfo, EventHooks, RepoEnv, TooledEnv
 from debug_gym.gym.terminal import Terminal
 from debug_gym.gym.tools.tool import ToolCall
+from debug_gym.gym.tools.toolbox import Toolbox
 
 
 @pytest.fixture
@@ -344,6 +345,44 @@ def test_reset(
         rewrite_counter=0,
         tools=[],
     )
+
+
+def test_rewrite_counter(env):
+    # env.calculate_score = lambda x: 0
+    env_info = env.reset()
+    assert env.rewrite_counter == 0
+    rewrite_tool = Toolbox.get_tool("rewrite")
+    env.add_tool(rewrite_tool)
+
+    rewrite_call = ToolCall(id="rewrite_id", name="rewrite", arguments={})
+    env_info = env.step(rewrite_call)
+    assert env.rewrite_counter == 1
+    assert env_info.rewrite_counter == 1
+    rewrite_obs = Observation(
+        source="rewrite",
+        observation="Error while rewriting the file: No file is currently open.\nRewrite failed.",
+    )
+    assert env_info.step_observation == rewrite_obs
+    assert env_info.all_observations == [rewrite_obs]
+
+    rewrite_call = ToolCall(
+        id="rewrite_id",
+        name="rewrite",
+        arguments={
+            "path": "file1.txt",
+            "new_code": "print('Hello')",
+        },
+    )
+    env_info = env.step(rewrite_call)
+    assert env.rewrite_counter == 2
+    assert env_info.rewrite_counter == 2
+    rewrite_obs = Observation(
+        source="rewrite", observation="Rewrite successful. The file has been modified."
+    )
+    assert env_info.step_observation == rewrite_obs
+    assert env_info.all_observations == [rewrite_obs]
+    with open(env.working_dir / "file1.txt", "r") as f:
+        assert f.read() == "print('Hello')"
 
 
 def test_overwrite_file(env):
