@@ -2,6 +2,7 @@ import json
 from dataclasses import make_dataclass
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import numpy as np
 import pytest
 import yaml
 
@@ -130,24 +131,27 @@ def completion_mock():
 @patch(
     "builtins.input",
     lambda *args, **kwargs: json.dumps(
-        {"id": "pdb-123", "name": "pdb", "arguments": "b 10"}
+        {"id": "pdb-637469", "name": "pdb", "arguments": {"command": "b 10"}}
     ),
 )
 def test_human(build_env_info):
+    # always generate the same random toolcall id: "pdb-637469"
+    np.random.seed(42)
     human = Human()
     messages = [{"role": "user", "content": "Hello"}]
     env_info = build_env_info(
-        action=ToolCall(id="pdb-123", name="pdb", arguments="b 10"),
+        action=ToolCall(id="pdb-637469", name="pdb", arguments="b 10"),
         tools=[Toolbox.get_tool("pdb"), Toolbox.get_tool("view")],
     )
     llm_response = human(messages, env_info.tools)
     # human only uses the messages content
     assert llm_response.prompt == [{"role": "user", "content": "Hello"}]
     assert (
-        llm_response.response == '{"id": "pdb-123", "name": "pdb", "arguments": "b 10"}'
+        llm_response.response
+        == '{"id": "pdb-637469", "name": "pdb", "arguments": {"command": "b 10"}}'
     )
     assert llm_response.token_usage.prompt == 4
-    assert llm_response.token_usage.response == 7
+    assert llm_response.token_usage.response == 8
 
 
 @patch.object(

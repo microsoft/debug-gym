@@ -48,7 +48,13 @@ class EnvironmentTool(ABC):
     def __call__(self, *args, **kwargs) -> Observation:
         """Forwards `tool()` to the tool.use() method and
         tracks the history of tool usage."""
-        return self.use(*args, **kwargs)
+        try:
+            return self.use(*args, **kwargs)
+        except Exception as e:
+            # Handle exceptions and return an observation
+            return Observation(
+                self.name, str(e)
+            )  # to handle cases where the LLM hallucinates and provide invalid arguments
 
     def register(self, environment):
         from debug_gym.gym.envs.env import RepoEnv
