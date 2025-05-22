@@ -1,7 +1,7 @@
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock, call, patch
 
 from debug_gym.agents.debug_agent import Debug_5_Agent, DebugAgent, DebugHumanInTheLoop
-from debug_gym.agents.llm_api import LLMResponse, TokenUsage, Human
+from debug_gym.agents.llm_api import Human, LLMResponse, TokenUsage
 from debug_gym.agents.rewrite_agent import RewriteAgent
 
 
@@ -102,7 +102,16 @@ def test_run_debug_5_agent(agent_setup, build_env_info):
     result = agent.run(task_name="test_task", debug=False)
     assert result
 
-@patch.object(Human, '__call__', return_value=LLMResponse("Prompt", '{"id": "pdb-267437", "name": "pdb", "arguments": {"command": "c"}}', TokenUsage(2, 4)))
+
+@patch.object(
+    Human,
+    "__call__",
+    return_value=LLMResponse(
+        "Prompt",
+        '{"id": "pdb-267437", "name": "pdb", "arguments": {"command": "c"}}',
+        TokenUsage(2, 4),
+    ),
+)
 def test_human_in_the_loop(human, agent_setup, build_env_info):
     agent, env, llm = next(agent_setup(DebugHumanInTheLoop))
     env.reset.return_value = build_env_info(
@@ -153,17 +162,19 @@ def test_human_in_the_loop(human, agent_setup, build_env_info):
 
     # test that llm actions were logged
     _history, _prompt_response_pairs = agent.history.get()
-    assert [[], [llm()]]  == _prompt_response_pairs
+    assert [[], [llm()]] == _prompt_response_pairs
 
     # test that env was cloned
     assert env.clone.called
     assert env.clone().reset.called
-    
+
     # assert that cloned env was called with history steps
-    env.clone().step.assert_has_calls([
-        call(agent.history.get_all()[0].action),
-    ])
-    
+    env.clone().step.assert_has_calls(
+        [
+            call(agent.history.get_all()[0].action),
+        ]
+    )
+
     # test that human action was executed
     assert env.clone().step.called
     env.clone().step.assert_called_with(human().response)

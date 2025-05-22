@@ -508,7 +508,6 @@ class RepoEnv(TooledEnv):
 
         return self.infos
 
-
     def clone(self):
         # Create a new instance of RepoEnv
         new_env = RepoEnv(
@@ -516,17 +515,17 @@ class RepoEnv(TooledEnv):
             entrypoint=self.entrypoint,
             debug_entrypoint=self.debug_entrypoint,
             max_score=self.max_score,
-            readonly_patterns=None,  
+            readonly_patterns=None,
             run_on_rewrite=self.run_on_rewrite,
             run_timeout=self.run_timeout,
             dir_tree_depth=self.dir_tree_depth,
             auto_view_change=self.auto_view_change,
-            terminal=Terminal(),  
+            terminal=Terminal(),
             logger=self.logger,
         )
 
         return new_env
-    
+
     def close(self):
         self.cleanup_workspace()
         if self.terminal:

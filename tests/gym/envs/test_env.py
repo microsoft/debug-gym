@@ -512,10 +512,11 @@ def test_queue_and_process_events():
     ]
     mock.assert_has_calls(expected_calls)
 
+
 def test_clone(env):
     cloned_env = env.clone()
 
-     # Check that the cloned environment is a different instance
+    # Check that the cloned environment is a different instance
     assert id(env) != id(cloned_env)
 
     # Check that the properties are the same

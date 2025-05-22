@@ -1,6 +1,7 @@
 from debug_gym.agents.base_agent import BaseAgent, register_agent
 from debug_gym.agents.llm_api import LLM
 
+
 @register_agent
 class DebugAgent(BaseAgent):
     name = "debug_agent"
@@ -62,13 +63,18 @@ class Debug_5_Agent(DebugAgent):
 
         return info.done
 
+
 @register_agent
 class DebugHumanInTheLoop(DebugAgent):
     name: str = "debug_hitl"
 
     def run(self, task_name=None, debug=False):
         # instantiate the human in the loop
-        self.hitl = LLM.instantiate(llm_name="human", llm_config_file_path=self.config.get("llm_config_file_path"), logger=self.logger)
+        self.hitl = LLM.instantiate(
+            llm_name="human",
+            llm_config_file_path=self.config.get("llm_config_file_path"),
+            logger=self.logger,
+        )
 
         self.history.reset()
         info = self.env.reset(options={"task_name": task_name})
@@ -117,11 +123,13 @@ class DebugHumanInTheLoop(DebugAgent):
             hitl_response = self.hitl(prompt, hitl_info.tools)
             hitl_info = self.hitl_env.step(hitl_response.response)
 
-            if hitl_info.done or hitl_info.rewrite_counter >= self.config["max_rewrite_steps"]:
+            if (
+                hitl_info.done
+                or hitl_info.rewrite_counter >= self.config["max_rewrite_steps"]
+            ):
                 self.logger.info(
                     f"Score (human): {hitl_info.score}/{hitl_info.max_score} ({hitl_info.score/hitl_info.max_score:.1%})"
                 )
                 break
-
 
         return info.done
