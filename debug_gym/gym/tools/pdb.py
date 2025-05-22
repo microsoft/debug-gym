@@ -127,9 +127,11 @@ class PDBTool(EnvironmentTool):
             output += self.start_pdb(environment)
 
         if not self.pdb_is_running:
-            return Observation(self.name, f"Tool failure:\n{output}")
+            return Observation(self.name, f"Failure calling pdb:\n{output}")
         if command == "":  # empty command
-            return Observation(self.name, "Tool failure:\nEmpty command.")
+            return Observation(
+                self.name, "Failure calling pdb:\nEmpty commands are not allowed."
+            )
 
         if command in ["b", "break"]:
             # list all breakpoints
@@ -194,7 +196,7 @@ class PDBTool(EnvironmentTool):
                         "l .", environment.run_timeout
                     )
         else:
-            obs = "\n".join([f"Invalid tool arguments: {command}", _warning, output])
+            obs = "\n".join([f"Invalid pdb command: {command}", _warning, output])
 
         if self.pdb_is_running:
             # read the current frame info, find the current file, so we can change view to that file.
@@ -207,7 +209,7 @@ class PDBTool(EnvironmentTool):
         # this is a wrapper that manages the self.breakpoints_state, which does not reset at each pseudo terminal start
         # self.breakpoints_state is a dict, the keys are "|||".join([file_path, str(line_number)]) and values are breakpoint_command
         # TODO: we don't support tbreak
-        if which_file is None:
+        if which_file is None:  # TODO: remove current_file
             which_file = environment.current_file
         manipulation = "set" if action.startswith("b") else "clear"
         if which_file is None:
@@ -220,7 +222,7 @@ class PDBTool(EnvironmentTool):
         if which_file not in environment.all_files:
             return (
                 False,
-                f"Failed to {manipulation} breakpoint. {which_file} is not in the current repository.",
+                f"Failed to {manipulation} breakpoint. `{which_file}` is not found in the repository.",
             )
         # IMPORTANT: insert the viewing file into breakpoint command
         # for example, "b 42" -> "b src/main.py:42" if the current file is "src/main.py"
@@ -242,7 +244,7 @@ class PDBTool(EnvironmentTool):
                 # breakpoint already exists
                 return (
                     True,
-                    f"Breakpoint already exists at line {_line_number} in {which_file}.",
+                    f"Breakpoint already exists at line {_line_number} in `{which_file}`.",
                 )
             else:
                 # check if line number is valid
@@ -269,7 +271,7 @@ class PDBTool(EnvironmentTool):
                 # breakpoint does not exist
                 return (
                     True,
-                    f"No breakpoint exists at line {_line_number} in {which_file}.",
+                    f"No breakpoint exists at line {_line_number} in `{which_file}`.",
                 )
             else:
                 try:

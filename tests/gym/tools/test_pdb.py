@@ -95,7 +95,7 @@ def test_pdb_use_empty_command(tmp_path, setup_test_repo):
     _ = pdb.start_pdb(environment)
 
     output = pdb.use(environment, command="").observation
-    assert """Tool failure:\nEmpty command.""" in output
+    assert """Failure calling pdb:\nEmpty commands are not allowed.""" in output
 
 
 def test_pdb_use_default_environment_entrypoint(tmp_path, setup_test_repo):
@@ -194,7 +194,7 @@ def test_breakpoint_add_clear_add_existing_breakpoint(
     pdb_tool, test_repo, env = setup_pdb_repo_env(tmp_path)
     success, output = pdb_tool.breakpoint_add_clear(env, "b 10")
     assert success
-    assert output == "Breakpoint already exists at line 10 in file1.py."
+    assert output == "Breakpoint already exists at line 10 in `file1.py`."
     assert env.current_breakpoints_state == breakpoints_state
 
 
@@ -222,7 +222,7 @@ def test_breakpoint_add_clear_clear_not_found(
     pdb_tool, test_repo, env = setup_pdb_repo_env(tmp_path)
     success, output = pdb_tool.breakpoint_add_clear(env, "cl 8")
     assert success
-    assert output == "No breakpoint exists at line 8 in file1.py."
+    assert output == "No breakpoint exists at line 8 in `file1.py`."
     assert env.current_breakpoints_state == breakpoints_state
 
 
