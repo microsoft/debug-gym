@@ -27,7 +27,7 @@ def test_rewrite(mock_environment):
     }
     result = patcher.use(mock_environment, **patch)
 
-    assert result.observation == "Rewriting done."
+    assert result.observation == "Rewrite successful. The file has been modified."
     assert patcher.rewrite_success
     mock_environment.overwrite_file.assert_called_once_with(
         filepath="test.py", content=""
@@ -46,7 +46,7 @@ def test_rewrite_with_file_path(mock_environment):
     }
     result = patcher.use(mock_environment, **patch)
 
-    assert result.observation == "Rewriting done."
+    assert result.observation == "Rewrite successful. The file has been modified."
     assert patcher.rewrite_success
     mock_environment.overwrite_file.assert_called_once_with(
         filepath="test.py", content=""

@@ -118,7 +118,7 @@ class RewriteTool(EnvironmentTool):
             return self.fail(environment, f"Error while rewriting the file: {str(e)}")
 
         self.rewrite_success = True
-        message = "Rewriting done."
+        message = "Rewrite successful. The file has been modified."
         self.queue_event(
             environment=environment,
             event=Event.REWRITE_SUCCESS,
