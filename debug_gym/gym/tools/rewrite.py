@@ -1,3 +1,5 @@
+import difflib
+
 from debug_gym.gym.entities import Event, Observation
 from debug_gym.gym.tools.tool import EnvironmentTool
 from debug_gym.gym.tools.toolbox import Toolbox
@@ -48,11 +50,12 @@ class RewriteTool(EnvironmentTool):
             file_path in environment.editable_files
         ), f"File {file_path} is not editable."
 
+        original_content = environment.load_file(file_path)
+
         new_code = clean_code(new_code)  # str
         new_code_lines = new_code.split("\n")
-        new_code_length = len(
-            new_code_lines
-        )  # number of lines in the newly generated code
+        new_code_length = len(new_code_lines)
+
         if start is None:
             # no line number is provided, rewrite the whole code
             environment.overwrite_file(filepath=file_path, content=new_code)
@@ -72,7 +75,19 @@ class RewriteTool(EnvironmentTool):
             )
             if file_path == environment.current_file:
                 environment.load_current_file(file_path)
-        return new_code_length
+
+        # Calculate diff between original and new content
+        new_content = environment.load_file(file_path)
+        diff = "".join(
+            difflib.unified_diff(
+                original_content.splitlines(keepends=True),
+                new_content.splitlines(keepends=True),
+                fromfile="original",
+                tofile="current",
+            )
+        )
+
+        return diff, new_code_length
 
     def fail(self, environment, message: str) -> Observation:
         self.rewrite_success = False
@@ -111,14 +126,16 @@ class RewriteTool(EnvironmentTool):
                 )
             start, end = start - 1, end - 1  # 1-based to 0-based
         try:
-            new_code_length = self._rewrite_file(
+            diff, new_code_length = self._rewrite_file(
                 environment, path, start, end, new_code
             )
         except Exception as e:
             return self.fail(environment, f"Error while rewriting the file: {str(e)}")
 
         self.rewrite_success = True
-        message = "Rewrite successful. The file has been modified."
+        message = (
+            f"Rewrite was successful. The file has been updated.\n\nDiff:\n\n{diff}"
+        )
         self.queue_event(
             environment=environment,
             event=Event.REWRITE_SUCCESS,

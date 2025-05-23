@@ -12,8 +12,15 @@ def env(tmp_path):
     repo_path = tmp_path / "repo"
     repo_path.mkdir()
 
+    file_content = """import abc
+
+def greet():
+    print('Hello, world!')
+    print('Goodbye, world!')
+"""
+
     with open(repo_path / "test.py", "w") as f:
-        f.write("def greet():\n    print('Hello, world!')\n")
+        f.write(file_content)
 
     env = RepoEnv(path=repo_path, dir_tree_depth=2)
 
@@ -29,17 +36,43 @@ def test_rewrite(env):
     rewrite_tool = env.get_tool("rewrite")
     patch = {
         "path": None,
-        "start": 2,
+        "start": 4,
         "end": None,
         "new_code": "    print(f'Hello, {name}!')",
     }
     obs = rewrite_tool.use(env, **patch)
 
-    assert obs.observation == "Rewrite successful. The file has been modified."
     assert rewrite_tool.rewrite_success
+    # using \n to prevent ide from removing trailing spaces
+    assert (
+        obs.observation
+        == """Rewrite was successful. The file has been updated.
+
+Diff:
+
+--- original
++++ current
+@@ -1,5 +1,5 @@
+ import abc
+ \n def greet():
+-    print('Hello, world!')
++    print(f'Hello, {name}!')
+     print('Goodbye, world!')
+"""
+    )
+
     with open(env.working_dir / "test.py", "r") as f:
         new_content = f.read()
-    assert new_content == "def greet():\n    print(f'Hello, {name}!')\n"
+
+    assert (
+        new_content
+        == """import abc
+
+def greet():
+    print(f'Hello, {name}!')
+    print('Goodbye, world!')
+"""
+    )
 
 
 def test_rewrite_with_file_path(env):
@@ -47,17 +80,114 @@ def test_rewrite_with_file_path(env):
 
     patch = {
         "path": "test.py",
-        "start": 2,
+        "start": 4,
         "end": None,
         "new_code": "    print(f'Hello, {name}!')",
     }
     obs = rewrite_tool.use(env, **patch)
 
-    assert obs.observation == "Rewrite successful. The file has been modified."
     assert rewrite_tool.rewrite_success
+    # using \n to prevent ide from removing trailing spaces
+    assert (
+        obs.observation
+        == """Rewrite was successful. The file has been updated.
+
+Diff:
+
+--- original
++++ current
+@@ -1,5 +1,5 @@
+ import abc
+ \n def greet():
+-    print('Hello, world!')
++    print(f'Hello, {name}!')
+     print('Goodbye, world!')
+"""
+    )
     with open(env.working_dir / "test.py", "r") as f:
         new_content = f.read()
-    assert new_content == "def greet():\n    print(f'Hello, {name}!')\n"
+    assert (
+        new_content
+        == """import abc
+
+def greet():
+    print(f'Hello, {name}!')
+    print('Goodbye, world!')
+"""
+    )
+
+
+def test_rewrite_start_end(env):
+    rewrite_tool = env.get_tool("rewrite")
+
+    patch = {
+        "path": "test.py",
+        "start": 4,
+        "end": 5,
+        "new_code": "    print(f'Hello, {name}!')",
+    }
+    obs = rewrite_tool.use(env, **patch)
+
+    assert rewrite_tool.rewrite_success
+    # using \n to prevent ide from removing trailing spaces
+    assert (
+        obs.observation
+        == """Rewrite was successful. The file has been updated.
+
+Diff:
+
+--- original
++++ current
+@@ -1,5 +1,4 @@
+ import abc
+ \n def greet():
+-    print('Hello, world!')
+-    print('Goodbye, world!')
++    print(f'Hello, {name}!')
+"""
+    )
+    with open(env.working_dir / "test.py", "r") as f:
+        new_content = f.read()
+    assert (
+        new_content
+        == """import abc
+
+def greet():
+    print(f'Hello, {name}!')
+"""
+    )
+
+
+def test_full_rewrite(env):
+    rewrite_tool = env.get_tool("rewrite")
+
+    patch = {
+        "path": "test.py",
+        "new_code": "print(f'Hello, {name}!')",
+    }
+    obs = rewrite_tool.use(env, **patch)
+
+    assert rewrite_tool.rewrite_success
+    # using \n to prevent ide from removing trailing spaces
+    assert (
+        obs.observation
+        == """Rewrite was successful. The file has been updated.
+
+Diff:
+
+--- original
++++ current
+@@ -1,5 +1 @@
+-import abc
+-
+-def greet():
+-    print('Hello, world!')
+-    print('Goodbye, world!')
++print(f'Hello, {name}!')"""
+    )
+    with open(env.working_dir / "test.py", "r") as f:
+        new_content = f.read()
+    assert new_content == """print(f'Hello, {name}!')"""
 
 
 def test_rewrite_invalid_file(env):
