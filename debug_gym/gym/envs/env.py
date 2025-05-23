@@ -251,6 +251,10 @@ class RepoEnv(TooledEnv):
 
     @staticmethod
     def _prepare_entrypoint(entrypoint):
+        # Remove PYTHONPATH prefix if present
+        if entrypoint.startswith("PYTHONPATH=$PYTHONPATH:$PWD "):
+            entrypoint = entrypoint[len("PYTHONPATH=$PYTHONPATH:$PWD ") :]
+
         entrypoint_list = entrypoint.split()
 
         if entrypoint_list[0] != "python":
@@ -513,6 +517,24 @@ class RepoEnv(TooledEnv):
         )
 
         return self.infos
+
+    def clone(self):
+        # Create a new instance of RepoEnv
+        new_env = RepoEnv(
+            path=self.path,
+            entrypoint=self.entrypoint,
+            debug_entrypoint=self.debug_entrypoint,
+            max_score=self.max_score,
+            readonly_patterns=None,
+            run_on_rewrite=self.run_on_rewrite,
+            run_timeout=self.run_timeout,
+            dir_tree_depth=self.dir_tree_depth,
+            auto_view_change=self.auto_view_change,
+            terminal=Terminal(),
+            logger=self.logger,
+        )
+
+        return new_env
 
     def post_process_event(self, event: Event, source, kwargs, observations):
         """Post-process the event after it has been handled by the tools."""
