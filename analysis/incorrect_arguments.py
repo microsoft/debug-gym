@@ -18,11 +18,13 @@ plt.rcParams.update(
         "legend.fontsize": 22,  # Legend text
     }
 )
+ONLY_SUCCESS = True
 
 
 def analyze_froggy_results(model_name):
     """
     Analyzes froggy.jsonl files for a given model to extract success rates and rewrite counts.
+
     Args:
         model_name (str): Path to the model directory (e.g. 'exps/swe-bench/rewrite_4o_0')
 
@@ -32,11 +34,10 @@ def analyze_froggy_results(model_name):
     model_dir = os.path.join(model_name)
     results = []
 
-    for jsonl_name in ["debug_gym.jsonl"]:
+    for jsonl_name in ["froggy.jsonl", "debug_gym.jsonl"]:
         for jsonl_file in glob.glob(f"{model_dir}/**/{jsonl_name}", recursive=True):
             # Get task name from directory path
             task = os.path.dirname(jsonl_file).split("/")[-1]
-            # import pdb; pdb.set_trace()
 
             with open(jsonl_file) as f:
                 data = json.load(f)
@@ -45,37 +46,28 @@ def analyze_froggy_results(model_name):
                 success = data.get("success", False)
 
                 # Count rewrite commands
+                total_incorrect_arguments = 0
                 episode_length = 0
-
-                tool_counter = {
-                    "view": 0,
-                    "listdir": 0,
-                    "pdb": 0,
-                    "rewrite": 0,
-                    "eval": 0,
-                    "other": 0,
-                }
-
                 for step in data.get("log", []):
                     episode_length += 1
-                    if step.get("action") is None:
-                        continue
-                    tool_name = step["action"]["name"]
-                    if tool_name in tool_counter:
-                        tool_counter[tool_name] += 1
-                    else:
-                        tool_counter["other"] += 1
+                    if episode_length == 50:
+                        break
+                    if "got an unexpected keyword argument" in step["obs"]:
+                        total_incorrect_arguments += 1
 
                 results.append(
                     {
                         "task": task,
                         "success": success,
+                        "incorrect_arguments": total_incorrect_arguments
+                        / episode_length
+                        * 100.0,
                         "episode_length": episode_length,
-                        "tool_counter": tool_counter,
                     }
                 )
 
     df = pd.DataFrame(results)
+
     return df
 
 
@@ -84,7 +76,7 @@ def analyze_froggy_results_with_seeds(base_model_name, seeds=[0, 1, 2]):
     Analyzes and averages results across different seeds for a base model name
 
     Args:
-        base_model_name (str): Base path without seed (e.g. '../exps/may22/rewrite_o3-mini')
+        base_model_name (str): Base path without seed (e.g. '../exps/swe-bench/rewrite_o3-mini')
         seeds (list): List of seeds to average over
 
     Returns:
@@ -107,85 +99,77 @@ def analyze_froggy_results_with_seeds(base_model_name, seeds=[0, 1, 2]):
     return combined_df
 
 
-def plot_tool_use_categories(df_dict, figsize=(12, 7)):
+def plot_incorrect_arguments(df_dict, figsize=(12, 7)):
     """
-    Creates a grouped hist plot showing the distribution of tool use categories for each model.
+    Creates a grouped bar chart showing episode lengths for multiple models, grouped by agent types (rewrite, pdb, seq), each bar is averaged over seeds (0, 1, 2, with error bars)
     Args:
         df_dict (dict): Dictionary mapping model names to their DataFrames with averaged results
         figsize (tuple): Figure size (width, height)
     """
+    plt.figure(figsize=figsize)
 
     all_data = []
     # Create plot for each model
     for model_name, df in df_dict.items():
-        # o1, o3-mini, o1, o3-mini, o1, o3-mini
-        tool_category_per_model = {
-            "view": 0,
-            "listdir": 0,
-            "pdb": 0,
-            "rewrite": 0,
-            "eval": 0,
-            "other": 0,
-        }
-        tool_call_count = 0
-        for _kv in df["tool_counter"].items():
-            if _kv[1] == {}:
+        # ignore the data points where the agent failed
+        if ONLY_SUCCESS:
+            df = df[df["success"]]
+        for agent in ["rewrite", "debug"]:
+            if agent not in model_name:
                 continue
-            for k, v in _kv[1].items():
-                tool_call_count += v
-                tool_category_per_model[k] += v
-        # percentage
-        tool_category_per_model = {
-            k: round(v / tool_call_count, 2) for k, v in tool_category_per_model.items()
-        }
-        all_data.append(
-            [
-                model_name,
-                model_name.split("_")[1],
-                tool_category_per_model["view"],
-                tool_category_per_model["listdir"],
-                tool_category_per_model["pdb"],
-                tool_category_per_model["rewrite"],
-                tool_category_per_model["eval"],
-                tool_category_per_model["other"],
-            ]
-        )
+            incorrect_arguments_mean = df["incorrect_arguments"].mean()
+            incorrect_arguments_std = df["incorrect_arguments"].std()
+            all_data.append(
+                [
+                    model_name,
+                    model_name[len(agent) + 1 :],
+                    agent,
+                    float(round(incorrect_arguments_mean, 2)),
+                    float(round(incorrect_arguments_std, 2)),
+                ]
+            )
     print(all_data)
     # convert to DataFrame
     all_data = pd.DataFrame(
-        all_data,
-        columns=["name", "model", "view", "listdir", "pdb", "rewrite", "eval", "other"],
+        all_data, columns=["name", "model", "agent", "incorrect arguments", "std"]
     )
-    # nice palette
-    palette = sns.color_palette("Set2")
-    # set color
-    sns.set_palette(palette)
-    # stacked bar plot showing the distribution of PDB command categories for each model
-    all_data.set_index("name")[
-        ["view", "listdir", "pdb", "rewrite", "eval", "other"]
-    ].plot(kind="bar", stacked=True, figsize=figsize)
+    # bar chart
+    sns.barplot(
+        data=all_data, x="name", y="incorrect arguments", hue="agent", palette="Set2"
+    )
+    # add error bars
+    plt.errorbar(
+        x=all_data["name"],
+        y=all_data["incorrect arguments"],
+        yerr=all_data["std"],
+        fmt="none",
+        capsize=5,
+        color="black",
+    )
+
+    plt.ylim(0, 60)
+    plt.ylabel("Incorrect Arguments (%)")
     plt.xlabel("Backbone LLM")
-    plt.ylabel("Percentage")
     plt.xticks(rotation=90)
     # custom x ticks
     plt.xticks(
         np.arange(len(all_data)),
         [
-            "rw 4o",
-            "rw 4o1",
-            "rw o3",
-            "rw o3-high",
-            "rw o3-mini",
-            "rw o4-mini",
-            "dbg 4o",
-            "dbg o1",
-            "dbg o3",
-            "dbg o3-high",
-            "dbg o3-mini",
-            "dbg o4-mini",
+            "4o",
+            "4o1",
+            "o3",
+            "o3-high",
+            "o3-mini",
+            "o4-mini",
+            "4o",
+            "4o1",
+            "o3",
+            "o3-high",
+            "o3-mini",
+            "o4-mini",
         ],
     )
-
+    plt.grid(True, alpha=0.3)
     plt.tight_layout()
     plt.show()
 
@@ -212,5 +196,6 @@ for _path in tqdm(model_paths):
     _name = _path.split("/")[-1]
     results_dict[_name] = analyze_froggy_results_with_seeds(_path, seeds=[0])
 
+
 # Plot comparison
-plot_tool_use_categories(results_dict)
+plot_incorrect_arguments(results_dict)
