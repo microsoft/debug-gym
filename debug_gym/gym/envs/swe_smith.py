@@ -1,12 +1,11 @@
 import os
-import re
-import shutil
 import subprocess
-from ast import literal_eval
+from importlib.resources import files as importlib_files
 from pathlib import Path
 
 import datasets
 import docker
+import yaml
 from swebench.harness.constants import NON_TEST_EXTS
 from swesmith.build_repo.download_images import DOCKER_ORG, TAG
 from swesmith.constants import MAP_REPO_TO_SPECS
@@ -14,25 +13,20 @@ from swesmith.harness.grading import TestStatus
 from swesmith.harness.log_parsers import MAP_REPO_TO_PARSER, parse_log_pytest
 from swesmith.harness.utils import get_test_command
 from swesmith.utils import get_repo_commit_from_image_name
-
-# from swebench.harness.docker_build import (
-#     build_env_images,
-#     build_instance_image,
-#     get_env_configs_to_build,
-# )
-# from swebench.harness.log_parsers import MAP_REPO_TO_PARSER
-# from swebench.harness.test_spec import make_test_spec
-# from swebench.harness.utils import get_test_directives, load_swebench_dataset
 from tqdm import tqdm
 
 from debug_gym.gym.entities import EvalOutput
 from debug_gym.gym.envs.env import RepoEnv
 from debug_gym.gym.terminal import DockerTerminal, Terminal
 from debug_gym.gym.utils import create_ignore_file
+from debug_gym.utils import DEBUG_GYM_CACHE_DIR, DEBUG_GYM_CONFIG_DIR
 
 
 class SWESmithEnv(RepoEnv):
-    CACHE = Path.joinpath(Path.home(), ".cache", "debug_gym", "swe-smith")
+    CACHE = DEBUG_GYM_CACHE_DIR / "swe-smith"
+    CONFIG = (
+        importlib_files("debug_gym") / "gym" / "envs" / "configs" / "swe_smith.yaml"
+    )
 
     def __init__(
         self,
@@ -71,19 +65,19 @@ class SWESmithEnv(RepoEnv):
         }
 
         # To avoid concurrency issues, we will clone all the repos in the dataset.
-        repos = set(
-            self.ds["repo"]
-        )  # sorted({task["repo"] for task in self.dataset.values()})
+        swesmith_repos = set(self.ds["repo"])
         self.logger.debug(
-            f"Loaded {len(self.ds)} tasks accross {len(repos)} repos from {self.dataset_id}."
+            f"Loaded {len(self.ds)} tasks accross {len(swesmith_repos)} repos from {self.dataset_id}."
         )
-        repo_names = [repo.split("/")[1] for repo in repos]
+        swesmith_repo_names = [repo.split("/")[1] for repo in swesmith_repos]
         missing_repos = [
-            repo for repo in repo_names if not Path.exists(SWESmithEnv.CACHE / repo)
+            repo
+            for repo in swesmith_repo_names
+            if not Path.exists(SWESmithEnv.CACHE / repo)
         ]
         if missing_repos:
-            self.logger.debug("Cloning all repos needed for SWE-Bench...")
-            for repo in tqdm(repos, desc="Cloning repos needed for SWE-Bench"):
+            self.logger.debug("Cloning all repos needed for SWE-Smith...")
+            for repo in tqdm(missing_repos, desc="Cloning repos needed for SWE-Smith"):
                 self.clone_repo(repo_address=repo)
 
         # Download all images needed for SWE-Smith.
@@ -104,63 +98,31 @@ class SWESmithEnv(RepoEnv):
                     image_name
                 )  # Rename images via tagging
 
+        # Load dataset splits.
+        with open(SWESmithEnv.CONFIG) as f:
+            self.dataset_splits = yaml.safe_load(f)
+
+    def get_dataset_split(self, split):
+        if split == "all":
+            return sorted(self.dataset.keys())  # all tasks
+        elif split in self.dataset:
+            return [split]  # Single task
+        elif split in self.dataset_splits:
+            return self.dataset_splits[split]["ids"]
+        else:
+            raise ValueError(
+                f"Invalid split '{split}'. Available splits are: {['all'] + sorted(self.dataset_splits.keys())}"
+            )
+
     def setup_local_repo(self):
-        repo_address = self.ds_row["repo"]
-        base_commit = self.ds_row["base_commit"]
-        test_patch = self.ds_row["patch"]
-        # TODO: use fail_to_pass and pass_to_pass
         self.fail_to_pass = self.ds_row["FAIL_TO_PASS"]
         self.pass_to_pass = self.ds_row["PASS_TO_PASS"]
         self.test_cmd, self.test_directives = get_test_command(self.ds_row)
 
-        local_repo_path = SWESmithEnv.CACHE / self.repo_name
+        local_repo_path = SWESmithEnv.CACHE / self.swesmith_repo_name
         assert local_repo_path.exists()
-        # local_branch_path = local_repo_path.parent / self.ds_row["instance_id"]
-
-        # if not local_branch_path.exists():
-        #     # Duplicate the repo to avoid changing the current branch.
-        #     self.logger.info(f"Copying {local_repo_path} to {local_branch_path}")
-        #     shutil.copytree(local_repo_path, local_branch_path, symlinks=True)
-
-        #     # Checkout to base commit.
-        #     command = f"git -C {local_branch_path} checkout {base_commit} -f"
-        #     self.logger.info(f"Checking out to {base_commit}")
-        #     subprocess.run(command.split(), check=True)
-
-        #     # Apply test patch
-        #     if test_patch != "":
-        #         command = f"git -C {local_branch_path} apply -"
-        #         subprocess.run(command.split(), input=test_patch, text=True, check=True)
-        #         self.logger.info("Patch applied successfully.")
-
-        #     create_ignore_file(
-        #         local_branch_path / ".debugignore", patterns=self.ignore_files
-        #     )
-        #     create_ignore_file(
-        #         local_branch_path / ".debugreadonly", patterns=self.test_directives
-        #     )
-        # else:
-        #     self.logger.debug(
-        #         f"Local checked out branch {local_branch_path} already exists."
-        #     )
 
         entrypoint = " ".join([self.test_cmd, *self.test_directives])
-
-        # if (
-        #     "sphinx" in self.ds_row["instance_id"]
-        #     or "sympy" in self.ds_row["instance_id"]
-        # ):
-        #     # use pytest instead of `sympy bin/test` and `sphinx tox` so pdb breakpoints work
-        #     expression = " ".join(self.test_directives)
-        #     debug_entrypoint = f"python -m pytest {expression}"
-        #     # Install pytest if not already installed
-        #     self.install_configs["install"] += " && python -m pip install pytest"
-
-        #     if entrypoint.startswith("PYTHONWARNINGS"):
-        #         # Move PYTHONWARNINGS from the entrypoint to the session commands
-        #         export, remaining = entrypoint.split(" ", 1)
-        #         self.session_commands.append(f"export {export}")
-        #         entrypoint = remaining
 
         # -s (capture=no) from pytest, allows for debugging with pdb
         # -q (quiet) from pytest, to avoid long pytest output
@@ -174,16 +136,18 @@ class SWESmithEnv(RepoEnv):
         )
 
         # Checkout to base commit.
-        command = f"git -C {self.working_dir} checkout {base_commit} -f"
-        self.logger.info(f"Checking out to {base_commit}")
-        cmd_output = subprocess.run(command.split(), check=True, capture_output=True)
-        self.logger.debug(cmd_output)
-
-        # # Apply test patch
-        # if test_patch != "":
-        #     command = f"git -C {local_branch_path} apply -"
-        #     subprocess.run(command.split(), input=test_patch, text=True, check=True)
-        #     self.logger.info("Patch applied successfully.")
+        try:
+            command = f"git -C {self.working_dir} checkout {self.base_commit} -f"
+            self.logger.info(f"Checking out to {self.base_commit}")
+            cmd_output = subprocess.run(
+                command.split(), check=True, capture_output=True
+            )
+            self.logger.debug(cmd_output)
+        except subprocess.CalledProcessError as e:
+            self.logger.debug(e)
+            self.logger.debug(e.stderr)
+            self.logger.debug(e.stdout)
+            raise
 
         # create_ignore_file(
         #     self.working_dir / ".debugignore", patterns=self.ignore_files
@@ -200,17 +164,17 @@ class SWESmithEnv(RepoEnv):
                     "Please provide a valid task or initialize the environment without instance_ids to load all tasks."
                 )
         self.task_name = task_name
-        # self.task = self.ds[self.dataset[self.task_name]]
         self.ds_row = self.ds[self.dataset[self.task_name]]
-        self.repo = self.ds_row["repo"]
-        self.repo_name = self.repo.split("/")[1]
+        self.swesmith_repo_name = self.ds_row["repo"].split("/")[1]
         self.base_commit = self.ds_row["base_commit"]
         self.branch_name = self.ds_row["instance_id"]
-        self.install_configs = self.get_configs()
         self.gold_patch = self.ds_row["patch"]
         self.git_apply_args = "--reverse"
-
-        self.base_image = f"{DOCKER_ORG}/{self.ds_row["image_name"]}:{TAG}"
+        self.image_name = self.ds_row["image_name"]
+        self.repo, self.commit = get_repo_commit_from_image_name(self.image_name)
+        self.install_configs = MAP_REPO_TO_SPECS[self.repo][self.commit]
+        self.base_image = f"{DOCKER_ORG}/{self.image_name}:{TAG}"
+        self.repo_name = self.repo.split("/")[1]
 
     @property
     def patch(self):
@@ -222,10 +186,7 @@ class SWESmithEnv(RepoEnv):
         return patch
 
     def calculate_score(self, eval_output: EvalOutput) -> int:
-        repo, commit = get_repo_commit_from_image_name(self.ds_row["image_name"])
-        # repo = inst[KEY_INSTANCE_ID].split(".")[0].replace("__", "/")
-        log_parser = MAP_REPO_TO_PARSER.get(repo, parse_log_pytest)
-        # test_status_map = MAP_REPO_TO_PARSER[self.repo](eval_output.output)
+        log_parser = MAP_REPO_TO_PARSER.get(self.repo, parse_log_pytest)
         test_status_map = log_parser(eval_output.output)
         self.logger.debug(f"fail_to_pass: {self.fail_to_pass}")
         self.logger.debug(f"Test status map: {test_status_map}")
@@ -333,13 +294,13 @@ class SWESmithEnv(RepoEnv):
         )
         self._index_files()
 
-        self.terminal.run(f"git config user.name 'SWE-Smith'")
+        self.terminal.run(f"git config user.name 'debug-gym'")
         self.terminal.run(f"git config user.email '<>'")
         self.terminal.run(f"git add .debugignore")
-        self.terminal.run(f"git commit -am 'Applied test patch'")
+        self.terminal.run(f"git add .debugreadonly")
+        self.terminal.run(f"git commit -am 'Add debug-gym ignore files'")
 
         # Reset RepoEnv
-        # TODO: Create a RepoEnv per task and set max_score at initialization.
         self.max_score = len(self.fail_to_pass)
         infos = super().reset(options=options)
         assert not self.done, "Tests should be failing before debugging."
@@ -380,18 +341,4 @@ class SWESmithEnv(RepoEnv):
         if install_cmds:
             self.logger.debug("Running install commands...")
             for install_cmd in install_cmds:
-                install_cmd = (
-                    install_cmd.replace("--verbose", "").replace("-v", "").strip()
-                )
                 self.run_command_with_raise(install_cmd)
-
-    # def run_post_install(self):
-    #     post_install_cmds = self.install_configs.get("post_install", [])
-    #     if post_install_cmds:
-    #         self.logger.debug("Running post-install commands...")
-    #         for post_install_cmd in post_install_cmds:
-    #             self.run_command_with_raise(post_install_cmd)
-
-    def get_configs(self):
-        repo, commit = get_repo_commit_from_image_name(self.ds_row["image_name"])
-        return MAP_REPO_TO_SPECS[repo][commit]

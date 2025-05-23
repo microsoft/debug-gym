@@ -41,17 +41,23 @@ class AgentSolution(BaseAgent):
                 )
             )
 
-            self.logger.info(f"Applying gold patch to {self.env.working_dir}.")
-            command = f"git -C {self.env.working_dir} apply {getattr(self.env, "git_apply_args", "")} -"
-            cmd_out = subprocess.run(
-                command.split(),
-                input=self.env.gold_patch,
-                text=True,
-                check=True,
-                capture_output=True,
-            )
-            self.logger.info("Patch applied successfully.")
-            self.logger.debug(cmd_out)
+            try:
+                self.logger.info(f"Applying gold patch to {self.env.working_dir}.")
+                command = f"git -C {self.env.working_dir} apply {getattr(self.env, "git_apply_args", "")} -"
+                cmd_out = subprocess.run(
+                    command.split(),
+                    input=self.env.gold_patch,
+                    text=True,
+                    check=True,
+                    capture_output=True,
+                )
+                self.logger.info("Patch applied successfully.")
+                self.logger.debug(cmd_out)
+            except subprocess.CalledProcessError as e:
+                self.logger.debug(e)
+                self.logger.debug(e.stderr)
+                self.logger.debug(e.stdout)
+                raise
 
             if debug:
                 breakpoint()
