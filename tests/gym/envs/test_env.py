@@ -394,7 +394,8 @@ def test_rewrite_counter(env):
     assert env.rewrite_counter == 2
     assert env_info.rewrite_counter == 2
     rewrite_obs = Observation(
-        source="rewrite", observation="Rewrite successful. The file has been modified."
+        source="rewrite",
+        observation="Rewrite was successful. The file has been updated.\n\nDiff:\n\n--- original\n+++ current\n@@ -0,0 +1 @@\n+print('Hello')",
     )
     assert env_info.step_observation == rewrite_obs
     assert env_info.all_observations == [rewrite_obs]
