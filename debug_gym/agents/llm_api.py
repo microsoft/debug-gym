@@ -788,7 +788,7 @@ class OpenAILLM(LLM):
                         "id": response[0].tool.id,
                         "function": {
                             "name": response[0].tool.name,
-                            "arguments": str(response[0].tool.arguments),
+                            "arguments": json.dumps(response[0].tool.arguments),
                         },
                     },
                 ],
