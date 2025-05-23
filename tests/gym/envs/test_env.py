@@ -222,10 +222,27 @@ def test_restore(env):
 def test_display_files(env):
     result = env.display_files()
     assert result == (
-        "Listing files in the current working directory. (ro) indicates read-only files. Max depth: 2.\n"
+        "Listing files in the current working directory. (read-only) indicates read-only files. Max depth: 2.\n"
         f"{env.working_dir}/\n"
         "|-- file1.txt\n"
         "|-- file2.txt\n"
+        "|-- subdir/\n"
+        "  |-- subfile1.txt"
+    )
+
+
+def test_display_files_read_only(env):
+    # with open(env.working_dir / ".debugreadonly", "w") as f:
+    #     f.write("file2.txt")
+    with open(env.working_dir / "read-only-file.txt", "w") as f:
+        f.write("hello world")
+    result = env.display_files()
+    assert result == (
+        "Listing files in the current working directory. (read-only) indicates read-only files. Max depth: 2.\n"
+        f"{env.working_dir}/\n"
+        "|-- file1.txt\n"
+        "|-- file2.txt\n"
+        "|-- read-only-file.txt (read-only)\n"
         "|-- subdir/\n"
         "  |-- subfile1.txt"
     )
@@ -329,7 +346,7 @@ def test_reset(
         step_observation=Observation(source="env", observation="1 failed, 0 passed"),
         all_observations=[Observation(source="env", observation="1 failed, 0 passed")],
         eval_observation=Observation(source="env", observation="1 failed, 0 passed"),
-        dir_tree=f"""Listing files in the current working directory. (ro) indicates read-only files. Max depth: 2.
+        dir_tree=f"""Listing files in the current working directory. (read-only) indicates read-only files. Max depth: 2.
 {env.tempdir.name}/
 |-- file1.txt
 |-- file2.txt
@@ -377,7 +394,8 @@ def test_rewrite_counter(env):
     assert env.rewrite_counter == 2
     assert env_info.rewrite_counter == 2
     rewrite_obs = Observation(
-        source="rewrite", observation="Rewrite successful. The file has been modified."
+        source="rewrite",
+        observation="The file `file1.txt` has been updated successfully.\n\nDiff:\n\n--- original\n+++ current\n@@ -0,0 +1 @@\n+print('Hello')",
     )
     assert env_info.step_observation == rewrite_obs
     assert env_info.all_observations == [rewrite_obs]
