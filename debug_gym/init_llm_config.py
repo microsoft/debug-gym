@@ -3,6 +3,7 @@ import os
 from pathlib import Path
 
 from debug_gym.agents.llm_api import LLM_CONFIG_TEMPLATE
+from debug_gym.utils import DEBUG_GYM_CONFIG_DIR
 
 
 def init_llm_config(dest_dir: str = None):
@@ -31,7 +32,7 @@ def init_llm_config(dest_dir: str = None):
     elif args.dest is not None:
         dest_dir = Path(args.dest)
     else:
-        dest_dir = Path.joinpath(Path.home(), ".config", "debug_gym")
+        dest_dir = DEBUG_GYM_CONFIG_DIR
 
     os.makedirs(dest_dir, exist_ok=True)
 

@@ -2,6 +2,7 @@ import json
 import os
 import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from itertools import groupby
 from pathlib import Path
 
 from termcolor import colored
@@ -17,6 +18,91 @@ from debug_gym.logger import DebugGymLogger
 
 class BreakTaskLoop(Exception):
     pass
+
+
+def find_common_prefix(strings):
+    """
+    Find the common prefix part of the strings until a separator.
+    Uses underscore '_' as the separator.
+    """
+    if not strings:
+        return ""
+
+    # Get the first string to compare with others
+    first = strings[0]
+
+    # Find the position of the last separator in the common prefix
+    pos = 0
+    for char in first:
+        if all(s.startswith(first[: pos + 1]) for s in strings):
+            pos += 1
+        else:
+            break
+
+    # Find the last separator position in the common prefix
+    last_sep = first[:pos].rfind("_")
+    if last_sep != -1:
+        return first[: last_sep + 1]
+
+    return ""
+
+
+def group_problems_by_prefix(problems):
+    """
+    Group problems by common prefix.
+    Returns a dictionary with prefix as key and list of problems as value.
+    """
+    # Sort the problems first
+    sorted_problems = sorted(problems)
+
+    # Group problems by common prefix
+    grouped = {}
+
+    # Try to find a natural grouping by identifying common prefixes
+    for problem in sorted_problems:
+        # Extract prefix from problem name (everything before the last underscore)
+        parts = problem.split("_")
+
+        # If the problem name has underscores, use everything before the last one as prefix
+        if len(parts) > 1:
+            prefix = "_".join(parts[:-1]) + "_"
+        else:
+            # No underscore in problem name, use the whole name
+            prefix = problem
+
+        if prefix not in grouped:
+            grouped[prefix] = []
+
+        grouped[prefix].append(problem)
+
+    return grouped
+
+
+def pretty_print_problems(grouped_problems, logger):
+    """
+    Pretty print the grouped problems.
+    """
+    total_problems = sum(len(problems) for problems in grouped_problems.values())
+
+    logger.info(f"Total of {total_problems} problems available:")
+
+    for prefix, problems in grouped_problems.items():
+        if len(problems) > 1:
+            # Use the prefix for grouping
+            logger.info(f"  {prefix} ({len(problems)} problems)")
+            for problem in problems:
+                # If the problem is the same as the prefix, don't show it twice
+                if problem == prefix:
+                    continue
+
+                # Extract the suffix part to display
+                suffix = (
+                    problem[len(prefix) :] if problem.startswith(prefix) else problem
+                )
+                logger.info(f"    - {suffix}")
+        else:
+            # For single problems, just print the problem name
+            logger.info(f"  {problems[0]}")
 
 
 def run_agent(args, problem, config):
@@ -103,9 +189,12 @@ def main():
 
     # Figure out which problems to solve.
     problems = config.get("problems", ["custom"])
-    if problems == "all" and "benchmark" in config:
+    if type(problems) == str and "benchmark" in config:
         env = create_env(config, logger=logger)
-        problems = sorted(env.dataset.keys())  # all tasks
+        if problems == "all":
+            problems = sorted(env.dataset.keys())  # all tasks
+        else:
+            problems = env.get_dataset_split(problems)
 
     num_workers = int(os.environ.get("DEBUG_GYM_WORKERS", 1))
     logger.warning(f"Running with {num_workers} workers")
