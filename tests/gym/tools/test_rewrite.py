@@ -46,7 +46,7 @@ def test_rewrite(env):
     # using \n to prevent ide from removing trailing spaces
     assert (
         obs.observation
-        == """Rewrite was successful. The file has been updated.
+        == f"""The file `{env.current_file}` has been updated successfully.
 
 Diff:
 
@@ -56,7 +56,7 @@ Diff:
  import abc
  \n def greet():
 -    print('Hello, world!')
-+    print(f'Hello, {name}!')
++    print(f'Hello, {{name}}!')
      print('Goodbye, world!')
 """
     )
@@ -90,7 +90,7 @@ def test_rewrite_with_file_path(env):
     # using \n to prevent ide from removing trailing spaces
     assert (
         obs.observation
-        == """Rewrite was successful. The file has been updated.
+        == """The file `test.py` has been updated successfully.
 
 Diff:
 
@@ -132,7 +132,7 @@ def test_rewrite_start_end(env):
     # using \n to prevent ide from removing trailing spaces
     assert (
         obs.observation
-        == """Rewrite was successful. The file has been updated.
+        == """The file `test.py` has been updated successfully.
 
 Diff:
 
@@ -171,7 +171,7 @@ def test_full_rewrite(env):
     # using \n to prevent ide from removing trailing spaces
     assert (
         obs.observation
-        == """Rewrite was successful. The file has been updated.
+        == """The file `test.py` has been updated successfully.
 
 Diff:
 
