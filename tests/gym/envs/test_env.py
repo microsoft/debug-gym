@@ -320,8 +320,6 @@ def test_reset(
     infos = env.reset()
 
     mock_eval.assert_called_once()
-    assert env.current_file is None
-    assert env.current_file_content is None
     assert env.current_breakpoints_state == {}
     assert env.rewrite_counter == 0
     assert infos == EnvInfo(

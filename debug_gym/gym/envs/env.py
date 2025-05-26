@@ -188,8 +188,6 @@ class RepoEnv(TooledEnv):
     def _reset_env_state(self):
         """Reset the environment state to the initial state."""
         # reset all state variables
-        self.current_file = None
-        self.current_file_content = None
         self.current_breakpoints_state = {}
         self.rewrite_counter = 0
         self.last_eval: EvalOutput = None
@@ -358,10 +356,6 @@ class RepoEnv(TooledEnv):
         success, output = self.terminal.run(self.entrypoint, timeout=self.run_timeout)
         self.last_eval = EvalOutput(success, output)
         return self.last_eval
-
-    def load_current_file(self, filepath: str) -> bool:
-        self.current_file = filepath
-        self.current_file_content = self.read_file(filepath)
 
     def read_file(self, filepath: str) -> str:
         return (self.working_dir / filepath).read_text()
