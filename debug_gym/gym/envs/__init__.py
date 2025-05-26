@@ -19,4 +19,3 @@ def select_env(env_type: str = None):
             return MiniNightmareEnv
         case _:
             raise ValueError(f"Unknown benchmark {env_type}")
-    return env_class
