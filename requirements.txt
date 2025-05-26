@@ -10,6 +10,7 @@ termcolor
 transformers
 tiktoken
 docker
-swebench==2.1.7
+swebench==4.0.3
+swesmith==0.0.2
 prompt_toolkit
 anthropic>=0.49.0

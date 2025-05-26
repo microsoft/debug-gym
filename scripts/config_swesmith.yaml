@@ -1,0 +1,13 @@
+agent:
+  name: base_agent
+
+env:
+  name: swesmith
+  dataset_id: "SWE-bench/SWE-smith"
+  split: "test"
+  # Add sample instance ID(s) here
+  instance_ids: []
+
+session:
+  save_dir: "runs"
+  max_steps: 10
