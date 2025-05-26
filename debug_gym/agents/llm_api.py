@@ -424,7 +424,7 @@ class LLM(ABC):
                 messages = trim_prompt_messages(
                     messages, self.context_length, self.count_tokens
                 )
-                llm_response = self.generate_with_drop_message_and_retry(
+                llm_response = generate_with_drop_message_and_retry(
                     messages, tools, **kwargs
                 )
                 self.logger.info(
