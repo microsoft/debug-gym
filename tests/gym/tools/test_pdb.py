@@ -49,7 +49,6 @@ def setup_pdb_repo_env(setup_test_repo, breakpoints_state):
         test_repo = setup_test_repo(base_dir)
         env = RepoEnv(path=str(test_repo))
         env.current_breakpoints_state = breakpoints_state
-        env.current_file = "file1.py"
         env.all_files = ["file1.py", "file2.py"]
         pdb_tool = PDBTool()
         pdb_tool.register(env)
@@ -181,7 +180,7 @@ def test_breakpoint_add_clear_add_new_breakpoint(
     pdb_message = "Breakpoint 5 at file1.py:25"
     mock_interact_with_pdb.return_value = pdb_message
     pdb_tool, test_repo, env = setup_pdb_repo_env(tmp_path)
-    success, output = pdb_tool.breakpoint_add_clear(env, "b 25")
+    success, output = pdb_tool.breakpoint_add_clear(env, "b 25", "file1.py")
     assert success
     assert output == pdb_message
     expected_state = {"file1.py|||25": "b file1.py:25"} | breakpoints_state
@@ -192,7 +191,7 @@ def test_breakpoint_add_clear_add_existing_breakpoint(
     tmp_path, setup_pdb_repo_env, breakpoints_state
 ):
     pdb_tool, test_repo, env = setup_pdb_repo_env(tmp_path)
-    success, output = pdb_tool.breakpoint_add_clear(env, "b 10")
+    success, output = pdb_tool.breakpoint_add_clear(env, "b 10", "file1.py")
     assert success
     assert output == "Breakpoint already exists at line 10 in `file1.py`."
     assert env.current_breakpoints_state == breakpoints_state
@@ -205,7 +204,7 @@ def test_breakpoint_add_clear_clear_specific(
     pdb_message = "Deleted breakpoint 2 at file1.py:20"
     mock_interact_with_pdb.return_value = pdb_message
     pdb_tool, test_repo, env = setup_pdb_repo_env(tmp_path)
-    success, output = pdb_tool.breakpoint_add_clear(env, "cl 20")
+    success, output = pdb_tool.breakpoint_add_clear(env, "cl 20", "file1.py")
     expected_state = {
         "file1.py|||10": "b file1.py:10",
         "file1.py|||30": "b file1.py:30",
@@ -220,7 +219,7 @@ def test_breakpoint_add_clear_clear_not_found(
     tmp_path, setup_pdb_repo_env, breakpoints_state
 ):
     pdb_tool, test_repo, env = setup_pdb_repo_env(tmp_path)
-    success, output = pdb_tool.breakpoint_add_clear(env, "cl 8")
+    success, output = pdb_tool.breakpoint_add_clear(env, "cl 8", "file1.py")
     assert success
     assert output == "No breakpoint exists at line 8 in `file1.py`."
     assert env.current_breakpoints_state == breakpoints_state

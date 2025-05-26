@@ -146,7 +146,10 @@ class PDBTool(EnvironmentTool):
             and command.split()[1].isnumeric()
         ):
             # wrapper handle adding/removing breakpoints
-            success, output = self.breakpoint_add_clear(environment, command)
+            # TODO: Not sure we can or should use self.current_frame_file here
+            success, output = self.breakpoint_add_clear(
+                environment, command, self.current_frame_file
+            )
         elif (
             command.split()[0] in ["b", "break", "cl", "clear"]
             and ":" in command.split()[1]
@@ -204,19 +207,12 @@ class PDBTool(EnvironmentTool):
 
         return Observation(self.name, obs)
 
-    def breakpoint_add_clear(self, environment, action: str, which_file=None):
+    def breakpoint_add_clear(self, environment, action: str, which_file):
         # handle adding/removing breakpoints
         # this is a wrapper that manages the self.breakpoints_state, which does not reset at each pseudo terminal start
         # self.breakpoints_state is a dict, the keys are "|||".join([file_path, str(line_number)]) and values are breakpoint_command
         # TODO: we don't support tbreak
-        if which_file is None:  # TODO: remove current_file
-            which_file = environment.current_file
         manipulation = "set" if action.startswith("b") else "clear"
-        if which_file is None:
-            return (
-                False,
-                f"Failed to {manipulation} breakpoint. No file is currently open.",
-            )
         if which_file.startswith(str(environment.working_dir)):
             which_file = which_file[len(str(environment.working_dir)) + 1 :]
         if which_file not in environment.all_files:
@@ -248,7 +244,7 @@ class PDBTool(EnvironmentTool):
                 )
             else:
                 # check if line number is valid
-                code_string = environment.load_file(which_file)
+                code_string = environment.read_file(which_file)
                 code_length = get_code_length(code_string)
                 if int(_line_number) > code_length or int(_line_number) < 1:
                     return (
@@ -300,8 +296,6 @@ class PDBTool(EnvironmentTool):
         current_breakpoints_state_copy = copy.deepcopy(
             environment.current_breakpoints_state
         )
-        if rewrite_file is None:
-            rewrite_file = environment.current_file
         if rewrite_file.startswith(str(environment.working_dir)):
             rewrite_file = rewrite_file[len(str(environment.working_dir)) + 1 :]
         for _key in environment.current_breakpoints_state.keys():
@@ -361,9 +355,5 @@ class PDBTool(EnvironmentTool):
             file_path = output.split("(")[0]
             if file_path != self.current_frame_file:
                 self.current_frame_file = file_path
-                if environment.auto_view_change:
-                    new_context = file_path
-                    if new_context in environment.all_files:
-                        self.load_current_file(new_context)
         except BaseException:
             pass
