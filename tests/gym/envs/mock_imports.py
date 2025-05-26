@@ -5,15 +5,19 @@ import subprocess
 from ast import literal_eval
 from pathlib import Path
 
-import datasets
-import docker
-from tqdm import tqdm
+# Mock the external modules
+import sys
+from unittest.mock import MagicMock
 
-# Import from swesmith
-import swesmith
-from swesmith.constants import MAP_REPO_TO_SPECS
-from swesmith.utils import clone_repo
+# Create mock modules
+sys.modules['datasets'] = MagicMock()
+sys.modules['docker'] = MagicMock()
+sys.modules['tqdm'] = MagicMock()
+sys.modules['swesmith'] = MagicMock()
+sys.modules['swesmith.constants'] = MagicMock()
+sys.modules['swesmith.utils'] = MagicMock()
 
+# Import after mocking
 from debug_gym.gym.entities import EvalOutput
 from debug_gym.gym.envs.env import RepoEnv
 from debug_gym.gym.terminal import DockerTerminal, Terminal
@@ -56,8 +60,6 @@ class SWEBenchEnvMock(RepoEnv):
 
 
 # Replace SWEBenchEnv with our mock in the imports to avoid issues
-import sys
-import debug_gym.gym.envs
 sys.modules['debug_gym.gym.envs.swe_bench'] = type('ModuleMock', (), {'SWEBenchEnv': SWEBenchEnvMock})
 
 # Import our SWESmithEnv
