@@ -948,7 +948,7 @@ class Human(LLM):
                     return tool_call
         except Exception:
             pass
-        self.logger.error("Invalid action, please try again.")
+        self.logger.error("Invalid action format or command not available, please try again.")
 
     def format_tool_call_history(
         self, history_info: EnvInfo, response: LLMResponse
