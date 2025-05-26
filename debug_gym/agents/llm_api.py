@@ -70,9 +70,8 @@ o1-mini:
   endpoint: "{LLM_ENDPOINT_PLACEHOLDER}"
   api_key: "{LLM_API_KEY_PLACEHOLDER}"
   tags: [gpt-4o, azure openai, GCR]
-  api_version: "2024-09-01-preview"
+  api_version: "2025-04-01-preview"
   context_limit: 128
-  system_prompt_support: false
   ignore_kwargs: [temperature, top_p, presence_penalty, frequency_penalty, logprobs, top_logprobs, logit_bias, max_tokens]
 
 gpt-4o-az-login:

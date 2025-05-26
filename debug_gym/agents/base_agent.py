@@ -128,6 +128,10 @@ class BaseAgent:
             )
 
         shortcut_features = []
+        shortcut_features.append(
+            "- To save space, the current code in view and the current evaluation output are shown above, not in the history. Please expect empty feedback in the history after calling the View and Eval tools, and always refer to the system prompt for the current code and evaluation output."
+        )
+
         if (
             self.config.get("env_kwargs") is not None
             and self.config.get("env_kwargs").get("run_on_rewrite") is True
