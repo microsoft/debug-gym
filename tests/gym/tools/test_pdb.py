@@ -94,7 +94,47 @@ def test_pdb_use_empty_command(tmp_path, setup_test_repo):
     _ = pdb.start_pdb(environment)
 
     output = pdb.use(environment, command="").observation
-    assert """Failure calling pdb:\nEmpty commands are not allowed.""" in output
+    assert "Failure calling pdb:\nEmpty commands are not allowed." in output
+
+
+def test_pdb_fail_if_empty_path_at_start(tmp_path, setup_test_repo):
+    # Test PDBTool with Terminal, verbose pytest
+    tests_path = str(setup_test_repo(tmp_path))
+    terminal = Terminal()
+    environment = RepoEnv(
+        path=tests_path,
+        terminal=terminal,
+        debug_entrypoint="python -m pdb -m pytest -sv .",
+    )
+    pdb = PDBTool()
+    _ = pdb.start_pdb(environment)
+
+    output = pdb.use(environment, command="b 1").observation
+    assert (
+        "Invalid pdb command: b 1\n\nFailed to set breakpoint. No file is specified in the command."
+        in output
+    )
+
+
+def test_pdb_pass_empty_path_if_in_session(tmp_path, setup_test_repo):
+    # Test PDBTool with Terminal, verbose pytest
+    tests_path = str(setup_test_repo(tmp_path))
+    terminal = Terminal()
+    environment = RepoEnv(
+        path=tests_path,
+        terminal=terminal,
+        debug_entrypoint="python -m pdb -m pytest -sv .",
+    )
+    pdb = PDBTool()
+    _ = pdb.start_pdb(environment)
+
+    obs = pdb.use(environment, command="b test_pass.py:1").observation
+    assert obs.startswith(f"Breakpoint 1 at {environment.working_dir/'test_pass.py'}:1")
+    obs = pdb.use(environment, command="c").observation
+    assert "1 B->\tdef test_pass():" in obs
+    # Now try to set a breakpoint without specifying the file, it should pass
+    obs = pdb.use(environment, command="b 2").observation
+    assert obs.startswith(f"Breakpoint 2 at {environment.working_dir/'test_pass.py'}:2")
 
 
 def test_pdb_use_default_environment_entrypoint(tmp_path, setup_test_repo):

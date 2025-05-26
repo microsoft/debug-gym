@@ -146,7 +146,7 @@ class PDBTool(EnvironmentTool):
             and command.split()[1].isnumeric()
         ):
             # wrapper handle adding/removing breakpoints
-            # TODO: Not sure we can or should use self.current_frame_file here
+            # Attempt to set a breakpoint in the current frame file; fails if it's not set
             success, output = self.breakpoint_add_clear(
                 environment, command, self.current_frame_file
             )
@@ -202,7 +202,7 @@ class PDBTool(EnvironmentTool):
             obs = "\n".join([f"Invalid pdb command: {command}", _warning, output])
 
         if self.pdb_is_running:
-            # read the current frame info, find the current file, so we can change view to that file.
+            # read the current frame info to determine the current file
             self.get_current_frame_file(environment)
 
         return Observation(self.name, obs)
@@ -213,6 +213,11 @@ class PDBTool(EnvironmentTool):
         # self.breakpoints_state is a dict, the keys are "|||".join([file_path, str(line_number)]) and values are breakpoint_command
         # TODO: we don't support tbreak
         manipulation = "set" if action.startswith("b") else "clear"
+        if which_file is None or which_file == "":
+            return (
+                False,
+                f"Failed to {manipulation} breakpoint. No file is specified in the command.",
+            )
         if which_file.startswith(str(environment.working_dir)):
             which_file = which_file[len(str(environment.working_dir)) + 1 :]
         if which_file not in environment.all_files:
