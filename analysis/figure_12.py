@@ -37,7 +37,7 @@ def unescape(s):
         result.encode("utf-8")
         return result
     except UnicodeEncodeError:
-        # If it contains surrogate pairs that can't be encoded to UTF-8, 
+        # If it contains surrogate pairs that can't be encoded to UTF-8,
         # replace them with the Unicode replacement character (U+FFFD)
         result = codecs.decode(s, "unicode_escape")
         return result.encode("utf-8", errors="replace").decode("utf-8")
