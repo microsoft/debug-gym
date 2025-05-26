@@ -3,7 +3,17 @@ import subprocess
 from unittest.mock import patch
 
 import pytest
-from filelock import FileLock
+
+# Create a simple FileLock implementation
+class FileLock:
+    def __init__(self, lock_file):
+        self.lock_file = lock_file
+    
+    def __enter__(self):
+        return self
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        pass
 
 # Import our mock setup first
 from tests.gym.envs.mock_imports import SWESmithEnv
