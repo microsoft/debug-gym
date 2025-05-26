@@ -154,6 +154,24 @@ def test_human(build_env_info):
     assert llm_response.token_usage.response == 8
 
 
+@patch(
+    "builtins.input",
+    side_effect=["invalid input"] * 10,  # Return invalid input 10 times
+)
+def test_human_max_retries(_, build_env_info):
+    human = Human(max_retries=5)  # Set max_retries to 5
+    messages = [{"role": "user", "content": "Test message"}]
+    env_info = build_env_info(
+        tools=[Toolbox.get_tool("pdb"), Toolbox.get_tool("view")],
+    )
+
+    # Should raise ValueError when max retries is reached
+    with pytest.raises(
+        ValueError, match="Maximum retries \\(5\\) reached without valid input."
+    ):
+        human(messages, env_info.tools)
+
+
 @patch.object(
     LLMConfigRegistry,
     "from_file",
@@ -942,9 +960,35 @@ def test_parse_tool_call_response_valid(logger_mock, example_tools):
     ],
 )
 def test_parse_tool_call_response_invalid(logger_mock, example_tools, bad_command):
-    """For malformed or non-matching commands the method should return None"""
+    """For malformed or non-matching commands the method should raise ValueError"""
     human = Human(logger=logger_mock)
 
-    result = human.parse_tool_call_response(bad_command, example_tools)
+    with pytest.raises(ValueError, match="Failed to parse valid tool call from input"):
+        human.parse_tool_call_response(bad_command, example_tools)
 
-    assert result is None
+
+def test_parse_tool_call_response_no_tools(logger_mock):
+    """Should raise ValueError when no tools are provided"""
+    human = Human(logger=logger_mock)
+
+    with pytest.raises(
+        ValueError, match="No tools provided. At least one tool must be available."
+    ):
+        human.parse_tool_call_response(
+            '{"id": "test", "name": "test", "arguments": {}}', []
+        )
+
+    with pytest.raises(
+        ValueError, match="No tools provided. At least one tool must be available."
+    ):
+        human.parse_tool_call_response(
+            '{"id": "test", "name": "test", "arguments": {}}', None
+        )
+
+
+def test_parse_tool_call_response_none(logger_mock, example_tools):
+    """Should raise ValueError when response is None"""
+    human = Human(logger=logger_mock)
+
+    with pytest.raises(ValueError, match="Tool call cannot be None"):
+        human.parse_tool_call_response(None, example_tools)
