@@ -904,12 +904,13 @@ class AzureOpenAILLM(OpenAILLM):
 
 
 class Human(LLM):
-    def __init__(self, model_name=None, logger: DebugGymLogger | None = None):
+    def __init__(self, model_name=None, logger: DebugGymLogger | None = None, max_retries=10):
         self.model_name = model_name or "human"
         self.logger = logger or DebugGymLogger("debug-gym")
         self.context_length = None
         self.reasoning_end_token = None
         self._history = None
+        self.max_retries = max_retries
         if prompt_toolkit_available:
             self._history = InMemoryHistory()
 
@@ -987,7 +988,10 @@ class Human(LLM):
         all_tools = self.define_tools(tools)
         available_commands = [json.dumps(t) for t in all_tools]
         tool_call = None
-        while tool_call is None:
+        retry_count = 0
+        action = ""
+        
+        while tool_call is None and retry_count < self.max_retries:
             if prompt_toolkit_available:
                 actions_completer = WordCompleter(
                     available_commands, ignore_case=False, sentence=True
@@ -1004,6 +1008,16 @@ class Human(LLM):
                 )
                 action = input("> ")
             tool_call = self.parse_tool_call_response(action, all_tools)
+            retry_count += 1
+            
+        if tool_call is None:
+            self.logger.error(f"Maximum retries ({self.max_retries}) reached without a valid tool call. Using default tool call.")
+            # Create a default tool call to avoid returning None
+            tool_call = ToolCall(
+                id="max_retries_reached",
+                name="error",
+                arguments={"message": f"Maximum retries ({self.max_retries}) reached without valid input."}
+            )
 
         return LLMResponse(
             prompt=messages,

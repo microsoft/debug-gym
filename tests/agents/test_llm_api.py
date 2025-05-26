@@ -154,6 +154,25 @@ def test_human(build_env_info):
     assert llm_response.token_usage.response == 8
 
 
+@patch(
+    "builtins.input",
+    side_effect=["invalid input"] * 10,  # Return invalid input 10 times
+)
+def test_human_max_retries(_, build_env_info):
+    human = Human(max_retries=5)  # Set max_retries to 5
+    messages = [{"role": "user", "content": "Test message"}]
+    env_info = build_env_info(
+        tools=[Toolbox.get_tool("pdb"), Toolbox.get_tool("view")],
+    )
+    
+    llm_response = human(messages, env_info.tools)
+    
+    # Check that we get a default error tool call after max retries
+    assert llm_response.tool.id == "max_retries_reached"
+    assert llm_response.tool.name == "error"
+    assert "Maximum retries (5) reached without valid input" in llm_response.tool.arguments["message"]
+
+
 @patch.object(
     LLMConfigRegistry,
     "from_file",
