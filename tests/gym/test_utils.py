@@ -11,9 +11,9 @@ from debug_gym.gym.utils import (
     extract_reward_from_pytest_output,
     is_subdirectory,
     make_file_matcher,
-    parse_action,
     show_line_number,
     str2bool,
+    unescape,
 )
 
 
@@ -412,6 +412,25 @@ def test_walk():
     assert path_list == expected
 
 
+def test_unescape_surrogate_pairs():
+    # Test with regular string
+    regular_string = "This is a regular string with escapes \\n\\t"
+    assert unescape(regular_string) == "This is a regular string with escapes \n\t"
+
+    # Test with surrogate pairs that would cause UTF-8 encoding issues
+    surrogate_string = "Test with surrogate \\ud800\\udc00 pair"
+    result = unescape(surrogate_string)
+
+    # Verify we can encode the result to UTF-8 without errors
+    try:
+        result.encode("utf-8")
+    except UnicodeEncodeError:
+        assert False, "Unescaped string still has invalid surrogate pairs"
+
+    # The result should replace the surrogate with a replacement character
+    assert "Test with surrogate" in result
+
+
 def test_cleanup_pytest_output():
     message = "============================= test session starts ==============================\n===============================\n==============================\n=============================\n"
     cleaned_message = cleanup_pytest_output(message)
@@ -437,25 +456,3 @@ def test_cleanup_pytest_output():
     cleaned_message = cleanup_pytest_output(message)
     expected = "\nSomething else\n"
     assert cleaned_message == expected
-
-
-def test_parse_action():
-    # e.g. ```pdb b src/main.py:42```
-    # e.g., ```listdir```
-    action = "```pdb b src/main.py:42```"
-    tool_name, tool_args = parse_action(action)
-    assert tool_name == "pdb"
-    assert tool_args == "b src/main.py:42"
-
-    action = "```listdir```"
-    tool_name, tool_args = parse_action(action)
-    assert tool_name == "listdir"
-    assert tool_args == ""
-
-    action = "```pdb b 13"
-    with pytest.raises(Exception, match="Syntax error: invalid action syntax."):
-        parse_action(action)
-
-    action = "``````"
-    with pytest.raises(Exception, match="Empty action."):
-        parse_action(action)

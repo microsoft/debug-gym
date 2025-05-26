@@ -14,7 +14,17 @@ def clean_code(code):
 
 
 def unescape(s):
-    return codecs.decode(s, "unicode_escape")
+    try:
+        # First, try the normal unescape
+        result = codecs.decode(s, "unicode_escape")
+        # Test if it can be encoded to UTF-8 (which will happen during JSON encoding)
+        result.encode("utf-8")
+        return result
+    except UnicodeEncodeError:
+        # If it contains surrogate pairs that can't be encoded to UTF-8,
+        # replace them with the Unicode replacement character (U+FFFD)
+        result = codecs.decode(s, "unicode_escape")
+        return result.encode("utf-8", errors="replace").decode("utf-8")
 
 
 def get_code_length(code_string):
@@ -200,23 +210,3 @@ def extract_reward_from_pytest_output(output):
         return int(match.group(1))
 
     return 0
-
-
-def parse_action(action):
-    # e.g. ```pdb b src/main.py:42```
-    # e.g., ```listdir```
-    action = action.strip()
-    assert action.startswith("```") and action.endswith(
-        "```"
-    ), "Syntax error: invalid action syntax. Make sure the action is enclosed in triple backticks ``` on both sides."
-    action = action[3:-3].strip()
-    assert len(action) > 0, "Empty action."
-    tool_info = action.split(maxsplit=1)
-    if len(tool_info) == 1:
-        tool_name, tool_args = tool_info[0], ""
-    else:
-        tool_name, tool_args = tool_info
-    tool_name, tool_args = tool_name.strip(), tool_args.strip()
-    # tool_name: pdb
-    # tool_args: b src/main.py:42
-    return tool_name, tool_args

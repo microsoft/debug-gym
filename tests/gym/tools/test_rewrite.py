@@ -1,97 +1,245 @@
-from unittest.mock import MagicMock
+from pathlib import Path
 
 import pytest
 
+from debug_gym.gym.envs.env import RepoEnv
 from debug_gym.gym.tools.rewrite import RewriteTool
 
 
 @pytest.fixture
-def mock_environment():
-    env = MagicMock()
-    env.current_file_content = "def greet():\n    print('Hello, world!')\n".splitlines()
-    env.current_file = "test.py"
-    env.all_files = ["test.py"]
-    env.editable_files = ["test.py"]
+def env(tmp_path):
+    tmp_path = Path(tmp_path)
+    repo_path = tmp_path / "repo"
+    repo_path.mkdir()
+
+    file_content = """import abc
+
+def greet():
+    print('Hello, world!')
+    print('Goodbye, world!')
+"""
+
+    with open(repo_path / "test.py", "w") as f:
+        f.write(file_content)
+
+    env = RepoEnv(path=repo_path, dir_tree_depth=2)
+
+    rewrite_tool = RewriteTool()
+    env.add_tool(rewrite_tool)
+
+    env.reset()
+    env.load_current_file("test.py")
     return env
 
 
-def test_rewrite(mock_environment):
-    patcher = RewriteTool()
-    patcher.environment = mock_environment
+def test_rewrite(env):
+    rewrite_tool = env.get_tool("rewrite")
+    patch = {
+        "path": None,
+        "start": 4,
+        "end": None,
+        "new_code": "    print(f'Hello, {name}!')",
+    }
+    obs = rewrite_tool.use(env, **patch)
 
-    patch = "2 <c>    print(f'Hello, {name}!')</c>"
-    result = patcher.use(patch)
+    assert rewrite_tool.rewrite_success
+    # using \n to prevent ide from removing trailing spaces
+    assert (
+        obs.observation
+        == f"""The file `{env.current_file}` has been updated successfully.
 
-    assert result.observation == "Rewriting done."
-    assert patcher.rewrite_success
-    mock_environment.overwrite_file.assert_called_once_with(
-        filepath="test.py", content=""
+Diff:
+
+--- original
++++ current
+@@ -1,5 +1,5 @@
+ import abc
+ \n def greet():
+-    print('Hello, world!')
++    print(f'Hello, {{name}}!')
+     print('Goodbye, world!')
+"""
     )
 
-
-def test_rewrite_with_file_path(mock_environment):
-    patcher = RewriteTool()
-    patcher.environment = mock_environment
-
-    patch = "test.py 2 <c>    print(f'Hello, {name}!')</c>"
-    result = patcher.use(patch)
-
-    assert result.observation == "Rewriting done."
-    assert patcher.rewrite_success
-    mock_environment.overwrite_file.assert_called_once_with(
-        filepath="test.py", content=""
-    )
-
-
-def test_rewrite_invalid_content(mock_environment):
-    patcher = RewriteTool()
-    patcher.environment = mock_environment
-
-    patch = "invalid content"
-    result = patcher.use(patch)
-
-    assert result.observation == "SyntaxError: invalid syntax.\nRewrite failed."
-    assert not patcher.rewrite_success
-
-
-def test_rewrite_invalid_file(mock_environment):
-    patcher = RewriteTool()
-    patcher.environment = mock_environment
-    mock_environment.all_files = ["another_file.py"]
-
-    patch = "test.py 2 <c>    print(f'Hello, {name}!')</c>"
-    result = patcher.use(patch)
+    with open(env.working_dir / "test.py", "r") as f:
+        new_content = f.read()
 
     assert (
-        result.observation
-        == "File test.py does not exist or is not in the current repository.\nRewrite failed."
+        new_content
+        == """import abc
+
+def greet():
+    print(f'Hello, {name}!')
+    print('Goodbye, world!')
+"""
     )
-    assert not patcher.rewrite_success
 
 
-def test_rewrite_invalid_line_number(mock_environment):
-    patcher = RewriteTool()
-    patcher.environment = mock_environment
+def test_rewrite_with_file_path(env):
+    rewrite_tool = env.get_tool("rewrite")
 
-    patch = "test.py 0 <c>    print(f'Hello, {name}!')</c>"
-    result = patcher.use(patch)
+    patch = {
+        "path": "test.py",
+        "start": 4,
+        "end": None,
+        "new_code": "    print(f'Hello, {name}!')",
+    }
+    obs = rewrite_tool.use(env, **patch)
+
+    assert rewrite_tool.rewrite_success
+    # using \n to prevent ide from removing trailing spaces
+    assert (
+        obs.observation
+        == """The file `test.py` has been updated successfully.
+
+Diff:
+
+--- original
++++ current
+@@ -1,5 +1,5 @@
+ import abc
+ \n def greet():
+-    print('Hello, world!')
++    print(f'Hello, {name}!')
+     print('Goodbye, world!')
+"""
+    )
+    with open(env.working_dir / "test.py", "r") as f:
+        new_content = f.read()
+    assert (
+        new_content
+        == """import abc
+
+def greet():
+    print(f'Hello, {name}!')
+    print('Goodbye, world!')
+"""
+    )
+
+
+def test_rewrite_start_end(env):
+    rewrite_tool = env.get_tool("rewrite")
+
+    patch = {
+        "path": "test.py",
+        "start": 4,
+        "end": 5,
+        "new_code": "    print(f'Hello, {name}!')",
+    }
+    obs = rewrite_tool.use(env, **patch)
+
+    assert rewrite_tool.rewrite_success
+    # using \n to prevent ide from removing trailing spaces
+    assert (
+        obs.observation
+        == """The file `test.py` has been updated successfully.
+
+Diff:
+
+--- original
++++ current
+@@ -1,5 +1,4 @@
+ import abc
+ \n def greet():
+-    print('Hello, world!')
+-    print('Goodbye, world!')
++    print(f'Hello, {name}!')
+"""
+    )
+    with open(env.working_dir / "test.py", "r") as f:
+        new_content = f.read()
+    assert (
+        new_content
+        == """import abc
+
+def greet():
+    print(f'Hello, {name}!')
+"""
+    )
+
+
+def test_full_rewrite(env):
+    rewrite_tool = env.get_tool("rewrite")
+
+    patch = {
+        "path": "test.py",
+        "new_code": "print(f'Hello, {name}!')",
+    }
+    obs = rewrite_tool.use(env, **patch)
+
+    assert rewrite_tool.rewrite_success
+    # using \n to prevent ide from removing trailing spaces
+    assert (
+        obs.observation
+        == """The file `test.py` has been updated successfully.
+
+Diff:
+
+--- original
++++ current
+@@ -1,5 +1 @@
+-import abc
+-
+-def greet():
+-    print('Hello, world!')
+-    print('Goodbye, world!')
++print(f'Hello, {name}!')"""
+    )
+    with open(env.working_dir / "test.py", "r") as f:
+        new_content = f.read()
+    assert new_content == """print(f'Hello, {name}!')"""
+
+
+def test_rewrite_invalid_file(env):
+    rewrite_tool = env.get_tool("rewrite")
+    env.all_files = ["another_file.py"]
+
+    patch = {
+        "path": "test.py",
+        "start": 2,
+        "end": None,
+        "new_code": "    print(f'Hello, {name}!')",
+    }
+    obs = rewrite_tool.use(env, **patch)
 
     assert (
-        result.observation
+        obs.observation
+        == "Error while rewriting the file: File test.py does not exist or is not in the current repository.\nRewrite failed."
+    )
+    assert not rewrite_tool.rewrite_success
+
+
+def test_rewrite_invalid_line_number(env):
+    rewrite_tool = env.get_tool("rewrite")
+
+    patch = {
+        "path": "test.py",
+        "start": 0,
+        "end": None,
+        "new_code": "    print(f'Hello, {name}!')",
+    }
+    obs = rewrite_tool.use(env, **patch)
+
+    assert (
+        obs.observation
         == "Invalid line number, line numbers are 1-based.\nRewrite failed."
     )
-    assert not patcher.rewrite_success
+    assert not rewrite_tool.rewrite_success
 
 
-def test_rewrite_invalid_line_number_2(mock_environment):
-    patcher = RewriteTool()
-    patcher.environment = mock_environment
+def test_rewrite_invalid_line_number_2(env):
+    rewrite_tool = env.get_tool("rewrite")
 
-    patch = "test.py 12:4 <c>    print(f'Hello, {name}!')</c>"
-    result = patcher.use(patch)
+    patch = {
+        "path": "test.py",
+        "start": 12,
+        "end": 4,
+        "new_code": "    print(f'Hello, {name}!')",
+    }
+    obs = rewrite_tool.use(env, **patch)
 
     assert (
-        result.observation
-        == "Invalid line number range, head should be less than or equal to tail.\nRewrite failed."
+        obs.observation
+        == "Invalid line number range, start should be less than or equal to end.\nRewrite failed."
     )
-    assert not patcher.rewrite_success
+    assert not rewrite_tool.rewrite_success
