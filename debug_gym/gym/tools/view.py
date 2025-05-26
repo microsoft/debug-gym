@@ -26,9 +26,6 @@ class ViewTool(EnvironmentTool):
         },
     }
 
-    def is_editable(self, environment, filepath):
-        return filepath in environment.editable_files
-
     def use(self, environment, path: str) -> Observation:
         new_file = path.strip()
         if new_file == "":
@@ -44,14 +41,10 @@ class ViewTool(EnvironmentTool):
                 f"the root directory: `{environment.working_dir}`."
             )
         elif os.path.isfile(pjoin(environment.working_dir, new_file)):
-            environment.load_current_file(filepath=new_file)
-            environment.current_file = new_file
-            read_only = (
-                " (read-only)" if not self.is_editable(environment, new_file) else ""
-            )
+            read_only = " (read-only)" if not environment.is_editable(new_file) else ""
             obs = (
                 f"Viewing `{new_file}`{read_only}:"
-                f"\n\n```\n{environment.current_file_content}\n```\n\n"
+                f"\n\n```\n{environment.read_file(new_file)}\n```\n\n"
             )
         else:
             obs = (

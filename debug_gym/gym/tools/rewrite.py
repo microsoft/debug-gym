@@ -22,8 +22,8 @@ class RewriteTool(EnvironmentTool):
     )
     arguments = {
         "path": {
-            "type": ["string", "null"],
-            "description": "A file path to be rewritten. If None, the current file will be used.",
+            "type": ["string"],
+            "description": "A file path to be rewritten.",
         },
         "start": {
             "type": ["number", "null"],
@@ -39,18 +39,20 @@ class RewriteTool(EnvironmentTool):
         },
     }
 
+    def _overwrite_file(self, environment, filepath: str, content: str):
+        assert isinstance(content, str), "content should be a string."
+        with open(environment.working_dir / filepath, "w") as f:
+            f.write(content)
+
     def _rewrite_file(self, environment, file_path, start, end, new_code):
-        assert file_path is not None, "No file is currently open."
         if file_path.startswith(str(environment.working_dir)):
             file_path = file_path[len(str(environment.working_dir)) + 1 :]
         assert (
             file_path in environment.all_files
         ), f"File {file_path} does not exist or is not in the current repository."
-        assert (
-            file_path in environment.editable_files
-        ), f"File {file_path} is not editable."
+        assert environment.is_editable(file_path), f"File {file_path} is not editable."
 
-        original_content = environment.load_file(file_path)
+        original_content = environment.read_file(file_path)
 
         new_code = clean_code(new_code)  # str
         new_code_lines = new_code.split("\n")
@@ -58,26 +60,22 @@ class RewriteTool(EnvironmentTool):
 
         if start is None:
             # no line number is provided, rewrite the whole code
-            environment.overwrite_file(filepath=file_path, content=new_code)
-            if file_path == environment.current_file:
-                environment.load_current_file(file_path)
+            self._overwrite_file(environment, filepath=file_path, content=new_code)
         else:
             # rewrite the code given the provided line numbers
-            full_code_lines = environment.load_file(file_path).split("\n")
+            full_code_lines = environment.read_file(file_path).split("\n")
             if start >= len(full_code_lines):
                 # if start exceeds the number of lines in the file, append the new code to the end of the file
                 full_code_lines.extend(new_code_lines)
             else:
                 # rewrite the code
                 full_code_lines[start : end + 1] = new_code_lines  # list
-            environment.overwrite_file(
-                filepath=file_path, content="\n".join(full_code_lines)
+            self._overwrite_file(
+                environment, filepath=file_path, content="\n".join(full_code_lines)
             )
-            if file_path == environment.current_file:
-                environment.load_current_file(file_path)
 
         # Calculate diff between original and new content
-        new_content = environment.load_file(file_path)
+        new_content = environment.read_file(file_path)
         diff = "".join(
             difflib.unified_diff(
                 original_content.splitlines(keepends=True),
@@ -102,15 +100,14 @@ class RewriteTool(EnvironmentTool):
     def use(
         self,
         environment,
-        path: str = None,
+        path: str,
         start: int = None,
         end: int = None,
         new_code: str = "",
     ) -> Observation:
         self.rewrite_success = False
         if path is None:
-            # by default, rewrite the current file
-            path = environment.current_file
+            raise ValueError("File path is None. Please provide a valid file path.")
         if start is not None:
             if end is None:
                 # only start is provided (rewrite that line)

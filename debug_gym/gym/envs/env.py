@@ -363,10 +363,13 @@ class RepoEnv(TooledEnv):
 
     def load_current_file(self, filepath: str) -> bool:
         self.current_file = filepath
-        self.current_file_content = self.load_file(filepath)
+        self.current_file_content = self.read_file(filepath)
 
-    def load_file(self, filepath: str) -> str:
+    def read_file(self, filepath: str) -> str:
         return (self.working_dir / filepath).read_text()
+
+    def is_editable(self, filepath):
+        return filepath in self.editable_files
 
     def _index_files(self, readonly_patterns: list[str] | None = None):
         # get all file paths relative to the working directory
@@ -453,11 +456,6 @@ class RepoEnv(TooledEnv):
                 "B indicates breakpoint before a certain line of code, this can be changed by calling the pdb tool."
             )
         return output
-
-    def overwrite_file(self, filepath: str, content: str):
-        assert isinstance(content, str), "content should be a string."
-        with open(pjoin(self.working_dir, filepath), "w") as f:
-            f.write(content)
 
     @property
     def patch(self):

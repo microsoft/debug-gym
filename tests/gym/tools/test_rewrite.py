@@ -28,11 +28,10 @@ def greet():
     env.add_tool(rewrite_tool)
 
     env.reset()
-    env.load_current_file("test.py")
     return env
 
 
-def test_rewrite(env):
+def test_rewrite_no_path_error(env):
     rewrite_tool = env.get_tool("rewrite")
     patch = {
         "path": None,
@@ -40,39 +39,8 @@ def test_rewrite(env):
         "end": None,
         "new_code": "    print(f'Hello, {name}!')",
     }
-    obs = rewrite_tool.use(env, **patch)
-
-    assert rewrite_tool.rewrite_success
-    # using \n to prevent ide from removing trailing spaces
-    assert (
-        obs.observation
-        == """Rewrite was successful. The file has been updated.
-
-Diff:
-
---- original
-+++ current
-@@ -1,5 +1,5 @@
- import abc
- \n def greet():
--    print('Hello, world!')
-+    print(f'Hello, {name}!')
-     print('Goodbye, world!')
-"""
-    )
-
-    with open(env.working_dir / "test.py", "r") as f:
-        new_content = f.read()
-
-    assert (
-        new_content
-        == """import abc
-
-def greet():
-    print(f'Hello, {name}!')
-    print('Goodbye, world!')
-"""
-    )
+    with pytest.raises(ValueError):
+        rewrite_tool.use(env, **patch)
 
 
 def test_rewrite_with_file_path(env):

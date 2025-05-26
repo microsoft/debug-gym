@@ -39,7 +39,6 @@ def test_view_valid_file(env):
         env_info.step_observation.observation
         == "Viewing `main.py`:\n\n```\nprint('Hello, World!')\n```\n\n"
     )
-    assert env.current_file == "main.py"  # TODO: remove side effect
 
     view_call = ToolCall(
         id="view_id", name="view", arguments={"path": str(env.working_dir / "main.py")}
@@ -57,7 +56,6 @@ def test_view_valid_read_only_file(env):
         env_info.step_observation.observation
         == "Viewing `test_1.py` (read-only):\n\n```\ndef test_1():\n  assert False\n\n```\n\n"
     )
-    assert env.current_file == "test_1.py"  # TODO: remove side effect
 
 
 def test_view_invalid_file_empty(env):
