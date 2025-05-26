@@ -951,7 +951,11 @@ class Human(LLM):
                     return tool_call
         except Exception:
             pass
+        
         self.logger.error("Invalid action format or command not available, please try again.")
+        
+        # Raise exception if tool_call is None as requested
+        raise ValueError("Failed to parse valid tool call from input")
 
     def format_tool_call_history(
         self, history_info: EnvInfo, response: LLMResponse
@@ -1010,7 +1014,12 @@ class Human(LLM):
                     "\n".join(["Available commands:"] + available_commands)
                 )
                 action = input("> ")
-            tool_call = self.parse_tool_call_response(action, all_tools)
+            
+            try:
+                tool_call = self.parse_tool_call_response(action, all_tools)
+            except ValueError as e:
+                self.logger.error(f"Error parsing tool call: {e}")
+            
             retry_count += 1
             
         if tool_call is None:
