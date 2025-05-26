@@ -24,7 +24,6 @@ class EnvInfo:
     all_observations: list[Observation]  #  env.step + triggered tools obs
     eval_observation: Observation  # last eval observation
     dir_tree: str
-    current_code_with_line_number: dict | str
     current_breakpoints: str
     action: ToolCall | None
     instructions: dict
@@ -321,7 +320,6 @@ class RepoEnv(TooledEnv):
             all_observations=self.all_observations,
             eval_observation=Observation("env", self.last_eval.output),
             dir_tree=self.display_files(),
-            current_code_with_line_number=self.current_code_with_line_number(),
             current_breakpoints=self.current_breakpoints(),
             action=None,
             done=self.done,
@@ -437,26 +435,6 @@ class RepoEnv(TooledEnv):
             ]
             return "\n".join(breakpoints)
 
-    def current_code_with_line_number(self):
-        if self.current_file is None or self.current_file_content is None:
-            return "You are currently not working in a file. You can call the view tool to navigate to a file first."
-
-        output = {
-            "File name": self.current_file,
-            "Content": "\n"
-            + show_line_number(
-                self.current_file_content,
-                self.current_file,
-                self.current_breakpoints_state,
-            )
-            + "\n",
-        }
-        if self.current_breakpoints_state:
-            output["Note"] = (
-                "B indicates breakpoint before a certain line of code, this can be changed by calling the pdb tool."
-            )
-        return output
-
     @property
     def patch(self):
         command = ["git", "diff", "--no-index", self.path, self.working_dir]
@@ -499,7 +477,6 @@ class RepoEnv(TooledEnv):
             all_observations=self.all_observations,
             eval_observation=Observation("env", self.last_eval.output),
             dir_tree=self.display_files(),
-            current_code_with_line_number=self.current_code_with_line_number(),
             current_breakpoints=self.current_breakpoints(),
             action=action,
             instructions=self.instructions,

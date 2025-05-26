@@ -18,7 +18,7 @@ def env(tmp_path):
         f.write("print('Hello, World!')")
 
     with open(repo_path / "test_1.py", "w") as f:
-        f.write("def test_1():\n  assert False\n")
+        f.write("def test_1():\n  assert False")
 
     with open(repo_path / ".debugreadonly", "w") as f:
         f.write("test_1.py")
@@ -31,13 +31,58 @@ def env(tmp_path):
 
 
 def test_view_valid_file(env):
-    view_call = ToolCall(id="view_id", name="view", arguments={"path": "main.py"})
+    view_call = ToolCall(
+        id="view_id",
+        name="view",
+        arguments={"path": "main.py", "include_line_numbers_and_breakpoints": False},
+    )
     env_info = env.step(view_call)
 
     assert env_info.step_observation.source == "view"
     assert (
         env_info.step_observation.observation
         == "Viewing `main.py`:\n\n```\nprint('Hello, World!')\n```\n\n"
+    )
+
+    view_call = ToolCall(
+        id="view_id",
+        name="view",
+        arguments={
+            "path": str(env.working_dir / "main.py"),
+            "include_line_numbers_and_breakpoints": False,
+        },
+    )
+    env_info_2 = env.step(view_call)
+    assert env_info_2.step_observation == env_info.step_observation
+
+
+def test_view_valid_file_with_line_numbers_no_breakpoints(env):
+    view_call = ToolCall(id="view_id", name="view", arguments={"path": "main.py"})
+    env_info = env.step(view_call)
+
+    assert env_info.step_observation.source == "view"
+    assert (
+        env_info.step_observation.observation
+        == "Viewing `main.py`:\n\n```\n     1 print('Hello, World!')\n```\n\n"
+    )
+
+    view_call = ToolCall(
+        id="view_id", name="view", arguments={"path": str(env.working_dir / "main.py")}
+    )
+    env_info_2 = env.step(view_call)
+    assert env_info_2.step_observation == env_info.step_observation
+
+
+def test_view_valid_file_with_line_numbers_and_breakpoints(env):
+    # set a breakpoint at line 1 of main.py
+    env.current_breakpoints_state["main.py|||1"] = "b main.py|||1"
+    view_call = ToolCall(id="view_id", name="view", arguments={"path": "main.py"})
+    env_info = env.step(view_call)
+
+    assert env_info.step_observation.source == "view"
+    assert (
+        env_info.step_observation.observation
+        == """Viewing `main.py`. B indicates breakpoint before a certain line of code:\n\n```\nB    1 print('Hello, World!')\n```\n\n"""
     )
 
     view_call = ToolCall(
@@ -48,13 +93,41 @@ def test_view_valid_file(env):
 
 
 def test_view_valid_read_only_file(env):
+    view_call = ToolCall(
+        id="view_id",
+        name="view",
+        arguments={"path": "test_1.py", "include_line_numbers_and_breakpoints": False},
+    )
+    env_info = env.step(view_call)
+
+    assert env_info.step_observation.source == "view"
+    assert (
+        env_info.step_observation.observation
+        == "Viewing `test_1.py` (read-only):\n\n```\ndef test_1():\n  assert False\n```\n\n"
+    )
+
+
+def test_view_valid_read_only_file_with_line_numbers_no_breakpoints(env):
     view_call = ToolCall(id="view_id", name="view", arguments={"path": "test_1.py"})
     env_info = env.step(view_call)
 
     assert env_info.step_observation.source == "view"
     assert (
         env_info.step_observation.observation
-        == "Viewing `test_1.py` (read-only):\n\n```\ndef test_1():\n  assert False\n\n```\n\n"
+        == "Viewing `test_1.py` (read-only):\n\n```\n     1 def test_1():\n     2   assert False\n```\n\n"
+    )
+
+
+def test_view_valid_read_only_file_with_line_numbers_and_breakpoints(env):
+    # set a breakpoint at line 2 of test_1.py
+    env.current_breakpoints_state["test_1.py|||2"] = "b test_1.py|||2"
+    view_call = ToolCall(id="view_id", name="view", arguments={"path": "test_1.py"})
+    env_info = env.step(view_call)
+
+    assert env_info.step_observation.source == "view"
+    assert (
+        env_info.step_observation.observation
+        == "Viewing `test_1.py` (read-only). B indicates breakpoint before a certain line of code:\n\n```\n     1 def test_1():\nB    2   assert False\n```\n\n"
     )
 
 
