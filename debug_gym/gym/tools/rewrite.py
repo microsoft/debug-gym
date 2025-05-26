@@ -100,14 +100,17 @@ class RewriteTool(EnvironmentTool):
     def use(
         self,
         environment,
-        path: str,
+        path: str = None,
         start: int = None,
         end: int = None,
         new_code: str = "",
     ) -> Observation:
         self.rewrite_success = False
         if path is None:
-            raise ValueError("File path is None. Please provide a valid file path.")
+            return self.fail(
+                environment,
+                "File path is None. Please provide a valid file path.",
+            )
         if start is not None:
             if end is None:
                 # only start is provided (rewrite that line)

@@ -39,8 +39,12 @@ def test_rewrite_no_path_error(env):
         "end": None,
         "new_code": "    print(f'Hello, {name}!')",
     }
-    with pytest.raises(ValueError):
-        rewrite_tool.use(env, **patch)
+    obs = rewrite_tool.use(env, **patch)
+    assert obs.source == "rewrite"
+    assert (
+        obs.observation
+        == "File path is None. Please provide a valid file path.\nRewrite failed."
+    )
 
 
 def test_rewrite_with_file_path(env):

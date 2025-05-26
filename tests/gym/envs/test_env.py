@@ -358,7 +358,7 @@ def test_rewrite_counter(env):
     assert env_info.rewrite_counter == 1
     rewrite_obs = Observation(
         source="rewrite",
-        observation="Error while rewriting the file: No file is currently open.\nRewrite failed.",
+        observation="File path is None. Please provide a valid file path.\nRewrite failed.",
     )
     assert env_info.step_observation == rewrite_obs
     assert env_info.all_observations == [rewrite_obs]
