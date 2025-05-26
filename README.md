@@ -100,12 +100,13 @@ We provide the below LLM-based agents, they all have minimal design and serve th
 
 #### 2.3. Benchmarks
 
-To demonstrate how to integrate `debug-gym` with coding tasks and repositories, we provide example code importing two widely used benchmarks, namely `aider` and `swebench`, and a small set of minimal buggy code snippets, namely `mini_nightmare`.
+To demonstrate how to integrate `debug-gym` with coding tasks and repositories, we provide example code importing several widely used benchmarks: `aider`, `swebench`, `swesmith`, and a small set of minimal buggy code snippets, namely `mini_nightmare`.
 
 | Benchmark name | Link |
 | :-: | :----- |
 | `aider` | [https://github.com/Aider-AI/aider](https://github.com/Aider-AI/aider) |
 | `swebench`| [https://github.com/princeton-nlp/SWE-bench](https://github.com/princeton-nlp/SWE-bench) |
+| `swesmith`| [https://github.com/SWE-bench/SWE-smith](https://github.com/SWE-bench/SWE-smith) |
 | `mini_nightmare` | A set of 10 hand-crafted minimal buggy code snippet where rewrite only agents have harder time to tackle. Read details [here](https://github.com/microsoft/debug-gym/blob/main/data/mini_nightmare/mini_nightmare.md). |
 
 ---
