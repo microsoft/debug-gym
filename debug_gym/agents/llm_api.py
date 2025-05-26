@@ -904,12 +904,15 @@ class AzureOpenAILLM(OpenAILLM):
 
 
 class Human(LLM):
-    def __init__(self, model_name=None, logger: DebugGymLogger | None = None):
+    def __init__(
+        self, model_name=None, logger: DebugGymLogger | None = None, max_retries=10
+    ):
         self.model_name = model_name or "human"
         self.logger = logger or DebugGymLogger("debug-gym")
         self.context_length = None
         self.reasoning_end_token = None
         self._history = None
+        self.max_retries = max_retries
         if prompt_toolkit_available:
             self._history = InMemoryHistory()
 
@@ -936,6 +939,12 @@ class Human(LLM):
     def parse_tool_call_response(self, response, all_tools) -> ToolCall:
         """Parse user input and return a ToolCall object.
         Validate the input against the available tools."""
+        if response is None:
+            raise ValueError("Tool call cannot be None")
+
+        if not all_tools:
+            raise ValueError("No tools provided. At least one tool must be available.")
+
         try:
             tool_call = ToolCall(**json.loads(response))
             for t in all_tools:
@@ -947,7 +956,13 @@ class Human(LLM):
                     return tool_call
         except Exception:
             pass
-        self.logger.error("Invalid action, please try again.")
+
+        self.logger.error(
+            "Invalid action format or command not available, please try again."
+        )
+
+        # Raise exception for parsing failures
+        raise ValueError("Failed to parse valid tool call from input")
 
     def format_tool_call_history(
         self, history_info: EnvInfo, response: LLMResponse
@@ -987,7 +1002,10 @@ class Human(LLM):
         all_tools = self.define_tools(tools)
         available_commands = [json.dumps(t) for t in all_tools]
         tool_call = None
-        while tool_call is None:
+        retry_count = 0
+        action = ""
+
+        while tool_call is None and retry_count < self.max_retries:
             if prompt_toolkit_available:
                 actions_completer = WordCompleter(
                     available_commands, ignore_case=False, sentence=True
@@ -1003,7 +1021,22 @@ class Human(LLM):
                     "\n".join(["Available commands:"] + available_commands)
                 )
                 action = input("> ")
-            tool_call = self.parse_tool_call_response(action, all_tools)
+
+            try:
+                tool_call = self.parse_tool_call_response(action, all_tools)
+            except ValueError as e:
+                self.logger.error(f"Error parsing tool call: {e}")
+
+            retry_count += 1
+
+        if tool_call is None:
+            error_message = (
+                f"Maximum retries ({self.max_retries}) reached without valid input."
+            )
+            self.logger.error(
+                f"Maximum retries ({self.max_retries}) reached without a valid tool call."
+            )
+            raise ValueError(error_message)
 
         return LLMResponse(
             prompt=messages,
