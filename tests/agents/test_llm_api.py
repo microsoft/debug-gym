@@ -961,12 +961,11 @@ def test_parse_tool_call_response_valid(logger_mock, example_tools):
     ],
 )
 def test_parse_tool_call_response_invalid(logger_mock, example_tools, bad_command):
-    """For malformed or non-matching commands the method should return None"""
+    """For malformed or non-matching commands the method should raise ValueError"""
     human = Human(logger=logger_mock)
 
-    result = human.parse_tool_call_response(bad_command, example_tools)
-
-    assert result is None
+    with pytest.raises(ValueError, match="Failed to parse valid tool call from input"):
+        human.parse_tool_call_response(bad_command, example_tools)
 
 
 def test_parse_tool_call_response_no_tools(logger_mock):
@@ -978,3 +977,11 @@ def test_parse_tool_call_response_no_tools(logger_mock):
         
     with pytest.raises(ValueError, match="No tools provided. At least one tool must be available."):
         human.parse_tool_call_response('{"id": "test", "name": "test", "arguments": {}}', None)
+
+
+def test_parse_tool_call_response_none(logger_mock, example_tools):
+    """Should raise ValueError when response is None"""
+    human = Human(logger=logger_mock)
+    
+    with pytest.raises(ValueError, match="Tool call cannot be None"):
+        human.parse_tool_call_response(None, example_tools)

@@ -937,6 +937,9 @@ class Human(LLM):
     def parse_tool_call_response(self, response, all_tools) -> ToolCall:
         """Parse user input and return a ToolCall object.
         Validate the input against the available tools."""
+        if response is None:
+            raise ValueError("Tool call cannot be None")
+            
         if not all_tools:
             raise ValueError("No tools provided. At least one tool must be available.")
             
@@ -954,7 +957,7 @@ class Human(LLM):
         
         self.logger.error("Invalid action format or command not available, please try again.")
         
-        # Raise exception if tool_call is None as requested
+        # Raise exception for parsing failures
         raise ValueError("Failed to parse valid tool call from input")
 
     def format_tool_call_history(
