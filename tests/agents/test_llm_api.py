@@ -164,9 +164,11 @@ def test_human_max_retries(_, build_env_info):
     env_info = build_env_info(
         tools=[Toolbox.get_tool("pdb"), Toolbox.get_tool("view")],
     )
-    
+
     # Should raise ValueError when max retries is reached
-    with pytest.raises(ValueError, match="Maximum retries \\(5\\) reached without valid input."):
+    with pytest.raises(
+        ValueError, match="Maximum retries \\(5\\) reached without valid input."
+    ):
         human(messages, env_info.tools)
 
 
@@ -968,17 +970,25 @@ def test_parse_tool_call_response_invalid(logger_mock, example_tools, bad_comman
 def test_parse_tool_call_response_no_tools(logger_mock):
     """Should raise ValueError when no tools are provided"""
     human = Human(logger=logger_mock)
-    
-    with pytest.raises(ValueError, match="No tools provided. At least one tool must be available."):
-        human.parse_tool_call_response('{"id": "test", "name": "test", "arguments": {}}', [])
-        
-    with pytest.raises(ValueError, match="No tools provided. At least one tool must be available."):
-        human.parse_tool_call_response('{"id": "test", "name": "test", "arguments": {}}', None)
+
+    with pytest.raises(
+        ValueError, match="No tools provided. At least one tool must be available."
+    ):
+        human.parse_tool_call_response(
+            '{"id": "test", "name": "test", "arguments": {}}', []
+        )
+
+    with pytest.raises(
+        ValueError, match="No tools provided. At least one tool must be available."
+    ):
+        human.parse_tool_call_response(
+            '{"id": "test", "name": "test", "arguments": {}}', None
+        )
 
 
 def test_parse_tool_call_response_none(logger_mock, example_tools):
     """Should raise ValueError when response is None"""
     human = Human(logger=logger_mock)
-    
+
     with pytest.raises(ValueError, match="Tool call cannot be None"):
         human.parse_tool_call_response(None, example_tools)
