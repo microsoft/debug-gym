@@ -165,12 +165,9 @@ def test_human_max_retries(_, build_env_info):
         tools=[Toolbox.get_tool("pdb"), Toolbox.get_tool("view")],
     )
     
-    llm_response = human(messages, env_info.tools)
-    
-    # Check that we get a default error tool call after max retries
-    assert llm_response.tool.id == "max_retries_reached"
-    assert llm_response.tool.name == "error"
-    assert "Maximum retries (5) reached without valid input" in llm_response.tool.arguments["message"]
+    # Should raise ValueError when max retries is reached
+    with pytest.raises(ValueError, match="Maximum retries \\(5\\) reached without valid input."):
+        human(messages, env_info.tools)
 
 
 @patch.object(

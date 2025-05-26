@@ -1026,13 +1026,9 @@ class Human(LLM):
             retry_count += 1
             
         if tool_call is None:
-            self.logger.error(f"Maximum retries ({self.max_retries}) reached without a valid tool call. Using default tool call.")
-            # Create a default tool call to avoid returning None
-            tool_call = ToolCall(
-                id="max_retries_reached",
-                name="error",
-                arguments={"message": f"Maximum retries ({self.max_retries}) reached without valid input."}
-            )
+            error_message = f"Maximum retries ({self.max_retries}) reached without valid input."
+            self.logger.error(f"Maximum retries ({self.max_retries}) reached without a valid tool call.")
+            raise ValueError(error_message)
 
         return LLMResponse(
             prompt=messages,
