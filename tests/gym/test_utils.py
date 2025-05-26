@@ -13,6 +13,7 @@ from debug_gym.gym.utils import (
     make_file_matcher,
     show_line_number,
     str2bool,
+    unescape,
 )
 
 
@@ -409,6 +410,25 @@ def test_walk():
     path_list.sort()
     expected.sort()
     assert path_list == expected
+
+
+def test_unescape_surrogate_pairs():
+    # Test with regular string
+    regular_string = "This is a regular string with escapes \\n\\t"
+    assert unescape(regular_string) == "This is a regular string with escapes \n\t"
+    
+    # Test with surrogate pairs that would cause UTF-8 encoding issues
+    surrogate_string = "Test with surrogate \\ud800\\udc00 pair"
+    result = unescape(surrogate_string)
+    
+    # Verify we can encode the result to UTF-8 without errors
+    try:
+        result.encode("utf-8")
+    except UnicodeEncodeError:
+        assert False, "Unescaped string still has invalid surrogate pairs"
+    
+    # The result should replace the surrogate with a replacement character
+    assert "Test with surrogate" in result
 
 
 def test_cleanup_pytest_output():
