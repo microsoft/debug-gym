@@ -128,13 +128,18 @@ class BaseAgent:
             )
 
         shortcut_features = []
-        if self.config.get("env_kwargs").get("run_on_rewrite") is True:
+        if (
+            self.config.get("env_kwargs") is not None
+            and self.config.get("env_kwargs").get("run_on_rewrite") is True
+        ):
             shortcut_features.append(
                 "- After successful rewrites, the environment will automatically call the Eval tool to evaluate the rewritten code. The evaluation output will be updated."
             )
-        if self.config.get("env_kwargs").get(
-            "auto_view_change"
-        ) is True and self.env.has_tool("pdb"):
+        if (
+            self.config.get("env_kwargs") is not None
+            and self.config.get("env_kwargs").get("auto_view_change") is True
+            and self.env.has_tool("pdb")
+        ):
             shortcut_features.append(
                 "- When the frame is changed after calling the PDB tool (e.g., stopped at a breakpoint), the environment will automatically call the View tool to follow the new frame."
             )
