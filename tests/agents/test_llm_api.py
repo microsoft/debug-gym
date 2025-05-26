@@ -967,3 +967,14 @@ def test_parse_tool_call_response_invalid(logger_mock, example_tools, bad_comman
     result = human.parse_tool_call_response(bad_command, example_tools)
 
     assert result is None
+
+
+def test_parse_tool_call_response_no_tools(logger_mock):
+    """Should raise ValueError when no tools are provided"""
+    human = Human(logger=logger_mock)
+    
+    with pytest.raises(ValueError, match="No tools provided. At least one tool must be available."):
+        human.parse_tool_call_response('{"id": "test", "name": "test", "arguments": {}}', [])
+        
+    with pytest.raises(ValueError, match="No tools provided. At least one tool must be available."):
+        human.parse_tool_call_response('{"id": "test", "name": "test", "arguments": {}}', None)

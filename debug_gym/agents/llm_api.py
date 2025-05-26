@@ -937,6 +937,9 @@ class Human(LLM):
     def parse_tool_call_response(self, response, all_tools) -> ToolCall:
         """Parse user input and return a ToolCall object.
         Validate the input against the available tools."""
+        if not all_tools:
+            raise ValueError("No tools provided. At least one tool must be available.")
+            
         try:
             tool_call = ToolCall(**json.loads(response))
             for t in all_tools:
