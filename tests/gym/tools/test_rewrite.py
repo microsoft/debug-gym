@@ -62,7 +62,7 @@ def test_rewrite_with_file_path(env):
     # using \n to prevent ide from removing trailing spaces
     assert (
         obs.observation
-        == """Rewrite was successful. The file has been updated.
+        == """The file `test.py` has been updated successfully.
 
 Diff:
 
@@ -104,7 +104,7 @@ def test_rewrite_start_end(env):
     # using \n to prevent ide from removing trailing spaces
     assert (
         obs.observation
-        == """Rewrite was successful. The file has been updated.
+        == """The file `test.py` has been updated successfully.
 
 Diff:
 
@@ -143,7 +143,7 @@ def test_full_rewrite(env):
     # using \n to prevent ide from removing trailing spaces
     assert (
         obs.observation
-        == """Rewrite was successful. The file has been updated.
+        == """The file `test.py` has been updated successfully.
 
 Diff:
 
