@@ -47,16 +47,9 @@ class MiniNightmareEnv(RepoEnv):
     def reset(self, *, options: dict = None):
         options = options or {}
         self.current_sample = self.dataset[options["task_name"]]
-
         directory = self.current_sample["base_directory"]
         self.setup_workspace(directory, entrypoint=self.entrypoint)
-
         infos = super().reset(options=options)
-
-        # By default, open the only modifiable file.
-        self.load_current_file(self.current_sample["filename"])
-        # an update the infos related to current code.
-        infos.current_code_with_line_number = self.current_code_with_line_number()
         return infos
 
     def load_dataset(self):
