@@ -10,13 +10,13 @@ from debug_gym.gym.utils import clean_code
 class RewriteTool(EnvironmentTool):
     name = "rewrite"
     examples = [
-        """rewrite(path=None, start=None, end=None, new_code="print('hola')") will rewrite the current file (the entire code) to be print('hola'), because no line number is provided.""",
-        """rewrite(path=None, start=10, end=None, new_code="    print('bonjour')") will rewite line number 10 of the current file to be print('bonjour'), with the indents ahead (in this case, 4 spaces).""",
-        """rewrite(path=None, start=10, end=20, new_code="    print('hello')\\n    print('hi again')") will replace the chunk of code between line number 10 and 20 in the current file by the two lines provided, both with indents ahead (in this case, 4 spaces).""",
-        """rewrite(path='code/utils.py', start=4, end=6, new_code="        print('buongiorno')") will replace the chunk of code between line number 4 and 6 in the file code/utils.py by the single line provided, with the indent ahead (in this case, 8 spaces).""",
+        """rewrite(path="code/utils.py", start=None, end=None, new_code="print('hola')") will rewrite the specified file 'code/utils.py' (the entire code) to be print('hola'), because no line number is provided.""",
+        """rewrite(path="code/utils.py", start=10, end=None, new_code="    print('bonjour')") will rewite line number 10 of the specified file 'code/utils.py' to be print('bonjour'), with the indents ahead (in this case, 4 spaces).""",
+        """rewrite(path="code/utils.py", start=10, end=20, new_code="    print('hello')\\n    print('hi again')") will replace the chunk of code between line number 10 and 20 in the specified file 'code/utils.py' by the two lines provided, both with indents ahead (in this case, 4 spaces).""",
+        """rewrite(path='code/utils.py', start=4, end=6, new_code="        print('buongiorno')") will replace the chunk of code between line number 4 and 6 in the specified file 'code/utils.py' by the single line provided, with the indent ahead (in this case, 8 spaces).""",
     ]
     description = (
-        "Rewrite the content of the specified file path, between lines [start, end], with the new code. Line numbers are 1-based. When file path is None, it's assumed to rewrite the current file. When start and end are None, it's assumed to rewrite the whole file. When start is provided and end is None, it's assumed to rewrite a single line (start). The new code should be valid python code include proper indentation (can be determined from context)."
+        "Rewrite the content of the specified file path, between lines [start, end], with the new code. Line numbers are 1-based. When start and end are None, it's assumed to rewrite the whole file. When start is provided and end is None, it's assumed to rewrite a single line (start). The new code should be valid python code include proper indentation (can be determined from context)."
         + "\nExamples (for demonstration purposes only, you need to adjust the tool calling format according to your specific syntax):"
         + "\n".join(examples)
     )

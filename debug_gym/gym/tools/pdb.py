@@ -12,13 +12,14 @@ from debug_gym.gym.utils import get_code_length
 class PDBTool(EnvironmentTool):
     name: str = "pdb"
     examples = [
-        """pdb(command="p x") to print the value of the variable x in the current context.""",
-        """pdb(command="b 42") to set a breakpoint at line 42 in the current file.""",
-        """pdb(command="cl src/code.py:26") to clear the breakpoint at line 26 in the file src/code.py.""",
+        """pdb(command="b mttl/models/modifiers/mlp.py:42") to set a breakpoint at line 42 in the file with the path 'mttl/models/modifiers/mlp.py'.""",
         """pdb(command="c") to continue the execution until the next breakpoint.""",
+        """pdb(command="p x") to print the value of the variable x in the current context.""",
+        """pdb(command="cl src/code.py:26") to clear the breakpoint at line 26 in the file 'src/code.py'.""",
     ]
     description = (
         "An interface to the Python debugger PDB. Send a command to the PDB terminal. The command should be a valid PDB command."
+        + "\nWhen using the breakpoint command (e.g., 'b', 'break', 'cl', 'clear'), make sure you specify the file path and line number in the format `file_path:line_number`."
         + "\nExamples (for demonstration purposes only, you need to adjust the tool calling format according to your specific syntax):"
         + "\n".join(examples)
     )
