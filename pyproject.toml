@@ -31,4 +31,5 @@ dev = [
     "pytest-xdist",
     "pytest-cov",
     "pytest-asyncio",
+    "pytest-timeout",
 ]
