@@ -226,8 +226,10 @@ class LLMConfigRegistry:
                 raw_llm_config = yaml.safe_load(f)
             return cls.register_all(raw_llm_config)
         except FileNotFoundError:
-            msg = (f"Cannot find llm config file: {config_file_path}. "
-                   "Use `debug-gym-init-llm-config` to create one and edit it.")
+            msg = (
+                f"Cannot find llm config file: {config_file_path}. "
+                "Use `debug-gym-init-llm-config` to create one and edit it."
+            )
             raise FileNotFoundError(msg)
 
     def __getitem__(self, model_name: str) -> LLMConfig:

@@ -2,8 +2,9 @@ import argparse
 import os
 from pathlib import Path
 
-from debug_gym.agents.llm_api import LLM_CONFIG_TEMPLATE
 from termcolor import colored
+
+from debug_gym.agents.llm_api import LLM_CONFIG_TEMPLATE
 
 
 def init_llm_config(dest_dir: str = None):
@@ -48,7 +49,13 @@ def init_llm_config(dest_dir: str = None):
     else:
         print(f"LLM config template already exists at `{destination}`.")
 
-    print(colored(f"Please edit `{destination}` to configure your LLM settings.", "green", attrs=["bold"]))
+    print(
+        colored(
+            f"Please edit `{destination}` to configure your LLM settings.",
+            "green",
+            attrs=["bold"],
+        )
+    )
 
 
 if __name__ == "__main__":
