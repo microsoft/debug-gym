@@ -351,7 +351,7 @@ class LLM(ABC):
         return len(self.tokenize(text))
 
     @abstractmethod
-    def define_tools(self, tool_call_list: dict[str, EnvironmentTool]) -> list[dict]:
+    def define_tools(self, tool_call_list: list[EnvironmentTool]) -> list[dict]:
         """Translates the list of tools into a format that is specifically defined by each LLM.
         The method should be overridden by subclasses.
         """
@@ -515,7 +515,7 @@ class AnthropicLLM(LLM):
         )
         return exception_full_name in rate_limit_errors
 
-    def define_tools(self, tool_call_list: dict[str, EnvironmentTool]) -> list[dict]:
+    def define_tools(self, tool_call_list: list[EnvironmentTool]) -> list[dict]:
         """Translates the list of tools into a format that is specifically defined by each LLM.
         Anthropic function calling format: https://docs.anthropic.com/en/docs/build-with-claude/tool-use/overview
         """
@@ -923,7 +923,7 @@ class Human(LLM):
     def count_tokens(self, text: str) -> int:
         return len(self.tokenize(text))
 
-    def define_tools(self, tool_call_list: dict[str, EnvironmentTool]) -> list[dict]:
+    def define_tools(self, tool_call_list: list[EnvironmentTool]) -> list[dict]:
         available_commands = []
         for tool in tool_call_list:
             random_id = "".join(map(str, np.random.randint(0, 10, size=6)))
