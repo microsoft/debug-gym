@@ -9,7 +9,7 @@ base:
         "auto_eval_on_rewrite": True,
         "run_timeout": 10,
     }
-    tools: ["eval", "pdb", "view", "rewrite"]
+    tools: ["pdb", "view", "rewrite"]
     terminal: {
         type: "docker",  # "docker" or "local"
         base_image: "python:3.12-slim",
@@ -34,11 +34,11 @@ base:
     reset_prompt_history_after_rewrite: True
 
 rewrite_agent:
-    tools: ["eval", "view", "rewrite"]
+    tools: ["view", "rewrite"]
 
 debug_agent:
-    tools: ["eval", "pdb", "view", "rewrite"]
+    tools: ["pdb", "view", "rewrite"]
 
 debug_5_agent:
     n_rewrites_before_pdb: 5
-    tools: ["eval", "pdb", "view", "rewrite"]
+    tools: ["pdb", "view", "rewrite"]
