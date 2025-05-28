@@ -4,8 +4,8 @@ base:
     uuid: "dev"
     benchmark: "swesmith"
     # problems: "all"  # lillst of problems, e.g., ["astropy__astropy-12907"], or "all"
-    # problems: "test-128"  # list of problems, e.g., ["astropy__astropy-12907"], or "all"
-    problems: ["spulec__freezegun.5f171db0.combine_file__f3rcc5ea"]
+    problems: "test-128"  # list of problems, e.g., ["astropy__astropy-12907"], or "all"
+    # problems: ["spulec__freezegun.5f171db0.combine_file__f3rcc5ea"]
     env_kwargs: {
         "dir_tree_depth": 1,
         "run_on_rewrite": True,
