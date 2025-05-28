@@ -15,7 +15,6 @@ def env_info():
         all_observations=[],
         eval_observation=Observation(source="env", observation="eval_observation"),
         dir_tree="dir_tree",
-        current_code_with_line_number="current_code_with_line_number",
         current_breakpoints="current_breakpoints",
         action="action",
         instructions={},
@@ -52,12 +51,7 @@ def test_instructions(mini_nightmare_env):
     assert mini_nightmare_env.instructions == expected_instructions
 
 
-@patch(
-    "debug_gym.gym.envs.RepoEnv.current_code_with_line_number",
-    return_value="Current code",
-)
 @patch("debug_gym.gym.envs.MiniNightmareEnv.setup_workspace")
-@patch("debug_gym.gym.envs.MiniNightmareEnv.load_current_file")
 @patch.object(
     Terminal,
     "run",
@@ -69,9 +63,7 @@ def test_reset(
     mock_run,
     mock_load_dataset,
     mock_terminal_run,
-    mock_load_current_file,
     mock_setup_workspace,
-    mock_line_number,
     mini_nightmare_env,
 ):
     mini_nightmare_env.dataset = {
@@ -90,4 +82,4 @@ def test_reset(
     )
     assert infos.max_score == 10
     assert infos.score == 5
-    assert infos.done == False
+    assert not infos.done

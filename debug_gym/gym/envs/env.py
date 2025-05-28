@@ -24,7 +24,6 @@ class EnvInfo:
     all_observations: list[Observation]  #  env.step + triggered tools obs
     eval_observation: Observation  # last eval observation
     dir_tree: str
-    current_code_with_line_number: dict | str
     current_breakpoints: str
     action: ToolCall | None
     instructions: dict
@@ -189,8 +188,6 @@ class RepoEnv(TooledEnv):
     def _reset_env_state(self):
         """Reset the environment state to the initial state."""
         # reset all state variables
-        self.current_file = None
-        self.current_file_content = None
         self.current_breakpoints_state = {}
         self.rewrite_counter = 0
         self.last_eval: EvalOutput = None
@@ -277,7 +274,7 @@ class RepoEnv(TooledEnv):
     def display_files(self):
         msg = (
             "Listing files in the current working directory."
-            " (ro) indicates read-only files."
+            " (read-only) indicates read-only files."
             f" Max depth: {str(self.dir_tree_depth)}.\n"
         )
         msg += self.directory_tree()
@@ -325,7 +322,6 @@ class RepoEnv(TooledEnv):
             all_observations=self.all_observations,
             eval_observation=Observation("env", self.last_eval.output),
             dir_tree=self.display_files(),
-            current_code_with_line_number=self.current_code_with_line_number(),
             current_breakpoints=self.current_breakpoints(),
             action=None,
             done=self.done,
@@ -365,12 +361,11 @@ class RepoEnv(TooledEnv):
         self.last_eval = EvalOutput(success, output)
         return self.last_eval
 
-    def load_current_file(self, filepath: str) -> bool:
-        self.current_file = filepath
-        self.current_file_content = self.load_file(filepath)
-
-    def load_file(self, filepath: str) -> str:
+    def read_file(self, filepath: str) -> str:
         return (self.working_dir / filepath).read_text()
+
+    def is_editable(self, filepath):
+        return filepath in self.editable_files
 
     def _index_files(self, readonly_patterns: list[str] | None = None):
         # get all file paths relative to the working directory
@@ -414,8 +409,9 @@ class RepoEnv(TooledEnv):
             if path.is_dir():
                 result[-1] += "/"
 
+            # TODO: Revert this logic to use the readonly patterns, otherwise new files will be read-only
             if str(path.relative_to(self.working_dir)) not in self.editable_files:
-                result[-1] += " (ro)"
+                result[-1] += " (read-only)"
 
         return "\n".join(result)
 
@@ -436,31 +432,6 @@ class RepoEnv(TooledEnv):
                 for _file_path, _line_number in breakpoints
             ]
             return "\n".join(breakpoints)
-
-    def current_code_with_line_number(self):
-        if self.current_file is None or self.current_file_content is None:
-            return "You are currently not working in a file. You can call the view tool to navigate to a file first."
-
-        output = {
-            "File name": self.current_file,
-            "Content": "\n"
-            + show_line_number(
-                self.current_file_content,
-                self.current_file,
-                self.current_breakpoints_state,
-            )
-            + "\n",
-        }
-        if self.current_breakpoints_state:
-            output["Note"] = (
-                "B indicates breakpoint before a certain line of code, this can be changed by calling the pdb tool."
-            )
-        return output
-
-    def overwrite_file(self, filepath: str, content: str):
-        assert isinstance(content, str), "content should be a string."
-        with open(pjoin(self.working_dir, filepath), "w") as f:
-            f.write(content)
 
     @property
     def patch(self):
@@ -504,7 +475,6 @@ class RepoEnv(TooledEnv):
             all_observations=self.all_observations,
             eval_observation=Observation("env", self.last_eval.output),
             dir_tree=self.display_files(),
-            current_code_with_line_number=self.current_code_with_line_number(),
             current_breakpoints=self.current_breakpoints(),
             action=action,
             instructions=self.instructions,

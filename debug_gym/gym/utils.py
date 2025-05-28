@@ -14,7 +14,17 @@ def clean_code(code):
 
 
 def unescape(s):
-    return codecs.decode(s, "unicode_escape")
+    try:
+        # First, try the normal unescape
+        result = codecs.decode(s, "unicode_escape")
+        # Test if it can be encoded to UTF-8 (which will happen during JSON encoding)
+        result.encode("utf-8")
+        return result
+    except UnicodeEncodeError:
+        # If it contains surrogate pairs that can't be encoded to UTF-8,
+        # replace them with the Unicode replacement character (U+FFFD)
+        result = codecs.decode(s, "unicode_escape")
+        return result.encode("utf-8", errors="replace").decode("utf-8")
 
 
 def get_code_length(code_string):

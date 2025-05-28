@@ -12,13 +12,14 @@ from debug_gym.gym.utils import get_code_length
 class PDBTool(EnvironmentTool):
     name: str = "pdb"
     examples = [
-        """pdb(command="p x") to print the value of the variable x in the current context.""",
-        """pdb(command="b 42") to set a breakpoint at line 42 in the current file.""",
-        """pdb(command="cl src/code.py:26") to clear the breakpoint at line 26 in the file src/code.py.""",
+        """pdb(command="b mttl/models/modifiers/mlp.py:42") to set a breakpoint at line 42 in the file with the path 'mttl/models/modifiers/mlp.py'.""",
         """pdb(command="c") to continue the execution until the next breakpoint.""",
+        """pdb(command="p x") to print the value of the variable x in the current context.""",
+        """pdb(command="cl src/code.py:26") to clear the breakpoint at line 26 in the file 'src/code.py'.""",
     ]
     description = (
         "An interface to the Python debugger PDB. Send a command to the PDB terminal. The command should be a valid PDB command."
+        + "\nWhen using the breakpoint command (e.g., 'b', 'break', 'cl', 'clear'), make sure you specify the file path and line number in the format `file_path:line_number`."
         + "\nExamples (for demonstration purposes only, you need to adjust the tool calling format according to your specific syntax):"
         + "\n".join(examples)
     )
@@ -120,18 +121,20 @@ class PDBTool(EnvironmentTool):
             splits = re.split("\n|;", command)
             if len(splits) > 1:
                 command = splits[0].strip()
-                _warning += f"Multiple commands are not supported. Only the first command will be executed."
+                _warning += "Multiple commands are not supported. Only the first command will be executed."
 
         success, output = True, ""
         if not self.pdb_is_running:
             output += self.start_pdb(environment)
 
         if not self.pdb_is_running:
-            return Observation(self.name, f"Tool failure:\n{output}")
-        elif command == "":
-            # empty command
-            return Observation(self.name, "Tool failure:\nEmpty command.")
-        elif command in ["b", "break"]:
+            return Observation(self.name, f"Failure calling pdb:\n{output}")
+        if command == "":  # empty command
+            return Observation(
+                self.name, "Failure calling pdb:\nEmpty commands are not allowed."
+            )
+
+        if command in ["b", "break"]:
             # list all breakpoints
             success, output = True, environment.current_breakpoints()
         elif command in ["cl", "clear"]:
@@ -144,7 +147,10 @@ class PDBTool(EnvironmentTool):
             and command.split()[1].isnumeric()
         ):
             # wrapper handle adding/removing breakpoints
-            success, output = self.breakpoint_add_clear(environment, command)
+            # Attempt to set a breakpoint in the current frame file; fails if it's not set
+            success, output = self.breakpoint_add_clear(
+                environment, command, self.current_frame_file
+            )
         elif (
             command.split()[0] in ["b", "break", "cl", "clear"]
             and ":" in command.split()[1]
@@ -161,7 +167,7 @@ class PDBTool(EnvironmentTool):
             try:
                 output += self.interact_with_pdb(command, environment.run_timeout)
                 self.pdb_obs = output
-            except:  # TODO: catch specific exceptions
+            except Exception:  # TODO: catch specific exceptions
                 success = False
 
         if success:
@@ -194,33 +200,31 @@ class PDBTool(EnvironmentTool):
                         "l .", environment.run_timeout
                     )
         else:
-            obs = "\n".join([f"Invalid tool arguments: {command}", _warning, output])
+            obs = "\n".join([f"Invalid pdb command: {command}", _warning, output])
 
         if self.pdb_is_running:
-            # read the current frame info, find the current file, so we can change view to that file.
+            # read the current frame info to determine the current file
             self.get_current_frame_file(environment)
 
         return Observation(self.name, obs)
 
-    def breakpoint_add_clear(self, environment, action: str, which_file=None):
+    def breakpoint_add_clear(self, environment, action: str, which_file):
         # handle adding/removing breakpoints
         # this is a wrapper that manages the self.breakpoints_state, which does not reset at each pseudo terminal start
         # self.breakpoints_state is a dict, the keys are "|||".join([file_path, str(line_number)]) and values are breakpoint_command
         # TODO: we don't support tbreak
-        if which_file is None:
-            which_file = environment.current_file
         manipulation = "set" if action.startswith("b") else "clear"
-        if which_file is None:
+        if which_file is None or which_file == "":
             return (
                 False,
-                f"Failed to {manipulation} breakpoint. No file is currently open.",
+                f"Failed to {manipulation} breakpoint. No file is specified in the command.",
             )
         if which_file.startswith(str(environment.working_dir)):
             which_file = which_file[len(str(environment.working_dir)) + 1 :]
         if which_file not in environment.all_files:
             return (
                 False,
-                f"Failed to {manipulation} breakpoint. {which_file} is not in the current repository.",
+                f"Failed to {manipulation} breakpoint. `{which_file}` is not found in the repository.",
             )
         # IMPORTANT: insert the viewing file into breakpoint command
         # for example, "b 42" -> "b src/main.py:42" if the current file is "src/main.py"
@@ -242,11 +246,11 @@ class PDBTool(EnvironmentTool):
                 # breakpoint already exists
                 return (
                     True,
-                    f"Breakpoint already exists at line {_line_number} in {which_file}.",
+                    f"Breakpoint already exists at line {_line_number} in `{which_file}`.",
                 )
             else:
                 # check if line number is valid
-                code_string = environment.load_file(which_file)
+                code_string = environment.read_file(which_file)
                 code_length = get_code_length(code_string)
                 if int(_line_number) > code_length or int(_line_number) < 1:
                     return (
@@ -269,7 +273,7 @@ class PDBTool(EnvironmentTool):
                 # breakpoint does not exist
                 return (
                     True,
-                    f"No breakpoint exists at line {_line_number} in {which_file}.",
+                    f"No breakpoint exists at line {_line_number} in `{which_file}`.",
                 )
             else:
                 try:
@@ -283,7 +287,10 @@ class PDBTool(EnvironmentTool):
                 except BaseException:
                     success = False
         else:
-            return False, output
+            return (
+                False,
+                f"Invalid action: `{action}`. Expected 'b', 'break', 'cl', or 'clear'.",
+            )
 
         return success, output
 
@@ -298,8 +305,6 @@ class PDBTool(EnvironmentTool):
         current_breakpoints_state_copy = copy.deepcopy(
             environment.current_breakpoints_state
         )
-        if rewrite_file is None:
-            rewrite_file = environment.current_file
         if rewrite_file.startswith(str(environment.working_dir)):
             rewrite_file = rewrite_file[len(str(environment.working_dir)) + 1 :]
         for _key in environment.current_breakpoints_state.keys():
@@ -359,9 +364,5 @@ class PDBTool(EnvironmentTool):
             file_path = output.split("(")[0]
             if file_path != self.current_frame_file:
                 self.current_frame_file = file_path
-                if environment.auto_view_change:
-                    new_context = file_path
-                    if new_context in environment.all_files:
-                        self.load_current_file(new_context)
         except BaseException:
             pass
