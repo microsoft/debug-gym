@@ -45,7 +45,7 @@ def test_view_valid_file(env):
     assert env_info.step_observation.source == "view"
     assert (
         env_info.step_observation.observation
-        == "Viewing `main.py`:\n\n```\nprint('Hello, World!')\n```\n\n"
+        == "Viewing `main.py`, lines 1-1 of 1 total lines. \n\n```\nprint('Hello, World!')\n```\n\n"
     )
 
     view_call = ToolCall(
@@ -67,7 +67,7 @@ def test_view_valid_file_with_line_numbers_no_breakpoints(env):
     assert env_info.step_observation.source == "view"
     assert (
         env_info.step_observation.observation
-        == "Viewing `main.py`:\n\n```\n     1 print('Hello, World!')\n```\n\n"
+        == "Viewing `main.py`, lines 1-1 of 1 total lines. \n\n```\n     1 print('Hello, World!')\n```\n\n"
     )
 
     view_call = ToolCall(
@@ -86,7 +86,7 @@ def test_view_valid_file_with_line_numbers_and_breakpoints(env):
     assert env_info.step_observation.source == "view"
     assert (
         env_info.step_observation.observation
-        == """Viewing `main.py`. B indicates breakpoint before a certain line of code:\n\n```\nB    1 print('Hello, World!')\n```\n\n"""
+        == """Viewing `main.py`, lines 1-1 of 1 total lines. B indicates breakpoint before a certain line of code. \n\n```\nB    1 print('Hello, World!')\n```\n\n"""
     )
 
     view_call = ToolCall(
@@ -107,7 +107,7 @@ def test_view_valid_read_only_file(env):
     assert env_info.step_observation.source == "view"
     assert (
         env_info.step_observation.observation
-        == "Viewing `test_1.py` (read-only):\n\n```\ndef test_1():\n  assert False\n```\n\n"
+        == "Viewing `test_1.py`, lines 1-2 of 2 total lines. The file is read-only. \n\n```\ndef test_1():\n  assert False\n```\n\n"
     )
 
 
@@ -118,7 +118,7 @@ def test_view_valid_read_only_file_with_line_numbers_no_breakpoints(env):
     assert env_info.step_observation.source == "view"
     assert (
         env_info.step_observation.observation
-        == "Viewing `test_1.py` (read-only):\n\n```\n     1 def test_1():\n     2   assert False\n```\n\n"
+        == "Viewing `test_1.py`, lines 1-2 of 2 total lines. The file is read-only. \n\n```\n     1 def test_1():\n     2   assert False\n```\n\n"
     )
 
 
@@ -131,7 +131,7 @@ def test_view_valid_read_only_file_with_line_numbers_and_breakpoints(env):
     assert env_info.step_observation.source == "view"
     assert (
         env_info.step_observation.observation
-        == "Viewing `test_1.py` (read-only). B indicates breakpoint before a certain line of code:\n\n```\n     1 def test_1():\nB    2   assert False\n```\n\n"
+        == "Viewing `test_1.py`, lines 1-2 of 2 total lines. The file is read-only. B indicates breakpoint before a certain line of code. \n\n```\n     1 def test_1():\nB    2   assert False\n```\n\n"
     )
 
 
@@ -180,7 +180,7 @@ def test_view_file_with_range_full_content(env):
     assert env_info.step_observation.source == "view"
     assert (
         env_info.step_observation.observation
-        == """Viewing `ten_lines.py`:
+        == """Viewing `ten_lines.py`, lines 1-10 of 10 total lines. 
 
 ```
      1 print('Line 1')
@@ -220,7 +220,7 @@ def test_view_file_with_range_start_5(env):
     env_info = env.step(view_call)
     assert (
         env_info.step_observation.observation
-        == """Viewing `ten_lines.py`:
+        == """Viewing `ten_lines.py`, lines 5-10 of 10 total lines. 
 
 ```
      5 print('Line 5')
@@ -245,7 +245,7 @@ def test_view_file_with_range_start_5_end_8(env):
     env_info = env.step(view_call)
     assert (
         env_info.step_observation.observation
-        == """Viewing `ten_lines.py`:
+        == """Viewing `ten_lines.py`, lines 5-8 of 10 total lines. 
 
 ```
      5 print('Line 5')

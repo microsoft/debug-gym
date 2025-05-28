@@ -28,11 +28,11 @@ class ViewTool(EnvironmentTool):
             "description": "The path to the file to be viewed. The path should be relative to the root directory of the repository.",
         },
         "start": {
-            "type": ["integer", "null"],
+            "type": ["number", "null"],
             "description": "The starting line number (1-based, inclusive) to view. If not provided, starts from the beginning.",
         },
         "end": {
-            "type": ["integer", "null"],
+            "type": ["number", "null"],
             "description": "The ending line number (1-based, inclusive) to view. If not provided, shows until the end of the file.",
         },
         "include_line_numbers_and_breakpoints": {
@@ -112,12 +112,19 @@ class ViewTool(EnvironmentTool):
             )
             if environment.current_breakpoints_state:
                 breakpoints_message = (
-                    ". B indicates breakpoint before a certain line of code"
+                    "B indicates breakpoint before a certain line of code. "
                 )
 
-        read_only = " (read-only)" if not environment.is_editable(new_file) else ""
+        line_numbers = (
+            f"lines {s + 1}-{e} of {len(file_lines)} total lines. "
+            if len(file_lines) > 0
+            else ""
+        )
+        read_only = (
+            "The file is read-only. " if not environment.is_editable(new_file) else ""
+        )
         obs = (
-            f"Viewing `{new_file}`{read_only}{breakpoints_message}:"
+            f"Viewing `{new_file}`, {line_numbers}{read_only}{breakpoints_message}"
             f"\n\n```\n{display_content}\n```\n\n"
         )
         return Observation(self.name, obs)
