@@ -58,7 +58,7 @@ class BaseAgent:
 
     def build_history_prompt(self):
         messages = build_history_prompt(
-            self.history.filter_out(actions=["eval", None]),
+            self.history.filter_out(actions=[None]),
             self.llm,
             self.config["reset_prompt_history_after_rewrite"],
         )
