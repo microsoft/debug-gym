@@ -114,15 +114,57 @@ class SWESmithEnv(RepoEnv):
                 f"Invalid split '{split}'. Available splits are: {['all'] + sorted(self.dataset_splits.keys())}"
             )
 
-    def setup_local_repo(self):
+    def setup_task_info(self, task_name):
+        if self.instance_ids:
+            if task_name not in self.instance_ids:
+                raise ValueError(
+                    f"Task `{task_name}` was not found in instance_ids. The available tasks are: {self.instance_ids}.\n"
+                    "Please provide a valid task or initialize the environment without instance_ids to load all tasks."
+                )
+        self.task_name = task_name
+        self.ds_row = self.ds[self.dataset[self.task_name]]
+        self.swesmith_repo_name = self.ds_row["repo"].split("/")[1]
+        self.base_commit = self.ds_row["base_commit"]
+        self.branch_name = self.ds_row["instance_id"]
+        self.gold_patch = self.ds_row["patch"]
+        self.git_apply_args = "--reverse"
+        self.image_name = self.ds_row["image_name"]
+        self.repo, self.commit = get_repo_commit_from_image_name(self.image_name)
+        self.install_configs = MAP_REPO_TO_SPECS[self.repo][self.commit]
+        self.base_image = f"{DOCKER_ORG}/{self.image_name}:{TAG}"
+        self.package_name = self.repo.split("/")[1]
+        self.test_cmd, self.test_directives = get_test_command(self.ds_row)
         self.fail_to_pass = self.ds_row["FAIL_TO_PASS"]
         self.pass_to_pass = self.ds_row["PASS_TO_PASS"]
-        self.test_cmd, self.test_directives = get_test_command(self.ds_row)
+
+        if self.package_name == "python-colorlog":
+            self.package_name = "colorlog"
+        elif self.package_name == "MONAI":
+            self.package_name = "monai"
+        elif self.package_name == "mido":
+            # ../dev doesn't exist in docker image
+            self.test_cmd = self.test_cmd.replace("/dev/null", "/dev")
+            self.test_cmd = self.test_cmd.replace("../dev/", "./")
+            self.test_directives = [
+                directive.replace("../dev/", "") for directive in self.test_directives
+            ]
+            self.fail_to_pass = [
+                test.replace("../dev/", "") for test in self.fail_to_pass
+            ]
+            self.pass_to_pass = [
+                test.replace("../dev/", "") for test in self.pass_to_pass
+            ]
+        elif self.package_name == "pydantic":
+            self.test_cmd = self.test_cmd.replace("/root/", "$HOME/")
+
+    def setup_local_repo(self):
 
         local_repo_path = SWESmithEnv.CACHE / self.swesmith_repo_name
         assert local_repo_path.exists()
 
-        entrypoint = " ".join([self.test_cmd, *self.test_directives])
+        entrypoint = str(
+            self.test_cmd
+        )  # " ".join([self.test_cmd, *self.test_directives])
 
         # -s (capture=no) from pytest, allows for debugging with pdb
         # -q (quiet) from pytest, to avoid long pytest output
@@ -156,26 +198,6 @@ class SWESmithEnv(RepoEnv):
         #     self.working_dir / ".debugreadonly", patterns=self.test_directives
         # )
 
-    def setup_task_info(self, task_name):
-        if self.instance_ids:
-            if task_name not in self.instance_ids:
-                raise ValueError(
-                    f"Task `{task_name}` was not found in instance_ids. The available tasks are: {self.instance_ids}.\n"
-                    "Please provide a valid task or initialize the environment without instance_ids to load all tasks."
-                )
-        self.task_name = task_name
-        self.ds_row = self.ds[self.dataset[self.task_name]]
-        self.swesmith_repo_name = self.ds_row["repo"].split("/")[1]
-        self.base_commit = self.ds_row["base_commit"]
-        self.branch_name = self.ds_row["instance_id"]
-        self.gold_patch = self.ds_row["patch"]
-        self.git_apply_args = "--reverse"
-        self.image_name = self.ds_row["image_name"]
-        self.repo, self.commit = get_repo_commit_from_image_name(self.image_name)
-        self.install_configs = MAP_REPO_TO_SPECS[self.repo][self.commit]
-        self.base_image = f"{DOCKER_ORG}/{self.image_name}:{TAG}"
-        self.repo_name = self.repo.split("/")[1]
-
     @property
     def patch(self):
         command = "git diff"
@@ -193,10 +215,18 @@ class SWESmithEnv(RepoEnv):
         score = sum(
             1
             for test in self.fail_to_pass
-            # *Do not* assume silent success for now as done in SWE-Bench grading.py
-            if test_status_map.get(test, TestStatus.ERROR.value)
+            # Like in SWE-Smith, we assume silent success.
+            # Ref: https://github.com/SWE-bench/SWE-smith/blob/main/swesmith/harness/grading.py#L154
+            if test_status_map.get(test, TestStatus.PASSED.value)
             in (TestStatus.PASSED.value, TestStatus.XFAIL.value)
         )
+        # Getting not passed tests.
+        not_passed_tests = {
+            test: status
+            for test, status in test_status_map.items()
+            if status not in (TestStatus.PASSED.value, TestStatus.XFAIL.value)
+        }
+        self.logger.debug(f"Not passed tests: {not_passed_tests}")
         assert score <= self.max_score
         return score
 
@@ -210,10 +240,6 @@ class SWESmithEnv(RepoEnv):
         self.setup_task_info(options["task_name"])
         self.setup_local_repo()
 
-        # spec = make_test_spec(self.ds_row)
-        # docker_client = docker.from_env()
-        # build_instance_image(spec, docker_client, logger=None, nocache=False)
-
         # Start the terminal
         self.terminal.base_image = self.base_image
 
@@ -226,8 +252,19 @@ class SWESmithEnv(RepoEnv):
         self.terminal.run(
             f"useradd -m -u {uid} -g {group_id} -G sudo debug_gym_user", user="root"
         )
+
+        # Install sudo.
+        self.terminal.run(f"apt update && apt install -y sudo", user="root")
+        # Add the user to sudoers.
+        self.terminal.run(
+            f"echo 'debug_gym_user ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/debug_gym_user",
+            user="root",
+        )
+
         # Allow for the user to pip install in the env. TODO: This is still slow.
         # self.terminal.run(f"chmod -R o+rwX /opt/miniconda3/envs/testbed", user="root")
+
+        # Alternatively, we can use the following to specifically allow read/write/execute permissions on certain directories.
         self.terminal.run(
             f"chmod -R o+rwX /opt/miniconda3/envs/testbed/bin", user="root"
         )
@@ -240,11 +277,11 @@ class SWESmithEnv(RepoEnv):
             user="root",
         )
         self.terminal.run(
-            f"chmod -R o+rwX /opt/miniconda3/envs/testbed/lib/python*/site-packages/{self.repo_name}*",
+            f"chmod -R o+rwX /opt/miniconda3/envs/testbed/lib/python*/site-packages/{self.package_name}*",
             user="root",
         )
         self.terminal.run(
-            f"chmod -R o+rwX /opt/miniconda3/envs/testbed/lib/python*/site-packages/{self.repo_name.title()}*",
+            f"chmod -R o+rwX /opt/miniconda3/envs/testbed/lib/python*/site-packages/{self.package_name.title()}*",
             user="root",
         )
 
@@ -254,26 +291,14 @@ class SWESmithEnv(RepoEnv):
         # Copy the initial code to the working directory.
         self.terminal.run(f"cp -r /testbed/. {self.working_dir}")
 
-        self.terminal.run(f"git fetch origin {self.branch_name}")
-        self.terminal.run(f"git checkout {self.branch_name}")
-
         self.terminal.session_commands.append("source /opt/miniconda3/bin/activate")
         self.terminal.session_commands.append(f"conda activate testbed")
 
+        self.terminal.run(f"pip install uv")
         self.run_install()
-        # self.run_post_install()
 
-        # Apply test patch
-        # command = f"git apply -"
-        # subprocess.run(
-        #     command.split(),
-        #     cwd=self.working_dir,
-        #     input=self.ds_row["test_patch"],
-        #     stdout=subprocess.PIPE,
-        #     stderr=subprocess.PIPE,
-        #     text=True,
-        #     check=True,
-        # )
+        self.terminal.run(f"git fetch origin {self.branch_name}")
+        self.terminal.run(f"git checkout {self.branch_name}")
 
         # Need to recreate those files after copying the initial code.
         create_ignore_file(
@@ -320,21 +345,21 @@ class SWESmithEnv(RepoEnv):
 
     @property
     def ignore_files(self):
-        return [
-            ".*/",
-            # ".pytest_cache/",
-            # "*test*.py",
-            # "*.pyc",
-            # "*.md",
-            # ".*",
-        ]
+        return [".*/"]
 
     def run_command_with_raise(self, command):
-        command = command.replace("apt-get", "sudo apt-get").replace(
-            "sudo sudo", "sudo"
-        )
-        status, output = self.terminal.run(command, raises=True)
-        return status, output
+        try:
+            command = command.replace("apt-get", "sudo apt-get").replace(
+                "sudo sudo", "sudo"
+            )
+            command = command.replace("pip install -U", "pip install --no-deps")
+            status, output = self.terminal.run(command, raises=True)
+            return status, output
+        except ValueError as e:
+            if "error: remote upstream already exists." in str(e):
+                pass
+            # else:
+            #     raise
 
     def run_install(self):
         install_cmds = self.install_configs.get("install", [])

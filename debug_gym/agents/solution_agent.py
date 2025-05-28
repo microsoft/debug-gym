@@ -55,8 +55,8 @@ class AgentSolution(BaseAgent):
                 self.logger.debug(cmd_out)
             except subprocess.CalledProcessError as e:
                 self.logger.debug(e)
-                self.logger.debug(e.stderr)
-                self.logger.debug(e.stdout)
+                self.logger.debug(f"stderr: {e.stderr}")
+                self.logger.debug(f"stdout: {e.stdout}")
                 raise
 
             if debug:
@@ -66,6 +66,10 @@ class AgentSolution(BaseAgent):
             info = self.env.step(action)
 
             self.history.step(info)
+
+            assert (
+                info.done is True
+            ), "The task should be done after applying the gold patch."
 
             if info.done or info.rewrite_counter >= self.config["max_rewrite_steps"]:
                 self.logger.info(

@@ -3,9 +3,9 @@ base:
     output_path: "exps/swesmith"
     uuid: "dev"
     benchmark: "swesmith"
-    # problems: "all"  # list of problems, e.g., ["astropy__astropy-12907"], or "all"
-    problems: "test-128"  # list of problems, e.g., ["astropy__astropy-12907"], or "all"
-    # problems: ["andialbrecht__sqlparse.e57923b3.lm_rewrite__3i3o5sl5"]
+    # problems: "all"  # lillst of problems, e.g., ["astropy__astropy-12907"], or "all"
+    # problems: "test-128"  # list of problems, e.g., ["astropy__astropy-12907"], or "all"
+    problems: ["spulec__freezegun.5f171db0.combine_file__f3rcc5ea"]
     env_kwargs: {
         "dir_tree_depth": 1,
         "run_on_rewrite": True,
