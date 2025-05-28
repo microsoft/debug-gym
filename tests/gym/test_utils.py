@@ -31,17 +31,16 @@ def test_clean_code(code, expected):
     assert clean_code(code) == expected
 
 
-def test_show_line_number():
-    s4 = "    "
-    s2 = "  "
-
+def test_show_line_number_empty_code_string():
     # code_string is empty
     with pytest.raises(
         Exception,
-        match="code_string should not be None",
+        match="code_string should not be empty",
     ):
         show_line_number(None)
 
+
+def test_show_line_number_code_string_is_list():
     # code_string is a list
     code_string = ["def foo():", "    return 42"]
     with pytest.raises(
@@ -50,19 +49,28 @@ def test_show_line_number():
     ):
         show_line_number(code_string)
 
-    # no code_path, no breakpoints
+
+def test_show_line_number_no_code_path_no_breakpoints():
+    s4 = "    "
+    s2 = "  "
     code_string = f"def foo():\n{s4}return 42\n"
     expected = f"{s2}   1 def foo():\n{s2}   2 {s4}return 42\n{s2}   3 "
     assert show_line_number(code_string) == expected
 
-    # with code_path
+
+def test_show_line_number_with_code_path():
+    s4 = "    "
+    s2 = "  "
     code_path = "path/to/code.py"
     breakpoints_state = {"path/to/code.py|||2": "b 2"}
     code_string = f"def foo():\n{s4}return 42\n"
     expected = f"{s2}   1 def foo():\nB    2 {s4}return 42\n{s2}   3 "
     assert show_line_number(code_string, code_path, breakpoints_state) == expected
 
-    # multiple breakpoints
+
+def test_show_line_number_multiple_breakpoints():
+    s4 = "    "
+    s2 = "  "
     code_path = "path/to/code.py"
     breakpoints_state = {
         "path/to/code.py|||2": "b 2",
@@ -81,17 +89,77 @@ def test_show_line_number():
     expected += f"{s2}   6 "
     assert show_line_number(code_string, code_path, breakpoints_state) == expected
 
-    # 10000 lines, so line numbers will take 8 digits
-    code_string = f"def foo():\n"
+
+def test_show_line_number_multiple_breakpoints_with_start_index():
+    s4 = "    "
+    code_path = "path/to/code.py"
+    breakpoints_state = {
+        "path/to/code.py|||102": "b 102",
+        "path/to/code.py|||103": "b 103, bar > 4",
+    }
+    code_string = "def foo():\n"
+    code_string += f"{s4}bar = 20\n"
+    code_string += f"{s4}foobar = 42\n"
+    code_string += f"{s4}print('frog')\n"
+    code_string += f"{s4}return foobar\n"
+    start_index = 101
+    annotated_code = show_line_number(
+        code_string, code_path, breakpoints_state, start_index
+    )
+    expected = "   101 def foo():\n"
+    expected += f"B  102 {s4}bar = 20\n"
+    expected += f"B  103 {s4}foobar = 42\n"
+    expected += f"   104 {s4}print('frog')\n"
+    expected += f"   105 {s4}return foobar\n"
+    expected += "   106 "
+    assert annotated_code == expected
+
+
+def test_show_line_number_large_number_of_lines():
+    s4 = "    "
+    s2 = "  "
+    code_string = "def foo():\n"
     for i in range(9997):
         code_string += f"{s4}print({i})\n"
     code_string += f"{s4}return 42\n"
-    expected = f"{s2}{s4}   1 def foo():\n"
+    annotated_code = show_line_number(code_string)
+
+    expected = "         1 def foo():\n"
     for i in range(9997):
         expected += "{}{:>8} {}print({})\n".format(s2, i + 2, s4, i)
-    expected += f"{s2}{s4}9999 {s4}return 42\n"
-    expected += f"{s2}   10000 "
-    assert show_line_number(code_string) == expected
+    expected += f"      9999 {s4}return 42\n"
+    expected += "     10000 "
+
+    # Check full match, but only report the first and last 100 characters
+    # If the test fails and the output is too large, pytest may hang
+    assert annotated_code[:100] == expected[:100]
+    assert annotated_code[-100:] == expected[-100:]
+    match = annotated_code == expected
+    assert match, "Annotated code does not match expected output"
+
+
+def test_show_line_number_large_number_of_lines_with_start_index():
+    s4 = "    "
+    s2 = "  "
+    code_string = "def foo():\n"
+    for i in range(9997):
+        code_string += f"{s4}print({i})\n"
+    code_string += f"{s4}return 42\n"
+    start_index = 101
+    annotated_code = show_line_number(code_string, start_index=start_index)
+
+    expected = "       101 def foo():\n"
+    for i in range(9997):
+        expected += "{}{:>8} {}print({})\n".format(s2, i + start_index + 1, s4, i)
+    expected += f"     10099 {s4}return 42\n"
+    expected += "     10100 "
+
+    # Check full match, but only report the first and last 100 characters
+    # If the test fails and the output is too large, pytest may hang
+    assert annotated_code[:100] == expected[:100]
+    assert annotated_code[-100:] == expected[-100:]
+    match = annotated_code == expected
+    assert match, "Annotated code does not match expected output"
 
 
 def test_make_file_matcher(tmp_path):
