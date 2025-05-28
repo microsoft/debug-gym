@@ -7,7 +7,6 @@ base:
         "entrypoint": "python -m pytest -s test.py",
         "dir_tree_depth": 1,
         "run_on_rewrite": True,
-        "auto_view_change": True,
         "run_timeout": 30,
     }
     terminal: {

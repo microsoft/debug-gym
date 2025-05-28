@@ -6,7 +6,6 @@ base:
     env_kwargs: {
         "dir_tree_depth": 1,
         "run_on_rewrite": True,
-        "auto_view_change": True,
         "run_timeout": 300,
         "dataset_id": "princeton-nlp/SWE-bench_lite"
     }

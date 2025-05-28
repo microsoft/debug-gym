@@ -7,7 +7,6 @@ base:
         "debug_entrypoint": "python -m pdb -m pytest -s test.py",
         "dir_tree_depth": 1,
         "run_on_rewrite": True,
-        "auto_view_change": True,
         "run_timeout": 10,
     }
     tools: ["eval", "pdb", "view", "rewrite"]
