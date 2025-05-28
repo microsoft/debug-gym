@@ -17,7 +17,6 @@ def test_build_prompt(agent_setup, build_env_info):
     info = build_env_info(
         instructions="Test instructions",
         dir_tree="Test dir tree",
-        current_code_with_line_number="Test code",
         current_breakpoints="Test breakpoints",
         step_observation="Test last run obs",
     )
@@ -33,7 +32,6 @@ def test_run(agent_setup, build_env_info):
         max_score=10,
         instructions="Test instructions",
         dir_tree="Test dir tree",
-        current_code_with_line_number="Test code",
         current_breakpoints="Test breakpoints",
         step_observation="Test last run obs",
     )
@@ -43,7 +41,6 @@ def test_run(agent_setup, build_env_info):
         max_score=10,
         instructions="Test instructions",
         dir_tree="Test dir tree",
-        current_code_with_line_number="Test code",
         current_breakpoints="Test breakpoints",
         step_observation="Test last run obs",
     )
@@ -57,7 +54,6 @@ def test_build_system_prompt_rewrite_agent(agent_setup, build_env_info):
     info = build_env_info(
         instructions="Test instructions",
         dir_tree="Test dir tree",
-        current_code_with_line_number="Test code",
         current_breakpoints="Test breakpoints",
         step_observation="Test last run obs",
     )
@@ -82,7 +78,6 @@ def test_run_debug_5_agent(agent_setup, build_env_info):
         rewrite_counter=0,
         instructions="Test instructions",
         dir_tree="Test dir tree",
-        current_code_with_line_number="Test code",
         current_breakpoints="Test breakpoints",
         step_observation="Test last run obs",
     )
@@ -93,7 +88,6 @@ def test_run_debug_5_agent(agent_setup, build_env_info):
         rewrite_counter=0,
         instructions="Test instructions",
         dir_tree="Test dir tree",
-        current_code_with_line_number="Test code",
         current_breakpoints="Test breakpoints",
         step_observation="Test last run obs",
     )

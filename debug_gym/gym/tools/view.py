@@ -4,15 +4,16 @@ from os.path import join as pjoin
 from debug_gym.gym.entities import Observation
 from debug_gym.gym.tools.tool import EnvironmentTool
 from debug_gym.gym.tools.toolbox import Toolbox
-from debug_gym.gym.utils import is_subdirectory
+from debug_gym.gym.utils import is_subdirectory, show_line_number
 
 
 @Toolbox.register()
 class ViewTool(EnvironmentTool):
     name: str = "view"
     examples = [
-        """view(path="main.py") to navigate to a file called 'main.py' in the root.""",
-        """view(path="src/util.py") to navigate to a file called 'util.py' in a subdirectory called 'src'.""",
+        """view(path="main.py") to show the content of a file called 'main.py' in the root. The content will be annotated with line numbers and current breakpoints because include_line_numbers_and_breakpoints is True by default.""",
+        """view(path="utils/vector.py", include_line_numbers_and_breakpoints=True) to show the content of a file called 'vector.py' in a subdirectory called 'utils'. The content will be annotated with line numbers and current breakpoints.""",
+        """view(path="src/util.py", include_line_numbers_and_breakpoints=False) to show the content of a file called 'util.py' in a subdirectory called 'src'. The line numbers and breakpoints will not be included in the output.""",
     ]
     description = (
         "Specify a file path to set as current working file. The file path should be relative to the root directory of the repository."
@@ -24,12 +25,19 @@ class ViewTool(EnvironmentTool):
             "type": ["string"],
             "description": "The path to the file to be viewed. The path should be relative to the root directory of the repository.",
         },
+        "include_line_numbers_and_breakpoints": {
+            "type": ["boolean", "null"],
+            "description": "Whether to annotate the file content with line numbers and current breakpoints before each line of code. For example, a line can be shown as 'B  426         self.assertEqual(CustomUser._default_manager.count(), 0)', where 'B' indicates a breakpoint before this line of code. '426' is the line number. This argument is optional and defaults to True. If set to False, the file content will be shown without line numbers and breakpoints.",
+        },
     }
 
-    def is_editable(self, environment, filepath):
-        return filepath in environment.editable_files
-
-    def use(self, environment, path: str) -> Observation:
+    def use(
+        self,
+        environment,
+        path: str,
+        include_line_numbers_and_breakpoints: bool = True,
+    ) -> Observation:
+        # TODO: Decide whether to use natural language or json like format for the tool call observation.
         new_file = path.strip()
         if new_file == "":
             obs = "Invalid file path. Please specify a valid file path."
@@ -44,14 +52,22 @@ class ViewTool(EnvironmentTool):
                 f"the root directory: `{environment.working_dir}`."
             )
         elif os.path.isfile(pjoin(environment.working_dir, new_file)):
-            environment.load_current_file(filepath=new_file)
-            environment.current_file = new_file
-            read_only = (
-                " (read-only)" if not self.is_editable(environment, new_file) else ""
-            )
+            file_content = environment.read_file(new_file)
+            breakpoints_message = ""
+            if include_line_numbers_and_breakpoints:
+                file_content = show_line_number(
+                    file_content,
+                    code_path=new_file,
+                    breakpoints_state=environment.current_breakpoints_state,
+                )
+                if environment.current_breakpoints_state:
+                    breakpoints_message = (
+                        ". B indicates breakpoint before a certain line of code"
+                    )
+            read_only = " (read-only)" if not environment.is_editable(new_file) else ""
             obs = (
-                f"Viewing `{new_file}`{read_only}:"
-                f"\n\n```\n{environment.current_file_content}\n```\n\n"
+                f"Viewing `{new_file}`{read_only}{breakpoints_message}:"
+                f"\n\n```\n{file_content}\n```\n\n"
             )
         else:
             obs = (
