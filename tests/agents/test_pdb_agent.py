@@ -115,7 +115,6 @@ def test_human_in_the_loop(human, agent_setup, build_env_info):
         rewrite_counter=0,
         instructions="Test instructions",
         dir_tree="Test dir tree",
-        current_code_with_line_number="Test code",
         current_breakpoints="Test breakpoints",
         step_observation="Test last run obs",
     )
@@ -126,7 +125,6 @@ def test_human_in_the_loop(human, agent_setup, build_env_info):
         rewrite_counter=0,
         instructions="Test instructions",
         dir_tree="Test dir tree",
-        current_code_with_line_number="Test code",
         current_breakpoints="Test breakpoints",
         step_observation="Test last run obs",
     )
@@ -142,7 +140,6 @@ def test_human_in_the_loop(human, agent_setup, build_env_info):
         rewrite_counter=0,
         instructions="Test instructions",
         dir_tree="Test dir tree",
-        current_code_with_line_number="Test code",
         current_breakpoints="Test breakpoints",
         step_observation="Test last run obs",
     )
