@@ -31,3 +31,6 @@ dev = [
     "pytest-timeout",
     "pytest-env",
 ]
+mini_nightmare = [
+    "pandas",
+]
