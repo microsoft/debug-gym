@@ -116,7 +116,7 @@ class BaseAgent:
 
         if (
             self.config.get("env_kwargs") is not None
-            and self.config.get("env_kwargs").get("run_on_rewrite") is True
+            and self.config.get("env_kwargs").get("auto_eval_on_rewrite") is True
         ):
             shortcut_features.append(
                 "- After successful rewrites, the environment will automatically call the Eval tool to evaluate the rewritten code. The evaluation output will be updated."

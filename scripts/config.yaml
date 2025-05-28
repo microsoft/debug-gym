@@ -6,7 +6,7 @@ base:
         "entrypoint": "python -m pytest -sv test.py",
         "debug_entrypoint": "python -m pdb -m pytest -s test.py",
         "dir_tree_depth": 1,
-        "run_on_rewrite": True,
+        "auto_eval_on_rewrite": True,
         "run_timeout": 10,
     }
     tools: ["eval", "pdb", "view", "rewrite"]

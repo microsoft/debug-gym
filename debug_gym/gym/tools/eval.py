@@ -18,6 +18,6 @@ class EvalTool(EnvironmentTool):
         return self(environment)
 
     def on_rewrite_success(self, environment, **kwargs):
-        if environment.run_on_rewrite:
+        if environment.auto_eval_on_rewrite:
             return self(environment)
         return None

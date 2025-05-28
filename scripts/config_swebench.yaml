@@ -5,7 +5,7 @@ base:
     problems: "all"  # list of problems, e.g., ["astropy__astropy-12907"], or "all"
     env_kwargs: {
         "dir_tree_depth": 1,
-        "run_on_rewrite": True,
+        "auto_eval_on_rewrite": True,
         "run_timeout": 300,
         "dataset_id": "princeton-nlp/SWE-bench_lite"
     }

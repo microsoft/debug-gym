@@ -6,7 +6,7 @@ base:
     env_kwargs: {
         "entrypoint": "python -m pytest -s .",
         "dir_tree_depth": 1,
-        "run_on_rewrite": True,
+        "auto_eval_on_rewrite": True,
         "run_timeout": 20,
     }
     terminal: {
