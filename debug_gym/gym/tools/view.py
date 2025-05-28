@@ -11,8 +11,9 @@ from debug_gym.gym.utils import is_subdirectory, show_line_number
 class ViewTool(EnvironmentTool):
     name: str = "view"
     examples = [
-        """view(path="main.py") to navigate to a file called 'main.py' in the root.""",
-        """view(path="src/util.py") to navigate to a file called 'util.py' in a subdirectory called 'src'.""",
+        """view(path="main.py") to show the content of a file called 'main.py' in the root. The content will be annotated with line numbers and current breakpoints because include_line_numbers_and_breakpoints is True by default.""",
+        """view(path="utils/vector.py", include_line_numbers_and_breakpoints=True) to show the content of a file called 'vector.py' in a subdirectory called 'utils'. The content will be annotated with line numbers and current breakpoints.""",
+        """view(path="src/util.py", include_line_numbers_and_breakpoints=False) to show the content of a file called 'util.py' in a subdirectory called 'src'. The line numbers and breakpoints will not be included in the output.""",
     ]
     description = (
         "Specify a file path to set as current working file. The file path should be relative to the root directory of the repository."
@@ -26,7 +27,7 @@ class ViewTool(EnvironmentTool):
         },
         "include_line_numbers_and_breakpoints": {
             "type": ["boolean", "null"],
-            "description": "Whether to annotate the file content with line numbers and breakpoints. Defaults to True.",
+            "description": "Whether to annotate the file content with line numbers and current breakpoints before each line of code. For example, a line can be shown as 'B  426         self.assertEqual(CustomUser._default_manager.count(), 0)', where 'B' indicates a breakpoint before this line of code. '426' is the line number. This argument is optional and defaults to True. If set to False, the file content will be shown without line numbers and breakpoints.",
         },
     }
 
