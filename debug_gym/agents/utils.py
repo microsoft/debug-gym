@@ -137,6 +137,11 @@ def load_config():
         "--agent",
     )
     parser.add_argument(
+        "--list",
+        action="store_true",
+        help="List available agents and problems.",
+    )
+    parser.add_argument(
         "--debug",
         action="store_true",
         help="Break before sending action to the environment.",
@@ -186,6 +191,7 @@ def load_config():
         "--params",
         nargs="+",
         metavar="my.setting=value",
+        action='extend',
         default=[],
         help="override params of the config file,"
         " e.g. -p 'rewrite_only.random_seed=123'",
