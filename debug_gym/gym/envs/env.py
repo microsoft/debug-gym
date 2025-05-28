@@ -5,7 +5,6 @@ import subprocess
 import tempfile
 from dataclasses import dataclass
 from glob import glob
-from os.path import join as pjoin
 from pathlib import Path
 
 import numpy as np
@@ -13,7 +12,7 @@ import numpy as np
 from debug_gym.gym.entities import EvalOutput, Event, Observation
 from debug_gym.gym.terminal import Terminal
 from debug_gym.gym.tools.tool import EnvironmentTool, ToolCall
-from debug_gym.gym.utils import _walk, make_file_matcher, show_line_number
+from debug_gym.gym.utils import _walk, make_file_matcher
 from debug_gym.logger import DebugGymLogger
 
 
