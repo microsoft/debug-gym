@@ -532,7 +532,8 @@ class RepoEnv(TooledEnv):
             terminal=Terminal(),
             logger=self.logger,
         )
-
+        for tool in self.tools:
+            new_env.add_tool(tool)
         return new_env
 
     def post_process_event(self, event: Event, source, kwargs, observations):
