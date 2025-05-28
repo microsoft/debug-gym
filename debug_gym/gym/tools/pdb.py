@@ -287,7 +287,10 @@ class PDBTool(EnvironmentTool):
                 except BaseException:
                     success = False
         else:
-            return False, output
+            return (
+                False,
+                f"Invalid action: `{action}`. Expected 'b', 'break', 'cl', or 'clear'.",
+            )
 
         return success, output
 
