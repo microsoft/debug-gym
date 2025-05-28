@@ -30,7 +30,7 @@ class ViewTool(EnvironmentTool):
         },
         "end": {
             "type": ["integer", "null"],
-            "description": "The ending line number (1-based, exclusive) to view. If not provided, shows until the end of the file.",
+            "description": "The ending line number (1-based, inclusive) to view. If not provided, shows until the end of the file.",
         },
         "include_line_numbers_and_breakpoints": {
             "type": ["boolean", "null"],
@@ -64,8 +64,26 @@ class ViewTool(EnvironmentTool):
             file_lines = file_content.splitlines()
 
             # convert 1-based line numbers to 0-based indices
-            s = (start - 1) if start is not None and start > 0 else 0
-            e = end if end is not None and end > 0 else len(file_lines)
+            s = (start - 1) if start is not None else 0
+            # end inclusive, so no need to subtract 1
+            e = end if end is not None else len(file_lines)
+
+            # Return an error message if indices are out of bounds
+            if s < 0 or s >= len(file_lines):
+                return Observation(
+                    self.name,
+                    f"Invalid start index: `{start}`. It should be between 1 and {len(file_lines)}.",
+                )
+            if e < 0 or e > len(file_lines):
+                return Observation(
+                    self.name,
+                    f"Invalid end index: `{end}`. It should be between 1 and {len(file_lines)}.",
+                )
+            if s + 1 > e:  # s + 1 because end is inclusive
+                return Observation(
+                    self.name,
+                    f"Invalid range: start index `{start}` is greater than end index `{end}`.",
+                )
 
             file_lines = file_lines[s:e]
             file_content = "\n".join(file_lines)
