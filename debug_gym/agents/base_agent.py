@@ -94,24 +94,6 @@ class BaseAgent:
         else:
             system_prompt["Repo directory tree"] = info.dir_tree
         system_prompt["Current breakpoints"] = info.current_breakpoints
-        system_prompt["Current code in view"] = info.current_code_with_line_number
-        if isinstance(info.current_code_with_line_number, dict):
-            system_prompt["Current code in view"] = dict(
-                info.current_code_with_line_number
-            )
-            if (
-                self.llm.context_length is not None
-                and self.llm.count_tokens is not None
-            ):
-                system_prompt["Current code in view"]["Content"] = trim(
-                    system_prompt["Current code in view"]["Content"],
-                    min(
-                        int(0.8 * self.llm.context_length),
-                        calc_tokens_left(system_prompt),
-                    ),
-                    count_tokens=self.llm.count_tokens,
-                    where="end",
-                )
 
         if self.llm.context_length is not None and self.llm.count_tokens is not None:
             system_prompt["Evaluation output of current code"] = trim(
