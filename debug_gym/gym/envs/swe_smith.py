@@ -156,6 +156,8 @@ class SWESmithEnv(RepoEnv):
             ]
         elif self.package_name == "pydantic":
             self.test_cmd = self.test_cmd.replace("/root/", "$HOME/")
+        elif self.package_name == "alive-progress":
+            self.install_configs["install"].append("pip uninstall -y pdbpp")
 
     def setup_local_repo(self):
 
@@ -168,7 +170,8 @@ class SWESmithEnv(RepoEnv):
 
         # -s (capture=no) from pytest, allows for debugging with pdb
         # -q (quiet) from pytest, to avoid long pytest output
-        debug_entrypoint = entrypoint.replace("pytest", "pytest -sq")
+        # debug_entrypoint = entrypoint.replace("pytest", "pytest -sq")
+        debug_entrypoint = entrypoint.replace("pytest", "pytest -q")
 
         self.setup_workspace(
             # path=local_branch_path,
@@ -210,8 +213,6 @@ class SWESmithEnv(RepoEnv):
     def calculate_score(self, eval_output: EvalOutput) -> int:
         log_parser = MAP_REPO_TO_PARSER.get(self.repo, parse_log_pytest)
         test_status_map = log_parser(eval_output.output)
-        self.logger.debug(f"fail_to_pass: {self.fail_to_pass}")
-        self.logger.debug(f"Test status map: {test_status_map}")
         score = sum(
             1
             for test in self.fail_to_pass
@@ -284,12 +285,18 @@ class SWESmithEnv(RepoEnv):
             f"chmod -R o+rwX /opt/miniconda3/envs/testbed/lib/python*/site-packages/{self.package_name.title()}*",
             user="root",
         )
+        self.terminal.run(
+            f"chmod -R o+rwX /opt/miniconda3/envs/testbed/lib/python*/site-packages/*pdb*",
+            user="root",
+        )
 
         # Delete the content in the working directory.
         self.terminal.run(f"rm -rf {self.working_dir / '*'}")
         self.terminal.run(f"rm -rf {self.working_dir / '.*'}")
+
         # Copy the initial code to the working directory.
         self.terminal.run(f"cp -r /testbed/. {self.working_dir}")
+        self.terminal.run(f"chmod -R a+rw {self.working_dir}")
 
         self.terminal.session_commands.append("source /opt/miniconda3/bin/activate")
         self.terminal.session_commands.append(f"conda activate testbed")
