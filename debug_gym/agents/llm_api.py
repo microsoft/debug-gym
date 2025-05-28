@@ -731,7 +731,7 @@ class OpenAILLM(LLM):
 
         return is_error
 
-    def define_tools(self, tool_call_list: dict[str, EnvironmentTool]) -> list[dict]:
+    def define_tools(self, tool_call_list: list[EnvironmentTool]) -> list[dict]:
         """Translates the list of tools into a format that is specifically defined by each LLM.
         OpenAI function calling format: https://platform.openai.com/docs/guides/function-calling
         """
