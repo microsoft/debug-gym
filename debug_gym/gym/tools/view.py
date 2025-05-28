@@ -14,6 +14,8 @@ class ViewTool(EnvironmentTool):
         """view(path="main.py") to show the content of a file called 'main.py' in the root. The content will be annotated with line numbers and current breakpoints because include_line_numbers_and_breakpoints is True by default.""",
         """view(path="utils/vector.py", include_line_numbers_and_breakpoints=True) to show the content of a file called 'vector.py' in a subdirectory called 'utils'. The content will be annotated with line numbers and current breakpoints.""",
         """view(path="src/util.py", include_line_numbers_and_breakpoints=False) to show the content of a file called 'util.py' in a subdirectory called 'src'. The line numbers and breakpoints will not be included in the output.""",
+        """view(path="funcs/helper.py", start=6, end=24) to show the content of a file called 'helper.py' in a subdirectory called 'funcs', starting from line 6 to line 24. The content will be annotated with line numbers and current breakpoints.""",
+        """view(path="src/main.py", start=514) to show the content of a file called 'main.py' in a subdirectory called 'src', starting from line 514 to the end of the file. The content will be annotated with line numbers and current breakpoints.""",
     ]
     description = (
         "Specify a file path to set as current working file. The file path should be relative to the root directory of the repository."
