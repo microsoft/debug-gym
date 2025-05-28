@@ -111,7 +111,7 @@ class BaseAgent:
 
         shortcut_features = []
         shortcut_features.append(
-            "- To save space, the current code in view and the current evaluation output are shown above, not in the history. Please expect empty feedback in the history after calling the View and Eval tools, and always refer to the system prompt for the current code and evaluation output."
+            "- Always refer to the system prompt for the evaluation output."
         )
 
         if (
@@ -120,14 +120,6 @@ class BaseAgent:
         ):
             shortcut_features.append(
                 "- After successful rewrites, the environment will automatically call the Eval tool to evaluate the rewritten code. The evaluation output will be updated."
-            )
-        if (
-            self.config.get("env_kwargs") is not None
-            and self.config.get("env_kwargs").get("auto_view_change") is True
-            and self.env.has_tool("pdb")
-        ):
-            shortcut_features.append(
-                "- When the frame is changed after calling the PDB tool (e.g., stopped at a breakpoint), the environment will automatically call the View tool to follow the new frame."
             )
         if self.config.get("persistent_breakpoints") is True and self.env.has_tool(
             "pdb"
