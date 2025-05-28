@@ -108,9 +108,6 @@ To demonstrate how to integrate `debug-gym` with coding tasks and repositories, 
 | `swebench`| [https://github.com/princeton-nlp/SWE-bench](https://github.com/princeton-nlp/SWE-bench) |
 | `mini_nightmare` | A set of 10 hand-crafted minimal buggy code snippet where rewrite only agents have harder time to tackle. Read details [here](https://github.com/microsoft/debug-gym/blob/main/data/mini_nightmare/mini_nightmare.md). |
 
-> [!NOTE]
-> Before using `mini_nightmare`, please install its dependencies.
-> `pip install -e .[mini_nightmare]`
 ---
 
 ## 3. Running Baselines
