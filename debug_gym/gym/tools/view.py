@@ -24,6 +24,14 @@ class ViewTool(EnvironmentTool):
             "type": ["string"],
             "description": "The path to the file to be viewed. The path should be relative to the root directory of the repository.",
         },
+        "start": {
+            "type": ["integer", "null"],
+            "description": "The starting line number (1-based, inclusive) to view. If not provided, starts from the beginning.",
+        },
+        "end": {
+            "type": ["integer", "null"],
+            "description": "The ending line number (1-based, exclusive) to view. If not provided, shows until the end of the file.",
+        },
         "include_line_numbers_and_breakpoints": {
             "type": ["boolean", "null"],
             "description": "Whether to annotate the file content with line numbers and breakpoints. Defaults to True.",
@@ -34,9 +42,10 @@ class ViewTool(EnvironmentTool):
         self,
         environment,
         path: str,
+        start: int = None,
+        end: int = None,
         include_line_numbers_and_breakpoints: bool = True,
     ) -> Observation:
-        # TODO: Decide whether to use natural language or json like format for the tool call observation.
         new_file = path.strip()
         if new_file == "":
             obs = "Invalid file path. Please specify a valid file path."
@@ -52,12 +61,22 @@ class ViewTool(EnvironmentTool):
             )
         elif os.path.isfile(pjoin(environment.working_dir, new_file)):
             file_content = environment.read_file(new_file)
+            file_lines = file_content.splitlines()
+
+            # convert 1-based line numbers to 0-based indices
+            s = (start - 1) if start is not None and start > 0 else 0
+            e = end if end is not None and end > 0 else len(file_lines)
+
+            file_lines = file_lines[s:e]
+            file_content = "\n".join(file_lines)
+
             breakpoints_message = ""
             if include_line_numbers_and_breakpoints:
                 file_content = show_line_number(
                     file_content,
                     code_path=new_file,
                     breakpoints_state=environment.current_breakpoints_state,
+                    start_index=s + 1,  # Convert to 1-based index for display
                 )
                 if environment.current_breakpoints_state:
                     breakpoints_message = (
