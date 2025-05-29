@@ -153,10 +153,9 @@ class RepoEnv(TooledEnv):
         debug_entrypoint: str | None = None,
         max_score: int | None = None,
         readonly_patterns: list[str] | None = None,
-        run_on_rewrite: bool = True,
+        auto_eval_on_rewrite: bool = True,
         run_timeout: int | None = None,
         dir_tree_depth: int | None = None,
-        auto_view_change: bool = True,
         terminal: Terminal | None = None,
         logger: DebugGymLogger | None = None,
     ):
@@ -164,10 +163,9 @@ class RepoEnv(TooledEnv):
 
         self.path = None
         self.max_score = max_score
-        self.run_on_rewrite = run_on_rewrite
+        self.auto_eval_on_rewrite = auto_eval_on_rewrite
         self.run_timeout = run_timeout
         self.dir_tree_depth = dir_tree_depth
-        self.auto_view_change = auto_view_change
         self.terminal = terminal or Terminal()
         self.entrypoint = entrypoint
         self.debug_entrypoint = debug_entrypoint or entrypoint

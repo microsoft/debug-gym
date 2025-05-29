@@ -37,7 +37,7 @@ def test_eval(env):
 
 
 @pytest.mark.parametrize(
-    "method,env_run_on_rewrite,expected",
+    "method,env_auto_eval_on_rewrite,expected",
     [
         ("on_env_reset", False, "1 passed in "),
         ("on_env_reset", True, "1 passed in "),
@@ -45,10 +45,10 @@ def test_eval(env):
         ("on_rewrite_success", False, "FAILED test_1.py::test_1"),
     ],
 )
-def test_eval_on_event(env, method, env_run_on_rewrite, expected):
+def test_eval_on_event(env, method, env_auto_eval_on_rewrite, expected):
     eval_tool = Toolbox.get_tool("eval")
     env.add_tool(eval_tool)
-    env.run_on_rewrite = env_run_on_rewrite
+    env.auto_eval_on_rewrite = env_auto_eval_on_rewrite
 
     eval_call = ToolCall(id="eval_id", name="eval", arguments={})
     env_info = env.step(eval_call)

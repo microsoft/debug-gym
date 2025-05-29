@@ -91,8 +91,10 @@ def add_tools(env, config: dict, logger: DebugGymLogger):
     for tool in config["tools"]:
         kwargs = {}
         if tool == "pdb":
-            kwargs["persistent_breakpoints"] = config["persistent_breakpoints"]
-            kwargs["auto_list"] = config["auto_list"]
+            kwargs["persistent_breakpoints"] = config["env_kwargs"][
+                "persistent_breakpoints"
+            ]
+            kwargs["auto_list"] = config["env_kwargs"]["auto_list"]
 
         tool_instantiated = Toolbox.get_tool(tool, **kwargs)
         env.add_tool(tool_instantiated)
