@@ -156,6 +156,8 @@ class RepoEnv(TooledEnv):
         auto_eval_on_rewrite: bool = True,
         run_timeout: int | None = None,
         dir_tree_depth: int | None = None,
+        persistent_breakpoints: bool = True,
+        auto_list: bool = True,
         terminal: Terminal | None = None,
         logger: DebugGymLogger | None = None,
     ):
@@ -169,6 +171,8 @@ class RepoEnv(TooledEnv):
         self.terminal = terminal or Terminal()
         self.entrypoint = entrypoint
         self.debug_entrypoint = debug_entrypoint or entrypoint
+        self.persistent_breakpoints = persistent_breakpoints
+        self.auto_list = auto_list
         self.logger = logger or DebugGymLogger("debug-gym")
         self.infos: EnvInfo | None = None
         self.rng = None
