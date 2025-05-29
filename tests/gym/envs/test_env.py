@@ -551,10 +551,8 @@ def test_clone(env):
     assert env.entrypoint == cloned_env.entrypoint
     assert env.debug_entrypoint == cloned_env.debug_entrypoint
     assert env.max_score == cloned_env.max_score
-    assert env.run_on_rewrite == cloned_env.run_on_rewrite
     assert env.run_timeout == cloned_env.run_timeout
     assert env.dir_tree_depth == cloned_env.dir_tree_depth
-    assert env.auto_view_change == cloned_env.auto_view_change
     assert env.logger == cloned_env.logger
 
     # Check that the terminal is not the same instance

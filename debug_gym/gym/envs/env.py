@@ -496,10 +496,8 @@ class RepoEnv(TooledEnv):
             debug_entrypoint=self.debug_entrypoint,
             max_score=self.max_score,
             readonly_patterns=None,
-            run_on_rewrite=self.run_on_rewrite,
             run_timeout=self.run_timeout,
             dir_tree_depth=self.dir_tree_depth,
-            auto_view_change=self.auto_view_change,
             terminal=Terminal(),
             logger=self.logger,
         )
