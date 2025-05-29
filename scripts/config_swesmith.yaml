@@ -31,7 +31,7 @@ base:
     reset_prompt_history_after_rewrite: True
 
 solution:
-    llm_name: null # "human"  # No need for LLM.
+    llm_name: "human"  # No need for an LLM.
     tools: ["eval", "pdb"]
 
 rewrite_agent:
