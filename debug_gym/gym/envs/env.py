@@ -5,7 +5,6 @@ import subprocess
 import tempfile
 from dataclasses import dataclass
 from glob import glob
-from os.path import join as pjoin
 from pathlib import Path
 
 import numpy as np
@@ -13,7 +12,7 @@ import numpy as np
 from debug_gym.gym.entities import EvalOutput, Event, Observation
 from debug_gym.gym.terminal import Terminal
 from debug_gym.gym.tools.tool import EnvironmentTool, ToolCall
-from debug_gym.gym.utils import _walk, make_file_matcher, show_line_number
+from debug_gym.gym.utils import _walk, make_file_matcher
 from debug_gym.logger import DebugGymLogger
 
 
@@ -154,10 +153,11 @@ class RepoEnv(TooledEnv):
         debug_entrypoint: str | None = None,
         max_score: int | None = None,
         readonly_patterns: list[str] | None = None,
-        run_on_rewrite: bool = True,
+        auto_eval_on_rewrite: bool = True,
         run_timeout: int | None = None,
         dir_tree_depth: int | None = None,
-        auto_view_change: bool = True,
+        persistent_breakpoints: bool = True,
+        auto_list: bool = True,
         terminal: Terminal | None = None,
         logger: DebugGymLogger | None = None,
     ):
@@ -165,13 +165,14 @@ class RepoEnv(TooledEnv):
 
         self.path = None
         self.max_score = max_score
-        self.run_on_rewrite = run_on_rewrite
+        self.auto_eval_on_rewrite = auto_eval_on_rewrite
         self.run_timeout = run_timeout
         self.dir_tree_depth = dir_tree_depth
-        self.auto_view_change = auto_view_change
         self.terminal = terminal or Terminal()
         self.entrypoint = entrypoint
         self.debug_entrypoint = debug_entrypoint or entrypoint
+        self.persistent_breakpoints = persistent_breakpoints
+        self.auto_list = auto_list
         self.logger = logger or DebugGymLogger("debug-gym")
         self.infos: EnvInfo | None = None
         self.rng = None

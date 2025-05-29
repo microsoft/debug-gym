@@ -289,9 +289,10 @@ class SWEBenchEnv(RepoEnv):
         test_files = [
             f for f in test_files if not any(f.endswith(ext) for ext in NON_TEST_EXTS)
         ]
-        # Add test/ to readonly files if not already present
-        if "test/" not in test_files:
-            test_files.append("test/")
+        # Add test/ and tests/ to readonly files if not already present
+        for test_dir in ["test/", "tests/"]:
+            if test_dir not in test_files:
+                test_files.append(test_dir)
         create_ignore_file(self.working_dir / ".debugreadonly", patterns=test_files)
         self._index_files()
 

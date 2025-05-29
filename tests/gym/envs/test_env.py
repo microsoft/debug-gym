@@ -121,7 +121,7 @@ def test_setup_workspace(mock_atexit_register, mock_tempdir, tmp_path):
     working_dir = tmp_path / "tempdir"
     working_dir.mkdir()
     mock_tempdir.return_value.name = str(working_dir)
-    repo_env = RepoEnv(run_timeout=10, dir_tree_depth=2, auto_view_change=True)
+    repo_env = RepoEnv(run_timeout=10, dir_tree_depth=2)
     repo_env.setup_workspace(
         path=str(path_dir),
         entrypoint="python",
@@ -142,7 +142,7 @@ def test_setup_workspace(mock_atexit_register, mock_tempdir, tmp_path):
 def test_setup_workspace_with_none_path(
     mock_copytree, mock_atexit_register, mock_tempdir
 ):
-    repo_env = RepoEnv(run_timeout=10, dir_tree_depth=2, auto_view_change=True)
+    repo_env = RepoEnv(run_timeout=10, dir_tree_depth=2)
     repo_env.setup_workspace(None, "/bin/bash")
 
     assert repo_env.path is None
