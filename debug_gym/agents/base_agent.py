@@ -114,13 +114,15 @@ class BaseAgent:
             shortcut_features.append(
                 "- After successful rewrites, the environment will automatically call the Eval tool to evaluate the rewritten code. The evaluation output will be updated automatically in the system prompt."
             )
-        if self.config.get("persistent_breakpoints") is True and self.env.has_tool(
-            "pdb"
-        ):
+        if self.config.get("env_kwargs", {}).get(
+            "persistent_breakpoints"
+        ) is True and self.env.has_tool("pdb"):
             shortcut_features.append(
                 "- The environment will automatically restore existing breakpoints when a new PDB session is started (e.g., after a rewrite)."
             )
-        if self.config.get("auto_list") is True and self.env.has_tool("pdb"):
+        if self.config.get("env_kwargs", {}).get(
+            "auto_list"
+        ) is True and self.env.has_tool("pdb"):
             shortcut_features.append(
                 "- After every valid PDB tool calling, the environment will automatically call the PDB tool again with a `list .` command, which will show the code around the current frame."
             )
