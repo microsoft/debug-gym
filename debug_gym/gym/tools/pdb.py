@@ -30,15 +30,9 @@ class PDBTool(EnvironmentTool):
         },
     }
 
-    def __init__(
-        self,
-        persistent_breakpoints: bool = False,
-        auto_list: bool = True,
-    ):
+    def __init__(self):
         super().__init__()
         self.pdb_obs = ""
-        self.persistent_breakpoints = persistent_breakpoints
-        self.auto_list = auto_list
         self.current_frame_file = None
         self._session: ShellSession = None
 
@@ -79,7 +73,7 @@ class PDBTool(EnvironmentTool):
         if "The program finished and will be restarted" in initial_output:
             self.close_pdb()
         else:
-            if self.persistent_breakpoints:
+            if environment.persistent_breakpoints:
                 # restore persistent breakpoints
                 for _, _command in environment.current_breakpoints_state.items():
                     self.interact_with_pdb(_command, environment.run_timeout)
@@ -192,7 +186,7 @@ class PDBTool(EnvironmentTool):
             # Add the current frame information to the observation.
             if (
                 self.pdb_is_running
-                and self.auto_list
+                and environment.auto_list
                 and command.split()[0] not in ["l", "list"]
             ):
                 if '"""The pytest entry point."""' not in obs:
