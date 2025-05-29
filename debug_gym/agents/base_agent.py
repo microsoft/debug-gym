@@ -112,7 +112,7 @@ class BaseAgent:
         shortcut_features = []
         if self.config.get("env_kwargs", {}).get("auto_eval_on_rewrite") is True:
             shortcut_features.append(
-                "- After successful rewrites, the environment will automatically call the Eval tool to evaluate the rewritten code. The evaluation output will be updated automatically in the system prompt."
+                "- After successful rewrites, the environment will automatically call the Eval tool to evaluate the rewritten code. Therefore, you do not need to call the Eval tool yourself. The evaluation output will be updated automatically in the system prompt."
             )
         if self.config.get("env_kwargs", {}).get(
             "persistent_breakpoints"
