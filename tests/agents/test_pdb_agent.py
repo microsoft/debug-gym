@@ -148,12 +148,12 @@ def test_human_in_the_loop(human, agent_setup, build_env_info):
     assert result is False
     # test that llm actions were executed
     assert env.step.called
-    env.step.assert_called_with(llm().response)
+    env.step.assert_called_with(human().response)
     assert env.step().done is False
 
     # test that llm actions were logged
     _history, _prompt_response_pairs = agent.history.get()
-    assert [[], [llm()]] == _prompt_response_pairs
+    assert [[], [human()]] == _prompt_response_pairs
 
     # test that env was cloned
     assert env.clone.called
@@ -168,7 +168,7 @@ def test_human_in_the_loop(human, agent_setup, build_env_info):
 
     # test that human action was executed
     assert env.clone().step.called
-    env.clone().step.assert_called_with(human().response)
+    env.clone().step.assert_called_with(llm().response)
 
     # ensure that human action was not recorded in history
     assert env.clone().step() not in agent.history.get_all()

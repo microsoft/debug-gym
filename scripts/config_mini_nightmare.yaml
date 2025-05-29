@@ -43,5 +43,5 @@ debug_5_agent:
     n_rewrites_before_pdb: 5
     tools: ["eval", "view", "rewrite", "pdb"]
 
-debug_hitl:
+debug_human:
     tools: ["eval", "pdb", "view", "rewrite"]
