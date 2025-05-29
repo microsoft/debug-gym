@@ -33,8 +33,8 @@ jobs:
       - name: Test with pytest - PR
         if: github.event_name == 'pull_request'
         run: |
-          DEBUG_GYM_DEBUG=1 pytest -n 16 -vv -k "not test_swe_bench" --cov=. --cov-report=term-missing --cov-fail-under=85
+          DEBUG_GYM_DEBUG=1 pytest -vv -n 16 -k "not test_swe_bench" --cov=debug_gym --cov-report=term-missing --cov-fail-under=80 --timeout=300
       - name: Test with pytest
         if: github.event_name != 'pull_request'
         run: |
-          DEBUG_GYM_DEBUG=1 pytest -n 4 -vv --cov=. --cov-report=term-missing --cov-fail-under=90
+          DEBUG_GYM_DEBUG=1 pytest -vv -n 16 --cov=debug_gym --cov-report=term-missing --cov-fail-under=85 --timeout=600

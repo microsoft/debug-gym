@@ -121,7 +121,7 @@ def test_setup_workspace(mock_atexit_register, mock_tempdir, tmp_path):
     working_dir = tmp_path / "tempdir"
     working_dir.mkdir()
     mock_tempdir.return_value.name = str(working_dir)
-    repo_env = RepoEnv(run_timeout=10, dir_tree_depth=2, auto_view_change=True)
+    repo_env = RepoEnv(run_timeout=10, dir_tree_depth=2)
     repo_env.setup_workspace(
         path=str(path_dir),
         entrypoint="python",
@@ -142,7 +142,7 @@ def test_setup_workspace(mock_atexit_register, mock_tempdir, tmp_path):
 def test_setup_workspace_with_none_path(
     mock_copytree, mock_atexit_register, mock_tempdir
 ):
-    repo_env = RepoEnv(run_timeout=10, dir_tree_depth=2, auto_view_change=True)
+    repo_env = RepoEnv(run_timeout=10, dir_tree_depth=2)
     repo_env.setup_workspace(None, "/bin/bash")
 
     assert repo_env.path is None
@@ -248,29 +248,12 @@ def test_display_files_read_only(env):
     )
 
 
-@patch("debug_gym.gym.utils.show_line_number")
-def test_current_code_with_line_number(mock_show_line_number):
-    mock_show_line_number.return_value = "1    def foo():\n2        return 42"
-    env = RepoEnv(path=".")
-    env.current_file = "file.py"
-    env.current_file_content = "def foo():\n    return 42"
-
-    result = env.current_code_with_line_number()
-    expected_result = {
-        "File name": "file.py",
-        "Content": "\n     1 def foo():\n     2     return 42\n",
-    }
-    assert result == expected_result
-
-
 @patch.object(RepoEnv, "get_triggered_tools")
 @patch.object(RepoEnv, "get_tool")
 @patch.object(RepoEnv, "has_tool", return_value=False)
 @patch.object(RepoEnv, "eval")
 @patch.object(RepoEnv, "display_files")
-@patch.object(RepoEnv, "current_code_with_line_number")
 def test_step(
-    mock_current_code_with_line_number,
     mock_display_files,
     mock_eval,
     mock_has_tool,
@@ -285,7 +268,6 @@ def test_step(
     mock_pdb_tool.pdb_obs = "PDB started"
     mock_get_tool.return_value = None
     mock_display_files.return_value = "file list"
-    mock_current_code_with_line_number.return_value = "code with line numbers"
 
     env = RepoEnv(path=".")
     env.last_eval = EvalOutput(success=False, output="1 failed, 0 passed")
@@ -338,8 +320,6 @@ def test_reset(
     infos = env.reset()
 
     mock_eval.assert_called_once()
-    assert env.current_file is None
-    assert env.current_file_content is None
     assert env.current_breakpoints_state == {}
     assert env.rewrite_counter == 0
     assert infos == EnvInfo(
@@ -352,7 +332,6 @@ def test_reset(
 |-- file2.txt
 |-- subdir/
   |-- subfile1.txt""",
-        current_code_with_line_number="You are currently not working in a file. You can call the view tool to navigate to a file first.",
         current_breakpoints="No breakpoints are set.",
         action=None,
         instructions={},
@@ -377,7 +356,7 @@ def test_rewrite_counter(env):
     assert env_info.rewrite_counter == 1
     rewrite_obs = Observation(
         source="rewrite",
-        observation="Error while rewriting the file: No file is currently open.\nRewrite failed.",
+        observation="File path is None. Please provide a valid file path.\nRewrite failed.",
     )
     assert env_info.step_observation == rewrite_obs
     assert env_info.all_observations == [rewrite_obs]
@@ -401,15 +380,6 @@ def test_rewrite_counter(env):
     assert env_info.all_observations == [rewrite_obs]
     with open(env.working_dir / "file1.txt", "r") as f:
         assert f.read() == "print('Hello')"
-
-
-def test_overwrite_file(env):
-    filepath = "file.py"
-    content = 'print("Hello, World!")'
-    env.overwrite_file(filepath, content)
-
-    with open(env.working_dir / filepath, "r") as f:
-        assert f.read() == content
 
 
 def test_patch(env):

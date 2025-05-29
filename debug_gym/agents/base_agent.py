@@ -58,7 +58,7 @@ class BaseAgent:
 
     def build_history_prompt(self):
         messages = build_history_prompt(
-            self.history.filter_out(actions=["eval", None]),
+            self.history.filter_out(actions=[None]),
             self.llm,
             self.config["reset_prompt_history_after_rewrite"],
         )
@@ -94,27 +94,9 @@ class BaseAgent:
         else:
             system_prompt["Repo directory tree"] = info.dir_tree
         system_prompt["Current breakpoints"] = info.current_breakpoints
-        system_prompt["Current code in view"] = info.current_code_with_line_number
-        if isinstance(info.current_code_with_line_number, dict):
-            system_prompt["Current code in view"] = dict(
-                info.current_code_with_line_number
-            )
-            if (
-                self.llm.context_length is not None
-                and self.llm.count_tokens is not None
-            ):
-                system_prompt["Current code in view"]["Content"] = trim(
-                    system_prompt["Current code in view"]["Content"],
-                    min(
-                        int(0.8 * self.llm.context_length),
-                        calc_tokens_left(system_prompt),
-                    ),
-                    count_tokens=self.llm.count_tokens,
-                    where="end",
-                )
 
         if self.llm.context_length is not None and self.llm.count_tokens is not None:
-            system_prompt["Last evaluation output"] = trim(
+            system_prompt["Evaluation output of current code"] = trim(
                 info.eval_observation.observation,
                 min(
                     int(0.8 * self.llm.context_length), calc_tokens_left(system_prompt)
@@ -123,7 +105,30 @@ class BaseAgent:
                 where="middle",
             )
         else:
-            system_prompt["Last evaluation output"] = info.eval_observation.observation
+            system_prompt["Evaluation output of current code"] = (
+                info.eval_observation.observation
+            )
+
+        shortcut_features = []
+        if self.config.get("env_kwargs", {}).get("auto_eval_on_rewrite") is True:
+            shortcut_features.append(
+                "- After successful rewrites, the environment will automatically call the Eval tool to evaluate the rewritten code. Therefore, you do not need to call the Eval tool yourself. The evaluation output will be updated automatically in the system prompt."
+            )
+        if self.config.get("env_kwargs", {}).get(
+            "persistent_breakpoints"
+        ) is True and self.env.has_tool("pdb"):
+            shortcut_features.append(
+                "- The environment will automatically restore existing breakpoints when a new PDB session is started (e.g., after a rewrite)."
+            )
+        if self.config.get("env_kwargs", {}).get(
+            "auto_list"
+        ) is True and self.env.has_tool("pdb"):
+            shortcut_features.append(
+                "- After every valid PDB tool calling, the environment will automatically call the PDB tool again with a `list .` command, which will show the code around the current frame."
+            )
+        if len(shortcut_features) > 0:
+            system_prompt["Shortcut features"] = "\n".join(shortcut_features)
+
         system_prompt = unescape(json.dumps(system_prompt, indent=2, sort_keys=False))
         messages = [
             {

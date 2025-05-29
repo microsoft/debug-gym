@@ -6,11 +6,13 @@ base:
         "entrypoint": "python -m pytest -sv test.py",
         "debug_entrypoint": "python -m pdb -m pytest -s test.py",
         "dir_tree_depth": 1,
-        "run_on_rewrite": True,
-        "auto_view_change": True,
         "run_timeout": 10,
+        # shortcut features
+        "auto_eval_on_rewrite": True,  # The environment will automatically call the Eval tool after a successful rewrite. If this is set to True, the agent does not need to call the Eval tool itself.
+        "persistent_breakpoints": True,  # The environemnt will keep a set of breakpoint states across PDB sessions. When a new PDB session is started, the environment will automatically load the breakpoints from the previous session.
+        "auto_list": True,  # The environment will automatically call `list .` via the PDB tool after every pdb tool call, which will show the code around the current frame.
     }
-    tools: ["eval", "pdb", "view", "rewrite"]
+    tools: ["pdb", "view", "rewrite"]
     terminal: {
         type: "docker",  # "docker" or "local"
         base_image: "python:3.12-slim",
@@ -19,8 +21,6 @@ base:
         # setup_commands define commands that are executed only once when the terminal is created. This is only supported for Docker terminal.
         setup_commands: ["pip install pytest"],
     }
-    persistent_breakpoints: True  # in pdb tool
-    auto_list: True  # in pdb tool
 
     # LLM configs
     llm_name: "gpt-4o"
@@ -35,11 +35,11 @@ base:
     reset_prompt_history_after_rewrite: True
 
 rewrite_agent:
-    tools: ["eval", "view", "rewrite"]
+    tools: ["view", "rewrite", "eval"]
 
 debug_agent:
-    tools: ["eval", "pdb", "view", "rewrite"]
+    tools: ["pdb", "view", "rewrite", "eval"]
 
 debug_5_agent:
     n_rewrites_before_pdb: 5
-    tools: ["eval", "pdb", "view", "rewrite"]
+    tools: ["pdb", "view", "rewrite", "eval"]

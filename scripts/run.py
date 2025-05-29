@@ -89,12 +89,7 @@ def create_env(config: dict, logger: DebugGymLogger):
 def add_tools(env, config: dict, logger: DebugGymLogger):
     """Add tools to the environment"""
     for tool in config["tools"]:
-        kwargs = {}
-        if tool == "pdb":
-            kwargs["persistent_breakpoints"] = config["persistent_breakpoints"]
-            kwargs["auto_list"] = config["auto_list"]
-
-        tool_instantiated = Toolbox.get_tool(tool, **kwargs)
+        tool_instantiated = Toolbox.get_tool(tool)
         env.add_tool(tool_instantiated)
         logger.debug(f"Adding tool to toolbox: {tool_instantiated.__class__.__name__}")
 

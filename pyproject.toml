@@ -25,7 +25,9 @@ exclude = [".*tests.*", "exps/*", "output_*"]
 [project.optional-dependencies]
 dev = [
     "pytest",
-    "pytest-xdist",
-    "pytest-cov",
     "pytest-asyncio",
+    "pytest-cov",
+    "pytest-xdist",
+    "pytest-timeout",
+    "pytest-env",
 ]

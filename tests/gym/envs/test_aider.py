@@ -14,7 +14,6 @@ def env_info():
         all_observations=[],
         eval_observation=Observation("env", "eval_observation"),
         dir_tree="dir_tree",
-        current_code_with_line_number="current_code_with_line_number",
         current_breakpoints="current_breakpoints",
         action="action",
         instructions={},
@@ -54,16 +53,9 @@ def test_instructions(aider_env):
 
 
 @patch("debug_gym.gym.envs.RepoEnv.reset")
-@patch(
-    "debug_gym.gym.envs.RepoEnv.current_code_with_line_number",
-    return_value="Current code",
-)
 @patch("debug_gym.gym.envs.AiderBenchmarkEnv.setup_workspace")
-@patch("debug_gym.gym.envs.AiderBenchmarkEnv.load_current_file")
 def test_reset(
-    mock_load_current_file,
     mock_setup_workspace,
-    mock_line_number,
     repo_env,
     aider_env,
     env_info,
@@ -80,7 +72,6 @@ def test_reset(
     options = {"task_name": "test_task"}
     infos = aider_env.reset(options=options)
     assert aider_env.current_sample == test_task["test_task"]
-    assert infos.current_code_with_line_number == "Current code"
     assert infos.step_observation == Observation("tool", "obs")
     assert infos.max_score == 10
     assert infos.score == 5

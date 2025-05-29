@@ -10,20 +10,20 @@ from debug_gym.gym.utils import clean_code
 class RewriteTool(EnvironmentTool):
     name = "rewrite"
     examples = [
-        """rewrite(path=None, start=None, end=None, new_code="print('hola')") will rewrite the current file (the entire code) to be print('hola'), because no line number is provided.""",
-        """rewrite(path=None, start=10, end=None, new_code="    print('bonjour')") will rewite line number 10 of the current file to be print('bonjour'), with the indents ahead (in this case, 4 spaces).""",
-        """rewrite(path=None, start=10, end=20, new_code="    print('hello')\\n    print('hi again')") will replace the chunk of code between line number 10 and 20 in the current file by the two lines provided, both with indents ahead (in this case, 4 spaces).""",
-        """rewrite(path='code/utils.py', start=4, end=6, new_code="        print('buongiorno')") will replace the chunk of code between line number 4 and 6 in the file code/utils.py by the single line provided, with the indent ahead (in this case, 8 spaces).""",
+        """rewrite(path="code/utils.py", start=None, end=None, new_code="print('hola')") will rewrite the specified file 'code/utils.py' (the entire code) to be print('hola'), because no line number is provided.""",
+        """rewrite(path="code/utils.py", start=10, end=None, new_code="    print('bonjour')") will rewite line number 10 of the specified file 'code/utils.py' to be print('bonjour'), with the indents ahead (in this case, 4 spaces).""",
+        """rewrite(path="code/utils.py", start=10, end=20, new_code="    print('hello')\\n    print('hi again')") will replace the chunk of code between line number 10 and 20 in the specified file 'code/utils.py' by the two lines provided, both with indents ahead (in this case, 4 spaces).""",
+        """rewrite(path='code/utils.py', start=4, end=6, new_code="        print('buongiorno')") will replace the chunk of code between line number 4 and 6 in the specified file 'code/utils.py' by the single line provided, with the indent ahead (in this case, 8 spaces).""",
     ]
     description = (
-        "Rewrite the content of the specified file path, between lines [start, end], with the new code. Line numbers are 1-based. When file path is None, it's assumed to rewrite the current file. When start and end are None, it's assumed to rewrite the whole file. When start is provided and end is None, it's assumed to rewrite a single line (start). The new code should be valid python code include proper indentation (can be determined from context)."
+        "Rewrite the content of the specified file path, between lines [start, end], with the new code. Line numbers are 1-based. When start and end are None, it's assumed to rewrite the whole file. When start is provided and end is None, it's assumed to rewrite a single line (start). The new code should be valid python code include proper indentation (can be determined from context)."
         + "\nExamples (for demonstration purposes only, you need to adjust the tool calling format according to your specific syntax):"
         + "\n".join(examples)
     )
     arguments = {
         "path": {
-            "type": ["string", "null"],
-            "description": "A file path to be rewritten. If None, the current file will be used.",
+            "type": ["string"],
+            "description": "A file path to be rewritten.",
         },
         "start": {
             "type": ["number", "null"],
@@ -39,18 +39,20 @@ class RewriteTool(EnvironmentTool):
         },
     }
 
+    def _overwrite_file(self, environment, filepath: str, content: str):
+        assert isinstance(content, str), "content should be a string."
+        with open(environment.working_dir / filepath, "w") as f:
+            f.write(content)
+
     def _rewrite_file(self, environment, file_path, start, end, new_code):
-        assert file_path is not None, "No file is currently open."
         if file_path.startswith(str(environment.working_dir)):
             file_path = file_path[len(str(environment.working_dir)) + 1 :]
         assert (
             file_path in environment.all_files
         ), f"File {file_path} does not exist or is not in the current repository."
-        assert (
-            file_path in environment.editable_files
-        ), f"File {file_path} is not editable."
+        assert environment.is_editable(file_path), f"File {file_path} is not editable."
 
-        original_content = environment.load_file(file_path)
+        original_content = environment.read_file(file_path)
 
         new_code = clean_code(new_code)  # str
         new_code_lines = new_code.split("\n")
@@ -58,26 +60,22 @@ class RewriteTool(EnvironmentTool):
 
         if start is None:
             # no line number is provided, rewrite the whole code
-            environment.overwrite_file(filepath=file_path, content=new_code)
-            if file_path == environment.current_file:
-                environment.load_current_file(file_path)
+            self._overwrite_file(environment, filepath=file_path, content=new_code)
         else:
             # rewrite the code given the provided line numbers
-            full_code_lines = environment.load_file(file_path).split("\n")
+            full_code_lines = environment.read_file(file_path).split("\n")
             if start >= len(full_code_lines):
                 # if start exceeds the number of lines in the file, append the new code to the end of the file
                 full_code_lines.extend(new_code_lines)
             else:
                 # rewrite the code
                 full_code_lines[start : end + 1] = new_code_lines  # list
-            environment.overwrite_file(
-                filepath=file_path, content="\n".join(full_code_lines)
+            self._overwrite_file(
+                environment, filepath=file_path, content="\n".join(full_code_lines)
             )
-            if file_path == environment.current_file:
-                environment.load_current_file(file_path)
 
         # Calculate diff between original and new content
-        new_content = environment.load_file(file_path)
+        new_content = environment.read_file(file_path)
         diff = "".join(
             difflib.unified_diff(
                 original_content.splitlines(keepends=True),
@@ -109,8 +107,10 @@ class RewriteTool(EnvironmentTool):
     ) -> Observation:
         self.rewrite_success = False
         if path is None:
-            # by default, rewrite the current file
-            path = environment.current_file
+            return self.fail(
+                environment,
+                "File path is None. Please provide a valid file path.",
+            )
         if start is not None:
             if end is None:
                 # only start is provided (rewrite that line)
@@ -134,6 +134,7 @@ class RewriteTool(EnvironmentTool):
 
         self.rewrite_success = True
         message = f"The file `{path}` has been updated successfully.\n\nDiff:\n\n{diff}"
+
         self.queue_event(
             environment=environment,
             event=Event.REWRITE_SUCCESS,

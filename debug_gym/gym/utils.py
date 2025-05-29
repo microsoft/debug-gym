@@ -14,7 +14,17 @@ def clean_code(code):
 
 
 def unescape(s):
-    return codecs.decode(s, "unicode_escape")
+    try:
+        # First, try the normal unescape
+        result = codecs.decode(s, "unicode_escape")
+        # Test if it can be encoded to UTF-8 (which will happen during JSON encoding)
+        result.encode("utf-8")
+        return result
+    except UnicodeEncodeError:
+        # If it contains surrogate pairs that can't be encoded to UTF-8,
+        # replace them with the Unicode replacement character (U+FFFD)
+        result = codecs.decode(s, "unicode_escape")
+        return result.encode("utf-8", errors="replace").decode("utf-8")
 
 
 def get_code_length(code_string):
@@ -26,34 +36,39 @@ def get_code_length(code_string):
     return len(code_line)
 
 
-def show_line_number(code_string, code_path=None, breakpoints_state=None):
+def show_line_number(
+    code_string, code_path=None, breakpoints_state=None, start_index=1
+):
     # Show line number for each line
     # code_path is the path of the code file in view
     # breakpoints_state is a dict, the keys are "|||".join([file_path, str(line_number)]) and values are breakpoint_command
-    # line numbers are 1-indexed
-    # line numbers and code lines are separated by a tab
+    # start_index is the starting line number for the code string
+    # line numbers are 1-indexed, and are separated from the code by a space
 
-    assert code_string is not None, "code_string should not be None"
+    assert code_string, "code_string should not be empty"
     assert isinstance(
         code_string, str
     ), f"code_string should be a string, but got {type(code_string)}"
     code_line = code_string.split("\n")
 
     output = []
-    line_number_digit = len(str(len(code_line) + 1))  # e.g., 999 lines -> 4 digits
+    # Calculate the number of digits needed for line numbers
+    # e.g., 999 lines -> 4 digits
     # 1-4 digits: 4
     # 5-8 digits: 8...
+    line_number_digit = len(str(start_index + len(code_line) + 1))
     line_number_digit = (line_number_digit - 1) // 4 * 4 + 4
     for i, line in enumerate(code_line):
         has_breakpoint = False
-        if code_path is not None and len(breakpoints_state) > 0:
-            _key = "|||".join([code_path, str(i + 1)])
+        line_number = start_index + i
+        if code_path is not None and breakpoints_state:
+            _key = "|||".join([code_path, str(line_number)])
             if _key in breakpoints_state.keys():
                 has_breakpoint = True
         _tmp = ""
         if has_breakpoint:
             _tmp += "B"
-        _tmp = "{:<2}{:>{}} {}".format(_tmp, i + 1, line_number_digit, line)
+        _tmp = "{:<2}{:>{}} {}".format(_tmp, line_number, line_number_digit, line)
         output.append(_tmp)
     return "\n".join(output)
 

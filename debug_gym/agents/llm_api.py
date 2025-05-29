@@ -70,9 +70,8 @@ o1-mini:
   endpoint: "{LLM_ENDPOINT_PLACEHOLDER}"
   api_key: "{LLM_API_KEY_PLACEHOLDER}"
   tags: [gpt-4o, azure openai, GCR]
-  api_version: "2024-09-01-preview"
+  api_version: "2025-04-01-preview"
   context_limit: 128
-  system_prompt_support: false
   ignore_kwargs: [temperature, top_p, presence_penalty, frequency_penalty, logprobs, top_logprobs, logit_bias, max_tokens]
 
 gpt-4o-az-login:
@@ -351,7 +350,7 @@ class LLM(ABC):
         return len(self.tokenize(text))
 
     @abstractmethod
-    def define_tools(self, tool_call_list: dict[str, EnvironmentTool]) -> list[dict]:
+    def define_tools(self, tool_call_list: list[EnvironmentTool]) -> list[dict]:
         """Translates the list of tools into a format that is specifically defined by each LLM.
         The method should be overridden by subclasses.
         """
@@ -424,7 +423,7 @@ class LLM(ABC):
                 messages = trim_prompt_messages(
                     messages, self.context_length, self.count_tokens
                 )
-                llm_response = self.generate_with_drop_message_and_retry(
+                llm_response = generate_with_drop_message_and_retry(
                     messages, tools, **kwargs
                 )
                 self.logger.info(
@@ -515,7 +514,7 @@ class AnthropicLLM(LLM):
         )
         return exception_full_name in rate_limit_errors
 
-    def define_tools(self, tool_call_list: dict[str, EnvironmentTool]) -> list[dict]:
+    def define_tools(self, tool_call_list: list[EnvironmentTool]) -> list[dict]:
         """Translates the list of tools into a format that is specifically defined by each LLM.
         Anthropic function calling format: https://docs.anthropic.com/en/docs/build-with-claude/tool-use/overview
         """
@@ -731,7 +730,7 @@ class OpenAILLM(LLM):
 
         return is_error
 
-    def define_tools(self, tool_call_list: dict[str, EnvironmentTool]) -> list[dict]:
+    def define_tools(self, tool_call_list: list[EnvironmentTool]) -> list[dict]:
         """Translates the list of tools into a format that is specifically defined by each LLM.
         OpenAI function calling format: https://platform.openai.com/docs/guides/function-calling
         """
@@ -904,12 +903,15 @@ class AzureOpenAILLM(OpenAILLM):
 
 
 class Human(LLM):
-    def __init__(self, model_name=None, logger: DebugGymLogger | None = None):
+    def __init__(
+        self, model_name=None, logger: DebugGymLogger | None = None, max_retries=10
+    ):
         self.model_name = model_name or "human"
         self.logger = logger or DebugGymLogger("debug-gym")
         self.context_length = None
         self.reasoning_end_token = None
         self._history = None
+        self.max_retries = max_retries
         if prompt_toolkit_available:
             self._history = InMemoryHistory()
 
@@ -920,7 +922,7 @@ class Human(LLM):
     def count_tokens(self, text: str) -> int:
         return len(self.tokenize(text))
 
-    def define_tools(self, tool_call_list: dict[str, EnvironmentTool]) -> list[dict]:
+    def define_tools(self, tool_call_list: list[EnvironmentTool]) -> list[dict]:
         available_commands = []
         for tool in tool_call_list:
             random_id = "".join(map(str, np.random.randint(0, 10, size=6)))
@@ -936,6 +938,12 @@ class Human(LLM):
     def parse_tool_call_response(self, response, all_tools) -> ToolCall:
         """Parse user input and return a ToolCall object.
         Validate the input against the available tools."""
+        if response is None:
+            raise ValueError("Tool call cannot be None")
+
+        if not all_tools:
+            raise ValueError("No tools provided. At least one tool must be available.")
+
         try:
             tool_call = ToolCall(**json.loads(response))
             for t in all_tools:
@@ -947,7 +955,13 @@ class Human(LLM):
                     return tool_call
         except Exception:
             pass
-        self.logger.error("Invalid action, please try again.")
+
+        self.logger.error(
+            "Invalid action format or command not available, please try again."
+        )
+
+        # Raise exception for parsing failures
+        raise ValueError("Failed to parse valid tool call from input")
 
     def format_tool_call_history(
         self, history_info: EnvInfo, response: LLMResponse
@@ -987,7 +1001,10 @@ class Human(LLM):
         all_tools = self.define_tools(tools)
         available_commands = [json.dumps(t) for t in all_tools]
         tool_call = None
-        while tool_call is None:
+        retry_count = 0
+        action = ""
+
+        while tool_call is None and retry_count < self.max_retries:
             if prompt_toolkit_available:
                 actions_completer = WordCompleter(
                     available_commands, ignore_case=False, sentence=True
@@ -1003,7 +1020,22 @@ class Human(LLM):
                     "\n".join(["Available commands:"] + available_commands)
                 )
                 action = input("> ")
-            tool_call = self.parse_tool_call_response(action, all_tools)
+
+            try:
+                tool_call = self.parse_tool_call_response(action, all_tools)
+            except ValueError as e:
+                self.logger.error(f"Error parsing tool call: {e}")
+
+            retry_count += 1
+
+        if tool_call is None:
+            error_message = (
+                f"Maximum retries ({self.max_retries}) reached without valid input."
+            )
+            self.logger.error(
+                f"Maximum retries ({self.max_retries}) reached without a valid tool call."
+            )
+            raise ValueError(error_message)
 
         return LLMResponse(
             prompt=messages,
