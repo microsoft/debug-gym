@@ -146,12 +146,18 @@ def test_pdb_pass_empty_path_if_in_session(tmp_path, setup_test_repo):
     _ = pdb.start_pdb(environment)
 
     obs = pdb.use(environment, command="b test_pass.py:1").observation
-    assert obs.startswith(f"Breakpoint 1 at {environment.working_dir/'test_pass.py'}:1")
+    assert obs.startswith(
+        "Pdb command output:\n"
+        f"Breakpoint 1 at {environment.working_dir/'test_pass.py'}:1"
+    )
     obs = pdb.use(environment, command="c").observation
     assert "1 B->\tdef test_pass():" in obs
     # Now try to set a breakpoint without specifying the file, it should pass
     obs = pdb.use(environment, command="b 2").observation
-    assert obs.startswith(f"Breakpoint 2 at {environment.working_dir/'test_pass.py'}:2")
+    assert obs.startswith(
+        "Pdb command output:\n"
+        f"Breakpoint 2 at {environment.working_dir/'test_pass.py'}:2"
+    )
 
 
 def test_pdb_use_default_environment_entrypoint(tmp_path, setup_test_repo):
@@ -551,7 +557,9 @@ def test_set_current_frame_file_sets_file(tmp_path, setup_pdb_repo_env):
     test_dir = env.working_dir / "test_fail.py"
     # pdb_tool.use calls pdb_tool.set_current_frame_file(env)
     obs = pdb_tool.use(env, "b test_fail.py:2")
-    assert obs.observation.startswith(f"Breakpoint 1 at {test_dir}:2")
+    assert obs.observation.startswith(
+        f"Pdb command output:\nBreakpoint 1 at {test_dir}:2"
+    )
     # no `continue` command, so current_frame_file should still be pytest main file
     assert "pytest/__main__.py" in pdb_tool.current_frame_file
     obs = pdb_tool.use(env, "c")
