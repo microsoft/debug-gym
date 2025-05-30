@@ -538,3 +538,22 @@ def test_queue_and_process_events():
         call(environment=env, event=Event.ENV_RESET, source="source2", arg2="val2"),
     ]
     mock.assert_has_calls(expected_calls)
+
+
+def test_clone(env):
+    cloned_env = env.clone()
+
+    # Check that the cloned environment is a different instance
+    assert id(env) != id(cloned_env)
+
+    # Check that the properties are the same
+    assert env.path == cloned_env.path
+    assert env.entrypoint == cloned_env.entrypoint
+    assert env.debug_entrypoint == cloned_env.debug_entrypoint
+    assert env.max_score == cloned_env.max_score
+    assert env.run_timeout == cloned_env.run_timeout
+    assert env.dir_tree_depth == cloned_env.dir_tree_depth
+    assert env.logger == cloned_env.logger
+
+    # Check that the terminal is not the same instance
+    assert id(env.terminal) != id(cloned_env.terminal)

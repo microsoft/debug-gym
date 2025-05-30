@@ -7,7 +7,7 @@ from pathlib import Path
 from termcolor import colored
 from tqdm import tqdm
 
-from debug_gym.agents.base_agent import create_agent
+from debug_gym.agents.base_agent import AGENT_REGISTRY, create_agent
 from debug_gym.agents.utils import load_config
 from debug_gym.gym.envs import select_env
 from debug_gym.gym.terminal import select_terminal
@@ -106,6 +106,17 @@ def main():
     if problems == "all" and "benchmark" in config:
         env = create_env(config, logger=logger)
         problems = list(env.dataset.keys())  # all tasks
+
+        if args.list:
+            print(f"\n-= Available problems in {config['benchmark']}=-")
+            for problem in problems:
+                print(f" - {problem}")
+
+            # list agent
+            print("\n-= Available agents =-")
+            for agent in AGENT_REGISTRY:
+                print(f" - {agent}")
+            return
 
     num_workers = int(os.environ.get("DEBUG_GYM_WORKERS", 1))
     logger.warning(f"Running with {num_workers} workers")
