@@ -108,13 +108,15 @@ class PDBTool(EnvironmentTool):
         return self.start_pdb(environment)
 
     def use(self, environment, command: str) -> Observation:
+        if command == "":
+            return Observation(
+                self.name, "Failure calling pdb:\nEmpty commands are not allowed."
+            )
+
         _warning = ""
         # if print, it's OK to have ";" or "\n" in the command
-        if not (
-            command == ""
-            or command.split()[0] in ["p", "pp"]
-            or command.startswith("print(")
-        ):
+        # otherwise, only the first command will be executed
+        if not (command.split()[0] in ["p", "pp"] or command.startswith("print(")):
             splits = re.split("\n|;", command)
             if len(splits) > 1:
                 command = splits[0].strip()
@@ -128,10 +130,6 @@ class PDBTool(EnvironmentTool):
             # update the current frame file to None
             self.set_current_frame_file(environment)
             return Observation(self.name, f"Failure calling pdb:\n{output}")
-        if command == "":  # empty command
-            return Observation(
-                self.name, "Failure calling pdb:\nEmpty commands are not allowed."
-            )
 
         if command in ["b", "break"]:
             # list all breakpoints
