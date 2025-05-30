@@ -2,7 +2,6 @@ import json
 import os
 import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from itertools import groupby
 from pathlib import Path
 
 from termcolor import colored
