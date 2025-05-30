@@ -62,6 +62,7 @@ class PDBTool(EnvironmentTool):
 
     def close_pdb(self):
         self._session.close()
+        self.current_frame_file = None
 
     def start_pdb(self, environment) -> str:
         self._session = environment.terminal.new_shell_session()
@@ -81,6 +82,7 @@ class PDBTool(EnvironmentTool):
                     initial_output = "\n".join(
                         [initial_output, "Breakpoints have been restored."]
                     )
+            self.set_current_frame_file(environment)
         self.pdb_obs = initial_output
         return initial_output
 
@@ -104,14 +106,12 @@ class PDBTool(EnvironmentTool):
 
     def use(self, environment, command: str) -> Observation:
         _warning = ""
-        if (
+        # if print, it's OK to have ";" or "\n" in the command
+        if not (
             command == ""
             or command.split()[0] in ["p", "pp"]
             or command.startswith("print(")
         ):
-            # OK to have ";" or "\n" in the command
-            pass
-        else:
             splits = re.split("\n|;", command)
             if len(splits) > 1:
                 command = splits[0].strip()
@@ -122,6 +122,8 @@ class PDBTool(EnvironmentTool):
             output += self.start_pdb(environment)
 
         if not self.pdb_is_running:
+            # update the current frame file to None
+            self.set_current_frame_file(environment)
             return Observation(self.name, f"Failure calling pdb:\n{output}")
         if command == "":  # empty command
             return Observation(
@@ -130,7 +132,10 @@ class PDBTool(EnvironmentTool):
 
         if command in ["b", "break"]:
             # list all breakpoints
-            success, output = True, environment.current_breakpoints()
+            success, output = (
+                True,
+                f"Breakpoints:\n{environment.current_breakpoints()}\n",
+            )
         elif command in ["cl", "clear"]:
             # clear all breakpoints
             environment.current_breakpoints_state = {}
@@ -164,41 +169,40 @@ class PDBTool(EnvironmentTool):
             except Exception:  # TODO: catch specific exceptions
                 success = False
 
-        if success:
-            # sometimes it will run into the end of the program
-            # we need to put the stdout before:
-            # The program exited via sys.exit().
-            # into self.last_eval_output, and remove them from the output
-            if "The program exited via sys.exit()." in output:
-                # end index is the last occurrence of the program exited (from the \n after)
-                end_index = (
-                    output.find(
-                        "\n", output.rfind("The program exited via sys.exit().")
-                    )
-                    + 1
-                )
-                output = (
-                    "Reached the end of the file. Restarting the debugging session.\n"
-                    + output[end_index:]
-                )
-            obs = "\n".join([_warning, output]).strip()
-
-            # Add the current frame information to the observation.
-            if (
-                self.pdb_is_running
-                and environment.auto_list
-                and command.split()[0] not in ["l", "list"]
-            ):
-                if '"""The pytest entry point."""' not in obs:
-                    obs += "\nlist .\n" + self.interact_with_pdb(
-                        "l .", environment.run_timeout
-                    )
-        else:
+        if not success:
             obs = "\n".join([f"Invalid pdb command: {command}", _warning, output])
+            return Observation(self.name, obs)
 
+        # sometimes it will run into the end of the program
+        # we need to put the stdout before:
+        # The program exited via sys.exit().
+        # into self.last_eval_output, and remove them from the output
+        if "The program exited via sys.exit()." in output:
+            # end index is the last occurrence of the program exited (from the \n after)
+            end_index = (
+                output.find("\n", output.rfind("The program exited via sys.exit()."))
+                + 1
+            )
+            output = (
+                "Reached the end of the file. Restarting the debugging session.\n"
+                + output[end_index:]
+            )
+        obs = "\n".join([_warning, output]).strip() + "\n"
+
+        # Add the current frame information to the observation.
         if self.pdb_is_running:
             # read the current frame info to determine the current file
-            self.get_current_frame_file(environment)
+            current_frame = self.set_current_frame_file(environment)
+
+            # free 'list' to provide context around the current frame
+            list_output = ""
+            if environment.auto_list and command.split()[0] not in ["l", "list"]:
+                list_output = self.interact_with_pdb("l .", environment.run_timeout)
+
+            if current_frame:
+                obs += f"\nCurrent frame:\n{current_frame}\n"
+            if list_output:
+                obs += f"\nContext around the current frame:\n{list_output}\n"
 
         return Observation(self.name, obs)
 
@@ -336,11 +340,10 @@ class PDBTool(EnvironmentTool):
                     pass
         environment.current_breakpoints_state = current_breakpoints_state_copy
 
-    def get_current_frame_file(self, environment):
+    def set_current_frame_file(self, environment) -> str | None:
         """A free 'where' to obtain the current frame (line number), hidden from the agent."""
         command = "where"
         output = self.interact_with_pdb(command, environment.run_timeout)
-
         # parse the output to get the current frame
         # example output:
         #    /home/eryua/venvs/pdb/lib/python3.12/bdb.py(606)run()
@@ -348,15 +351,18 @@ class PDBTool(EnvironmentTool):
         #    <string>(1)<module>()
         # > /tmp/RepoEnv-_ha8r7_2/constants.py(6)<module>()
         # -> ACTION_TO_INDEX = {
-        sep = "> " + str(environment.working_dir) + "/"
-        if sep not in output:
-            return
-        output = output.rsplit(sep, 1)[1]
-        # constants.py(6)<module>()
-        # -> ACTION_TO_INDEX = {
-        try:
-            file_path = output.split("(")[0]
-            if file_path != self.current_frame_file:
-                self.current_frame_file = file_path
-        except BaseException:
-            pass
+        workdir = f"{environment.working_dir}/"
+        sep = "> "
+        file_path = None
+        for line in output.splitlines():
+            # find the line that starts with "> "
+            if line.startswith(sep):
+                # extract the file path from the line,
+                # remove the leading "> ", the trailing "(line_number)<module>()", and working_dir
+                # constants.py(6)<module>()
+                # -> ACTION_TO_INDEX = {
+                file_path = line[len(sep) :].split("(")[0].replace(workdir, "")
+                break
+        if self.current_frame_file != file_path:
+            self.current_frame_file = file_path
+        return file_path
