@@ -265,7 +265,6 @@ def test_step(
     mock_pdb_tool.return_value = observation
     mock_pdb_tool.rewrite_success = True
     mock_pdb_tool.current_frame_file = "file.py"
-    mock_pdb_tool.pdb_obs = "PDB started"
     mock_get_tool.return_value = None
     mock_display_files.return_value = "file list"
 
@@ -315,7 +314,6 @@ def test_reset(
 ):
     mock_pdb_tool = MagicMock()
     mock_pdb_tool.start_pseudo_terminal.return_value = None
-    mock_pdb_tool.pdb_obs = "PDB started"
     mock_get_tool.return_value = mock_pdb_tool
     infos = env.reset()
 
