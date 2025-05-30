@@ -181,12 +181,11 @@ class PDBTool(EnvironmentTool):
         # into self.last_eval_output, and remove them from the output
         if "The program exited via sys.exit()." in output:
             # end index is the last occurrence of the program exited (from the \n after)
-            end_index = (
-                output.find("\n", output.rfind("The program exited via sys.exit()."))
-                + 1
-            )
+            start_index = output.rfind("The program exited via sys.exit().")
+            end_index = output.find("\n", start_index) + 1
             output = (
-                "Reached the end of the file. Restarting the debugging session.\n"
+                output[:start_index]
+                + "\nReached the end of the program. Restarting the debugging session.\n"
                 + output[end_index:]
             )
         obs = "\n".join([_warning, output]).strip() + "\n"

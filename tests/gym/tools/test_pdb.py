@@ -77,10 +77,13 @@ def test_pdb_use(tmp_path, setup_test_repo):
     assert """The pytest entry point.""" in output
     assert "(Pdb)" not in output
     output = pdb.use(environment, command="c").observation
-    assert "1 failed, 1 passed" in pdb.pdb_obs
-    assert "test_fail.py::test_fail FAILED" in pdb.pdb_obs
-    assert "test_pass.py::test_pass PASSED" in pdb.pdb_obs
-    assert "Reached the end of the file. Restarting the debugging session." in output
+    assert "1 failed, 1 passed" in output
+    assert "test_fail.py::test_fail FAILED" in output
+    assert "test_pass.py::test_pass PASSED" in output
+    assert "Reached the end of the program. Restarting the debugging session." in output
+    assert "pytest/__main__.py" in output
+    assert '-> """The pytest entry point."""' in output
+    assert 'Context around the current frame:\n1  ->	"""The pytest entry point.""""'
     assert "(Pdb)" not in output
 
 
@@ -152,10 +155,13 @@ def test_pdb_use_default_environment_entrypoint(tmp_path, setup_test_repo):
     assert "(Pdb)" not in output
 
     output = pdb.use(environment, command="c").observation
-    assert "1 failed, 1 passed" in pdb.pdb_obs
-    assert "test_fail.py::test_fail" in pdb.pdb_obs
-    assert "test_pass.py::test_pass" not in pdb.pdb_obs
-    assert "Reached the end of the file. Restarting the debugging session." in output
+    assert "1 failed, 1 passed" in output
+    assert "test_fail.py::test_fail" in output
+    assert "test_pass.py::test_pass" not in output
+    assert "Reached the end of the program. Restarting the debugging session." in output
+    assert "pytest/__main__.py" in output
+    assert '-> """The pytest entry point."""' in output
+    assert 'Context around the current frame:\n1  ->	"""The pytest entry point.""""'
     assert "(Pdb)" not in output
 
 
@@ -182,10 +188,13 @@ def test_pdb_use_docker_terminal(tmp_path, setup_test_repo):
     assert "(Pdb)" not in output
 
     output = pdb.use(environment, command="c").observation
-    assert "1 failed, 1 passed" in pdb.pdb_obs
-    assert "test_fail.py::test_fail FAILED" in pdb.pdb_obs
-    assert "test_pass.py::test_pass PASSED" in pdb.pdb_obs
-    assert "Reached the end of the file. Restarting the debugging session." in output
+    assert "1 failed, 1 passed" in output
+    assert "test_fail.py::test_fail FAILED" in output
+    assert "test_pass.py::test_pass PASSED" in output
+    assert "Reached the end of the program. Restarting the debugging session." in output
+    assert "pytest/__main__.py" in output
+    assert '-> """The pytest entry point."""' in output
+    assert 'Context around the current frame:\n1  ->	"""The pytest entry point.""""'
     assert "(Pdb)" not in output
 
 
