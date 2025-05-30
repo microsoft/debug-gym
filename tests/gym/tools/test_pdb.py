@@ -191,7 +191,6 @@ def test_pdb_use_docker_terminal(tmp_path, setup_test_repo):
 
 def test_initialization():
     pdb_tool = PDBTool()
-    assert pdb_tool.pdb_obs == ""
     assert pdb_tool.current_frame_file is None
     assert pdb_tool._session is None
 
@@ -357,12 +356,11 @@ def test_close_pdb_start_and_close_session(tmp_path, setup_pdb_repo_env):
 
 def test_deepcopy_sets_session_none(tmp_path, setup_pdb_repo_env):
     pdb_tool, _ = setup_pdb_repo_env(tmp_path)
-    pdb_tool.pdb_obs = "obs"
-    pdb_tool.current_frame_file = "file1.py"
+    assert pdb_tool.current_frame_file.endswith("pytest/__main__.py")
     tool_copy = copy.deepcopy(pdb_tool)
     assert tool_copy._session is None
-    assert tool_copy.pdb_obs == "obs"
-    assert tool_copy.current_frame_file == "file1.py"
+    assert tool_copy.current_frame_file is None
+    assert pdb_tool.current_frame_file.endswith("pytest/__main__.py")
 
 
 def test_start_pdb_restores_breakpoints(tmp_path, setup_pdb_repo_env):
