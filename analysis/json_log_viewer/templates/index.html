@@ -161,17 +161,117 @@
             font-weight: 600;
         }
 
+        /* Color-coding for different action types */
+        .step.action-pdb {
+            background: #ef476f;
+            color: white;
+            border-color: #ef476f;
+        }
+
+        .step.action-view {
+            background: #f78c6b;
+            color: white;
+            border-color: #f78c6b;
+        }
+
+        .step.action-rewrite {
+            background: #ffd166;
+            color: black;
+            border-color: #ffd166;
+        }
+
+        .step.action-listdir {
+            background: #06d6a0;
+            color: white;
+            border-color: #06d6a0;
+        }
+
+        .step.action-eval {
+            background: #118ab2;
+            color: white;
+            border-color: #118ab2;
+        }
+
+        .step.action-no_action,
+        .step.action-unknown {
+            background: #073b4c;
+            color: white;
+            border-color: #073b4c;
+        }
+
         .step:hover {
             transform: translateY(-5px);
             box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
         }
 
         .step.active {
-            background: linear-gradient(45deg, #84AE92, #5A827E);
-            color: white;
-            border-color: #84AE92;
+            background: #eeeae6 !important;
+            color: #2c3e50 !important;
+            border-color: #2c3e50 !important;
             transform: translateY(-5px);
-            box-shadow: 0 15px 35px rgba(132, 174, 146, 0.4);
+            box-shadow: 0 15px 35px rgba(44, 62, 80, 0.4);
+        }
+
+        .color-legend {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            margin: 20px 0;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .color-legend h3 {
+            color: #2c3e50;
+            margin-bottom: 15px;
+            font-size: 1.2rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .legend-items {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 5px;
+        }
+
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 4px;
+            border: 1px solid rgba(0, 0, 0, 0.1);
+        }
+
+        /* Apply the same colors to legend items */
+        .legend-color.action-pdb {
+            background: #ef476f;
+        }
+
+        .legend-color.action-view {
+            background: #f78c6b;
+        }
+
+        .legend-color.action-rewrite {
+            background: #ffd166;
+        }
+
+        .legend-color.action-listdir {
+            background: #06d6a0;
+        }
+
+        .legend-color.action-eval {
+            background: #118ab2;
+        }
+
+        .legend-color.action-no_action {
+            background: #073b4c;
         }
 
         .nav-buttons {
@@ -379,6 +479,9 @@
             <!-- File Info -->
             <div class="file-info">
                 <span><i class="fas fa-file-code"></i> <strong>Current File:</strong> {{ current_file }}</span>
+                <a href="/statistics" class="change-file-btn">
+                    <i class="fas fa-chart-bar"></i> Statistics
+                </a>
                 <a href="/change_file" class="change-file-btn">
                     <i class="fas fa-exchange-alt"></i> Change File
                 </a>
@@ -425,11 +528,42 @@
                 <h2><i class="fas fa-route"></i> Trajectory ({{ total_steps }} steps)</h2>
                 <div class="timeline">
                     {% for i in range(total_steps) %}
-                        <div class="step" data-step-id="{{ i }}">
+                        <div class="step action-{{ step_actions[i] }}" data-step-id="{{ i }}">
                             <i class="fas fa-step-forward"></i>
                             Step {{ i }}
                         </div>
                     {% endfor %}
+                </div>
+
+                <!-- Color Legend -->
+                <div class="color-legend">
+                    <h3><i class="fas fa-palette"></i> Action Types Legend</h3>
+                    <div class="legend-items">
+                        <div class="legend-item">
+                            <div class="legend-color action-pdb"></div>
+                            <span>pdb</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color action-view"></div>
+                            <span>view</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color action-rewrite"></div>
+                            <span>rewrite</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color action-listdir"></div>
+                            <span>listdir</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color action-eval"></div>
+                            <span>eval</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color action-no_action"></div>
+                            <span>no action</span>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Navigation Buttons -->
