@@ -1,4 +1,5 @@
 import copy
+import re
 import subprocess
 from unittest.mock import MagicMock, patch
 
@@ -435,12 +436,18 @@ def test_use_breakpoints_and_clear(tmp_path, setup_pdb_repo_env):
     env.all_files = ["file1.py"]
     pdb_tool.current_frame_file = "file1.py"
     obs = pdb_tool.use(env, "b").observation
+    # clean up the pytest path to not depend on the environment
+    obs = re.sub(
+        r"Current frame:\n.*pytest/__main__\.py",
+        "Current frame:\n.../pytest/__main__.py",
+        obs,
+    )
     assert obs == (
         "Breakpoints:\n"
         "line 1 in file1.py\n"
         "\n"
         "Current frame:\n"
-        "/home/matpereira/miniconda3/envs/Froggy-terminal/lib/python3.12/site-packages/pytest/__main__.py\n"
+        ".../pytest/__main__.py\n"
         "\n"
         "Context around the current frame:\n"
         '1  ->\t"""The pytest entry point."""\r\n'
@@ -454,12 +461,19 @@ def test_use_breakpoints_and_clear(tmp_path, setup_pdb_repo_env):
         "  9  \t    raise SystemExit(pytest.console_main())\r\n"
         "[EOF]\n"
     )
+
     obs2 = pdb_tool.use(env, "cl").observation
+    # clean up the pytest path to not depend on the environment
+    obs2 = re.sub(
+        r"Current frame:\n.*pytest/__main__\.py",
+        "Current frame:\n.../pytest/__main__.py",
+        obs2,
+    )
     assert obs2 == (
         "All breakpoints have been cleared.\n"
         "\n"
         "Current frame:\n"
-        "/home/matpereira/miniconda3/envs/Froggy-terminal/lib/python3.12/site-packages/pytest/__main__.py\n"
+        ".../pytest/__main__.py\n"
         "\n"
         "Context around the current frame:\n"
         '1  ->\t"""The pytest entry point."""\r\n'
