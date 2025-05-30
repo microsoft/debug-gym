@@ -16,6 +16,15 @@ if_docker_running = pytest.mark.skipif(
 )
 
 
+def clean_up_pytest_path(obs):
+    """clean up the pytest path to not depend on the environment"""
+    return re.sub(
+        r"Current frame:\n.*pytest/__main__\.py",
+        "Current frame:\n.../pytest/__main__.py",
+        obs,
+    )
+
+
 @pytest.fixture
 def setup_test_repo():
     def _setup_test_repo(base_dir):
@@ -351,7 +360,7 @@ def test_pdb_timeout(tmp_path, setup_test_repo):
     assert "The pytest entry point." in initial_output
     output = pdb.interact_with_pdb("c", timeout=1)
     assert "timed out" in output
-    assert pdb.pdb_is_running is False
+    assert not pdb.pdb_is_running
 
 
 def test_close_pdb_start_and_close_session(tmp_path, setup_pdb_repo_env):
@@ -437,11 +446,7 @@ def test_use_breakpoints_and_clear(tmp_path, setup_pdb_repo_env):
     pdb_tool.current_frame_file = "file1.py"
     obs = pdb_tool.use(env, "b").observation
     # clean up the pytest path to not depend on the environment
-    obs = re.sub(
-        r"Current frame:\n.*pytest/__main__\.py",
-        "Current frame:\n.../pytest/__main__.py",
-        obs,
-    )
+    obs = clean_up_pytest_path(obs)
     assert obs == (
         "Breakpoints:\n"
         "line 1 in file1.py\n"
@@ -464,11 +469,7 @@ def test_use_breakpoints_and_clear(tmp_path, setup_pdb_repo_env):
 
     obs2 = pdb_tool.use(env, "cl").observation
     # clean up the pytest path to not depend on the environment
-    obs2 = re.sub(
-        r"Current frame:\n.*pytest/__main__\.py",
-        "Current frame:\n.../pytest/__main__.py",
-        obs2,
-    )
+    obs2 = clean_up_pytest_path(obs2)
     assert obs2 == (
         "All breakpoints have been cleared.\n"
         "\n"
@@ -584,3 +585,132 @@ def test_breakpoint_add_clear_invalid_action_type(tmp_path, setup_pdb_repo_env):
     success, output = pdb_tool.breakpoint_add_clear(env, "foo 1", "file1.py")
     assert not success
     assert output == "Invalid action: `foo 1`. Expected 'b', 'break', 'cl', or 'clear'."
+
+
+def test_use_multiple_commands_only_first_executed(tmp_path, setup_pdb_repo_env):
+    pdb_tool, env = setup_pdb_repo_env(tmp_path)
+    env.current_breakpoints_state = {}
+    pdb_tool.restart_pdb(env)
+    pdb_obs = pdb_tool.use(env, "b")
+    obs = clean_up_pytest_path(pdb_obs.observation)
+    assert pdb_obs.source == "pdb"
+    assert obs == (
+        "Breakpoints:\n"
+        "No breakpoints are set.\n"
+        "\n"
+        "Current frame:\n"
+        ".../pytest/__main__.py\n"
+        "\n"
+        "Context around the current frame:\n"
+        '1  ->\t"""The pytest entry point."""\r\n'
+        "  2  \t\r\n"
+        "  3  \tfrom __future__ import annotations\r\n"
+        "  4  \t\r\n"
+        "  5  \timport pytest\r\n"
+        "  6  \t\r\n"
+        "  7  \t\r\n"
+        '  8  \tif __name__ == "__main__":\r\n'
+        "  9  \t    raise SystemExit(pytest.console_main())\r\n"
+        "[EOF]\n"
+    )
+    pdb_obs = pdb_tool.use(env, "b file1.py:1; b file1.py:2; b file1.py:3")
+    assert pdb_obs.source == "pdb"
+    assert pdb_obs.observation.startswith(
+        "Multiple commands are not supported. Only the first command will be executed.\n"
+        f"Breakpoint 1 at {env.working_dir / 'file1.py'}:1\n"
+        "\n"
+        "Current frame:"
+    )
+
+
+def test_use_print_command_allows_semicolon(tmp_path, setup_pdb_repo_env):
+    pdb_tool, env = setup_pdb_repo_env(tmp_path)
+    env.all_files = ["file1.py"]
+    pdb_tool.current_frame_file = "file1.py"
+    # Patch interact_with_pdb to check command is not split
+    called = []
+
+    def fake_interact_with_pdb(command, timeout):
+        called.append(command)
+        return "42"
+
+    pdb_tool.interact_with_pdb = fake_interact_with_pdb
+    obs = pdb_tool.use(env, "p x; p y").observation
+    assert "Multiple commands are not supported" not in obs
+    # print + free where and list commands
+    assert called == ["p x; p y", "where", "l ."]
+
+
+def test_use_empty_command_returns_failure_message(tmp_path, setup_pdb_repo_env):
+    pdb_tool, env = setup_pdb_repo_env(tmp_path)
+    obs = pdb_tool.use(env, "").observation
+    assert "Empty commands are not allowed" in obs
+
+
+def test_use_starts_pdb_if_not_running(tmp_path, setup_pdb_repo_env):
+    pdb_tool, env = setup_pdb_repo_env(tmp_path)
+    pdb_tool._session = None  # simulate not running
+    # Patch start_pdb to simulate output
+    pdb_tool.start_pdb = lambda e: "Started PDB"
+    pdb_tool.set_current_frame_file = lambda e: None
+    obs = pdb_tool.use(env, "b 1").observation
+    assert "Started PDB" in obs
+
+
+def test_use_lists_breakpoints(tmp_path, setup_pdb_repo_env):
+    pdb_tool, env = setup_pdb_repo_env(tmp_path)
+    env.current_breakpoints_state = {"file1.py|||1": "b file1.py:1"}
+    env.current_breakpoints = lambda: "line 1 in file1.py"
+    obs = pdb_tool.use(env, "b").observation
+    assert "Breakpoints:" in obs
+    assert "line 1 in file1.py" in obs
+
+
+def test_use_clears_all_breakpoints(tmp_path, setup_pdb_repo_env):
+    pdb_tool, env = setup_pdb_repo_env(tmp_path)
+    env.current_breakpoints_state = {"file1.py|||1": "b file1.py:1"}
+    env.all_files = ["file1.py"]
+    # Patch restart_pdb to avoid real restart
+    pdb_tool.restart_pdb = lambda e: None
+    obs = pdb_tool.use(env, "cl").observation
+    assert "All breakpoints have been cleared." in obs
+    assert env.current_breakpoints_state == {}
+
+
+def test_use_breakpoint_add_clear_numeric(tmp_path, setup_pdb_repo_env):
+    pdb_tool, env = setup_pdb_repo_env(tmp_path)
+    env.all_files = ["file1.py"]
+    pdb_tool.current_frame_file = "file1.py"
+    # Patch breakpoint_add_clear to simulate success
+    pdb_tool.breakpoint_add_clear = lambda e, a, f: (True, "Breakpoint set")
+    obs = pdb_tool.use(env, "b 10").observation
+    assert "Breakpoint set" in obs
+
+
+def test_use_breakpoint_add_clear_with_colon(tmp_path, setup_pdb_repo_env):
+    pdb_tool, env = setup_pdb_repo_env(tmp_path)
+    env.all_files = ["file1.py"]
+    # Patch breakpoint_add_clear to simulate success
+    pdb_tool.breakpoint_add_clear = lambda e, a, f: (True, "Breakpoint set")
+    obs = pdb_tool.use(env, "b file1.py:10").observation
+    assert "Breakpoint set" in obs
+
+
+def test_use_other_command_calls_interact_with_pdb(tmp_path, setup_pdb_repo_env):
+    pdb_tool, env = setup_pdb_repo_env(tmp_path)
+    # Patch interact_with_pdb to simulate output
+    pdb_tool.interact_with_pdb = lambda c, t: "42"
+    obs = pdb_tool.use(env, "p x").observation
+    assert "42" in obs
+
+
+def test_use_invalid_command_returns_invalid_message(tmp_path, setup_pdb_repo_env):
+    pdb_tool, env = setup_pdb_repo_env(tmp_path)
+
+    # Patch interact_with_pdb to raise exception
+    def raise_exc(c, t):
+        raise Exception("fail")
+
+    pdb_tool.interact_with_pdb = raise_exc
+    obs = pdb_tool.use(env, "invalid").observation
+    assert "Invalid pdb command: invalid" in obs
