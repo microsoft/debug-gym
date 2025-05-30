@@ -127,8 +127,7 @@ class PDBTool(EnvironmentTool):
             output += self.start_pdb(environment)
 
         if not self.pdb_is_running:
-            # update the current frame file to None
-            self.set_current_frame_file(environment)
+            # pdb failed to start
             return Observation(self.name, f"Failure calling pdb:\n{output}")
 
         if command in ["b", "break"]:
