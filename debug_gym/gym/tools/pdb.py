@@ -32,7 +32,6 @@ class PDBTool(EnvironmentTool):
 
     def __init__(self):
         super().__init__()
-        self.pdb_obs = ""
         self.current_frame_file = None
         self._session: ShellSession = None
 
@@ -42,7 +41,12 @@ class PDBTool(EnvironmentTool):
         memo[id(self)] = result
         # Copy all attributes except _session
         for k, v in self.__dict__.items():
+            # drop the session which is not serializable
             if k == "_session":
+                setattr(result, k, None)
+            # drop the current_frame_file which is None at the beginning
+            # and will be set when the PDB session starts
+            elif k == "current_frame_file":
                 setattr(result, k, None)
             else:
                 setattr(result, k, copy.deepcopy(v, memo))
@@ -83,7 +87,6 @@ class PDBTool(EnvironmentTool):
                         [initial_output, "Breakpoints have been restored."]
                     )
             self.set_current_frame_file(environment)
-        self.pdb_obs = initial_output
         return initial_output
 
     def on_env_reset(self, environment, **kwargs) -> Observation:
@@ -165,7 +168,6 @@ class PDBTool(EnvironmentTool):
             # other pdb commands, send directly
             try:
                 output += self.interact_with_pdb(command, environment.run_timeout)
-                self.pdb_obs = output
             except Exception:  # TODO: catch specific exceptions
                 success = False
 
@@ -257,7 +259,6 @@ class PDBTool(EnvironmentTool):
                     )
                 try:
                     output = self.interact_with_pdb(command, environment.run_timeout)
-                    self.pdb_obs = output
                     # when success, the output always repeats the command, we can remove it
                     output = output.strip()
                     if output.startswith(command):
@@ -276,7 +277,6 @@ class PDBTool(EnvironmentTool):
             else:
                 try:
                     output = self.interact_with_pdb(command, environment.run_timeout)
-                    self.pdb_obs = output
                     # when success, the output always repeats the command, we can remove it
                     output = output.strip()
                     if output.startswith(command):
