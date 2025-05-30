@@ -141,35 +141,30 @@ class PDBTool(EnvironmentTool):
             environment.current_breakpoints_state = {}
             self.restart_pdb(environment)
             success, output = True, "All breakpoints have been cleared."
-        elif (
-            command.split()[0] in ["b", "break", "cl", "clear"]
-            and command.split()[1].isnumeric()
-        ):
-            # wrapper handle adding/removing breakpoints
-            # Attempt to set a breakpoint in the current frame file; fails if it's not set
-            success, output = self.breakpoint_add_clear(
-                environment, command, self.current_frame_file
-            )
-        elif (
-            command.split()[0] in ["b", "break", "cl", "clear"]
-            and ":" in command.split()[1]
-            and command.split()[1].split(":")[1][0].isnumeric()
-        ):
-            # e.g., b src/main.py:42 some_other_args
-            which_file, _bp_args = command.split(maxsplit=1)[1].split(":")
-            _command_without_file = f"{command.split()[0]} {_bp_args}"
-            success, output = self.breakpoint_add_clear(
-                environment, _command_without_file, which_file
-            )
         else:
             # other pdb commands, send directly
             try:
-                output += self.interact_with_pdb(command, environment.run_timeout)
-            except Exception:  # TODO: catch specific exceptions
+                pdb_out = self.interact_with_pdb(command, environment.run_timeout)
+                if pdb_out in (
+                    "End of file",
+                    "Blank or comment",
+                    "*** Blank or comment",
+                ):
+                    # if out of bounds, pdb will return "End of file"
+                    # https://github.com/python/cpython/blob/main/Lib/pdb.py#L1464-L1485
+                    success = False
+                    output = f"Invalid line number: {pdb_out}."
+                else:
+                    output += f"Pdb command output:\n{pdb_out}"
+                self.update_breakpoints(environment)
+            except Exception:
                 success = False
 
         if not success:
-            obs = "\n".join([f"Invalid pdb command: {command}", _warning, output])
+            if _warning:  # prevend additional \n
+                obs = f"Invalid pdb command: {command}\n{_warning}\n{output.strip()}"
+            else:
+                obs = f"Invalid pdb command: {command}\n{output.strip()}"
             return Observation(self.name, obs)
 
         # sometimes it will run into the end of the program
@@ -185,7 +180,10 @@ class PDBTool(EnvironmentTool):
                 + "\nReached the end of the program. Restarting the debugging session.\n"
                 + output[end_index:]
             )
-        obs = "\n".join([_warning, output]).strip() + "\n"
+        if _warning:
+            obs = f"{_warning}\n{output.strip()}\n"
+        else:
+            obs = f"{output.strip()}\n"
 
         # Add the current frame information to the observation.
         if self.pdb_is_running:
@@ -335,6 +333,29 @@ class PDBTool(EnvironmentTool):
                 else:
                     pass
         environment.current_breakpoints_state = current_breakpoints_state_copy
+
+    def update_breakpoints(self, environment):
+        command = "b"  # list all breakpoints
+        output = self.interact_with_pdb(command, environment.run_timeout)
+        # parse the output to update the current_breakpoints_state
+        # example output:
+        # Num Type         Disp Enb   Where
+        # 1   breakpoint   keep yes   at /tmp/RepoEnv-_ha8r7_2/constants.py:6
+        # 2   breakpoint   keep yes   at /tmp/RepoEnv-_ha8r7_2/constants.py:10
+        # 3   breakpoint   keep yes   at /tmp/RepoEnv-_ha8r7_2/constants.py:14
+        # -> ACTION_TO_INDEX = {
+        sep = "keep yes   at "
+        for line in output.splitlines():
+            if sep in line:
+                # extract the file path and line number from the line
+                # e.g., /tmp/RepoEnv-_ha8r7_2/constants.py:6
+                file_line = line.split(sep)[-1].strip()
+                if ":" in file_line:
+                    file_path, line_number = file_line.rsplit(":", 1)
+                    if file_path.startswith(str(environment.working_dir)):
+                        file_path = file_path[len(str(environment.working_dir)) + 1 :]
+                    key = "|||".join([file_path, line_number])
+                    environment.current_breakpoints_state[key] = f"b {file_line}"
 
     def set_current_frame_file(self, environment) -> str | None:
         """A free 'where' to obtain the current frame (line number), hidden from the agent."""
