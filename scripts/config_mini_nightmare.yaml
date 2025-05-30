@@ -44,4 +44,4 @@ debug_5_agent:
     tools: ["pdb", "view", "rewrite", "eval"]
 
 debug_human:
-    tools: [["pdb", "view", "rewrite", "eval"]]
+    tools: ["pdb", "view", "rewrite", "eval"]
