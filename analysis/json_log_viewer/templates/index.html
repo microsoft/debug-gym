@@ -2,94 +2,655 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Debugging Timeline</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🐸 Froggy Debugging Trajectory</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
-        body { font-family: Arial, sans-serif; margin: 20px; }
-        .metadata { border: 1px solid #ccc; padding: 10px; margin-bottom: 20px; }
-        .timeline { display: flex; overflow-x: auto; gap: 10px; margin-bottom: 20px; }
-        .step { padding: 10px; border: 1px solid #ddd; cursor: pointer; }
-        .step.active { background-color: #e0f7fa; border-color: #007bff; }
-        .details { border: 1px solid #ccc; padding: 10px; }
-        pre { background: #f5f5f5; padding: 10px; white-space: pre-wrap; }
-        .nav-buttons { margin: 10px 0; }
+        html {
+            scroll-behavior: smooth;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #5A827E 0%, #84AE92 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(45deg, #2c3e50, #34495e);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
         .file-info {
-            background-color: #f8f9fa;
-            padding: 10px;
-            border-radius: 5px;
-            margin-bottom: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px 25px;
+            border-radius: 15px;
+            margin-top: 20px;
             display: flex;
             justify-content: space-between;
             align-items: center;
+            backdrop-filter: blur(10px);
         }
+
         .change-file-btn {
-            background-color: #6c757d;
+            background: linear-gradient(45deg, #e74c3c, #c0392b);
             color: white;
-            padding: 8px 16px;
+            padding: 10px 20px;
             border: none;
-            border-radius: 4px;
+            border-radius: 25px;
             cursor: pointer;
             text-decoration: none;
+            transition: all 0.3s ease;
+            font-weight: 600;
         }
+
         .change-file-btn:hover {
-            background-color: #545b62;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(231, 76, 60, 0.3);
+        }
+
+        .content {
+            padding: 30px;
+        }
+
+        .metadata {
+            background: linear-gradient(135deg, #84AE92 0%, #5A827E 100%);
+            color: white;
+            padding: 25px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(90, 130, 126, 0.3);
+        }
+
+        .metadata h2 {
+            margin-bottom: 20px;
+            font-size: 1.8rem;
+        }
+
+        .metadata-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .metadata-item {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 10px;
+            backdrop-filter: blur(10px);
+        }
+
+        .metadata-item strong {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 0.9rem;
+            opacity: 0.8;
+        }
+
+        .timeline-section {
+            margin-bottom: 30px;
+        }
+
+        .timeline-section h2 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-size: 1.8rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .timeline {
+            display: flex;
+            overflow-x: auto;
+            gap: 15px;
+            padding: 20px 0;
+            scrollbar-width: thin;
+            scrollbar-color: #667eea #f1f1f1;
+        }
+
+        .timeline::-webkit-scrollbar {
+            height: 8px;
+        }
+
+        .timeline::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+
+        .timeline::-webkit-scrollbar-thumb {
+            background: linear-gradient(45deg, #84AE92, #5A827E);
+            border-radius: 10px;
+        }
+
+        .step {
+            min-width: 120px;
+            padding: 15px 20px;
+            border: 2px solid #e0e0e0;
+            border-radius: 15px;
+            cursor: pointer;
+            text-align: center;
+            background: white;
+            transition: all 0.3s ease;
+            position: relative;
+            font-weight: 600;
+        }
+
+        .step:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+        }
+
+        .step.active {
+            background: linear-gradient(45deg, #84AE92, #5A827E);
+            color: white;
+            border-color: #84AE92;
+            transform: translateY(-5px);
+            box-shadow: 0 15px 35px rgba(132, 174, 146, 0.4);
+        }
+
+        .nav-buttons {
+            display: flex;
+            gap: 15px;
+            margin: 20px 0;
+            justify-content: center;
+        }
+
+        .nav-btn {
+            background: linear-gradient(45deg, #84AE92, #5A827E);
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .nav-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(132, 174, 146, 0.3);
+        }
+
+        .nav-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .details {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            min-height: 400px;
+        }
+
+        .details h3 {
+            color: #2c3e50;
+            margin-bottom: 25px;
+            font-size: 1.6rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .detail-section {
+            margin-bottom: 25px;
+        }
+
+        .detail-header {
+            background: linear-gradient(45deg, #84AE92, #5A827E);
+            color: white;
+            padding: 15px 20px;
+            border-radius: 10px 10px 0 0;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.3s ease;
+        }
+
+        .detail-header:hover {
+            background: linear-gradient(45deg, #5A827E, #84AE92);
+        }
+
+        .detail-content {
+            background: #FAFFCA;
+            border: 2px solid #84AE92;
+            border-top: none;
+            border-radius: 0 0 10px 10px;
+            max-height: 0;
+            overflow: hidden;
+            transition: all 0.3s ease;
+            font-size: 16px;
+        }
+
+        .detail-content.expanded {
+            max-height: 600px;
+            overflow-y: auto;
+        }
+
+        /* Ensure all text content in detail sections is readable */
+        .detail-content .json-viewer,
+        .detail-content > div {
+            font-size: 16px !important;
+            line-height: 1.6;
+        }
+
+        /* Style for "None" and other plain text content */
+        .json-viewer {
+            padding: 20px;
+            font-family: 'Courier New', monospace;
+            font-size: 16px;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            background: white;
+            border-radius: 8px;
+            margin: 10px;
+        }
+
+        .json-key {
+            color: #d73a49;
+            font-weight: 600;
+        }
+
+        .json-string {
+            color: #032f62;
+        }
+
+        .json-number {
+            color: #005cc5;
+        }
+
+        .json-boolean {
+            color: #e36209;
+        }
+
+        .json-null {
+            color: #6f42c1;
+        }
+
+        .collapsible {
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .collapsible:before {
+            content: '▼ ';
+            color: #666;
+            font-size: 14px;
+            margin-right: 5px;
+        }
+
+        .collapsed:before {
+            content: '▶ ';
+        }
+
+        .collapsed + .json-content {
+            display: none;
+        }
+
+        .expand-icon {
+            transition: transform 0.3s ease;
+        }
+
+        .expanded .expand-icon {
+            transform: rotate(180deg);
+        }
+
+        .loading {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 50px;
+            color: #666;
+        }
+
+        .loading i {
+            margin-right: 10px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .content {
+                padding: 20px;
+            }
+            
+            .timeline {
+                padding: 15px 0;
+            }
+            
+            .step {
+                min-width: 100px;
+                padding: 12px 15px;
+            }
         }
     </style>
 </head>
 <body>
-    <h1>Debugging Timeline</h1>
+    <div class="container">
+        <div class="header">
+            <h1>🐸 Froggy Debugging Trajectory</h1>
+            
+            <!-- File Info -->
+            <div class="file-info">
+                <span><i class="fas fa-file-code"></i> <strong>Current File:</strong> {{ current_file }}</span>
+                <a href="/change_file" class="change-file-btn">
+                    <i class="fas fa-exchange-alt"></i> Change File
+                </a>
+            </div>
+        </div>
 
-    <!-- File Info -->
-    <div class="file-info">
-        <span><strong>Current File:</strong> {{ current_file }}</span>
-        <a href="/change_file" class="change-file-btn">Change File</a>
-    </div>
+        <div class="content">
+            <!-- Metadata Section -->
+            <div class="metadata">
+                <h2><i class="fas fa-info-circle"></i> Metadata</h2>
+                <div class="metadata-grid">
+                    <div class="metadata-item">
+                        <strong>Problem</strong>
+                        <div>{{ metadata.problem }}</div>
+                    </div>
+                    <div class="metadata-item">
+                        <strong>UUID</strong>
+                        <div>{{ metadata.uuid }}</div>
+                    </div>
+                    <div class="metadata-item">
+                        <strong>Success</strong>
+                        <div>
+                            {% if metadata.success %}
+                                <i class="fas fa-check-circle" style="color: #5A827E;"></i> Success
+                            {% else %}
+                                <i class="fas fa-times-circle" style="color: #e74c3c;"></i> Failed
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                <div class="detail-section">
+                    <div class="detail-header" onclick="toggleSection('config-section')">
+                        <span><i class="fas fa-cog"></i> Configuration</span>
+                        <i class="fas fa-chevron-down expand-icon"></i>
+                    </div>
+                    <div class="detail-content" id="config-section">
+                        <div class="json-viewer" id="config-json">{{ metadata.config | tojson_pretty }}</div>
+                    </div>
+                </div>
+            </div>
 
-    <!-- Metadata Section -->
-    <div class="metadata">
-        <h2>Metadata</h2>
-        <p><strong>Problem:</strong> {{ metadata.problem }}</p>
-        <p><strong>UUID:</strong> {{ metadata.uuid }}</p>
-        <p><strong>Success:</strong> {{ metadata.success }}</p>
-        <p><strong>Config:</strong></p>
-        <pre>{{ metadata.config | tojson_pretty }}</pre>
-    </div>
+            <!-- Timeline Section -->
+            <div class="timeline-section">
+                <h2><i class="fas fa-route"></i> Trajectory ({{ total_steps }} steps)</h2>
+                <div class="timeline">
+                    {% for i in range(total_steps) %}
+                        <div class="step" data-step-id="{{ i }}">
+                            <i class="fas fa-step-forward"></i>
+                            Step {{ i }}
+                        </div>
+                    {% endfor %}
+                </div>
 
-    <!-- Timeline Section -->
-    <h2>Timeline</h2>
-    <div class="timeline">
-        {% for i in range(total_steps) %}
-            <div class="step" data-step-id="{{ i }}">Step {{ i }}</div>
-        {% endfor %}
-    </div>
+                <!-- Navigation Buttons -->
+                <div class="nav-buttons">
+                    <button id="prev-btn" class="nav-btn" disabled>
+                        <i class="fas fa-chevron-left"></i> Previous
+                    </button>
+                    <button id="next-btn" class="nav-btn">
+                        Next <i class="fas fa-chevron-right"></i>
+                    </button>
+                </div>
+            </div>
 
-    <!-- Navigation Buttons -->
-    <div class="nav-buttons">
-        <button id="prev-btn" disabled>Previous</button>
-        <button id="next-btn">Next</button>
-    </div>
-
-    <!-- Step Details -->
-    <div class="details" id="step-details">
-        <h3>Step Details</h3>
-        <p>Select a step to view details.</p>
+            <!-- Step Details -->
+            <div class="details" id="step-details">
+                <h3><i class="fas fa-search-plus"></i> Step Details</h3>
+                <div class="loading">
+                    <i class="fas fa-spinner"></i>
+                    Select a step to view details.
+                </div>
+            </div>
+        </div>
     </div>
 
     <script>
         const totalSteps = {{ total_steps }};
         let currentStep = 0;
 
+        // Toggle section visibility
+        function toggleSection(sectionId) {
+            const content = document.getElementById(sectionId);
+            const header = content.previousElementSibling;
+            const icon = header.querySelector('.expand-icon');
+            
+            content.classList.toggle('expanded');
+            header.classList.toggle('expanded');
+        }
+
+        // Create collapsible JSON viewer
+        function createCollapsibleJSON(obj, container, level = 0) {
+            if (typeof obj !== 'object' || obj === null) {
+                container.innerHTML = formatJSONValue(obj);
+                return;
+            }
+
+            const isArray = Array.isArray(obj);
+            const keys = Object.keys(obj);
+            
+            if (keys.length === 0) {
+                container.innerHTML = isArray ? '[]' : '{}';
+                return;
+            }
+
+            const wrapper = document.createElement('div');
+            
+            // Create header for collapsible section
+            const header = document.createElement('div');
+            header.className = 'collapsible';
+            header.innerHTML = `${isArray ? '[' : '{'} <span style="color: #666; font-size: 14px;">(${keys.length} items)</span>`;
+            
+            // Create content container
+            const content = document.createElement('div');
+            content.className = 'json-content';
+            content.style.marginLeft = '20px';
+            
+            keys.forEach((key, index) => {
+                const item = document.createElement('div');
+                item.style.marginBottom = '5px';
+                
+                const keySpan = document.createElement('span');
+                keySpan.className = 'json-key';
+                keySpan.textContent = isArray ? '' : `"${key}": `;
+                
+                const valueContainer = document.createElement('span');
+                
+                if (typeof obj[key] === 'object' && obj[key] !== null) {
+                    createCollapsibleJSON(obj[key], valueContainer, level + 1);
+                } else {
+                    valueContainer.innerHTML = formatJSONValue(obj[key]);
+                }
+                
+                item.appendChild(keySpan);
+                item.appendChild(valueContainer);
+                
+                if (index < keys.length - 1) {
+                    item.appendChild(document.createTextNode(','));
+                }
+                
+                content.appendChild(item);
+            });
+            
+            // Add closing bracket
+            const closing = document.createElement('div');
+            closing.textContent = isArray ? ']' : '}';
+            closing.style.marginLeft = '0px';
+            content.appendChild(closing);
+            
+            // Toggle functionality
+            header.addEventListener('click', function() {
+                header.classList.toggle('collapsed');
+            });
+            
+            wrapper.appendChild(header);
+            wrapper.appendChild(content);
+            container.appendChild(wrapper);
+        }
+
+        function formatJSONValue(value) {
+            if (typeof value === 'string') {
+                return `<span class="json-string">"${value}"</span>`;
+            } else if (typeof value === 'number') {
+                return `<span class="json-number">${value}</span>`;
+            } else if (typeof value === 'boolean') {
+                return `<span class="json-boolean">${value}</span>`;
+            } else if (value === null) {
+                return `<span class="json-null">null</span>`;
+            }
+            return value;
+        }
+
         // Fetch step data from the server
         async function fetchStep(stepId) {
-            const response = await fetch(`/get_step/${stepId}`);
-            const data = await response.json();
-            if (!data.error) {
-                document.getElementById('step-details').innerHTML = `
-                    <h3>Step ${stepId}</h3>
-                    <p><strong>Action:</strong></p><pre>${JSON.stringify(data.action, null, 2) || 'None'}</pre>
-                    <p><strong>Observation:</strong></p><pre>${data.obs}</pre>
-                    <p><strong>Rewrite Consumed:</strong></p><pre>${data.rewrite_consumed || 'None'}</pre>
-                    <p><strong>Prompt/Response Pairs:</strong></p><pre>${JSON.stringify(data.prompt_response_pairs, null, 2) || 'None'}</pre>
+            // Save current scroll position
+            const currentScrollY = window.scrollY;
+            
+            const detailsContainer = document.getElementById('step-details');
+            detailsContainer.innerHTML = `
+                <h3><i class="fas fa-search-plus"></i> Step ${stepId}</h3>
+                <div class="loading">
+                    <i class="fas fa-spinner"></i>
+                    Loading step data...
+                </div>
+            `;
+
+            try {
+                const response = await fetch(`/get_step/${stepId}`);
+                const data = await response.json();
+                
+                if (!data.error) {
+                    detailsContainer.innerHTML = `
+                        <h3><i class="fas fa-search-plus"></i> Step ${stepId}</h3>
+                        
+                        <div class="detail-section">
+                            <div class="detail-header expanded" onclick="toggleSection('action-section')">
+                                <span><i class="fas fa-play"></i> Action</span>
+                                <i class="fas fa-chevron-down expand-icon"></i>
+                            </div>
+                            <div class="detail-content expanded" id="action-section">
+                                <div class="json-viewer" id="action-json"></div>
+                            </div>
+                        </div>
+
+                        <div class="detail-section">
+                            <div class="detail-header expanded" onclick="toggleSection('observation-section')">
+                                <span><i class="fas fa-eye"></i> Observation</span>
+                                <i class="fas fa-chevron-down expand-icon"></i>
+                            </div>
+                            <div class="detail-content expanded" id="observation-section">
+                                <div class="json-viewer" style="white-space: pre-wrap;">${data.obs || 'None'}</div>
+                            </div>
+                        </div>
+
+                        <div class="detail-section">
+                            <div class="detail-header" onclick="toggleSection('rewrite-section')">
+                                <span><i class="fas fa-edit"></i> Rewrite Consumed</span>
+                                <i class="fas fa-chevron-down expand-icon"></i>
+                            </div>
+                            <div class="detail-content" id="rewrite-section">
+                                <div class="json-viewer">${data.rewrite_consumed || 'None'}</div>
+                            </div>
+                        </div>
+
+                        <div class="detail-section">
+                            <div class="detail-header" onclick="toggleSection('prompt-response-section')">
+                                <span><i class="fas fa-comments"></i> Prompt/Response Pairs</span>
+                                <i class="fas fa-chevron-down expand-icon"></i>
+                            </div>
+                            <div class="detail-content" id="prompt-response-section">
+                                <div class="json-viewer" id="prompt-response-json"></div>
+                            </div>
+                        </div>
+                    `;
+
+                    // Populate collapsible JSON sections
+                    if (data.action) {
+                        createCollapsibleJSON(data.action, document.getElementById('action-json'));
+                    } else {
+                        document.getElementById('action-json').textContent = 'None';
+                    }
+
+                    if (data.prompt_response_pairs) {
+                        createCollapsibleJSON(data.prompt_response_pairs, document.getElementById('prompt-response-json'));
+                    } else {
+                        document.getElementById('prompt-response-json').textContent = 'None';
+                    }
+                } else {
+                    detailsContainer.innerHTML = `
+                        <h3><i class="fas fa-exclamation-triangle"></i> Error</h3>
+                        <div style="color: #e74c3c; padding: 20px;">
+                            <i class="fas fa-times-circle"></i> ${data.error}
+                        </div>
+                    `;
+                }
+                
+                // Restore scroll position after a short delay to allow content to render
+                setTimeout(() => {
+                    window.scrollTo(0, currentScrollY);
+                }, 50);
+                
+            } catch (error) {
+                detailsContainer.innerHTML = `
+                    <h3><i class="fas fa-exclamation-triangle"></i> Error</h3>
+                    <div style="color: #e74c3c; padding: 20px;">
+                        <i class="fas fa-times-circle"></i> Failed to load step data: ${error.message}
+                    </div>
                 `;
+                
+                // Restore scroll position even on error
+                setTimeout(() => {
+                    window.scrollTo(0, currentScrollY);
+                }, 50);
             }
         }
 
@@ -101,6 +662,16 @@
             fetchStep(currentStep);
             document.getElementById('prev-btn').disabled = currentStep === 0;
             document.getElementById('next-btn').disabled = currentStep === totalSteps - 1;
+            
+            // Scroll active step into view horizontally only, without affecting vertical scroll
+            const activeStep = document.querySelector(`.step[data-step-id="${newStep}"]`);
+            if (activeStep) {
+                activeStep.scrollIntoView({ 
+                    behavior: 'smooth', 
+                    block: 'nearest', 
+                    inline: 'center' 
+                });
+            }
         }
 
         // Event listeners for timeline steps
@@ -117,6 +688,29 @@
         });
         document.getElementById('next-btn').addEventListener('click', () => {
             if (currentStep < totalSteps - 1) updateStep(currentStep + 1);
+        });
+
+        // Keyboard navigation
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowLeft' && currentStep > 0) {
+                updateStep(currentStep - 1);
+            } else if (e.key === 'ArrowRight' && currentStep < totalSteps - 1) {
+                updateStep(currentStep + 1);
+            }
+        });
+
+        // Initialize collapsible JSON for config
+        document.addEventListener('DOMContentLoaded', () => {
+            const configJson = document.getElementById('config-json');
+            if (configJson && configJson.textContent.trim()) {
+                try {
+                    const configData = JSON.parse(configJson.textContent);
+                    configJson.innerHTML = '';
+                    createCollapsibleJSON(configData, configJson);
+                } catch (e) {
+                    // Keep original content if parsing fails
+                }
+            }
         });
 
         // Load the first step by default
