@@ -141,10 +141,11 @@ class PDBTool(EnvironmentTool):
             environment.current_breakpoints_state = {}
             self.restart_pdb(environment)
             success, output = True, "All breakpoints have been cleared."
-        else:
-            # other pdb commands, send directly
+        else:  # other pdb commands, send directly
             try:
                 pdb_out = self.interact_with_pdb(command, environment.run_timeout)
+                # remove the working dir from the output
+                pdb_out = pdb_out.replace(f"{environment.working_dir}/", "")
                 if pdb_out in (
                     "End of file",
                     "Blank or comment",
@@ -344,18 +345,22 @@ class PDBTool(EnvironmentTool):
         # 2   breakpoint   keep yes   at /tmp/RepoEnv-_ha8r7_2/constants.py:10
         # 3   breakpoint   keep yes   at /tmp/RepoEnv-_ha8r7_2/constants.py:14
         # -> ACTION_TO_INDEX = {
+        new_breakpoints = {}
         sep = "keep yes   at "
         for line in output.splitlines():
             if sep in line:
                 # extract the file path and line number from the line
                 # e.g., /tmp/RepoEnv-_ha8r7_2/constants.py:6
+                # removes environment.working_dir if file is in the working directory
                 file_line = line.split(sep)[-1].strip()
-                if ":" in file_line:
-                    file_path, line_number = file_line.rsplit(":", 1)
-                    if file_path.startswith(str(environment.working_dir)):
-                        file_path = file_path[len(str(environment.working_dir)) + 1 :]
-                    key = "|||".join([file_path, line_number])
-                    environment.current_breakpoints_state[key] = f"b {file_line}"
+                if file_line.startswith(str(environment.working_dir)):
+                    file_line = file_line[len(str(environment.working_dir)) + 1 :]
+                file_path, line_number = file_line.rsplit(":", 1)
+                if file_path.startswith(str(environment.working_dir)):
+                    file_path = file_path[len(str(environment.working_dir)) + 1 :]
+                key = "|||".join([file_path, line_number])
+                new_breakpoints[key] = f"b {file_line}"
+        environment.current_breakpoints_state = new_breakpoints
 
     def set_current_frame_file(self, environment) -> str | None:
         """A free 'where' to obtain the current frame (line number), hidden from the agent."""
