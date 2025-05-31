@@ -27,15 +27,6 @@ def unescape(s):
         return result.encode("utf-8", errors="replace").decode("utf-8")
 
 
-def get_code_length(code_string):
-    # Get the number of lines in the code string
-    assert isinstance(
-        code_string, str
-    ), f"code_string should be a string, but got {type(code_string)}"
-    code_line = code_string.split("\n")
-    return len(code_line)
-
-
 def show_line_number(
     code_string, code_path=None, breakpoints_state=None, start_index=1
 ):
