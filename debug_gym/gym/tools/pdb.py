@@ -5,7 +5,6 @@ from debug_gym.gym.entities import Observation
 from debug_gym.gym.terminal import ShellSession
 from debug_gym.gym.tools.tool import EnvironmentTool
 from debug_gym.gym.tools.toolbox import Toolbox
-from debug_gym.gym.utils import get_code_length
 
 
 @Toolbox.register()
@@ -202,90 +201,6 @@ class PDBTool(EnvironmentTool):
                 obs += f"\nContext around the current frame:\n{list_output}\n"
 
         return Observation(self.name, obs)
-
-    def breakpoint_add_clear(self, environment, action: str, which_file):
-        # handle adding/removing breakpoints
-        # this is a wrapper that manages the self.breakpoints_state, which does not reset at each pseudo terminal start
-        # self.breakpoints_state is a dict, the keys are "|||".join([file_path, str(line_number)]) and values are breakpoint_command
-        # TODO: we don't support tbreak
-        manipulation = "set" if action.startswith("b") else "clear"
-        if which_file is None or which_file == "":
-            return (
-                False,
-                f"Failed to {manipulation} breakpoint. No file is specified in the command.",
-            )
-        if which_file.startswith(str(environment.working_dir)):
-            which_file = which_file[len(str(environment.working_dir)) + 1 :]
-        if which_file not in environment.all_files:
-            return (
-                False,
-                f"Failed to {manipulation} breakpoint. `{which_file}` is not found in the repository.",
-            )
-        # IMPORTANT: insert the viewing file into breakpoint command
-        # for example, "b 42" -> "b src/main.py:42" if the current file is "src/main.py"
-        # for example, "cl 42" -> "cl src/main.py:42" if the current file is "src/main.py"
-        action_split = action.split(maxsplit=2)
-        _action_type, _line_number, _bp_args = (
-            action_split[0],
-            action_split[1],
-            action_split[2] if len(action_split) > 2 else "",
-        )
-        _key = "|||".join([which_file, _line_number])
-        assert _line_number.isnumeric()
-        success, output = True, ""
-        joined_args = " ".join([_line_number, _bp_args])
-        command = f"{which_file}:{joined_args}".strip()
-        if _action_type in ["b", "break"]:
-            command = "b " + command
-            if _key in environment.current_breakpoints_state.keys():
-                # breakpoint already exists
-                return (
-                    True,
-                    f"Breakpoint already exists at line {_line_number} in `{which_file}`.",
-                )
-            else:
-                # check if line number is valid
-                code_string = environment.read_file(which_file)
-                code_length = get_code_length(code_string)
-                if int(_line_number) > code_length or int(_line_number) < 1:
-                    return (
-                        False,
-                        f"Invalid line number: {_line_number}, expected between 1 and {code_length}.",
-                    )
-                try:
-                    output = self.interact_with_pdb(command, environment.run_timeout)
-                    # when success, the output always repeats the command, we can remove it
-                    output = output.strip()
-                    if output.startswith(command):
-                        output = output[len(command) :].strip()
-                    environment.current_breakpoints_state[_key] = command
-                except BaseException:
-                    success = False
-        elif _action_type in ["cl", "clear"]:
-            command = "cl " + command
-            if _key not in environment.current_breakpoints_state.keys():
-                # breakpoint does not exist
-                return (
-                    True,
-                    f"No breakpoint exists at line {_line_number} in `{which_file}`.",
-                )
-            else:
-                try:
-                    output = self.interact_with_pdb(command, environment.run_timeout)
-                    # when success, the output always repeats the command, we can remove it
-                    output = output.strip()
-                    if output.startswith(command):
-                        output = output[len(command) :].strip()
-                    del environment.current_breakpoints_state[_key]
-                except BaseException:
-                    success = False
-        else:
-            return (
-                False,
-                f"Invalid action: `{action}`. Expected 'b', 'break', 'cl', or 'clear'.",
-            )
-
-        return success, output
 
     def breakpoint_modify(
         self, environment, rewrite_file, rewrite_head, rewrite_tail, new_code_length

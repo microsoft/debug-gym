@@ -509,7 +509,7 @@ def test_use_b_invalid_file(tmp_path, setup_pdb_repo_env):
     )
 
 
-def test_use_breakpoint_add_clear_invalid_line(tmp_path, setup_pdb_repo_env):
+def test_use_pdb_invalid_line(tmp_path, setup_pdb_repo_env):
     pdb_tool, env = setup_pdb_repo_env(tmp_path)
     pdb_obs = pdb_tool.use(env, "b file1.py:100")
     assert pdb_obs.source == "pdb"
