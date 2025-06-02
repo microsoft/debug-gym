@@ -358,6 +358,16 @@ class RepoEnv(TooledEnv):
         self.last_eval = EvalOutput(success, output)
         return self.last_eval
 
+    def to_absolute(self, filepath: str | Path) -> Path:
+        """Convert a relative filepath to absolute based on the working_dir.
+        If the path is already absolute, it is returned as is.
+        Returns an absolute Path object regardless of the path existing or not.
+        """
+        filepath = Path(filepath)
+        if filepath.is_absolute():
+            return filepath
+        return (Path(self.working_dir) / filepath).resolve()
+
     def read_file(self, filepath: str) -> str:
         return (self.working_dir / filepath).read_text()
 

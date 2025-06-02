@@ -536,3 +536,27 @@ def test_queue_and_process_events():
         call(environment=env, event=Event.ENV_RESET, source="source2", arg2="val2"),
     ]
     mock.assert_has_calls(expected_calls)
+
+
+def test_to_absolute(tmp_path):
+    env = RepoEnv(path=tmp_path)
+    abs_path = (env.working_dir / "file.txt").resolve()
+    (abs_path).touch()
+    # relative path
+    path_from_env = env.to_absolute("file.txt")
+    assert path_from_env == abs_path
+    # absolute path
+    path_from_env = env.to_absolute(str(abs_path))
+    assert path_from_env == abs_path
+    # relative path with Path object
+    path_from_env = env.to_absolute(Path("file.txt"))
+    assert path_from_env == abs_path
+    # absolute path with Path object
+    path_from_env = env.to_absolute(abs_path)
+    assert path_from_env == abs_path
+    # return an absolute path regardless of existence
+    non_existent_path = env.to_absolute("non_existent_file.txt")
+    assert non_existent_path == (env.working_dir / "non_existent_file.txt").resolve()
+    # non-existent absolute path
+    non_existent_path = env.to_absolute("/tmp/non_existent_file.txt")
+    assert non_existent_path == Path("/tmp/non_existent_file.txt").resolve()
