@@ -317,6 +317,15 @@ def test_breakpoint_modify_no_change(tmp_path, setup_pdb_repo_env):
     assert env.current_breakpoints_state == expected_state
 
 
+def test_breakpoint_modify_no_breakpoints(tmp_path, setup_pdb_repo_env):
+    pdb_tool, env = setup_pdb_repo_env(tmp_path)
+    env.current_breakpoints_state = {}
+    initial_output = pdb_tool.start_pdb(env)
+    assert "The pytest entry point." in initial_output
+    pdb_tool.breakpoint_modify(env, "rewrite_file", 1, 3, 1)
+    assert env.current_breakpoints_state == {}
+
+
 def test_pdb_crashing(tmp_path, setup_test_repo):
     tests_path = setup_test_repo(tmp_path)
     with open(tests_path / "test_fail.py", "w") as f:
