@@ -37,3 +37,15 @@ debug_agent:
 debug_5_agent:
     n_rewrites_before_pdb: 5
     tools: ["pdb", "view", "rewrite", "listdir", "eval"]
+
+agent1:
+    tools: ["pdb", "view", "rewrite", "listdir", "eval"]
+
+agent2:
+    tools: ["pdb", "view", "rewrite", "listdir", "eval"]
+
+agent3:
+    tools: ["pdb", "view", "rewrite", "listdir", "eval"]
+
+agent4:
+    tools: ["pdb", "view", "rewrite", "listdir", "eval"]
