@@ -85,7 +85,8 @@ def filter_trajectories(directory, trajectory_criteria=None, data_criteria=None)
 def main():
 
     trajectory_criteria = [
-        follows_proper_debugging_workflow,
+        # follows_proper_debugging_workflow,
+        uses_pdb_print_commands,
         # lambda trajectory: has_consecutive_pdb_calls(trajectory, n=2),
     ]
 
@@ -97,10 +98,21 @@ def main():
     # Filter trajectories
     matching_files = filter_trajectories(exps_dir, trajectory_criteria, data_criteria)
 
-    # Print results
-    print("\nMatching trajectory files:")
+    # Where are the matching files located
+    model_name = {}
     for file_path in matching_files:
-        print(f"  {file_path}")
+        if file_path.startswith(exps_dir):
+            file_path = file_path[len(exps_dir) + 1 :]
+        _mn = file_path.split("/")[0]
+        if _mn not in model_name:
+            model_name[_mn] = 0
+        model_name[_mn] += 1
+    print("Criteria used:")
+    for criterion in trajectory_criteria + data_criteria:
+        print(f"  {criterion.__name__}")
+    print("\nMatching files by model:")
+    for mn, count in model_name.items():
+        print(f"  {mn}: {count} files")
 
 
 if __name__ == "__main__":
