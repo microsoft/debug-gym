@@ -1,4 +1,5 @@
 import copy
+import re
 import subprocess
 from unittest.mock import MagicMock, patch
 
@@ -51,7 +52,6 @@ def setup_pdb_repo_env(setup_test_repo, breakpoints_state):
         env = RepoEnv(path=str(test_repo))
         pdb_tool = PDBTool()
         pdb_tool.register(env)
-        pdb_tool.start_pdb(env)
         env.reset()
         env.current_breakpoints_state = breakpoints_state
         env.persistent_breakpoints = True
@@ -78,10 +78,13 @@ def test_pdb_use(tmp_path, setup_test_repo):
     assert """The pytest entry point.""" in output
     assert "(Pdb)" not in output
     output = pdb.use(environment, command="c").observation
-    assert "1 failed, 1 passed" in pdb.pdb_obs
-    assert "test_fail.py::test_fail FAILED" in pdb.pdb_obs
-    assert "test_pass.py::test_pass PASSED" in pdb.pdb_obs
-    assert "Reached the end of the file. Restarting the debugging session." in output
+    assert "1 failed, 1 passed" in output
+    assert "test_fail.py::test_fail FAILED" in output
+    assert "test_pass.py::test_pass PASSED" in output
+    assert "Reached the end of the program. Restarting the debugging session." in output
+    assert "pytest/__main__.py" in output
+    assert '-> """The pytest entry point."""' in output
+    assert 'Context around the current frame:\n1  ->	"""The pytest entry point.""""'
     assert "(Pdb)" not in output
 
 
@@ -114,10 +117,7 @@ def test_pdb_fail_if_empty_path_at_start(tmp_path, setup_test_repo):
     _ = pdb.start_pdb(environment)
 
     output = pdb.use(environment, command="b 1").observation
-    assert (
-        "Invalid pdb command: b 1\n\nFailed to set breakpoint. No file is specified in the command."
-        in output
-    )
+    assert output.endswith("pytest/__main__.py` is not found in the repository.")
 
 
 def test_pdb_pass_empty_path_if_in_session(tmp_path, setup_test_repo):
@@ -156,10 +156,13 @@ def test_pdb_use_default_environment_entrypoint(tmp_path, setup_test_repo):
     assert "(Pdb)" not in output
 
     output = pdb.use(environment, command="c").observation
-    assert "1 failed, 1 passed" in pdb.pdb_obs
-    assert "test_fail.py::test_fail" in pdb.pdb_obs
-    assert "test_pass.py::test_pass" not in pdb.pdb_obs
-    assert "Reached the end of the file. Restarting the debugging session." in output
+    assert "1 failed, 1 passed" in output
+    assert "test_fail.py::test_fail" in output
+    assert "test_pass.py::test_pass" not in output
+    assert "Reached the end of the program. Restarting the debugging session." in output
+    assert "pytest/__main__.py" in output
+    assert '-> """The pytest entry point."""' in output
+    assert 'Context around the current frame:\n1  ->	"""The pytest entry point.""""'
     assert "(Pdb)" not in output
 
 
@@ -186,16 +189,18 @@ def test_pdb_use_docker_terminal(tmp_path, setup_test_repo):
     assert "(Pdb)" not in output
 
     output = pdb.use(environment, command="c").observation
-    assert "1 failed, 1 passed" in pdb.pdb_obs
-    assert "test_fail.py::test_fail FAILED" in pdb.pdb_obs
-    assert "test_pass.py::test_pass PASSED" in pdb.pdb_obs
-    assert "Reached the end of the file. Restarting the debugging session." in output
+    assert "1 failed, 1 passed" in output
+    assert "test_fail.py::test_fail FAILED" in output
+    assert "test_pass.py::test_pass PASSED" in output
+    assert "Reached the end of the program. Restarting the debugging session." in output
+    assert "pytest/__main__.py" in output
+    assert '-> """The pytest entry point."""' in output
+    assert 'Context around the current frame:\n1  ->	"""The pytest entry point.""""'
     assert "(Pdb)" not in output
 
 
 def test_initialization():
     pdb_tool = PDBTool()
-    assert pdb_tool.pdb_obs == ""
     assert pdb_tool.current_frame_file is None
     assert pdb_tool._session is None
 
@@ -310,17 +315,6 @@ def test_breakpoint_modify_no_change(tmp_path, setup_pdb_repo_env):
     assert env.current_breakpoints_state == expected_state
 
 
-@patch.object(PDBTool, "interact_with_pdb")
-def test_get_current_frame_file(mock_interact_with_pdb, tmp_path, setup_pdb_repo_env):
-    pdb_tool, env = setup_pdb_repo_env(tmp_path)
-    fail_test_path = str(env.working_dir / "test_fail.py")
-    mock_interact_with_pdb.return_value = (
-        f"somecontext > {fail_test_path}(2)<module>()\n-> some code context"
-    )
-    pdb_tool.get_current_frame_file(env)
-    assert str(fail_test_path).endswith(pdb_tool.current_frame_file)
-
-
 def test_pdb_crashing(tmp_path, setup_test_repo):
     tests_path = setup_test_repo(tmp_path)
     with open(tests_path / "test_fail.py", "w") as f:
@@ -372,12 +366,11 @@ def test_close_pdb_start_and_close_session(tmp_path, setup_pdb_repo_env):
 
 def test_deepcopy_sets_session_none(tmp_path, setup_pdb_repo_env):
     pdb_tool, _ = setup_pdb_repo_env(tmp_path)
-    pdb_tool.pdb_obs = "obs"
-    pdb_tool.current_frame_file = "file1.py"
+    assert pdb_tool.current_frame_file.endswith("pytest/__main__.py")
     tool_copy = copy.deepcopy(pdb_tool)
     assert tool_copy._session is None
-    assert tool_copy.pdb_obs == "obs"
-    assert tool_copy.current_frame_file == "file1.py"
+    assert tool_copy.current_frame_file is None
+    assert pdb_tool.current_frame_file.endswith("pytest/__main__.py")
 
 
 def test_start_pdb_restores_breakpoints(tmp_path, setup_pdb_repo_env):
@@ -443,9 +436,57 @@ def test_use_breakpoints_and_clear(tmp_path, setup_pdb_repo_env):
     env.all_files = ["file1.py"]
     pdb_tool.current_frame_file = "file1.py"
     obs = pdb_tool.use(env, "b").observation
-    assert "list" in obs
+    # clean up the pytest path to not depend on the environment
+    obs = re.sub(
+        r"Current frame:\n.*pytest/__main__\.py",
+        "Current frame:\n.../pytest/__main__.py",
+        obs,
+    )
+    assert obs == (
+        "Breakpoints:\n"
+        "line 1 in file1.py\n"
+        "\n"
+        "Current frame:\n"
+        ".../pytest/__main__.py\n"
+        "\n"
+        "Context around the current frame:\n"
+        '1  ->\t"""The pytest entry point."""\r\n'
+        "  2  \t\r\n"
+        "  3  \tfrom __future__ import annotations\r\n"
+        "  4  \t\r\n"
+        "  5  \timport pytest\r\n"
+        "  6  \t\r\n"
+        "  7  \t\r\n"
+        '  8  \tif __name__ == "__main__":\r\n'
+        "  9  \t    raise SystemExit(pytest.console_main())\r\n"
+        "[EOF]\n"
+    )
+
     obs2 = pdb_tool.use(env, "cl").observation
-    assert "cleared" in obs2
+    # clean up the pytest path to not depend on the environment
+    obs2 = re.sub(
+        r"Current frame:\n.*pytest/__main__\.py",
+        "Current frame:\n.../pytest/__main__.py",
+        obs2,
+    )
+    assert obs2 == (
+        "All breakpoints have been cleared.\n"
+        "\n"
+        "Current frame:\n"
+        ".../pytest/__main__.py\n"
+        "\n"
+        "Context around the current frame:\n"
+        '1  ->\t"""The pytest entry point."""\r\n'
+        "  2  \t\r\n"
+        "  3  \tfrom __future__ import annotations\r\n"
+        "  4  \t\r\n"
+        "  5  \timport pytest\r\n"
+        "  6  \t\r\n"
+        "  7  \t\r\n"
+        '  8  \tif __name__ == "__main__":\r\n'
+        "  9  \t    raise SystemExit(pytest.console_main())\r\n"
+        "[EOF]\n"
+    )
 
 
 def test_use_breakpoint_add_clear_invalid_file(tmp_path, setup_pdb_repo_env):
@@ -475,15 +516,71 @@ def test_breakpoint_add_clear_invalid_action(tmp_path, setup_pdb_repo_env):
     assert output == "Invalid action: `foo 1`. Expected 'b', 'break', 'cl', or 'clear'."
 
 
-def test_get_current_frame_file_sets_file(tmp_path, setup_pdb_repo_env):
+def test_set_current_frame_file_sets_file(tmp_path, setup_pdb_repo_env):
     pdb_tool, env = setup_pdb_repo_env(tmp_path)
+    # First stop at pytest main file
+    assert "pytest/__main__.py" in pdb_tool.current_frame_file
+
     test_dir = env.working_dir / "test_fail.py"
-    # pdb_tool.use calls pdb_tool.get_current_frame_file(env)
+    # pdb_tool.use calls pdb_tool.set_current_frame_file(env)
     obs = pdb_tool.use(env, "b test_fail.py:2")
     assert obs.observation.startswith(f"Breakpoint 1 at {test_dir}:2")
-    # starts from pytest, so current_frame_file should be None (not yet inside working dir)
-    assert pdb_tool.current_frame_file is None
+    # no `continue` command, so current_frame_file should still be pytest main file
+    assert "pytest/__main__.py" in pdb_tool.current_frame_file
     obs = pdb_tool.use(env, "c")
-    assert f"> {test_dir}(2)test_fail()" in obs.observation
     # At this point, current_frame_file should be set to the file where the breakpoint was set
     assert pdb_tool.current_frame_file == "test_fail.py"
+    # observation should contain the test file
+    assert "Current frame:\ntest_fail.py" in obs.observation
+    assert f"> {test_dir}(2)" in obs.observation
+
+
+def test_set_current_frame_file_sets_and_returns(tmp_path, setup_pdb_repo_env):
+    pdb_tool, env = setup_pdb_repo_env(tmp_path)
+    # Patch interact_with_pdb to simulate output
+    test_file = "file1.py"
+    test_path = str(env.working_dir / test_file)
+
+    def fake_interact_with_pdb(command, timeout):
+        return f"somecontext\n> {test_path}(10)<module>()\n-> some code context"
+
+    pdb_tool.interact_with_pdb = fake_interact_with_pdb
+    result = pdb_tool.set_current_frame_file(env)
+    assert result == test_file
+    assert pdb_tool.current_frame_file == test_file
+
+
+def test_breakpoint_add_clear_missing_file(tmp_path, setup_pdb_repo_env):
+    pdb_tool, env = setup_pdb_repo_env(tmp_path)
+    success, output = pdb_tool.breakpoint_add_clear(env, "b 10", None)
+    assert not success
+    assert output.startswith(
+        "Failed to set breakpoint. No file is specified in the command."
+    )
+
+
+def test_breakpoint_add_clear_file_not_in_repo(tmp_path, setup_pdb_repo_env):
+    pdb_tool, env = setup_pdb_repo_env(tmp_path)
+    env.all_files = ["file1.py"]
+    success, output = pdb_tool.breakpoint_add_clear(env, "b 10", "notafile.py")
+    assert not success
+    assert output.startswith(
+        "Failed to set breakpoint. `notafile.py` is not found in the repository."
+    )
+
+
+def test_breakpoint_add_clear_invalid_line_number(tmp_path, setup_pdb_repo_env):
+    pdb_tool, env = setup_pdb_repo_env(tmp_path)
+    env.all_files = ["file1.py"]
+    # file1.py only has 40 lines, so 100 is invalid
+    success, output = pdb_tool.breakpoint_add_clear(env, "b 100", "file1.py")
+    assert not success
+    assert output == "Invalid line number: 100, expected between 1 and 41."
+
+
+def test_breakpoint_add_clear_invalid_action_type(tmp_path, setup_pdb_repo_env):
+    pdb_tool, env = setup_pdb_repo_env(tmp_path)
+    env.all_files = ["file1.py"]
+    success, output = pdb_tool.breakpoint_add_clear(env, "foo 1", "file1.py")
+    assert not success
+    assert output == "Invalid action: `foo 1`. Expected 'b', 'break', 'cl', or 'clear'."

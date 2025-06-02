@@ -30,7 +30,7 @@ class Debug_5_Agent(DebugAgent):
         for step in self.logger.tqdm(range(self.config["max_steps"])):
             highscore = max(highscore, info.score)
             self.logger.info(
-                f"Score: {info.score}/{info.max_score} ({info.score/info.max_score:.1%}) [Best: {highscore}]"
+                f"Step: {step} | Score: {info.score}/{info.max_score} ({info.score/info.max_score:.1%}) [Best: {highscore}]"
             )
 
             messages = self.build_prompt(info)
@@ -55,8 +55,9 @@ class Debug_5_Agent(DebugAgent):
             self.history.step(info, llm_response)
 
             if info.done or info.rewrite_counter >= self.config["max_rewrite_steps"]:
+                reason = "done" if info.done else "max_rewrite_steps reached"
                 self.logger.info(
-                    f"Score: {info.score}/{info.max_score} ({info.score/info.max_score:.1%})"
+                    f"Step: {step} | Score: {info.score}/{info.max_score} ({info.score/info.max_score:.1%}) | Reason: {reason}"
                 )
                 break
 
