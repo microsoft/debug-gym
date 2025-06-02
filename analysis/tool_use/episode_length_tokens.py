@@ -281,18 +281,18 @@ def plot_episode_response_tokens(df_dict, figsize=(12, 7)):
 
 # Example usage:
 model_paths = [
-    "../exps/may22/rewrite_4o",
-    "../exps/may22/rewrite_o1",
-    "../exps/may22/rewrite_o3",
-    "../exps/may22/rewrite_o3-high",
-    "../exps/may22/rewrite_o3-mini",
-    "../exps/may22/rewrite_o4-mini",
-    "../exps/may22/debug_4o",
-    "../exps/may22/debug_o1",
-    "../exps/may22/debug_o3",
-    "../exps/may22/debug_o3-high",
-    "../exps/may22/debug_o3-mini",
-    "../exps/may22/debug_o4-mini",
+    "../../exps/may22/rewrite_4o",
+    "../../exps/may22/rewrite_o1",
+    "../../exps/may22/rewrite_o3",
+    "../../exps/may22/rewrite_o3-high",
+    "../../exps/may22/rewrite_o3-mini",
+    "../../exps/may22/rewrite_o4-mini",
+    "../../exps/may22/debug_4o",
+    "../../exps/may22/debug_o1",
+    "../../exps/may22/debug_o3",
+    "../../exps/may22/debug_o3-high",
+    "../../exps/may22/debug_o3-mini",
+    "../../exps/may22/debug_o4-mini",
 ]
 
 # Analyze all models with seed averaging

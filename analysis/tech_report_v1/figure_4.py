@@ -19,12 +19,6 @@ plt.rcParams.update(
     }
 )
 
-agent_name_map = {
-    "rewrite": "rewrite",
-    "pdb": "debug",
-    "seq": "debug(5)",
-}
-
 
 def analyze_froggy_results(model_name):
     """
@@ -53,10 +47,10 @@ def analyze_froggy_results(model_name):
             total_prompt_tokens = 0
             total_response_tokens = 0
             rewrite_count = 0
-            episode_length = 0
             for step in data.get("log", []):
-                episode_length += 1
-                if step.get("action") and "```rewrite" in step["action"]:
+                if step.get("action") and step["action"].strip().startswith(
+                    "```rewrite"
+                ):
                     rewrite_count += 1
 
                 # Extract token usage from prompt_response_pairs
@@ -68,6 +62,9 @@ def analyze_froggy_results(model_name):
                                 "response", 0
                             )
 
+                if rewrite_count == 10:
+                    break
+
             results.append(
                 {
                     "task": task,
@@ -75,13 +72,83 @@ def analyze_froggy_results(model_name):
                     "rewrite_count": rewrite_count,
                     "prompt_tokens": total_prompt_tokens,
                     "response_tokens": total_response_tokens,
-                    "episode_length": episode_length,
                 }
             )
 
     df = pd.DataFrame(results)
 
+    print("Success rate:", df["success"].mean())
+    print("Average rewrites:", df["rewrite_count"].mean())
+    print("Average prompt tokens:", df["prompt_tokens"].mean())
+    print("Average response tokens:", df["response_tokens"].mean())
+    print("\nResults by task:")
+    print(df)
     return df
+
+
+agent_name_map = {
+    "rewrite_4o": "gpt-4o",
+    "rewrite_r1-distill-qwen-32b": "r1-distill-qwen-32b",
+}
+
+
+def plot_multiple_cumulative_success(df_dict, figsize=(12, 7)):
+    """
+    Creates a comparative plot showing cumulative success rates vs number of rewrites for multiple models
+
+    Args:
+        df_dict (dict): Dictionary mapping model names to their DataFrames with averaged results
+        figsize (tuple): Figure size (width, height)
+    """
+    plt.figure(figsize=figsize)
+
+    # Create plot for each model
+    for model_name, df in df_dict.items():
+        # Sort by number of rewrites
+        max_rewrites = max(df["rewrite_count"])
+
+        avg_perf_per_rewrite = []
+        std_dev_per_rewrite = []
+        for i in range(int(max_rewrites) + 1):
+            accumulated_success = []
+            for seed in [0, 1, 2]:
+                _df = df[df["rewrite_count"] <= i]
+                _success = _df[_df["seed"] == seed]["success"].sum() / len(
+                    df[df["seed"] == seed]
+                )
+                # import pdb; pdb.set_trace()
+                accumulated_success.append(_success)
+            avg_perf_per_rewrite.append(np.mean(accumulated_success))
+            std_dev_per_rewrite.append(np.std(accumulated_success))
+
+        final_success_rate = avg_perf_per_rewrite[-1]
+        # Plot steps and points with success rate in legend
+        plt.step(
+            np.arange(max_rewrites + 1),
+            avg_perf_per_rewrite,
+            where="post",
+            label=f"{agent_name_map[model_name]}",
+        )
+        plt.fill_between(
+            np.arange(max_rewrites + 1),
+            np.array(avg_perf_per_rewrite) - np.array(std_dev_per_rewrite),
+            np.array(avg_perf_per_rewrite) + np.array(std_dev_per_rewrite),
+            alpha=0.2,
+            step="post",
+        )
+        # plt.scatter(np.arange(max_rewrites + 1), cumulative_success,
+        #            alpha=0.3, marker='o')
+        # Add light horizontal line at final average
+        plt.axhline(y=final_success_rate, linestyle="--", alpha=0.2)
+
+    plt.xlabel("Average Number of Rewrites")
+    plt.ylabel("Cumulative Average Success Rate")
+    plt.title("Cumulative Average Success Rates (Averaged Across 3 Runs)")
+    plt.grid(True, alpha=0.3)
+    plt.legend()
+    # plt.legend(bbox_to_anchor=(1.05, 1), loc="upper left")
+    plt.tight_layout()
+    plt.show()
 
 
 def analyze_froggy_results_with_seeds(base_model_name, seeds=[0, 1, 2]):
@@ -116,85 +183,17 @@ def analyze_froggy_results_with_seeds(base_model_name, seeds=[0, 1, 2]):
         .reset_index()
     )
 
+    print(f"\nAveraged results for {base_model_name}:")
+    print(f"Success rate: {averaged_df['success'].mean():.2%}")
+    print(f"Average rewrites: {averaged_df['rewrite_count'].mean():.2f}")
+
     return combined_df
-
-
-def plot_winning_time_per_game(df_dict, figsize=(12, 7)):
-    """
-    Creates a grouped bar plot showing how much time (seed) each agent solves the game.
-    Args:
-        df_dict (dict): Dictionary mapping model names to their DataFrames with averaged results
-        figsize (tuple): Figure size (width, height)
-    """
-
-    all_data = []
-    # Create plot for each model
-    for agent_model, df in df_dict.items():
-        # Group by task and calculate means
-        grouped_df = (
-            df.groupby("task")
-            .agg({"success": "mean", "rewrite_count": "mean"})
-            .reset_index()
-        )
-        grouped_df["success"] = grouped_df["success"] * 3
-        all_data.append([agent_name_map[agent_model.split("_")[0]], grouped_df])
-    # ignore tasks where all agent_model failed or succeeded
-
-    # nice palette
-    sns.set_palette("Set2")
-    f, (ax1, ax2, ax3, ax4) = plt.subplots(4, 1, figsize=(20, 5), sharex=True)
-    # subplot 1: rewrite_4o vs pdb_4o vs seq_4o
-    ax1.set_title("gpt-4o")
-    x = np.arange(len(all_data[0][1]["task"]))
-    width = 0.2
-    for i, (model_name, df) in enumerate(all_data[:3]):
-        ax1.bar(x + i * width, df["success"], width, label=model_name)
-    ax1.set_yticks(np.arange(0, 4, 1))
-
-    # subplot 2: rewrite_llama33-70b vs pdb_llama33-70b vs seq_llama33-70b
-    ax2.set_title("llama3.3-70b-instruct")
-    for i, (model_name, df) in enumerate(all_data[3:6]):
-        ax2.bar(x + i * width, df["success"], width, label=model_name)
-    ax2.set_yticks(np.arange(0, 4, 1))
-
-    # subplot 3: rewrite_r1-distill-llama-70b vs pdb_r1-distill-llama-70b vs seq_r1-distill-llama-70b
-    ax3.set_title("r1-llama-70b")
-    for i, (model_name, df) in enumerate(all_data[6:9]):
-        ax3.bar(x + i * width, df["success"], width, label=model_name)
-    ax3.set_yticks(np.arange(0, 4, 1))
-
-    # subplot 4: rewrite_claude37 vs pdb_claude37 vs seq_claude37
-    ax4.set_title("claude37")
-    for i, (model_name, df) in enumerate(all_data[9:]):
-        ax4.bar(x + i * width, df["success"], width, label=model_name)
-    ax4.set_yticks(np.arange(0, 4, 1))
-
-    ax1.set_ylabel("")
-    ax2.set_ylabel("")
-    ax3.set_ylabel("Number of success in 3 runs")
-    ax4.set_ylabel("")
-    # plt.ylabel("Number of success in 3 runs")
-    plt.xticks(x + width, all_data[0][1]["task"], rotation=45)
-    plt.yticks(np.arange(0, 4, 1))
-    plt.legend()
-    plt.tight_layout()
-    plt.show()
 
 
 # Example usage:
 model_paths = [
-    "../exps/mini_nightmare/rewrite_4o",
-    "../exps/mini_nightmare/pdb_4o",
-    "../exps/mini_nightmare/seq_4o",
-    "../exps/mini_nightmare/rewrite_llama33-70b",
-    "../exps/mini_nightmare/pdb_llama33-70b",
-    "../exps/mini_nightmare/seq_llama33-70b",
-    "../exps/mini_nightmare/rewrite_r1-distill-llama-70b",
-    "../exps/mini_nightmare/pdb_r1-distill-llama-70b",
-    "../exps/mini_nightmare/seq_r1-distill-llama-70b",
-    "../exps/mini_nightmare/rewrite_claude37",
-    "../exps/mini_nightmare/pdb_claude37",
-    "../exps/mini_nightmare/seq_claude37",
+    "../../exps/aider/rewrite_4o",
+    "../../exps/aider/rewrite_r1-distill-qwen-32b",
 ]
 
 # Analyze all models with seed averaging
@@ -205,5 +204,7 @@ for _path in tqdm(model_paths):
         _path + "/" + _name, seeds=[0, 1, 2]
     )
 
+
 # Plot comparison
-plot_winning_time_per_game(results_dict)
+plot_multiple_cumulative_success(results_dict)
+# plot_multiple_cumulative_success_by_resp_tokens(results_dict)

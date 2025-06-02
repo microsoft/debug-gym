@@ -121,7 +121,7 @@ def analyze_froggy_results_with_seeds(base_model_name, seeds=[0, 1, 2]):
     Analyzes and averages results across different seeds for a base model name
 
     Args:
-        base_model_name (str): Base path without seed (e.g. '../exps/aider/rewrite_o3-mini')
+        base_model_name (str): Base path without seed (e.g. '../../exps/aider/rewrite_o3-mini')
         seeds (list): List of seeds to average over
 
     Returns:
@@ -237,14 +237,14 @@ def plot_pdb_command_categories(df_dict, figsize=(12, 7)):
 
 # Example usage:
 model_paths = [
-    "../exps/aider/pdb_llama32-3b",
-    "../exps/aider/pdb_llama33-70b",
-    "../exps/aider/pdb_r1-distill-llama-70b",
-    "../exps/aider/pdb_r1-distill-qwen-32b",
-    "../exps/aider/pdb_4o",
-    "../exps/aider/pdb_4o-mini",
-    "../exps/aider/pdb_o1",
-    "../exps/aider/pdb_o3-mini",
+    "../../exps/aider/pdb_llama32-3b",
+    "../../exps/aider/pdb_llama33-70b",
+    "../../exps/aider/pdb_r1-distill-llama-70b",
+    "../../exps/aider/pdb_r1-distill-qwen-32b",
+    "../../exps/aider/pdb_4o",
+    "../../exps/aider/pdb_4o-mini",
+    "../../exps/aider/pdb_o1",
+    "../../exps/aider/pdb_o3-mini",
 ]
 
 # Analyze all models with seed averaging

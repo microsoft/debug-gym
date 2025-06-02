@@ -32,51 +32,52 @@ def analyze_froggy_results(model_name):
     model_dir = os.path.join(model_name)
     results = []
 
-    for jsonl_file in glob.glob(f"{model_dir}/**/froggy.jsonl", recursive=True):
-        # Get task name from directory path
-        task = os.path.dirname(jsonl_file).split("/")[-1]
+    for jsonl_name in ["froggy.jsonl", "debug_gym.jsonl"]:
+        for jsonl_file in glob.glob(f"{model_dir}/**/{jsonl_name}", recursive=True):
+            # Get task name from directory path
+            task = os.path.dirname(jsonl_file).split("/")[-1]
 
-        with open(jsonl_file) as f:
-            data = json.load(f)
+            with open(jsonl_file) as f:
+                data = json.load(f)
 
-            # Extract success status
-            success = data.get("success", False)
+                # Extract success status
+                success = data.get("success", False)
 
-            # Count rewrite commands
-            episode_length = 0
+                # Count rewrite commands
+                episode_length = 0
 
-            tool_counter = {
-                "```view": 0,
-                "```listdir": 0,
-                "```pdb": 0,
-                "```rewrite": 0,
-                "```eval": 0,
-                "other": 0,
-            }
-
-            for step in data.get("log", []):
-                episode_length += 1
-                if episode_length > 50:
-                    break
-                if step.get("action") is None:
-                    continue
-                flag = False
-                for tool_key in tool_counter:
-                    if step["action"].strip().startswith(tool_key):
-                        tool_counter[tool_key] += 1
-                        flag = True
-                        break
-                if not flag:
-                    tool_counter["other"] += 1
-
-            results.append(
-                {
-                    "task": task,
-                    "success": success,
-                    "episode_length": episode_length,
-                    "tool_counter": tool_counter,
+                tool_counter = {
+                    "```view": 0,
+                    "```listdir": 0,
+                    "```pdb": 0,
+                    "```rewrite": 0,
+                    "```eval": 0,
+                    "other": 0,
                 }
-            )
+
+                for step in data.get("log", []):
+                    episode_length += 1
+                    if episode_length > 50:
+                        break
+                    if step.get("action") is None:
+                        continue
+                    flag = False
+                    for tool_key in tool_counter:
+                        if step["action"].strip().startswith(tool_key):
+                            tool_counter[tool_key] += 1
+                            flag = True
+                            break
+                    if not flag:
+                        tool_counter["other"] += 1
+
+                results.append(
+                    {
+                        "task": task,
+                        "success": success,
+                        "episode_length": episode_length,
+                        "tool_counter": tool_counter,
+                    }
+                )
 
     df = pd.DataFrame(results)
     return df
@@ -87,7 +88,7 @@ def analyze_froggy_results_with_seeds(base_model_name, seeds=[0, 1, 2]):
     Analyzes and averages results across different seeds for a base model name
 
     Args:
-        base_model_name (str): Base path without seed (e.g. '../exps/swe-bench/rewrite_o3-mini')
+        base_model_name (str): Base path without seed (e.g. '../../exps/swe-bench/rewrite_o3-mini')
         seeds (list): List of seeds to average over
 
     Returns:
@@ -134,7 +135,6 @@ def plot_tool_use_categories(df_dict, figsize=(12, 7)):
         for _kv in df["tool_counter"].items():
             if _kv[1] == {}:
                 continue
-            # import pdb; pdb.set_trace()
             for k, v in _kv[1].items():
                 tool_call_count += v
                 tool_category_per_model[k] += v
@@ -168,7 +168,6 @@ def plot_tool_use_categories(df_dict, figsize=(12, 7)):
     all_data.set_index("name")[
         ["view", "listdir", "pdb", "rewrite", "eval", "other"]
     ].plot(kind="bar", stacked=True, figsize=figsize)
-    plt.title("Distribution of tool calls")
     plt.xlabel("Backbone LLM")
     plt.ylabel("Percentage")
     plt.xticks(rotation=90)
@@ -176,22 +175,24 @@ def plot_tool_use_categories(df_dict, figsize=(12, 7)):
     plt.xticks(
         np.arange(len(all_data)),
         [
-            "rw llama-3b",
-            "rw llama-70b",
-            "rw r1-llama-70b",
-            "rw r1-qwen-32b",
+            "rw llama33",
             "rw 4o",
             "rw 4o-mini",
             "rw o1",
             "rw o3-mini",
-            "dbg llama-3b",
-            "dbg llama-70b",
-            "dbg r1-llama-70b",
-            "dbg r1-qwen-32b",
+            "rw claude37",
+            "dbg llama33",
             "dbg 4o",
             "dbg 4o-mini",
             "dbg o1",
             "dbg o3-mini",
+            "dbg claude37",
+            "d(5) llama33",
+            "d(5) 4o",
+            "d(5) 4o-mini",
+            "d(5) o1",
+            "d(5) o3-mini",
+            "d(5) claude37",
         ],
     )
 
@@ -201,22 +202,24 @@ def plot_tool_use_categories(df_dict, figsize=(12, 7)):
 
 # Example usage:
 model_paths = [
-    "../exps/aider/rewrite_llama32-3b",
-    "../exps/aider/rewrite_llama33-70b",
-    "../exps/aider/rewrite_r1-distill-llama-70b",
-    "../exps/aider/rewrite_r1-distill-qwen-32b",
-    "../exps/aider/rewrite_4o",
-    "../exps/aider/rewrite_4o-mini",
-    "../exps/aider/rewrite_o1",
-    "../exps/aider/rewrite_o3-mini",
-    "../exps/aider/pdb_llama32-3b",
-    "../exps/aider/pdb_llama33-70b",
-    "../exps/aider/pdb_r1-distill-llama-70b",
-    "../exps/aider/pdb_r1-distill-qwen-32b",
-    "../exps/aider/pdb_4o",
-    "../exps/aider/pdb_4o-mini",
-    "../exps/aider/pdb_o1",
-    "../exps/aider/pdb_o3-mini",
+    "../../exps/swe-bench/rewrite_llama33-70b",
+    "../../exps/swe-bench/rewrite_4o",
+    "../../exps/swe-bench/rewrite_4o-mini",
+    "../../exps/swe-bench/rewrite_o1",
+    "../../exps/swe-bench/rewrite_o3-mini",
+    "../../exps/swe-bench/rewrite_claude37",
+    "../../exps/swe-bench/pdb_llama33-70b",
+    "../../exps/swe-bench/pdb_4o",
+    "../../exps/swe-bench/pdb_4o-mini",
+    "../../exps/swe-bench/pdb_o1",
+    "../../exps/swe-bench/pdb_o3-mini",
+    "../../exps/swe-bench/pdb_claude37",
+    "../../exps/swe-bench/seq_llama33-70b",
+    "../../exps/swe-bench/seq_4o",
+    "../../exps/swe-bench/seq_4o-mini",
+    "../../exps/swe-bench/seq_o1",
+    "../../exps/swe-bench/seq_o3-mini",
+    "../../exps/swe-bench/seq_claude37",
 ]
 
 # Analyze all models with seed averaging
