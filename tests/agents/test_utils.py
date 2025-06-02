@@ -5,20 +5,9 @@ import pytest
 
 from debug_gym.agents.utils import (
     load_config,
-    print_messages,
     trim,
     trim_prompt_messages,
 )
-
-
-def test_print_messages(logger_mock):
-    messages = [
-        {"role": "user", "content": "Hello"},
-        {"role": "assistant", "content": "Hi"},
-        {"role": "system", "content": "System message"},
-    ]
-    print_messages(messages, logger_mock)
-    assert logger_mock._log_history == ["Hello\n", "Hi\n", "System message\n"]
 
 
 def test_trim_prompt_messages():

@@ -1,5 +1,5 @@
 from debug_gym.agents.history_tracker import HistoryTracker, build_history_prompt
-from debug_gym.agents.llm_api import LLMResponse
+from debug_gym.llms.base import LLMResponse
 from debug_gym.gym.tools.tool import ToolCall
 
 

@@ -1,4 +1,5 @@
 from debug_gym.agents.base_agent import BaseAgent, register_agent
+from debug_gym.llms.base import LLM
 
 
 @register_agent
