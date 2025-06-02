@@ -369,7 +369,15 @@ class RepoEnv(TooledEnv):
         return (Path(self.working_dir) / filepath).resolve()
 
     def read_file(self, filepath: str) -> str:
-        return (self.working_dir / filepath).read_text()
+        """Reads a file from the working directory.
+        Raises value error if the file does not exist"""
+        abs_filepath = self.to_absolute(filepath)
+        if not abs_filepath.is_relative_to(self.working_dir):
+            raise FileNotFoundError(
+                f"File `{filepath}` does not exist or is not in "
+                f"the working directory `{self.working_dir}`."
+            )
+        return abs_filepath.read_text()
 
     def is_editable(self, filepath):
         return filepath in self.editable_files

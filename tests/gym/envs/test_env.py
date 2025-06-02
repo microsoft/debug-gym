@@ -560,3 +560,27 @@ def test_to_absolute(tmp_path):
     # non-existent absolute path
     non_existent_path = env.to_absolute("/tmp/non_existent_file.txt")
     assert non_existent_path == Path("/tmp/non_existent_file.txt").resolve()
+
+
+def test_read_file_reads_existing_file(tmp_path):
+    env = RepoEnv(path=tmp_path)
+    file_path = env.working_dir / "test.txt"
+    file_content = "Hello, DebugGym!"
+    file_path.write_text(file_content)
+    # Read file using relative path
+    result = env.read_file(str(env.working_dir / "test.txt"))
+    assert result == file_content
+    # Read file using just the filename (should also work)
+    result = env.read_file("test.txt")
+    assert result == file_content
+
+
+def test_read_file_raises_for_nonexistent_file(tmp_path):
+    env = RepoEnv(path=tmp_path)
+    (env.working_dir / "test.txt").touch()
+    # relative path that does not exist
+    with pytest.raises(FileNotFoundError):
+        env.read_file("does_not_exist.txt")
+    # absolute path matching a file in the working_dir
+    with pytest.raises(FileNotFoundError):
+        env.read_file("/test.txt")
