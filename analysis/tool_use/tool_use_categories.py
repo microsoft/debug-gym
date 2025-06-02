@@ -32,10 +32,11 @@ def analyze_froggy_results(model_name):
     model_dir = os.path.join(model_name)
     results = []
 
-    for jsonl_name in ["froggy.jsonl", "debug_gym.jsonl"]:
+    for jsonl_name in ["debug_gym.jsonl"]:
         for jsonl_file in glob.glob(f"{model_dir}/**/{jsonl_name}", recursive=True):
             # Get task name from directory path
             task = os.path.dirname(jsonl_file).split("/")[-1]
+            # import pdb; pdb.set_trace()
 
             with open(jsonl_file) as f:
                 data = json.load(f)
@@ -47,27 +48,22 @@ def analyze_froggy_results(model_name):
                 episode_length = 0
 
                 tool_counter = {
-                    "```view": 0,
-                    "```listdir": 0,
-                    "```pdb": 0,
-                    "```rewrite": 0,
-                    "```eval": 0,
+                    "view": 0,
+                    "listdir": 0,
+                    "pdb": 0,
+                    "rewrite": 0,
+                    "eval": 0,
                     "other": 0,
                 }
 
                 for step in data.get("log", []):
                     episode_length += 1
-                    if episode_length > 50:
-                        break
                     if step.get("action") is None:
                         continue
-                    flag = False
-                    for tool_key in tool_counter:
-                        if step["action"].strip().startswith(tool_key):
-                            tool_counter[tool_key] += 1
-                            flag = True
-                            break
-                    if not flag:
+                    tool_name = step["action"]["name"]
+                    if tool_name in tool_counter:
+                        tool_counter[tool_name] += 1
+                    else:
                         tool_counter["other"] += 1
 
                 results.append(
@@ -88,7 +84,7 @@ def analyze_froggy_results_with_seeds(base_model_name, seeds=[0, 1, 2]):
     Analyzes and averages results across different seeds for a base model name
 
     Args:
-        base_model_name (str): Base path without seed (e.g. '../exps/swe-bench/rewrite_o3-mini')
+        base_model_name (str): Base path without seed (e.g. '../exps/may22/rewrite_o3-mini')
         seeds (list): List of seeds to average over
 
     Returns:
@@ -124,11 +120,11 @@ def plot_tool_use_categories(df_dict, figsize=(12, 7)):
     for model_name, df in df_dict.items():
         # o1, o3-mini, o1, o3-mini, o1, o3-mini
         tool_category_per_model = {
-            "```view": 0,
-            "```listdir": 0,
-            "```pdb": 0,
-            "```rewrite": 0,
-            "```eval": 0,
+            "view": 0,
+            "listdir": 0,
+            "pdb": 0,
+            "rewrite": 0,
+            "eval": 0,
             "other": 0,
         }
         tool_call_count = 0
@@ -146,11 +142,11 @@ def plot_tool_use_categories(df_dict, figsize=(12, 7)):
             [
                 model_name,
                 model_name.split("_")[1],
-                tool_category_per_model["```view"],
-                tool_category_per_model["```listdir"],
-                tool_category_per_model["```pdb"],
-                tool_category_per_model["```rewrite"],
-                tool_category_per_model["```eval"],
+                tool_category_per_model["view"],
+                tool_category_per_model["listdir"],
+                tool_category_per_model["pdb"],
+                tool_category_per_model["rewrite"],
+                tool_category_per_model["eval"],
                 tool_category_per_model["other"],
             ]
         )
@@ -175,24 +171,18 @@ def plot_tool_use_categories(df_dict, figsize=(12, 7)):
     plt.xticks(
         np.arange(len(all_data)),
         [
-            "rw llama33",
             "rw 4o",
-            "rw 4o-mini",
-            "rw o1",
+            "rw 4o1",
+            "rw o3",
+            "rw o3-high",
             "rw o3-mini",
-            "rw claude37",
-            "dbg llama33",
+            "rw o4-mini",
             "dbg 4o",
-            "dbg 4o-mini",
             "dbg o1",
+            "dbg o3",
+            "dbg o3-high",
             "dbg o3-mini",
-            "dbg claude37",
-            "d(5) llama33",
-            "d(5) 4o",
-            "d(5) 4o-mini",
-            "d(5) o1",
-            "d(5) o3-mini",
-            "d(5) claude37",
+            "dbg o4-mini",
         ],
     )
 
@@ -202,33 +192,25 @@ def plot_tool_use_categories(df_dict, figsize=(12, 7)):
 
 # Example usage:
 model_paths = [
-    "../exps/swe-bench/rewrite_llama33-70b",
-    "../exps/swe-bench/rewrite_4o",
-    "../exps/swe-bench/rewrite_4o-mini",
-    "../exps/swe-bench/rewrite_o1",
-    "../exps/swe-bench/rewrite_o3-mini",
-    "../exps/swe-bench/rewrite_claude37",
-    "../exps/swe-bench/pdb_llama33-70b",
-    "../exps/swe-bench/pdb_4o",
-    "../exps/swe-bench/pdb_4o-mini",
-    "../exps/swe-bench/pdb_o1",
-    "../exps/swe-bench/pdb_o3-mini",
-    "../exps/swe-bench/pdb_claude37",
-    "../exps/swe-bench/seq_llama33-70b",
-    "../exps/swe-bench/seq_4o",
-    "../exps/swe-bench/seq_4o-mini",
-    "../exps/swe-bench/seq_o1",
-    "../exps/swe-bench/seq_o3-mini",
-    "../exps/swe-bench/seq_claude37",
+    "../exps/may22/rewrite_4o",
+    "../exps/may22/rewrite_o1",
+    "../exps/may22/rewrite_o3",
+    "../exps/may22/rewrite_o3-high",
+    "../exps/may22/rewrite_o3-mini",
+    "../exps/may22/rewrite_o4-mini",
+    "../exps/may22/debug_4o",
+    "../exps/may22/debug_o1",
+    "../exps/may22/debug_o3",
+    "../exps/may22/debug_o3-high",
+    "../exps/may22/debug_o3-mini",
+    "../exps/may22/debug_o4-mini",
 ]
 
 # Analyze all models with seed averaging
 results_dict = {}
 for _path in tqdm(model_paths):
     _name = _path.split("/")[-1]
-    results_dict[_name] = analyze_froggy_results_with_seeds(
-        _path + "/" + _name, seeds=[0, 1, 2]
-    )
+    results_dict[_name] = analyze_froggy_results_with_seeds(_path, seeds=[0])
 
 # Plot comparison
 plot_tool_use_categories(results_dict)
