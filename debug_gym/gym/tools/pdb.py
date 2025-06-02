@@ -251,6 +251,17 @@ class PDBTool(EnvironmentTool):
         environment.current_breakpoints_state = current_breakpoints_state_copy
 
     def update_breakpoints(self, environment):
+        """Updates the environment's current_breakpoints_state by
+        parsing the output of the PDB 'b' (breakpoints) command.
+
+        The new_breakpoints dictionary keys are in the format "file_path|||line_number",
+        and the values are the corresponding PDB breakpoint commands.
+
+        environment.current_breakpoints_state = {
+            "path/to/file.py|||line_number": "b path/to/file.py:line_number",
+            ...
+        }"""
+
         command = "b"  # list all breakpoints
         output = self.interact_with_pdb(command, environment.run_timeout)
         # parse the output to update the current_breakpoints_state
