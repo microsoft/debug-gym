@@ -232,10 +232,9 @@ def test_display_files(env):
 
 
 def test_display_files_read_only(env):
-    # with open(env.working_dir / ".debugreadonly", "w") as f:
-    #     f.write("file2.txt")
-    with open(env.working_dir / "read-only-file.txt", "w") as f:
-        f.write("hello world")
+    read_only_path = env.working_dir / "read-only-file.txt"
+    read_only_path.touch()
+    env.is_editable = lambda x: x != read_only_path
     result = env.display_files()
     assert result == (
         "Listing files in the current working directory. (read-only) indicates read-only files. Max depth: 2.\n"
@@ -354,7 +353,7 @@ def test_rewrite_counter(env):
     assert env_info.rewrite_counter == 1
     rewrite_obs = Observation(
         source="rewrite",
-        observation="File path is None. Please provide a valid file path.\nRewrite failed.",
+        observation="Rewrite failed. Error message:\nFile path is None.\n",
     )
     assert env_info.step_observation == rewrite_obs
     assert env_info.all_observations == [rewrite_obs]
@@ -560,6 +559,96 @@ def test_to_absolute(tmp_path):
     # non-existent absolute path
     non_existent_path = env.to_absolute("/tmp/non_existent_file.txt")
     assert non_existent_path == Path("/tmp/non_existent_file.txt").resolve()
+
+
+def test_index_files_basic(tmp_path):
+    # Setup a fake repo structure
+    env = RepoEnv(path=tmp_path)
+    subdir = env.working_dir / "subdir"
+    subdir.mkdir()
+    files = [
+        env.working_dir / "file1.txt",
+        env.working_dir / "file2.txt",
+        env.working_dir / "ignored.txt",
+        env.working_dir / "readonly.txt",
+        env.working_dir / "subdir/file3.txt",
+    ]
+    [f.touch() for f in files]
+    files.append(subdir)
+    env.index_files()
+    assert env.all_files == sorted(files)
+    # All files should be editable if no readonly patterns
+    assert env.editable_files == set(files)
+
+
+def test_index_files_with_ignore_patterns(tmp_path):
+    (tmp_path / "file1.txt").touch()
+    (tmp_path / "file2.txt").touch()
+    (tmp_path / "ignoreme.txt").touch()
+    (tmp_path / "subdir").mkdir()
+    (tmp_path / "subdir" / "file3.txt").touch()
+
+    env = RepoEnv(path=tmp_path)
+    # Ignore files matching "ignoreme.txt"
+    env.index_files(ignore_patterns=["ignoreme.txt"])
+    assert env.to_absolute("ignoreme.txt") not in env.all_files
+    assert env.to_absolute("file1.txt") in env.all_files
+    assert env.to_absolute("file2.txt") in env.all_files
+    assert env.to_absolute("subdir/file3.txt") in env.all_files
+
+
+def test_index_files_with_readonly_patterns(tmp_path):
+    (tmp_path / "file1.txt").touch()
+    (tmp_path / "readonly.txt").touch()
+
+    env = RepoEnv(path=tmp_path)
+    # Mark "readonly.txt" as read-only
+    env.index_files(readonly_patterns=["readonly.txt"])
+    assert env.to_absolute("file1.txt") in env.editable_files
+    assert env.to_absolute("readonly.txt") not in env.editable_files
+
+
+def test_index_files_with_debugignore_and_debugreadonly(tmp_path):
+    (tmp_path / "file1.txt").touch()
+    (tmp_path / "file2.txt").touch()
+    (tmp_path / "ignoreme.txt").touch()
+    (tmp_path / "readonly.txt").touch()
+    # Write .debugignore and .debugreadonly
+    (tmp_path / ".debugignore").write_text("ignoreme.txt\n")
+    (tmp_path / ".debugreadonly").write_text("readonly.txt\n")
+
+    env = RepoEnv(path=tmp_path)
+    env.index_files()
+    assert env.to_absolute("ignoreme.txt") not in env.all_files
+    assert env.to_absolute("file1.txt") in env.all_files
+    assert env.to_absolute("file2.txt") in env.all_files
+    assert env.to_absolute("readonly.txt") in env.all_files
+    # Check that readonly.txt is not in editable_files
+    assert env.to_absolute("readonly.txt") not in env.editable_files
+    # Check that file1.txt and file2.txt are in editable_files
+    assert env.to_absolute("file1.txt") in env.editable_files
+    assert env.to_absolute("file2.txt") in env.editable_files
+
+
+def test_index_files_combined_patterns(tmp_path):
+    (tmp_path / "file1.txt").touch()
+    (tmp_path / "file2.txt").touch()
+    (tmp_path / "ignoreme.txt").touch()
+    (tmp_path / "readonly.txt").touch()
+    (tmp_path / ".debugignore").write_text("ignoreme.txt\n")
+    (tmp_path / ".debugreadonly").write_text("readonly.txt\n")
+
+    env = RepoEnv(path=tmp_path)
+    # Also ignore file2.txt and mark file1.txt as readonly via patterns
+    env.index_files(ignore_patterns=["file2.txt"], readonly_patterns=["file1.txt"])
+    assert env.to_absolute("ignoreme.txt") not in env.all_files
+    assert env.to_absolute("file2.txt") not in env.all_files
+    assert env.to_absolute("file1.txt") in env.all_files
+    assert env.to_absolute("readonly.txt") in env.all_files
+    # Both file1.txt and readonly.txt should be readonly
+    assert env.to_absolute("file1.txt") not in env.editable_files
+    assert env.to_absolute("readonly.txt") not in env.editable_files
+    assert env.editable_files == set()
 
 
 def test_read_file_reads_existing_file(tmp_path):

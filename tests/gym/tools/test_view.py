@@ -87,9 +87,7 @@ def test_view_valid_file_with_line_numbers_no_breakpoints(env):
     )
 
     abs_path = str(env.working_dir / "main.py")
-    view_call = ToolCall(
-        id="view_id", name="view", arguments={"path": abs_path}
-    )
+    view_call = ToolCall(id="view_id", name="view", arguments={"path": abs_path})
     env_info_2 = env.step(view_call)
     assert env_info_2.step_observation.observation == (
         f"Viewing `{env.working_dir}/main.py`, lines 1-1 of 1 total lines.\n"
@@ -118,9 +116,7 @@ def test_view_valid_file_with_line_numbers_and_breakpoints(env):
         "\n"
     )
 
-    view_call = ToolCall(
-        id="view_id", name="view", arguments={"path": abs_path}
-    )
+    view_call = ToolCall(id="view_id", name="view", arguments={"path": abs_path})
     env_info_2 = env.step(view_call)
     assert env_info_2.step_observation.observation == (
         f"Viewing `{abs_path}`, lines 1-1 of 1 total lines. B indicates breakpoint before a certain line of code.\n"
@@ -169,7 +165,9 @@ def test_view_valid_read_only_file_with_line_numbers_no_breakpoints(env):
 
 def test_view_valid_read_only_file_with_line_numbers_and_breakpoints(env):
     # set a breakpoint at line 2 of test_1.py
-    env.current_breakpoints_state[f"{env.working_dir}/test_1.py|||2"] = "b test_1.py|||2"
+    env.current_breakpoints_state[f"{env.working_dir}/test_1.py|||2"] = (
+        "b test_1.py|||2"
+    )
     view_call = ToolCall(id="view_id", name="view", arguments={"path": "test_1.py"})
     env_info = env.step(view_call)
 
