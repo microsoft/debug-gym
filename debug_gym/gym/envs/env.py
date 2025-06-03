@@ -395,8 +395,14 @@ class RepoEnv(TooledEnv):
         readonly_patterns: list[str] | None = None,
         ignore_patterns: list[str] | None = None,
     ):
-        """ Indexes files and subdir in the working
+        """Indexes files and subdir in the working
         directory, applying ignore and readonly patterns."""
+        readonly_patterns = readonly_patterns or []
+        ignore_patterns = ignore_patterns or []
+
+        # Ignore debug gym hidden files
+        ignore_patterns += [".debugignore", ".debugreadonly"]
+
         # get all file paths relative to the working directory
         self._is_ignored = make_file_matcher(
             self.to_absolute(".debugignore"), patterns=ignore_patterns
