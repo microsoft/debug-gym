@@ -93,7 +93,8 @@ def main():
     data_criteria = [has_successful_outcome]
 
     # Directory containing trajectory files
-    exps_dir = "/Users/ericyuan/GitHub_Enterprise/Froggy/exps/may28"
+    # exps_dir = "/Users/ericyuan/GitHub_Enterprise/Froggy/exps/may28"
+    exps_dir = "/Users/ericyuan/GitHub_Enterprise/Froggy/exps/jun2"
 
     # Filter trajectories
     matching_files = filter_trajectories(exps_dir, trajectory_criteria, data_criteria)

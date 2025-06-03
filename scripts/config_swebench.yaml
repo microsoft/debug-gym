@@ -42,10 +42,11 @@ agent1:
     tools: ["pdb", "view", "rewrite", "listdir", "eval"]
 
 agent2:
-    tools: ["pdb", "view", "rewrite", "listdir", "eval"]
+    tools: ["pdb", "rewrite", "eval"]
 
 agent3:
     tools: ["pdb", "view", "rewrite", "listdir", "eval"]
+    memory_size: 5
 
 agent4:
     tools: ["pdb", "view", "rewrite", "listdir", "eval"]
