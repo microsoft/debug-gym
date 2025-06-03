@@ -100,7 +100,7 @@ class RewriteTool(EnvironmentTool):
         if path is None:
             return self.fail(environment, "File path is None.")
         if not environment.is_editable(path):
-            return self.fail(environment, f"File `{path}` is not editable.")
+            return self.fail(environment, f"`{path}` is not editable.")
         if start is not None:
             end = end or start  # only start is provided (rewrite that line)
             if start > end:
