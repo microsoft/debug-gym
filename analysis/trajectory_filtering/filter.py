@@ -17,6 +17,10 @@ def satisfy_criteria(json_file_path, trajectory_criteria=None, data_criteria=Non
     Returns:
         bool: True if all criteria are satisfied
     """
+    if trajectory_criteria is None:
+        trajectory_criteria = []
+    if data_criteria is None:
+        data_criteria = []
     try:
         with open(json_file_path, "r") as f:
             data = json.load(f)
@@ -90,7 +94,8 @@ def main():
         # lambda trajectory: has_consecutive_pdb_calls(trajectory, n=2),
     ]
 
-    data_criteria = [has_successful_outcome]
+    # data_criteria = [has_successful_outcome]
+    data_criteria = None
 
     # Directory containing trajectory files
     # exps_dir = "/Users/ericyuan/GitHub_Enterprise/Froggy/exps/may28"
