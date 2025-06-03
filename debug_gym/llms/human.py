@@ -1,6 +1,8 @@
 import json
 import sys
 
+import re
+from typing import Dict, List, Optional, Tuple, Any
 import numpy as np
 
 from debug_gym.gym.envs.env import EnvInfo
@@ -9,17 +11,400 @@ from debug_gym.llms.base import LLM, LLMResponse
 from debug_gym.llms.utils import print_messages
 from debug_gym.logger import DebugGymLogger
 
+
 prompt_toolkit_available = False
 try:
     # For command line history and autocompletion.
-    from prompt_toolkit import prompt
-    from prompt_toolkit.completion import WordCompleter
     from prompt_toolkit.history import InMemoryHistory
     from prompt_toolkit.shortcuts import CompleteStyle
+    from prompt_toolkit import PromptSession
+    from prompt_toolkit.completion import Completer, Completion
+    from prompt_toolkit.styles import Style
+    from prompt_toolkit.validation import Validator, ValidationError
+    from prompt_toolkit.document import Document
 
     prompt_toolkit_available = sys.stdout.isatty()
 except ImportError:
-    pass
+    # If prompt_toolkit is not available, we will not use it.
+    Validator = Completer = object
+
+
+def get_prompt_style():
+    """Return a Style object for the prompt"""
+    return Style.from_dict({
+        'completion-menu.completion.current': 'bg:#00aaaa #000000',
+        'completion-menu.completion': 'bg:#008888 #ffffff',
+        'completion-menu.meta.completion.current': 'bg:#00aaaa #000000',
+        'completion-menu.meta.completion': 'bg:#00aaaa #ffffff',
+        'scrollbar.background': 'bg:#88aaaa',
+        'scrollbar.button': 'bg:#222222',
+        'popup': 'bg:#333333 #ffffff',
+        'popup.title': 'bg:#555555 #ffffff',
+        'popup.border': 'bg:#444444 #ffffff',
+    })
+
+
+class CommandParser:
+    """Parser for command-line input with command and key=value arguments"""
+
+    def __init__(self):
+        self.patterns = {
+            'command': re.compile(r'^[a-zA-Z_][a-zA-Z0-9_]*$'),
+            'arg_name': re.compile(r'^[a-zA-Z_][a-zA-Z0-9_]*$'),
+            'boolean': re.compile(r'^(true|false)$', re.IGNORECASE),
+            'number': re.compile(r'^-?\d+(\.\d+)?$')
+        }
+
+    def parse_command(self, text: str) -> Tuple[Optional[str], Dict[str, Any], List[Tuple[str, int]]]:
+        """
+        Parse a command string into command name and arguments
+        Returns (command, args, errors) where errors is a list of (error_message, position)
+        """
+        text = text.strip()
+        if not text:
+            return None, {}, [("Empty input", 0)]
+
+        # Split the command from arguments
+        parts = text.split(maxsplit=1)
+        command = parts[0]
+
+        # Validate command name
+        if not self.patterns['command'].match(command):
+            return None, {}, [("Invalid command name", 0)]
+
+        args = {}
+        errors = []
+
+        # If we have arguments, parse them
+        if len(parts) > 1:
+            arg_text = parts[1]
+            position = len(command) + 1  # Position after the command and space
+
+            # Process arguments
+            self._parse_arguments(arg_text, position, args, errors)
+
+        return command, args, errors
+
+    def _parse_arguments(self, arg_text: str, start_position: int, args: Dict[str, Any], errors: List[Tuple[str, int]]):
+        """Parse arguments from text"""
+        # Parse argument key-value pairs
+        i = 0
+
+        while i < len(arg_text):
+            # Skip leading whitespace
+            while i < len(arg_text) and arg_text[i].isspace():
+                i += 1
+
+            if i >= len(arg_text):
+                break
+
+            # Find the argument name
+            arg_start = i
+            while i < len(arg_text) and not arg_text[i].isspace() and arg_text[i] != '=':
+                i += 1
+
+            if i >= len(arg_text) or arg_text[i] != '=':
+                errors.append(("Expected '=' after argument name", start_position + arg_start))
+                break
+
+            arg_name = arg_text[arg_start:i]
+
+            # Validate argument name
+            if not self.patterns['arg_name'].match(arg_name):
+                errors.append((f"Invalid argument name: {arg_name}", start_position + arg_start))
+                # Try to continue parsing
+                while i < len(arg_text) and not arg_text[i].isspace():
+                    i += 1
+                continue
+
+            # Skip equals sign
+            i += 1
+
+            # Skip whitespace after equals
+            while i < len(arg_text) and arg_text[i].isspace():
+                i += 1
+
+            if i >= len(arg_text):
+                errors.append((f"Missing value for argument '{arg_name}'", start_position + i - 1))
+                break
+
+            # Parse value
+            value, new_position, error = self._parse_value(arg_text, i)
+
+            if error:
+                errors.append((error, start_position + i))
+            else:
+                args[arg_name] = value
+                i = new_position
+
+            # Skip whitespace after value
+            while i < len(arg_text) and arg_text[i].isspace():
+                i += 1
+
+    def _parse_value(self, text: str, start: int) -> Tuple[Any, int, Optional[str]]:
+        """
+        Parse a value from text starting at position start
+        Returns (value, new_position, error_message)
+        """
+        # Check for quoted string
+        if start < len(text) and text[start] in ('"', "'"):
+            return self._parse_quoted_string(text, start)
+
+        # Find the end of the unquoted value (at whitespace)
+        end = start
+        while end < len(text) and not text[end].isspace():
+            end += 1
+
+        value_text = text[start:end]
+
+        # Try to interpret as boolean or number
+        if self.patterns['boolean'].match(value_text):
+            return value_text.lower() == 'true', end, None
+        elif self.patterns['number'].match(value_text):
+            if '.' in value_text:
+                return float(value_text), end, None
+            else:
+                return int(value_text), end, None
+
+        # Default to string
+        return value_text, end, None
+
+    def _parse_quoted_string(self, text: str, start: int) -> Tuple[str, int, Optional[str]]:
+        """Parse a quoted string"""
+        quote_char = text[start]
+        i = start + 1  # Skip opening quote
+        result = []
+
+        while i < len(text):
+            if text[i] == quote_char:
+                # Found closing quote
+                return ''.join(result), i + 1, None
+            elif text[i] == '\\' and i + 1 < len(text):
+                # Handle escape sequences
+                escape_char = text[i + 1]
+                if escape_char in ('"', "'", '\\'):
+                    result.append(escape_char)
+                else:
+                    result.append('\\' + escape_char)
+                i += 2
+            else:
+                result.append(text[i])
+                i += 1
+
+        # If we get here, the string wasn't closed
+        return ''.join(result), len(text), "Unclosed string literal"
+
+
+class ToolCommandValidator(Validator):
+    """Validates command input in real-time as the user types"""
+
+    def __init__(self, tools):
+        self.command_names = [tool['name'] for tool in tools]
+        self.command_args = {tool['name']: tool['arguments'] for tool in tools}
+        self.parser = CommandParser()
+
+    def validate_argument(self, arg_name: str, arg_value: Any, arg_info: Dict) -> Tuple[bool, Any, Optional[str]]:
+        """
+        Validate an argument value against its expected type
+        Returns (is_valid, converted_value, error_message)
+        """
+        if arg_info is None:
+            return False, None, f"Unknown argument: {arg_name}"        # Get expected types from the argument info
+        expected_types = arg_info.get('type', ['string'])
+        if not isinstance(expected_types, list):
+            expected_types = [expected_types]
+
+        # Type validation
+        if 'boolean' in expected_types and isinstance(arg_value, bool):
+            return True, arg_value, None
+
+        if 'number' in expected_types and isinstance(arg_value, (int, float)):
+            return True, arg_value, None
+
+        if 'string' in expected_types and isinstance(arg_value, str):
+            return True, arg_value, None
+
+        # If we get here, the type doesn't match what's expected
+        type_name = type(arg_value).__name__
+        return False, None, f"Invalid value for {arg_name}: '{arg_value}' (type: {type_name}). Expected types: {', '.join(expected_types)}"
+
+    def validate(self, document):
+        """Validate the command as the user types"""
+        text = document.text
+
+        if not text.strip():
+            return  # Empty input is valid during typing
+
+        # Parse the command
+        command, args, errors = self.parser.parse_command(text)
+
+        # Check for parsing errors
+        if errors:
+            raise ValidationError(message=errors[0][0], cursor_position=errors[0][1])
+
+        # Validate command name
+        if command not in self.command_names:
+            raise ValidationError(message=f"Unknown command: {command}", cursor_position=0)
+
+        # Check for missing mandatory arguments
+        command_arguments = self.command_args.get(command, {})
+        for arg_name, arg_info in command_arguments.items():
+            # Skip optional arguments represented as 'null' in types.
+            if "null" in arg_info.get('type', []):
+                continue
+
+            # Check if mandatory argument is provided
+            if arg_name not in args:
+                # Position at the end of the text for the error
+                raise ValidationError(
+                    message=f"Missing mandatory argument '{arg_name}' for command '{command}'",
+                    cursor_position=len(text)
+                )
+
+        # Validate arguments
+        for arg_name, arg_value in args.items():
+            # Check if argument is valid for this command
+            if arg_name not in self.command_args.get(command, {}):
+                # Find the position of this argument in the text
+                arg_pos = text.find(arg_name)
+                raise ValidationError(
+                    message=f"Unknown argument '{arg_name}' for command '{command}'",
+                    cursor_position=arg_pos
+                )
+
+            # Validate the argument value
+            arg_info = self.command_args[command].get(arg_name, {})
+            is_valid, _, error_msg = self.validate_argument(
+                arg_name, arg_value, arg_info
+            )
+
+            if not is_valid:
+                # Find the position of this argument value in the text
+                arg_pos = text.find(f"{arg_name}=") + len(arg_name) + 1
+                raise ValidationError(message=error_msg, cursor_position=arg_pos)
+
+
+class DynamicToolCommandCompleter(Completer):
+    """A completer that suggests commands and their arguments dynamically."""
+
+    def __init__(self, tools):
+        self.tools = tools
+
+        # Create mappings for more efficient lookups
+        self.command_names = []
+        self.command_args = {}
+        self.command_arg_descriptions = {}
+        self.command_descriptions = {}
+
+        for tool in self.tools:
+            tool_name = tool["name"]
+            # Store command name
+            self.command_names.append(tool_name)
+
+            # Store command arguments
+            self.command_args[tool_name] = tool["arguments"]
+
+            # Store argument descriptions
+            self.command_arg_descriptions[tool_name] = {arg_name: arg_info["description"] for arg_name, arg_info in tool["arguments"].items()}
+
+            # Store command descriptions
+            self.command_descriptions[tool_name] = tool["description"]
+
+    def get_completions(self, document, complete_event):
+        """Get completions based on the current document state"""
+        text = document.text
+        cursor_position = document.cursor_position
+        text_before_cursor = text[:cursor_position]
+
+        if not text_before_cursor or text_before_cursor.strip() == "":
+            # Suggest command names if nothing typed yet
+            yield from self._get_command_completions("")
+            return
+
+        # Split the text to analyze it
+        parts_before = text_before_cursor.strip().split()
+        command_name = parts_before[0] if parts_before else ""
+
+        # Handle command name completion
+        if len(parts_before) == 1 and not text_before_cursor.endswith(" "):
+            yield from self._get_command_completions(command_name)
+            return
+
+        # If command isn't recognized, don't suggest anything
+        if command_name not in self.command_args:
+            return
+
+        # Handle argument completion
+        if text_before_cursor.endswith(" "):
+            # Starting a new argument
+            used_args = self._get_used_args(parts_before[1:])
+            yield from self._get_argument_completions(command_name, used_args)
+        else:
+            # Handle current word completion
+            current_word = parts_before[-1] if parts_before else ""
+
+            if "=" not in current_word:
+                # Completing an argument name
+                arg_prefix = current_word
+                used_args = self._get_used_args(parts_before[1:-1])
+                yield from self._get_argument_name_completions(command_name, arg_prefix, used_args)
+            elif current_word.endswith("="):
+                # Completing an argument value
+                arg_name = current_word.split("=")[0]
+                yield from self._get_argument_value_completions(command_name, arg_name)
+
+    def _get_command_completions(self, prefix):
+        """Get completions for command names"""
+        prefix_lower = prefix.lower()
+        for name in self.command_names:
+            if not prefix or name.lower().startswith(prefix_lower):
+                display_meta = self.command_descriptions.get(name, "")
+                yield Completion(
+                    name,
+                    start_position=-len(prefix) if prefix else 0,
+                    display_meta=display_meta
+                )
+
+    def _get_used_args(self, parts):
+        """Get argument names that are already used"""
+        return [part.split("=")[0] for part in parts if "=" in part]
+
+    def _get_argument_completions(self, command_name, used_args):
+        """Get completions for all available arguments"""
+        available_args = [arg for arg in self.command_args[command_name] if arg not in used_args]
+        for arg_name in available_args:
+            completion = f"{arg_name}="
+            display_meta = self.command_arg_descriptions[command_name].get(
+                arg_name, f"Argument for {command_name}"
+            )
+            yield Completion(completion, start_position=0, display_meta=display_meta)
+
+    def _get_argument_name_completions(self, command_name, prefix, used_args):
+        """Get completions for argument names based on prefix"""
+        for arg_name in self.command_args[command_name]:
+            if arg_name.startswith(prefix) and arg_name not in used_args:
+                completion = f"{arg_name}="
+                display_meta = self.command_arg_descriptions[command_name].get(
+                    arg_name, f"Argument for {command_name}"
+                )
+                yield Completion(
+                    completion,
+                    start_position=-len(prefix),
+                    display_meta=display_meta
+                )
+
+    def _get_argument_value_completions(self, command_name, arg_name):
+        """Get completions for argument values"""
+        if arg_name in self.command_args[command_name]:
+            arg_info = self.command_args[command_name].get(arg_name, {})
+            expected_types = arg_info.get('type', ['string']) if isinstance(arg_info, dict) else ['string']
+            if not isinstance(expected_types, list):
+                expected_types = [expected_types]
+
+            # Boolean suggestions
+            if 'boolean' in expected_types:
+                yield Completion("true", start_position=0, display_meta="Boolean true value")
+                yield Completion("false", start_position=0, display_meta="Boolean false value")
 
 
 class Human(LLM):
@@ -44,7 +429,6 @@ class Human(LLM):
 
     def define_tools(self, tool_call_list: list[EnvironmentTool]) -> list[dict]:
         available_commands = []
-        meta_dict = {}
         for tool in tool_call_list:
             random_id = "".join(map(str, np.random.randint(0, 10, size=6)))
             tool_id = f"{tool.name}-{random_id}"
@@ -55,42 +439,13 @@ class Human(LLM):
                 "description": tool.description,
             }
             available_commands.append(template)
-            meta_dict[json.dumps(template)] = tool.description
 
-        return available_commands, meta_dict
-
-    def parse_tool_call_response(self, response, all_tools) -> ToolCall:
-        """Parse user input and return a ToolCall object.
-        Validate the input against the available tools."""
-        if response is None:
-            raise ValueError("Tool call cannot be None")
-
-        if not all_tools:
-            raise ValueError("No tools provided. At least one tool must be available.")
-
-        try:
-            tool_call = ToolCall(**json.loads(response))
-            for t in all_tools:
-                if (
-                    tool_call.id == t["id"]
-                    and tool_call.name == t["name"]
-                    and all([k in t["arguments"] for k in tool_call.arguments])
-                ):
-                    return tool_call
-        except Exception:
-            pass
-
-        self.logger.error(
-            "Invalid action format or command not available, please try again."
-        )
-
-        # Raise exception for parsing failures
-        raise ValueError("Failed to parse valid tool call from input")
+        return available_commands
 
     def format_tool_call_history(
         self, history_info: EnvInfo, response: LLMResponse
     ) -> list[dict]:
-        """Anthropic like format for tool call history"""
+        """Anthropic-like format for tool call history"""
         _messages = [
             {
                 "role": "assistant",
@@ -117,12 +472,16 @@ class Human(LLM):
         return _messages
 
     def generate(self, messages, tools, **kwargs) -> LLMResponse:
-        # Human overrides the entire __call__ method, so generate is never called
+        # Human overrides the entire __call__ method, so generate is never called.
+        pass
+
+    def parse_tool_call_response(self, response: str) -> ToolCall:
+        # Human does not parse tool calls from response, it generates them directly.
         pass
 
     def __call__(self, messages, tools, *args, **kwargs) -> LLMResponse:
         print_messages(messages, self.logger)
-        all_tools, meta_dict = self.define_tools(tools)
+        all_tools = self.define_tools(tools)
         available_commands = [json.dumps(t) for t in all_tools]
         tool_call = None
         retry_count = 0
@@ -130,29 +489,31 @@ class Human(LLM):
 
         while tool_call is None and retry_count < self.max_retries:
             if prompt_toolkit_available:
-                actions_completer = WordCompleter(
-                    available_commands,
-                    ignore_case=False,
-                    sentence=True,
-                    meta_dict=meta_dict,
-                )
-                action = prompt(
-                    "\n> ",
-                    completer=actions_completer,
+
+                # Create a prompt session with completion and validation
+                session = PromptSession(
+                    completer=DynamicToolCommandCompleter(tools=all_tools),
+                    complete_while_typing=True,
                     complete_style=CompleteStyle.MULTI_COLUMN,
+                    style=get_prompt_style(),
+                    validator=ToolCommandValidator(tools=all_tools),
                     history=self._history,
                     enable_history_search=True,
                 )
+                action = session.prompt("\n> ")
             else:
                 self.logger.info(
                     "\n".join(["Available commands:"] + available_commands)
                 )
                 action = input("> ")
 
-            try:
-                tool_call = self.parse_tool_call_response(action, all_tools)
-            except ValueError as e:
-                self.logger.error(f"Error parsing tool call: {e}")
+            parser = CommandParser()
+            command, args, errors = parser.parse_command(action)
+            tool_call = ToolCall(id=f"{command}-{np.random.randint(1000, 9999)}", name=command, arguments=args)
+            if errors:
+                error_message = "\n".join(f"Error at position {pos}: {msg}" for msg, pos in errors)
+                self.logger.error(f"Invalid input: {error_message}")
+                continue
 
             retry_count += 1
 
