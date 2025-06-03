@@ -1,10 +1,10 @@
 from dataclasses import make_dataclass
 from unittest.mock import MagicMock, patch
 
-from debug_gym.llms import OpenAILLM
-from debug_gym.llms.base import LLMConfigRegistry
 from debug_gym.gym.entities import Observation
 from debug_gym.gym.tools.tool import EnvironmentTool, ToolCall
+from debug_gym.llms import OpenAILLM
+from debug_gym.llms.base import LLMConfigRegistry
 
 
 class Tool1(EnvironmentTool):
@@ -22,7 +22,6 @@ class Tool1(EnvironmentTool):
 
 
 tools = [Tool1()]
-
 
 
 def create_fake_exception(module: str, classname: str, message: str):

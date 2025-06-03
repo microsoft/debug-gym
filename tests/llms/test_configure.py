@@ -2,8 +2,8 @@ from pathlib import Path
 
 import pytest
 
-from debug_gym.llms.constants import LLM_CONFIG_TEMPLATE
 from debug_gym.llms.configure import init_llm_config
+from debug_gym.llms.constants import LLM_CONFIG_TEMPLATE
 
 
 @pytest.fixture

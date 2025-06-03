@@ -1,9 +1,9 @@
 import logging
 
 from openai import AzureOpenAI, PermissionDeniedError
+
 from debug_gym.llms.constants import LLM_API_KEY_PLACEHOLDER, LLM_SCOPE_PLACEHOLDER
 from debug_gym.llms.openai import OpenAILLM
-
 
 # Set logging level down to WARNING for endpoint queries.
 logging.getLogger("azure.identity").setLevel(logging.WARNING)

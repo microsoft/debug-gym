@@ -4,9 +4,9 @@ from unittest.mock import patch
 import numpy as np
 import pytest
 
-from debug_gym.llms import Human
 from debug_gym.gym.tools.tool import ToolCall
 from debug_gym.gym.tools.toolbox import Toolbox
+from debug_gym.llms import Human
 
 
 @pytest.fixture

@@ -20,7 +20,6 @@ from debug_gym.llms.constants import DEFAULT_LLM_CONFIG
 from debug_gym.llms.utils import print_messages
 from debug_gym.logger import DebugGymLogger
 
-
 # Set logging level down to WARNING for endpoint queries.
 logging.getLogger("httpx").setLevel(logging.WARNING)
 
@@ -227,6 +226,7 @@ class LLM(ABC):
         logger = logger or DebugGymLogger("debug-gym")
         if llm_name == "human":
             from debug_gym.llms import Human
+
             return Human(llm_name, logger=logger)
 
         llm_config = LLMConfigRegistry.from_file(llm_config_file_path)[llm_name]
@@ -234,12 +234,15 @@ class LLM(ABC):
         tags = llm_config.tags
         if "azure openai" in tags:
             from debug_gym.llms import AzureOpenAILLM
+
             klass = AzureOpenAILLM
         elif "anthropic" in tags:
             from debug_gym.llms import AnthropicLLM
+
             klass = AnthropicLLM
         else:
             from debug_gym.llms import OpenAILLM
+
             klass = OpenAILLM
         llm = klass(llm_name, logger=logger, llm_config=llm_config)
         return llm

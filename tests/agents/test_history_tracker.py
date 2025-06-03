@@ -1,6 +1,6 @@
 from debug_gym.agents.history_tracker import HistoryTracker, build_history_prompt
-from debug_gym.llms.base import LLMResponse
 from debug_gym.gym.tools.tool import ToolCall
+from debug_gym.llms.base import LLMResponse
 
 
 def test_history_tracker(build_env_info):

@@ -3,11 +3,7 @@ from unittest.mock import patch
 
 import pytest
 
-from debug_gym.agents.utils import (
-    load_config,
-    trim,
-    trim_prompt_messages,
-)
+from debug_gym.agents.utils import load_config, trim, trim_prompt_messages
 
 
 def test_trim_prompt_messages():

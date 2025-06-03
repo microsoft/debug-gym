@@ -3,10 +3,10 @@ from unittest.mock import patch
 
 import pytest
 
-from debug_gym.llms.base import LLM, LLMConfigRegistry, LLMResponse
 from debug_gym.gym.entities import Observation
 from debug_gym.gym.envs.env import EnvInfo
 from debug_gym.gym.tools.tool import ToolCall
+from debug_gym.llms.base import LLM, LLMConfigRegistry, LLMResponse
 from debug_gym.logger import DebugGymLogger
 
 

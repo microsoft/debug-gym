@@ -3,16 +3,18 @@ import logging
 
 import openai
 import tiktoken
-from openai import NOT_GIVEN,OpenAI
-
+from openai import NOT_GIVEN, OpenAI
 from transformers import AutoTokenizer
 
 from debug_gym.gym.envs.env import EnvInfo
 from debug_gym.gym.tools.tool import EnvironmentTool, ToolCall
-from debug_gym.llms.base import LLM, retry_on_rate_limit
-from debug_gym.llms.base import LLMResponse, ContextLengthExceededError
+from debug_gym.llms.base import (
+    LLM,
+    ContextLengthExceededError,
+    LLMResponse,
+    retry_on_rate_limit,
+)
 from debug_gym.llms.constants import LLM_API_KEY_PLACEHOLDER, LLM_ENDPOINT_PLACEHOLDER
-
 
 # Set logging level down to WARNING for endpoint queries.
 logging.getLogger("openai").setLevel(logging.WARNING)

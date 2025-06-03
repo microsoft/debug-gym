@@ -9,14 +9,13 @@ from debug_gym.llms.base import LLM, LLMResponse
 from debug_gym.llms.utils import print_messages
 from debug_gym.logger import DebugGymLogger
 
-
 prompt_toolkit_available = False
 try:
     # For command line history and autocompletion.
     from prompt_toolkit import prompt
-    from prompt_toolkit.shortcuts import CompleteStyle
     from prompt_toolkit.completion import WordCompleter
     from prompt_toolkit.history import InMemoryHistory
+    from prompt_toolkit.shortcuts import CompleteStyle
 
     prompt_toolkit_available = sys.stdout.isatty()
 except ImportError:
@@ -132,8 +131,10 @@ class Human(LLM):
         while tool_call is None and retry_count < self.max_retries:
             if prompt_toolkit_available:
                 actions_completer = WordCompleter(
-                    available_commands, ignore_case=False, sentence=True,
-                    meta_dict=meta_dict
+                    available_commands,
+                    ignore_case=False,
+                    sentence=True,
+                    meta_dict=meta_dict,
                 )
                 action = prompt(
                     "\n> ",

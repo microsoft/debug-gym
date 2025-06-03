@@ -3,12 +3,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 import yaml
 
-from debug_gym.llms import (
-    OpenAILLM,
-    AnthropicLLM,
-    AzureOpenAILLM,
-    Human,
-)
+from debug_gym.gym.entities import Observation
+from debug_gym.gym.tools.tool import EnvironmentTool
+from debug_gym.llms import AnthropicLLM, AzureOpenAILLM, Human, OpenAILLM
 from debug_gym.llms.base import (
     LLM,
     LLMConfig,
@@ -17,8 +14,6 @@ from debug_gym.llms.base import (
     TokenUsage,
     retry_on_rate_limit,
 )
-from debug_gym.gym.entities import Observation
-from debug_gym.gym.tools.tool import EnvironmentTool
 
 
 @patch.object(
@@ -87,7 +82,6 @@ class Tool1(EnvironmentTool):
 
 
 tools = [Tool1()]
-
 
 
 @pytest.fixture

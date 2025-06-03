@@ -1,8 +1,8 @@
 import copy
 from dataclasses import asdict
 
-from debug_gym.llms.base import LLM, LLMResponse
 from debug_gym.gym.envs.env import EnvInfo
+from debug_gym.llms.base import LLM, LLMResponse
 
 
 class HistoryTracker:

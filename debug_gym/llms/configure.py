@@ -3,19 +3,20 @@ import os
 from pathlib import Path
 
 from termcolor import colored
-from debug_gym.llms.constants import LLM_CONFIG_TEMPLATE, DEFAULT_LLM_CONFIG
+
+from debug_gym.llms.constants import DEFAULT_LLM_CONFIG, LLM_CONFIG_TEMPLATE
 
 
 def init_llm_config(dest_dir: str = None):
     """Copy the llm config template to the specified
     directory or the user's home directory."""
 
-    parser = argparse.ArgumentParser(
-        description="Create an LLM config template."
-    )
+    parser = argparse.ArgumentParser(description="Create an LLM config template.")
     parser.add_argument(
-        "destination", nargs="?", type=str,
-        help=f"Destination directory (positional). Defaults to {DEFAULT_LLM_CONFIG.parent}"
+        "destination",
+        nargs="?",
+        type=str,
+        help=f"Destination directory (positional). Defaults to {DEFAULT_LLM_CONFIG.parent}",
     )
     parser.add_argument("-d", "--dest", type=str, help="Destination directory")
     parser.add_argument(

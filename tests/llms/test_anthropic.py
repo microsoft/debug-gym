@@ -3,13 +3,10 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from debug_gym.llms import AnthropicLLM
-from debug_gym.llms.base import (
-    LLMConfig,
-    LLMConfigRegistry,
-)
 from debug_gym.gym.entities import Observation
 from debug_gym.gym.tools.tool import EnvironmentTool, ToolCall
+from debug_gym.llms import AnthropicLLM
+from debug_gym.llms.base import LLMConfig, LLMConfigRegistry
 
 
 class Tool1(EnvironmentTool):
