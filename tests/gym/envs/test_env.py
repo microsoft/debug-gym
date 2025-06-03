@@ -584,3 +584,31 @@ def test_read_file_raises_for_nonexistent_file(tmp_path):
     # absolute path matching a file in the working_dir
     with pytest.raises(FileNotFoundError):
         env.read_file("/test.txt")
+
+
+def test_has_breakpoint_true_and_false(tmp_path):
+    env = RepoEnv(path=tmp_path)
+    file_path = env.working_dir / "test.py"
+    file_path.write_text("print('hello')")
+    line_number = 10
+    key = f"{file_path}|||{line_number}"
+    env.current_breakpoints_state = {key: "b test.py:10"}
+    assert env.has_breakpoint(str(file_path), line_number) is True
+    assert env.has_breakpoint(str(file_path), 20) is False
+    other_file = env.working_dir / "other.py"
+    assert env.has_breakpoint(str(other_file), line_number) is False
+
+
+def test_has_breakpoint_relative_path(tmp_path):
+    env = RepoEnv(path=tmp_path)
+    file_path = env.working_dir / "foo.py"
+    file_path.write_text("print('foo')")
+    line_number = 5
+    key = f"{file_path}|||{line_number}"
+    env.current_breakpoints_state = {key: "b foo.py:5"}
+    # Should work with relative path
+    assert env.has_breakpoint("foo.py", line_number) is True
+    # Should return False for wrong line
+    assert env.has_breakpoint("foo.py", 6) is False
+    # Should return False for non-existent file
+    assert env.has_breakpoint("bar.py", line_number) is False

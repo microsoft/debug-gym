@@ -430,6 +430,11 @@ class RepoEnv(TooledEnv):
 
         return "\n".join(result)
 
+    def has_breakpoint(self, file_path: str, line_number: int) -> bool:
+        """Check if a breakpoint is set at the given file and line number."""
+        key = f"{self.to_absolute(file_path)}|||{line_number}"
+        return key in self.current_breakpoints_state
+
     def current_breakpoints(self):
         if len(self.current_breakpoints_state) == 0:
             return "No breakpoints are set."

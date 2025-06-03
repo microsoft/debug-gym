@@ -27,12 +27,10 @@ def unescape(s):
         return result.encode("utf-8", errors="replace").decode("utf-8")
 
 
-def show_line_number(
-    code_string, code_path=None, breakpoints_state=None, start_index=1
-):
+def show_line_number(code_string, code_path=None, environment=None, start_index=1):
     # Show line number for each line
     # code_path is the path of the code file in view
-    # breakpoints_state is a dict, the keys are "|||".join([file_path, str(line_number)]) and values are breakpoint_command
+    # environment where to find the breakpoints state
     # start_index is the starting line number for the code string
     # line numbers are 1-indexed, and are separated from the code by a space
 
@@ -52,10 +50,8 @@ def show_line_number(
     for i, line in enumerate(code_line):
         has_breakpoint = False
         line_number = start_index + i
-        if code_path is not None and breakpoints_state:
-            _key = "|||".join([code_path, str(line_number)])
-            if _key in breakpoints_state.keys():
-                has_breakpoint = True
+        if code_path is not None and environment is not None:
+            has_breakpoint = environment.has_breakpoint(code_path, line_number)
         _tmp = ""
         if has_breakpoint:
             _tmp += "B"
@@ -64,7 +60,7 @@ def show_line_number(
     return "\n".join(output)
 
 
-def make_file_matcher(pattern_file, base_dir=None, patterns: list[str] = None):
+def make_file_matcher(pattern_file, base_dir=None, patterns: list[str] | None = None):
     """
     Creates a file matcher function based on ignore patterns from a file and additional patterns.
 
