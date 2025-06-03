@@ -43,21 +43,33 @@ def test_view_valid_file(env):
     env_info = env.step(view_call)
 
     assert env_info.step_observation.source == "view"
-    assert (
-        env_info.step_observation.observation
-        == "Viewing `main.py`, lines 1-1 of 1 total lines. \n\n```\nprint('Hello, World!')\n```\n\n"
+    assert env_info.step_observation.observation == (
+        "Viewing `main.py`, lines 1-1 of 1 total lines.\n"
+        "\n"
+        "```\n"
+        "print('Hello, World!')\n"
+        "```\n"
+        "\n"
     )
 
+    abs_path = str(env.working_dir / "main.py")
     view_call = ToolCall(
         id="view_id",
         name="view",
         arguments={
-            "path": str(env.working_dir / "main.py"),
+            "path": abs_path,
             "include_line_numbers_and_breakpoints": False,
         },
     )
     env_info_2 = env.step(view_call)
-    assert env_info_2.step_observation == env_info.step_observation
+    assert env_info_2.step_observation.observation == (
+        f"Viewing `{abs_path}`, lines 1-1 of 1 total lines.\n"
+        "\n"
+        "```\n"
+        "print('Hello, World!')\n"
+        "```\n"
+        "\n"
+    )
 
 
 def test_view_valid_file_with_line_numbers_no_breakpoints(env):
@@ -65,35 +77,59 @@ def test_view_valid_file_with_line_numbers_no_breakpoints(env):
     env_info = env.step(view_call)
 
     assert env_info.step_observation.source == "view"
-    assert (
-        env_info.step_observation.observation
-        == "Viewing `main.py`, lines 1-1 of 1 total lines. \n\n```\n     1 print('Hello, World!')\n```\n\n"
+    assert env_info.step_observation.observation == (
+        "Viewing `main.py`, lines 1-1 of 1 total lines.\n"
+        "\n"
+        "```\n"
+        "     1 print('Hello, World!')\n"
+        "```\n"
+        "\n"
     )
 
+    abs_path = str(env.working_dir / "main.py")
     view_call = ToolCall(
-        id="view_id", name="view", arguments={"path": str(env.working_dir / "main.py")}
+        id="view_id", name="view", arguments={"path": abs_path}
     )
     env_info_2 = env.step(view_call)
-    assert env_info_2.step_observation == env_info.step_observation
+    assert env_info_2.step_observation.observation == (
+        f"Viewing `{env.working_dir}/main.py`, lines 1-1 of 1 total lines.\n"
+        "\n"
+        "```\n"
+        "     1 print('Hello, World!')\n"
+        "```\n"
+        "\n"
+    )
 
 
 def test_view_valid_file_with_line_numbers_and_breakpoints(env):
     # set a breakpoint at line 1 of main.py
-    env.current_breakpoints_state["main.py|||1"] = "b main.py|||1"
+    abs_path = str(env.working_dir / "main.py")
+    env.current_breakpoints_state[f"{abs_path}|||1"] = "b main.py|||1"
     view_call = ToolCall(id="view_id", name="view", arguments={"path": "main.py"})
     env_info = env.step(view_call)
 
     assert env_info.step_observation.source == "view"
-    assert (
-        env_info.step_observation.observation
-        == """Viewing `main.py`, lines 1-1 of 1 total lines. B indicates breakpoint before a certain line of code. \n\n```\nB    1 print('Hello, World!')\n```\n\n"""
+    assert env_info.step_observation.observation == (
+        "Viewing `main.py`, lines 1-1 of 1 total lines. B indicates breakpoint before a certain line of code.\n"
+        "\n"
+        "```\n"
+        "B    1 print('Hello, World!')\n"
+        "```\n"
+        "\n"
     )
 
     view_call = ToolCall(
-        id="view_id", name="view", arguments={"path": str(env.working_dir / "main.py")}
+        id="view_id", name="view", arguments={"path": abs_path}
     )
     env_info_2 = env.step(view_call)
-    assert env_info_2.step_observation == env_info.step_observation
+    assert env_info_2.step_observation.observation == (
+        f"Viewing `{abs_path}`, lines 1-1 of 1 total lines. B indicates breakpoint before a certain line of code.\n"
+        "\n"
+        "```\n"
+        "B    1 print('Hello, World!')\n"
+        "```\n"
+        "\n"
+    )
 
 
 def test_view_valid_read_only_file(env):
@@ -105,33 +141,47 @@ def test_view_valid_read_only_file(env):
     env_info = env.step(view_call)
 
     assert env_info.step_observation.source == "view"
-    assert (
-        env_info.step_observation.observation
-        == "Viewing `test_1.py`, lines 1-2 of 2 total lines. The file is read-only. \n\n```\ndef test_1():\n  assert False\n```\n\n"
+    assert env_info.step_observation.observation == (
+        "Viewing `test_1.py`, lines 1-2 of 2 total lines. The file is read-only.\n"
+        "\n"
+        "```\n"
+        "def test_1():\n"
+        "  assert False\n"
+        "```\n"
+        "\n"
     )
 
 
 def test_view_valid_read_only_file_with_line_numbers_no_breakpoints(env):
     view_call = ToolCall(id="view_id", name="view", arguments={"path": "test_1.py"})
     env_info = env.step(view_call)
-
     assert env_info.step_observation.source == "view"
-    assert (
-        env_info.step_observation.observation
-        == "Viewing `test_1.py`, lines 1-2 of 2 total lines. The file is read-only. \n\n```\n     1 def test_1():\n     2   assert False\n```\n\n"
+    assert env_info.step_observation.observation == (
+        "Viewing `test_1.py`, lines 1-2 of 2 total lines. The file is read-only.\n"
+        "\n"
+        "```\n"
+        "     1 def test_1():\n"
+        "     2   assert False\n"
+        "```\n"
+        "\n"
     )
 
 
 def test_view_valid_read_only_file_with_line_numbers_and_breakpoints(env):
     # set a breakpoint at line 2 of test_1.py
-    env.current_breakpoints_state["test_1.py|||2"] = "b test_1.py|||2"
+    env.current_breakpoints_state[f"{env.working_dir}/test_1.py|||2"] = "b test_1.py|||2"
     view_call = ToolCall(id="view_id", name="view", arguments={"path": "test_1.py"})
     env_info = env.step(view_call)
 
     assert env_info.step_observation.source == "view"
-    assert (
-        env_info.step_observation.observation
-        == "Viewing `test_1.py`, lines 1-2 of 2 total lines. The file is read-only. B indicates breakpoint before a certain line of code. \n\n```\n     1 def test_1():\nB    2   assert False\n```\n\n"
+    assert env_info.step_observation.observation == (
+        "Viewing `test_1.py`, lines 1-2 of 2 total lines. The file is read-only. B indicates breakpoint before a certain line of code.\n"
+        "\n"
+        "```\n"
+        "     1 def test_1():\n"
+        "B    2   assert False\n"
+        "```\n"
+        "\n"
     )
 
 
@@ -152,24 +202,27 @@ def test_view_invalid_file_not_in_working_dir(env):
     assert env_info.step_observation == Observation(
         source="view",
         observation=(
-            "Invalid file path. The file path must be inside "
-            f"the root directory: `{env.working_dir}`."
+            "View failed. Error message:\n"
+            "`/nonexistent/main.py` does not exist or "
+            f"is not in the working directory `{env.working_dir}`."
         ),
     )
 
 
 def test_view_invalid_file_do_not_exist(env):
+    abs_file = str(env.working_dir / "nonexistent.py")
     view_call = ToolCall(
         id="view_id",
         name="view",
-        arguments={"path": f"{env.working_dir}/nonexistent.py"},
+        arguments={"path": abs_file},
     )
     env_info = env.step(view_call)
     assert env_info.step_observation == Observation(
         source="view",
         observation=(
-            "File not found. Could not navigate to `nonexistent.py`. "
-            f"Make sure that the file path is given relative to the root: `{env.working_dir}`."
+            "View failed. Error message:\n"
+            f"`{abs_file}` does not exist or "
+            f"is not in the working directory `{env.working_dir}`."
         ),
     )
 
@@ -180,7 +233,7 @@ def test_view_file_with_range_full_content(env):
     assert env_info.step_observation.source == "view"
     assert (
         env_info.step_observation.observation
-        == """Viewing `ten_lines.py`, lines 1-10 of 10 total lines. 
+        == """Viewing `ten_lines.py`, lines 1-10 of 10 total lines.
 
 ```
      1 print('Line 1')
@@ -218,43 +271,38 @@ def test_view_file_with_range_start_5(env):
         arguments={"path": "ten_lines.py", "start": 5},
     )
     env_info = env.step(view_call)
-    assert (
-        env_info.step_observation.observation
-        == """Viewing `ten_lines.py`, lines 5-10 of 10 total lines. 
-
-```
-     5 print('Line 5')
-     6 print('Line 6')
-     7 print('Line 7')
-     8 print('Line 8')
-     9 print('Line 9')
-    10 print('Line 10')
-```
-
-"""
+    assert env_info.step_observation.observation == (
+        "Viewing `ten_lines.py`, lines 5-10 of 10 total lines.\n"
+        "\n"
+        "```\n"
+        "     5 print('Line 5')\n"
+        "     6 print('Line 6')\n"
+        "     7 print('Line 7')\n"
+        "     8 print('Line 8')\n"
+        "     9 print('Line 9')\n"
+        "    10 print('Line 10')\n"
+        "```\n"
+        "\n"
     )
 
 
 def test_view_file_with_range_start_5_end_8(env):
-    # Range: start=1, end=2 (should return only the first line)
     view_call = ToolCall(
         id="view_id",
         name="view",
         arguments={"path": "ten_lines.py", "start": 5, "end": 8},
     )
     env_info = env.step(view_call)
-    assert (
-        env_info.step_observation.observation
-        == """Viewing `ten_lines.py`, lines 5-8 of 10 total lines. 
-
-```
-     5 print('Line 5')
-     6 print('Line 6')
-     7 print('Line 7')
-     8 print('Line 8')
-```
-
-"""
+    assert env_info.step_observation.observation == (
+        "Viewing `ten_lines.py`, lines 5-8 of 10 total lines.\n"
+        "\n"
+        "```\n"
+        "     5 print('Line 5')\n"
+        "     6 print('Line 6')\n"
+        "     7 print('Line 7')\n"
+        "     8 print('Line 8')\n"
+        "```\n"
+        "\n"
     )
 
 
