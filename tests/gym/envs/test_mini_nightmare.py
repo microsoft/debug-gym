@@ -37,11 +37,11 @@ def env_info():
 def mini_nightmare_env(mock_open, mock_tempdir, mock_exists, tmp_path):
     # Mock the temporary directory
     nightmare_dir = tmp_path / "tmp" / "MiniNightmareEnv-tempdir"
+    nightmare_dir.mkdir(parents=True, exist_ok=True)
     mock_tempdir.return_value.name = nightmare_dir
 
     # Initialize the MiniNightmareEnv
-    env = MiniNightmareEnv()
-    env.working_dir = nightmare_dir
+    env = MiniNightmareEnv(path=nightmare_dir)
     return env
 
 
