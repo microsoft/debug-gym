@@ -60,27 +60,28 @@ def show_line_number(code_string, code_path=None, environment=None, start_index=
     return "\n".join(output)
 
 
-def make_file_matcher(pattern_file, base_dir=None, patterns: list[str] | None = None):
+def make_file_matcher(pattern_file: str | Path, patterns: list[str] | None = None):
     """
     Creates a file matcher function based on ignore patterns from a file and additional patterns.
 
     Args:
-        pattern_file (str): Path to the file containing gitignore-like patterns.
-        base_dir (str, optional): Base directory to resolve relative paths. Defaults to the directory of the pattern_file.
-        patterns (list[str], optional): Additional patterns to include. Defaults to an empty list.
+        pattern_file (str | Path): Path to the file containing gitignore-like patterns.
+        patterns (list[str]): Additional patterns to include. Defaults to an empty list.
 
     Returns:
         function: A function that takes a file path as input and returns True if the file matches any of the patterns, False otherwise.
     """
-    if patterns is None:
-        patterns = []
     # Ref: gitignore_parser.parse_gitignore
     from gitignore_parser import _normalize_path, handle_negation, rule_from_pattern
 
-    base_dir = _normalize_path(base_dir or os.path.dirname(pattern_file))
+    if patterns is None:
+        patterns = []
+
+    pattern_file = Path(pattern_file)
+    base_dir = _normalize_path(str(pattern_file.parent))
 
     lines = []
-    if os.path.isfile(pattern_file):
+    if pattern_file.is_file():
         with open(pattern_file) as ignore_file:
             lines = ignore_file.readlines()
 
@@ -89,7 +90,7 @@ def make_file_matcher(pattern_file, base_dir=None, patterns: list[str] | None = 
     rules = []
     for i, line in enumerate(lines):
         line = line.rstrip("\n")
-        rule = rule_from_pattern(line.rstrip("\n"), base_dir, (pattern_file, i))
+        rule = rule_from_pattern(line.rstrip("\n"), base_dir, (str(pattern_file), i))
         if rule:
             rules.append(rule)
 
@@ -130,7 +131,7 @@ def create_ignore_file(
 def _walk(path, depth: int | None = None, skip: Callable | None = None):
     """recursively list files and directories up to a certain depth"""
     depth = 1e5 if depth is None else depth
-    if depth == 0:
+    if depth <= 0:  # stop recursion
         return
 
     with os.scandir(path) as p:
