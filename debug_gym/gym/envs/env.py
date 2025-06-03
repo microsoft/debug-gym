@@ -370,8 +370,7 @@ class RepoEnv(TooledEnv):
         if not abs_filepath.is_absolute():
             abs_filepath = (Path(self.working_dir) / abs_filepath).resolve()
         if raises and not (
-            abs_filepath.is_relative_to(self.working_dir)
-            and abs_filepath.exists()
+            abs_filepath.is_relative_to(self.working_dir) and abs_filepath.exists()
         ):
             # raises error with original path
             raise FileNotFoundError(
@@ -379,7 +378,6 @@ class RepoEnv(TooledEnv):
                 f"the working directory `{self.working_dir}`."
             )
         return abs_filepath
-
 
     def read_file(self, filepath: str) -> str:
         """Reads a file from the working directory.
@@ -407,21 +405,21 @@ class RepoEnv(TooledEnv):
         self._is_ignored = make_file_matcher(
             self.to_absolute(".debugignore"), patterns=ignore_patterns
         )
-        self.all_files = list(sorted(
-            self.to_absolute(path)
-            for path in _walk(self.working_dir, skip=self._is_ignored)
-        ))
+        self.all_files = list(
+            sorted(
+                self.to_absolute(path)
+                for path in _walk(self.working_dir, skip=self._is_ignored)
+            )
+        )
 
         # get list of editable files
         self._is_readonly = make_file_matcher(
             self.to_absolute(".debugreadonly"), patterns=readonly_patterns
         )
-        self.editable_files = set(
-            p for p in self.all_files if not self._is_readonly(p)
-        )
+        self.editable_files = set(p for p in self.all_files if not self._is_readonly(p))
 
-    def directory_tree(self, root: str = None, max_depth: int | None = None):
-        root = Path(root or self.working_dir).absolute()
+    def directory_tree(self, root: str | Path = None, max_depth: int | None = None):
+        root = self.to_absolute(root or self.working_dir, raises=True)
         max_depth = max_depth or self.dir_tree_depth
 
         # initalize with root directory
@@ -439,8 +437,7 @@ class RepoEnv(TooledEnv):
             if path.is_dir():
                 result[-1] += "/"
 
-            # TODO: Revert this logic to use the readonly patterns, otherwise new files will be read-only
-            if str(path.relative_to(self.working_dir)) not in self.editable_files:
+            if not self.is_editable(path):
                 result[-1] += " (read-only)"
 
         return "\n".join(result)
