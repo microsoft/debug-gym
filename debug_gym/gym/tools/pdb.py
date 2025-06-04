@@ -5,7 +5,6 @@ from debug_gym.gym.entities import Observation
 from debug_gym.gym.terminal import ShellSession
 from debug_gym.gym.tools.tool import EnvironmentTool
 from debug_gym.gym.tools.toolbox import Toolbox
-from debug_gym.gym.utils import get_code_length
 
 
 @Toolbox.register()
@@ -32,7 +31,6 @@ class PDBTool(EnvironmentTool):
 
     def __init__(self):
         super().__init__()
-        self.pdb_obs = ""
         self.current_frame_file = None
         self._session: ShellSession = None
 
@@ -42,7 +40,12 @@ class PDBTool(EnvironmentTool):
         memo[id(self)] = result
         # Copy all attributes except _session
         for k, v in self.__dict__.items():
+            # drop the session which is not serializable
             if k == "_session":
+                setattr(result, k, None)
+            # drop the current_frame_file which is None at the beginning
+            # and will be set when the PDB session starts
+            elif k == "current_frame_file":
                 setattr(result, k, None)
             else:
                 setattr(result, k, copy.deepcopy(v, memo))
@@ -62,6 +65,7 @@ class PDBTool(EnvironmentTool):
 
     def close_pdb(self):
         self._session.close()
+        self.current_frame_file = None
 
     def start_pdb(self, environment) -> str:
         self._session = environment.terminal.new_shell_session()
@@ -81,7 +85,7 @@ class PDBTool(EnvironmentTool):
                     initial_output = "\n".join(
                         [initial_output, "Breakpoints have been restored."]
                     )
-        self.pdb_obs = initial_output
+            self.set_current_frame_file(environment)
         return initial_output
 
     def on_env_reset(self, environment, **kwargs) -> Observation:
@@ -103,15 +107,15 @@ class PDBTool(EnvironmentTool):
         return self.start_pdb(environment)
 
     def use(self, environment, command: str) -> Observation:
+        if command == "":
+            return Observation(
+                self.name, "Failure calling pdb:\nEmpty commands are not allowed."
+            )
+
         _warning = ""
-        if (
-            command == ""
-            or command.split()[0] in ["p", "pp"]
-            or command.startswith("print(")
-        ):
-            # OK to have ";" or "\n" in the command
-            pass
-        else:
+        # if print, it's OK to have ";" or "\n" in the command
+        # otherwise, only the first command will be executed
+        if not (command.split()[0] in ["p", "pp"] or command.startswith("print(")):
             splits = re.split("\n|;", command)
             if len(splits) > 1:
                 command = splits[0].strip()
@@ -122,171 +126,81 @@ class PDBTool(EnvironmentTool):
             output += self.start_pdb(environment)
 
         if not self.pdb_is_running:
+            # pdb failed to start
             return Observation(self.name, f"Failure calling pdb:\n{output}")
-        if command == "":  # empty command
-            return Observation(
-                self.name, "Failure calling pdb:\nEmpty commands are not allowed."
-            )
 
         if command in ["b", "break"]:
             # list all breakpoints
-            success, output = True, environment.current_breakpoints()
+            success, output = (
+                True,
+                f"Breakpoints:\n{environment.current_breakpoints()}\n",
+            )
         elif command in ["cl", "clear"]:
             # clear all breakpoints
             environment.current_breakpoints_state = {}
             self.restart_pdb(environment)
             success, output = True, "All breakpoints have been cleared."
-        elif (
-            command.split()[0] in ["b", "break", "cl", "clear"]
-            and command.split()[1].isnumeric()
-        ):
-            # wrapper handle adding/removing breakpoints
-            # Attempt to set a breakpoint in the current frame file; fails if it's not set
-            success, output = self.breakpoint_add_clear(
-                environment, command, self.current_frame_file
-            )
-        elif (
-            command.split()[0] in ["b", "break", "cl", "clear"]
-            and ":" in command.split()[1]
-            and command.split()[1].split(":")[1][0].isnumeric()
-        ):
-            # e.g., b src/main.py:42 some_other_args
-            which_file, _bp_args = command.split(maxsplit=1)[1].split(":")
-            _command_without_file = f"{command.split()[0]} {_bp_args}"
-            success, output = self.breakpoint_add_clear(
-                environment, _command_without_file, which_file
-            )
-        else:
-            # other pdb commands, send directly
+        else:  # other pdb commands, send directly
             try:
-                output += self.interact_with_pdb(command, environment.run_timeout)
-                self.pdb_obs = output
-            except Exception:  # TODO: catch specific exceptions
+                pdb_out = self.interact_with_pdb(command, environment.run_timeout)
+                # remove the working dir from the output
+                pdb_out = pdb_out.replace(f"{environment.working_dir}/", "")
+                if pdb_out in (
+                    "End of file",
+                    "Blank or comment",
+                    "*** Blank or comment",
+                ):
+                    # if out of bounds, pdb will return "End of file"
+                    # https://github.com/python/cpython/blob/main/Lib/pdb.py#L1464-L1485
+                    success = False
+                    output = f"Invalid line number: {pdb_out}."
+                else:
+                    output += f"Pdb command output:\n{pdb_out}"
+                self.update_breakpoints(environment)
+            except Exception:
                 success = False
 
-        if success:
-            # sometimes it will run into the end of the program
-            # we need to put the stdout before:
-            # The program exited via sys.exit().
-            # into self.last_eval_output, and remove them from the output
-            if "The program exited via sys.exit()." in output:
-                # end index is the last occurrence of the program exited (from the \n after)
-                end_index = (
-                    output.find(
-                        "\n", output.rfind("The program exited via sys.exit().")
-                    )
-                    + 1
-                )
-                output = (
-                    "Reached the end of the file. Restarting the debugging session.\n"
-                    + output[end_index:]
-                )
-            obs = "\n".join([_warning, output]).strip()
+        if not success:
+            if _warning:  # prevend additional \n
+                obs = f"Invalid pdb command: {command}\n{_warning}\n{output.strip()}"
+            else:
+                obs = f"Invalid pdb command: {command}\n{output.strip()}"
+            return Observation(self.name, obs)
 
-            # Add the current frame information to the observation.
-            if (
-                self.pdb_is_running
-                and environment.auto_list
-                and command.split()[0] not in ["l", "list"]
-            ):
-                if '"""The pytest entry point."""' not in obs:
-                    obs += "\nlist .\n" + self.interact_with_pdb(
-                        "l .", environment.run_timeout
-                    )
+        # sometimes it will run into the end of the program
+        # we need to put the stdout before:
+        # The program exited via sys.exit().
+        # into self.last_eval_output, and remove them from the output
+        if "The program exited via sys.exit()." in output:
+            # end index is the last occurrence of the program exited (from the \n after)
+            start_index = output.rfind("The program exited via sys.exit().")
+            end_index = output.find("\n", start_index) + 1
+            output = (
+                output[:start_index]
+                + "\nReached the end of the program. Restarting the debugging session.\n"
+                + output[end_index:]
+            )
+        if _warning:
+            obs = f"{_warning}\n{output.strip()}\n"
         else:
-            obs = "\n".join([f"Invalid pdb command: {command}", _warning, output])
+            obs = f"{output.strip()}\n"
 
+        # Add the current frame information to the observation.
         if self.pdb_is_running:
             # read the current frame info to determine the current file
-            self.get_current_frame_file(environment)
+            current_frame = self.set_current_frame_file(environment)
+
+            # free 'list' to provide context around the current frame
+            list_output = ""
+            if environment.auto_list and command.split()[0] not in ["l", "list"]:
+                list_output = self.interact_with_pdb("l .", environment.run_timeout)
+
+            if current_frame:
+                obs += f"\nCurrent frame:\n{current_frame}\n"
+            if list_output:
+                obs += f"\nContext around the current frame:\n{list_output}\n"
 
         return Observation(self.name, obs)
-
-    def breakpoint_add_clear(self, environment, action: str, which_file):
-        # handle adding/removing breakpoints
-        # this is a wrapper that manages the self.breakpoints_state, which does not reset at each pseudo terminal start
-        # self.breakpoints_state is a dict, the keys are "|||".join([file_path, str(line_number)]) and values are breakpoint_command
-        # TODO: we don't support tbreak
-        manipulation = "set" if action.startswith("b") else "clear"
-        if which_file is None or which_file == "":
-            return (
-                False,
-                f"Failed to {manipulation} breakpoint. No file is specified in the command.",
-            )
-        if which_file.startswith(str(environment.working_dir)):
-            which_file = which_file[len(str(environment.working_dir)) + 1 :]
-        if which_file not in environment.all_files:
-            return (
-                False,
-                f"Failed to {manipulation} breakpoint. `{which_file}` is not found in the repository.",
-            )
-        # IMPORTANT: insert the viewing file into breakpoint command
-        # for example, "b 42" -> "b src/main.py:42" if the current file is "src/main.py"
-        # for example, "cl 42" -> "cl src/main.py:42" if the current file is "src/main.py"
-        action_split = action.split(maxsplit=2)
-        _action_type, _line_number, _bp_args = (
-            action_split[0],
-            action_split[1],
-            action_split[2] if len(action_split) > 2 else "",
-        )
-        _key = "|||".join([which_file, _line_number])
-        assert _line_number.isnumeric()
-        success, output = True, ""
-        joined_args = " ".join([_line_number, _bp_args])
-        command = f"{which_file}:{joined_args}".strip()
-        if _action_type in ["b", "break"]:
-            command = "b " + command
-            if _key in environment.current_breakpoints_state.keys():
-                # breakpoint already exists
-                return (
-                    True,
-                    f"Breakpoint already exists at line {_line_number} in `{which_file}`.",
-                )
-            else:
-                # check if line number is valid
-                code_string = environment.read_file(which_file)
-                code_length = get_code_length(code_string)
-                if int(_line_number) > code_length or int(_line_number) < 1:
-                    return (
-                        False,
-                        f"Invalid line number: {_line_number}, expected between 1 and {code_length}.",
-                    )
-                try:
-                    output = self.interact_with_pdb(command, environment.run_timeout)
-                    self.pdb_obs = output
-                    # when success, the output always repeats the command, we can remove it
-                    output = output.strip()
-                    if output.startswith(command):
-                        output = output[len(command) :].strip()
-                    environment.current_breakpoints_state[_key] = command
-                except BaseException:
-                    success = False
-        elif _action_type in ["cl", "clear"]:
-            command = "cl " + command
-            if _key not in environment.current_breakpoints_state.keys():
-                # breakpoint does not exist
-                return (
-                    True,
-                    f"No breakpoint exists at line {_line_number} in `{which_file}`.",
-                )
-            else:
-                try:
-                    output = self.interact_with_pdb(command, environment.run_timeout)
-                    self.pdb_obs = output
-                    # when success, the output always repeats the command, we can remove it
-                    output = output.strip()
-                    if output.startswith(command):
-                        output = output[len(command) :].strip()
-                    del environment.current_breakpoints_state[_key]
-                except BaseException:
-                    success = False
-        else:
-            return (
-                False,
-                f"Invalid action: `{action}`. Expected 'b', 'break', 'cl', or 'clear'.",
-            )
-
-        return success, output
 
     def breakpoint_modify(
         self, environment, rewrite_file, rewrite_head, rewrite_tail, new_code_length
@@ -299,10 +213,10 @@ class PDBTool(EnvironmentTool):
         current_breakpoints_state_copy = copy.deepcopy(
             environment.current_breakpoints_state
         )
-        if rewrite_file.startswith(str(environment.working_dir)):
-            rewrite_file = rewrite_file[len(str(environment.working_dir)) + 1 :]
+        rewrite_file = environment.resolve_path(rewrite_file)
         for _key in environment.current_breakpoints_state.keys():
             _file_path, _line_number = _key.split("|||")
+            _file_path = environment.resolve_path(_file_path)
             if _file_path != rewrite_file:
                 # the breakpoints are not in the current file, no need to modify
                 continue
@@ -322,7 +236,7 @@ class PDBTool(EnvironmentTool):
                         + new_code_length
                         - (rewrite_tail - rewrite_head + 1)
                     )
-                    new_key = "|||".join([_file_path, str(new_line_number)])
+                    new_key = "|||".join([str(_file_path), str(new_line_number)])
                     _new_value = environment.current_breakpoints_state[_key].split(":")
                     _new_value[1] = " ".join(
                         [str(new_line_number), " ".join(_new_value[1].split()[1:])]
@@ -336,11 +250,44 @@ class PDBTool(EnvironmentTool):
                     pass
         environment.current_breakpoints_state = current_breakpoints_state_copy
 
-    def get_current_frame_file(self, environment):
+    def update_breakpoints(self, environment):
+        """Updates the environment's current_breakpoints_state by
+        parsing the output of the PDB 'b' (breakpoints) command.
+
+        The new_breakpoints dictionary keys are in the format "file_path|||line_number",
+        and the values are the corresponding PDB breakpoint commands.
+
+        environment.current_breakpoints_state = {
+            "path/to/file.py|||line_number": "b path/to/file.py:line_number",
+            ...
+        }"""
+
+        command = "b"  # list all breakpoints
+        output = self.interact_with_pdb(command, environment.run_timeout)
+        # parse the output to update the current_breakpoints_state
+        # example output:
+        # Num Type         Disp Enb   Where
+        # 1   breakpoint   keep yes   at /tmp/RepoEnv-_ha8r7_2/constants.py:6
+        # 2   breakpoint   keep yes   at /tmp/RepoEnv-_ha8r7_2/constants.py:10
+        # 3   breakpoint   keep yes   at /tmp/RepoEnv-_ha8r7_2/constants.py:14
+        # -> ACTION_TO_INDEX = {
+        new_breakpoints = {}
+        breakpoint_pattern = re.compile(
+            r"^\s*\d+\s+breakpoint\s+keep\s+yes\s+at\s+(.+):(\d+)$"
+        )
+        for line in output.splitlines():
+            match = breakpoint_pattern.match(line)
+            if match:
+                # extract the file path and line number from the regex match
+                file_path, line_number = match.groups()
+                key = "|||".join([file_path, line_number])
+                new_breakpoints[key] = f"b {file_path}:{line_number}"
+        environment.current_breakpoints_state = new_breakpoints
+
+    def set_current_frame_file(self, environment) -> str | None:
         """A free 'where' to obtain the current frame (line number), hidden from the agent."""
         command = "where"
         output = self.interact_with_pdb(command, environment.run_timeout)
-
         # parse the output to get the current frame
         # example output:
         #    /home/eryua/venvs/pdb/lib/python3.12/bdb.py(606)run()
@@ -348,15 +295,17 @@ class PDBTool(EnvironmentTool):
         #    <string>(1)<module>()
         # > /tmp/RepoEnv-_ha8r7_2/constants.py(6)<module>()
         # -> ACTION_TO_INDEX = {
-        sep = "> " + str(environment.working_dir) + "/"
-        if sep not in output:
-            return
-        output = output.rsplit(sep, 1)[1]
-        # constants.py(6)<module>()
-        # -> ACTION_TO_INDEX = {
-        try:
-            file_path = output.split("(")[0]
-            if file_path != self.current_frame_file:
-                self.current_frame_file = file_path
-        except BaseException:
-            pass
+        sep = "> "
+        file_path = None
+        for line in output.splitlines():
+            # find the line that starts with "> "
+            if line.startswith(sep):
+                # extract the file path from the line,
+                # remove the leading "> ", the trailing "(line_number)<module>()", and working_dir
+                # constants.py(6)<module>()
+                # -> ACTION_TO_INDEX = {
+                file_path = line[len(sep) :].split("(")[0]
+                break
+        if self.current_frame_file != file_path:
+            self.current_frame_file = file_path
+        return file_path

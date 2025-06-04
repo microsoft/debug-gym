@@ -1,5 +1,8 @@
 # Changelog
 
+### 2025-06-03
+* Refactored `debug_gym/agents/llm_api.py` into separate modules in `debug_gym/llms/` for OpenAI, AzureOpenAI, Anthropic APIs, and human mode, allowing for easier extension to other LLM providers in the future.
+* Improved the Human mode to support better prompt completion and error handling.
 
 ### 2025-05-20
 
@@ -15,4 +18,4 @@ Added in the [analysis](https://github.com/microsoft/debug-gym/tree/main/analysi
 
 ### 2025-05-28
 
-Improved the View tool, added the `start` and `end` arguments so the agent can specify a particular chunk of code to view. 
+Improved the View tool, added the `start` and `end` arguments so the agent can specify a particular chunk of code to view.

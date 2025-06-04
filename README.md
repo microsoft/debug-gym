@@ -30,12 +30,12 @@ To install development dependencies, run:
 
 **Set your API information in llm.yaml**
 
-First, create an LLM config template by running `python -m debug_gym.init_llm_config`:
+First, create an LLM config template by running `python -m debug_gym.llms.configure`:
 
-    python -m debug_gym.init_llm_config $HOME/.config/debug_gym
+    python -m debug_gym.llms.configure
 
 > [!TIP]
-> Run `python -m debug_gym.init_llm_config --help` for more options. By default, the template is created at `$HOME/.config/debug_gym/llm.yaml`, but you can specify any directory.
+> Run `python -m debug_gym.llms.configure --help` for more options. By default, the template is created at `$HOME/.config/debug_gym/llm.yaml`, but you can specify any directory.
 
 Then, edit this file with your endpoint and credentials. You can choose one of these authentication methods:
 - For authenticating with an API key, provide `api_key`.
@@ -57,12 +57,15 @@ debug_gym
 │   ├── envs
 │   ├── terminal
 │   └── tools
-└── agents
+├── agents
+└── llms
 ```
 
 `debug_gym.gym` is a simulation environment. Given a code repository, an agent can iteratively interact with a set of tools, such as `pdb`, that are designed for investigate the code. Once gathered enough information, the agent can propose a patch that rewrites certain lines of the code. The terminal will subsequently execute the new code against a set of test cases.
 
 `debug_gym.agents` are LLM-based debugging agents that use `debug_gym.gym` to interact with code repositories to seek necessary information and thus fix potential bugs. At an interaction step, the agent takes a text observation that describes the environment states and tool states as input, it is expected to generate a command, subsequently, the environment will provide a new text observation in response, describing the state change caused by that command.
+
+`debug_gym.llms` are the different LLM backends that can be used to instantiate agents. Currently, we support OpenAI, Azure OpenAI, and Anthropic.
 
 ---
 

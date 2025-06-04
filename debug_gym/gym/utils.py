@@ -27,21 +27,10 @@ def unescape(s):
         return result.encode("utf-8", errors="replace").decode("utf-8")
 
 
-def get_code_length(code_string):
-    # Get the number of lines in the code string
-    assert isinstance(
-        code_string, str
-    ), f"code_string should be a string, but got {type(code_string)}"
-    code_line = code_string.split("\n")
-    return len(code_line)
-
-
-def show_line_number(
-    code_string, code_path=None, breakpoints_state=None, start_index=1
-):
+def show_line_number(code_string, code_path=None, environment=None, start_index=1):
     # Show line number for each line
     # code_path is the path of the code file in view
-    # breakpoints_state is a dict, the keys are "|||".join([file_path, str(line_number)]) and values are breakpoint_command
+    # environment where to find the breakpoints state
     # start_index is the starting line number for the code string
     # line numbers are 1-indexed, and are separated from the code by a space
 
@@ -61,10 +50,8 @@ def show_line_number(
     for i, line in enumerate(code_line):
         has_breakpoint = False
         line_number = start_index + i
-        if code_path is not None and breakpoints_state:
-            _key = "|||".join([code_path, str(line_number)])
-            if _key in breakpoints_state.keys():
-                has_breakpoint = True
+        if code_path is not None and environment is not None:
+            has_breakpoint = environment.has_breakpoint(code_path, line_number)
         _tmp = ""
         if has_breakpoint:
             _tmp += "B"
@@ -73,27 +60,28 @@ def show_line_number(
     return "\n".join(output)
 
 
-def make_file_matcher(pattern_file, base_dir=None, patterns: list[str] = None):
+def make_file_matcher(pattern_file: str | Path, patterns: list[str] | None = None):
     """
     Creates a file matcher function based on ignore patterns from a file and additional patterns.
 
     Args:
-        pattern_file (str): Path to the file containing gitignore-like patterns.
-        base_dir (str, optional): Base directory to resolve relative paths. Defaults to the directory of the pattern_file.
-        patterns (list[str], optional): Additional patterns to include. Defaults to an empty list.
+        pattern_file (str | Path): Path to the file containing gitignore-like patterns.
+        patterns (list[str]): Additional patterns to include. Defaults to an empty list.
 
     Returns:
         function: A function that takes a file path as input and returns True if the file matches any of the patterns, False otherwise.
     """
-    if patterns is None:
-        patterns = []
     # Ref: gitignore_parser.parse_gitignore
     from gitignore_parser import _normalize_path, handle_negation, rule_from_pattern
 
-    base_dir = _normalize_path(base_dir or os.path.dirname(pattern_file))
+    if patterns is None:
+        patterns = []
+
+    pattern_file = Path(pattern_file)
+    base_dir = _normalize_path(str(pattern_file.parent))
 
     lines = []
-    if os.path.isfile(pattern_file):
+    if pattern_file.is_file():
         with open(pattern_file) as ignore_file:
             lines = ignore_file.readlines()
 
@@ -102,7 +90,7 @@ def make_file_matcher(pattern_file, base_dir=None, patterns: list[str] = None):
     rules = []
     for i, line in enumerate(lines):
         line = line.rstrip("\n")
-        rule = rule_from_pattern(line.rstrip("\n"), base_dir, (pattern_file, i))
+        rule = rule_from_pattern(line.rstrip("\n"), base_dir, (str(pattern_file), i))
         if rule:
             rules.append(rule)
 
@@ -143,7 +131,7 @@ def create_ignore_file(
 def _walk(path, depth: int | None = None, skip: Callable | None = None):
     """recursively list files and directories up to a certain depth"""
     depth = 1e5 if depth is None else depth
-    if depth == 0:
+    if depth <= 0:  # stop recursion
         return
 
     with os.scandir(path) as p:
@@ -154,20 +142,6 @@ def _walk(path, depth: int | None = None, skip: Callable | None = None):
             yield Path(entry)
             if entry.is_dir() and depth > 0:
                 yield from _walk(entry.path, depth=depth - 1, skip=skip)
-
-
-# Helper class to control boolean flags from the command line with argparse
-def str2bool(v):
-    if isinstance(v, bool):
-        return v
-    if v.lower() in ("yes", "true", "t", "y", "1"):
-        return True
-    elif v.lower() in ("no", "false", "f", "n", "0"):
-        return False
-    else:
-        import argparse
-
-        raise argparse.ArgumentTypeError("Boolean value expected.")
 
 
 def is_subdirectory(path, directory):

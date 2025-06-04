@@ -2,6 +2,7 @@ from pathlib import Path
 
 import pytest
 
+from debug_gym.gym.envs.env import RepoEnv
 from debug_gym.gym.utils import (
     _walk,
     clean_code,
@@ -12,7 +13,6 @@ from debug_gym.gym.utils import (
     is_subdirectory,
     make_file_matcher,
     show_line_number,
-    str2bool,
     unescape,
 )
 
@@ -58,60 +58,76 @@ def test_show_line_number_no_code_path_no_breakpoints():
     assert show_line_number(code_string) == expected
 
 
-def test_show_line_number_with_code_path():
-    s4 = "    "
-    s2 = "  "
-    code_path = "path/to/code.py"
-    breakpoints_state = {"path/to/code.py|||2": "b 2"}
-    code_string = f"def foo():\n{s4}return 42\n"
-    expected = f"{s2}   1 def foo():\nB    2 {s4}return 42\n{s2}   3 "
-    assert show_line_number(code_string, code_path, breakpoints_state) == expected
-
-
-def test_show_line_number_multiple_breakpoints():
-    s4 = "    "
-    s2 = "  "
-    code_path = "path/to/code.py"
-    breakpoints_state = {
-        "path/to/code.py|||2": "b 2",
-        "path/to/code.py|||3": "b 3, bar > 4",
-    }
-    code_string = f"def foo():\n"
-    code_string += f"{s4}bar = 20\n"
-    code_string += f"{s4}foobar = 42\n"
-    code_string += f"{s4}print('frog')\n"
-    code_string += f"{s4}return foobar\n"
-    expected = f"{s2}   1 def foo():\n"
-    expected += f"B    2 {s4}bar = 20\n"
-    expected += f"B    3 {s4}foobar = 42\n"
-    expected += f"{s2}   4 {s4}print('frog')\n"
-    expected += f"{s2}   5 {s4}return foobar\n"
-    expected += f"{s2}   6 "
-    assert show_line_number(code_string, code_path, breakpoints_state) == expected
-
-
-def test_show_line_number_multiple_breakpoints_with_start_index():
-    s4 = "    "
-    code_path = "path/to/code.py"
-    breakpoints_state = {
-        "path/to/code.py|||102": "b 102",
-        "path/to/code.py|||103": "b 103, bar > 4",
-    }
-    code_string = "def foo():\n"
-    code_string += f"{s4}bar = 20\n"
-    code_string += f"{s4}foobar = 42\n"
-    code_string += f"{s4}print('frog')\n"
-    code_string += f"{s4}return foobar\n"
-    start_index = 101
-    annotated_code = show_line_number(
-        code_string, code_path, breakpoints_state, start_index
+def test_show_line_number_with_code_path(tmp_path):
+    env = RepoEnv(path=tmp_path)
+    code_path = f"{env.working_dir}/code.py"
+    breakpoints_state = {f"{code_path}|||2": "b 2"}
+    env.current_breakpoints_state = breakpoints_state
+    # fmt: off
+    code_string = (
+        "def foo():\n"
+        "    return 42\n"
     )
-    expected = "   101 def foo():\n"
-    expected += f"B  102 {s4}bar = 20\n"
-    expected += f"B  103 {s4}foobar = 42\n"
-    expected += f"   104 {s4}print('frog')\n"
-    expected += f"   105 {s4}return foobar\n"
-    expected += "   106 "
+    expected = (
+        "     1 def foo():\n"
+        "B    2     return 42\n"
+        "     3 "
+    )
+    # fmt: on
+    assert show_line_number(code_string, code_path, env) == expected
+
+
+def test_show_line_number_multiple_breakpoints(tmp_path):
+    env = RepoEnv(path=tmp_path)
+    code_path = f"{env.working_dir}/code.py"
+    breakpoints_state = {
+        f"{code_path}|||2": "b 2",
+        f"{code_path}|||3": "b 3, bar > 4",
+    }
+    env.current_breakpoints_state = breakpoints_state
+    code_string = (
+        "def foo():\n"
+        "    bar = 20\n"
+        "    foobar = 42\n"
+        "    print('frog')\n"
+        "    return foobar\n"
+    )
+    expected = (
+        "     1 def foo():\n"
+        "B    2     bar = 20\n"
+        "B    3     foobar = 42\n"
+        "     4     print('frog')\n"
+        "     5     return foobar\n"
+        "     6 "
+    )
+    assert show_line_number(code_string, code_path, env) == expected
+
+
+def test_show_line_number_multiple_breakpoints_with_start_index(tmp_path):
+    env = RepoEnv(path=tmp_path)
+    code_path = f"{env.working_dir}/code.py"
+    breakpoints_state = {
+        f"{code_path}|||102": "b 102",
+        f"{code_path}|||103": "b 103, bar > 4",
+    }
+    env.current_breakpoints_state = breakpoints_state
+    code_string = (
+        "def foo():\n"
+        "    bar = 20\n"
+        "    foobar = 42\n"
+        "    print('frog')\n"
+        "    return foobar\n"
+    )
+    start_index = 101
+    annotated_code = show_line_number(code_string, code_path, env, start_index)
+    expected = (
+        "   101 def foo():\n"
+        "B  102     bar = 20\n"
+        "B  103     foobar = 42\n"
+        "   104     print('frog')\n"
+        "   105     return foobar\n"
+        "   106 "
+    )
     assert annotated_code == expected
 
 
@@ -248,29 +264,6 @@ def test_create_ignore_file(tmp_path):
     with open(debugignore_path) as f:
         contents = f.read().splitlines()
     assert contents == ["*.tmp", "*.bak", ".debugignore"]
-
-
-def test_str2bool():
-    assert str2bool("True") is True
-    assert str2bool("true") is True
-    assert str2bool("t") is True
-    assert str2bool("1") is True
-    assert str2bool("Yes") is True
-    assert str2bool("Y") is True
-    assert str2bool("False") is False
-    assert str2bool("false") is False
-    assert str2bool("f") is False
-    assert str2bool("0") is False
-    assert str2bool("No") is False
-    assert str2bool("N") is False
-    assert str2bool(True) is True
-    assert str2bool(False) is False
-    with pytest.raises(Exception, match="Boolean value expected."):
-        str2bool("Maybe")
-    with pytest.raises(Exception, match="Boolean value expected."):
-        str2bool("yeah")
-    with pytest.raises(Exception, match="Boolean value expected."):
-        str2bool("nah")
 
 
 def test_is_subdirectory():

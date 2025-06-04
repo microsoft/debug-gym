@@ -204,8 +204,10 @@ class RepoEnv(TooledEnv):
         entrypoint: str | None = None,
         debug_entrypoint: str | None = None,
         readonly_patterns: list[str] | None = None,
+        ignore_patterns: list[str] | None = None,
     ):
         readonly_patterns = readonly_patterns or []
+        ignore_patterns = ignore_patterns or []
         if self.path:
             self.cleanup_workspace()
             self.path = None
@@ -224,7 +226,7 @@ class RepoEnv(TooledEnv):
         self.logger.debug(f"Working directory: {self.working_dir}")
         shutil.copytree(self.path, self.working_dir, dirs_exist_ok=True, symlinks=True)
 
-        self._index_files(readonly_patterns)
+        self.index_files(readonly_patterns, ignore_patterns)
 
         # override entrypoint as it might be task dependent
         self.set_entrypoints(entrypoint, debug_entrypoint)
@@ -362,41 +364,70 @@ class RepoEnv(TooledEnv):
         self.last_eval = EvalOutput(success, output)
         return self.last_eval
 
+    def resolve_path(self, filepath: str | Path, raises=False) -> Path:
+        """Convert a relative filepath to absolute based on the working_dir.
+        If the path is already absolute, it is returned as is.
+        If raises is True, raises FileNotFoundError if the file does not exist.
+        If raises is False, returns the absolute path regardless of the file existence.
+        """
+        abs_filepath = Path(filepath)
+        if not abs_filepath.is_absolute():
+            abs_filepath = (Path(self.working_dir) / abs_filepath).resolve()
+        if raises and not (
+            abs_filepath.is_relative_to(self.working_dir) and abs_filepath.exists()
+        ):
+            # raises error with original path
+            raise FileNotFoundError(
+                f"`{filepath}` does not exist or is not in "
+                f"the working directory `{self.working_dir}`."
+            )
+        return abs_filepath
+
     def read_file(self, filepath: str) -> str:
-        return (self.working_dir / filepath).read_text()
+        """Reads a file from the working directory.
+        Raises value error if the file does not exist"""
+        abs_filepath = self.resolve_path(filepath, raises=True)
+        return abs_filepath.read_text()
 
     def is_editable(self, filepath):
-        return filepath in self.editable_files
+        return not self._is_readonly(self.resolve_path(filepath))
 
-    def _index_files(self, readonly_patterns: list[str] | None = None):
+    def index_files(
+        self,
+        readonly_patterns: list[str] | None = None,
+        ignore_patterns: list[str] | None = None,
+    ):
+        """Indexes files and subdir in the working
+        directory, applying ignore and readonly patterns."""
+        readonly_patterns = readonly_patterns or []
+        ignore_patterns = ignore_patterns or []
+
+        # Ignore debug gym hidden files
+        ignore_patterns += [".debugignore", ".debugreadonly"]
+
         # get all file paths relative to the working directory
         self._is_ignored = make_file_matcher(
-            self.working_dir / ".debugignore", patterns=readonly_patterns
+            self.resolve_path(".debugignore"), patterns=ignore_patterns
         )
-        self.all_files = sorted(
-            os.path.relpath(path, self.working_dir)
-            for path in _walk(self.working_dir, skip=self._is_ignored)
+        self.all_files = list(
+            sorted(
+                self.resolve_path(path)
+                for path in _walk(self.working_dir, skip=self._is_ignored)
+            )
         )
 
         # get list of editable files
         self._is_readonly = make_file_matcher(
-            self.working_dir / ".debugreadonly", patterns=readonly_patterns
+            self.resolve_path(".debugreadonly"), patterns=readonly_patterns
         )
-        self.editable_files = [
-            p for p in self.all_files if not self._is_readonly(self.working_dir / p)
-        ]
+        self.editable_files = set(p for p in self.all_files if not self._is_readonly(p))
 
-    def directory_tree(self, root: str = None, max_depth: int | None = None):
-        root = Path(root or self.working_dir).absolute()
+    def directory_tree(self, root: str | Path = None, max_depth: int | None = None):
+        root = self.resolve_path(root or self.working_dir, raises=True)
         max_depth = max_depth or self.dir_tree_depth
 
-        if not root.exists() or root.is_file():
-            return (
-                f"Could not display directory tree because {root} is not a directory."
-            )
-
         # initalize with root directory
-        result = [str(root) + "/"]
+        result = [f"{root}/"]
 
         # get all paths with correct depth
         for path in _walk(root, max_depth, skip=self._is_ignored):
@@ -410,11 +441,15 @@ class RepoEnv(TooledEnv):
             if path.is_dir():
                 result[-1] += "/"
 
-            # TODO: Revert this logic to use the readonly patterns, otherwise new files will be read-only
-            if str(path.relative_to(self.working_dir)) not in self.editable_files:
+            if not self.is_editable(path):
                 result[-1] += " (read-only)"
 
         return "\n".join(result)
+
+    def has_breakpoint(self, file_path: str, line_number: int) -> bool:
+        """Check if a breakpoint is set at the given file and line number."""
+        key = f"{self.resolve_path(file_path)}|||{line_number}"
+        return key in self.current_breakpoints_state
 
     def current_breakpoints(self):
         if len(self.current_breakpoints_state) == 0:
