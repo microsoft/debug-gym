@@ -414,14 +414,21 @@ class RepoEnv(TooledEnv):
         # Ignore debug gym hidden files
         ignore_patterns += [".debugignore", ".debugreadonly"]
 
-        # get all file paths relative to the working directory
+        # create a matcher function for ignored files, .debugignore has precedence over .gitignore
         self._is_ignored_func = make_file_matcher(
-            self.resolve_path(".debugignore"), patterns=ignore_patterns
+            base_dir=self.working_dir,
+            pattern_files=[
+                self.resolve_path(".gitignore"),
+                self.resolve_path(".debugignore"),
+            ],
+            patterns=ignore_patterns,
         )
 
-        # get list of editable files
+        # create a matcher function for readonly files
         self._is_readonly_func = make_file_matcher(
-            self.resolve_path(".debugreadonly"), patterns=readonly_patterns
+            base_dir=self.working_dir,
+            pattern_files=self.resolve_path(".debugreadonly"),
+            patterns=readonly_patterns,
         )
 
     def directory_tree(self, root: str | Path = None, max_depth: int | None = None):
