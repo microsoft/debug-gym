@@ -213,10 +213,10 @@ class PDBTool(EnvironmentTool):
         current_breakpoints_state_copy = copy.deepcopy(
             environment.current_breakpoints_state
         )
-        if rewrite_file.startswith(str(environment.working_dir)):
-            rewrite_file = rewrite_file[len(str(environment.working_dir)) + 1 :]
+        rewrite_file = environment.to_absolute(rewrite_file)
         for _key in environment.current_breakpoints_state.keys():
             _file_path, _line_number = _key.split("|||")
+            _file_path = environment.to_absolute(_file_path)
             if _file_path != rewrite_file:
                 # the breakpoints are not in the current file, no need to modify
                 continue
@@ -236,7 +236,7 @@ class PDBTool(EnvironmentTool):
                         + new_code_length
                         - (rewrite_tail - rewrite_head + 1)
                     )
-                    new_key = "|||".join([_file_path, str(new_line_number)])
+                    new_key = "|||".join([str(_file_path), str(new_line_number)])
                     _new_value = environment.current_breakpoints_state[_key].split(":")
                     _new_value[1] = " ".join(
                         [str(new_line_number), " ".join(_new_value[1].split()[1:])]
@@ -280,9 +280,6 @@ class PDBTool(EnvironmentTool):
             if match:
                 # extract the file path and line number from the regex match
                 file_path, line_number = match.groups()
-                # removes environment.working_dir if file is in the working directory
-                if file_path.startswith(str(environment.working_dir)):
-                    file_path = file_path[len(str(environment.working_dir)) + 1 :]
                 key = "|||".join([file_path, line_number])
                 new_breakpoints[key] = f"b {file_path}:{line_number}"
         environment.current_breakpoints_state = new_breakpoints
