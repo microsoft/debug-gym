@@ -1,7 +1,8 @@
 # Changelog
 
 ### 2025-06-03
-Refactored `debug_gym/agents/llm_api.py` into separate modules in `debug_gym/llms/` for OpenAI, AzureOpenAI, Anthropic APIs, and human mode, allowing for easier extension to other LLM providers in the future.
+* Refactored `debug_gym/agents/llm_api.py` into separate modules in `debug_gym/llms/` for OpenAI, AzureOpenAI, Anthropic APIs, and human mode, allowing for easier extension to other LLM providers in the future.
+* Improved the Human mode to support better prompt completion and error handling.
 
 ### 2025-05-20
 

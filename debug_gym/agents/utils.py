@@ -152,6 +152,7 @@ def load_config():
         "-p",
         "--params",
         nargs="+",
+        action="extend",
         metavar="my.setting=value",
         default=[],
         help="override params of the config file,"
