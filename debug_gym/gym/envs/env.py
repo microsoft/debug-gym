@@ -360,7 +360,7 @@ class RepoEnv(TooledEnv):
         self.last_eval = EvalOutput(success, output)
         return self.last_eval
 
-    def to_absolute(self, filepath: str | Path, raises=False) -> Path:
+    def resolve_path(self, filepath: str | Path, raises=False) -> Path:
         """Convert a relative filepath to absolute based on the working_dir.
         If the path is already absolute, it is returned as is.
         If raises is True, raises FileNotFoundError if the file does not exist.
@@ -382,11 +382,11 @@ class RepoEnv(TooledEnv):
     def read_file(self, filepath: str) -> str:
         """Reads a file from the working directory.
         Raises value error if the file does not exist"""
-        abs_filepath = self.to_absolute(filepath, raises=True)
+        abs_filepath = self.resolve_path(filepath, raises=True)
         return abs_filepath.read_text()
 
     def is_editable(self, filepath):
-        return not self._is_readonly(self.to_absolute(filepath))
+        return not self._is_readonly(self.resolve_path(filepath))
 
     def index_files(
         self,
@@ -403,23 +403,23 @@ class RepoEnv(TooledEnv):
 
         # get all file paths relative to the working directory
         self._is_ignored = make_file_matcher(
-            self.to_absolute(".debugignore"), patterns=ignore_patterns
+            self.resolve_path(".debugignore"), patterns=ignore_patterns
         )
         self.all_files = list(
             sorted(
-                self.to_absolute(path)
+                self.resolve_path(path)
                 for path in _walk(self.working_dir, skip=self._is_ignored)
             )
         )
 
         # get list of editable files
         self._is_readonly = make_file_matcher(
-            self.to_absolute(".debugreadonly"), patterns=readonly_patterns
+            self.resolve_path(".debugreadonly"), patterns=readonly_patterns
         )
         self.editable_files = set(p for p in self.all_files if not self._is_readonly(p))
 
     def directory_tree(self, root: str | Path = None, max_depth: int | None = None):
-        root = self.to_absolute(root or self.working_dir, raises=True)
+        root = self.resolve_path(root or self.working_dir, raises=True)
         max_depth = max_depth or self.dir_tree_depth
 
         # initalize with root directory
@@ -444,7 +444,7 @@ class RepoEnv(TooledEnv):
 
     def has_breakpoint(self, file_path: str, line_number: int) -> bool:
         """Check if a breakpoint is set at the given file and line number."""
-        key = f"{self.to_absolute(file_path)}|||{line_number}"
+        key = f"{self.resolve_path(file_path)}|||{line_number}"
         return key in self.current_breakpoints_state
 
     def current_breakpoints(self):

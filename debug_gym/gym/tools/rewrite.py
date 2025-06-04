@@ -40,7 +40,7 @@ class RewriteTool(EnvironmentTool):
     }
 
     def _overwrite_file(self, environment, filepath: str, content: str):
-        with open(environment.to_absolute(filepath), "w") as f:
+        with open(environment.resolve_path(filepath), "w") as f:
             f.write(content)
 
     def _rewrite_file(self, environment, file_path, start, end, new_code):

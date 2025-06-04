@@ -537,27 +537,27 @@ def test_queue_and_process_events():
     mock.assert_has_calls(expected_calls)
 
 
-def test_to_absolute(tmp_path):
+def test_resolve_path(tmp_path):
     env = RepoEnv(path=tmp_path)
     abs_path = (env.working_dir / "file.txt").resolve()
     (abs_path).touch()
     # relative path
-    path_from_env = env.to_absolute("file.txt")
+    path_from_env = env.resolve_path("file.txt")
     assert path_from_env == abs_path
     # absolute path
-    path_from_env = env.to_absolute(str(abs_path))
+    path_from_env = env.resolve_path(str(abs_path))
     assert path_from_env == abs_path
     # relative path with Path object
-    path_from_env = env.to_absolute(Path("file.txt"))
+    path_from_env = env.resolve_path(Path("file.txt"))
     assert path_from_env == abs_path
     # absolute path with Path object
-    path_from_env = env.to_absolute(abs_path)
+    path_from_env = env.resolve_path(abs_path)
     assert path_from_env == abs_path
     # return an absolute path regardless of existence
-    non_existent_path = env.to_absolute("non_existent_file.txt")
+    non_existent_path = env.resolve_path("non_existent_file.txt")
     assert non_existent_path == (env.working_dir / "non_existent_file.txt").resolve()
     # non-existent absolute path
-    non_existent_path = env.to_absolute("/tmp/non_existent_file.txt")
+    non_existent_path = env.resolve_path("/tmp/non_existent_file.txt")
     assert non_existent_path == Path("/tmp/non_existent_file.txt").resolve()
 
 
@@ -591,10 +591,10 @@ def test_index_files_with_ignore_patterns(tmp_path):
     env = RepoEnv(path=tmp_path)
     # Ignore files matching "ignoreme.txt"
     env.index_files(ignore_patterns=["ignoreme.txt"])
-    assert env.to_absolute("ignoreme.txt") not in env.all_files
-    assert env.to_absolute("file1.txt") in env.all_files
-    assert env.to_absolute("file2.txt") in env.all_files
-    assert env.to_absolute("subdir/file3.txt") in env.all_files
+    assert env.resolve_path("ignoreme.txt") not in env.all_files
+    assert env.resolve_path("file1.txt") in env.all_files
+    assert env.resolve_path("file2.txt") in env.all_files
+    assert env.resolve_path("subdir/file3.txt") in env.all_files
 
 
 def test_index_files_with_readonly_patterns(tmp_path):
@@ -604,8 +604,8 @@ def test_index_files_with_readonly_patterns(tmp_path):
     env = RepoEnv(path=tmp_path)
     # Mark "readonly.txt" as read-only
     env.index_files(readonly_patterns=["readonly.txt"])
-    assert env.to_absolute("file1.txt") in env.editable_files
-    assert env.to_absolute("readonly.txt") not in env.editable_files
+    assert env.resolve_path("file1.txt") in env.editable_files
+    assert env.resolve_path("readonly.txt") not in env.editable_files
 
 
 def test_index_files_with_debugignore_and_debugreadonly(tmp_path):
@@ -619,15 +619,15 @@ def test_index_files_with_debugignore_and_debugreadonly(tmp_path):
 
     env = RepoEnv(path=tmp_path)
     env.index_files()
-    assert env.to_absolute("ignoreme.txt") not in env.all_files
-    assert env.to_absolute("file1.txt") in env.all_files
-    assert env.to_absolute("file2.txt") in env.all_files
-    assert env.to_absolute("readonly.txt") in env.all_files
+    assert env.resolve_path("ignoreme.txt") not in env.all_files
+    assert env.resolve_path("file1.txt") in env.all_files
+    assert env.resolve_path("file2.txt") in env.all_files
+    assert env.resolve_path("readonly.txt") in env.all_files
     # Check that readonly.txt is not in editable_files
-    assert env.to_absolute("readonly.txt") not in env.editable_files
+    assert env.resolve_path("readonly.txt") not in env.editable_files
     # Check that file1.txt and file2.txt are in editable_files
-    assert env.to_absolute("file1.txt") in env.editable_files
-    assert env.to_absolute("file2.txt") in env.editable_files
+    assert env.resolve_path("file1.txt") in env.editable_files
+    assert env.resolve_path("file2.txt") in env.editable_files
 
 
 def test_index_files_combined_patterns(tmp_path):
@@ -641,13 +641,13 @@ def test_index_files_combined_patterns(tmp_path):
     env = RepoEnv(path=tmp_path)
     # Also ignore file2.txt and mark file1.txt as readonly via patterns
     env.index_files(ignore_patterns=["file2.txt"], readonly_patterns=["file1.txt"])
-    assert env.to_absolute("ignoreme.txt") not in env.all_files
-    assert env.to_absolute("file2.txt") not in env.all_files
-    assert env.to_absolute("file1.txt") in env.all_files
-    assert env.to_absolute("readonly.txt") in env.all_files
+    assert env.resolve_path("ignoreme.txt") not in env.all_files
+    assert env.resolve_path("file2.txt") not in env.all_files
+    assert env.resolve_path("file1.txt") in env.all_files
+    assert env.resolve_path("readonly.txt") in env.all_files
     # Both file1.txt and readonly.txt should be readonly
-    assert env.to_absolute("file1.txt") not in env.editable_files
-    assert env.to_absolute("readonly.txt") not in env.editable_files
+    assert env.resolve_path("file1.txt") not in env.editable_files
+    assert env.resolve_path("readonly.txt") not in env.editable_files
     assert env.editable_files == set()
 
 

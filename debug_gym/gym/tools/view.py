@@ -88,7 +88,7 @@ class ViewTool(EnvironmentTool):
         if include_line_numbers_and_breakpoints:
             display_content = show_line_number(
                 display_content,
-                code_path=environment.to_absolute(new_file),
+                code_path=environment.resolve_path(new_file),
                 environment=environment,
                 start_index=s + 1,
             )
