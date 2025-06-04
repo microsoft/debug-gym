@@ -40,20 +40,11 @@ class RewriteTool(EnvironmentTool):
     }
 
     def _overwrite_file(self, environment, filepath: str, content: str):
-        assert isinstance(content, str), "content should be a string."
-        with open(environment.working_dir / filepath, "w") as f:
+        with open(environment.resolve_path(filepath), "w") as f:
             f.write(content)
 
     def _rewrite_file(self, environment, file_path, start, end, new_code):
-        if file_path.startswith(str(environment.working_dir)):
-            file_path = file_path[len(str(environment.working_dir)) + 1 :]
-        assert (
-            file_path in environment.all_files
-        ), f"File {file_path} does not exist or is not in the current repository."
-        assert environment.is_editable(file_path), f"File {file_path} is not editable."
-
         original_content = environment.read_file(file_path)
-
         new_code = clean_code(new_code)  # str
         new_code_lines = new_code.split("\n")
         new_code_length = len(new_code_lines)
@@ -89,7 +80,7 @@ class RewriteTool(EnvironmentTool):
 
     def fail(self, environment, message: str) -> Observation:
         self.rewrite_success = False
-        message = "\n".join([message, "Rewrite failed."])
+        message = f"Rewrite failed. Error message:\n{message}\n"
         self.queue_event(
             environment=environment,
             event=Event.REWRITE_FAIL,
@@ -107,14 +98,11 @@ class RewriteTool(EnvironmentTool):
     ) -> Observation:
         self.rewrite_success = False
         if path is None:
-            return self.fail(
-                environment,
-                "File path is None. Please provide a valid file path.",
-            )
+            return self.fail(environment, "File path is None.")
+        if not environment.is_editable(path):
+            return self.fail(environment, f"`{path}` is not editable.")
         if start is not None:
-            if end is None:
-                # only start is provided (rewrite that line)
-                end = start
+            end = end or start  # only start is provided (rewrite that line)
             if start > end:
                 return self.fail(
                     environment,
@@ -130,7 +118,7 @@ class RewriteTool(EnvironmentTool):
                 environment, path, start, end, new_code
             )
         except Exception as e:
-            return self.fail(environment, f"Error while rewriting the file: {str(e)}")
+            return self.fail(environment, str(e))
 
         self.rewrite_success = True
         message = f"The file `{path}` has been updated successfully.\n\nDiff:\n\n{diff}"

@@ -32,14 +32,12 @@ class ListdirTool(EnvironmentTool):
     }
 
     def use(self, environment, path: str = ".", depth: int = 1) -> Observation:
-        # TODO: reimplement dir_tree_depth via ListdirTool __init__
-        # if depth is None:
-        #     depth = environment.dir_tree_depth
         if depth <= 0:
-            return Observation(self.name, f"Depth must be 1 or greater: {depth}")
+            return Observation(
+                self.name, f"Depth must be 1 or greater, got `depth={depth}`"
+            )
         try:
-            startpath = pjoin(environment.working_dir, path)
-            result = environment.directory_tree(root=startpath, max_depth=depth)
-        except ValueError as e:
-            return Observation(self.name, f"Depth must be 1 or greater: {str(e)}")
+            result = environment.directory_tree(root=path, max_depth=depth)
+        except Exception as e:
+            result = f"Error listing directory '{path}': {str(e)}"
         return Observation(self.name, result)

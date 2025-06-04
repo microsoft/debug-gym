@@ -232,10 +232,9 @@ def test_display_files(env):
 
 
 def test_display_files_read_only(env):
-    # with open(env.working_dir / ".debugreadonly", "w") as f:
-    #     f.write("file2.txt")
-    with open(env.working_dir / "read-only-file.txt", "w") as f:
-        f.write("hello world")
+    read_only_path = env.working_dir / "read-only-file.txt"
+    read_only_path.touch()
+    env.is_editable = lambda x: x != read_only_path
     result = env.display_files()
     assert result == (
         "Listing files in the current working directory. (read-only) indicates read-only files. Max depth: 2.\n"
@@ -354,7 +353,7 @@ def test_rewrite_counter(env):
     assert env_info.rewrite_counter == 1
     rewrite_obs = Observation(
         source="rewrite",
-        observation="File path is None. Please provide a valid file path.\nRewrite failed.",
+        observation="Rewrite failed. Error message:\nFile path is None.\n",
     )
     assert env_info.step_observation == rewrite_obs
     assert env_info.all_observations == [rewrite_obs]
@@ -536,3 +535,169 @@ def test_queue_and_process_events():
         call(environment=env, event=Event.ENV_RESET, source="source2", arg2="val2"),
     ]
     mock.assert_has_calls(expected_calls)
+
+
+def test_resolve_path(tmp_path):
+    env = RepoEnv(path=tmp_path)
+    abs_path = (env.working_dir / "file.txt").resolve()
+    (abs_path).touch()
+    # relative path
+    path_from_env = env.resolve_path("file.txt")
+    assert path_from_env == abs_path
+    # absolute path
+    path_from_env = env.resolve_path(str(abs_path))
+    assert path_from_env == abs_path
+    # relative path with Path object
+    path_from_env = env.resolve_path(Path("file.txt"))
+    assert path_from_env == abs_path
+    # absolute path with Path object
+    path_from_env = env.resolve_path(abs_path)
+    assert path_from_env == abs_path
+    # return an absolute path regardless of existence
+    non_existent_path = env.resolve_path("non_existent_file.txt")
+    assert non_existent_path == (env.working_dir / "non_existent_file.txt").resolve()
+    # non-existent absolute path
+    non_existent_path = env.resolve_path("/tmp/non_existent_file.txt")
+    assert non_existent_path == Path("/tmp/non_existent_file.txt").resolve()
+
+
+def test_index_files_basic(tmp_path):
+    # Setup a fake repo structure
+    env = RepoEnv(path=tmp_path)
+    subdir = env.working_dir / "subdir"
+    subdir.mkdir()
+    files = [
+        env.working_dir / "file1.txt",
+        env.working_dir / "file2.txt",
+        env.working_dir / "ignored.txt",
+        env.working_dir / "readonly.txt",
+        env.working_dir / "subdir/file3.txt",
+    ]
+    [f.touch() for f in files]
+    files.append(subdir)
+    env.index_files()
+    assert env.all_files == sorted(files)
+    # All files should be editable if no readonly patterns
+    assert env.editable_files == set(files)
+
+
+def test_index_files_with_ignore_patterns(tmp_path):
+    (tmp_path / "file1.txt").touch()
+    (tmp_path / "file2.txt").touch()
+    (tmp_path / "ignoreme.txt").touch()
+    (tmp_path / "subdir").mkdir()
+    (tmp_path / "subdir" / "file3.txt").touch()
+
+    env = RepoEnv(path=tmp_path)
+    # Ignore files matching "ignoreme.txt"
+    env.index_files(ignore_patterns=["ignoreme.txt"])
+    assert env.resolve_path("ignoreme.txt") not in env.all_files
+    assert env.resolve_path("file1.txt") in env.all_files
+    assert env.resolve_path("file2.txt") in env.all_files
+    assert env.resolve_path("subdir/file3.txt") in env.all_files
+
+
+def test_index_files_with_readonly_patterns(tmp_path):
+    (tmp_path / "file1.txt").touch()
+    (tmp_path / "readonly.txt").touch()
+
+    env = RepoEnv(path=tmp_path)
+    # Mark "readonly.txt" as read-only
+    env.index_files(readonly_patterns=["readonly.txt"])
+    assert env.resolve_path("file1.txt") in env.editable_files
+    assert env.resolve_path("readonly.txt") not in env.editable_files
+
+
+def test_index_files_with_debugignore_and_debugreadonly(tmp_path):
+    (tmp_path / "file1.txt").touch()
+    (tmp_path / "file2.txt").touch()
+    (tmp_path / "ignoreme.txt").touch()
+    (tmp_path / "readonly.txt").touch()
+    # Write .debugignore and .debugreadonly
+    (tmp_path / ".debugignore").write_text("ignoreme.txt\n")
+    (tmp_path / ".debugreadonly").write_text("readonly.txt\n")
+
+    env = RepoEnv(path=tmp_path)
+    env.index_files()
+    assert env.resolve_path("ignoreme.txt") not in env.all_files
+    assert env.resolve_path("file1.txt") in env.all_files
+    assert env.resolve_path("file2.txt") in env.all_files
+    assert env.resolve_path("readonly.txt") in env.all_files
+    # Check that readonly.txt is not in editable_files
+    assert env.resolve_path("readonly.txt") not in env.editable_files
+    # Check that file1.txt and file2.txt are in editable_files
+    assert env.resolve_path("file1.txt") in env.editable_files
+    assert env.resolve_path("file2.txt") in env.editable_files
+
+
+def test_index_files_combined_patterns(tmp_path):
+    (tmp_path / "file1.txt").touch()
+    (tmp_path / "file2.txt").touch()
+    (tmp_path / "ignoreme.txt").touch()
+    (tmp_path / "readonly.txt").touch()
+    (tmp_path / ".debugignore").write_text("ignoreme.txt\n")
+    (tmp_path / ".debugreadonly").write_text("readonly.txt\n")
+
+    env = RepoEnv(path=tmp_path)
+    # Also ignore file2.txt and mark file1.txt as readonly via patterns
+    env.index_files(ignore_patterns=["file2.txt"], readonly_patterns=["file1.txt"])
+    assert env.resolve_path("ignoreme.txt") not in env.all_files
+    assert env.resolve_path("file2.txt") not in env.all_files
+    assert env.resolve_path("file1.txt") in env.all_files
+    assert env.resolve_path("readonly.txt") in env.all_files
+    # Both file1.txt and readonly.txt should be readonly
+    assert env.resolve_path("file1.txt") not in env.editable_files
+    assert env.resolve_path("readonly.txt") not in env.editable_files
+    assert env.editable_files == set()
+
+
+def test_read_file_reads_existing_file(tmp_path):
+    env = RepoEnv(path=tmp_path)
+    file_path = env.working_dir / "test.txt"
+    file_content = "Hello, DebugGym!"
+    file_path.write_text(file_content)
+    # Read file using relative path
+    result = env.read_file(str(env.working_dir / "test.txt"))
+    assert result == file_content
+    # Read file using just the filename (should also work)
+    result = env.read_file("test.txt")
+    assert result == file_content
+
+
+def test_read_file_raises_for_nonexistent_file(tmp_path):
+    env = RepoEnv(path=tmp_path)
+    (env.working_dir / "test.txt").touch()
+    # relative path that does not exist
+    with pytest.raises(FileNotFoundError):
+        env.read_file("does_not_exist.txt")
+    # absolute path matching a file in the working_dir
+    with pytest.raises(FileNotFoundError):
+        env.read_file("/test.txt")
+
+
+def test_has_breakpoint_true_and_false(tmp_path):
+    env = RepoEnv(path=tmp_path)
+    file_path = env.working_dir / "test.py"
+    file_path.write_text("print('hello')")
+    line_number = 10
+    key = f"{file_path}|||{line_number}"
+    env.current_breakpoints_state = {key: "b test.py:10"}
+    assert env.has_breakpoint(str(file_path), line_number) is True
+    assert env.has_breakpoint(str(file_path), 20) is False
+    other_file = env.working_dir / "other.py"
+    assert env.has_breakpoint(str(other_file), line_number) is False
+
+
+def test_has_breakpoint_relative_path(tmp_path):
+    env = RepoEnv(path=tmp_path)
+    file_path = env.working_dir / "foo.py"
+    file_path.write_text("print('foo')")
+    line_number = 5
+    key = f"{file_path}|||{line_number}"
+    env.current_breakpoints_state = {key: "b foo.py:5"}
+    # Should work with relative path
+    assert env.has_breakpoint("foo.py", line_number) is True
+    # Should return False for wrong line
+    assert env.has_breakpoint("foo.py", 6) is False
+    # Should return False for non-existent file
+    assert env.has_breakpoint("bar.py", line_number) is False
