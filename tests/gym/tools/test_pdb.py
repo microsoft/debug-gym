@@ -569,16 +569,15 @@ def test_set_current_frame_file_sets_file(tmp_path, setup_pdb_repo_env):
 def test_set_current_frame_file_sets_and_returns(tmp_path, setup_pdb_repo_env):
     pdb_tool, env = setup_pdb_repo_env(tmp_path)
     # Patch interact_with_pdb to simulate output
-    test_file = "file1.py"
-    test_path = str(env.working_dir / test_file)
+    test_path = str(env.working_dir / "file1.py")
 
     def fake_interact_with_pdb(command, timeout):
         return f"somecontext\n> {test_path}(10)<module>()\n-> some code context"
 
     pdb_tool.interact_with_pdb = fake_interact_with_pdb
     result = pdb_tool.set_current_frame_file(env)
-    assert result == test_file
-    assert pdb_tool.current_frame_file == test_file
+    assert result == test_path
+    assert pdb_tool.current_frame_file == test_path
 
 
 def test_use_multiple_commands_only_first_executed(tmp_path, setup_pdb_repo_env):

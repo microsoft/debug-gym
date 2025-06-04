@@ -295,7 +295,6 @@ class PDBTool(EnvironmentTool):
         #    <string>(1)<module>()
         # > /tmp/RepoEnv-_ha8r7_2/constants.py(6)<module>()
         # -> ACTION_TO_INDEX = {
-        workdir = f"{environment.working_dir}/"
         sep = "> "
         file_path = None
         for line in output.splitlines():
@@ -305,7 +304,7 @@ class PDBTool(EnvironmentTool):
                 # remove the leading "> ", the trailing "(line_number)<module>()", and working_dir
                 # constants.py(6)<module>()
                 # -> ACTION_TO_INDEX = {
-                file_path = line[len(sep) :].split("(")[0].replace(workdir, "")
+                file_path = line[len(sep) :].split("(")[0]
                 break
         if self.current_frame_file != file_path:
             self.current_frame_file = file_path
