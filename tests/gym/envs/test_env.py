@@ -561,7 +561,7 @@ def test_resolve_path(tmp_path):
     assert non_existent_path == Path("/tmp/non_existent_file.txt").resolve()
 
 
-def test_index_files_basic(tmp_path):
+def test_setup_file_filters_basic(tmp_path):
     # Setup a fake repo structure
     env = RepoEnv(path=tmp_path)
     subdir = env.working_dir / "subdir"
@@ -575,13 +575,14 @@ def test_index_files_basic(tmp_path):
     ]
     [f.touch() for f in files]
     files.append(subdir)
-    env.index_files()
-    assert env.all_files == sorted(files)
+    env.setup_file_filters()
+    # All files should be indexed
+    assert all(env.has_file(f) for f in files)
     # All files should be editable if no readonly patterns
-    assert env.editable_files == set(files)
+    assert all(env.is_editable(f) for f in files)
 
 
-def test_index_files_with_ignore_patterns(tmp_path):
+def test_setup_file_filters_with_ignore_patterns(tmp_path):
     (tmp_path / "file1.txt").touch()
     (tmp_path / "file2.txt").touch()
     (tmp_path / "ignoreme.txt").touch()
@@ -590,25 +591,25 @@ def test_index_files_with_ignore_patterns(tmp_path):
 
     env = RepoEnv(path=tmp_path)
     # Ignore files matching "ignoreme.txt"
-    env.index_files(ignore_patterns=["ignoreme.txt"])
-    assert env.resolve_path("ignoreme.txt") not in env.all_files
-    assert env.resolve_path("file1.txt") in env.all_files
-    assert env.resolve_path("file2.txt") in env.all_files
-    assert env.resolve_path("subdir/file3.txt") in env.all_files
+    env.setup_file_filters(ignore_patterns=["ignoreme.txt"])
+    assert not env.has_file("ignoreme.txt")
+    assert env.has_file("file1.txt")
+    assert env.has_file("file2.txt")
+    assert env.has_file("subdir/file3.txt")
 
 
-def test_index_files_with_readonly_patterns(tmp_path):
+def test_setup_file_filters_with_readonly_patterns(tmp_path):
     (tmp_path / "file1.txt").touch()
     (tmp_path / "readonly.txt").touch()
 
     env = RepoEnv(path=tmp_path)
     # Mark "readonly.txt" as read-only
-    env.index_files(readonly_patterns=["readonly.txt"])
-    assert env.resolve_path("file1.txt") in env.editable_files
-    assert env.resolve_path("readonly.txt") not in env.editable_files
+    env.setup_file_filters(readonly_patterns=["readonly.txt"])
+    assert env.is_editable("file1.txt")
+    assert not env.is_editable("readonly.txt")
 
 
-def test_index_files_with_debugignore_and_debugreadonly(tmp_path):
+def test_setup_file_filters_with_debugignore_and_debugreadonly(tmp_path):
     (tmp_path / "file1.txt").touch()
     (tmp_path / "file2.txt").touch()
     (tmp_path / "ignoreme.txt").touch()
@@ -618,19 +619,21 @@ def test_index_files_with_debugignore_and_debugreadonly(tmp_path):
     (tmp_path / ".debugreadonly").write_text("readonly.txt\n")
 
     env = RepoEnv(path=tmp_path)
-    env.index_files()
-    assert env.resolve_path("ignoreme.txt") not in env.all_files
-    assert env.resolve_path("file1.txt") in env.all_files
-    assert env.resolve_path("file2.txt") in env.all_files
-    assert env.resolve_path("readonly.txt") in env.all_files
-    # Check that readonly.txt is not in editable_files
-    assert env.resolve_path("readonly.txt") not in env.editable_files
-    # Check that file1.txt and file2.txt are in editable_files
-    assert env.resolve_path("file1.txt") in env.editable_files
-    assert env.resolve_path("file2.txt") in env.editable_files
+    env.setup_file_filters()
+    assert not env.has_file("ignoreme.txt")
+    assert env.has_file("file1.txt")
+    assert env.has_file("file2.txt")
+    assert env.has_file("readonly.txt")
+    # Check that readonly.txt is not editable
+    assert not env.is_editable("readonly.txt")
+    # Check that file1.txt and file2.txt are editable
+    assert env.is_editable("file1.txt")
+    assert env.is_editable("file2.txt")
+    with pytest.raises(FileNotFoundError):
+        env.is_editable("ignoreme.txt")
 
 
-def test_index_files_combined_patterns(tmp_path):
+def test_setup_file_filters_combined_patterns(tmp_path):
     (tmp_path / "file1.txt").touch()
     (tmp_path / "file2.txt").touch()
     (tmp_path / "ignoreme.txt").touch()
@@ -640,15 +643,21 @@ def test_index_files_combined_patterns(tmp_path):
 
     env = RepoEnv(path=tmp_path)
     # Also ignore file2.txt and mark file1.txt as readonly via patterns
-    env.index_files(ignore_patterns=["file2.txt"], readonly_patterns=["file1.txt"])
-    assert env.resolve_path("ignoreme.txt") not in env.all_files
-    assert env.resolve_path("file2.txt") not in env.all_files
-    assert env.resolve_path("file1.txt") in env.all_files
-    assert env.resolve_path("readonly.txt") in env.all_files
+    env.setup_file_filters(
+        ignore_patterns=["file2.txt"],
+        readonly_patterns=["file1.txt"],
+    )
+    assert not env.has_file("ignoreme.txt")
+    assert not env.has_file("file2.txt")
+    assert env.has_file("file1.txt")
+    assert env.has_file("readonly.txt")
     # Both file1.txt and readonly.txt should be readonly
-    assert env.resolve_path("file1.txt") not in env.editable_files
-    assert env.resolve_path("readonly.txt") not in env.editable_files
-    assert env.editable_files == set()
+    assert not env.is_editable("file1.txt")
+    assert not env.is_editable("readonly.txt")
+    with pytest.raises(FileNotFoundError):
+        assert not env.is_editable("ignoreme.txt")
+    with pytest.raises(FileNotFoundError):
+        assert not env.is_editable("file2.txt")
 
 
 def test_read_file_reads_existing_file(tmp_path):

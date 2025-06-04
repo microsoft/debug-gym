@@ -294,7 +294,7 @@ class SWEBenchEnv(RepoEnv):
             if test_dir not in test_files:
                 test_files.append(test_dir)
         create_ignore_file(self.working_dir / ".debugreadonly", patterns=test_files)
-        self.index_files()
+        self.setup_file_filters()
 
         self.terminal.run("git config user.name 'SWE-Bench'")
         self.terminal.run("git config user.email '<>'")

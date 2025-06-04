@@ -226,7 +226,7 @@ class RepoEnv(TooledEnv):
         self.logger.debug(f"Working directory: {self.working_dir}")
         shutil.copytree(self.path, self.working_dir, dirs_exist_ok=True, symlinks=True)
 
-        self.index_files(readonly_patterns, ignore_patterns)
+        self.setup_file_filters(readonly_patterns, ignore_patterns)
 
         # override entrypoint as it might be task dependent
         self.set_entrypoints(entrypoint, debug_entrypoint)
@@ -363,14 +363,17 @@ class RepoEnv(TooledEnv):
     def resolve_path(self, filepath: str | Path, raises=False) -> Path:
         """Convert a relative filepath to absolute based on the working_dir.
         If the path is already absolute, it is returned as is.
-        If raises is True, raises FileNotFoundError if the file does not exist.
+        If raises is True, raises FileNotFoundError if the file does not exist,
+        is not in the working directory or is ignored by the ignore patterns.
         If raises is False, returns the absolute path regardless of the file existence.
         """
         abs_filepath = Path(filepath)
         if not abs_filepath.is_absolute():
             abs_filepath = (Path(self.working_dir) / abs_filepath).resolve()
         if raises and not (
-            abs_filepath.is_relative_to(self.working_dir) and abs_filepath.exists()
+            abs_filepath.is_relative_to(self.working_dir)
+            and abs_filepath.exists()
+            and not self._is_ignored_func(abs_filepath)
         ):
             # raises error with original path
             raise FileNotFoundError(
@@ -379,6 +382,16 @@ class RepoEnv(TooledEnv):
             )
         return abs_filepath
 
+    def has_file(self, filepath: str) -> bool:
+        """Checks if a file exists in the working directory.
+        Shortcut for `resolve_path` with raises=True.
+        """
+        try:
+            self.resolve_path(filepath, raises=True)
+            return True
+        except FileNotFoundError:
+            return False
+
     def read_file(self, filepath: str) -> str:
         """Reads a file from the working directory.
         Raises value error if the file does not exist"""
@@ -386,9 +399,9 @@ class RepoEnv(TooledEnv):
         return abs_filepath.read_text()
 
     def is_editable(self, filepath):
-        return not self._is_readonly(self.resolve_path(filepath))
+        return not self._is_readonly_func(self.resolve_path(filepath, raises=True))
 
-    def index_files(
+    def setup_file_filters(
         self,
         readonly_patterns: list[str] | None = None,
         ignore_patterns: list[str] | None = None,
@@ -402,21 +415,14 @@ class RepoEnv(TooledEnv):
         ignore_patterns += [".debugignore", ".debugreadonly"]
 
         # get all file paths relative to the working directory
-        self._is_ignored = make_file_matcher(
+        self._is_ignored_func = make_file_matcher(
             self.resolve_path(".debugignore"), patterns=ignore_patterns
-        )
-        self.all_files = list(
-            sorted(
-                self.resolve_path(path)
-                for path in _walk(self.working_dir, skip=self._is_ignored)
-            )
         )
 
         # get list of editable files
-        self._is_readonly = make_file_matcher(
+        self._is_readonly_func = make_file_matcher(
             self.resolve_path(".debugreadonly"), patterns=readonly_patterns
         )
-        self.editable_files = set(p for p in self.all_files if not self._is_readonly(p))
 
     def directory_tree(self, root: str | Path = None, max_depth: int | None = None):
         root = self.resolve_path(root or self.working_dir, raises=True)
@@ -426,7 +432,7 @@ class RepoEnv(TooledEnv):
         result = [f"{root}/"]
 
         # get all paths with correct depth
-        for path in _walk(root, max_depth, skip=self._is_ignored):
+        for path in _walk(root, max_depth, skip=self._is_ignored_func):
             rel_path = path.relative_to(root)  # relative path from root
             depth = len(rel_path.parts) - 1  # depth of current path
             indent = "  " * depth  # 2 spaces per level for indent
