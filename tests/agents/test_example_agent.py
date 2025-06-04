@@ -1,8 +1,8 @@
 from unittest.mock import MagicMock
 
 from debug_gym.agents.debug_agent import Debug_5_Agent, DebugAgent
-from debug_gym.agents.llm_api import LLMResponse, TokenUsage
 from debug_gym.agents.rewrite_agent import RewriteAgent
+from debug_gym.llms.base import LLMResponse, TokenUsage
 
 
 def test_build_question_prompt(agent_setup):

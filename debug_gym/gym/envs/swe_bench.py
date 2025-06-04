@@ -100,7 +100,7 @@ class SWEBenchEnv(RepoEnv):
             )
 
     def setup_local_repo(self):
-        repo_address = self.ds_row["repo"]
+        # repo_address = self.ds_row["repo"]
         base_commit = self.ds_row["base_commit"]
         test_patch = self.ds_row["test_patch"]
         # TODO: use fail_to_pass and pass_to_pass
@@ -236,14 +236,14 @@ class SWEBenchEnv(RepoEnv):
         # Allow for the user to pip install in the env. TODO: This is still slow.
         # self.terminal.run(f"chmod -R o+rwX /opt/miniconda3/envs/testbed", user="root")
         self.terminal.run(
-            f"chmod -R o+rwX /opt/miniconda3/envs/testbed/bin", user="root"
+            "chmod -R o+rwX /opt/miniconda3/envs/testbed/bin", user="root"
         )
         self.terminal.run(
-            f"chmod o+rwX /opt/miniconda3/envs/testbed/lib/python*/site-packages",
+            "chmod o+rwX /opt/miniconda3/envs/testbed/lib/python*/site-packages",
             user="root",
         )
         self.terminal.run(
-            f"chmod o+rwX /opt/miniconda3/envs/testbed/lib/python*/site-packages/*",
+            "chmod o+rwX /opt/miniconda3/envs/testbed/lib/python*/site-packages/*",
             user="root",
         )
         self.terminal.run(
@@ -262,13 +262,13 @@ class SWEBenchEnv(RepoEnv):
         self.terminal.run(f"cp -r /testbed/. {self.working_dir}")
 
         self.terminal.session_commands.append("source /opt/miniconda3/bin/activate")
-        self.terminal.session_commands.append(f"conda activate testbed")
+        self.terminal.session_commands.append("conda activate testbed")
 
         self.run_install()
         self.run_post_install()
 
         # Apply test patch
-        command = f"git apply -"
+        command = "git apply -"
         subprocess.run(
             command.split(),
             cwd=self.working_dir,
@@ -294,12 +294,12 @@ class SWEBenchEnv(RepoEnv):
             if test_dir not in test_files:
                 test_files.append(test_dir)
         create_ignore_file(self.working_dir / ".debugreadonly", patterns=test_files)
-        self._index_files()
+        self.setup_file_filters()
 
-        self.terminal.run(f"git config user.name 'SWE-Bench'")
-        self.terminal.run(f"git config user.email '<>'")
-        self.terminal.run(f"git add .debugignore")
-        self.terminal.run(f"git commit -am 'Applied test patch'")
+        self.terminal.run("git config user.name 'SWE-Bench'")
+        self.terminal.run("git config user.email '<>'")
+        self.terminal.run("git add .debugignore")
+        self.terminal.run("git commit -am 'Applied test patch'")
 
         # Reset RepoEnv
         # TODO: Create a RepoEnv per task and set max_score at initialization.
