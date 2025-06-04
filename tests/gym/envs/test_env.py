@@ -592,10 +592,10 @@ def test_setup_file_filters_with_ignore_patterns(tmp_path):
     env = RepoEnv(path=tmp_path)
     # Ignore files matching "ignoreme.txt"
     env.setup_file_filters(ignore_patterns=["ignoreme.txt"])
-    assert env.resolve_path("ignoreme.txt") not in env.all_files
-    assert env.resolve_path("file1.txt") in env.all_files
-    assert env.resolve_path("file2.txt") in env.all_files
-    assert env.resolve_path("subdir/file3.txt") in env.all_files
+    assert not env.has_file("ignoreme.txt")
+    assert env.has_file("file1.txt")
+    assert env.has_file("file2.txt")
+    assert env.has_file("subdir/file3.txt")
 
 
 def test_setup_file_filters_with_readonly_patterns(tmp_path):
@@ -626,7 +626,7 @@ def test_setup_file_filters_with_debugignore_and_debugreadonly(tmp_path):
     assert env.has_file("readonly.txt")
     # Check that readonly.txt is not editable
     assert not env.is_editable("readonly.txt")
-    # Check that file1.txt and file2.txt are not editable
+    # Check that file1.txt and file2.txt are editable
     assert env.is_editable("file1.txt")
     assert env.is_editable("file2.txt")
     with pytest.raises(FileNotFoundError):
