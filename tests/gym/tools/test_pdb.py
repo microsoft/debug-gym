@@ -560,9 +560,9 @@ def test_set_current_frame_file_sets_file(tmp_path, setup_pdb_repo_env):
     assert "pytest/__main__.py" in pdb_tool.current_frame_file
     obs = pdb_tool.use(env, "c")
     # At this point, current_frame_file should be set to the file where the breakpoint was set
-    assert pdb_tool.current_frame_file == "test_fail.py"
+    assert pdb_tool.current_frame_file == f"{env.working_dir}/test_fail.py"
     # observation should contain the test file
-    assert "Current frame:\ntest_fail.py" in obs.observation
+    assert f"Current frame:\n{env.working_dir}/test_fail.py" in obs.observation
     assert "> test_fail.py(2)" in obs.observation
 
 
