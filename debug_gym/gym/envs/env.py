@@ -363,14 +363,17 @@ class RepoEnv(TooledEnv):
     def resolve_path(self, filepath: str | Path, raises=False) -> Path:
         """Convert a relative filepath to absolute based on the working_dir.
         If the path is already absolute, it is returned as is.
-        If raises is True, raises FileNotFoundError if the file does not exist.
+        If raises is True, raises FileNotFoundError if the file does not exist,
+        is not in the working directory or is ignored by the ignore patterns.
         If raises is False, returns the absolute path regardless of the file existence.
         """
         abs_filepath = Path(filepath)
         if not abs_filepath.is_absolute():
             abs_filepath = (Path(self.working_dir) / abs_filepath).resolve()
         if raises and not (
-            abs_filepath.is_relative_to(self.working_dir) and abs_filepath.exists()
+            abs_filepath.is_relative_to(self.working_dir)
+            and abs_filepath.exists()
+            and not self._is_ignored_func(abs_filepath)
         ):
             # raises error with original path
             raise FileNotFoundError(
@@ -379,6 +382,16 @@ class RepoEnv(TooledEnv):
             )
         return abs_filepath
 
+    def has_file(self, filepath: str) -> bool:
+        """Checks if a file exists in the working directory.
+        Shortcut for `resolve_path` with raises=True.
+        """
+        try:
+            self.resolve_path(filepath, raises=True)
+            return True
+        except FileNotFoundError:
+            return False
+
     def read_file(self, filepath: str) -> str:
         """Reads a file from the working directory.
         Raises value error if the file does not exist"""
@@ -386,7 +399,7 @@ class RepoEnv(TooledEnv):
         return abs_filepath.read_text()
 
     def is_editable(self, filepath):
-        return not self._is_readonly(self.resolve_path(filepath))
+        return not self._is_readonly_func(self.resolve_path(filepath, raises=True))
 
     def index_files(
         self,
