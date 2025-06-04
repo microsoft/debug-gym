@@ -116,7 +116,10 @@ class CommandParser:
 
             if i >= len(arg_text) or arg_text[i] != "=":
                 errors.append(
-                    ("Expected '=' after argument name", start_position + arg_start)
+                    (
+                        f"Expected '=' after argument name: {arg_text[arg_start:i]}",
+                        start_position + arg_start,
+                    )
                 )
                 break
 
