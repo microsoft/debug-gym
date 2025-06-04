@@ -214,6 +214,47 @@ def has_sufficient_debug_to_code_patterns(
     return count_debug_to_code_patterns(trajectory, max_steps_between) >= min_patterns
 
 
+def has_continue_after_setting_breakpoints(trajectory):
+    """
+    Check if trajectory follows a logical debugging sequence:
+    1. Set breakpoints using "b" or "break"
+    2. Continue execution using "c"
+
+    These actions don't need to be consecutive but should occur in this order.
+
+    Args:
+        trajectory: List of trajectory steps (log entries)
+
+    Returns:
+        bool: True if trajectory contains the logical debugging sequence
+    """
+    breakpoint_commands = ["b", "break"]
+    continue_commands = ["c", "continue"]
+
+    # Track states: 0 = looking for breakpoint, 1 = looking for continue, 2 = found all
+    state = 0
+
+    for step in trajectory:
+        action = step.get("action")
+        if action and action.get("name") == "pdb":
+            arguments = action.get("arguments", {})
+            command = arguments.get("command", "")
+
+            if command:
+                cmd = command.strip().split()[0]
+
+                # State 0: Looking for breakpoint setting
+                if state == 0 and cmd in breakpoint_commands:
+                    state = 1
+
+                # State 1: Looking for continue (after breakpoint was set)
+                elif state == 1 and cmd in continue_commands:
+                    state = 2
+                    return True  # Found complete sequence
+
+    return False
+
+
 def follows_proper_debugging_workflow(trajectory):
     """
     Check if trajectory follows a logical debugging sequence:

@@ -90,7 +90,8 @@ def main():
 
     trajectory_criteria = [
         # follows_proper_debugging_workflow,
-        uses_pdb_print_commands,
+        # uses_pdb_print_commands,
+        has_continue_after_setting_breakpoints
         # lambda trajectory: has_consecutive_pdb_calls(trajectory, n=2),
     ]
 
@@ -114,9 +115,12 @@ def main():
             model_name[_mn] = 0
         model_name[_mn] += 1
     print("Criteria used:")
-    for criterion in trajectory_criteria + data_criteria:
+    for criterion in (trajectory_criteria or []) + (data_criteria or []):
         print(f"  {criterion.__name__}")
     print("\nMatching files by model:")
+
+    # print the number of matching files for each model (sorted by model name)
+    model_name = dict(sorted(model_name.items()))
     for mn, count in model_name.items():
         print(f"  {mn}: {count} files")
 
