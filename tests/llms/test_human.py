@@ -7,12 +7,17 @@ import pytest
 from debug_gym.gym.tools.tool import ToolCall
 from debug_gym.gym.tools.toolbox import Toolbox
 from debug_gym.llms import Human
-from debug_gym.llms.human import CommandParser, ToolCommandValidator, DynamicToolCommandCompleter
+from debug_gym.llms.human import (
+    CommandParser,
+    DynamicToolCommandCompleter,
+    ToolCommandValidator,
+)
 
 # Import prompt_toolkit dependencies for testing, with fallback mocks
 try:
-    from prompt_toolkit.validation import ValidationError
     from prompt_toolkit.document import Document
+    from prompt_toolkit.validation import ValidationError
+
     prompt_toolkit_available = True
 except ImportError:
     # Create mock classes if prompt_toolkit is not available
@@ -25,7 +30,9 @@ except ImportError:
     class Document:
         def __init__(self, text="", cursor_position=None):
             self.text = text
-            self.cursor_position = cursor_position if cursor_position is not None else len(text)
+            self.cursor_position = (
+                cursor_position if cursor_position is not None else len(text)
+            )
 
     prompt_toolkit_available = False
 
@@ -41,10 +48,7 @@ def example_tools():
             "name": "print",
             "description": "Print a message to stdout",
             "arguments": {
-                "msg": {
-                    "type": ["string"],
-                    "description": "Message to print"
-                }
+                "msg": {"type": ["string"], "description": "Message to print"}
             },
         },
         {
@@ -52,14 +56,8 @@ def example_tools():
             "name": "sum",
             "description": "Add two numbers",
             "arguments": {
-                "a": {
-                    "type": ["number"],
-                    "description": "First number"
-                },
-                "b": {
-                    "type": ["number"],
-                    "description": "Second number"
-                }
+                "a": {"type": ["number"], "description": "First number"},
+                "b": {"type": ["number"], "description": "Second number"},
             },
         },
         {
@@ -67,14 +65,11 @@ def example_tools():
             "name": "toggle",
             "description": "Toggle a boolean flag",
             "arguments": {
-                "enabled": {
-                    "type": ["boolean"],
-                    "description": "Enable or disable"
-                },
+                "enabled": {"type": ["boolean"], "description": "Enable or disable"},
                 "verbose": {
                     "type": ["boolean", "null"],
-                    "description": "Optional verbose mode"
-                }
+                    "description": "Optional verbose mode",
+                },
             },
         },
     ]
@@ -89,23 +84,17 @@ def simple_tools():
             "name": "cmd1",
             "description": "First command",
             "arguments": {
-                "arg1": {
-                    "type": ["string"],
-                    "description": "First argument"
-                }
-            }
+                "arg1": {"type": ["string"], "description": "First argument"}
+            },
         },
         {
             "id": "cmd2-002",
             "name": "cmd2",
             "description": "Second command",
             "arguments": {
-                "arg2": {
-                    "type": ["number"],
-                    "description": "Second argument"
-                }
-            }
-        }
+                "arg2": {"type": ["number"], "description": "Second argument"}
+            },
+        },
     ]
 
 
@@ -115,11 +104,11 @@ class TestCommandParser:
     def test_init(self):
         """Test CommandParser initialization"""
         parser = CommandParser()
-        assert hasattr(parser, 'patterns')
-        assert 'command' in parser.patterns
-        assert 'arg_name' in parser.patterns
-        assert 'boolean' in parser.patterns
-        assert 'number' in parser.patterns
+        assert hasattr(parser, "patterns")
+        assert "command" in parser.patterns
+        assert "arg_name" in parser.patterns
+        assert "boolean" in parser.patterns
+        assert "number" in parser.patterns
 
     def test_parse_command_empty_input(self):
         """Test parsing empty input"""
@@ -241,12 +230,7 @@ class TestCommandParser:
         cmd = 'test name="John Doe" age=30 active=true score=95.5'
         command, args, errors = parser.parse_command(cmd)
         assert command == "test"
-        assert args == {
-            "name": "John Doe",
-            "age": 30,
-            "active": True,
-            "score": 95.5
-        }
+        assert args == {"name": "John Doe", "age": 30, "active": True, "score": 95.5}
         assert errors == []
 
 
@@ -293,7 +277,9 @@ class TestToolCommandValidator:
 
         # Test wrong type
         arg_info = {"type": ["number"], "description": "Test"}
-        is_valid, value, error = validator.validate_argument("test", "not_a_number", arg_info)
+        is_valid, value, error = validator.validate_argument(
+            "test", "not_a_number", arg_info
+        )
         assert not is_valid
         assert value is None
         assert "Invalid value for test" in error
@@ -347,7 +333,9 @@ class TestToolCommandValidator:
 
         with pytest.raises(ValidationError) as exc_info:
             validator.validate(document)
-        assert "Unknown argument 'unknown_arg' for command 'print'" in str(exc_info.value)
+        assert "Unknown argument 'unknown_arg' for command 'print'" in str(
+            exc_info.value
+        )
 
     def test_validate_command_with_invalid_argument_value(self, example_tools):
         """Test validation with command containing invalid argument value"""
@@ -446,7 +434,9 @@ class TestDynamicToolCommandCompleter:
     def test_get_argument_value_completions_boolean(self, example_tools):
         """Test argument value completions for boolean type"""
         completer = DynamicToolCommandCompleter(example_tools)
-        completions = list(completer._get_argument_value_completions("toggle", "enabled"))
+        completions = list(
+            completer._get_argument_value_completions("toggle", "enabled")
+        )
 
         assert len(completions) == 2
         completion_texts = [c.text for c in completions]
@@ -554,9 +544,9 @@ def test_human_max_retries_proper_behavior(build_env_info):
     )
 
     # Mock input to return invalid input twice, then valid input
-    inputs = ["", "invalid command syntax", "pdb command=\"help\""]
+    inputs = ["", "invalid command syntax", 'pdb command="help"']
     with patch("builtins.input", side_effect=inputs):
-        with patch('numpy.random.randint', return_value=np.array([1, 2, 3, 4])):
+        with patch("numpy.random.randint", return_value=np.array([1, 2, 3, 4])):
             llm_response = human(messages, env_info.tools)
             # Should succeed on the third try
             assert llm_response.tool.name == "pdb"
@@ -573,7 +563,9 @@ def test_human_max_retries_exceeded(build_env_info):
 
     # Mock input to always return invalid input
     with patch("builtins.input", return_value=""):
-        with pytest.raises(ValueError, match="Maximum retries \\(2\\) reached without valid input"):
+        with pytest.raises(
+            ValueError, match="Maximum retries \\(2\\) reached without valid input"
+        ):
             human(messages, env_info.tools)
 
 
@@ -595,23 +587,27 @@ def test_human_define_tools():
     """Test Human tool definitions"""
     human = Human()
     mock_tools = [
-        type('MockTool', (), {
-            'name': 'test_tool',
-            'arguments': {'arg1': 'value1'},
-            'description': 'Test tool description'
-        })()
+        type(
+            "MockTool",
+            (),
+            {
+                "name": "test_tool",
+                "arguments": {"arg1": "value1"},
+                "description": "Test tool description",
+            },
+        )()
     ]
 
     # Mock random to get predictable IDs - need to return array
-    with patch('numpy.random.randint', return_value=np.array([1, 2, 3, 4, 5, 6])):
+    with patch("numpy.random.randint", return_value=np.array([1, 2, 3, 4, 5, 6])):
         defined_tools = human.define_tools(mock_tools)
 
     assert len(defined_tools) == 1
     tool = defined_tools[0]
-    assert tool['name'] == 'test_tool'
-    assert tool['arguments'] == {'arg1': 'value1'}
-    assert tool['description'] == 'Test tool description'
-    assert tool['id'] == 'test_tool-123456'
+    assert tool["name"] == "test_tool"
+    assert tool["arguments"] == {"arg1": "value1"}
+    assert tool["description"] == "Test tool description"
+    assert tool["id"] == "test_tool-123456"
 
 
 @patch(
@@ -625,14 +621,18 @@ def test_human_with_number_arguments(build_env_info):
     messages = [{"role": "user", "content": "Calculate sum"}]
 
     # Create a mock tool that accepts number arguments
-    mock_tool = type('MockTool', (), {
-        'name': 'sum',
-        'arguments': {
-            'a': {'type': ['number'], 'description': 'First number'},
-            'b': {'type': ['number'], 'description': 'Second number'}
+    mock_tool = type(
+        "MockTool",
+        (),
+        {
+            "name": "sum",
+            "arguments": {
+                "a": {"type": ["number"], "description": "First number"},
+                "b": {"type": ["number"], "description": "Second number"},
+            },
+            "description": "Add two numbers",
         },
-        'description': 'Add two numbers'
-    })()
+    )()
 
     env_info = build_env_info(tools=[mock_tool])
     llm_response = human(messages, env_info.tools)
@@ -652,13 +652,17 @@ def test_human_with_boolean_arguments(build_env_info):
     messages = [{"role": "user", "content": "Toggle flag"}]
 
     # Create a mock tool that accepts boolean arguments
-    mock_tool = type('MockTool', (), {
-        'name': 'toggle',
-        'arguments': {
-            'enabled': {'type': ['boolean'], 'description': 'Enable flag'}
+    mock_tool = type(
+        "MockTool",
+        (),
+        {
+            "name": "toggle",
+            "arguments": {
+                "enabled": {"type": ["boolean"], "description": "Enable flag"}
+            },
+            "description": "Toggle a boolean flag",
         },
-        'description': 'Toggle a boolean flag'
-    })()
+    )()
 
     env_info = build_env_info(tools=[mock_tool])
     llm_response = human(messages, env_info.tools)
@@ -673,13 +677,13 @@ def test_human_format_tool_call_history(build_env_info):
 
     # Create mock response
     tool_call = ToolCall(id="test-123", name="test_tool", arguments={"arg": "value"})
-    mock_response = type('MockResponse', (), {})()
-    mock_response = [type('MockItem', (), {'tool': tool_call})()]
+    mock_response = type("MockResponse", (), {})()
+    mock_response = [type("MockItem", (), {"tool": tool_call})()]
 
     # Create mock history info
     history_info = build_env_info(
         action=ToolCall(id="test-123", name="test_tool", arguments={"arg": "value"}),
-        step_observation=type('MockObs', (), {'observation': 'Test observation'})()
+        step_observation=type("MockObs", (), {"observation": "Test observation"})(),
     )
 
     formatted = human.format_tool_call_history(history_info, mock_response)

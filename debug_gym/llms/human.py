@@ -1,8 +1,8 @@
 import json
-import sys
-
 import re
-from typing import Dict, List, Optional, Tuple, Any
+import sys
+from typing import Any, Dict, List, Optional, Tuple
+
 import numpy as np
 
 from debug_gym.gym.envs.env import EnvInfo
@@ -11,16 +11,15 @@ from debug_gym.llms.base import LLM, LLMResponse
 from debug_gym.llms.utils import print_messages
 from debug_gym.logger import DebugGymLogger
 
-
 prompt_toolkit_available = False
 try:
     # For command line history and autocompletion.
-    from prompt_toolkit.history import InMemoryHistory
-    from prompt_toolkit.shortcuts import CompleteStyle
     from prompt_toolkit import PromptSession
     from prompt_toolkit.completion import Completer, Completion
+    from prompt_toolkit.history import InMemoryHistory
+    from prompt_toolkit.shortcuts import CompleteStyle
     from prompt_toolkit.styles import Style
-    from prompt_toolkit.validation import Validator, ValidationError
+    from prompt_toolkit.validation import ValidationError, Validator
 
     prompt_toolkit_available = sys.stdout.isatty()
 except ImportError:
@@ -30,17 +29,19 @@ except ImportError:
 
 def get_prompt_style():
     """Return a Style object for the prompt"""
-    return Style.from_dict({
-        'completion-menu.completion.current': 'bg:#00aaaa #000000',
-        'completion-menu.completion': 'bg:#008888 #ffffff',
-        'completion-menu.meta.completion.current': 'bg:#00aaaa #000000',
-        'completion-menu.meta.completion': 'bg:#00aaaa #ffffff',
-        'scrollbar.background': 'bg:#88aaaa',
-        'scrollbar.button': 'bg:#222222',
-        'popup': 'bg:#333333 #ffffff',
-        'popup.title': 'bg:#555555 #ffffff',
-        'popup.border': 'bg:#444444 #ffffff',
-    })
+    return Style.from_dict(
+        {
+            "completion-menu.completion.current": "bg:#00aaaa #000000",
+            "completion-menu.completion": "bg:#008888 #ffffff",
+            "completion-menu.meta.completion.current": "bg:#00aaaa #000000",
+            "completion-menu.meta.completion": "bg:#00aaaa #ffffff",
+            "scrollbar.background": "bg:#88aaaa",
+            "scrollbar.button": "bg:#222222",
+            "popup": "bg:#333333 #ffffff",
+            "popup.title": "bg:#555555 #ffffff",
+            "popup.border": "bg:#444444 #ffffff",
+        }
+    )
 
 
 class CommandParser:
@@ -49,13 +50,15 @@ class CommandParser:
 
     def __init__(self):
         self.patterns = {
-            'command': re.compile(r'^[a-zA-Z_][a-zA-Z0-9_]*$'),
-            'arg_name': re.compile(r'^[a-zA-Z_][a-zA-Z0-9_]*$'),
-            'boolean': re.compile(r'^(true|false)$', re.IGNORECASE),
-            'number': re.compile(r'^-?\d+(\.\d+)?$')
+            "command": re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$"),
+            "arg_name": re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$"),
+            "boolean": re.compile(r"^(true|false)$", re.IGNORECASE),
+            "number": re.compile(r"^-?\d+(\.\d+)?$"),
         }
 
-    def parse_command(self, text: str) -> Tuple[Optional[str], Dict[str, Any], List[Tuple[str, int]]]:
+    def parse_command(
+        self, text: str
+    ) -> Tuple[Optional[str], Dict[str, Any], List[Tuple[str, int]]]:
         """
         Parse a command string into command name and arguments
         Returns (command, args, errors) where errors is a list of (error_message, position)
@@ -69,7 +72,7 @@ class CommandParser:
         command = parts[0]
 
         # Validate command name
-        if not self.patterns['command'].match(command):
+        if not self.patterns["command"].match(command):
             return None, {}, [("Invalid command name", 0)]
 
         args = {}
@@ -85,7 +88,13 @@ class CommandParser:
 
         return command, args, errors
 
-    def _parse_arguments(self, arg_text: str, start_position: int, args: Dict[str, Any], errors: List[Tuple[str, int]]):
+    def _parse_arguments(
+        self,
+        arg_text: str,
+        start_position: int,
+        args: Dict[str, Any],
+        errors: List[Tuple[str, int]],
+    ):
         """Parse arguments from text"""
         # Parse argument key-value pairs
         i = 0
@@ -100,18 +109,24 @@ class CommandParser:
 
             # Find the argument name
             arg_start = i
-            while i < len(arg_text) and not arg_text[i].isspace() and arg_text[i] != '=':
+            while (
+                i < len(arg_text) and not arg_text[i].isspace() and arg_text[i] != "="
+            ):
                 i += 1
 
-            if i >= len(arg_text) or arg_text[i] != '=':
-                errors.append(("Expected '=' after argument name", start_position + arg_start))
+            if i >= len(arg_text) or arg_text[i] != "=":
+                errors.append(
+                    ("Expected '=' after argument name", start_position + arg_start)
+                )
                 break
 
             arg_name = arg_text[arg_start:i]
 
             # Validate argument name
-            if not self.patterns['arg_name'].match(arg_name):
-                errors.append((f"Invalid argument name: {arg_name}", start_position + arg_start))
+            if not self.patterns["arg_name"].match(arg_name):
+                errors.append(
+                    (f"Invalid argument name: {arg_name}", start_position + arg_start)
+                )
                 # Try to continue parsing
                 while i < len(arg_text) and not arg_text[i].isspace():
                     i += 1
@@ -125,7 +140,9 @@ class CommandParser:
                 i += 1
 
             if i >= len(arg_text):
-                errors.append((f"Missing value for argument '{arg_name}'", start_position + i - 1))
+                errors.append(
+                    (f"Missing value for argument '{arg_name}'", start_position + i - 1)
+                )
                 break
 
             # Parse value
@@ -158,10 +175,10 @@ class CommandParser:
         value_text = text[start:end]
 
         # Try to interpret as boolean or number
-        if self.patterns['boolean'].match(value_text):
-            return value_text.lower() == 'true', end, None
-        elif self.patterns['number'].match(value_text):
-            if '.' in value_text:
+        if self.patterns["boolean"].match(value_text):
+            return value_text.lower() == "true", end, None
+        elif self.patterns["number"].match(value_text):
+            if "." in value_text:
                 return float(value_text), end, None
             else:
                 return int(value_text), end, None
@@ -169,7 +186,9 @@ class CommandParser:
         # Default to string
         return value_text, end, None
 
-    def _parse_quoted_string(self, text: str, start: int) -> Tuple[str, int, Optional[str]]:
+    def _parse_quoted_string(
+        self, text: str, start: int
+    ) -> Tuple[str, int, Optional[str]]:
         """Parse a quoted string"""
         quote_char = text[start]
         i = start + 1  # Skip opening quote
@@ -178,21 +197,21 @@ class CommandParser:
         while i < len(text):
             if text[i] == quote_char:
                 # Found closing quote
-                return ''.join(result), i + 1, None
-            elif text[i] == '\\' and i + 1 < len(text):
+                return "".join(result), i + 1, None
+            elif text[i] == "\\" and i + 1 < len(text):
                 # Handle escape sequences
                 escape_char = text[i + 1]
-                if escape_char in ('"', "'", '\\'):
+                if escape_char in ('"', "'", "\\"):
                     result.append(escape_char)
                 else:
-                    result.append('\\' + escape_char)
+                    result.append("\\" + escape_char)
                 i += 2
             else:
                 result.append(text[i])
                 i += 1
 
         # If we get here, the string wasn't closed
-        return ''.join(result), len(text), "Unclosed string literal"
+        return "".join(result), len(text), "Unclosed string literal"
 
 
 class ToolCommandValidator(Validator):
@@ -200,34 +219,44 @@ class ToolCommandValidator(Validator):
     """Validates command input in real-time as the user types"""
 
     def __init__(self, tools):
-        self.command_names = [tool['name'] for tool in tools]
-        self.command_args = {tool['name']: tool['arguments'] for tool in tools}
+        self.command_names = [tool["name"] for tool in tools]
+        self.command_args = {tool["name"]: tool["arguments"] for tool in tools}
         self.parser = CommandParser()
 
-    def validate_argument(self, arg_name: str, arg_value: Any, arg_info: Dict) -> Tuple[bool, Any, Optional[str]]:
+    def validate_argument(
+        self, arg_name: str, arg_value: Any, arg_info: Dict
+    ) -> Tuple[bool, Any, Optional[str]]:
         """
         Validate an argument value against its expected type
         Returns (is_valid, converted_value, error_message)
         """
         if arg_info is None:
-            return False, None, f"Unknown argument: {arg_name}"        # Get expected types from the argument info
-        expected_types = arg_info.get('type', ['string'])
+            return (
+                False,
+                None,
+                f"Unknown argument: {arg_name}",
+            )  # Get expected types from the argument info
+        expected_types = arg_info.get("type", ["string"])
         if not isinstance(expected_types, list):
             expected_types = [expected_types]
 
         # Type validation
-        if 'boolean' in expected_types and isinstance(arg_value, bool):
+        if "boolean" in expected_types and isinstance(arg_value, bool):
             return True, arg_value, None
 
-        if 'number' in expected_types and isinstance(arg_value, (int, float)):
+        if "number" in expected_types and isinstance(arg_value, (int, float)):
             return True, arg_value, None
 
-        if 'string' in expected_types and isinstance(arg_value, str):
+        if "string" in expected_types and isinstance(arg_value, str):
             return True, arg_value, None
 
         # If we get here, the type doesn't match what's expected
         type_name = type(arg_value).__name__
-        return False, None, f"Invalid value for {arg_name}: '{arg_value}' (type: {type_name}). Expected types: {', '.join(expected_types)}"
+        return (
+            False,
+            None,
+            f"Invalid value for {arg_name}: '{arg_value}' (type: {type_name}). Expected types: {', '.join(expected_types)}",
+        )
 
     def validate(self, document):
         """Validate the command as the user types"""
@@ -245,13 +274,15 @@ class ToolCommandValidator(Validator):
 
         # Validate command name
         if command not in self.command_names:
-            raise ValidationError(message=f"Unknown command: {command}", cursor_position=0)
+            raise ValidationError(
+                message=f"Unknown command: {command}", cursor_position=0
+            )
 
         # Check for missing mandatory arguments
         command_arguments = self.command_args.get(command, {})
         for arg_name, arg_info in command_arguments.items():
             # Skip optional arguments represented as 'null' in types.
-            if "null" in arg_info.get('type', []):
+            if "null" in arg_info.get("type", []):
                 continue
 
             # Check if mandatory argument is provided
@@ -259,7 +290,7 @@ class ToolCommandValidator(Validator):
                 # Position at the end of the text for the error
                 raise ValidationError(
                     message=f"Missing mandatory argument '{arg_name}' for command '{command}'",
-                    cursor_position=len(text)
+                    cursor_position=len(text),
                 )
 
         # Validate arguments
@@ -270,7 +301,7 @@ class ToolCommandValidator(Validator):
                 arg_pos = text.find(arg_name)
                 raise ValidationError(
                     message=f"Unknown argument '{arg_name}' for command '{command}'",
-                    cursor_position=arg_pos
+                    cursor_position=arg_pos,
                 )
 
             # Validate the argument value
@@ -307,7 +338,10 @@ class DynamicToolCommandCompleter(Completer):
             self.command_args[tool_name] = tool["arguments"]
 
             # Store argument descriptions
-            self.command_arg_descriptions[tool_name] = {arg_name: arg_info["description"] for arg_name, arg_info in tool["arguments"].items()}
+            self.command_arg_descriptions[tool_name] = {
+                arg_name: arg_info["description"]
+                for arg_name, arg_info in tool["arguments"].items()
+            }
 
             # Store command descriptions
             self.command_descriptions[tool_name] = tool["description"]
@@ -349,7 +383,9 @@ class DynamicToolCommandCompleter(Completer):
                 # Completing an argument name
                 arg_prefix = current_word
                 used_args = self._get_used_args(parts_before[1:-1])
-                yield from self._get_argument_name_completions(command_name, arg_prefix, used_args)
+                yield from self._get_argument_name_completions(
+                    command_name, arg_prefix, used_args
+                )
             elif current_word.endswith("="):
                 # Completing an argument value
                 arg_name = current_word.split("=")[0]
@@ -364,7 +400,7 @@ class DynamicToolCommandCompleter(Completer):
                 yield Completion(
                     name,
                     start_position=-len(prefix) if prefix else 0,
-                    display_meta=display_meta
+                    display_meta=display_meta,
                 )
 
     def _get_used_args(self, parts):
@@ -373,7 +409,9 @@ class DynamicToolCommandCompleter(Completer):
 
     def _get_argument_completions(self, command_name, used_args):
         """Get completions for all available arguments"""
-        available_args = [arg for arg in self.command_args[command_name] if arg not in used_args]
+        available_args = [
+            arg for arg in self.command_args[command_name] if arg not in used_args
+        ]
         for arg_name in available_args:
             completion = f"{arg_name}="
             display_meta = self.command_arg_descriptions[command_name].get(
@@ -390,23 +428,29 @@ class DynamicToolCommandCompleter(Completer):
                     arg_name, f"Argument for {command_name}"
                 )
                 yield Completion(
-                    completion,
-                    start_position=-len(prefix),
-                    display_meta=display_meta
+                    completion, start_position=-len(prefix), display_meta=display_meta
                 )
 
     def _get_argument_value_completions(self, command_name, arg_name):
         """Get completions for argument values"""
         if arg_name in self.command_args[command_name]:
             arg_info = self.command_args[command_name].get(arg_name, {})
-            expected_types = arg_info.get('type', ['string']) if isinstance(arg_info, dict) else ['string']
+            expected_types = (
+                arg_info.get("type", ["string"])
+                if isinstance(arg_info, dict)
+                else ["string"]
+            )
             if not isinstance(expected_types, list):
                 expected_types = [expected_types]
 
             # Boolean suggestions
-            if 'boolean' in expected_types:
-                yield Completion("true", start_position=0, display_meta="Boolean true value")
-                yield Completion("false", start_position=0, display_meta="Boolean false value")
+            if "boolean" in expected_types:
+                yield Completion(
+                    "true", start_position=0, display_meta="Boolean true value"
+                )
+                yield Completion(
+                    "false", start_position=0, display_meta="Boolean false value"
+                )
 
 
 class Human(LLM):
@@ -512,13 +556,19 @@ class Human(LLM):
             parser = CommandParser()
             command, args, errors = parser.parse_command(action)
             if errors:
-                error_message = "\n".join(f"Error at position {pos}: {msg}" for msg, pos in errors)
+                error_message = "\n".join(
+                    f"Error at position {pos}: {msg}" for msg, pos in errors
+                )
                 self.logger.error(f"Invalid input: {error_message}")
                 retry_count += 1
                 continue
 
             # Only create tool_call if there were no parsing errors
-            tool_call = ToolCall(id=f"{command}-{np.random.randint(1000, 9999)}", name=command, arguments=args)
+            tool_call = ToolCall(
+                id=f"{command}-{np.random.randint(1000, 9999)}",
+                name=command,
+                arguments=args,
+            )
             retry_count += 1
 
         if tool_call is None:
