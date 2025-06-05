@@ -95,13 +95,12 @@ def test_load_dataset(mock_listdir, mock_exists, mock_run, aider_env):
 
 
 @pytest.fixture
-@patch("pathlib.Path.home")
-def env(mock_home, tmp_path):
-    mock_home.return_value = tmp_path
-    aider_path = AiderBenchmarkEnv.REPO_PATH
-    aider_path.mkdir(exist_ok=True)
-    repo_path = aider_path / "hangman"
-    repo_path.mkdir(exist_ok=True)
+def env(tmp_path):
+    aider_path = tmp_path / ".cache" / "debug_gym" / "exercism"
+    aider_path.mkdir(parents=True, exist_ok=True)
+    AiderBenchmarkEnv.REPO_PATH = aider_path
+    repo_path = aider_path / "exercises" / "practice" / "hangman"
+    repo_path.mkdir(parents=True, exist_ok=True)
     (repo_path / "hangman.py").write_text("return 'Hello, Hangman!'")
     (repo_path / "hangman_test.py").write_text(
         "import hangman\n"
