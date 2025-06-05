@@ -92,3 +92,48 @@ def test_step(mock_step, aider_env, env_info):
 def test_load_dataset(mock_listdir, mock_exists, mock_run, aider_env):
     aider_env.load_dataset()
     assert mock_run.called
+
+
+@pytest.fixture
+def env(tmp_path):
+    aider_path = tmp_path / ".cache" / "debug_gym" / "exercism"
+    aider_path.mkdir(parents=True, exist_ok=True)
+    AiderBenchmarkEnv.REPO_PATH = aider_path
+    repo_path = aider_path / "exercises" / "practice" / "hangman"
+    repo_path.mkdir(parents=True, exist_ok=True)
+    (repo_path / "hangman.py").write_text("return 'Hello, Hangman!'")
+    (repo_path / "hangman_test.py").write_text(
+        "import hangman\n"
+        "\n"
+        "def test_hangman():\n"
+        "    assert hangman() == 'Hello, Hangman!'"
+    )
+    env = AiderBenchmarkEnv()
+    env.reset(options={"task_name": "hangman"})
+    return env
+
+
+def test_resolve_path(env):
+    path = env.resolve_path(env.working_dir, raises=True)
+    assert path == env.working_dir
+    assert env.resolve_path("hangman.py", raises=True) == env.working_dir / "hangman.py"
+    with pytest.raises(FileNotFoundError):
+        env.resolve_path("nested/file.py", raises=True)
+
+
+def test_ignored_files(env):
+    assert env.has_file("hangman_test.py")
+    assert env.has_file("hangman.py")
+    assert not env.has_file(".gitignore")
+    assert not env.has_file(".debugignore")
+    assert not env.has_file(".debugreadonly")
+    assert not env.has_file("nested/file.py")
+
+
+def test_is_editable_files(env):
+    assert env.is_editable("hangman.py")
+    assert not env.is_editable("hangman_test.py")
+    with pytest.raises(FileNotFoundError):
+        assert not env.is_editable("nested/file.py")
+    with pytest.raises(FileNotFoundError):
+        assert not env.is_editable(".debugignore")
