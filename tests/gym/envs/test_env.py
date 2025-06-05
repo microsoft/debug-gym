@@ -541,6 +541,9 @@ def test_resolve_path(tmp_path):
     env = RepoEnv(path=tmp_path)
     abs_path = (env.working_dir / "file.txt").resolve()
     (abs_path).touch()
+    # env.working_dir itself
+    path_from_env = env.resolve_path(str(env.working_dir), raises=True)
+    assert path_from_env == env.working_dir.resolve()
     # relative path
     path_from_env = env.resolve_path("file.txt")
     assert path_from_env == abs_path

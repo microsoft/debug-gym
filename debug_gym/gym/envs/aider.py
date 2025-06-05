@@ -66,7 +66,7 @@ class AiderBenchmarkEnv(RepoEnv):
             utils.create_ignore_file(
                 directory / ".debugignore",
                 patterns=[
-                    ".*/",
+                    ".*/*",  # Aider is single-file, so ignore nested directories.
                     "__pycache__/",
                     "*.pyc",
                     # "*.md",

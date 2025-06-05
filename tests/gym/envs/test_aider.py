@@ -92,3 +92,35 @@ def test_step(mock_step, aider_env, env_info):
 def test_load_dataset(mock_listdir, mock_exists, mock_run, aider_env):
     aider_env.load_dataset()
     assert mock_run.called
+
+
+def test_resolve_path():
+    env = AiderBenchmarkEnv()
+    env.reset(options={"task_name": "hangman"})
+    path = env.resolve_path(env.working_dir, raises=True)
+    assert path == env.working_dir
+    assert env.resolve_path("hangman.py", raises=True) == env.working_dir / "hangman.py"
+    with pytest.raises(FileNotFoundError):
+        env.resolve_path("nested/file.py", raises=True)
+
+
+def test_ignored_files():
+    env = AiderBenchmarkEnv()
+    env.reset(options={"task_name": "hangman"})
+    assert env.has_file("hangman_test.py")
+    assert env.has_file("hangman.py")
+    assert not env.has_file(".gitignore")
+    assert not env.has_file(".debugignore")
+    assert not env.has_file(".debugreadonly")
+    assert not env.has_file("nested/file.py")
+
+
+def test_is_editable_files():
+    env = AiderBenchmarkEnv()
+    env.reset(options={"task_name": "hangman"})
+    assert env.is_editable("hangman.py")
+    assert not env.is_editable("hangman_test.py")
+    with pytest.raises(FileNotFoundError):
+        assert not env.is_editable("nested/file.py")
+    with pytest.raises(FileNotFoundError):
+        assert not env.is_editable(".debugignore")
