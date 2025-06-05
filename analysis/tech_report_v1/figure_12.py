@@ -162,7 +162,7 @@ def analyze_froggy_results_with_seeds(base_model_name, seeds=[0, 1, 2]):
     Analyzes and averages results across different seeds for a base model name
 
     Args:
-        base_model_name (str): Base path without seed (e.g. '../exps/swe-bench/rewrite_o3-mini')
+        base_model_name (str): Base path without seed (e.g. '../../exps/swe-bench/rewrite_o3-mini')
         seeds (list): List of seeds to average over
 
     Returns:
@@ -373,24 +373,24 @@ def plot_rewrite_length_grouped(df_dict, figsize=(12, 7)):
 
 # Example usage:
 model_paths = [
-    "../exps/swe-bench/rewrite_llama33-70b",
-    "../exps/swe-bench/rewrite_4o",
-    "../exps/swe-bench/rewrite_4o-mini",
-    "../exps/swe-bench/rewrite_o1",
-    "../exps/swe-bench/rewrite_o3-mini",
-    "../exps/swe-bench/rewrite_claude37",
-    "../exps/swe-bench/pdb_llama33-70b",
-    "../exps/swe-bench/pdb_4o",
-    "../exps/swe-bench/pdb_4o-mini",
-    "../exps/swe-bench/pdb_o1",
-    "../exps/swe-bench/pdb_o3-mini",
-    "../exps/swe-bench/pdb_claude37",
-    "../exps/swe-bench/seq_llama33-70b",
-    "../exps/swe-bench/seq_4o",
-    "../exps/swe-bench/seq_4o-mini",
-    "../exps/swe-bench/seq_o1",
-    "../exps/swe-bench/seq_o3-mini",
-    "../exps/swe-bench/seq_claude37",
+    "../../exps/swe-bench/rewrite_llama33-70b",
+    "../../exps/swe-bench/rewrite_4o",
+    "../../exps/swe-bench/rewrite_4o-mini",
+    "../../exps/swe-bench/rewrite_o1",
+    "../../exps/swe-bench/rewrite_o3-mini",
+    "../../exps/swe-bench/rewrite_claude37",
+    "../../exps/swe-bench/pdb_llama33-70b",
+    "../../exps/swe-bench/pdb_4o",
+    "../../exps/swe-bench/pdb_4o-mini",
+    "../../exps/swe-bench/pdb_o1",
+    "../../exps/swe-bench/pdb_o3-mini",
+    "../../exps/swe-bench/pdb_claude37",
+    "../../exps/swe-bench/seq_llama33-70b",
+    "../../exps/swe-bench/seq_4o",
+    "../../exps/swe-bench/seq_4o-mini",
+    "../../exps/swe-bench/seq_o1",
+    "../../exps/swe-bench/seq_o3-mini",
+    "../../exps/swe-bench/seq_claude37",
 ]
 
 # Analyze all models with seed averaging
