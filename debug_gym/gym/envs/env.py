@@ -370,10 +370,14 @@ class RepoEnv(TooledEnv):
         abs_filepath = Path(filepath)
         if not abs_filepath.is_absolute():
             abs_filepath = (Path(self.working_dir) / abs_filepath).resolve()
-        if raises and not (
-            abs_filepath.is_relative_to(self.working_dir)
-            and abs_filepath.exists()
-            and not self._is_ignored_func(abs_filepath)
+        if (
+            raises
+            and abs_filepath != self.working_dir
+            and not (
+                abs_filepath.is_relative_to(self.working_dir)
+                and abs_filepath.exists()
+                and not self._is_ignored_func(abs_filepath)
+            )
         ):
             # raises error with original path
             raise FileNotFoundError(

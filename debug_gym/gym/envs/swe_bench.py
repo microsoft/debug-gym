@@ -323,7 +323,7 @@ class SWEBenchEnv(RepoEnv):
     @property
     def ignore_files(self):
         return [
-            ".*/",
+            ".?*",  # Ignore hidden files and directories but not current dir "."
             # ".pytest_cache/",
             # "*test*.py",
             # "*.pyc",

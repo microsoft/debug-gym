@@ -537,7 +537,9 @@ def test_queue_and_process_events():
     mock.assert_has_calls(expected_calls)
 
 
-def test_resolve_path(tmp_path):
+@pytest.mark.parametrize("debugignore", ["", ".?*"])
+def test_resolve_path(tmp_path, debugignore):
+    (tmp_path / ".debugignore").write_text(debugignore)
     env = RepoEnv(path=tmp_path)
     abs_path = (env.working_dir / "file.txt").resolve()
     (abs_path).touch()
@@ -546,6 +548,9 @@ def test_resolve_path(tmp_path):
     assert path_from_env == env.working_dir.resolve()
     # relative path
     path_from_env = env.resolve_path("file.txt")
+    assert path_from_env == abs_path
+    # relative path with ./
+    path_from_env = env.resolve_path("./file.txt")
     assert path_from_env == abs_path
     # absolute path
     path_from_env = env.resolve_path(str(abs_path))
@@ -562,6 +567,30 @@ def test_resolve_path(tmp_path):
     # non-existent absolute path
     non_existent_path = env.resolve_path("/tmp/non_existent_file.txt")
     assert non_existent_path == Path("/tmp/non_existent_file.txt").resolve()
+
+
+def test_resolve_path_raises(tmp_path):
+    env = RepoEnv(path=tmp_path)
+    # Non-existent file with raises=True
+    with pytest.raises(FileNotFoundError):
+        env.resolve_path("non_existent_file.txt", raises=True)
+    # Non-existent absolute path with raises=True
+    with pytest.raises(FileNotFoundError):
+        env.resolve_path("/tmp/non_existent_file.txt", raises=True)
+    with pytest.raises(FileNotFoundError):
+        env.resolve_path("..", raises=True)
+    # Invalid path type
+    with pytest.raises(TypeError):
+        env.resolve_path(123, raises=True)
+    with pytest.raises(TypeError):
+        env.resolve_path(None, raises=True)
+
+
+def test_resolve_path_do_not_raise_working_dir(tmp_path):
+    # Do not raise for working directory even if the ignore patterns match
+    (tmp_path / ".debugignore").write_text(".*")
+    env = RepoEnv(path=tmp_path)
+    assert env.resolve_path(env.working_dir, raises=True) == env.working_dir
 
 
 def test_setup_file_filters_basic(tmp_path):
