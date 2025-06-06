@@ -1,11 +1,12 @@
 import os
 import subprocess
 from importlib.resources import files as importlib_files
+from pathlib import Path
 
 import datasets
 import docker
 import yaml
-from swebench.harness.constants import NON_TEST_EXTS
+from datasets import load_from_disk
 from swesmith.build_repo.download_images import DOCKER_ORG, TAG
 from swesmith.constants import MAP_REPO_TO_SPECS
 from swesmith.harness.grading import TestStatus
@@ -59,7 +60,18 @@ class SWESmithEnv(RepoEnv):
         }
 
     def load_dataset(self):
-        self.ds = datasets.load_dataset(self.dataset_id)[self.split]
+        if Path(self.dataset_id).is_file() and self.dataset_id.endswith(".json"):
+            # Loading from local JSON file.
+            self.ds = datasets.load_dataset("json", data_files=self.dataset_id)[
+                self.split
+            ]
+        elif Path(self.dataset_id).is_dir():
+            # Loading from local folder.
+            self.ds = load_from_disk(self.dataset_id)[self.split]
+        else:
+            # Loading from HuggingFace or a folder.
+            self.ds = datasets.load_dataset(self.dataset_id)[self.split]
+
         self.dataset = {id: i for i, id in enumerate(self.ds["instance_id"])}
 
         # To avoid concurrency issues, we will clone all the repos in the dataset.
