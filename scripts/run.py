@@ -2,7 +2,6 @@ import json
 import os
 import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from itertools import groupby
 from pathlib import Path
 
 from termcolor import colored
@@ -104,12 +103,12 @@ def main():
 
     # Figure out which problems to solve.
     problems = config.get("problems", ["custom"])
-    if type(problems) == str and "benchmark" in config:
+    if isinstance(problems, str) and "benchmark" in config:
         env = create_env(config, logger=logger)
-        if problems == "all":
-            problems = sorted(env.dataset.keys())  # all tasks
-        else:
-            problems = env.get_dataset_split(problems)
+        problems = env.get_dataset_split(problems)
+
+    if not isinstance(problems, list) or not all(isinstance(p, str) for p in problems):
+        raise ValueError("Invalid list of problems.")
 
     if args.list:
         print(f"\n# Available problems in {config.get('benchmark', 'config')}:")
