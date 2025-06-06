@@ -108,6 +108,11 @@ def load_config():
         action="store_true",
         help="Break before sending action to the environment.",
     )
+    parser.add_argument(
+        "--list",
+        action="store_true",
+        help="List available agents and problems.",
+    )
     group = parser.add_mutually_exclusive_group()
     group.add_argument(
         "-v",
