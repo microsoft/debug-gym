@@ -4,6 +4,8 @@ import os
 from criteria import *
 from tqdm import tqdm
 
+exp_folder_path = "jun7"
+
 
 def satisfy_criteria(json_file_path, trajectory_criteria=None, data_criteria=None):
     """
@@ -89,18 +91,18 @@ def filter_trajectories(directory, trajectory_criteria=None, data_criteria=None)
 def main():
 
     trajectory_criteria = [
-        # follows_proper_debugging_workflow,
+        follows_proper_debugging_workflow,
         # uses_pdb_print_commands,
-        has_continue_after_setting_breakpoints
-        # lambda trajectory: has_consecutive_pdb_calls(trajectory, n=2),
+        # has_continue_after_setting_breakpoints
+        # lambda trajectory: has_consecutive_pdb_calls(trajectory, n=1),
     ]
 
-    # data_criteria = [has_successful_outcome]
-    data_criteria = None
+    data_criteria = [has_successful_outcome]
+    # data_criteria = None
 
     # Directory containing trajectory files
     # exps_dir = "/Users/ericyuan/GitHub_Enterprise/Froggy/exps/may28"
-    exps_dir = "/Users/ericyuan/GitHub_Enterprise/Froggy/exps/jun2"
+    exps_dir = "/Users/ericyuan/GitHub_Enterprise/Froggy/exps/" + exp_folder_path
 
     # Filter trajectories
     matching_files = filter_trajectories(exps_dir, trajectory_criteria, data_criteria)
@@ -114,6 +116,7 @@ def main():
         if _mn not in model_name:
             model_name[_mn] = 0
         model_name[_mn] += 1
+
     print("Criteria used:")
     for criterion in (trajectory_criteria or []) + (data_criteria or []):
         print(f"  {criterion.__name__}")
@@ -123,6 +126,28 @@ def main():
     model_name = dict(sorted(model_name.items()))
     for mn, count in model_name.items():
         print(f"  {mn}: {count} files")
+
+    # extract matching files relative to the experiments directory
+    matching_files = [
+        os.path.relpath(file_path, exps_dir) for file_path in matching_files
+    ]
+    # remove the jsonl file names
+    matching_files = [os.path.dirname(file_path) for file_path in matching_files]
+
+    # Save data into a JSON file
+    output_file = os.path.join(
+        exps_dir, f"filtered_trajectories_{exp_folder_path}.json"
+    )
+    with open(output_file, "w") as f:
+        json.dump(
+            {
+                "criteria": [c.__name__ for c in trajectory_criteria + data_criteria],
+                "number_of_matching_files": len(matching_files),
+                "matching_files": matching_files,
+            },
+            f,
+            indent=2,
+        )
 
 
 if __name__ == "__main__":
