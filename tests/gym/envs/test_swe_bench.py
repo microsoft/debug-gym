@@ -1,6 +1,5 @@
 import os
 import subprocess
-from unittest.mock import patch
 
 import pytest
 from filelock import FileLock
@@ -88,7 +87,7 @@ def test_reset_and_step(get_swe_env):
 
     assert "short test summary info" in env_info.step_observation.observation
     assert env_info.score == swe_env.score == 0
-    assert env_info.max_score == swe_env.max_score == 1
+    assert env_info.max_score == swe_env.max_score == len(swe_env.fail_to_pass) == 1
     assert not env_info.done
     assert not swe_env.done
 
@@ -205,11 +204,11 @@ def test_load_dataset(tmp_path, get_swe_env):
 
 
 @if_docker_running
-def test_setup_task_info(tmp_path, get_swe_env):
+def test_setup_task(tmp_path, get_swe_env):
     working_dir = str(tmp_path)
     swe_env = get_swe_env(working_dir)
     task_name = "astropy__astropy-14096"
-    swe_env.setup_task_info(task_name)
+    swe_env.setup_task(task_name)
     assert swe_env.task_name == task_name
     assert swe_env.ds_row["repo"] == "astropy/astropy"
     assert swe_env.ds_row["version"] == "5.1"
@@ -222,7 +221,7 @@ def test_setup_terminal(tmp_path, get_swe_env):
     working_dir = str(tmp_path)
     swe_env = get_swe_env(working_dir)
     task_name = "astropy__astropy-14096"
-    swe_env.setup_task_info(task_name)
+    swe_env.setup_task(task_name)
     swe_env.setup_terminal()
     git_logs = subprocess.run(
         f"git -C {swe_env.working_dir} log -n 4".split(),
@@ -244,3 +243,69 @@ def test_setup_terminal(tmp_path, get_swe_env):
 
     assert ".debugignore" in os.listdir(swe_env.working_dir)
     assert ".debugreadonly" in os.listdir(swe_env.working_dir)
+
+
+@if_docker_running
+def test_patch_property(tmp_path, get_swe_env):
+    """Test the patch property that generates git diff output."""
+    swe_env = get_swe_env(working_dir=tmp_path)
+
+    # Reset with a task to set up the environment
+    swe_env.reset(options={"task_name": "astropy__astropy-14096"})
+
+    # Initially, there should be no changes (empty patch)
+    initial_patch = swe_env.patch
+    assert initial_patch == "", f"Expected empty patch initially, got: {initial_patch}"
+
+    # Create a test file with some content
+    test_file = swe_env.working_dir / "test_patch_file.py"
+    test_content = """def hello_world():
+    print("Hello, World!")
+    return "success"
+"""
+    test_file.write_text(test_content)
+
+    # Add the file to git
+    swe_env.terminal.run(f"git add {test_file}")
+    swe_env.terminal.run(f"git commit -m 'Add test file'")
+
+    # Now modify the file
+    modified_content = """def hello_world():
+    print("Hello, Modified World!")
+    return "modified"
+
+def new_function():
+    return "new"
+"""
+    test_file.write_text(modified_content)
+
+    # Get the patch
+    patch = swe_env.patch
+
+    # Verify patch contains expected changes
+    assert patch != "", "Patch should not be empty after file modification"
+    assert "test_patch_file.py" in patch, "Patch should reference the modified file"
+    assert "Hello, World!" in patch, "Patch should contain old content"
+    assert "Hello, Modified World!" in patch, "Patch should contain new content"
+    assert "-" in patch and "+" in patch, "Patch should contain diff markers"
+
+    # Test edge case: deleted file
+    test_file.unlink()
+    patch_with_deletion = swe_env.patch
+    assert "test_patch_file.py" in patch_with_deletion
+    assert "deleted file" in patch_with_deletion.lower() or "---" in patch_with_deletion
+
+
+@if_docker_running
+def test_apply_gold_patch(tmp_path, get_swe_env):
+    swe_env = get_swe_env()
+    env_info = swe_env.reset(options={"task_name": "astropy__astropy-14096"})
+
+    assert not env_info.done
+    assert env_info.score == swe_env.score == 0
+
+    swe_env.apply_gold_patch()
+    eval_output = swe_env.eval()
+    score = swe_env.calculate_score(eval_output)
+
+    assert score == swe_env.max_score

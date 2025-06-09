@@ -1,18 +1,10 @@
 import json
 import os
-import re
-import shutil
 import subprocess
-from ast import literal_eval
-from pathlib import Path
 
 import datasets
 import docker
-from swebench.harness.constants import (
-    MAP_REPO_VERSION_TO_SPECS,
-    NON_TEST_EXTS,
-    TestStatus,
-)
+from swebench.harness.constants import MAP_REPO_VERSION_TO_SPECS, TestStatus
 from swebench.harness.docker_build import (
     build_env_images,
     build_instance_image,
@@ -22,7 +14,6 @@ from swebench.harness.log_parsers import MAP_REPO_TO_PARSER
 from swebench.harness.test_spec.python import get_test_directives
 from swebench.harness.test_spec.test_spec import make_test_spec
 from swebench.harness.utils import load_swebench_dataset
-from tqdm import tqdm
 
 from debug_gym.constants import DEBUG_GYM_CACHE_DIR
 from debug_gym.gym.entities import EvalOutput
@@ -70,17 +61,6 @@ class SWEBenchEnv(RepoEnv):
         self.ds = datasets.load_dataset(self.dataset_id)[self.split]
         self.dataset = {row["instance_id"]: row for row in self.ds.sort("instance_id")}
 
-        # # To avoid concurrency issues, we will clone all the repos in the dataset.
-        # repos = sorted({task["repo"] for task in self.dataset.values()})
-        # repo_names = [repo.split("/")[1] for repo in repos]
-        # missing_repos = [
-        #     repo for repo in repo_names if not Path.exists(SWEBenchEnv.CACHE / repo)
-        # ]
-        # if missing_repos:
-        #     self.logger.debug("Cloning all repos needed for SWE-Bench...")
-        #     for repo in tqdm(repos, desc="Cloning repos needed for SWE-Bench"):
-        #         self.clone_repo(repo_address=repo)
-
         swebench_instances = load_swebench_dataset(
             name=self.dataset_id, instance_ids=self.instance_ids
         )
@@ -103,49 +83,7 @@ class SWEBenchEnv(RepoEnv):
                 max_workers=24,
             )
 
-    # def setup_local_repo(self):
-    #     # repo_address = self.ds_row["repo"]
-    #     base_commit = self.ds_row["base_commit"]
-    #     test_patch = self.ds_row["test_patch"]
-    #     # TODO: use fail_to_pass and pass_to_pass
-    #     self.fail_to_pass = literal_eval(self.ds_row["FAIL_TO_PASS"])
-    #     self.pass_to_pass = literal_eval(self.ds_row["PASS_TO_PASS"])
-    #     self.test_directives = get_test_directives(self.ds_row)
-
-    #     local_repo_path = SWEBenchEnv.CACHE / self.repo_name
-    #     assert local_repo_path.exists()
-    #     local_branch_path = local_repo_path.parent / self.ds_row["instance_id"]
-
-    #     if not local_branch_path.exists():
-    #         # Duplicate the repo to avoid changing the current branch.
-    #         self.logger.info(f"Copying {local_repo_path} to {local_branch_path}")
-    #         shutil.copytree(local_repo_path, local_branch_path, symlinks=True)
-
-    #         # Checkout to base commit.
-    #         command = f"git -C {local_branch_path} checkout {base_commit} -f"
-    #         self.logger.info(f"Checking out to {base_commit}")
-    #         subprocess.run(command.split(), check=True)
-
-    #         # Apply test patch
-    #         if test_patch != "":
-    #             command = f"git -C {local_branch_path} apply -"
-    #             subprocess.run(command.split(), input=test_patch, text=True, check=True)
-    #             self.logger.info("Patch applied successfully.")
-
-    #         create_ignore_file(
-    #             local_branch_path / ".debugignore", patterns=self.ignore_files
-    #         )
-    #         create_ignore_file(
-    #             local_branch_path / ".debugreadonly", patterns=self.test_directives
-    #         )
-    #     else:
-    #         self.logger.debug(
-    #             f"Local checked out branch {local_branch_path} already exists."
-    #         )
-
-    #     return local_branch_path
-
-    def setup_task_info(self, task_name):
+    def setup_task(self, task_name):
         if self.instance_ids:
             if task_name not in self.instance_ids:
                 raise ValueError(
@@ -154,12 +92,10 @@ class SWEBenchEnv(RepoEnv):
                 )
         self.task_name = task_name
         self.ds_row = self.dataset[self.task_name]
-        self.instance_id = self.ds_row["instance_id"]
         self.repo = self.ds_row["repo"]
-        self.repo_name = self.repo.split("/")[1]
         self.package_name = self.repo.split("/")[1]
         self.version = self.ds_row["version"]
-        self.install_configs = self.get_configs(self.repo, self.version)
+        self.install_configs = MAP_REPO_VERSION_TO_SPECS[self.repo][self.version]
         self.gold_patch = self.ds_row["patch"]
         self.test_spec = make_test_spec(self.ds_row)
         self.base_image = self.test_spec.instance_image_key
@@ -169,17 +105,6 @@ class SWEBenchEnv(RepoEnv):
         self.pass_to_pass = json.loads(self.ds_row["PASS_TO_PASS"])
         self.test_cmd = self.install_configs["test_cmd"]
         self.test_directives = get_test_directives(self.ds_row)
-
-        # # Get test directives from test patch and remove non-test files
-        # test_files = re.findall(r"diff --git a/.* b/(.*)", self.test_patch)
-        # test_files = [
-        #     f for f in test_files if not any(f.endswith(ext) for ext in NON_TEST_EXTS)
-        # ]
-        # # Add test/ and tests/ to readonly files if not already present
-        # for test_dir in ["test/", "tests/"]:
-        #     if test_dir not in test_files:
-        #         test_files.append(test_dir)
-        # self.test_directives = test_files
 
         entrypoint = " ".join([self.test_cmd, *self.test_directives])
 
@@ -220,8 +145,14 @@ class SWEBenchEnv(RepoEnv):
         result = subprocess.run(
             command.split(), cwd=self.working_dir, text=True, capture_output=True
         )
-        patch = result.stdout.replace(str(self.working_dir), str(self.path))
-        return patch
+        # patch = result.stdout.replace(str(self.working_dir), str(self.path))
+        return result.stdout
+
+    def apply_gold_patch(self):
+        self.logger.info(f"Applying gold patch to {self.working_dir}.")
+        command = self.git_apply_cmd + f" <<'EOF'\n{self.gold_patch}\nEOF"
+        self.terminal.run(command, raises=True)
+        self.logger.info("Patch applied successfully.")
 
     def calculate_score(self, eval_output: EvalOutput) -> int:
         test_status_map = MAP_REPO_TO_PARSER[self.repo](
@@ -296,9 +227,7 @@ class SWEBenchEnv(RepoEnv):
 
         self.terminal.run(f"git config user.name 'debug-gym'")
         self.terminal.run(f"git config user.email '<>'")
-        self.terminal.run(
-            f"git commit -am 'Applying test patch for {self.instance_id}'"
-        )
+        self.terminal.run(f"git commit -am 'Applying test patch for {self.task_name}'")
 
         # Rebuild the debug ignore and read-only files.
         create_ignore_file(
@@ -323,7 +252,7 @@ class SWEBenchEnv(RepoEnv):
         # Clean up the previous task, if any.
         self.close()
 
-        self.setup_task_info(options["task_name"])
+        self.setup_task(options["task_name"])
 
         self.setup_terminal()
 
@@ -334,17 +263,6 @@ class SWEBenchEnv(RepoEnv):
         assert not self.done, "Tests should be failing before debugging."
 
         return infos
-
-    # def clone_repo(self, repo_address):
-    #     org_name, repo_name = repo_address.split("/")
-    #     repo_url = f"https://github.com/{repo_address.lstrip('/')}"
-    #     local_repo_path = SWEBenchEnv.CACHE / repo_name
-
-    #     if not local_repo_path.exists():
-    #         self.logger.info(f"Cloning {repo_url} into {local_repo_path}")
-    #         subprocess.run(["git", "clone", repo_url, local_repo_path], check=True)
-
-    #     return local_repo_path
 
     @property
     def ignore_files(self):
@@ -359,17 +277,16 @@ class SWEBenchEnv(RepoEnv):
         status, output = self.terminal.run(command, raises=True)
         return status, output
 
-    def prepare_eval_commands(self):
-        """Add eval_cmd to be executed every time the terminal is called"""
-        for eval_cmd in self.install_configs.get("eval_commands", []):
-            self.session_commands.append(eval_cmd)
-
     def run_install(self):
-        install_cmd = self.install_configs.get("install", "")
-        if install_cmd:
+        install_cmds = self.install_configs.get("install", [])
+        if install_cmds:
+            if type(install_cmds) is str:
+                install_cmds = [install_cmds]
+
             self.logger.debug("Running install commands...")
-            install_cmd = install_cmd.replace("--verbose", "").replace("-v", "").strip()
-            self.run_command_with_raise(install_cmd)
+            for install_cmd in install_cmds:
+                # install_cmd = install_cmd.replace("--verbose", "").replace("-v", "").strip()
+                self.run_command_with_raise(install_cmd)
 
     def run_post_install(self):
         post_install_cmds = self.install_configs.get("post_install", [])
@@ -377,6 +294,3 @@ class SWEBenchEnv(RepoEnv):
             self.logger.debug("Running post-install commands...")
             for post_install_cmd in post_install_cmds:
                 self.run_command_with_raise(post_install_cmd)
-
-    def get_configs(self, repo, version):
-        return MAP_REPO_VERSION_TO_SPECS[repo][version]

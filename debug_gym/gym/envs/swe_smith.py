@@ -38,20 +38,13 @@ class SWESmithEnv(SWEBenchEnv):
         terminal: Terminal | None = None,
         **kwargs,
     ):
-        terminal = terminal or DockerTerminal(logger=kwargs.get("logger"))
-        if not isinstance(terminal, DockerTerminal):
-            raise ValueError("SWESmithEnv only supports DockerTerminal.")
-
-        super().__init__(terminal=terminal, **kwargs)
-
-        self.dataset_id = dataset_id
-        self.split = split
-        self.instance_ids = instance_ids
-        SWESmithEnv.DUMMY_DIR.mkdir(parents=True, exist_ok=True)
-
-        self.load_dataset()
-        self.session_commands = []
-        self.test_directives = []
+        super().__init__(
+            dataset_id=dataset_id,
+            split=split,
+            instance_ids=instance_ids,
+            terminal=terminal,
+            **kwargs,
+        )
 
     def load_dataset(self):
         if Path(self.dataset_id).is_file() and self.dataset_id.endswith(".json"):
@@ -117,7 +110,6 @@ class SWESmithEnv(SWEBenchEnv):
 
         self.task_name = task_name
         self.ds_row = self.ds[self.dataset[self.task_name]]
-        self.swesmith_repo_name = self.ds_row["repo"].split("/")[1]
         self.base_commit = self.ds_row["base_commit"]
         self.branch_name = self.ds_row["instance_id"]
         self.test_patch = self.ds_row["patch"]
@@ -153,8 +145,6 @@ class SWESmithEnv(SWEBenchEnv):
             # Removing pdbpp as it creates conflicts, i.e. we read until "(Pdb)" in the pdb tool.
             self.install_configs["install"].append("pip uninstall -y pdbpp")
 
-        # self.terminal.run(f"pip install uv")
-
         # The following will create the temporary working directory.
         self.setup_workspace(
             # Empty folder. The actual codebase will come from the docker image.
@@ -175,7 +165,7 @@ class SWESmithEnv(SWEBenchEnv):
                 for test in self.pass_to_pass
             ]
 
-        self.git_apply_cmd = f"git -C {self.env.working_dir} apply --reverse -"
+        self.git_apply_cmd = f"git -C {self.working_dir} apply --reverse -"
         # Note that the `gold_patch` is the same as the `test_patch` but will
         # be used in conjunction with --reverse.
         self.gold_patch = self.test_patch
@@ -206,30 +196,6 @@ class SWESmithEnv(SWEBenchEnv):
         )
         return score
 
-    # def reset(self, *, options: dict | None = None):
-    #     # TODO: support reset current task, i.e. no options provided.
-    #     options = options or {}
-
-    #     # Clean up the previous task, if any.
-    #     self.close()
-
-    #     self.setup_task(options["task_name"])
-
-    #     self.setup_terminal()
-
-    #     # Reset RepoEnv
-    #     self.max_score = len(self.fail_to_pass)
-    #     infos = super().reset(options=options)
-    #     assert not self.done, "Tests should be failing before debugging."
-
-    #     return infos
-
-    # @property
-    # def ignore_files(self):
-    #     return [
-    #         ".?*",  # Hidden files and directories. It also ignores the parent directory.
-    #     ]
-
     def run_command_with_raise(self, command):
         try:
             command = command.replace("apt-get", "sudo apt-get").replace(
@@ -246,10 +212,3 @@ class SWESmithEnv(SWEBenchEnv):
 
     def run_post_install(self):
         pass  # SWE-Smith does not have post-install commands.
-
-    # def run_install(self):
-    #     install_cmds = self.install_configs.get("install", [])
-    #     if install_cmds:
-    #         self.logger.debug("Running install commands...")
-    #         for install_cmd in install_cmds:
-    #             self.run_command_with_raise(install_cmd)

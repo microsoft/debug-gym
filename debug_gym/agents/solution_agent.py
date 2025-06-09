@@ -42,26 +42,13 @@ class AgentSolution(BaseAgent):
             in pdb_continue_info.step_observation.observation
         ), f"PDB command did not return expected continue message.\n{pdb_continue_info.step_observation.observation}"
 
-        if not hasattr(self.env, "gold_patch"):
-            raise ValueError(
+        try:
+            self.env.apply_gold_patch()
+        except NotImplementedError as e:
+            self.logger.error(
                 f"The environment {type(self.env)} is not compatible with SolutionAgent"
                 "Check the README.md to see which environments are compatible."
             )
-        try:
-            self.logger.info(f"Applying gold patch to {self.env.working_dir}.")
-            cmd_out = subprocess.run(
-                self.env.git_apply_cmd.split(),
-                input=self.env.gold_patch,
-                text=True,
-                check=True,
-                capture_output=True,
-            )
-            self.logger.info("Patch applied successfully.")
-            self.logger.debug(cmd_out)
-        except subprocess.CalledProcessError as e:
-            self.logger.debug(e)
-            self.logger.debug(f"stderr: {e.stderr}")
-            self.logger.debug(f"stdout: {e.stdout}")
             raise
 
         if debug:

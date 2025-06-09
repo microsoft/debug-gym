@@ -1,9 +1,6 @@
 import json
 import logging
 
-# Set logging level down to WARNING for endpoint queries.
-logging.getLogger("httpx").setLevel(logging.WARNING)
-
 import openai
 import tiktoken
 from openai import NOT_GIVEN, OpenAI

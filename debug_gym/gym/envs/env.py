@@ -495,6 +495,11 @@ class RepoEnv(TooledEnv):
         patch = result.stdout.replace(str(self.working_dir), str(self.path))
         return patch
 
+    def apply_gold_patch(self):
+        raise NotImplementedError(
+            f"apply_gold_patch is not implemented for {self.__class__.__name__}."
+        )
+
     def step(self, action: ToolCall) -> EnvInfo:
         # given action, return new obs, and update infos
         # the action space is composed of a few smaller action spaces
