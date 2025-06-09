@@ -1,5 +1,3 @@
-from os.path import join as pjoin
-
 from debug_gym.gym.entities import Observation
 from debug_gym.gym.tools.tool import EnvironmentTool
 from debug_gym.gym.tools.toolbox import Toolbox

@@ -52,28 +52,6 @@ def get_swe_env(build_swe_env_once):
 
 
 @if_docker_running
-def test_load_dataset(tmp_path, get_swe_env):
-    working_dir = str(tmp_path)
-    swe_env = get_swe_env(working_dir)
-    assert swe_env.dataset_id == "princeton-nlp/SWE-bench_Verified"
-    # check if the dataset contains features that SWEBenchEnv expects
-    assert list(swe_env.ds.features.keys()) == [
-        "repo",
-        "instance_id",
-        "base_commit",
-        "patch",  # not required
-        "test_patch",
-        "problem_statement",
-        "hints_text",  # not required
-        "created_at",  # not required
-        "version",  # not required
-        "FAIL_TO_PASS",
-        "PASS_TO_PASS",
-        "environment_setup_commit",  # not required
-    ]
-
-
-@if_docker_running
 def test_clone_repo(tmp_path, get_swe_env):
     working_dir = str(tmp_path)
     swe_env = get_swe_env(working_dir)
@@ -228,7 +206,6 @@ def test_run_post_install(tmp_path, install_configs_mock, get_swe_env):
 def test_load_dataset(tmp_path, get_swe_env):
     working_dir = str(tmp_path)
     swe_env = get_swe_env(working_dir)
-    swe_env.load_dataset()
     assert swe_env.dataset_id == "princeton-nlp/SWE-bench_Verified"
     task_name = "astropy__astropy-14096"
     assert task_name in swe_env.dataset.keys()
@@ -254,7 +231,6 @@ def test_setup_task_info(tmp_path, get_swe_env):
     working_dir = str(tmp_path)
     swe_env = get_swe_env(working_dir)
     task_name = "astropy__astropy-14096"
-    swe_env.load_dataset()
     swe_env.setup_task_info(task_name)
     assert swe_env.task_name == task_name
     assert swe_env.ds_row["repo"] == "astropy/astropy"
@@ -268,7 +244,6 @@ def test_setup_local_repo(tmp_path, get_swe_env):
     working_dir = str(tmp_path)
     swe_env = get_swe_env(working_dir)
     task_name = "astropy__astropy-14096"
-    swe_env.load_dataset()
     swe_env.setup_task_info(task_name)
     swe_env.setup_local_repo()
     git_commit = subprocess.run(

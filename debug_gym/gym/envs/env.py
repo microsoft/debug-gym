@@ -155,7 +155,7 @@ class RepoEnv(TooledEnv):
         readonly_patterns: list[str] | None = None,
         auto_eval_on_rewrite: bool = True,
         run_timeout: int | None = None,
-        dir_tree_depth: int | None = None,
+        dir_tree_depth: int = 1,
         persistent_breakpoints: bool = True,
         auto_list: bool = True,
         terminal: Terminal | None = None,
