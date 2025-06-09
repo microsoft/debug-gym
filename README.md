@@ -98,6 +98,7 @@ We provide the below LLM-based agents, they all have minimal design and serve th
 | `debug_agent` | `pdb`, `rewrite`, `view`, `eval` | A minimal agent that dumps all available information into its prompt and queries the LLM to generate a command. |
 | `rewrite_agent` | `rewrite`, `view`, `eval`  | A `debug_agent` but `pdb` tool is disabled (an agent keeps rewriting). |
 | `debug_5_agent` | `pdb`, `rewrite`, `view`, `eval`  | A `debug_agent`, but `pdb` tool is only enabled after certain amount of rewrites. |
+| `solution_agent` | `pdb`, `eval`  | An oracle agent that applies a gold patch (only works with `swebench` and `swesmith` benchmarks for now). The agent checks that tests are failing before applying the patch, and passing after. It also checks that `pdb` tool can be used as expected. |
 
 ---
 
@@ -109,6 +110,7 @@ To demonstrate how to integrate `debug-gym` with coding tasks and repositories, 
 | :-: | :----- |
 | `aider` | [https://github.com/Aider-AI/aider](https://github.com/Aider-AI/aider) |
 | `swebench`| [https://github.com/princeton-nlp/SWE-bench](https://github.com/princeton-nlp/SWE-bench) |
+| `swesmith`| [https://github.com/SWE-bench/SWE-smith](https://github.com/SWE-bench/SWE-smith) |
 | `mini_nightmare` | A set of 10 hand-crafted minimal buggy code snippet where rewrite only agents have harder time to tackle. Read details [here](https://github.com/microsoft/debug-gym/blob/main/data/mini_nightmare/mini_nightmare.md). |
 
 ---

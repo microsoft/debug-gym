@@ -1,9 +1,8 @@
 base:
     # Environment configs
     output_path: "exps/swesmith"
-    uuid: "dev"
     benchmark: "swesmith"
-    problems: "test-126"  # list of problems, e.g., ["astropy__astropy-12907"], or string like "test-126", "test-1008", or "all",
+    problems: "all"  # list of problems, e.g., ["astropy__astropy-12907"], or string like "test-126", "test-1008", or "all",
     env_kwargs: {
         "dir_tree_depth": 1,
         "run_timeout": 300,
@@ -30,10 +29,6 @@ base:
     log_prompt_response_pairs: True
     reset_prompt_history_after_rewrite: True
 
-solution:
-    llm_name: "human"  # No need for an LLM.
-    tools: ["eval", "pdb"]
-
 rewrite_agent:
     tools: ["view", "rewrite", "listdir", "eval"]
 
@@ -43,3 +38,7 @@ debug_agent:
 debug_5_agent:
     n_rewrites_before_pdb: 5
     tools: ["pdb", "view", "rewrite", "listdir", "eval"]
+
+solution_agent:
+    llm_name: "human"  # No need for an LLM.
+    tools: ["eval", "pdb"]

@@ -252,11 +252,14 @@ class RepoEnv(TooledEnv):
     @staticmethod
     def _prepare_entrypoint(entrypoint):
         entrypoint_list = entrypoint.split()
-
+        # Handle uv package manager's run command by ensuring the correct interpreter path
+        # and explicitly adding 'python' to the execution chain for consistency.
         if entrypoint_list[0].endswith("uv") and entrypoint_list[1] == "run":
             entrypoint_list[2] = f"$(which {entrypoint_list[2]})"
             entrypoint_list = entrypoint_list[:2] + ["python"] + entrypoint_list[2:]
 
+        # For non-python commands, ensure we have the absolute path to the Python executable
+        # and explicitly run it through Python for consistent execution behavior.
         elif entrypoint_list[0] != "python":
             entrypoint_list[0] = f"$(which {entrypoint_list[0]})"
             entrypoint_list = ["python"] + entrypoint_list

@@ -1,12 +1,14 @@
 import subprocess
 
 from debug_gym.agents.base_agent import BaseAgent, register_agent
+from debug_gym.gym.envs.swe_bench import SWEBenchEnv
+from debug_gym.gym.envs.swe_smith import SWESmithEnv
 from debug_gym.gym.tools.tool import ToolCall
 
 
 @register_agent
 class AgentSolution(BaseAgent):
-    name: str = "solution"
+    name: str = "solution_agent"
 
     def run(self, task_name=None, debug=False):
         self.history.reset()
@@ -26,7 +28,7 @@ class AgentSolution(BaseAgent):
         pdb_help_info = self.env.step(action)
         assert (
             "h(elp)" in pdb_help_info.step_observation.observation
-        ), "PDB command did not return expected help message."
+        ), f"PDB command did not return expected help message.\n{pdb_help_info.step_observation.observation}"
 
         # Send a pdb continue command, and check the output matches the one from env.reset.
         action = ToolCall(name="pdb", id="pdb", arguments={"command": "continue"})
@@ -38,13 +40,17 @@ class AgentSolution(BaseAgent):
         ) or (
             info.step_observation.observation.splitlines()[-1]
             in pdb_continue_info.step_observation.observation
-        ), "PDB command did not return expected continue message."
+        ), f"PDB command did not return expected continue message.\n{pdb_continue_info.step_observation.observation}"
 
+        if not hasattr(self.env, "gold_patch"):
+            raise ValueError(
+                f"The environment {type(self.env)} is not compatible with SolutionAgent"
+                "Check the README.md to see which environments are compatible."
+            )
         try:
             self.logger.info(f"Applying gold patch to {self.env.working_dir}.")
-            command = f"git -C {self.env.working_dir} apply {getattr(self.env, "git_apply_args", "")} -"
             cmd_out = subprocess.run(
-                command.split(),
+                self.env.git_apply_cmd.split(),
                 input=self.env.gold_patch,
                 text=True,
                 check=True,
@@ -69,6 +75,8 @@ class AgentSolution(BaseAgent):
         self.logger.info(
             f"Score: {info.score}/{info.max_score} ({info.score/info.max_score:.1%})"
         )
-        assert info.done, "The task should be done after applying the gold patch."
+        assert (
+            info.done
+        ), f"The task is not done after applying the gold patch.\n{info.step_observation.observation}"
 
         return info.done

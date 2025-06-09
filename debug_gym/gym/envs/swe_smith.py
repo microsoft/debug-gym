@@ -18,11 +18,12 @@ from tqdm import tqdm
 from debug_gym.constants import DEBUG_GYM_CACHE_DIR
 from debug_gym.gym.entities import EvalOutput
 from debug_gym.gym.envs.env import RepoEnv
+from debug_gym.gym.envs.swe_bench import SWEBenchEnv
 from debug_gym.gym.terminal import DockerTerminal, Terminal
 from debug_gym.gym.utils import create_ignore_file
 
 
-class SWESmithEnv(RepoEnv):
+class SWESmithEnv(SWEBenchEnv):
     CACHE = DEBUG_GYM_CACHE_DIR / "swe-smith"
     DUMMY_DIR = DEBUG_GYM_CACHE_DIR / "swe-smith" / "empty"
     CONFIG = (
@@ -51,13 +52,6 @@ class SWESmithEnv(RepoEnv):
         self.load_dataset()
         self.session_commands = []
         self.test_directives = []
-
-    @property
-    def instructions(self):
-        return {
-            **super().instructions,
-            "Problem description": self.ds_row["problem_statement"],
-        }
 
     def load_dataset(self):
         if Path(self.dataset_id).is_file() and self.dataset_id.endswith(".json"):
@@ -126,11 +120,7 @@ class SWESmithEnv(RepoEnv):
         self.swesmith_repo_name = self.ds_row["repo"].split("/")[1]
         self.base_commit = self.ds_row["base_commit"]
         self.branch_name = self.ds_row["instance_id"]
-        self.bug_patch = self.ds_row["patch"]
-        self.gold_patch = self.ds_row[
-            "patch"
-        ]  # Buggy code patch but will be used in conjunction with --reverse.
-        self.git_apply_args = "--reverse"
+        self.test_patch = self.ds_row["patch"]
         self.image_name = self.ds_row["image_name"]
         self.repo, self.commit = get_repo_commit_from_image_name(self.image_name)
         self.install_configs = MAP_REPO_TO_SPECS[self.repo][self.commit]
@@ -160,7 +150,10 @@ class SWESmithEnv(RepoEnv):
         elif self.package_name == "pydantic":
             self.test_cmd = self.test_cmd.replace("/root/", "$HOME/")
         elif self.package_name == "alive-progress":
+            # Removing pdbpp as it creates conflicts, i.e. we read until "(Pdb)" in the pdb tool.
             self.install_configs["install"].append("pip uninstall -y pdbpp")
+
+        # self.terminal.run(f"pip install uv")
 
         # The following will create the temporary working directory.
         self.setup_workspace(
@@ -182,14 +175,10 @@ class SWESmithEnv(RepoEnv):
                 for test in self.pass_to_pass
             ]
 
-    @property
-    def patch(self):
-        command = "git diff"
-        result = subprocess.run(
-            command.split(), cwd=self.working_dir, text=True, capture_output=True
-        )
-        patch = result.stdout.replace(str(self.working_dir), str(self.path))
-        return patch
+        self.git_apply_cmd = f"git -C {self.env.working_dir} apply --reverse -"
+        # Note that the `gold_patch` is the same as the `test_patch` but will
+        # be used in conjunction with --reverse.
+        self.gold_patch = self.test_patch
 
     def calculate_score(self, eval_output: EvalOutput) -> int:
         log_parser = MAP_REPO_TO_PARSER.get(self.repo, parse_log_pytest)
@@ -208,127 +197,38 @@ class SWESmithEnv(RepoEnv):
             for test, status in test_status_map.items()
             if status not in (TestStatus.PASSED.value, TestStatus.XFAIL.value)
         }
-        self.logger.debug(f"Not passed tests: {not_passed_tests}")
+        if not_passed_tests:
+            self.logger.debug(f"Not passed tests: {not_passed_tests}")
+
         assert score <= self.max_score
+        self.logger.debug(
+            f"Score: {score}/{self.max_score} ({score/self.max_score:.1%})"
+        )
         return score
 
-    def reset(self, *, options: dict | None = None):
-        # TODO: support reset current task, i.e. no options provided.
-        options = options or {}
+    # def reset(self, *, options: dict | None = None):
+    #     # TODO: support reset current task, i.e. no options provided.
+    #     options = options or {}
 
-        # Clean up the previous task, if any.
-        self.close()
+    #     # Clean up the previous task, if any.
+    #     self.close()
 
-        self.setup_task(options["task_name"])
+    #     self.setup_task(options["task_name"])
 
-        # Start the terminal
-        self.terminal.base_image = self.base_image
+    #     self.setup_terminal()
 
-        self.logger.info(f"Configuring docker container: {self.terminal.container}")
+    #     # Reset RepoEnv
+    #     self.max_score = len(self.fail_to_pass)
+    #     infos = super().reset(options=options)
+    #     assert not self.done, "Tests should be failing before debugging."
 
-        # Create new group (if needed) and user.
-        uid = os.getuid()
-        group_id = os.getgid()
-        self.terminal.run(f"groupadd -g {group_id} debug_gym_group", user="root")
-        self.terminal.run(
-            f"useradd -m -u {uid} -g {group_id} -G sudo debug_gym_user", user="root"
-        )
+    #     return infos
 
-        # Install sudo.
-        self.terminal.run(f"apt update && apt install -y sudo", user="root")
-        # Add the user to sudoers.
-        self.terminal.run(
-            f"echo 'debug_gym_user ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/debug_gym_user",
-            user="root",
-        )
-
-        # Allow for the user to pip install in the env. TODO: This is still slow.
-        # self.terminal.run(f"chmod -R o+rwX /opt/miniconda3/envs/testbed", user="root")
-
-        # Alternatively, we can use the following to specifically allow read/write/execute permissions on certain directories.
-        self.terminal.run(
-            f"chmod -R o+rwX /opt/miniconda3/envs/testbed/bin", user="root"
-        )
-        self.terminal.run(
-            f"chmod o+rwX /opt/miniconda3/envs/testbed/lib/python*/site-packages",
-            user="root",
-        )
-        self.terminal.run(
-            f"chmod o+rwX /opt/miniconda3/envs/testbed/lib/python*/site-packages/*",
-            user="root",
-        )
-        self.terminal.run(
-            f"chmod -R o+rwX /opt/miniconda3/envs/testbed/lib/python*/site-packages/{self.package_name}*",
-            user="root",
-        )
-        self.terminal.run(
-            f"chmod -R o+rwX /opt/miniconda3/envs/testbed/lib/python*/site-packages/{self.package_name.title()}*",
-            user="root",
-        )
-        self.terminal.run(
-            f"chmod -R o+rwX /opt/miniconda3/envs/testbed/lib/python*/site-packages/*pdb*",
-            user="root",
-        )
-
-        # Delete the content in the working directory.
-        self.terminal.run(f"rm -rf {self.working_dir / '*'} {self.working_dir / '.*'}")
-
-        # Copy the initial code to the working directory.
-        self.terminal.run(f"cp -r /testbed/. {self.working_dir}")
-        self.terminal.run(f"chmod -R a+rw {self.working_dir}")
-
-        self.terminal.session_commands.append("source /opt/miniconda3/bin/activate")
-        self.terminal.session_commands.append(f"conda activate testbed")
-
-        self.terminal.run(f"pip install uv")
-        self.run_install()
-
-        ## Checkout the branch for the current task.
-        # self.terminal.run(f"git fetch origin {self.branch_name}")
-        # self.terminal.run(f"git checkout {self.branch_name}")
-
-        # Apply the bug patch directly.
-        self.terminal.run(f"git apply - <<'EOF'\n{self.bug_patch}\nEOF")
-
-        self.terminal.run(f"git config user.name 'debug-gym'")
-        self.terminal.run(f"git config user.email '<>'")
-        self.terminal.run(f"git commit -am 'Applying buggy patch {self.branch_name}'")
-
-        # Rebuild the debug ignore and read-only files.
-        create_ignore_file(
-            self.working_dir / ".debugignore", patterns=self.ignore_files
-        )
-
-        # # Get test directives from test patch and remove non-test files
-        # test_files = re.findall(r"diff --git a/.* b/(.*)", self.gold_patch)
-        # test_files = [
-        #     f for f in test_files if not any(f.endswith(ext) for ext in NON_TEST_EXTS)
-        # ]
-        # # Add test/ to readonly files if not already present
-        # if "test/" not in test_files:
-        #     test_files.append("test/")
-        # TODO: do we want to add all test/ ?, if so check that the gold_patch is not about fixing a bug in such file.
-        create_ignore_file(
-            self.working_dir / ".debugreadonly", patterns=self.test_directives
-        )
-        self.setup_file_filters()  # Need to refresh the file filters after re-creating ignore files.
-
-        self.terminal.run(f"git add .debugignore")
-        self.terminal.run(f"git add .debugreadonly")
-        self.terminal.run(f"git commit -am 'Add debug-gym ignore and read-only files'")
-
-        # Reset RepoEnv
-        self.max_score = len(self.fail_to_pass)
-        infos = super().reset(options=options)
-        assert not self.done, "Tests should be failing before debugging."
-
-        return infos
-
-    @property
-    def ignore_files(self):
-        return [
-            ".?*",  # Hidden files and directories. It also ignores the parent directory.
-        ]
+    # @property
+    # def ignore_files(self):
+    #     return [
+    #         ".?*",  # Hidden files and directories. It also ignores the parent directory.
+    #     ]
 
     def run_command_with_raise(self, command):
         try:
@@ -340,13 +240,16 @@ class SWESmithEnv(RepoEnv):
             return status, output
         except ValueError as e:
             if "error: remote upstream already exists." in str(e):
-                pass
-            # else:
-            #     raise
+                pass  # Trying to add the upstream remote, but it already exists.
+            else:
+                raise
 
-    def run_install(self):
-        install_cmds = self.install_configs.get("install", [])
-        if install_cmds:
-            self.logger.debug("Running install commands...")
-            for install_cmd in install_cmds:
-                self.run_command_with_raise(install_cmd)
+    def run_post_install(self):
+        pass  # SWE-Smith does not have post-install commands.
+
+    # def run_install(self):
+    #     install_cmds = self.install_configs.get("install", [])
+    #     if install_cmds:
+    #         self.logger.debug("Running install commands...")
+    #         for install_cmd in install_cmds:
+    #             self.run_command_with_raise(install_cmd)

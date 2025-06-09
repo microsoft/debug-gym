@@ -52,30 +52,25 @@ def get_swe_env(build_swe_env_once):
 
 
 @if_docker_running
-def test_clone_repo(tmp_path, get_swe_env):
+def test_load_dataset(tmp_path, get_swe_env):
     working_dir = str(tmp_path)
     swe_env = get_swe_env(working_dir)
-    task_name = "astropy__astropy-14096"
-    row = swe_env.dataset[task_name]
-    repo_address = row["repo"]
-    org_name, repo_name = repo_address.split("/")
-    local_repo_path = SWEBenchEnv.CACHE / repo_name
-
-    if not local_repo_path.exists():
-        with patch("subprocess.run") as mock_run:
-            local_repo_path = swe_env.clone_repo(repo_address)
-            mock_run.assert_called_once_with(
-                [
-                    "git",
-                    "clone",
-                    f"https://github.com/{repo_address.lstrip('/')}",
-                    local_repo_path,
-                ],
-                check=True,
-            )
-    else:
-        repo_content = os.listdir(local_repo_path)
-        assert "astropy" in repo_content
+    assert swe_env.dataset_id == "princeton-nlp/SWE-bench_Verified"
+    # check if the dataset contains features that SWEBenchEnv expects
+    assert list(swe_env.ds.features.keys()) == [
+        "repo",
+        "instance_id",
+        "base_commit",
+        "patch",  # not required
+        "test_patch",
+        "problem_statement",
+        "hints_text",  # not required
+        "created_at",  # not required
+        "version",  # not required
+        "FAIL_TO_PASS",
+        "PASS_TO_PASS",
+        "environment_setup_commit",  # not required
+    ]
 
 
 @if_docker_running
@@ -120,23 +115,6 @@ def test_reset_and_step(get_swe_env):
 |-- README.rst
 |-- astropy/"""
     assert env_info.step_observation.observation.startswith(listdir_start)
-
-
-@if_docker_running
-def test_repo_name(tmp_path, get_swe_env):
-    working_dir = str(tmp_path)
-    swe_env = get_swe_env(working_dir)
-    repo = "test_org/test_repo"
-    expected_repo_name = "test_org__test_repo"
-    assert swe_env.repo_name(repo) == expected_repo_name
-
-    repo_with_spaces = "test org/test repo"
-    expected_repo_name_with_spaces = "test--org__test--repo"
-    assert swe_env.repo_name(repo_with_spaces) == expected_repo_name_with_spaces
-
-    repo_with_apostrophe = "test'org/test'repo"
-    expected_repo_name_with_apostrophe = "testorg__testrepo"
-    assert swe_env.repo_name(repo_with_apostrophe) == expected_repo_name_with_apostrophe
 
 
 @if_docker_running
@@ -240,25 +218,29 @@ def test_setup_task_info(tmp_path, get_swe_env):
 
 
 @if_docker_running
-def test_setup_local_repo(tmp_path, get_swe_env):
+def test_setup_terminal(tmp_path, get_swe_env):
     working_dir = str(tmp_path)
     swe_env = get_swe_env(working_dir)
     task_name = "astropy__astropy-14096"
     swe_env.setup_task_info(task_name)
-    swe_env.setup_local_repo()
-    git_commit = subprocess.run(
-        f"git -C {swe_env.working_dir} status".split(),
+    swe_env.setup_terminal()
+    git_logs = subprocess.run(
+        f"git -C {swe_env.working_dir} log -n 4".split(),
         stdout=subprocess.PIPE,
         text=True,
     ).stdout
-    assert f"HEAD detached at {swe_env.ds_row["base_commit"][:8]}" in git_commit
+    assert swe_env.base_commit in git_logs
+    assert f"Applying test patch for {task_name}" in git_logs
+    assert "Add debug-gym ignore and read-only files" in git_logs
 
     git_diff = subprocess.run(
-        f"git -C {swe_env.working_dir} diff".split(),
+        f"git -C {swe_env.working_dir} show HEAD^1".split(),
         stdout=subprocess.PIPE,
         text=True,
     ).stdout
+    git_diff = git_diff[git_diff.index("diff --git") :]
     git_diff = [l for l in git_diff.split("\n") if not l.startswith("index ")]
-    assert git_diff == swe_env.ds_row["test_patch"].split("\n")
+    assert git_diff == swe_env.test_patch.split("\n")
 
     assert ".debugignore" in os.listdir(swe_env.working_dir)
+    assert ".debugreadonly" in os.listdir(swe_env.working_dir)
