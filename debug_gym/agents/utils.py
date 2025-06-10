@@ -108,6 +108,16 @@ def load_config():
         action="store_true",
         help="Break before sending action to the environment.",
     )
+    parser.add_argument(
+        "-n",
+        "--num-workers",
+        type=int,
+        default=None,
+        help=(
+            "Number of workers to use, default is 1 (no parallelism). "
+            "Can be set via DEBUG_GYM_WORKERS environment variable."
+        ),
+    )
     group = parser.add_mutually_exclusive_group()
     group.add_argument(
         "-v",
