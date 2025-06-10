@@ -1,7 +1,7 @@
 import json
 import os
 import uuid
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 
 from termcolor import colored
@@ -120,8 +120,8 @@ def main():
     tasks_succeeded = []
 
     if num_workers > 1:
-        # Multi-thread
-        with ThreadPoolExecutor(num_workers) as executor:
+        # Multi-process
+        with ProcessPoolExecutor(num_workers) as executor:
             futures = {
                 executor.submit(run_agent, args, problem, config): problem
                 for problem in problems
