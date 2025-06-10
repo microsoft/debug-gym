@@ -6,6 +6,7 @@ from collections import OrderedDict
 from os.path import join as pjoin
 
 import numpy as np
+from jinja2 import Template
 
 from debug_gym.agents.history_tracker import HistoryTracker, build_history_prompt
 from debug_gym.agents.utils import trim
@@ -24,6 +25,17 @@ def register_agent(cls):
         raise ValueError("agent_class must have a name attribute")
     AGENT_REGISTRY[cls.name.lower()] = cls
     return cls
+
+
+SIMPLE_TEMPLATE = """{
+    "Overall task": "{{ overall_task }}",
+    "Instructions": "{{ instructions }}",
+    "Repo directory tree": "{{ repo_tree }}",
+    "Current breakpoints": "{{ current_breakpoints }}",{% if eval_observation %}
+    "Eval observation": "{{ eval_observation }}",{% endif %}{% if shortcut_features %}
+    "Shortcut features": {{ shortcut_features }},
+    {% endif %}
+}"""
 
 
 class BaseAgent:
@@ -72,64 +84,66 @@ class BaseAgent:
             response = response[reasoning_end:].strip()
         return response
 
-    def build_system_prompt(self, info):
-        def calc_tokens_left(system_prompt: dict):
-            system_prompt = unescape(
-                json.dumps(system_prompt, indent=2, sort_keys=False)
-            )
-            return self.llm.context_length - self.llm.count_tokens(system_prompt)
+    # def _trimmed_dir_tree(self, system_prompt: dict, info):
+    #     def calc_tokens_left(system_prompt: dict):
+    #         system_prompt = unescape(
+    #             json.dumps(system_prompt, indent=2, sort_keys=False)
+    #         )
+    #         return self.llm.context_length - self.llm.count_tokens(system_prompt)
 
-        system_prompt = OrderedDict()
-        system_prompt["Overall task"] = self.system_prompt
-        system_prompt["Instructions"] = info.instructions
-        if self.llm.context_length is not None and self.llm.count_tokens is not None:
-            system_prompt["Repo directory tree"] = trim(
-                info.dir_tree,
-                min(
-                    int(0.1 * self.llm.context_length), calc_tokens_left(system_prompt)
-                ),
-                count_tokens=self.llm.count_tokens,
-                where="end",
-            )
-        else:
-            system_prompt["Repo directory tree"] = info.dir_tree
-        system_prompt["Current breakpoints"] = info.current_breakpoints
+    #     if self.llm.context_length is not None and self.llm.count_tokens is not None:
+    #         dir_tree = trim(
+    #             info.dir_tree,
+    #             min(
+    #                 int(0.1 * self.llm.context_length), calc_tokens_left(system_prompt)
+    #             ),
+    #             count_tokens=self.llm.count_tokens,
+    #             where="end",
+    #         )
+    #     else:
+    #         dir_tree = info.dir_tree
 
-        if self.llm.context_length is not None and self.llm.count_tokens is not None:
-            system_prompt["Evaluation output of current code"] = trim(
-                info.eval_observation.observation,
-                min(
-                    int(0.8 * self.llm.context_length), calc_tokens_left(system_prompt)
-                ),
-                count_tokens=self.llm.count_tokens,
-                where="middle",
-            )
-        else:
-            system_prompt["Evaluation output of current code"] = (
-                info.eval_observation.observation
-            )
-
+    def _shortcut_features(self):
         shortcut_features = []
         if self.config.get("env_kwargs", {}).get("auto_eval_on_rewrite") is True:
             shortcut_features.append(
-                "After successful rewrites, the environment will automatically call the Eval tool to evaluate the rewritten code. Therefore, you do not need to call the Eval tool yourself. The evaluation output will be updated automatically in the system prompt."
+                "After successful rewrites, the environment will automatically "
+                "call the Eval tool to evaluate the rewritten code. Therefore, "
+                "you do not need to call the Eval tool yourself. The evaluation "
+                "output will be updated automatically in the system prompt."
             )
         if self.config.get("env_kwargs", {}).get(
             "persistent_breakpoints"
         ) is True and self.env.has_tool("pdb"):
             shortcut_features.append(
-                "The environment will automatically restore existing breakpoints when a new PDB session is started (e.g., after a rewrite)."
+                "The environment will automatically restore existing breakpoints "
+                "when a new PDB session is started (e.g., after a rewrite)."
             )
         if self.config.get("env_kwargs", {}).get(
             "auto_list"
         ) is True and self.env.has_tool("pdb"):
             shortcut_features.append(
-                "After every valid PDB tool calling, the environment will automatically call the PDB tool again with a `list .` command, which will show the code around the current frame."
+                "After every valid PDB tool calling, the environment will "
+                "automatically call the PDB tool again with a `list .` command, "
+                "which will show the code around the current frame."
             )
-        if len(shortcut_features) > 0:
-            system_prompt["Shortcut features"] = shortcut_features
+        return shortcut_features
 
-        system_prompt = unescape(json.dumps(system_prompt, indent=2, sort_keys=False))
+    def build_system_prompt(self, info):
+        """Build system prompt using template from config."""
+        # Get the appropriate template based on agent type
+        system_prompt_template = self.config.get("system_prompt_template", "")
+        if not system_prompt_template:
+            system_prompt_template = SIMPLE_TEMPLATE
+        system_prompt_template = Template(system_prompt_template)
+        system_prompt = system_prompt_template.render(
+            overall_task=self.system_prompt,
+            instructions=info.instructions,
+            repo_tree=info.dir_tree,
+            current_breakpoints=info.current_breakpoints,
+            eval_observation=info.eval_observation.observation,
+            shortcut_features=json.dumps(self._shortcut_features()),
+        )
         messages = [
             {
                 "role": "system",
