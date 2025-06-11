@@ -10,7 +10,7 @@ import numpy as np
 from debug_gym.agents.history_tracker import HistoryTracker, build_history_prompt
 from debug_gym.agents.utils import trim
 from debug_gym.gym.envs.env import RepoEnv
-from debug_gym.gym.utils import unescape
+from debug_gym.gym.utils import filter_non_utf8
 from debug_gym.llms.base import LLM
 from debug_gym.logger import DebugGymLogger
 
@@ -74,7 +74,7 @@ class BaseAgent:
 
     def build_system_prompt(self, info):
         def calc_tokens_left(system_prompt: dict):
-            system_prompt = unescape(
+            system_prompt = filter_non_utf8(
                 json.dumps(system_prompt, indent=2, sort_keys=False)
             )
             return self.llm.context_length - self.llm.count_tokens(system_prompt)
@@ -129,7 +129,7 @@ class BaseAgent:
         if len(shortcut_features) > 0:
             system_prompt["Shortcut features"] = shortcut_features
 
-        system_prompt = unescape(json.dumps(system_prompt, indent=2, sort_keys=False))
+        system_prompt = filter_non_utf8(json.dumps(system_prompt, indent=2, sort_keys=False))
         messages = [
             {
                 "role": "system",

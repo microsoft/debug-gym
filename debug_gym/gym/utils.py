@@ -13,6 +13,13 @@ def clean_code(code):
     return "\n".join(line.rstrip() for line in code_line)
 
 
+def filter_non_utf8(text):
+    """Filter out non-UTF-8 characters from text."""
+    if isinstance(text, str):
+        return text.encode('utf-8', errors='ignore').decode('utf-8')
+    return text
+
+
 def unescape(s):
     try:
         # First, try the normal unescape
