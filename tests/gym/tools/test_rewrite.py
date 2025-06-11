@@ -117,7 +117,6 @@ def test_rewrite_start_end(env):
 
 def test_full_rewrite(env):
     rewrite_tool = env.get_tool("rewrite")
-    # env.editable_files = [f"{env.working_dir}/test.py"]
     patch = {
         "path": "test.py",
         "new_code": "print(f'Hello, {name}!')",

@@ -19,3 +19,7 @@ Added in the [analysis](https://github.com/microsoft/debug-gym/tree/main/analysi
 ### 2025-05-28
 
 Improved the View tool, added the `start` and `end` arguments so the agent can specify a particular chunk of code to view.
+
+### 2025-06-11
+
+Added support to [SWE-smith](https://swesmith.com/). Users can use the tasks shipped with the official SWE-smith package, or customized tasks generated using SWE-smith.

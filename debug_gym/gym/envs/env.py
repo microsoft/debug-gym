@@ -155,7 +155,7 @@ class RepoEnv(TooledEnv):
         readonly_patterns: list[str] | None = None,
         auto_eval_on_rewrite: bool = True,
         run_timeout: int | None = None,
-        dir_tree_depth: int | None = None,
+        dir_tree_depth: int = 1,
         persistent_breakpoints: bool = True,
         auto_list: bool = True,
         terminal: Terminal | None = None,
@@ -226,7 +226,7 @@ class RepoEnv(TooledEnv):
         self.logger.debug(f"Working directory: {self.working_dir}")
         shutil.copytree(self.path, self.working_dir, dirs_exist_ok=True, symlinks=True)
 
-        self.index_files(readonly_patterns, ignore_patterns)
+        self.setup_file_filters(readonly_patterns, ignore_patterns)
 
         # override entrypoint as it might be task dependent
         self.set_entrypoints(entrypoint, debug_entrypoint)
@@ -251,16 +251,18 @@ class RepoEnv(TooledEnv):
 
     @staticmethod
     def _prepare_entrypoint(entrypoint):
-        # Remove PYTHONPATH prefix if present
-        if entrypoint.startswith("PYTHONPATH=$PYTHONPATH:$PWD "):
-            entrypoint = entrypoint[len("PYTHONPATH=$PYTHONPATH:$PWD ") :]
-
         entrypoint_list = entrypoint.split()
+        # Handle uv package manager's run command by ensuring the correct interpreter path
+        # and explicitly adding 'python' to the execution chain for consistency.
+        if entrypoint_list[0].endswith("uv") and entrypoint_list[1] == "run":
+            entrypoint_list[2] = f"$(which {entrypoint_list[2]})"
+            entrypoint_list = entrypoint_list[:2] + ["python"] + entrypoint_list[2:]
 
-        if entrypoint_list[0] != "python":
+        # For non-python commands, ensure we have the absolute path to the Python executable
+        # and explicitly run it through Python for consistent execution behavior.
+        elif entrypoint_list[0] != "python":
             entrypoint_list[0] = f"$(which {entrypoint_list[0]})"
             entrypoint_list = ["python"] + entrypoint_list
-            entrypoint = entrypoint_list
 
         entrypoint = " ".join(entrypoint_list)
         return entrypoint
@@ -367,14 +369,21 @@ class RepoEnv(TooledEnv):
     def resolve_path(self, filepath: str | Path, raises=False) -> Path:
         """Convert a relative filepath to absolute based on the working_dir.
         If the path is already absolute, it is returned as is.
-        If raises is True, raises FileNotFoundError if the file does not exist.
+        If raises is True, raises FileNotFoundError if the file does not exist,
+        is not in the working directory or is ignored by the ignore patterns.
         If raises is False, returns the absolute path regardless of the file existence.
         """
         abs_filepath = Path(filepath)
         if not abs_filepath.is_absolute():
             abs_filepath = (Path(self.working_dir) / abs_filepath).resolve()
-        if raises and not (
-            abs_filepath.is_relative_to(self.working_dir) and abs_filepath.exists()
+        if (
+            raises
+            and abs_filepath != self.working_dir
+            and not (
+                abs_filepath.is_relative_to(self.working_dir)
+                and abs_filepath.exists()
+                and not self._is_ignored_func(abs_filepath)
+            )
         ):
             # raises error with original path
             raise FileNotFoundError(
@@ -383,6 +392,16 @@ class RepoEnv(TooledEnv):
             )
         return abs_filepath
 
+    def has_file(self, filepath: str) -> bool:
+        """Checks if a file exists in the working directory.
+        Shortcut for `resolve_path` with raises=True.
+        """
+        try:
+            self.resolve_path(filepath, raises=True)
+            return True
+        except FileNotFoundError:
+            return False
+
     def read_file(self, filepath: str) -> str:
         """Reads a file from the working directory.
         Raises value error if the file does not exist"""
@@ -390,9 +409,9 @@ class RepoEnv(TooledEnv):
         return abs_filepath.read_text()
 
     def is_editable(self, filepath):
-        return not self._is_readonly(self.resolve_path(filepath))
+        return not self._is_readonly_func(self.resolve_path(filepath, raises=True))
 
-    def index_files(
+    def setup_file_filters(
         self,
         readonly_patterns: list[str] | None = None,
         ignore_patterns: list[str] | None = None,
@@ -405,22 +424,22 @@ class RepoEnv(TooledEnv):
         # Ignore debug gym hidden files
         ignore_patterns += [".debugignore", ".debugreadonly"]
 
-        # get all file paths relative to the working directory
-        self._is_ignored = make_file_matcher(
-            self.resolve_path(".debugignore"), patterns=ignore_patterns
-        )
-        self.all_files = list(
-            sorted(
-                self.resolve_path(path)
-                for path in _walk(self.working_dir, skip=self._is_ignored)
-            )
+        # create a matcher function for ignored files, .debugignore has precedence over .gitignore
+        self._is_ignored_func = make_file_matcher(
+            base_dir=self.working_dir,
+            pattern_files=[
+                self.resolve_path(".gitignore"),
+                self.resolve_path(".debugignore"),
+            ],
+            patterns=ignore_patterns,
         )
 
-        # get list of editable files
-        self._is_readonly = make_file_matcher(
-            self.resolve_path(".debugreadonly"), patterns=readonly_patterns
+        # create a matcher function for readonly files
+        self._is_readonly_func = make_file_matcher(
+            base_dir=self.working_dir,
+            pattern_files=self.resolve_path(".debugreadonly"),
+            patterns=readonly_patterns,
         )
-        self.editable_files = set(p for p in self.all_files if not self._is_readonly(p))
 
     def directory_tree(self, root: str | Path = None, max_depth: int | None = None):
         root = self.resolve_path(root or self.working_dir, raises=True)
@@ -430,7 +449,7 @@ class RepoEnv(TooledEnv):
         result = [f"{root}/"]
 
         # get all paths with correct depth
-        for path in _walk(root, max_depth, skip=self._is_ignored):
+        for path in _walk(root, max_depth, skip=self._is_ignored_func):
             rel_path = path.relative_to(root)  # relative path from root
             depth = len(rel_path.parts) - 1  # depth of current path
             indent = "  " * depth  # 2 spaces per level for indent
@@ -475,6 +494,11 @@ class RepoEnv(TooledEnv):
         result = subprocess.run(command, text=True, capture_output=True)
         patch = result.stdout.replace(str(self.working_dir), str(self.path))
         return patch
+
+    def apply_gold_patch(self):
+        raise NotImplementedError(
+            f"apply_gold_patch is not implemented for {self.__class__.__name__}."
+        )
 
     def step(self, action: ToolCall) -> EnvInfo:
         # given action, return new obs, and update infos

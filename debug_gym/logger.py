@@ -55,7 +55,7 @@ class DebugGymLogger(logging.Logger):
             log_dir = Path(log_dir)
             log_dir.mkdir(parents=True, exist_ok=True)
 
-            self.log_file = log_dir / f"{name}.log"
+            self.log_file = (log_dir / f"{name}.log").absolute()
             fh = logging.FileHandler(self.log_file, mode=mode)
             formatter = StripAnsiFormatter("%(asctime)s %(levelname)-8s %(message)s")
             fh.setFormatter(formatter)
