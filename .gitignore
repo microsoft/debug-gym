@@ -180,8 +180,6 @@ logs/
 
 /data
 
-.vscode/
-
 vscode/out
 vscode/node_modules
 vscode/package-lock.json

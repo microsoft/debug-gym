@@ -159,7 +159,6 @@ def load_config():
         nargs="+",
         action="extend",
         metavar="my.setting=value",
-        action="extend",
         default=[],
         help="override params of the config file,"
         " e.g. -p 'rewrite_only.random_seed=123'",

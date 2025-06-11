@@ -1,5 +1,4 @@
 from debug_gym.agents.base_agent import BaseAgent, register_agent
-from debug_gym.llms.base import LLM
 
 
 @register_agent
@@ -59,82 +58,6 @@ class Debug_5_Agent(DebugAgent):
                 reason = "done" if info.done else "max_rewrite_steps reached"
                 self.logger.info(
                     f"Step: {step} | Score: {info.score}/{info.max_score} ({info.score/info.max_score:.1%}) | Reason: {reason}"
-                )
-                break
-
-        return info.done
-
-
-@register_agent
-class DebugHumanInTheLoop(DebugAgent):
-    name: str = "debug_human"
-
-    def run(self, task_name=None, debug=False):
-        # instantiate the human in the loop
-        self.human = LLM.instantiate(
-            llm_name="human",
-            llm_config_file_path=self.config.get("llm_config_file_path"),
-            logger=self.logger,
-        )
-
-        self.history.reset()
-        info = self.env.reset(options={"task_name": task_name})
-        # initial state does not have prompt and response
-        self.history.step(info, None)
-
-        if info.done is True:
-            # msg = "Environment started with entrypoint passing without errors."
-            return True
-
-        highscore = info.score
-
-        for step in self.logger.tqdm(range(self.config["max_steps"])):
-            highscore = max(highscore, info.score)
-            self.logger.info(
-                f"Score: {info.score}/{info.max_score} ({info.score/info.max_score:.1%}) [Best: {highscore}]"
-            )
-
-            prompt = self.build_prompt(info)
-
-            human_response = self.human(prompt, info.tools)
-
-            if debug:
-                breakpoint()
-
-            # make a copy of the env for the llm
-            self.cloned_env = self.env.clone()
-            # remove the pdb tool from the cloned env
-            if self.cloned_env.has_tool("pdb"):
-                self.cloned_env.remove_tool("pdb")
-            llm_info = self.cloned_env.reset(options={"task_name": task_name})
-            # replay the history up to the current step
-            for step in self.history.get_all():
-                if step.done:
-                    break
-                llm_info = self.cloned_env.step(step.action)
-
-            # step the environment with the human response
-            info = self.env.step(human_response.response)
-            # log the human response
-            self.history.step(info, human_response)
-
-            if info.done or info.rewrite_counter >= self.config["max_rewrite_steps"]:
-                self.logger.info(
-                    f"Score (human): {info.score}/{info.max_score} ({info.score/info.max_score:.1%})"
-                )
-                break
-
-            # call the llm with the cloned environment
-            prompt = self.build_prompt(llm_info)
-            llm_response = self.llm(prompt, llm_info.tools)
-            llm_info = self.cloned_env.step(llm_response.response)
-
-            if (
-                llm_info.done
-                or llm_info.rewrite_counter >= self.config["max_rewrite_steps"]
-            ):
-                self.logger.info(
-                    f"Score (llm): {llm_info.score}/{llm_info.max_score} ({llm_info.score/llm_info.max_score:.1%})"
                 )
                 break
 
