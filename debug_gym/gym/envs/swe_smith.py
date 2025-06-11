@@ -83,14 +83,17 @@ class SWESmithEnv(SWEBenchEnv):
         # Load dataset splits.
         with open(SWESmithEnv.CONFIG) as f:
             self.dataset_splits = yaml.safe_load(f)
+            self.excluded_ids = self.dataset_splits.get("excluded", [])
 
     def get_dataset_split(self, split):
         if split == "all":
-            return sorted(self.dataset.keys())  # all tasks
+            return sorted(
+                k for k in self.dataset.keys() if k not in self.excluded_ids
+            )  # all tasks
         elif split in self.dataset:
             return [split]  # Single task
         elif split in self.dataset_splits:
-            return self.dataset_splits[split]["ids"]
+            return self.dataset_splits[split]
         else:
             raise ValueError(
                 f"Invalid split '{split}'. Available splits are: {['all'] + sorted(self.dataset_splits.keys())}"
