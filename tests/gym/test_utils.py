@@ -10,6 +10,7 @@ from debug_gym.gym.utils import (
     create_ignore_file,
     extract_max_score_from_pytest_output,
     extract_reward_from_pytest_output,
+    filter_non_utf8,
     is_subdirectory,
     make_file_matcher,
     show_line_number,
@@ -584,6 +585,104 @@ def test_unescape_surrogate_pairs():
 
     # The result should replace the surrogate with a replacement character
     assert "Test with surrogate" in result
+
+
+def test_filter_non_utf8():
+    """Test the filter_non_utf8 function with various inputs."""
+
+    # Test with regular ASCII text
+    assert filter_non_utf8("hello world") == "hello world"
+
+    # Test with valid UTF-8 characters
+    assert filter_non_utf8("héllo wørld") == "héllo wørld"
+
+    # Test with emoji (valid surrogate pairs)
+    assert filter_non_utf8("hello 👋 world 🌍") == "hello 👋 world 🌍"
+
+    # Test with various Unicode characters
+    assert filter_non_utf8("こんにちは 你好 مرحبا") == "こんにちは 你好 مرحبا"
+
+    # Test with mixed content
+    mixed_text = "Regular text with émoji 🎉 and ünïcode"
+    assert filter_non_utf8(mixed_text) == mixed_text
+
+    # Test with empty string
+    assert filter_non_utf8("") == ""
+
+    # Test with non-string input (should return as-is)
+    assert filter_non_utf8(None) is None
+    assert filter_non_utf8(123) == 123
+    assert filter_non_utf8([1, 2, 3]) == [1, 2, 3]
+
+    # Test with newlines and special characters
+    text_with_newlines = "line1\nline2\tTabbed\r\nWindows line ending"
+    assert filter_non_utf8(text_with_newlines) == text_with_newlines
+
+    # Test with string containing invalid UTF-8 bytes (simulated)
+    # Note: This is tricky to test directly since Python strings are Unicode
+    # But we can test the function's behavior with valid input
+    text_with_special_chars = "Text with \u0000 null and \uffff characters"
+    result = filter_non_utf8(text_with_special_chars)
+    # Should preserve valid Unicode characters
+    assert isinstance(result, str)
+
+    # Test with very long string
+    long_text = "a" * 10000 + "🎉" * 1000
+    result = filter_non_utf8(long_text)
+    assert len(result) == 11000
+    assert result.startswith("a" * 10000)
+    assert result.endswith("🎉" * 1000)
+
+
+def test_filter_non_utf8_edge_cases():
+    """Test edge cases for filter_non_utf8 function."""
+
+    # Test with only whitespace
+    assert filter_non_utf8("   \t\n  ") == "   \t\n  "
+
+    # Test with only special Unicode characters
+    assert (
+        filter_non_utf8("\u200b\u200c\u200d") == "\u200b\u200c\u200d"
+    )  # Zero-width characters
+
+    # Test with combining characters
+    combining_text = "e\u0301"  # e with acute accent as combining character
+    result = filter_non_utf8(combining_text)
+    assert result == combining_text
+
+    # Test with different types that should pass through
+    test_cases = [
+        (42, 42),
+        (3.14, 3.14),
+        (True, True),
+        (False, False),
+        ([], []),
+        ({}, {}),
+        (set(), set()),
+    ]
+
+    for input_val, expected in test_cases:
+        assert filter_non_utf8(input_val) == expected
+
+
+def test_filter_non_utf8_preserves_json_serializable():
+    """Test that the function preserves JSON-serializable content."""
+    import json
+
+    test_strings = [
+        "simple text",
+        "text with émoji 🎉",
+        '{"key": "value with ünicöde"}',
+        "line1\nline2\ttab",
+    ]
+
+    for text in test_strings:
+        filtered = filter_non_utf8(text)
+        # Should be JSON serializable
+        json_str = json.dumps({"text": filtered})
+        # Should be able to parse back
+        parsed = json.loads(json_str)
+        assert parsed["text"] == filtered
 
 
 def test_cleanup_pytest_output():
