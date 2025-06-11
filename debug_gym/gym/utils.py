@@ -13,6 +13,13 @@ def clean_code(code):
     return "\n".join(line.rstrip() for line in code_line)
 
 
+def filter_non_utf8(text):
+    """Filter out non-UTF-8 characters from text."""
+    if isinstance(text, str):
+        return text.encode("utf-8", errors="ignore").decode("utf-8")
+    return text
+
+
 def unescape(s):
     try:
         # First, try the normal unescape
@@ -60,12 +67,17 @@ def show_line_number(code_string, code_path=None, environment=None, start_index=
     return "\n".join(output)
 
 
-def make_file_matcher(pattern_file: str | Path, patterns: list[str] | None = None):
+def make_file_matcher(
+    base_dir: str | Path,
+    pattern_files: list[str | Path] | str | Path,
+    patterns: list[str] | None = None,
+) -> Callable[[str | Path], bool]:
     """
-    Creates a file matcher function based on ignore patterns from a file and additional patterns.
+    Creates a file matcher function based on ignore patterns from files and additional patterns.
 
     Args:
-        pattern_file (str | Path): Path to the file containing gitignore-like patterns.
+        base_dir (str | Path): The base directory to normalize the patterns against.
+        pattern_files (list[str | Path] | str | Path): Path(s) to file(s) containing gitignore-like patterns.
         patterns (list[str]): Additional patterns to include. Defaults to an empty list.
 
     Returns:
@@ -77,20 +89,25 @@ def make_file_matcher(pattern_file: str | Path, patterns: list[str] | None = Non
     if patterns is None:
         patterns = []
 
-    pattern_file = Path(pattern_file)
-    base_dir = _normalize_path(str(pattern_file.parent))
+    if isinstance(pattern_files, (str, Path)):
+        pattern_files = [pattern_files]
 
+    # iterate over all pattern files and read their contents
     lines = []
-    if pattern_file.is_file():
-        with open(pattern_file) as ignore_file:
-            lines = ignore_file.readlines()
+    for pattern_file in pattern_files:
+        pattern_file = Path(pattern_file)
+        if pattern_file.is_file():
+            with open(pattern_file) as ignore_file:
+                lines.extend(ignore_file.readlines())
 
+    # concatenate the additional patterns
     lines += patterns
 
+    base_dir = _normalize_path(str(Path(base_dir)))
     rules = []
     for i, line in enumerate(lines):
         line = line.rstrip("\n")
-        rule = rule_from_pattern(line.rstrip("\n"), base_dir, (str(pattern_file), i))
+        rule = rule_from_pattern(line.rstrip("\n"), base_dir, ("multiple_files", i))
         if rule:
             rules.append(rule)
 

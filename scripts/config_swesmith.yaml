@@ -1,12 +1,13 @@
 base:
     # Environment configs
-    output_path: "exps/swebench-lite"
-    benchmark: "swebench"
-    problems: "all"  # list of problems, e.g., ["astropy__astropy-12907"], or "all"
+    output_path: "exps/swesmith"
+    benchmark: "swesmith"
+    problems: "all"  # list of problems, e.g., ["astropy__astropy-12907"], or strings like "test-124" (defined in gym/envs/configs), or "all",
     env_kwargs: {
         "dir_tree_depth": 1,
         "run_timeout": 300,
-        "dataset_id": "princeton-nlp/SWE-bench_lite",
+        "dataset_id": "SWE-bench/SWE-smith",
+
         # shortcut features
         "auto_eval_on_rewrite": True,  # The environment will automatically call the Eval tool after a successful rewrite. If this is set to True, the agent does not need to call the Eval tool itself.
         "persistent_breakpoints": True,  # The environemnt will keep a set of breakpoint states across PDB sessions. When a new PDB session is started, the environment will automatically load the breakpoints from the previous session.
@@ -41,16 +42,3 @@ debug_5_agent:
 solution_agent:
     llm_name: "human"  # No need for an LLM.
     tools: ["eval", "pdb"]
-
-agent1:
-    tools: ["pdb", "view", "rewrite", "listdir", "eval"]
-
-agent2:
-    tools: ["pdb", "rewrite", "eval"]
-
-agent3:
-    tools: ["pdb", "view", "rewrite", "listdir", "eval"]
-    memory_size: 5
-
-agent4:
-    tools: ["pdb", "view", "rewrite", "listdir", "eval"]

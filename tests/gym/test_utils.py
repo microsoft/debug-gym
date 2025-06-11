@@ -10,6 +10,7 @@ from debug_gym.gym.utils import (
     create_ignore_file,
     extract_max_score_from_pytest_output,
     extract_reward_from_pytest_output,
+    filter_non_utf8,
     is_subdirectory,
     make_file_matcher,
     show_line_number,
@@ -178,55 +179,149 @@ def test_show_line_number_large_number_of_lines_with_start_index():
     assert match, "Annotated code does not match expected output"
 
 
-def test_make_file_matcher(tmp_path):
+@pytest.mark.parametrize("with_negation", [False, True])
+def test_make_file_matcher(tmp_path, with_negation):
     working_dir = Path(tmp_path)
     ignore_file = working_dir / ".debugignore"
 
-    for with_negation in [False, True]:
-        debugignore_contents = "\n".join(
-            [
-                ".DS_Store",
-                "__pycache__/",
-                ".approaches/",
-                ".docs/",
-                ".meta/",
-                ".pytest_cache/",
-                "*test*.py",
-                "*.pyc",
-                "*.md",
-                ".debugignore",
-                "log/",
-                "data/",
-            ]
-        )
-        if with_negation is True:
-            debugignore_contents += "\n!data/unignore/*"
-        with open(ignore_file, "w") as f:
-            f.write(debugignore_contents)
-        is_ignored = make_file_matcher(ignore_file, patterns=["source/*.frog"])
+    debugignore_contents = "\n".join(
+        [
+            ".DS_Store",
+            "__pycache__/",
+            ".approaches/",
+            ".docs/",
+            ".meta/",
+            ".pytest_cache/",
+            "*test*.py",
+            "*.pyc",
+            "*.md",
+            ".debugignore",
+            "log/",
+            "data/",
+        ]
+    )
+    if with_negation is True:
+        debugignore_contents += "\n!data/unignore/*"
+    with open(ignore_file, "w") as f:
+        f.write(debugignore_contents)
+    is_ignored = make_file_matcher(working_dir, ignore_file, patterns=["source/*.frog"])
 
-        assert is_ignored(working_dir / "foo.py") is False
-        assert is_ignored(working_dir / "source/source.py") is False
-        assert is_ignored(working_dir / "source/__init__.py") is False
-        assert is_ignored(working_dir / "source/main.frog") is True
-        assert is_ignored(working_dir / "utils/main.frog") is False
-        assert is_ignored(working_dir / ".DS_Store") is True
-        assert is_ignored(working_dir / "foo.pyc") is True
-        assert is_ignored(working_dir / "foo_test.py") is True
-        assert is_ignored(working_dir / "testy.py") is True
-        assert is_ignored(working_dir / "data/foo.py") is True
-        assert is_ignored(working_dir / "docs/source_code.py") is False
-        assert is_ignored(working_dir / ".docs/source_code.py") is True
-        assert is_ignored(working_dir / "this_is_code.md") is True
-        assert is_ignored(working_dir / ".debugignore") is True
-        assert is_ignored(working_dir / "log/foo.py") is True
-        assert is_ignored(working_dir / "source/fotesto.py") is True
-        assert is_ignored(working_dir / ".meta/important.cc") is True
-        assert is_ignored(working_dir / "data/specific.py") is True
-        if with_negation is True:
-            assert is_ignored(working_dir / "data/unignore/foo.py") is False
-        else:
-            assert is_ignored(working_dir / "data/unignore/foo.py") is True
+    assert not is_ignored(working_dir / "foo.py")
+    assert not is_ignored(working_dir / "source/source.py")
+    assert not is_ignored(working_dir / "source/__init__.py")
+    assert is_ignored(working_dir / "source/main.frog")
+    assert not is_ignored(working_dir / "utils/main.frog")
+    assert is_ignored(working_dir / ".DS_Store")
+    assert is_ignored(working_dir / "foo.pyc")
+    assert is_ignored(working_dir / "foo_test.py")
+    assert is_ignored(working_dir / "testy.py")
+    assert is_ignored(working_dir / "data/foo.py")
+    assert not is_ignored(working_dir / "docs/source_code.py")
+    assert is_ignored(working_dir / ".docs/source_code.py")
+    assert is_ignored(working_dir / "this_is_code.md")
+    assert is_ignored(working_dir / ".debugignore")
+    assert is_ignored(working_dir / "log/foo.py")
+    assert is_ignored(working_dir / "source/fotesto.py")
+    assert is_ignored(working_dir / ".meta/important.cc")
+    assert is_ignored(working_dir / "data/specific.py")
+    if with_negation is True:
+        assert not is_ignored(working_dir / "data/unignore/foo.py")
+    else:
+        assert is_ignored(working_dir / "data/unignore/foo.py")
+
+
+def test_make_file_matcher_multiple_pattern_files(tmp_path):
+    working_dir = Path(tmp_path)
+    # Create first pattern file
+    ignore_file1 = working_dir / ".gitignore"
+    with open(ignore_file1, "w") as f:
+        f.write("*.pyc\n__pycache__/\n*.log\n")
+    # Create second pattern file
+    ignore_file2 = working_dir / ".debugignore"
+    with open(ignore_file2, "w") as f:
+        f.write("*.tmp\ntest_*\n.secret/\n")
+    # Create third pattern file
+    ignore_file3 = working_dir / ".customignore"
+    with open(ignore_file3, "w") as f:
+        f.write("*.backup\ndocs/\n")
+    pattern_files = [ignore_file1, ignore_file2, ignore_file3]
+    additional_patterns = ["*.cache", "build/"]
+    is_ignored = make_file_matcher(working_dir, pattern_files, additional_patterns)
+    # Test files that should be ignored from first pattern file
+    assert is_ignored(working_dir / "script.pyc")
+    assert is_ignored(working_dir / "__pycache__/module.py")
+    assert is_ignored(working_dir / "app.log")
+    # Test files that should be ignored from second pattern file
+    assert is_ignored(working_dir / "data.tmp")
+    assert is_ignored(working_dir / "test_module.py")
+    assert is_ignored(working_dir / ".secret/config.json")
+    # Test files that should be ignored from third pattern file
+    assert is_ignored(working_dir / "file.backup")
+    assert is_ignored(working_dir / "docs/readme.md")
+    # Test files that should be ignored from additional patterns
+    assert is_ignored(working_dir / "app.cache")
+    assert is_ignored(working_dir / "build/output.exe")
+    # Test files that should not be ignored
+    assert not is_ignored(working_dir / "main.py")
+    assert not is_ignored(working_dir / "src/utils.py")
+    assert not is_ignored(working_dir / "config.json")
+
+
+def test_make_file_matcher_with_negation_multiple_files(tmp_path):
+    working_dir = Path(tmp_path)
+    # Create first pattern file with normal patterns
+    ignore_file1 = working_dir / ".gitignore"
+    with open(ignore_file1, "w") as f:
+        f.write("*.log\ntmp/\n")
+    # Create second pattern file with negation
+    ignore_file2 = working_dir / ".exceptions"
+    with open(ignore_file2, "w") as f:
+        f.write("!important.log\n!tmp/keep/**\n")
+    pattern_files = [ignore_file1, ignore_file2]
+    is_ignored = make_file_matcher(working_dir, pattern_files)
+    # Test normal ignoring
+    assert is_ignored(working_dir / "debug.log")
+    assert is_ignored(working_dir / "tmp/cache.txt")
+    # Test negation (exceptions)
+    assert not is_ignored(working_dir / "important.log")
+    assert not is_ignored(working_dir / "tmp/keep/data.txt")
+
+
+def test_make_file_matcher_nonexistent_pattern_files(tmp_path):
+    working_dir = Path(tmp_path)
+
+    # Create one existing file and one non-existent file
+    existing_file = working_dir / ".gitignore"
+    with open(existing_file, "w") as f:
+        f.write("*.pyc\n")
+
+    nonexistent_file = working_dir / ".nonexistent"
+    pattern_files = [existing_file, nonexistent_file]
+
+    is_ignored = make_file_matcher(working_dir, pattern_files, ["*.tmp"])
+
+    # Should work with existing patterns and additional patterns
+    assert is_ignored(working_dir / "script.pyc")
+    assert is_ignored(working_dir / "data.tmp")
+    assert not is_ignored(working_dir / "main.py")
+
+
+def test_make_file_matcher_empty_pattern_files(tmp_path):
+    working_dir = Path(tmp_path)
+
+    # Create empty pattern files
+    empty_file1 = working_dir / ".empty1"
+    empty_file1.touch()
+    empty_file2 = working_dir / ".empty2"
+    empty_file2.touch()
+
+    pattern_files = [empty_file1, empty_file2]
+
+    is_ignored = make_file_matcher(working_dir, pattern_files, ["*.test"])
+
+    # Should only match additional patterns
+    assert is_ignored(working_dir / "file.test")
+    assert not is_ignored(working_dir / "main.py")
 
 
 def test_create_ignore_file(tmp_path):
@@ -490,6 +585,104 @@ def test_unescape_surrogate_pairs():
 
     # The result should replace the surrogate with a replacement character
     assert "Test with surrogate" in result
+
+
+def test_filter_non_utf8():
+    """Test the filter_non_utf8 function with various inputs."""
+
+    # Test with regular ASCII text
+    assert filter_non_utf8("hello world") == "hello world"
+
+    # Test with valid UTF-8 characters
+    assert filter_non_utf8("héllo wørld") == "héllo wørld"
+
+    # Test with emoji (valid surrogate pairs)
+    assert filter_non_utf8("hello 👋 world 🌍") == "hello 👋 world 🌍"
+
+    # Test with various Unicode characters
+    assert filter_non_utf8("こんにちは 你好 مرحبا") == "こんにちは 你好 مرحبا"
+
+    # Test with mixed content
+    mixed_text = "Regular text with émoji 🎉 and ünïcode"
+    assert filter_non_utf8(mixed_text) == mixed_text
+
+    # Test with empty string
+    assert filter_non_utf8("") == ""
+
+    # Test with non-string input (should return as-is)
+    assert filter_non_utf8(None) is None
+    assert filter_non_utf8(123) == 123
+    assert filter_non_utf8([1, 2, 3]) == [1, 2, 3]
+
+    # Test with newlines and special characters
+    text_with_newlines = "line1\nline2\tTabbed\r\nWindows line ending"
+    assert filter_non_utf8(text_with_newlines) == text_with_newlines
+
+    # Test with string containing invalid UTF-8 bytes (simulated)
+    # Note: This is tricky to test directly since Python strings are Unicode
+    # But we can test the function's behavior with valid input
+    text_with_special_chars = "Text with \u0000 null and \uffff characters"
+    result = filter_non_utf8(text_with_special_chars)
+    # Should preserve valid Unicode characters
+    assert isinstance(result, str)
+
+    # Test with very long string
+    long_text = "a" * 10000 + "🎉" * 1000
+    result = filter_non_utf8(long_text)
+    assert len(result) == 11000
+    assert result.startswith("a" * 10000)
+    assert result.endswith("🎉" * 1000)
+
+
+def test_filter_non_utf8_edge_cases():
+    """Test edge cases for filter_non_utf8 function."""
+
+    # Test with only whitespace
+    assert filter_non_utf8("   \t\n  ") == "   \t\n  "
+
+    # Test with only special Unicode characters
+    assert (
+        filter_non_utf8("\u200b\u200c\u200d") == "\u200b\u200c\u200d"
+    )  # Zero-width characters
+
+    # Test with combining characters
+    combining_text = "e\u0301"  # e with acute accent as combining character
+    result = filter_non_utf8(combining_text)
+    assert result == combining_text
+
+    # Test with different types that should pass through
+    test_cases = [
+        (42, 42),
+        (3.14, 3.14),
+        (True, True),
+        (False, False),
+        ([], []),
+        ({}, {}),
+        (set(), set()),
+    ]
+
+    for input_val, expected in test_cases:
+        assert filter_non_utf8(input_val) == expected
+
+
+def test_filter_non_utf8_preserves_json_serializable():
+    """Test that the function preserves JSON-serializable content."""
+    import json
+
+    test_strings = [
+        "simple text",
+        "text with émoji 🎉",
+        '{"key": "value with ünicöde"}',
+        "line1\nline2\ttab",
+    ]
+
+    for text in test_strings:
+        filtered = filter_non_utf8(text)
+        # Should be JSON serializable
+        json_str = json.dumps({"text": filtered})
+        # Should be able to parse back
+        parsed = json.loads(json_str)
+        assert parsed["text"] == filtered
 
 
 def test_cleanup_pytest_output():

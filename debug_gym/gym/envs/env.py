@@ -155,7 +155,7 @@ class RepoEnv(TooledEnv):
         readonly_patterns: list[str] | None = None,
         auto_eval_on_rewrite: bool = True,
         run_timeout: int | None = None,
-        dir_tree_depth: int | None = None,
+        dir_tree_depth: int = 1,
         persistent_breakpoints: bool = True,
         auto_list: bool = True,
         terminal: Terminal | None = None,
@@ -252,11 +252,17 @@ class RepoEnv(TooledEnv):
     @staticmethod
     def _prepare_entrypoint(entrypoint):
         entrypoint_list = entrypoint.split()
+        # Handle uv package manager's run command by ensuring the correct interpreter path
+        # and explicitly adding 'python' to the execution chain for consistency.
+        if entrypoint_list[0].endswith("uv") and entrypoint_list[1] == "run":
+            entrypoint_list[2] = f"$(which {entrypoint_list[2]})"
+            entrypoint_list = entrypoint_list[:2] + ["python"] + entrypoint_list[2:]
 
-        if entrypoint_list[0] != "python":
+        # For non-python commands, ensure we have the absolute path to the Python executable
+        # and explicitly run it through Python for consistent execution behavior.
+        elif entrypoint_list[0] != "python":
             entrypoint_list[0] = f"$(which {entrypoint_list[0]})"
             entrypoint_list = ["python"] + entrypoint_list
-            entrypoint = entrypoint_list
 
         entrypoint = " ".join(entrypoint_list)
         return entrypoint
@@ -370,10 +376,14 @@ class RepoEnv(TooledEnv):
         abs_filepath = Path(filepath)
         if not abs_filepath.is_absolute():
             abs_filepath = (Path(self.working_dir) / abs_filepath).resolve()
-        if raises and not (
-            abs_filepath.is_relative_to(self.working_dir)
-            and abs_filepath.exists()
-            and not self._is_ignored_func(abs_filepath)
+        if (
+            raises
+            and abs_filepath != self.working_dir
+            and not (
+                abs_filepath.is_relative_to(self.working_dir)
+                and abs_filepath.exists()
+                and not self._is_ignored_func(abs_filepath)
+            )
         ):
             # raises error with original path
             raise FileNotFoundError(
@@ -414,14 +424,21 @@ class RepoEnv(TooledEnv):
         # Ignore debug gym hidden files
         ignore_patterns += [".debugignore", ".debugreadonly"]
 
-        # get all file paths relative to the working directory
+        # create a matcher function for ignored files, .debugignore has precedence over .gitignore
         self._is_ignored_func = make_file_matcher(
-            self.resolve_path(".debugignore"), patterns=ignore_patterns
+            base_dir=self.working_dir,
+            pattern_files=[
+                self.resolve_path(".gitignore"),
+                self.resolve_path(".debugignore"),
+            ],
+            patterns=ignore_patterns,
         )
 
-        # get list of editable files
+        # create a matcher function for readonly files
         self._is_readonly_func = make_file_matcher(
-            self.resolve_path(".debugreadonly"), patterns=readonly_patterns
+            base_dir=self.working_dir,
+            pattern_files=self.resolve_path(".debugreadonly"),
+            patterns=readonly_patterns,
         )
 
     def directory_tree(self, root: str | Path = None, max_depth: int | None = None):
@@ -477,6 +494,11 @@ class RepoEnv(TooledEnv):
         result = subprocess.run(command, text=True, capture_output=True)
         patch = result.stdout.replace(str(self.working_dir), str(self.path))
         return patch
+
+    def apply_gold_patch(self):
+        raise NotImplementedError(
+            f"apply_gold_patch is not implemented for {self.__class__.__name__}."
+        )
 
     def step(self, action: ToolCall) -> EnvInfo:
         # given action, return new obs, and update infos
