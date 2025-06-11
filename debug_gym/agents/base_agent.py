@@ -18,6 +18,16 @@ from debug_gym.logger import DebugGymLogger
 AGENT_REGISTRY = {}
 
 
+BASE_SYSTEM_PROMPT_TEMPLATE = """{
+    "Overall task": "{{ overall_task }}",
+    "Instructions": "{{ instructions }}",
+    "Repo directory tree": "{{ repo_dir_tree }}",
+    "Current breakpoints": {{ current_breakpoints }}{% if eval_observation %},
+    "Eval observation": "{{ eval_observation }}"{% endif %}{% if shortcut_features %},
+    "Shortcut features": {{ shortcut_features }}{% endif %}
+}"""
+
+
 def register_agent(cls):
     if not issubclass(cls, BaseAgent):
         raise ValueError("agent_class must be a subclass of BaseAgent")
@@ -25,17 +35,6 @@ def register_agent(cls):
         raise ValueError("agent_class must have a name attribute")
     AGENT_REGISTRY[cls.name.lower()] = cls
     return cls
-
-
-SIMPLE_TEMPLATE = """{
-    "Overall task": "{{ overall_task }}",
-    "Instructions": "{{ instructions }}",
-    "Repo directory tree": "{{ repo_tree }}",
-    "Current breakpoints": "{{ current_breakpoints }}",{% if eval_observation %}
-    "Eval observation": "{{ eval_observation }}",{% endif %}{% if shortcut_features %}
-    "Shortcut features": {{ shortcut_features }},
-    {% endif %}
-}"""
 
 
 class BaseAgent:
@@ -129,27 +128,29 @@ class BaseAgent:
             )
         return shortcut_features
 
+    def _load_system_prompt_template(self) -> Template:
+        system_prompt_template = self.config.get(
+            "system_prompt_template", BASE_SYSTEM_PROMPT_TEMPLATE
+        )
+        if isinstance(system_prompt_template, str) and os.path.isfile(
+            system_prompt_template
+        ):
+            with open(system_prompt_template, "r") as f:
+                system_prompt_template = f.read()
+        return Template(system_prompt_template)
+
     def build_system_prompt(self, info):
         """Build system prompt using template from config."""
-        # Get the appropriate template based on agent type
-        system_prompt_template = self.config.get("system_prompt_template", "")
-        if not system_prompt_template:
-            system_prompt_template = SIMPLE_TEMPLATE
-        system_prompt_template = Template(system_prompt_template)
+        system_prompt_template = self._load_system_prompt_template()
         system_prompt = system_prompt_template.render(
             overall_task=self.system_prompt,
             instructions=info.instructions,
-            repo_tree=info.dir_tree,
+            repo_dir_tree=info.dir_tree,
             current_breakpoints=info.current_breakpoints,
             eval_observation=info.eval_observation.observation,
             shortcut_features=json.dumps(self._shortcut_features()),
         )
-        messages = [
-            {
-                "role": "system",
-                "content": system_prompt,
-            }
-        ]
+        messages = [{"role": "system", "content": system_prompt}]
         return messages
 
     def build_question_prompt(self):
