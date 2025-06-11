@@ -1,5 +1,6 @@
 from debug_gym.gym.envs.env import EnvInfo
 from debug_gym.gym.tools.tool import EnvironmentTool, ToolCall
+from debug_gym.gym.utils import filter_non_utf8
 from debug_gym.llms.base import LLM, LLMResponse, retry_on_rate_limit
 from debug_gym.llms.constants import LLM_API_KEY_PLACEHOLDER
 
@@ -127,7 +128,9 @@ class AnthropicLLM(LLM):
                     {
                         "type": "tool_result",
                         "tool_use_id": history_info.action.id,  # 'toolu_01SdR84CsnTKRpdH4zwFjvGj'
-                        "content": f"{history_info.step_observation.observation}",  # 'Viewing `hangman_test.py`. The file is read-only, it is not editable.'
+                        "content": filter_non_utf8(
+                            f"{history_info.step_observation.observation}"
+                        ),  # 'Viewing `hangman_test.py`. The file is read-only, it is not editable.'
                     }
                 ],
             },
