@@ -1,6 +1,5 @@
 import os
 import subprocess
-from unittest.mock import patch
 
 import pytest
 from filelock import FileLock
@@ -58,17 +57,19 @@ def test_load_dataset(tmp_path, get_swe_env):
     swe_env = get_swe_env(working_dir)
     assert swe_env.dataset_id == "SWE-bench/SWE-smith"
     # check if the dataset contains features that SWESmithEnv expects
-    assert sorted(swe_env.ds.features.keys()) == [
-        "instance_id",
-        "repo",
-        "patch",
-        "FAIL_TO_PASS",
-        "PASS_TO_PASS",
-        "created_at",
-        "image_name",
-        "base_commit",
-        "problem_statement",
-    ]
+    assert sorted(swe_env.ds.features.keys()) == sorted(
+        [
+            "instance_id",
+            "repo",
+            "patch",
+            "FAIL_TO_PASS",
+            "PASS_TO_PASS",
+            "created_at",
+            "image_name",
+            "base_commit",
+            "problem_statement",
+        ]
+    )
 
 
 @if_docker_running
@@ -165,7 +166,7 @@ def test_reset_and_step(get_swe_env):
 
 
 @if_docker_running
-def test_apply_gold_patch(tmp_path, get_swe_env):
+def test_apply_gold_patch(get_swe_env):
     swe_env = get_swe_env()
     env_info = swe_env.reset(
         options={
@@ -181,3 +182,39 @@ def test_apply_gold_patch(tmp_path, get_swe_env):
     score = swe_env.calculate_score(eval_output)
 
     assert score == swe_env.max_score
+
+
+@if_docker_running
+def test_calculate_score_with_pytest_error(get_swe_env):
+    """Test that the indentation error in pytest is handled correctly."""
+    swe_env = get_swe_env()
+    task_name = "john-kurkowski__tldextract.3d1bf184.combine_file__1vnuqpt4"
+    swe_env.reset(options={"task_name": task_name})
+
+    # Modify 'tldextract/tldextract.py' in the working_dir to introduce an indentation error.
+    file_path = os.path.join(swe_env.working_dir, "tldextract", "tldextract.py")
+    with open(file_path, "r") as file:
+        content = file.readlines()
+
+    # Introduce an indentation error by adding an extra space at the beginning of a line.
+    content[10] = " 1/0   " + content[10]
+    with open(file_path, "w") as file:
+        file.writelines(content)
+
+    # Now, when we run the tests, we should see an indentation error.
+    eval_output = swe_env.eval()
+    # ============================= test session starts ==============================
+    # platform linux -- Python 3.10.15, pytest-8.3.4, pluggy-1.5.0 -- /opt/miniconda3/envs/testbed/bin/python
+    # cachedir: .pytest_cache
+    # rootdir: /tmp/RepoEnv-z_m4s7ts
+    # configfile: pyproject.toml
+    # plugins: syrupy-4.8.0, gitignore-1.3, mock-3.14.0
+    # collecting ... collected 45 items / 1 error
+
+    # =========================== short test summary info ============================
+    # ERROR tldextract/tldextract.py - ValueError: line 11 of the docstring for tld...
+    # !!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!
+    # =============================== 1 error in 0.40s ===============================
+
+    score = swe_env.calculate_score(eval_output)
+    assert score == 0

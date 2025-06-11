@@ -1,5 +1,3 @@
-import os
-import subprocess
 from importlib.resources import files as importlib_files
 from pathlib import Path
 
@@ -17,10 +15,8 @@ from tqdm import tqdm
 
 from debug_gym.constants import DEBUG_GYM_CACHE_DIR
 from debug_gym.gym.entities import EvalOutput
-from debug_gym.gym.envs.env import RepoEnv
 from debug_gym.gym.envs.swe_bench import SWEBenchEnv
-from debug_gym.gym.terminal import DockerTerminal, Terminal
-from debug_gym.gym.utils import create_ignore_file
+from debug_gym.gym.terminal import Terminal
 
 
 class SWESmithEnv(SWEBenchEnv):
@@ -141,9 +137,34 @@ class SWESmithEnv(SWEBenchEnv):
             ]
         elif self.package_name == "pydantic":
             self.test_cmd = self.test_cmd.replace("/root/", "$HOME/")
+            self.install_configs["install"] = ["pip install uv"] + self.install_configs[
+                "install"
+            ]
+
         elif self.package_name == "alive-progress":
             # Removing pdbpp as it creates conflicts, i.e. we read until "(Pdb)" in the pdb tool.
             self.install_configs["install"].append("pip uninstall -y pdbpp")
+        elif self.package_name == "conan":
+            # Skip system packages installation (they are already installed in the Docker image).
+            self.install_configs["install"] = ["python -m pip install ."]
+
+        # Filter out the command that removes tests files.
+        self.install_configs["install"] = [
+            cmd for cmd in self.install_configs["install"] if "rm tests/" not in cmd
+        ]
+
+        # Convert all "pip update" to normal "pip install" without dependencies.
+        self.install_configs["install"] = [
+            cmd.replace("pip install -U", "pip install --no-deps")
+            for cmd in self.install_configs["install"]
+        ]
+
+        # Filter out the command that adds the upstream remote.
+        self.install_configs["install"] = [
+            cmd
+            for cmd in self.install_configs["install"]
+            if "git remote add upstream" not in cmd
+        ]
 
         # The following will create the temporary working directory.
         self.setup_workspace(
@@ -178,9 +199,12 @@ class SWESmithEnv(SWEBenchEnv):
             for test in self.fail_to_pass
             # Like in SWE-Smith, we assume silent success.
             # Ref: https://github.com/SWE-bench/SWE-smith/blob/main/swesmith/harness/grading.py#L154
-            if test_status_map.get(test, TestStatus.PASSED.value)
+            # if test_status_map.get(test, TestStatus.PASSED.value)
+            # *Do not* assume silent success for now as done in SWE-Smith grading.py
+            if test_status_map.get(test, TestStatus.ERROR.value)
             in (TestStatus.PASSED.value, TestStatus.XFAIL.value)
         )
+
         # Getting not passed tests.
         not_passed_tests = {
             test: status
@@ -195,20 +219,6 @@ class SWESmithEnv(SWEBenchEnv):
             f"Score: {score}/{self.max_score} ({score/self.max_score:.1%})"
         )
         return score
-
-    def run_command_with_raise(self, command):
-        try:
-            command = command.replace("apt-get", "sudo apt-get").replace(
-                "sudo sudo", "sudo"
-            )
-            command = command.replace("pip install -U", "pip install --no-deps")
-            status, output = self.terminal.run(command, raises=True)
-            return status, output
-        except ValueError as e:
-            if "error: remote upstream already exists." in str(e):
-                pass  # Trying to add the upstream remote, but it already exists.
-            else:
-                raise
 
     def run_post_install(self):
         pass  # SWE-Smith does not have post-install commands.
