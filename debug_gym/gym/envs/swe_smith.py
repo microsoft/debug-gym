@@ -117,6 +117,7 @@ class SWESmithEnv(SWEBenchEnv):
         self.test_cmd, self.test_directives = get_test_command(self.ds_row)
         self.fail_to_pass = self.ds_row["FAIL_TO_PASS"]
         self.pass_to_pass = self.ds_row["PASS_TO_PASS"]
+        self.log_parser = MAP_REPO_TO_PARSER.get(self.repo, parse_log_pytest)
 
         if self.package_name == "python-colorlog":
             self.package_name = "colorlog"
@@ -140,13 +141,17 @@ class SWESmithEnv(SWEBenchEnv):
             self.install_configs["install"] = ["pip install uv"] + self.install_configs[
                 "install"
             ]
-
         elif self.package_name == "alive-progress":
             # Removing pdbpp as it creates conflicts, i.e. we read until "(Pdb)" in the pdb tool.
             self.install_configs["install"].append("pip uninstall -y pdbpp")
         elif self.package_name == "conan":
             # Skip system packages installation (they are already installed in the Docker image).
             self.install_configs["install"] = ["python -m pip install ."]
+        elif self.package_name == "autograd":
+            # Disable pytest-xdist which interfers with pytest output.
+            self.test_cmd = self.test_cmd.replace("--verbose", "-n 0 --verbose")
+            # Since disabling pytest-xdist, no need for a special log parser.
+            self.log_parser = parse_log_pytest
 
         # Filter out the command that removes tests files.
         self.install_configs["install"] = [
@@ -192,15 +197,12 @@ class SWESmithEnv(SWEBenchEnv):
         self.gold_patch = self.test_patch
 
     def calculate_score(self, eval_output: EvalOutput) -> int:
-        log_parser = MAP_REPO_TO_PARSER.get(self.repo, parse_log_pytest)
-        test_status_map = log_parser(eval_output.output)
+        test_status_map = self.log_parser(eval_output.output)
         score = sum(
             1
             for test in self.fail_to_pass
-            # Like in SWE-Smith, we assume silent success.
-            # Ref: https://github.com/SWE-bench/SWE-smith/blob/main/swesmith/harness/grading.py#L154
-            # if test_status_map.get(test, TestStatus.PASSED.value)
             # *Do not* assume silent success for now as done in SWE-Smith grading.py
+            # Ref: https://github.com/SWE-bench/SWE-smith/blob/main/swesmith/harness/grading.py#L154
             if test_status_map.get(test, TestStatus.ERROR.value)
             in (TestStatus.PASSED.value, TestStatus.XFAIL.value)
         )
