@@ -2,7 +2,6 @@ import json
 import os
 import subprocess
 import uuid
-from collections import OrderedDict
 from os.path import join as pjoin
 
 import numpy as np
@@ -19,12 +18,12 @@ AGENT_REGISTRY = {}
 
 
 BASE_SYSTEM_PROMPT_TEMPLATE = """{
-    "Overall task": "{{ overall_task }}",
-    "Instructions": "{{ instructions }}",
-    "Repo directory tree": "{{ repo_dir_tree }}",
-    "Current breakpoints": {{ current_breakpoints }}{% if eval_observation %},
-    "Eval observation": "{{ eval_observation }}"{% endif %}{% if shortcut_features %},
-    "Shortcut features": {{ shortcut_features }}{% endif %}
+    'Overall task': '{{ agent.system_prompt }}',
+    'Instructions': '{{ info.instructions }}',
+    'Repo directory tree': '{{ info.dir_tree }}',
+    'Current breakpoints': {{ info.current_breakpoints }}{% if info.eval_observation.observation %},
+    'Eval observation': '{{ info.eval_observation.observation }}'{% endif %}{% if agent.shortcut_features() %},
+    'Shortcut features': {{ agent.shortcut_features() }}{% endif %}
 }"""
 
 
@@ -102,10 +101,10 @@ class BaseAgent:
     #     else:
     #         dir_tree = info.dir_tree
 
-    def _shortcut_features(self):
-        shortcut_features = []
+    def shortcut_features(self):
+        features = []
         if self.config.get("env_kwargs", {}).get("auto_eval_on_rewrite") is True:
-            shortcut_features.append(
+            features.append(
                 "After successful rewrites, the environment will automatically "
                 "call the Eval tool to evaluate the rewritten code. Therefore, "
                 "you do not need to call the Eval tool yourself. The evaluation "
@@ -114,19 +113,19 @@ class BaseAgent:
         if self.config.get("env_kwargs", {}).get(
             "persistent_breakpoints"
         ) is True and self.env.has_tool("pdb"):
-            shortcut_features.append(
+            features.append(
                 "The environment will automatically restore existing breakpoints "
                 "when a new PDB session is started (e.g., after a rewrite)."
             )
         if self.config.get("env_kwargs", {}).get(
             "auto_list"
         ) is True and self.env.has_tool("pdb"):
-            shortcut_features.append(
+            features.append(
                 "After every valid PDB tool calling, the environment will "
                 "automatically call the PDB tool again with a `list .` command, "
                 "which will show the code around the current frame."
             )
-        return shortcut_features
+        return features
 
     def _load_system_prompt_template(self) -> Template:
         system_prompt_template = self.config.get(
@@ -142,14 +141,7 @@ class BaseAgent:
     def build_system_prompt(self, info):
         """Build system prompt using template from config."""
         system_prompt_template = self._load_system_prompt_template()
-        system_prompt = system_prompt_template.render(
-            overall_task=self.system_prompt,
-            instructions=info.instructions,
-            repo_dir_tree=info.dir_tree,
-            current_breakpoints=info.current_breakpoints,
-            eval_observation=info.eval_observation.observation,
-            shortcut_features=json.dumps(self._shortcut_features()),
-        )
+        system_prompt = system_prompt_template.render(agent=self, info=info)
         messages = [{"role": "system", "content": system_prompt}]
         return messages
 
