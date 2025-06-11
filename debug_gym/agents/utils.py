@@ -117,6 +117,7 @@ def load_config():
             "Number of workers to use, default is 1 (no parallelism). "
             "Can be set via DEBUG_GYM_WORKERS environment variable."
         ),
+    )
     parser.add_argument(
         "--list",
         action="store_true",
