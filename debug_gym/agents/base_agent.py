@@ -129,7 +129,9 @@ class BaseAgent:
         if len(shortcut_features) > 0:
             system_prompt["Shortcut features"] = shortcut_features
 
-        system_prompt = filter_non_utf8(json.dumps(system_prompt, indent=2, sort_keys=False))
+        system_prompt = filter_non_utf8(
+            json.dumps(system_prompt, indent=2, sort_keys=False)
+        )
         messages = [
             {
                 "role": "system",
