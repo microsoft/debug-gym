@@ -8,38 +8,13 @@ import numpy as np
 from jinja2 import Environment, Template
 
 from debug_gym.agents.history_tracker import HistoryTracker, build_history_prompt
+from debug_gym.agents.utils import trim
 from debug_gym.gym.envs.env import RepoEnv
 from debug_gym.gym.utils import filter_non_utf8
 from debug_gym.llms.base import LLM
 from debug_gym.logger import DebugGymLogger
 
 AGENT_REGISTRY = {}
-
-
-def to_pretty_json(value):
-    return json.dumps(value, indent=2, sort_keys=False)
-
-
-# Default system prompt template for agents
-# This can be overridden by providing a custom template file in the agent's config.
-# The template should contain placeholders for the agent and info objects.
-# Creates a JSON-like structure with keys for overall task, instructions, repo directory tree,
-# current breakpoints, and optionally eval observation and shortcut features.
-# The template uses Jinja2 syntax for rendering.
-# It also includes a custom filter to convert the output to pretty JSON format.
-BASE_SYSTEM_PROMPT_TEMPLATE = """{%- set prompt_dict = {
-  "Overall task": agent.system_prompt,
-  "Instructions": info.instructions,
-  "Repo directory tree": info.dir_tree,
-  "Current breakpoints": info.current_breakpoints
-} -%}
-{%- if info.eval_observation.observation and agent._auto_eval_on_rewrite() %}
-  {%- set _ = prompt_dict.update({"Eval observation": info.eval_observation.observation}) %}
-{%- endif %}
-{%- if agent.shortcut_features() %}
-  {%- set _ = prompt_dict.update({"Shortcut features": agent.shortcut_features()}) %}
-{%- endif %}{{ prompt_dict | to_pretty_json }}
-"""
 
 
 def register_agent(cls):
@@ -124,7 +99,42 @@ class BaseAgent:
                 )
         return features
 
-    def _load_system_prompt_template(self) -> Template:
+    @staticmethod
+    def to_pretty_json(value):
+        """Convert a value to a pretty JSON string."""
+        return json.dumps(value, indent=2, sort_keys=False)
+
+    def trim_message(
+        self,
+        message,
+        count_tokens=None,
+        max_length=None,
+        max_length_percentage=0,
+        where="middle",
+    ):
+        """Filter non utf8 and trim the message to fit within the token limit.
+        If the message exceeds the max_length, it will be trimmed to fit.
+        The `max_length` can be specified as an absolute value or a percentage
+        of the LLM's context length, if any."""
+        message = filter_non_utf8(message)
+        count_tokens = count_tokens or self.llm.count_tokens
+        max_length = (
+            max_length
+            or max_length_percentage * self.llm.context_length
+            or self.llm.context_length
+        )
+
+        if count_tokens is None or max_length is None or max_length <= 0:
+            return message
+        tokens = count_tokens(message)
+        if tokens > max_length:
+            return trim(message, max_length, count_tokens=count_tokens, where=where)
+        return message
+
+    def _load_system_prompt_template(self) -> Template | None:
+        """Load system prompt template from config if specified and register custom filters.
+        If no template is specified, return None.
+        """
         system_prompt_template = self.config.get("system_prompt_template_file")
         if system_prompt_template:
             if not os.path.isfile(system_prompt_template):
@@ -135,17 +145,46 @@ class BaseAgent:
                 raise FileNotFoundError(error_msg)
             with open(system_prompt_template, "r") as f:
                 system_prompt_template = f.read()
-        else:
-            system_prompt_template = BASE_SYSTEM_PROMPT_TEMPLATE
-        # Add custom filter to Jinja2 environment
-        env = Environment()
-        env.filters["to_pretty_json"] = to_pretty_json
-        return env.from_string(system_prompt_template)
+            # Add custom filter to Jinja2 environment
+            env = Environment()
+            env.filters["to_pretty_json"] = self.to_pretty_json
+            env.filters["trim_message"] = self.trim_message
+            return env.from_string(system_prompt_template)
+        return None
+
+    def _default_system_prompt(self, info) -> str:
+        """Return the default system prompt as pretty JSON.
+        Trimmed to fit within the token limit."""
+
+        system_prompt_dict = {
+            "Overall task": self.system_prompt,
+            "Instructions": info.instructions,
+            "Repo directory tree": self.trim_message(
+                info.dir_tree, max_length_percentage=0.1, where="end"
+            ),
+            "Current breakpoints": info.current_breakpoints,
+        }
+
+        if self._auto_eval_on_rewrite():
+            system_prompt_dict["Evaluation output of current code"] = self.trim_message(
+                info.eval_observation.observation,
+                max_length_percentage=0.8,
+                where="middle",
+            )
+
+        shortcut_features = self.shortcut_features()
+        if shortcut_features:
+            system_prompt_dict["Shortcut features"] = shortcut_features
+
+        return self.to_pretty_json(system_prompt_dict)
 
     def build_system_prompt(self, info):
-        """Build system prompt using template from config."""
+        """Build system prompt using jinja template from config or default template."""
         system_prompt_template = self._load_system_prompt_template()
-        system_prompt = system_prompt_template.render(agent=self, info=info)
+        if system_prompt_template is not None:
+            system_prompt = system_prompt_template.render(agent=self, info=info)
+        else:
+            system_prompt = self._default_system_prompt(info)
         messages = [{"role": "system", "content": filter_non_utf8(system_prompt)}]
         return messages
 

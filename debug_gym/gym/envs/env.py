@@ -272,9 +272,8 @@ class RepoEnv(TooledEnv):
             self.tempdir.cleanup()
 
     @property
-    def instructions(self):
-        _instruction = {}
-        return _instruction
+    def instructions(self) -> str:
+        return ""
 
     def display_files(self):
         msg = (
