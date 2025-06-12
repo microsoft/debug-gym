@@ -7,7 +7,7 @@ from jinja2 import Template
 from debug_gym.agents.debug_agent import DebugAgent
 
 
-def test_load_system_prompt_template_default(agent_setup, build_env_info):
+def test_default_system_prompt(agent_setup, build_env_info):
     agent, _, _ = next(agent_setup(DebugAgent))
     agent.system_prompt = "some task"
     agent.shortcut_features = Mock(return_value=["f1", "f2"])
@@ -17,19 +17,26 @@ def test_load_system_prompt_template_default(agent_setup, build_env_info):
         current_breakpoints=[],
         eval_observation="eval obs",
     )
-    template = agent._load_system_prompt_template()
-    assert isinstance(template, Template)
-    expected = {
-        "Overall task": "some task",
-        "Instructions": "some instruction",
-        "Repo directory tree": "dir tree",
-        "Current breakpoints": [],
-        "Shortcut features": ["f1", "f2"],
-    }
-    assert template.render(agent=agent, info=info) == json.dumps(expected, indent=2)
+    system_prompt = agent.build_system_prompt(info)
+    expected = [
+        {
+            "role": "system",
+            "content": json.dumps(
+                {
+                    "Overall task": "some task",
+                    "Instructions": "some instruction",
+                    "Repo directory tree": "dir tree",
+                    "Current breakpoints": [],
+                    "Shortcut features": ["f1", "f2"],
+                },
+                indent=2,
+            ),
+        }
+    ]
+    assert system_prompt == expected
 
 
-def test_load_system_prompt_template_default_auto_eval(agent_setup, build_env_info):
+def test_default_system_prompt_auto_eval(agent_setup, build_env_info):
     agent, _, _ = next(agent_setup(DebugAgent))
     agent.system_prompt = "some task"
     agent.shortcut_features = Mock(return_value=["f1", "f2"])
@@ -40,17 +47,24 @@ def test_load_system_prompt_template_default_auto_eval(agent_setup, build_env_in
         current_breakpoints=[],
         eval_observation="eval obs",
     )
-    template = agent._load_system_prompt_template()
-    assert isinstance(template, Template)
-    expected = {
-        "Overall task": "some task",
-        "Instructions": "some instruction",
-        "Repo directory tree": "dir tree",
-        "Current breakpoints": [],
-        "Eval observation": "eval obs",
-        "Shortcut features": ["f1", "f2"],
-    }
-    assert template.render(agent=agent, info=info) == json.dumps(expected, indent=2)
+    system_prompt = agent.build_system_prompt(info)
+    expected = [
+        {
+            "role": "system",
+            "content": json.dumps(
+                {
+                    "Overall task": "some task",
+                    "Instructions": "some instruction",
+                    "Repo directory tree": "dir tree",
+                    "Current breakpoints": [],
+                    "Evaluation output of current code": "eval obs",
+                    "Shortcut features": ["f1", "f2"],
+                },
+                indent=2,
+            ),
+        }
+    ]
+    assert system_prompt == expected
 
 
 def test_load_system_prompt_template_default_no_shortcuts_or_eval(
@@ -65,15 +79,22 @@ def test_load_system_prompt_template_default_no_shortcuts_or_eval(
         current_breakpoints=[1, 2],
         eval_observation="",
     )
-    template = agent._load_system_prompt_template()
-    assert isinstance(template, Template)
-    expected = {
-        "Overall task": "some task",
-        "Instructions": "some instruction",
-        "Repo directory tree": "dir tree",
-        "Current breakpoints": [1, 2],
-    }
-    assert template.render(agent=agent, info=info) == json.dumps(expected, indent=2)
+    system_prompt = agent.build_system_prompt(info)
+    expected = [
+        {
+            "role": "system",
+            "content": json.dumps(
+                {
+                    "Overall task": "some task",
+                    "Instructions": "some instruction",
+                    "Repo directory tree": "dir tree",
+                    "Current breakpoints": [1, 2],
+                },
+                indent=2,
+            ),
+        }
+    ]
+    assert system_prompt == expected
 
 
 def test_load_system_prompt_template_from_file(tmp_path, agent_setup):
