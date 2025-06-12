@@ -17,28 +17,6 @@ from debug_gym.logger import DebugGymLogger
 AGENT_REGISTRY = {}
 
 
-# Default system prompt template for agents
-# This can be overridden by providing a custom template file in the agent's config.
-# The template should contain placeholders for the agent and info objects.
-# Creates a JSON-like structure with keys for overall task, instructions, repo directory tree,
-# current breakpoints, and optionally eval observation and shortcut features.
-# The template uses Jinja2 syntax for rendering.
-# It also includes a custom filter to convert the output to pretty JSON format.
-BASE_SYSTEM_PROMPT_TEMPLATE = """{%- set prompt_dict = {
-  "Overall task": agent.system_prompt,
-  "Instructions": info.instructions,
-  "Repo directory tree": info.dir_tree,
-  "Current breakpoints": info.current_breakpoints
-} -%}
-{%- if info.eval_observation.observation and agent._auto_eval_on_rewrite() %}
-  {%- set _ = prompt_dict.update({"Eval observation": info.eval_observation.observation}) %}
-{%- endif %}
-{%- if agent.shortcut_features() %}
-  {%- set _ = prompt_dict.update({"Shortcut features": agent.shortcut_features()}) %}
-{%- endif %}{{ prompt_dict | to_pretty_json }}
-"""
-
-
 def register_agent(cls):
     if not issubclass(cls, BaseAgent):
         raise ValueError("agent_class must be a subclass of BaseAgent")
