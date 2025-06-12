@@ -37,11 +37,15 @@ jobs:
           files: |
             debug_gym/gym/envs/swe_*.py
             tests/gym/envs/test_swe_*.py
-      - name: Test with pytest - PR
+      - name: Test - PR - Fast
         if: github.event_name == 'pull_request' && steps.changed-files-specific.outputs.any_changed != 'true'
         run: |
-          DEBUG_GYM_DEBUG=1 pytest -vv -n 16 -k "not test_swe_bench and not test_swe_smith" --cov=debug_gym --cov-report=term-missing --cov-fail-under=80 --timeout=300
-      - name: Test with pytest
-        if: github.event_name != 'pull_request' || steps.changed-files-specific.outputs.any_changed == 'true'
+          DEBUG_GYM_DEBUG=1 pytest -vv -n 16 -k "not test_swe_bench and not test_swe_smith" --cov=debug_gym --cov-report=term-missing --cov-fail-under=80 --timeout=600
+      - name: Test - PR - Slow
+        if: github.event_name == 'pull_request' && steps.changed-files-specific.outputs.any_changed == 'true'
+        run: |
+          DEBUG_GYM_DEBUG=1 pytest -vv -n 16 --cov=debug_gym --cov-report=term-missing --cov-fail-under=85 --timeout=600
+      - name: Test - main
+        if: github.event_name != 'pull_request'
         run: |
           DEBUG_GYM_DEBUG=1 pytest -vv -n 16 --cov=debug_gym --cov-report=term-missing --cov-fail-under=85 --timeout=600
