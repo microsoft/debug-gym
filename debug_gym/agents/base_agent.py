@@ -10,7 +10,7 @@ from jinja2 import Template
 from debug_gym.agents.history_tracker import HistoryTracker, build_history_prompt
 from debug_gym.agents.utils import trim
 from debug_gym.gym.envs.env import RepoEnv
-from debug_gym.gym.utils import unescape
+from debug_gym.gym.utils import filter_non_utf8
 from debug_gym.llms.base import LLM
 from debug_gym.logger import DebugGymLogger
 
@@ -89,6 +89,13 @@ class BaseAgent:
     #         )
     #         return self.llm.context_length - self.llm.count_tokens(system_prompt)
 
+    # def _build_system_prompt(self, info):
+    #     def calc_tokens_left(system_prompt: dict):
+    #         system_prompt = filter_non_utf8(
+    #             json.dumps(system_prompt, indent=2, sort_keys=False)
+    #         )
+    #         return self.llm.context_length - self.llm.count_tokens(system_prompt)
+
     #     if self.llm.context_length is not None and self.llm.count_tokens is not None:
     #         dir_tree = trim(
     #             info.dir_tree,
@@ -100,6 +107,18 @@ class BaseAgent:
     #         )
     #     else:
     #         dir_tree = info.dir_tree
+
+    #     system_prompt = filter_non_utf8(
+    #         json.dumps(system_prompt, indent=2, sort_keys=False)
+    #     )
+    #     messages = [
+    #         {
+    #             "role": "system",
+    #             "content": system_prompt,
+    #         }
+    #     ]
+
+    #     return messages
 
     def shortcut_features(self):
         features = []
@@ -155,7 +174,8 @@ class BaseAgent:
         return messages
 
     def build_prompt(self, info):
-        messages = self.build_system_prompt(info)
+        messages = []
+        messages.extend(self.build_system_prompt(info))
         messages.extend(self.build_history_prompt())
         messages.extend(self.build_question_prompt())
         return messages

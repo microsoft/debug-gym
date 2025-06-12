@@ -81,7 +81,9 @@ def test_steps(env):
     assert infos.step_observation.observation.startswith(
         "The file `clock.py` has been updated successfully."
     )
+    assert env.auto_eval_on_rewrite is True
     assert infos.score == 1
+
     infos = env.step(eval_call)
     assert infos.step_observation.source == "eval"
     assert "clock_test.py ." in infos.eval_observation.observation

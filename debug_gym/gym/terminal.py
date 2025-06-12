@@ -450,6 +450,7 @@ class DockerTerminal(Terminal):
             remove=True,
             tty=True,
             stdin_open=True,
+            network_mode="host",
         )
         container_name = f"debug_gym_{container.name}"
         container.rename(container_name)

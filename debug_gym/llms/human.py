@@ -7,6 +7,7 @@ import numpy as np
 
 from debug_gym.gym.envs.env import EnvInfo
 from debug_gym.gym.tools.tool import EnvironmentTool, ToolCall
+from debug_gym.gym.utils import filter_non_utf8
 from debug_gym.llms.base import LLM, LLMResponse
 from debug_gym.llms.utils import print_messages
 from debug_gym.logger import DebugGymLogger
@@ -513,7 +514,9 @@ class Human(LLM):
                     {
                         "type": "tool_result",
                         "tool_use_id": history_info.action.id,
-                        "content": f"{history_info.step_observation.observation}",
+                        "content": filter_non_utf8(
+                            f"{history_info.step_observation.observation}"
+                        ),
                     }
                 ],
             },

@@ -2,12 +2,13 @@ import json
 import os
 import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from itertools import groupby
 from pathlib import Path
 
 from termcolor import colored
 from tqdm import tqdm
 
-from debug_gym.agents.base_agent import create_agent
+from debug_gym.agents.base_agent import AGENT_REGISTRY, create_agent
 from debug_gym.agents.utils import load_config
 from debug_gym.gym.envs import select_env
 from debug_gym.gym.terminal import select_terminal
@@ -103,9 +104,24 @@ def main():
 
     # Figure out which problems to solve.
     problems = config.get("problems", ["custom"])
-    if problems == "all" and "benchmark" in config:
+    if type(problems) == str and "benchmark" in config:
         env = create_env(config, logger=logger)
-        problems = list(env.dataset.keys())  # all tasks
+        if problems == "all":
+            problems = sorted(env.dataset.keys())  # all tasks
+        else:
+            problems = env.get_dataset_split(problems)
+
+    if args.list:
+        print(f"\n# Available problems in {config.get('benchmark', 'config')}:")
+        for problem in problems:
+            print(f" - {problem}")
+
+        # list agent
+        print("\n# Available agents:")
+        for agent in AGENT_REGISTRY:
+            print(f" - {agent}")
+
+        return
 
     num_workers = int(os.environ.get("DEBUG_GYM_WORKERS", 1))
     logger.warning(f"Running with {num_workers} workers")
