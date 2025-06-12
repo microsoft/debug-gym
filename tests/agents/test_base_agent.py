@@ -132,9 +132,12 @@ def test_build_system_prompt(agent_setup, build_env_info):
         "Instructions": "Do X",
         "Repo directory tree": "repo/tree",
         "Current breakpoints": [1, 2],
-        "Eval observation": "eval obs",
+        "Evaluation output of current code": "eval obs",
         "Shortcut features": [
-            "After successful rewrites, the environment will automatically call the Eval tool to evaluate the rewritten code. Therefore, you do not need to call the Eval tool yourself. The evaluation output will be updated automatically in the system prompt."
+            "After successful rewrites, the environment will automatically call "
+            "the Eval tool to evaluate the rewritten code. Therefore, you do not "
+            "need to call the Eval tool yourself. The evaluation output will be "
+            "updated automatically in the system prompt."
         ],
     }
     assert messages == [{"role": "system", "content": json.dumps(expected, indent=2)}]
