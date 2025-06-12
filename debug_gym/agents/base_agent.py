@@ -5,10 +5,9 @@ import uuid
 from os.path import join as pjoin
 
 import numpy as np
-from jinja2 import Template
+from jinja2 import Environment, Template
 
 from debug_gym.agents.history_tracker import HistoryTracker, build_history_prompt
-from debug_gym.agents.utils import trim
 from debug_gym.gym.envs.env import RepoEnv
 from debug_gym.gym.utils import filter_non_utf8
 from debug_gym.llms.base import LLM
@@ -17,14 +16,30 @@ from debug_gym.logger import DebugGymLogger
 AGENT_REGISTRY = {}
 
 
-BASE_SYSTEM_PROMPT_TEMPLATE = """{
-    'Overall task': '{{ agent.system_prompt }}',
-    'Instructions': '{{ info.instructions }}',
-    'Repo directory tree': '{{ info.dir_tree }}',
-    'Current breakpoints': {{ info.current_breakpoints }}{% if info.eval_observation.observation %},
-    'Eval observation': '{{ info.eval_observation.observation }}'{% endif %}{% if agent.shortcut_features() %},
-    'Shortcut features': {{ agent.shortcut_features() }}{% endif %}
-}"""
+def to_pretty_json(value):
+    return json.dumps(value, indent=2, sort_keys=False)
+
+
+# Default system prompt template for agents
+# This can be overridden by providing a custom template file in the agent's config.
+# The template should contain placeholders for the agent and info objects.
+# Creates a JSON-like structure with keys for overall task, instructions, repo directory tree,
+# current breakpoints, and optionally eval observation and shortcut features.
+# The template uses Jinja2 syntax for rendering.
+# It also includes a custom filter to convert the output to pretty JSON format.
+BASE_SYSTEM_PROMPT_TEMPLATE = """{%- set prompt_dict = {
+  "Overall task": agent.system_prompt,
+  "Instructions": info.instructions,
+  "Repo directory tree": info.dir_tree,
+  "Current breakpoints": info.current_breakpoints
+} -%}
+{%- if info.eval_observation.observation and agent._auto_eval_on_rewrite() %}
+  {%- set _ = prompt_dict.update({"Eval observation": info.eval_observation.observation}) %}
+{%- endif %}
+{%- if agent.shortcut_features() %}
+  {%- set _ = prompt_dict.update({"Shortcut features": agent.shortcut_features()}) %}
+{%- endif %}{{ prompt_dict | to_pretty_json }}
+"""
 
 
 def register_agent(cls):
@@ -82,68 +97,31 @@ class BaseAgent:
             response = response[reasoning_end:].strip()
         return response
 
-    # def _trimmed_dir_tree(self, system_prompt: dict, info):
-    #     def calc_tokens_left(system_prompt: dict):
-    #         system_prompt = unescape(
-    #             json.dumps(system_prompt, indent=2, sort_keys=False)
-    #         )
-    #         return self.llm.context_length - self.llm.count_tokens(system_prompt)
-
-    # def _build_system_prompt(self, info):
-    #     def calc_tokens_left(system_prompt: dict):
-    #         system_prompt = filter_non_utf8(
-    #             json.dumps(system_prompt, indent=2, sort_keys=False)
-    #         )
-    #         return self.llm.context_length - self.llm.count_tokens(system_prompt)
-
-    #     if self.llm.context_length is not None and self.llm.count_tokens is not None:
-    #         dir_tree = trim(
-    #             info.dir_tree,
-    #             min(
-    #                 int(0.1 * self.llm.context_length), calc_tokens_left(system_prompt)
-    #             ),
-    #             count_tokens=self.llm.count_tokens,
-    #             where="end",
-    #         )
-    #     else:
-    #         dir_tree = info.dir_tree
-
-    #     system_prompt = filter_non_utf8(
-    #         json.dumps(system_prompt, indent=2, sort_keys=False)
-    #     )
-    #     messages = [
-    #         {
-    #             "role": "system",
-    #             "content": system_prompt,
-    #         }
-    #     ]
-
-    #     return messages
+    def _auto_eval_on_rewrite(self):
+        """Check if auto eval on rewrite is enabled."""
+        return self.config.get("env_kwargs", {}).get("auto_eval_on_rewrite", False)
 
     def shortcut_features(self):
         features = []
-        if self.config.get("env_kwargs", {}).get("auto_eval_on_rewrite") is True:
+        if self._auto_eval_on_rewrite():
             features.append(
                 "After successful rewrites, the environment will automatically "
                 "call the Eval tool to evaluate the rewritten code. Therefore, "
                 "you do not need to call the Eval tool yourself. The evaluation "
                 "output will be updated automatically in the system prompt."
             )
-        if self.config.get("env_kwargs", {}).get(
-            "persistent_breakpoints"
-        ) is True and self.env.has_tool("pdb"):
-            features.append(
-                "The environment will automatically restore existing breakpoints "
-                "when a new PDB session is started (e.g., after a rewrite)."
-            )
-        if self.config.get("env_kwargs", {}).get(
-            "auto_list"
-        ) is True and self.env.has_tool("pdb"):
-            features.append(
-                "After every valid PDB tool calling, the environment will "
-                "automatically call the PDB tool again with a `list .` command, "
-                "which will show the code around the current frame."
-            )
+        if self.env.has_tool("pdb"):
+            if self.config.get("env_kwargs", {}).get("persistent_breakpoints"):
+                features.append(
+                    "The environment will automatically restore existing breakpoints "
+                    "when a new PDB session is started (e.g., after a rewrite)."
+                )
+            if self.config.get("env_kwargs", {}).get("auto_list"):
+                features.append(
+                    "After every valid PDB tool calling, the environment will "
+                    "automatically call the PDB tool again with a `list .` command, "
+                    "which will show the code around the current frame."
+                )
         return features
 
     def _load_system_prompt_template(self) -> Template:
@@ -159,13 +137,16 @@ class BaseAgent:
                 system_prompt_template = f.read()
         else:
             system_prompt_template = BASE_SYSTEM_PROMPT_TEMPLATE
-        return Template(system_prompt_template)
+        # Add custom filter to Jinja2 environment
+        env = Environment()
+        env.filters["to_pretty_json"] = to_pretty_json
+        return env.from_string(system_prompt_template)
 
     def build_system_prompt(self, info):
         """Build system prompt using template from config."""
         system_prompt_template = self._load_system_prompt_template()
         system_prompt = system_prompt_template.render(agent=self, info=info)
-        messages = [{"role": "system", "content": system_prompt}]
+        messages = [{"role": "system", "content": filter_non_utf8(system_prompt)}]
         return messages
 
     def build_question_prompt(self):
