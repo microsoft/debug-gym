@@ -1,5 +1,7 @@
 import logging
 
+from termcolor import colored
+
 from debug_gym.agents.base_agent import register_agent
 from debug_gym.agents.rewrite_agent import RewriteAgent
 from debug_gym.llms.base import LLM
@@ -12,6 +14,9 @@ class GuidedRewriteAgent(RewriteAgent):
 
     def try_rewrite(self, task_name):
         # make a copy of the env for the llm
+        from ipdb import set_trace
+
+        set_trace()
         cloned_env = self.env.clone()
 
         # Only keep the rewrite tool in the cloned env
@@ -33,7 +38,10 @@ class GuidedRewriteAgent(RewriteAgent):
         return info.done
 
     def run(self, task_name=None, debug=False):
-        self.llm.logger = DebugGymLogger(name="LLM", level=logging.ERROR)
+        self.logger.level = logging.DEBUG
+        self.llm.logger = DebugGymLogger(
+            name="LLM", level=logging.ERROR, log_dir=self.logger.log_file.parent
+        )
         self.human = LLM.instantiate(llm_name="human", logger=self.logger)
 
         self.history.reset()
@@ -55,10 +63,12 @@ class GuidedRewriteAgent(RewriteAgent):
 
             llm_done = self.try_rewrite(task_name)
             if llm_done:
-                self.logger.info(
-                    f"*** The rewrite-only agent with {self.llm.model_name} managed to solve the task with the current context. ***"
-                )
+                msg = f"*** The rewrite-only agent with {self.llm.model_name} managed to solve the task with the current context. ***"
+                self.logger.info(colored(msg, "green"))
                 break
+            else:
+                msg = f"*** The rewrite-only agent with {self.llm.model_name} failed to solve the task with the current context. ***"
+                self.logger.info(colored(msg, "red"))
 
             # If the LLM did not manage to solve the task, we continue with the guided approach.
             prompt = self.build_prompt(info)
@@ -68,7 +78,7 @@ class GuidedRewriteAgent(RewriteAgent):
                 breakpoint()
 
             # step the environment with the human response
-            info = self.env.step(human_response.response)
+            info = self.env.step(human_response.tool)
             # log the human response
             self.history.step(info, human_response)
 
