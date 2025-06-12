@@ -110,7 +110,7 @@ class BaseAgent:
         count_tokens=None,
         max_length=None,
         max_length_percentage=0,
-        where="end",
+        where="middle",
     ):
         """Filter non utf8 and trim the message to fit within the token limit.
         If the message exceeds the max_length, it will be trimmed to fit.
@@ -160,7 +160,7 @@ class BaseAgent:
             "Overall task": self.system_prompt,
             "Instructions": info.instructions,
             "Repo directory tree": self.trim_message(
-                info.dir_tree, max_length_percentage=0.1
+                info.dir_tree, max_length_percentage=0.1, where="end"
             ),
             "Current breakpoints": info.current_breakpoints,
         }
@@ -169,6 +169,7 @@ class BaseAgent:
             system_prompt_dict["Evaluation output of current code"] = self.trim_message(
                 info.eval_observation.observation,
                 max_length_percentage=0.8,
+                where="middle",
             )
 
         shortcut_features = self.shortcut_features()
