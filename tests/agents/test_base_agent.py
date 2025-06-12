@@ -1,5 +1,6 @@
 from unittest.mock import Mock
 
+import pytest
 from jinja2 import Template
 
 from debug_gym.agents.debug_agent import DebugAgent
@@ -53,26 +54,23 @@ def test_load_system_prompt_template_default_no_shortcuts_or_eval(
     )
 
 
-def test_load_system_prompt_template_from_file(tmp_path, agent_setup, build_env_info):
+def test_load_system_prompt_template_from_file(tmp_path, agent_setup):
     agent, _, _ = next(agent_setup(DebugAgent))
     agent.system_prompt = "test task"
     template_content = "Task: {{ agent.system_prompt }}"
     template_path = tmp_path / "template.jinja"
     template_path.write_text(template_content)
-    agent.config["system_prompt_template"] = str(template_path)
+    agent.config["system_prompt_template_file"] = str(template_path)
     template = agent._load_system_prompt_template()
     assert isinstance(template, Template)
     assert template.render(agent=agent) == "Task: test task"
 
 
-def test_load_system_prompt_template_from_plain_text(agent_setup, tmp_path):
+def test_load_system_prompt_template_file_not_found(agent_setup):
     agent, _, _ = next(agent_setup(DebugAgent))
-    agent.system_prompt = "test task"
-    template_content = "Task: {{ agent.system_prompt }}"
-    agent.config["system_prompt_template"] = template_content
-    template = agent._load_system_prompt_template()
-    assert isinstance(template, Template)
-    assert template.render(agent=agent) == "Task: test task"
+    agent.config["system_prompt_template_file"] = "non_existent_template.jinja2"
+    with pytest.raises(FileNotFoundError):
+        agent._load_system_prompt_template()
 
 
 def test_build_system_prompt(agent_setup, build_env_info):

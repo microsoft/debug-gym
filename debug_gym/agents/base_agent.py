@@ -128,14 +128,18 @@ class BaseAgent:
         return features
 
     def _load_system_prompt_template(self) -> Template:
-        system_prompt_template = self.config.get(
-            "system_prompt_template", BASE_SYSTEM_PROMPT_TEMPLATE
-        )
-        if isinstance(system_prompt_template, str) and os.path.isfile(
-            system_prompt_template
-        ):
+        system_prompt_template = self.config.get("system_prompt_template_file")
+        if system_prompt_template:
+            if not os.path.isfile(system_prompt_template):
+                error_msg = (
+                    f"System prompt template file `{system_prompt_template}` not found."
+                )
+                self.logger.error(error_msg)
+                raise FileNotFoundError(error_msg)
             with open(system_prompt_template, "r") as f:
                 system_prompt_template = f.read()
+        else:
+            system_prompt_template = BASE_SYSTEM_PROMPT_TEMPLATE
         return Template(system_prompt_template)
 
     def build_system_prompt(self, info):
