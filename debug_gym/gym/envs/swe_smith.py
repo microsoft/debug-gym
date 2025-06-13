@@ -59,13 +59,21 @@ class SWESmithEnv(SWEBenchEnv):
 
         # To avoid concurrency issues, we will clone all the repos in the dataset.
         swesmith_repos = set(self.ds["repo"])
+        image_names = set(self.ds["image_name"])
+        if self.instance_ids:
+            # If instance_ids are provided, filter the dataset to only include those repos.
+            swesmith_repos = set(
+                self.ds[self.dataset[id]]["repo"] for id in self.instance_ids
+            )
+            image_names = set(
+                self.ds[self.dataset[id]]["image_name"] for id in self.instance_ids
+            )
         self.logger.debug(
             f"Loaded {len(self.ds)} tasks accross {len(swesmith_repos)} repos from {self.dataset_id}."
         )
 
         # Download all images needed for SWE-Smith.
         client = docker.from_env()
-        image_names = set(self.ds["image_name"])
         tagged_image_names = set(f"{DOCKER_ORG}/{name}:{TAG}" for name in image_names)
 
         existing_images = set(
