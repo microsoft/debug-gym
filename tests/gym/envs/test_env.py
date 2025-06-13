@@ -331,7 +331,7 @@ def test_reset(
   |-- subfile1.txt""",
         current_breakpoints="No breakpoints are set.",
         action=None,
-        instructions={},
+        instructions="",
         score=0,
         max_score=1,
         done=False,

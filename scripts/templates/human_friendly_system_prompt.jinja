@@ -1,0 +1,28 @@
+
+******** Overall task ********
+{{ agent.system_prompt }}
+
+
+
+******** Instructions ********
+{{ info.instructions }}
+
+
+
+******** Repo directory tree ********
+{{ info.dir_tree }}
+
+
+
+******** Current breakpoints ********
+{{ info.current_breakpoints }}{% if info.eval_observation.observation %}
+
+
+
+******** Eval observation ********
+{{ info.eval_observation.observation }}{% endif %}{% if agent.shortcut_features() %}
+
+
+
+******** Shortcut features ********
+{{ agent.shortcut_features()  | to_pretty_json}}{% endif %}

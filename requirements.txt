@@ -14,3 +14,4 @@ swebench==4.0.3
 swesmith
 prompt_toolkit
 anthropic>=0.49.0
+jinja2

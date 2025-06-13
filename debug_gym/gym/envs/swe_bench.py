@@ -44,18 +44,15 @@ class SWEBenchEnv(RepoEnv):
         self.dataset_id = dataset_id
         self.split = split
         self.instance_ids = instance_ids
-        SWEBenchEnv.DUMMY_DIR.mkdir(parents=True, exist_ok=True)
+        self.DUMMY_DIR.mkdir(parents=True, exist_ok=True)
 
         self.load_dataset()
         self.session_commands = []
         self.test_directives = []
 
     @property
-    def instructions(self):
-        return {
-            **super().instructions,
-            "Problem description": self.ds_row["problem_statement"],
-        }
+    def instructions(self) -> str:
+        return self.ds_row["problem_statement"]
 
     def load_dataset(self):
         self.ds = datasets.load_dataset(self.dataset_id)[self.split]
