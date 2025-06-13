@@ -4,7 +4,8 @@ import os
 from criteria import *
 from tqdm import tqdm
 
-exp_folder_path = "jun7"
+exp_path = "../../exps/"
+exp_uuid = "jun7"
 
 
 def satisfy_criteria(json_file_path, trajectory_criteria=None, data_criteria=None):
@@ -101,8 +102,7 @@ def main():
     # data_criteria = None
 
     # Directory containing trajectory files
-    # exps_dir = "/Users/ericyuan/GitHub_Enterprise/Froggy/exps/may28"
-    exps_dir = "/Users/ericyuan/GitHub_Enterprise/Froggy/exps/" + exp_folder_path
+    exps_dir = os.path.join(exp_path, exp_uuid)
 
     # Filter trajectories
     matching_files = filter_trajectories(exps_dir, trajectory_criteria, data_criteria)
@@ -135,9 +135,7 @@ def main():
     matching_files = [os.path.dirname(file_path) for file_path in matching_files]
 
     # Save data into a JSON file
-    output_file = os.path.join(
-        exps_dir, f"filtered_trajectories_{exp_folder_path}.json"
-    )
+    output_file = os.path.join(exps_dir, f"filtered_trajectories_{exp_uuid}.json")
     with open(output_file, "w") as f:
         json.dump(
             {
