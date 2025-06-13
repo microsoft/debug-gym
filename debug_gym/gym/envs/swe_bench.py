@@ -51,11 +51,8 @@ class SWEBenchEnv(RepoEnv):
         self.test_directives = []
 
     @property
-    def instructions(self):
-        return {
-            **super().instructions,
-            "Problem description": self.ds_row["problem_statement"],
-        }
+    def instructions(self) -> str:
+        return self.ds_row["problem_statement"]
 
     def load_dataset(self):
         self.ds = datasets.load_dataset(self.dataset_id)[self.split]

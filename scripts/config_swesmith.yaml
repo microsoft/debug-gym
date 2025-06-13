@@ -9,7 +9,7 @@ base:
         "dataset_id": "SWE-bench/SWE-smith",
 
         # shortcut features
-        "auto_eval_on_rewrite": True,  # The environment will automatically call the Eval tool after a successful rewrite. If this is set to True, the agent does not need to call the Eval tool itself.
+        "auto_eval_on_rewrite": False,  # The environment will automatically call the Eval tool after a successful rewrite. If this is set to True, the agent does not need to call the Eval tool itself.
         "persistent_breakpoints": True,  # The environemnt will keep a set of breakpoint states across PDB sessions. When a new PDB session is started, the environment will automatically load the breakpoints from the previous session.
         "auto_list": True,  # The environment will automatically call `list .` via the PDB tool after every pdb tool call, which will show the code around the current frame.
     }
@@ -28,6 +28,8 @@ base:
     save_patch: True
     log_prompt_response_pairs: True
     reset_prompt_history_after_rewrite: True
+    # Optionally loads a custom system prompt template from a file.
+    # system_prompt_template_file: "script/templates/system_prompt.jinja"
 
 rewrite_agent:
     tools: ["view", "rewrite", "listdir", "eval"]
