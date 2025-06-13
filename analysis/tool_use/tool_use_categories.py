@@ -171,18 +171,8 @@ def plot_tool_use_categories(df_dict, figsize=(12, 7)):
     plt.xticks(
         np.arange(len(all_data)),
         [
-            "rw 4o",
-            "rw 4o1",
-            "rw o3",
-            "rw o3-high",
-            "rw o3-mini",
-            "rw o4-mini",
-            "dbg 4o",
-            "dbg o1",
-            "dbg o3",
-            "dbg o3-high",
-            "dbg o3-mini",
-            "dbg o4-mini",
+            item.split("/")[-1].replace("rewrite_", "rw ").replace("debug_", "dbg ")
+            for item in model_paths
         ],
     )
 

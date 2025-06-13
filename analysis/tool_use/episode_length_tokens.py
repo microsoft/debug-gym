@@ -163,20 +163,7 @@ def plot_episode_length(df_dict, figsize=(12, 7)):
     # custom x ticks
     plt.xticks(
         np.arange(len(all_data)),
-        [
-            "4o",
-            "4o1",
-            "o3",
-            "o3-high",
-            "o3-mini",
-            "o4-mini",
-            "4o",
-            "4o1",
-            "o3",
-            "o3-high",
-            "o3-mini",
-            "o4-mini",
-        ],
+        [item.split("_")[-1] for item in model_paths],
     )
     plt.grid(True, alpha=0.3)
     plt.tight_layout()
@@ -257,20 +244,7 @@ def plot_episode_response_tokens(df_dict, figsize=(12, 7)):
     # custom x ticks
     plt.xticks(
         np.arange(len(all_data)),
-        [
-            "4o",
-            "4o1",
-            "o3",
-            "o3-high",
-            "o3-mini",
-            "o4-mini",
-            "4o",
-            "4o1",
-            "o3",
-            "o3-high",
-            "o3-mini",
-            "o4-mini",
-        ],
+        [item.split("_")[-1] for item in model_paths],
     )
     plt.legend.loc = "upper left"
 
@@ -303,5 +277,5 @@ for _path in tqdm(model_paths):
 
 
 # Plot comparison
-# plot_episode_length(results_dict)
-plot_episode_response_tokens(results_dict)
+plot_episode_length(results_dict)
+# plot_episode_response_tokens(results_dict)

@@ -154,20 +154,7 @@ def plot_incorrect_arguments(df_dict, figsize=(12, 7)):
     # custom x ticks
     plt.xticks(
         np.arange(len(all_data)),
-        [
-            "4o",
-            "4o1",
-            "o3",
-            "o3-high",
-            "o3-mini",
-            "o4-mini",
-            "4o",
-            "4o1",
-            "o3",
-            "o3-high",
-            "o3-mini",
-            "o4-mini",
-        ],
+        [item.split("_")[-1] for item in model_paths],
     )
     plt.grid(True, alpha=0.3)
     plt.tight_layout()
