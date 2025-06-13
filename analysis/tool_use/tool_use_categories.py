@@ -1,3 +1,4 @@
+import argparse
 import glob
 import json
 import os
@@ -180,27 +181,35 @@ def plot_tool_use_categories(df_dict, figsize=(12, 7)):
     plt.show()
 
 
-# Example usage:
-model_paths = [
-    "../../exps/may22/rewrite_4o",
-    "../../exps/may22/rewrite_o1",
-    "../../exps/may22/rewrite_o3",
-    "../../exps/may22/rewrite_o3-high",
-    "../../exps/may22/rewrite_o3-mini",
-    "../../exps/may22/rewrite_o4-mini",
-    "../../exps/may22/debug_4o",
-    "../../exps/may22/debug_o1",
-    "../../exps/may22/debug_o3",
-    "../../exps/may22/debug_o3-high",
-    "../../exps/may22/debug_o3-mini",
-    "../../exps/may22/debug_o4-mini",
-]
+def main():
+    # Parse command line arguments
+    parser = argparse.ArgumentParser(
+        description="Filter trajectory files based on specified criteria"
+    )
+    parser.add_argument(
+        "--exp-path",
+        required=True,
+        help="Path to experiments directory, e.g., '../../exps/'",
+    )
+    parser.add_argument(
+        "--exp-uuid-list",
+        nargs="+",  # Accept one or more arguments
+        required=True,
+        help="A list of experiment UUID/name to analyze, e.g., exp1 exp2 exp3",
+    )
 
-# Analyze all models with seed averaging
-results_dict = {}
-for _path in tqdm(model_paths):
-    _name = _path.split("/")[-1]
-    results_dict[_name] = analyze_froggy_results_with_seeds(_path, seeds=[0])
+    args = parser.parse_args()
+    model_paths = [os.path.join(args.exp_path, item) for item in args.exp_uuid_list]
 
-# Plot comparison
-plot_tool_use_categories(results_dict)
+    # Analyze all models with seed averaging
+    results_dict = {}
+    for _path in tqdm(model_paths):
+        _name = _path.split("/")[-1]
+        results_dict[_name] = analyze_froggy_results_with_seeds(_path, seeds=[0])
+
+    # Plot comparison
+    plot_tool_use_categories(results_dict)
+
+
+if __name__ == "__main__":
+    main()

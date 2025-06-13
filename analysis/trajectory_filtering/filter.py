@@ -93,14 +93,18 @@ def main():
         description="Filter trajectory files based on specified criteria"
     )
     parser.add_argument(
-        "--exp-path", help="Path to experiments directory (default: ../../exps/)"
+        "--exp-path",
+        help="Path to experiments directory",
+        required=True,
     )
     parser.add_argument(
-        "--exp-uuid", help="Experiment UUID/name to analyze (default: dev)"
+        "--exp-uuid",
+        help="Experiment UUID/name to analyze",
+        required=True,
     )
     parser.add_argument(
         "--output-file",
-        help="Custom output file path (default: <exp_dir>/filtered_trajectories_<exp_uuid>.json)",
+        help="Custom output file path (default: <exp_path>/filtered_trajectories_<exp_uuid>.json)",
     )
 
     args = parser.parse_args()

@@ -19,7 +19,7 @@ python filter.py --exp-path /path/to/experiments --exp-uuid my_experiment  --out
 #### 2.1. Command Line Options
 - `--exp-path`: Path to experiments directory
 - `--exp-uuid`: Experiment UUID/name to analyze
-- `--output-file`: Custom output file path (default: exp_path/filtered_trajectories_exp_uuid.json)
+- `--output-file`: Custom output file path (default: <exp_path>/filtered_trajectories_<exp_uuid>.json)
 
 ### 3. Criteria
 
