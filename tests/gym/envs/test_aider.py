@@ -92,4 +92,4 @@ def test_steps(env):
 
 
 def test_instructions(env):
-    assert env.instructions == {"Problem description": "What time is it?"}
+    assert env.instructions == "What time is it?"

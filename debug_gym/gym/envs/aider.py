@@ -12,11 +12,8 @@ class AiderBenchmarkEnv(RepoEnv):
     REPO_PATH = Path.joinpath(Path.home(), ".cache", "debug_gym", "exercism")
 
     @property
-    def instructions(self):
-        return {
-            **super().instructions,
-            "Problem description": self.current_sample["instructions"],
-        }
+    def instructions(self) -> str:
+        return self.current_sample["instructions"]
 
     def __init__(self, entrypoint: str = "python -m pytest -s .", **kwargs):
         super().__init__(entrypoint=entrypoint, **kwargs)

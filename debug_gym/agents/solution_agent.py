@@ -1,8 +1,4 @@
-import subprocess
-
 from debug_gym.agents.base_agent import BaseAgent, register_agent
-from debug_gym.gym.envs.swe_bench import SWEBenchEnv
-from debug_gym.gym.envs.swe_smith import SWESmithEnv
 from debug_gym.gym.tools.tool import ToolCall
 
 
