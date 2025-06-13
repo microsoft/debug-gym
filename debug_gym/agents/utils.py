@@ -109,6 +109,16 @@ def load_config():
         help="Break before sending action to the environment.",
     )
     parser.add_argument(
+        "-n",
+        "--num-workers",
+        type=int,
+        default=None,
+        help=(
+            "Number of workers to use, default is 1 (no parallelism). "
+            "Can be set via DEBUG_GYM_WORKERS environment variable."
+        ),
+    )
+    parser.add_argument(
         "--list",
         action="store_true",
         help="List available agents and problems.",

@@ -1,7 +1,7 @@
 import json
 import os
 import uuid
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 
 from termcolor import colored
@@ -122,18 +122,21 @@ def main():
 
         return
 
-    num_workers = int(os.environ.get("DEBUG_GYM_WORKERS", 1))
-    logger.warning(f"Running with {num_workers} workers")
+    num_workers = args.num_workers or int(os.environ.get("DEBUG_GYM_WORKERS", 1))
     if args.debug:
+        logger.warning("Running in debug mode, num_workers set to 1")
         num_workers = 1
+    # make sure number of workers is in range [1, len(problems)]
+    num_workers = min(max(1, num_workers), len(problems))
+    logger.warning(f"Running with {num_workers} workers")
 
     tasks_done = 0
     mean_perf = 0
     tasks_succeeded = []
 
     if num_workers > 1:
-        # Multi-thread
-        with ThreadPoolExecutor(num_workers) as executor:
+        # Multi-process
+        with ProcessPoolExecutor(num_workers) as executor:
             futures = {
                 executor.submit(run_agent, args, problem, config): problem
                 for problem in problems
