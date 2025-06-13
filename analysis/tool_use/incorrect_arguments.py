@@ -100,11 +100,12 @@ def analyze_froggy_results_with_seeds(base_model_name, seeds=[0, 1, 2]):
     return combined_df
 
 
-def plot_incorrect_arguments(df_dict, figsize=(12, 7)):
+def plot_incorrect_arguments(df_dict, model_paths, figsize=(12, 7)):
     """
     Creates a grouped bar chart showing episode lengths for multiple models, grouped by agent types (rewrite, pdb, seq), each bar is averaged over seeds (0, 1, 2, with error bars)
     Args:
         df_dict (dict): Dictionary mapping model names to their DataFrames with averaged results
+        model_paths (list): List of model paths for custom x-tick labels
         figsize (tuple): Figure size (width, height)
     """
     plt.figure(figsize=figsize)
@@ -189,7 +190,7 @@ def main():
         results_dict[_name] = analyze_froggy_results_with_seeds(_path, seeds=[0])
 
     # Plot comparison
-    plot_incorrect_arguments(results_dict)
+    plot_incorrect_arguments(results_dict, model_paths)
 
 
 if __name__ == "__main__":
