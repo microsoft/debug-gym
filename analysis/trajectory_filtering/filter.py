@@ -1,11 +1,9 @@
+import argparse
 import json
 import os
 
 from criteria import *
 from tqdm import tqdm
-
-exp_path = "../../exps/"
-exp_uuid = "jun7"
 
 
 def satisfy_criteria(json_file_path, trajectory_criteria=None, data_criteria=None):
@@ -90,6 +88,22 @@ def filter_trajectories(directory, trajectory_criteria=None, data_criteria=None)
 
 
 def main():
+    # Parse command line arguments
+    parser = argparse.ArgumentParser(
+        description="Filter trajectory files based on specified criteria"
+    )
+    parser.add_argument(
+        "--exp-path", help="Path to experiments directory (default: ../../exps/)"
+    )
+    parser.add_argument(
+        "--exp-uuid", help="Experiment UUID/name to analyze (default: dev)"
+    )
+    parser.add_argument(
+        "--output-file",
+        help="Custom output file path (default: <exp_dir>/filtered_trajectories_<exp_uuid>.json)",
+    )
+
+    args = parser.parse_args()
 
     trajectory_criteria = [
         follows_proper_debugging_workflow,
@@ -102,7 +116,7 @@ def main():
     # data_criteria = None
 
     # Directory containing trajectory files
-    exps_dir = os.path.join(exp_path, exp_uuid)
+    exps_dir = os.path.join(args.exp_path, args.exp_uuid)
 
     # Filter trajectories
     matching_files = filter_trajectories(exps_dir, trajectory_criteria, data_criteria)
@@ -135,7 +149,9 @@ def main():
     matching_files = [os.path.dirname(file_path) for file_path in matching_files]
 
     # Save data into a JSON file
-    output_file = os.path.join(exps_dir, f"filtered_trajectories_{exp_uuid}.json")
+    output_file = args.output_file or os.path.join(
+        exps_dir, f"filtered_trajectories_{args.exp_uuid}.json"
+    )
     with open(output_file, "w") as f:
         json.dump(
             {
@@ -146,6 +162,8 @@ def main():
             f,
             indent=2,
         )
+
+    print(f"\nResults saved to: {output_file}")
 
 
 if __name__ == "__main__":

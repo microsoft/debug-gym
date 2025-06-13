@@ -11,29 +11,17 @@ The trajectory filtering system consists of two main components:
 
 ## Quick Start
 
-```python
-from filter import filter_trajectories
-from criteria import has_successful_outcome, follows_proper_debugging_workflow
-
-# Define criteria
-trajectory_criteria = [follows_proper_debugging_workflow]
-data_criteria = [has_successful_outcome]
-
-# Filter trajectories
-matching_files = filter_trajectories(
-    directory="../../exps/jun7",
-    trajectory_criteria=trajectory_criteria,
-    data_criteria=data_criteria
-)
-
-print(f"Found {len(matching_files)} trajectories matching criteria")
-```
-
 #### Usage Example
 Add necessary criteria in `criteria.py`, enable them in `filter.py`, then run:
 ```bash
-python filter.py
+# Specify custom experiment path, UUID, and output file
+python filter.py --exp-path /path/to/experiments --exp-uuid my_experiment  --output-file /path/to/experiments/filtered_trajectories_my_experiment.json
 ```
+
+#### Command Line Options
+- `--exp-path`: Path to experiments directory
+- `--exp-uuid`: Experiment UUID/name to analyze
+- `--output-file`: Custom output file path (default: exp_path/filtered_trajectories_exp_uuid.json)
 
 ### `criteria.py`
 
