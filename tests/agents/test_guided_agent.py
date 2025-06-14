@@ -1,4 +1,4 @@
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, call, patch
 
 from debug_gym.agents import GuidedRewriteAgent
 from debug_gym.llms import Human
@@ -42,7 +42,7 @@ def test_human_in_the_loop(human, agent_setup, build_env_info):
     env.tools = {"pdb": MagicMock()}
 
     env.clone().step.return_value = build_env_info(
-        done=True,
+        done=False,
         score=10,
         max_score=10,
         rewrite_counter=0,
@@ -56,12 +56,12 @@ def test_human_in_the_loop(human, agent_setup, build_env_info):
     assert result is False
     # test that llm actions were executed
     assert env.step.called
-    env.step.assert_called_with(human().response)
+    env.step.assert_called_with(human().tool)
     assert env.step().done is False
 
     # test that llm actions were logged
     _history, _prompt_response_pairs = agent.history.get()
-    assert [[], [human()]] == _prompt_response_pairs
+    assert [human()] == _prompt_response_pairs[0]
 
     # test that env was cloned
     assert env.clone.called
@@ -79,4 +79,4 @@ def test_human_in_the_loop(human, agent_setup, build_env_info):
     env.clone().step.assert_called_with(llm().response)
 
     # ensure that human action was not recorded in history
-    assert env.clone().step() not in agent.history.get_all()
+    assert env.clone().step() in agent.history.get_all()

@@ -14,9 +14,6 @@ class GuidedRewriteAgent(RewriteAgent):
 
     def try_rewrite(self, task_name):
         # make a copy of the env for the llm
-        from ipdb import set_trace
-
-        set_trace()
         cloned_env = self.env.clone()
 
         # Only keep the rewrite tool in the cloned env
@@ -40,7 +37,7 @@ class GuidedRewriteAgent(RewriteAgent):
     def run(self, task_name=None, debug=False):
         self.logger.level = logging.DEBUG
         self.llm.logger = DebugGymLogger(
-            name="LLM", level=logging.ERROR, log_dir=self.logger.log_file.parent
+            name="LLM", level=logging.ERROR#, log_dir=self.logger.log_file.parent
         )
         self.human = LLM.instantiate(llm_name="human", logger=self.logger)
 

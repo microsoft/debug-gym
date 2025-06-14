@@ -251,6 +251,9 @@ class RepoEnv(TooledEnv):
 
     @staticmethod
     def _prepare_entrypoint(entrypoint):
+        # Remove PYTHONPATH prefix if present
+        if entrypoint.startswith("PYTHONPATH=$PYTHONPATH:$PWD "):
+            entrypoint = entrypoint[len("PYTHONPATH=$PYTHONPATH:$PWD ") :]
         entrypoint_list = entrypoint.split()
         # Handle uv package manager's run command by ensuring the correct interpreter path
         # and explicitly adding 'python' to the execution chain for consistency.
