@@ -37,7 +37,7 @@ class GuidedRewriteAgent(RewriteAgent):
     def run(self, task_name=None, debug=False):
         self.logger.level = logging.DEBUG
         self.llm.logger = DebugGymLogger(
-            name="LLM", level=logging.ERROR#, log_dir=self.logger.log_file.parent
+            name="LLM", level=logging.ERROR  # , log_dir=self.logger.log_file.parent
         )
         self.human = LLM.instantiate(llm_name="human", logger=self.logger)
 
