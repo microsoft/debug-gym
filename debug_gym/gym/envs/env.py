@@ -1,4 +1,5 @@
 import atexit
+import copy
 import os
 import shutil
 import subprocess
@@ -559,11 +560,12 @@ class RepoEnv(TooledEnv):
             readonly_patterns=None,
             run_timeout=self.run_timeout,
             dir_tree_depth=self.dir_tree_depth,
-            terminal=Terminal(),
+            terminal=type(self.terminal)(),
             logger=self.logger,
         )
+        # Create deep copies of the tools for the cloned environment
         for tool in self.tools:
-            new_env.add_tool(tool)
+            new_env.add_tool(copy.deepcopy(tool))
         return new_env
 
     def post_process_event(self, event: Event, source, kwargs, observations):

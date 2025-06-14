@@ -745,10 +745,19 @@ def test_has_breakpoint_relative_path(tmp_path):
 
 
 def test_clone(env):
+    # add a tool to the original environment
+    tool = MagicMock()
+    tool.name = "tool1"
+    env.add_tool(tool)
+
+    # Clone the environment
     cloned_env = env.clone()
 
     # Check that the cloned environment is a different instance
     assert id(env) != id(cloned_env)
+
+    # Check if the tool exists in the cloned env
+    assert cloned_env.has_tool('tool1')
 
     # Check that the properties are the same
     assert env.path == cloned_env.path
