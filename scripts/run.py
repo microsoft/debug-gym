@@ -1,4 +1,5 @@
 import json
+import logging  # Set logging level down to WARNING for endpoint queries.
 import os
 import uuid
 from concurrent.futures import ProcessPoolExecutor, as_completed
@@ -8,6 +9,9 @@ from termcolor import colored
 from tqdm import tqdm
 
 from debug_gym.agents.base_agent import AGENT_REGISTRY, create_agent
+
+logging.getLogger("httpx").setLevel(logging.WARNING)
+
 from debug_gym.agents.utils import load_config
 from debug_gym.gym.envs import select_env
 from debug_gym.gym.terminal import select_terminal
@@ -103,7 +107,7 @@ def main():
 
     # Figure out which problems to solve.
     problems = config.get("problems", ["custom"])
-    if type(problems) == str and "benchmark" in config:
+    if type(problems) is str and "benchmark" in config:
         env = create_env(config, logger=logger)
         if problems == "all":
             problems = sorted(env.dataset.keys())  # all tasks
