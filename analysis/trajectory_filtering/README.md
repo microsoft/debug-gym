@@ -12,14 +12,32 @@ The trajectory filtering system consists of two main components:
 ### 2. Usage Example
 Add necessary criteria in `criteria.py`, enable them in `filter.py`, then run:
 ```bash
-# Specify custom experiment path, UUID, and output file
-python filter.py --exp-path /path/to/experiments --exp-uuid my_experiment  --output-file /path/to/experiments/filtered_trajectories_my_experiment.json
+# Basic filtering with JSON output
+python filter.py --exp-path /path/to/experiments --exp-uuid my_experiment
+
+# Create a zip file containing all matching JSONL files
+python filter.py --exp-path /path/to/experiments --exp-uuid my_experiment --create-zip
+
+# Custom output locations for both JSON and zip files
+python filter.py --exp-path /path/to/experiments --exp-uuid my_experiment --output-file /custom/path/results.json --create-zip --zip-output /custom/path/trajectories.zip
 ```
 
 #### 2.1. Command Line Options
 - `--exp-path`: Path to experiments directory
 - `--exp-uuid`: Experiment UUID/name to analyze
-- `--output-file`: Custom output file path (default: <exp_path>/filtered_trajectories_<exp_uuid>.json)
+- `--output-file`: Custom output file path (default: `<exp_path>/filtered_trajectories_<exp_uuid>.json`)
+- `--create-zip`: Create a zip file containing all matching JSONL files
+- `--zip-output`: Custom zip file path (default: `<exp_path>/filtered_trajectories_<exp_uuid>.zip`)
+
+#### 2.2. Output Files
+The script generates two types of output:
+
+1. **JSON Summary File**: Contains metadata about the filtering results:
+   - List of criteria used
+   - Number of matching files
+   - Relative paths to matching trajectory directories
+
+2. **Zip Archive** (optional, when `--create-zip` is used): Contains the actual JSONL files that matched the criteria, preserving the original directory structure for easy analysis
 
 ### 3. Criteria
 
