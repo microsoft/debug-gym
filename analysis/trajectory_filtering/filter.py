@@ -1,6 +1,7 @@
 import argparse
 import json
 import os
+import zipfile
 
 from criteria import *
 from tqdm import tqdm
@@ -87,6 +88,46 @@ def filter_trajectories(directory, trajectory_criteria=None, data_criteria=None)
     return matching_files
 
 
+def create_zip_with_matching_files(matching_files, exps_dir, output_zip_path):
+    """
+    Create a zip file containing all matching JSONL files.
+
+    Args:
+        matching_files: List of file paths that match the criteria
+        exps_dir: Base experiments directory
+        output_zip_path: Path where the zip file should be created
+    """
+    if not matching_files:
+        print("No matching files found. Skipping zip creation.")
+        return
+
+    print(f"\nCreating zip file with {len(matching_files)} matching files...")
+
+    try:
+        # Create the directory for the zip file if it doesn't exist
+        os.makedirs(os.path.dirname(output_zip_path), exist_ok=True)
+
+        with zipfile.ZipFile(output_zip_path, "w", zipfile.ZIP_DEFLATED) as zipf:
+            for file_path in tqdm(matching_files, desc="Adding files to zip"):
+                # Check if file exists before adding to zip
+                if os.path.exists(file_path):
+                    # Calculate the relative path within the zip
+                    relative_path = os.path.relpath(file_path, exps_dir)
+
+                    # Add the file to the zip with its relative path structure
+                    zipf.write(file_path, relative_path)
+                else:
+                    print(f"Warning: File not found, skipping: {file_path}")
+
+        # Get the file size for user feedback
+        zip_size = os.path.getsize(output_zip_path)
+        zip_size_mb = zip_size / (1024 * 1024)
+        print(f"Zip file created: {output_zip_path} ({zip_size_mb:.2f} MB)")
+
+    except Exception as e:
+        print(f"Error creating zip file: {e}")
+
+
 def main():
     # Parse command line arguments
     parser = argparse.ArgumentParser(
@@ -106,6 +147,15 @@ def main():
         "--output-file",
         help="Custom output file path (default: <exp_path>/filtered_trajectories_<exp_uuid>.json)",
     )
+    parser.add_argument(
+        "--create-zip",
+        action="store_true",
+        help="Create a zip file containing all matching JSONL files",
+    )
+    parser.add_argument(
+        "--zip-output",
+        help="Custom zip file path (default: <exp_path>/filtered_trajectories_<exp_uuid>.zip)",
+    )
 
     args = parser.parse_args()
 
@@ -124,6 +174,9 @@ def main():
 
     # Filter trajectories
     matching_files = filter_trajectories(exps_dir, trajectory_criteria, data_criteria)
+
+    # Store original paths for zip creation if needed
+    original_matching_files = matching_files.copy()
 
     # Where are the matching files located
     model_name = {}
@@ -168,6 +221,15 @@ def main():
         )
 
     print(f"\nResults saved to: {output_file}")
+
+    # Create zip file if requested
+    if args.create_zip:
+        zip_output_file = args.zip_output or os.path.join(
+            exps_dir, f"filtered_trajectories_{args.exp_uuid}.zip"
+        )
+        create_zip_with_matching_files(
+            original_matching_files, exps_dir, zip_output_file
+        )
 
 
 if __name__ == "__main__":
