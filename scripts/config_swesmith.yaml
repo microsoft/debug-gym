@@ -2,7 +2,7 @@ base:
     # Environment configs
     output_path: "exps/swesmith"
     benchmark: "swesmith"
-    problems: "all"  # list of problems, e.g., ["astropy__astropy-12907"], or strings like "test-124" (defined in gym/envs/configs), or "all",
+    problems: "all"  # list of problems, e.g., ["astropy__astropy-12907"], or strings like "test-125" (defined in gym/envs/configs), or "all",
     env_kwargs: {
         "dir_tree_depth": 1,
         "run_timeout": 300,
