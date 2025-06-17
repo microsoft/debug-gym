@@ -76,7 +76,7 @@ def test_human_in_the_loop(human, agent_setup, build_env_info):
 
     # test that human action was executed
     assert env.clone().step.called
-    env.clone().step.assert_called_with(llm().response)
+    env.clone().step.assert_called_with(llm().tool)
 
     # ensure that human action was not recorded in history
     assert env.clone().step() in agent.history.get_all()
