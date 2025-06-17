@@ -473,7 +473,7 @@ class Human(LLM):
 
         # Warn if self.logger.level is not set at least to INFO, as this is a human interface.
         if self.logger.level > logging.INFO:
-            self.logger.warning(
+            raise ValueError(
                 "Human Mode should have logger level set to at least INFO (using -v) for better interaction."
             )
 
