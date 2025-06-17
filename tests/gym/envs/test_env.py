@@ -757,7 +757,7 @@ def test_clone(env):
     assert id(env) != id(cloned_env)
 
     # Check if the tool exists in the cloned env
-    assert cloned_env.has_tool('tool1')
+    assert cloned_env.has_tool("tool1")
 
     # Check that the properties are the same
     assert env.path == cloned_env.path

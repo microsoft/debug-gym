@@ -16,11 +16,6 @@ class GuidedRewriteAgent(RewriteAgent):
         # make a copy of the env for the llm
         cloned_env = self.env.clone()
 
-        # Only keep the rewrite tool in the cloned env
-        for tool in cloned_env.tools:
-            if tool.name != "rewrite":
-                cloned_env.remove_tool(tool.name)
-
         # Reset the cloned environment and replay the history.
         info = cloned_env.reset(options={"task_name": task_name})
         # replay the history up to the current step
@@ -28,9 +23,15 @@ class GuidedRewriteAgent(RewriteAgent):
             assert not step.done
             info = cloned_env.step(step.action)
 
+        # Only keep the rewrite tool in the cloned env
+        for tool in cloned_env.tools:
+            if tool.name != "rewrite":
+                cloned_env.remove_tool(tool.name)
+
         prompt = self.build_prompt(info)
         response = self.llm(prompt, info.tools)
-        info = cloned_env.step(response.response)
+        self.logger.info(colored(response.tool, "blue"))
+        info = cloned_env.step(response.tool)
 
         return info.done
 
