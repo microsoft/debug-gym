@@ -337,7 +337,7 @@ class DockerTerminal(Terminal):
         self.setup_commands = setup_commands or []
         self.volumes = volumes or {}
         self.map_host_uid_gid = map_host_uid_gid
-        self.docker_client = docker.from_env()
+        self.docker_client = docker.from_env(timeout=300)
         self.host_uid = os.getuid()
         self.host_gid = os.getgid()
         self._container = None
