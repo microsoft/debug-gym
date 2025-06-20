@@ -27,6 +27,8 @@ def env(tmp_path):
     with open(repo_path / ".debugreadonly", "w") as f:
         f.write("test_1.py")
 
+    (repo_path / "empty.py").touch()  # Create an empty file
+
     env = RepoEnv(path=repo_path, dir_tree_depth=2)
     view_tool = Toolbox.get_tool("view")
     env.add_tool(view_tool)
@@ -327,3 +329,13 @@ def test_view_file_with_invalid_range(env):
         env_info.step_observation.observation
         == "Invalid range: start index `5` is greater than end index `4`."
     )
+
+
+def test_view_empty_file(env):
+    view_call = ToolCall(
+        id="view_id",
+        name="view",
+        arguments={"path": "empty.py", "start": 1, "end": 3},
+    )
+    env_info = env.step(view_call)
+    assert env_info.step_observation.observation == "The file `empty.py` is empty."
