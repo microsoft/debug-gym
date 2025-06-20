@@ -60,6 +60,9 @@ class ViewTool(EnvironmentTool):
             return Observation(self.name, f"View failed. Error message:\n{str(e)}")
         file_lines = file_content.splitlines()
 
+        if not file_lines:
+            return Observation(self.name, f"The file `{new_file}` is empty.")
+
         # Convert 1-based line numbers to 0-based indices
         s = (start - 1) if start is not None else 0
         e = end if end is not None else len(file_lines)
