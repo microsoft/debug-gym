@@ -187,7 +187,7 @@ class OpenAILLM(LLM):
         kwargs["max_tokens"] = kwargs.get("max_tokens", NOT_GIVEN)
         try:
             response = retry_on_exception(
-                self.client.chat.completions.create, self.is_rate_limit_error
+                self.client.chat.completions.create, self.need_to_be_retried
             )(
                 model=self.config.model,
                 messages=messages,

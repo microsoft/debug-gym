@@ -172,7 +172,7 @@ class AnthropicLLM(LLM):
         try:
             # https://docs.anthropic.com/en/docs/agents-and-tools/tool-use/overview
             response = retry_on_exception(
-                self.client.messages.create, self.is_rate_limit_error
+                self.client.messages.create, self.need_to_be_retried
             )(
                 model=self.config.model,
                 system=system_prompt,
