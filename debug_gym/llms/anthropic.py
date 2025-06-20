@@ -1,7 +1,12 @@
 from debug_gym.gym.envs.env import EnvInfo
 from debug_gym.gym.tools.tool import EnvironmentTool, ToolCall
 from debug_gym.gym.utils import filter_non_utf8
-from debug_gym.llms.base import LLM, LLMResponse, retry_on_rate_limit
+from debug_gym.llms.base import (
+    LLM,
+    ContextLengthExceededError,
+    LLMResponse,
+    retry_on_exception,
+)
 from debug_gym.llms.constants import LLM_API_KEY_PLACEHOLDER
 
 
@@ -50,8 +55,8 @@ class AnthropicLLM(LLM):
             )
         return 0
 
-    def is_rate_limit_error(self, exception) -> bool:
-        rate_limit_errors = [
+    def need_to_be_retried(self, exception) -> bool:
+        _errors = [
             "anthropic.RateLimitError",
             "anthropic.OverloadedError",
             "anthropic._exceptions.OverloadedError",
@@ -65,7 +70,7 @@ class AnthropicLLM(LLM):
             f"Error calling {self.model_name}: {exception_full_name!r} "
             f"{exception.message if hasattr(exception, 'message') else exception}"
         )
-        return exception_full_name in rate_limit_errors
+        return exception_full_name in _errors
 
     def define_tools(self, tool_call_list: list[EnvironmentTool]) -> list[dict]:
         """Translates the list of tools into a format that is specifically defined by each LLM.
@@ -166,8 +171,8 @@ class AnthropicLLM(LLM):
 
         try:
             # https://docs.anthropic.com/en/docs/agents-and-tools/tool-use/overview
-            response = retry_on_rate_limit(
-                self.client.messages.create, self.is_rate_limit_error
+            response = retry_on_exception(
+                self.client.messages.create, self.need_to_be_retried
             )(
                 model=self.config.model,
                 system=system_prompt,
