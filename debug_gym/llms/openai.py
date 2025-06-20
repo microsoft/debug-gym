@@ -71,6 +71,7 @@ class OpenAILLM(LLM):
             "openai.APIConnectionError",
             "openai.RateLimitError",
             "openai.PermissionDeniedError",
+            "openai.BadRequestError",
             # Add more as needed
         ]
         exception_full_name = (
@@ -92,6 +93,13 @@ class OpenAILLM(LLM):
             ):
                 is_error = False
                 logger = self.logger.warning
+        if (
+            exception_full_name == "openai.BadRequestError"
+            and len(self.config.tags) > 0
+            and "vllm" not in self.config.tags
+        ):
+            # only retry when a such error occurs on a model hosting on vllm
+            is_error = False
 
         logger(
             f"Error calling {self.model_name}: {exception_full_name!r} {
