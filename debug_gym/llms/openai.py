@@ -13,7 +13,7 @@ from debug_gym.llms.base import (
     LLM,
     ContextLengthExceededError,
     LLMResponse,
-    retry_on_rate_limit,
+    retry_on_exception,
 )
 from debug_gym.llms.constants import LLM_API_KEY_PLACEHOLDER, LLM_ENDPOINT_PLACEHOLDER
 
@@ -58,9 +58,9 @@ class OpenAILLM(LLM):
                     )
         return self._tk_func(text)
 
-    def is_rate_limit_error(self, exception) -> bool:
+    def need_to_be_retried(self, exception) -> bool:
         # List of fully qualified names of RateLimitError exceptions from various libraries
-        rate_limit_errors = [
+        _errors = [
             "openai.APIStatusError",
             "openai.APITimeoutError",
             "openai.error.Timeout",
@@ -78,7 +78,7 @@ class OpenAILLM(LLM):
             f"{exception.__class__.__module__}.{exception.__class__.__name__}"
         )
 
-        is_error = exception_full_name in rate_limit_errors
+        need_to_retry = exception_full_name in _errors
         logger = self.logger.debug
 
         # Ignore error that are not rate limit errors
@@ -91,7 +91,7 @@ class OpenAILLM(LLM):
                     and "A previous prompt was too large." in exception.message
                 )
             ):
-                is_error = False
+                need_to_retry = False
                 logger = self.logger.warning
         if (
             exception_full_name == "openai.BadRequestError"
@@ -99,7 +99,7 @@ class OpenAILLM(LLM):
             and "vllm" not in self.config.tags
         ):
             # only retry when a such error occurs on a model hosting on vllm
-            is_error = False
+            need_to_retry = False
 
         logger(
             f"Error calling {self.model_name}: {exception_full_name!r} {
@@ -107,7 +107,7 @@ class OpenAILLM(LLM):
             }"
         )
 
-        return is_error
+        return need_to_retry
 
     def define_tools(self, tool_call_list: list[EnvironmentTool]) -> list[dict]:
         """Translates the list of tools into a format that is specifically defined by each LLM.
@@ -186,7 +186,7 @@ class OpenAILLM(LLM):
         # set max tokens if not provided
         kwargs["max_tokens"] = kwargs.get("max_tokens", NOT_GIVEN)
         try:
-            response = retry_on_rate_limit(
+            response = retry_on_exception(
                 self.client.chat.completions.create, self.is_rate_limit_error
             )(
                 model=self.config.model,
