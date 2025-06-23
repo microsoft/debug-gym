@@ -219,7 +219,7 @@ class RepoEnv(TooledEnv):
 
         # Create a random temporary folder for storing a backup of the repo.
         self.tempdir = tempfile.TemporaryDirectory(prefix="RepoEnv-")
-        self.working_dir = Path(self.tempdir.name)
+        self.working_dir = Path(self.tempdir.name).resolve()
         # Make sure to cleanup that folder once done.
         atexit.register(self.tempdir.cleanup)
 
@@ -374,7 +374,7 @@ class RepoEnv(TooledEnv):
         """
         abs_filepath = Path(filepath)
         if not abs_filepath.is_absolute():
-            abs_filepath = (Path(self.working_dir) / abs_filepath).absolute()
+            abs_filepath = (Path(self.working_dir) / abs_filepath).resolve()
         if (
             raises
             and abs_filepath != self.working_dir
