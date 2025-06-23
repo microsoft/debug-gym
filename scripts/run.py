@@ -134,49 +134,21 @@ def main():
     mean_perf = 0
     tasks_succeeded = []
 
-    if num_workers > 1:
-        # Multi-process
-        with ProcessPoolExecutor(num_workers) as executor:
-            futures = {
-                executor.submit(run_agent, args, problem, config): problem
-                for problem in problems
-            }
-            mean_perf_text = colored(f"{mean_perf}", "green")
-            desc = f"Overall progress ({mean_perf_text} are successful)"
-            pbar = tqdm(as_completed(futures), desc=desc, total=len(problems))
-            for future in pbar:
-                if future.cancelled():
-                    continue
-
-                try:
-                    problem = futures[future]
-                    success = future.result()
-                    mean_perf += success
-                    tasks_done += 1
-
-                    if success:
-                        tasks_succeeded.append(problem)
-
-                    # update message on overall progress bar
-                    mean_perf_text = colored(f"{mean_perf}", "green")
-                    pbar.set_description(
-                        f"Overall tasks done ({mean_perf_text} are successful)"
-                    )
-                except (KeyboardInterrupt, BreakTaskLoop) as e:
-                    executor.shutdown(wait=False, cancel_futures=True)
-                    raise e
-                except Exception as e:
-                    executor.shutdown(wait=False, cancel_futures=True)
-                    raise e
-
-    else:
-        # Single thread
+    with ProcessPoolExecutor(num_workers) as executor:
+        futures = {
+            executor.submit(run_agent, args, problem, config): problem
+            for problem in problems
+        }
         mean_perf_text = colored(f"{mean_perf}", "green")
-        desc = f"Overall tasks done ({mean_perf_text} are successful)"
-        pbar = tqdm(problems, desc=desc, total=len(problems))
-        for problem in pbar:
+        desc = f"Overall progress ({mean_perf_text} are successful)"
+        pbar = tqdm(as_completed(futures), desc=desc, total=len(problems))
+        for future in pbar:
+            if future.cancelled():
+                continue
+
             try:
-                success = run_agent(args, problem, config)
+                problem = futures[future]
+                success = future.result()
                 mean_perf += success
                 tasks_done += 1
 
@@ -189,12 +161,14 @@ def main():
                     f"Overall tasks done ({mean_perf_text} are successful)"
                 )
             except (KeyboardInterrupt, BreakTaskLoop) as e:
+                executor.shutdown(wait=False, cancel_futures=True)
                 raise e
             except Exception as e:
+                executor.shutdown(wait=False, cancel_futures=True)
                 raise e
 
-        logger.info(f"Tasks that succeeded: {tasks_succeeded}")
-        logger.info(f"Tasks that failed: {set(problems) - set(tasks_succeeded)}")
+    logger.info(f"Tasks that succeeded: {tasks_succeeded}")
+    logger.info(f"Tasks that failed: {set(problems) - set(tasks_succeeded)}")
 
 
 if __name__ == "__main__":
