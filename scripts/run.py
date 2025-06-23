@@ -103,7 +103,7 @@ def main():
 
     # Figure out which problems to solve.
     problems = config.get("problems", ["custom"])
-    if type(problems) == str and "benchmark" in config:
+    if isinstance(problems, str) and "benchmark" in config:
         env = create_env(config, logger=logger)
         if problems == "all":
             problems = sorted(env.dataset.keys())  # all tasks
