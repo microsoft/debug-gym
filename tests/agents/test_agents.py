@@ -145,13 +145,6 @@ def test_build_system_prompt(agent_setup, build_env_info):
     assert messages == [{"role": "system", "content": json.dumps(expected, indent=2)}]
 
 
-def test_build_question_prompt(agent_setup):
-    agent, _, _ = next(agent_setup(DebugAgent))
-    messages = agent.build_question_prompt()
-    assert len(messages) == 1
-    assert "continue your debugging" in messages[0]["content"]
-
-
 def test_build_prompt(agent_setup, build_env_info):
     agent, _, _ = next(agent_setup(DebugAgent))
     info = build_env_info(
@@ -200,13 +193,6 @@ def test_build_system_prompt_rewrite_agent(agent_setup, build_env_info):
     messages = agent.build_system_prompt(info)
     assert len(messages) == 1
     assert "Overall task" in messages[0]["content"]
-
-
-def test_build_question_prompt_rewrite_agent(agent_setup):
-    agent, _, _ = next(agent_setup(RewriteAgent))
-    messages = agent.build_question_prompt()
-    assert len(messages) == 1
-    assert "continue your debugging" in messages[0]["content"]
 
 
 def test_run_debug_5_agent(agent_setup, build_env_info):

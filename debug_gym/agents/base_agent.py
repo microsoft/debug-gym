@@ -29,7 +29,6 @@ def register_agent(cls):
 class BaseAgent:
     name: str = None
     system_prompt: str = None
-    action_prompt: str = None
 
     def __init__(
         self,
@@ -188,16 +187,10 @@ class BaseAgent:
         messages = [{"role": "system", "content": filter_non_utf8(system_prompt)}]
         return messages
 
-    def build_question_prompt(self):
-        messages = []
-        messages.append({"role": "user", "content": self.action_prompt})
-        return messages
-
     def build_prompt(self, info):
         messages = []
         messages.extend(self.build_system_prompt(info))
         messages.extend(self.build_history_prompt())
-        messages.extend(self.build_question_prompt())
         return messages
 
     def run(self, task_name=None, debug=False):
