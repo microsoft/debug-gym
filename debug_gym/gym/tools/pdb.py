@@ -198,7 +198,34 @@ class PDBTool(EnvironmentTool):
             if current_frame:
                 obs += f"\nCurrent frame:\n{current_frame}\n"
             if list_output:
-                obs += f"\nContext around the current frame:\n  {list_output}\n"
+                # Calculate proper indentation based on line numbers in the output
+                import re
+                
+                # Find all line numbers in the list output
+                line_numbers = re.findall(r'^\s*(\d+)\s+', list_output, re.MULTILINE)
+                
+                if line_numbers:
+                    # Find the maximum line number to determine digits needed
+                    max_line_num = max(int(num) for num in line_numbers)
+                    max_digits = len(str(max_line_num))
+                    
+                    # PDB uses right-aligned line numbers with consistent total width
+                    # For 1-digit numbers: "  1  " (2 leading spaces)
+                    # For 2-digit numbers: " 10  " (1 leading space) 
+                    # For 3-digit numbers: "100  " (0 leading spaces)
+                    indent_spaces = max(0, 3 - max_digits)
+                    indentation = " " * indent_spaces
+                else:
+                    # Fallback to original behavior if no line numbers found
+                    indentation = "  "
+                
+                # Apply indentation to each line
+                indented_lines = []
+                for line in list_output.split('\n'):
+                    indented_lines.append(indentation + line)
+                indented_output = '\n'.join(indented_lines)
+                
+                obs += f"\nContext around the current frame:\n{indented_output}\n"
 
         return Observation(self.name, obs)
 
