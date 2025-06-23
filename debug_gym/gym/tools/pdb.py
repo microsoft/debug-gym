@@ -61,7 +61,7 @@ class PDBTool(EnvironmentTool):
         except TimeoutError as e:
             output = f"The command `{command}` has timed out. {e!r}"
 
-        return output.replace("(Pdb)", "").strip()  # remove the prompt
+        return output.replace("(Pdb)", "").rstrip()  # remove the prompt
 
     def close_pdb(self):
         self._session.close()
