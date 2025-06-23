@@ -175,9 +175,7 @@ def test_build_history_prompt(build_env_info, llm_mock):
     # test with empty history
     ht = HistoryTracker(history_steps=3)
     messages = build_history_prompt(ht, llm_mock)
-    expected = [
-        {"role": "user", "content": "No history of command and terminal outputs."}
-    ]
+    expected = []
     assert messages == expected
 
     # test with non-empty history
@@ -224,10 +222,6 @@ def test_build_history_prompt(build_env_info, llm_mock):
     )
 
     expected = [
-        {
-            "role": "user",
-            "content": "History of command and terminal outputs (the last 2 steps):",
-        },
         {"role": "role", "content": {"id": "3", "name": "action3", "arguments": {}}},
         {
             "role": "role",
@@ -246,10 +240,6 @@ def test_build_history_prompt(build_env_info, llm_mock):
         ht, llm_mock, reset_prompt_history_after_rewrite=True
     )
     expected = [
-        {
-            "role": "user",
-            "content": "History of command and terminal outputs (the last 1 steps):",
-        },
         {
             "role": "role",
             "content": {
