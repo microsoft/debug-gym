@@ -79,7 +79,7 @@ def test_pdb_use(tmp_path, setup_test_repo):
     assert "Reached the end of the program. Restarting the debugging session." in output
     assert "pytest/__main__.py" in output
     assert '-> """The pytest entry point."""' in output
-    assert 'Context around the current frame:\n1  ->	"""The pytest entry point.""""'
+    assert 'Context around the current frame:\n  1  ->	"""The pytest entry point.""""'
     assert "(Pdb)" not in output
 
 
@@ -161,7 +161,7 @@ def test_pdb_use_default_environment_entrypoint(tmp_path, setup_test_repo):
     assert "Reached the end of the program. Restarting the debugging session." in output
     assert "pytest/__main__.py" in output
     assert '-> """The pytest entry point."""' in output
-    assert 'Context around the current frame:\n1  ->	"""The pytest entry point.""""'
+    assert 'Context around the current frame:\n  1  ->	"""The pytest entry point.""""'
     assert "(Pdb)" not in output
 
 
@@ -194,7 +194,7 @@ def test_pdb_use_docker_terminal(tmp_path, setup_test_repo):
     assert "Reached the end of the program. Restarting the debugging session." in output
     assert "pytest/__main__.py" in output
     assert '-> """The pytest entry point."""' in output
-    assert 'Context around the current frame:\n1  ->	"""The pytest entry point.""""'
+    assert 'Context around the current frame:\n  1  ->	"""The pytest entry point.""""'
     assert "(Pdb)" not in output
 
 
@@ -458,7 +458,7 @@ def test_use_breakpoints_and_clear(tmp_path, setup_pdb_repo_env):
         ".../pytest/__main__.py\n"
         "\n"
         "Context around the current frame:\n"
-        '1  ->\t"""The pytest entry point."""\r\n'
+        '  1  ->\t"""The pytest entry point."""\r\n'
         "  2  \t\r\n"
         "  3  \tfrom __future__ import annotations\r\n"
         "  4  \t\r\n"
@@ -480,7 +480,7 @@ def test_use_breakpoints_and_clear(tmp_path, setup_pdb_repo_env):
         ".../pytest/__main__.py\n"
         "\n"
         "Context around the current frame:\n"
-        '1  ->\t"""The pytest entry point."""\r\n'
+        '  1  ->\t"""The pytest entry point."""\r\n'
         "  2  \t\r\n"
         "  3  \tfrom __future__ import annotations\r\n"
         "  4  \t\r\n"
@@ -506,7 +506,7 @@ def test_use_b_invalid_file(tmp_path, setup_pdb_repo_env):
         ".../pytest/__main__.py\n"
         "\n"
         "Context around the current frame:\n"
-        '1  ->\t"""The pytest entry point."""\r\n'
+        '  1  ->\t"""The pytest entry point."""\r\n'
         "  2  \t\r\n"
         "  3  \tfrom __future__ import annotations\r\n"
         "  4  \t\r\n"
@@ -595,7 +595,7 @@ def test_use_multiple_commands_only_first_executed(tmp_path, setup_pdb_repo_env)
         ".../pytest/__main__.py\n"
         "\n"
         "Context around the current frame:\n"
-        '1  ->\t"""The pytest entry point."""\r\n'
+        '  1  ->\t"""The pytest entry point."""\r\n'
         "  2  \t\r\n"
         "  3  \tfrom __future__ import annotations\r\n"
         "  4  \t\r\n"
