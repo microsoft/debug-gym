@@ -374,7 +374,7 @@ class RepoEnv(TooledEnv):
         """
         abs_filepath = Path(filepath)
         if not abs_filepath.is_absolute():
-            abs_filepath = (Path(self.working_dir) / abs_filepath).resolve()
+            abs_filepath = (Path(self.working_dir) / abs_filepath).absolute()
         if (
             raises
             and abs_filepath != self.working_dir

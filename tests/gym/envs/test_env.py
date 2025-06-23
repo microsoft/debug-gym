@@ -541,11 +541,11 @@ def test_queue_and_process_events():
 def test_resolve_path(tmp_path, debugignore):
     (tmp_path / ".debugignore").write_text(debugignore)
     env = RepoEnv(path=tmp_path)
-    abs_path = (env.working_dir / "file.txt").resolve()
+    abs_path = (env.working_dir / "file.txt").absolute()
     (abs_path).touch()
     # env.working_dir itself
     path_from_env = env.resolve_path(str(env.working_dir), raises=True)
-    assert path_from_env == env.working_dir.resolve()
+    assert path_from_env == env.working_dir.absolute()
     # relative path
     path_from_env = env.resolve_path("file.txt")
     assert path_from_env == abs_path
@@ -563,10 +563,10 @@ def test_resolve_path(tmp_path, debugignore):
     assert path_from_env == abs_path
     # return an absolute path regardless of existence
     non_existent_path = env.resolve_path("non_existent_file.txt")
-    assert non_existent_path == (env.working_dir / "non_existent_file.txt").resolve()
+    assert non_existent_path == (env.working_dir / "non_existent_file.txt").absolute()
     # non-existent absolute path
     non_existent_path = env.resolve_path("/tmp/non_existent_file.txt")
-    assert non_existent_path == Path("/tmp/non_existent_file.txt").resolve()
+    assert non_existent_path == Path("/tmp/non_existent_file.txt").absolute()
 
 
 def test_resolve_path_raises(tmp_path):
