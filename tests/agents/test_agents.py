@@ -27,8 +27,6 @@ def test_default_system_prompt(agent_setup, build_env_info):
                 {
                     "Overall task": "some task",
                     "Instructions": "some instruction",
-                    "Repo directory tree": "dir tree",
-                    "Current breakpoints": [],
                     "Shortcut features": ["f1", "f2"],
                 },
                 indent=2,
@@ -57,8 +55,6 @@ def test_default_system_prompt_auto_eval(agent_setup, build_env_info):
                 {
                     "Overall task": "some task",
                     "Instructions": "some instruction",
-                    "Repo directory tree": "dir tree",
-                    "Current breakpoints": [],
                     "Evaluation output of current code": "eval obs",
                     "Shortcut features": ["f1", "f2"],
                 },
@@ -89,8 +85,6 @@ def test_load_system_prompt_template_default_no_shortcuts_or_eval(
                 {
                     "Overall task": "some task",
                     "Instructions": "some instruction",
-                    "Repo directory tree": "dir tree",
-                    "Current breakpoints": [1, 2],
                 },
                 indent=2,
             ),
@@ -120,7 +114,11 @@ def test_load_system_prompt_template_file_not_found(agent_setup):
 
 def test_build_system_prompt(agent_setup, build_env_info):
     agent, _, _ = next(agent_setup(DebugAgent))
-    agent.config["env_kwargs"] = {"auto_eval_on_rewrite": True}
+    agent.config["env_kwargs"] = {
+        "auto_eval_on_rewrite": True,
+        "show_current_breakpoints": True,
+        "show_directory_tree": True,
+    }
     agent.system_prompt = "Test overall task"
     info = build_env_info(
         instructions="Do X",
@@ -139,7 +137,9 @@ def test_build_system_prompt(agent_setup, build_env_info):
             "After successful rewrites, the environment will automatically call "
             "the Eval tool to evaluate the rewritten code. Therefore, you do not "
             "need to call the Eval tool yourself. The evaluation output will be "
-            "updated automatically in the system prompt."
+            "updated automatically in the system prompt.",
+            "The environment will show the directory tree of the repository in the system prompt.",
+            "The environment will show the current breakpoints in the system prompt.",
         ],
     }
     assert messages == [{"role": "system", "content": json.dumps(expected, indent=2)}]
