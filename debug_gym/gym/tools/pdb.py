@@ -61,7 +61,7 @@ class PDBTool(EnvironmentTool):
         except TimeoutError as e:
             output = f"The command `{command}` has timed out. {e!r}"
 
-        return output.replace("(Pdb)", "").rstrip()  # remove the prompt
+        return output.replace("(Pdb)", "").strip()  # remove the prompt
 
     def close_pdb(self):
         self._session.close()
@@ -198,7 +198,7 @@ class PDBTool(EnvironmentTool):
             if current_frame:
                 obs += f"\nCurrent frame:\n{current_frame}\n"
             if list_output:
-                obs += f"\nContext around the current frame:\n{list_output}\n"
+                obs += f"\nContext around the current frame:\n  {list_output}\n"
 
         return Observation(self.name, obs)
 
