@@ -565,7 +565,7 @@ def test_resolve_path(tmp_path, debugignore):
     non_existent_path = env.resolve_path("non_existent_file.txt")
     assert non_existent_path == (env.working_dir / "non_existent_file.txt").resolve()
     # non-existent absolute path
-    non_existent_path = env.resolve_path("/tmp/non_existent_file.txt")
+    non_existent_path = env.resolve_path("/tmp/non_existent_file.txt").resolve()
     assert non_existent_path == Path("/tmp/non_existent_file.txt").resolve()
 
 
