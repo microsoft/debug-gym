@@ -160,6 +160,7 @@ class RepoEnv(TooledEnv):
         auto_list: bool = True,
         terminal: Terminal | None = None,
         logger: DebugGymLogger | None = None,
+        **kwargs,
     ):
         super().__init__()
 
@@ -177,6 +178,7 @@ class RepoEnv(TooledEnv):
         self.infos: EnvInfo | None = None
         self.rng = None
         self.tempdir = None
+        self.additional_kwargs = kwargs
 
         self.setup_workspace(
             path=path,
