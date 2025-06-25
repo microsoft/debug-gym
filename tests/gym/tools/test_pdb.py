@@ -652,92 +652,104 @@ def test_pdb_list_output_indentation_hundred_lines():
     """Test PDB list output indentation for line numbers around 100 (3-digit)"""
     # Test the indentation logic directly without requiring full PDB infrastructure
     import re
-    
+
     # Mock PDB list output for lines around 100 - this is what PDB would return
     mock_list_output = (
         " 98\t    print('Line 98')\n"
-        " 99\t    print('Line 99')\n" 
+        " 99\t    print('Line 99')\n"
         "100\t->  print('Line 100')\n"
         "101\t    print('Line 101')\n"
         "102\t    print('Line 102')\n"
     )
-    
+
     # Apply the same indentation logic as in PDBTool.use()
-    line_numbers = re.findall(r'^\s*(\d+)\s+', mock_list_output, re.MULTILINE)
-    
+    line_numbers = re.findall(r"^\s*(\d+)\s+", mock_list_output, re.MULTILINE)
+
     if line_numbers:
         # Find the maximum line number to determine digits needed
         max_line_num = max(int(num) for num in line_numbers)
         max_digits = len(str(max_line_num))
-        
+
         # For 3-digit numbers (100+), should get 0 leading spaces
         expected_indent_spaces = max(0, 3 - max_digits)  # max(0, 3-3) = 0
-        assert expected_indent_spaces == 0, f"Expected 0 indent spaces for 3-digit lines, got {expected_indent_spaces}"
-        
+        assert (
+            expected_indent_spaces == 0
+        ), f"Expected 0 indent spaces for 3-digit lines, got {expected_indent_spaces}"
+
         indentation = " " * expected_indent_spaces
-        
+
         # Apply indentation to each line
         indented_lines = []
-        for line in mock_list_output.split('\n'):
+        for line in mock_list_output.split("\n"):
             if line:  # Skip empty lines
                 indented_lines.append(indentation + line)
-        indented_output = '\n'.join(indented_lines)
-        
-        # Verify that line 100 has no extra leading spaces 
-        assert "100\t->  print('Line 100')" in indented_output, f"Line 100 should have no leading spaces in output: {indented_output}"
-        
+        indented_output = "\n".join(indented_lines)
+
+        # Verify that line 100 has no extra leading spaces
+        assert (
+            "100\t->  print('Line 100')" in indented_output
+        ), f"Line 100 should have no leading spaces in output: {indented_output}"
+
         # Verify that all lines in the 100s range have consistent formatting
-        lines = indented_output.split('\n')
+        lines = indented_output.split("\n")
         for line in lines:
-            if re.match(r'^\s*10[0-2]\s+', line):
+            if re.match(r"^\s*10[0-2]\s+", line):
                 # Lines 100-102 should start directly with the line number (no leading spaces)
-                assert not line.startswith(' '), f"3-digit line should not have leading spaces: {repr(line)}"
+                assert not line.startswith(
+                    " "
+                ), f"3-digit line should not have leading spaces: {repr(line)}"
 
 
 def test_pdb_list_output_indentation_thousand_lines():
     """Test PDB list output indentation for line numbers around 1000 (4-digit)"""
     # Test the indentation logic directly without requiring full PDB infrastructure
     import re
-    
+
     # Mock PDB list output for lines around 1000 - this is what PDB would return
     mock_list_output = (
         " 998\t    print('Line 998')\n"
-        " 999\t    print('Line 999')\n" 
+        " 999\t    print('Line 999')\n"
         "1000\t->  print('Line 1000')\n"
         "1001\t    print('Line 1001')\n"
         "1002\t    print('Line 1002')\n"
     )
-    
+
     # Apply the same indentation logic as in PDBTool.use()
-    line_numbers = re.findall(r'^\s*(\d+)\s+', mock_list_output, re.MULTILINE)
-    
+    line_numbers = re.findall(r"^\s*(\d+)\s+", mock_list_output, re.MULTILINE)
+
     if line_numbers:
         # Find the maximum line number to determine digits needed
         max_line_num = max(int(num) for num in line_numbers)
         max_digits = len(str(max_line_num))
-        
+
         # For 4-digit numbers (1000+), should get 0 leading spaces
         expected_indent_spaces = max(0, 3 - max_digits)  # max(0, 3-4) = 0
-        assert expected_indent_spaces == 0, f"Expected 0 indent spaces for 4-digit lines, got {expected_indent_spaces}"
-        
+        assert (
+            expected_indent_spaces == 0
+        ), f"Expected 0 indent spaces for 4-digit lines, got {expected_indent_spaces}"
+
         indentation = " " * expected_indent_spaces
-        
+
         # Apply indentation to each line
         indented_lines = []
-        for line in mock_list_output.split('\n'):
+        for line in mock_list_output.split("\n"):
             if line:  # Skip empty lines
                 indented_lines.append(indentation + line)
-        indented_output = '\n'.join(indented_lines)
-        
+        indented_output = "\n".join(indented_lines)
+
         # Verify that line 1000 has no extra leading spaces
-        assert "1000\t->  print('Line 1000')" in indented_output, f"Line 1000 should have no leading spaces in output: {indented_output}"
-        
+        assert (
+            "1000\t->  print('Line 1000')" in indented_output
+        ), f"Line 1000 should have no leading spaces in output: {indented_output}"
+
         # Verify that all lines in the 1000s range have consistent formatting
-        lines = indented_output.split('\n')
+        lines = indented_output.split("\n")
         for line in lines:
-            if re.match(r'^\s*100[0-2]\s+', line):
+            if re.match(r"^\s*100[0-2]\s+", line):
                 # Lines 1000-1002 should start directly with the line number (no leading spaces)
-                assert not line.startswith(' '), f"4-digit line should not have leading spaces: {repr(line)}"
+                assert not line.startswith(
+                    " "
+                ), f"4-digit line should not have leading spaces: {repr(line)}"
 
 
 def test_use_lists_breakpoints(tmp_path, setup_pdb_repo_env):
