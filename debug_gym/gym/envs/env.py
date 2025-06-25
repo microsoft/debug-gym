@@ -218,14 +218,11 @@ class RepoEnv(TooledEnv):
         self.path = Path(path)
 
         # Create a random temporary folder for storing a backup of the repo.
-<<<<<<< HEAD
         self.tempdir = tempfile.TemporaryDirectory(prefix="RepoEnv-")
         self.working_dir = Path(self.tempdir.name).resolve()
-=======
         self._tempdir = tempfile.TemporaryDirectory(prefix="RepoEnv-")
         self.working_dir = Path(self._tempdir.name).resolve()
 
->>>>>>> a06ee2902dfc3c15651bbda50dd535bb1280f53b
         # Make sure to cleanup that folder once done.
         atexit.register(self._tempdir.cleanup)
 
