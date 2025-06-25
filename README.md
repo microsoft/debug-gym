@@ -67,8 +67,8 @@ debug_gym
 
 `debug_gym.llms` are the different LLM backends that can be used to instantiate agents. Currently, we support OpenAI, Azure OpenAI, and Anthropic.
 
-> **Warning**
-`debug-gym` has limited support on non-Linux platforms. Interactive terminal sessions using PTY (pseudo-terminal) in Docker are fully supported on Linux, but not on macOS or Windows. As a result, the `pdb` tool (see [2.1. Environment and Tools](#21. Environment and Tools)) and the benchmarks `swe-bench` and `swe-smith` (see [2.3. Benchmarks](#23-benchmarks)) are only available on Linux.
+> [!WARNING]
+> `debug-gym` has limited support on non-Linux platforms. Interactive terminal sessions using PTY (pseudo-terminal) in Docker are not fully supported on macOS or Windows. As a result, the `pdb` tool (see [2.1. Environment and Tools](#21-environment-and-tools)) only works on Linux.
 
 ---
 
