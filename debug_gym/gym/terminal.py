@@ -9,6 +9,7 @@ import tempfile
 import termios
 import time
 import uuid
+from pathlib import Path
 
 import docker
 
@@ -215,9 +216,9 @@ class Terminal:
     def working_dir(self):
         """Lazy initialization of the working directory."""
         if self._working_dir is None:
-            temp_dir = tempfile.TemporaryDirectory(prefix="Terminal-")
-            atexit.register(temp_dir.cleanup)
-            self._working_dir = temp_dir.name
+            _tempdir = tempfile.TemporaryDirectory(prefix="Terminal-")
+            atexit.register(_tempdir.cleanup)
+            self._working_dir = str(Path(_tempdir.name).resolve())
             self.logger.debug(f"Using temporary working directory: {self._working_dir}")
         return self._working_dir
 
