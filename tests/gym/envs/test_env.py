@@ -130,10 +130,10 @@ def test_setup_workspace(mock_atexit_register, mock_tempdir, tmp_path):
 
     assert repo_env.path == path_dir
     assert repo_env.working_dir == working_dir
-    assert repo_env.tempdir.startswith("RepoEnv-")
+    assert repo_env._tempdir.startswith("RepoEnv-")
     with open(working_dir / "file.py", "r") as f:
         assert f.read() == file_content
-    mock_atexit_register.assert_called_once_with(repo_env.tempdir.cleanup)
+    mock_atexit_register.assert_called_once_with(repo_env._tempdir.cleanup)
 
 
 @patch("tempfile.TemporaryDirectory")
@@ -156,7 +156,7 @@ def test_cleanup_workspace(mock_tempdir):
     mock_tempdir_instance = MagicMock()
     mock_tempdir.return_value = mock_tempdir_instance
     env = RepoEnv()
-    env.tempdir = mock_tempdir_instance
+    env._tempdir = mock_tempdir_instance
     env.cleanup_workspace()
 
     mock_tempdir_instance.cleanup.assert_called_once()
@@ -324,7 +324,7 @@ def test_reset(
         all_observations=[Observation(source="env", observation="1 failed, 0 passed")],
         eval_observation=Observation(source="env", observation="1 failed, 0 passed"),
         dir_tree=f"""Listing files in the current working directory. (read-only) indicates read-only files. Max depth: 2.
-{env.tempdir.name}/
+{env.working_dir}/
 |-- file1.txt
 |-- file2.txt
 |-- subdir/

@@ -176,7 +176,7 @@ class RepoEnv(TooledEnv):
         self.logger = logger or DebugGymLogger("debug-gym")
         self.infos: EnvInfo | None = None
         self.rng = None
-        self.tempdir = None
+        self._tempdir = None
 
         self.setup_workspace(
             path=path,
@@ -218,10 +218,16 @@ class RepoEnv(TooledEnv):
         self.path = Path(path)
 
         # Create a random temporary folder for storing a backup of the repo.
+<<<<<<< HEAD
         self.tempdir = tempfile.TemporaryDirectory(prefix="RepoEnv-")
         self.working_dir = Path(self.tempdir.name).resolve()
+=======
+        self._tempdir = tempfile.TemporaryDirectory(prefix="RepoEnv-")
+        self.working_dir = Path(self._tempdir.name).resolve()
+
+>>>>>>> a06ee2902dfc3c15651bbda50dd535bb1280f53b
         # Make sure to cleanup that folder once done.
-        atexit.register(self.tempdir.cleanup)
+        atexit.register(self._tempdir.cleanup)
 
         self.logger.debug(f"Working directory: {self.working_dir}")
         shutil.copytree(self.path, self.working_dir, dirs_exist_ok=True, symlinks=True)
@@ -268,8 +274,8 @@ class RepoEnv(TooledEnv):
         return entrypoint
 
     def cleanup_workspace(self):
-        if self.tempdir:
-            self.tempdir.cleanup()
+        if self._tempdir:
+            self._tempdir.cleanup()
 
     @property
     def instructions(self) -> str:
