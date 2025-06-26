@@ -34,6 +34,19 @@ class PDBTool(EnvironmentTool):
         self.current_frame_file = None
         self._session: ShellSession = None
 
+    def __getstate__(self):
+        """Handles serialisation of the PDBTool instance (for pickle) without un-picklable attributes"""
+        state = self.__dict__.copy()
+        for k in ["_session", "current_frame_file"]:
+            del state[k]
+        return state
+
+    def __setstate__(self, state):
+        """Handles de-serialisation of the PDBTool instance (for pickle) without un-picklable attributes"""
+        self.__dict__.update(state)
+        self.current_frame_file = None
+        self._session = None
+
     def __deepcopy__(self, memo):
         """Create a deep copy of the PDBTool instance with _session set to None."""
         result = type(self).__new__(self.__class__)
