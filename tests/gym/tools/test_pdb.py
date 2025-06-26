@@ -677,3 +677,23 @@ def test_use_invalid_command_returns_invalid_message(tmp_path, setup_pdb_repo_en
     pdb_tool.interact_with_pdb = raise_exc
     obs = pdb_tool.use(env, "invalid").observation
     assert "Invalid pdb command: invalid" in obs
+
+
+def test_pdbtool_pickle_roundtrip(tmp_path, setup_pdb_repo_env):
+    """
+    A PDBTool should survive a pickle --> un-pickle cycle.
+    The non-serialisable _session and current_frame_file
+    must be stripped to None, while the rest of the state
+    (e.g. its class-level name) is preserved.
+    """
+    import pickle
+
+    pdb_tool, _env = setup_pdb_repo_env(tmp_path)
+    dumped = pickle.dumps(pdb_tool)
+    rehydrated = pickle.loads(dumped)
+
+    assert rehydrated._session is None
+    assert rehydrated.current_frame_file is None
+
+    assert rehydrated.name == pdb_tool.name
+    assert rehydrated.examples == pdb_tool.examples
