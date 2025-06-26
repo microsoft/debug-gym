@@ -221,7 +221,7 @@ class PDBTool(EnvironmentTool):
                         indented_lines.append("  " + stripped_line)
                     else:
                         indented_lines.append(line)
-                
+
                 indented_output = "\n".join(indented_lines)
                 obs += f"\nContext around the current frame:\n{indented_output}\n"
 

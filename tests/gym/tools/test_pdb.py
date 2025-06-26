@@ -668,7 +668,7 @@ def test_use_starts_pdb_if_not_running(tmp_path, setup_pdb_repo_env):
 def test_pdb_list_output_indentation_hundred_lines():
     """Test PDB list output indentation for line numbers around 100 (3-digit)"""
     # Test the indentation logic directly without requiring full PDB infrastructure
-    
+
     # Mock PDB list output for lines around 100 - this is what PDB would return
     # Note: PDB might not include leading spaces for 3-digit numbers
     mock_list_output = (
@@ -688,23 +688,27 @@ def test_pdb_list_output_indentation_hundred_lines():
             indented_lines.append("  " + stripped_line)
         else:
             indented_lines.append(line)
-    
+
     indented_output = "\n".join(indented_lines)
 
     # Verify that all lines have exactly 2 leading spaces for consistency
     lines = indented_output.split("\n")
     for line in lines:
         if line.strip():  # Skip empty lines
-            assert line.startswith("  "), f"Line should start with exactly 2 spaces: {repr(line)}"
-    
+            assert line.startswith(
+                "  "
+            ), f"Line should start with exactly 2 spaces: {repr(line)}"
+
     # Verify specific formatting for line 100
-    assert "  100\t->  print('Line 100')" in indented_output, f"Line 100 should have 2 leading spaces: {indented_output}"
+    assert (
+        "  100\t->  print('Line 100')" in indented_output
+    ), f"Line 100 should have 2 leading spaces: {indented_output}"
 
 
 def test_pdb_list_output_indentation_thousand_lines():
     """Test PDB list output indentation for line numbers around 1000 (4-digit)"""
     # Test the indentation logic directly without requiring full PDB infrastructure
-    
+
     # Mock PDB list output for lines around 1000 - this is what PDB would return
     # Note: PDB might not include leading spaces for 4-digit numbers
     mock_list_output = (
@@ -724,17 +728,21 @@ def test_pdb_list_output_indentation_thousand_lines():
             indented_lines.append("  " + stripped_line)
         else:
             indented_lines.append(line)
-    
+
     indented_output = "\n".join(indented_lines)
 
     # Verify that all lines have exactly 2 leading spaces for consistency
     lines = indented_output.split("\n")
     for line in lines:
         if line.strip():  # Skip empty lines
-            assert line.startswith("  "), f"Line should start with exactly 2 spaces: {repr(line)}"
-    
+            assert line.startswith(
+                "  "
+            ), f"Line should start with exactly 2 spaces: {repr(line)}"
+
     # Verify specific formatting for line 1000
-    assert "  1000\t->  print('Line 1000')" in indented_output, f"Line 1000 should have 2 leading spaces: {indented_output}"
+    assert (
+        "  1000\t->  print('Line 1000')" in indented_output
+    ), f"Line 1000 should have 2 leading spaces: {indented_output}"
 
 
 def test_use_lists_breakpoints(tmp_path, setup_pdb_repo_env):
