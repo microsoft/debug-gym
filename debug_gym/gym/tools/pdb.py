@@ -40,7 +40,7 @@ class PDBTool(EnvironmentTool):
         for k in ["_session", "current_frame_file"]:
             del state[k]
         return state
-    
+
     def __setstate__(self, state):
         """Handles de-serialisation of the PDBTool instance (for pickle) without un-picklable attributes"""
         self.__dict__.update(state)
