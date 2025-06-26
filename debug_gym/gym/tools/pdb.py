@@ -211,31 +211,18 @@ class PDBTool(EnvironmentTool):
             if current_frame:
                 obs += f"\nCurrent frame:\n{current_frame}\n"
             if list_output:
-                # Calculate proper indentation based on line numbers in the output
-                # Find all line numbers in the list output
-                line_numbers = re.findall(r"^\s*(\d+)\s+", list_output, re.MULTILINE)
-
-                if line_numbers:
-                    # Find the maximum line number to determine digits needed
-                    max_line_num = max(int(num) for num in line_numbers)
-                    max_digits = len(str(max_line_num))
-
-                    # PDB uses right-aligned line numbers with consistent total width
-                    # For 1-digit numbers: "  1  " (2 leading spaces)
-                    # For 2-digit numbers: " 10  " (1 leading space)
-                    # For 3-digit numbers: "100  " (0 leading spaces)
-                    indent_spaces = max(0, 3 - max_digits)
-                    indentation = " " * indent_spaces
-                else:
-                    # Fallback to original behavior if no line numbers found
-                    indentation = "  "
-
-                # Apply indentation to each line
+                # Ensure consistent indentation for all line numbers
+                # PDB output should have consistent leading spaces regardless of line number range
                 indented_lines = []
                 for line in list_output.split("\n"):
-                    indented_lines.append(indentation + line)
+                    if line.strip():  # Skip empty lines
+                        # Ensure each line starts with exactly 2 spaces for consistent formatting
+                        stripped_line = line.lstrip()
+                        indented_lines.append("  " + stripped_line)
+                    else:
+                        indented_lines.append(line)
+                
                 indented_output = "\n".join(indented_lines)
-
                 obs += f"\nContext around the current frame:\n{indented_output}\n"
 
         return Observation(self.name, obs)
