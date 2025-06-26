@@ -43,12 +43,23 @@ deepseek-r1-distill-qwen-32b:
   tokenizer: Qwen/Qwen2.5-32B
   endpoint: "{LLM_ENDPOINT_PLACEHOLDER}"
   api_key: "{LLM_API_KEY_PLACEHOLDER}"
-  tags: [DeepSeek-R1-Distill-Qwen-32B, H100]
+  tags: [DeepSeek-R1-Distill-Qwen-32B, vllm]
   system_prompt_support: false
   context_limit: 128
   reasoning_end_token: "</think>"
   generate_kwargs:
     temperature: 0.5
+
+qwen3-8b-vllm:
+  model: Qwen/Qwen3-8b
+  tokenizer: Qwen/Qwen3-8b
+  endpoint: "{LLM_ENDPOINT_PLACEHOLDER}"
+  api_key: "{LLM_API_KEY_PLACEHOLDER}"
+  tags: [qwen3-8b, vllm]
+  context_limit: 128
+  generate_kwargs:
+    temperature: 0.5
+    max_tokens: 8192
 
 claude-3.7:
   model: claude-3-7-sonnet-20250219
