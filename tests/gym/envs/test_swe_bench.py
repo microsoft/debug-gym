@@ -10,8 +10,17 @@ from debug_gym.gym.terminal import DockerTerminal
 from debug_gym.gym.tools.tool import ToolCall
 from debug_gym.gym.tools.toolbox import Toolbox
 
+
+def is_docker_running():
+    try:
+        subprocess.check_output(["docker", "ps"])
+        return True
+    except Exception:
+        return False
+
+
 if_docker_running = pytest.mark.skipif(
-    not subprocess.check_output(["docker", "ps"]),
+    not is_docker_running(),
     reason="Docker not running",
 )
 
