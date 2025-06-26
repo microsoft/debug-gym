@@ -1,4 +1,5 @@
 import copy
+import platform
 import re
 import subprocess
 from unittest.mock import MagicMock
@@ -10,9 +11,24 @@ from debug_gym.gym.envs.env import RepoEnv
 from debug_gym.gym.terminal import DockerTerminal, Terminal
 from debug_gym.gym.tools.pdb import PDBTool
 
+
+def is_docker_running():
+    try:
+        subprocess.check_output(["docker", "ps"])
+        return True
+    except Exception:
+        return False
+
+
 if_docker_running = pytest.mark.skipif(
-    not subprocess.check_output(["docker", "ps"]),
+    not is_docker_running(),
     reason="Docker not running",
+)
+
+
+if_is_linux = pytest.mark.skipif(
+    platform.system() != "Linux",
+    reason="Interactive ShellSession (pty) requires Linux.",
 )
 
 
@@ -165,6 +181,7 @@ def test_pdb_use_default_environment_entrypoint(tmp_path, setup_test_repo):
     assert "(Pdb)" not in output
 
 
+@if_is_linux
 @if_docker_running
 def test_pdb_use_docker_terminal(tmp_path, setup_test_repo):
     """Test PDBTool similar to test_pdb_use but using DockerTerminal"""
