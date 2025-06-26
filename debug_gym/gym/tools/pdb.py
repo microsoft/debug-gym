@@ -212,8 +212,6 @@ class PDBTool(EnvironmentTool):
                 obs += f"\nCurrent frame:\n{current_frame}\n"
             if list_output:
                 # Calculate proper indentation based on line numbers in the output
-                import re
-
                 # Find all line numbers in the list output
                 line_numbers = re.findall(r"^\s*(\d+)\s+", list_output, re.MULTILINE)
 
