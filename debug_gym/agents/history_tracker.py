@@ -91,7 +91,7 @@ class HistoryTracker:
         return history
 
 
-def build_history_conversation(
+def build_history_prompt(
     history: HistoryTracker, llm: LLM, reset_prompt_history_after_rewrite: bool = False
 ):
     _history, _prompt_response_pairs = history.get()
@@ -109,30 +109,3 @@ def build_history_conversation(
     ):
         _messages.extend(llm.format_tool_call_history(history_info, response))
     return _messages
-
-
-def build_history_prompt(
-    history: HistoryTracker,
-    llm: LLM,
-    reset_prompt_history_after_rewrite: bool = False,
-):
-    messages = []
-    conversation_history = build_history_conversation(
-        history, llm, reset_prompt_history_after_rewrite
-    )
-    if len(conversation_history) == 0:
-        messages.append(
-            {
-                "role": "user",
-                "content": "No history of command and terminal outputs.",
-            }
-        )
-    else:
-        messages.append(
-            {
-                "role": "user",
-                "content": f"History of command and terminal outputs (the last {(len(conversation_history) + 1) // 2} steps):",
-            }
-        )
-        messages.extend(conversation_history)
-    return messages
