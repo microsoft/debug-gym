@@ -16,7 +16,7 @@ class RewriteTool(EnvironmentTool):
         """rewrite(path='code/utils.py', start=4, end=6, new_code="        print('buongiorno')") will replace the chunk of code between line number 4 and 6 in the specified file 'code/utils.py' by the single line provided, with the indent ahead (in this case, 8 spaces).""",
     ]
     description = (
-        "Rewrite the content of the specified file path, between lines [start, end], with the new code. Line numbers are 1-based. When start and end are None, it's assumed to rewrite the whole file. When start is provided and end is None, it's assumed to rewrite a single line (start). The new code should be valid python code include proper indentation (can be determined from context)."
+        "Rewrite the content of the specified file path, between lines [start, end], with the new code. Line numbers are 1-based. When start is provided and end is None, it's assumed to rewrite a single line (start). When both start and end are None, it's assumed to rewrite the whole file, this is not recommended because most of the time the expected edit is local. The new code should be valid python code include proper indentation (can be determined from context)."
         + "\nExamples (for demonstration purposes only, you need to adjust the tool calling format according to your specific syntax):"
         + "\n".join(examples)
     )
