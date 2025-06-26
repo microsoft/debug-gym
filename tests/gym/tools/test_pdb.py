@@ -1,4 +1,5 @@
 import copy
+import platform
 import re
 import subprocess
 from unittest.mock import MagicMock
@@ -10,9 +11,24 @@ from debug_gym.gym.envs.env import RepoEnv
 from debug_gym.gym.terminal import DockerTerminal, Terminal
 from debug_gym.gym.tools.pdb import PDBTool
 
+
+def is_docker_running():
+    try:
+        subprocess.check_output(["docker", "ps"])
+        return True
+    except Exception:
+        return False
+
+
 if_docker_running = pytest.mark.skipif(
-    not subprocess.check_output(["docker", "ps"]),
+    not is_docker_running(),
     reason="Docker not running",
+)
+
+
+if_is_linux = pytest.mark.skipif(
+    platform.system() != "Linux",
+    reason="Interactive ShellSession (pty) requires Linux.",
 )
 
 
@@ -165,6 +181,7 @@ def test_pdb_use_default_environment_entrypoint(tmp_path, setup_test_repo):
     assert "(Pdb)" not in output
 
 
+@if_is_linux
 @if_docker_running
 def test_pdb_use_docker_terminal(tmp_path, setup_test_repo):
     """Test PDBTool similar to test_pdb_use but using DockerTerminal"""
@@ -781,3 +798,23 @@ def test_use_invalid_command_returns_invalid_message(tmp_path, setup_pdb_repo_en
     pdb_tool.interact_with_pdb = raise_exc
     obs = pdb_tool.use(env, "invalid").observation
     assert "Invalid pdb command: invalid" in obs
+
+
+def test_pdbtool_pickle_roundtrip(tmp_path, setup_pdb_repo_env):
+    """
+    A PDBTool should survive a pickle --> un-pickle cycle.
+    The non-serialisable _session and current_frame_file
+    must be stripped to None, while the rest of the state
+    (e.g. its class-level name) is preserved.
+    """
+    import pickle
+
+    pdb_tool, _env = setup_pdb_repo_env(tmp_path)
+    dumped = pickle.dumps(pdb_tool)
+    rehydrated = pickle.loads(dumped)
+
+    assert rehydrated._session is None
+    assert rehydrated.current_frame_file is None
+
+    assert rehydrated.name == pdb_tool.name
+    assert rehydrated.examples == pdb_tool.examples
