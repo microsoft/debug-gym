@@ -716,7 +716,6 @@ def test_pdb_list_output_indentation(tmp_path, setup_pdb_repo_env):
         "1005 \t    'Line 1005'\n"
     )
     assert expected_output in pdb_obs.observation
-    assert expected_output in pdb_obs.observation
 
     pdb_obs = pdb_tool.use(env, "b large_file.py:2000")
     assert (
