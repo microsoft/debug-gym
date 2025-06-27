@@ -207,6 +207,13 @@ class BaseAgent:
         self.history.step(info, None)
 
         if info.done is True:
+            self.logger.report_progress(
+                problem_id=task_name,
+                step=1,  # TODO: zero or one?
+                score=info.score,
+                max_score=info.max_score,
+                status="done",
+            )
             return True
         self.logger.info(
             f"Available tools (in LLM's tool calling format):\n{json.dumps(self.llm.define_tools(info.tools), indent=4)}\n"
@@ -214,7 +221,7 @@ class BaseAgent:
 
         highscore = info.score
 
-        for step in self.logger.tqdm(range(self.config["max_steps"])):
+        for step in range(self.config["max_steps"]):
             highscore = max(highscore, info.score)
             self.logger.info(
                 f"Step: {step} | Score: {info.score}/{info.max_score} ({info.score/info.max_score:.1%}) [Best: {highscore}]"
@@ -235,6 +242,13 @@ class BaseAgent:
                     f"Step: {step} | Score: {info.score}/{info.max_score} ({info.score/info.max_score:.1%}) | Reason: {reason}"
                 )
                 break
+        self.logger.report_progress(
+            problem_id=task_name,
+            step=step + 1,  # TODO: zero or one?
+            score=info.score,
+            max_score=info.max_score,
+            status="done" if info.done else "failed",
+        )
         return info.done
 
     def apply_patch(self, patch_path: str) -> bool:
