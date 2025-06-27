@@ -665,7 +665,7 @@ def test_use_starts_pdb_if_not_running(tmp_path, setup_pdb_repo_env):
     assert "Started PDB" in obs
 
 
-def test_pdb_list_output_indentation_hundred_lines(tmp_path, setup_pdb_repo_env):
+def test_pdb_list_output_indentation(tmp_path, setup_pdb_repo_env):
     """Test PDB list output indentation for line numbers around 100 (3-digit)"""
     pdb_tool, env = setup_pdb_repo_env(tmp_path)
     with (env.working_dir / "large_file.py").open("w") as f:
@@ -682,17 +682,17 @@ def test_pdb_list_output_indentation_hundred_lines(tmp_path, setup_pdb_repo_env)
     pdb_obs = pdb_tool.use(env, "c")
     expected_output = (
         "Context around the current frame:\n"
-        " 95  	    'Line 95'\n"
-        " 96  	    'Line 96'\n"
-        " 97  	    'Line 97'\n"
-        " 98  	    'Line 98'\n"
-        " 99  	    'Line 99'\n"
-        "100 B->	    'Line 100'\n"
-        "101  	    'Line 101'\n"
-        "102  	    'Line 102'\n"
-        "103  	    'Line 103'\n"
-        "104  	    'Line 104'\n"
-        "105  	    'Line 105'\n"
+        " 95  \t    'Line 95'\r\n"
+        " 96  \t    'Line 96'\r\n"
+        " 97  \t    'Line 97'\r\n"
+        " 98  \t    'Line 98'\r\n"
+        " 99  \t    'Line 99'\r\n"
+        "100 B->\t    'Line 100'\r\n"
+        "101  \t    'Line 101'\r\n"
+        "102  \t    'Line 102'\r\n"
+        "103  \t    'Line 103'\r\n"
+        "104  \t    'Line 104'\r\n"
+        "105  \t    'Line 105'\n"
     )
     assert expected_output in pdb_obs.observation
 
@@ -703,18 +703,20 @@ def test_pdb_list_output_indentation_hundred_lines(tmp_path, setup_pdb_repo_env)
     pdb_obs = pdb_tool.use(env, "c")
     expected_output = (
         "Context around the current frame:\n"
-        " 995  	    'Line 995'\n"
-        " 996  	    'Line 996'\n"
-        " 997  	    'Line 997'\n"
-        " 998  	    'Line 998'\n"
-        " 999  	    'Line 999'\n"
-        "1000 B->	    'Line 1000'\n"
-        "1001  	    'Line 1001'\n"
-        "1002  	    'Line 1002'\n"
-        "1003  	    'Line 1003'\n"
-        "1004  	    'Line 1004'\n"
-        "1005  	    'Line 1005'\n"
+        "995  \t    'Line 995'\r\n"
+        "996  \t    'Line 996'\r\n"
+        "997  \t    'Line 997'\r\n"
+        "998  \t    'Line 998'\r\n"
+        "999  \t    'Line 999'\r\n"
+        "1000B->\t    'Line 1000'\r\n"
+        "1001 \t    'Line 1001'\r\n"
+        "1002 \t    'Line 1002'\r\n"
+        "1003 \t    'Line 1003'\r\n"
+        "1004 \t    'Line 1004'\r\n"
+        "1005 \t    'Line 1005'\n"
     )
+    assert expected_output in pdb_obs.observation
+    assert expected_output in pdb_obs.observation
 
     pdb_obs = pdb_tool.use(env, "b large_file.py:2000")
     assert (
@@ -723,15 +725,19 @@ def test_pdb_list_output_indentation_hundred_lines(tmp_path, setup_pdb_repo_env)
     pdb_obs = pdb_tool.use(env, "c")
     expected_output = (
         "Context around the current frame:\n"
-        "1995  	    'Line 1995'\n"
-        "1996  	    'Line 1996'\n"
-        "1997  	    'Line 1997'\n"
-        "1998  	    'Line 1998'\n"
-        "1999  	    'Line 1999'\n"
-        "2000 B->	    'Line 2000'\n"
-        "2001  	    if __name__ == '__main__':\n"
-        "2002  	    dummy_function()\n"
+        "1995 \t    'Line 1995'\r\n"
+        "1996 \t    'Line 1996'\r\n"
+        "1997 \t    'Line 1997'\r\n"
+        "1998 \t    'Line 1998'\r\n"
+        "1999 \t    'Line 1999'\r\n"
+        "2000B->\t    'Line 2000'\r\n"
+        "2001 \t\r\n"
+        "2002 \tif __name__ == '__main__':\r\n"
+        "2003 \t    dummy_function()\r\n"
+        "[EOF]\n"
     )
+    assert expected_output in pdb_obs.observation
+    assert expected_output in pdb_obs.observation
 
 
 def test_use_lists_breakpoints(tmp_path, setup_pdb_repo_env):

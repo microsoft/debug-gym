@@ -217,23 +217,33 @@ class PDBTool(EnvironmentTool):
         return Observation(self.name, obs)
 
     def _indent_first_line(self, list_output: str) -> str:
-        """Add indentation to the first line of the list output
-        to match the indentation of the other lines."""
+        """Add indentation to the first line of the list output to match the
+        indentation of the other lines, based on the second line's indentation."""
+
         lines = list_output.splitlines()
-        # Find the pattern of spaces before line numbers from the second line if available
-        if len(lines) > 1:
-            second_line_match = re.match(r"^(\s*)(\d+)", lines[1])
-            if second_line_match:
-                space_pattern = second_line_match.group(1)
+        # Check if we have enough lines to process
+        if len(lines) <= 1:
+            return list_output
 
-                # Modify the first line if it has a number and different spacing
-                first_line_match = re.match(r"^(\s*)(\d+)(.*)", lines[0])
-                if first_line_match:
-                    spaces, number, rest = first_line_match.groups()
-                    if spaces != space_pattern:
-                        lines[0] = f"{space_pattern}{number}{rest}"
+        # Get the first two lines for comparison
+        first_line = lines[0]
+        second_line = lines[1]
 
-        return "\n".join(lines)
+        # Find the spaces at the beginning of both lines
+        first_line_match = re.match(r"^(\s*)(\d+)", first_line)
+        second_line_match = re.match(r"^(\s*)(\d+)", second_line)
+
+        if first_line_match and second_line_match:
+            first_spaces = first_line_match.group(1)
+            second_spaces = second_line_match.group(1)
+
+            # If first line has fewer spaces, add the difference
+            if len(first_spaces) < len(second_spaces):
+                spaces_to_add = second_spaces[len(first_spaces) :]
+                return spaces_to_add + list_output
+
+        # If no adjustment needed, return original
+        return list_output
 
     def breakpoint_modify(
         self, environment, rewrite_file, rewrite_head, rewrite_tail, new_code_length
