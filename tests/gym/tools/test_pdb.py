@@ -737,7 +737,6 @@ def test_pdb_list_output_indentation(tmp_path, setup_pdb_repo_env):
         "[EOF]\n"
     )
     assert expected_output in pdb_obs.observation
-    assert expected_output in pdb_obs.observation
 
 
 def test_use_lists_breakpoints(tmp_path, setup_pdb_repo_env):
