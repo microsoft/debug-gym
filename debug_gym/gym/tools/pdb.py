@@ -211,9 +211,39 @@ class PDBTool(EnvironmentTool):
             if current_frame:
                 obs += f"\nCurrent frame:\n{current_frame}\n"
             if list_output:
-                obs += f"\nContext around the current frame:\n{list_output}\n"
+                indented_output = self._indent_first_line(list_output)
+                obs += f"\nContext around the current frame:\n{indented_output}\n"
 
         return Observation(self.name, obs)
+
+    def _indent_first_line(self, list_output: str) -> str:
+        """Add indentation to the first line of the list output to match the
+        indentation of the other lines, based on the second line's indentation."""
+
+        lines = list_output.splitlines()
+        # Check if we have enough lines to process
+        if len(lines) <= 1:
+            return list_output
+
+        # Get the first two lines for comparison
+        first_line = lines[0]
+        second_line = lines[1]
+
+        # Find the spaces at the beginning of both lines
+        first_line_match = re.match(r"^(\s*)(\d+)", first_line)
+        second_line_match = re.match(r"^(\s*)(\d+)", second_line)
+
+        if first_line_match and second_line_match:
+            first_spaces = first_line_match.group(1)
+            second_spaces = second_line_match.group(1)
+
+            # If first line has fewer spaces, add the difference
+            if len(first_spaces) < len(second_spaces):
+                spaces_to_add = second_spaces[len(first_spaces) :]
+                return spaces_to_add + list_output
+
+        # If no adjustment needed, return original
+        return list_output
 
     def breakpoint_modify(
         self, environment, rewrite_file, rewrite_head, rewrite_tail, new_code_length
