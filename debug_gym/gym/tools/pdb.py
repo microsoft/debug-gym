@@ -211,21 +211,29 @@ class PDBTool(EnvironmentTool):
             if current_frame:
                 obs += f"\nCurrent frame:\n{current_frame}\n"
             if list_output:
-                # Ensure consistent indentation for all line numbers
-                # PDB output should have consistent leading spaces regardless of line number range
-                indented_lines = []
-                for line in list_output.split("\n"):
-                    if line.strip():  # Skip empty lines
-                        # Ensure each line starts with exactly 2 spaces for consistent formatting
-                        stripped_line = line.lstrip()
-                        indented_lines.append("  " + stripped_line)
-                    else:
-                        indented_lines.append(line)
-
-                indented_output = "\n".join(indented_lines)
+                indented_output = self._indent_first_line(list_output)
                 obs += f"\nContext around the current frame:\n{indented_output}\n"
 
         return Observation(self.name, obs)
+
+    def _indent_first_line(self, list_output: str) -> str:
+        """Add indentation to the first line of the list output
+        to match the indentation of the other lines."""
+        lines = list_output.splitlines()
+        # Find the pattern of spaces before line numbers from the second line if available
+        if len(lines) > 1:
+            second_line_match = re.match(r"^(\s*)(\d+)", lines[1])
+            if second_line_match:
+                space_pattern = second_line_match.group(1)
+
+                # Modify the first line if it has a number and different spacing
+                first_line_match = re.match(r"^(\s*)(\d+)(.*)", lines[0])
+                if first_line_match:
+                    spaces, number, rest = first_line_match.groups()
+                    if spaces != space_pattern:
+                        lines[0] = f"{space_pattern}{number}{rest}"
+
+        return "\n".join(lines)
 
     def breakpoint_modify(
         self, environment, rewrite_file, rewrite_head, rewrite_tail, new_code_length

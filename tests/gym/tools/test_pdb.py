@@ -665,84 +665,73 @@ def test_use_starts_pdb_if_not_running(tmp_path, setup_pdb_repo_env):
     assert "Started PDB" in obs
 
 
-def test_pdb_list_output_indentation_hundred_lines():
+def test_pdb_list_output_indentation_hundred_lines(tmp_path, setup_pdb_repo_env):
     """Test PDB list output indentation for line numbers around 100 (3-digit)"""
-    # Test the indentation logic directly without requiring full PDB infrastructure
+    pdb_tool, env = setup_pdb_repo_env(tmp_path)
+    with (env.working_dir / "large_file.py").open("w") as f:
+        f.write("def dummy_function():\n")
+        f.write("\n".join(f"    'Line {i+1}'" for i in range(1, 2000)))
+        f.write("\n\nif __name__ == '__main__':\n")
+        f.write("    dummy_function()\n")
+    env.set_entrypoints("python large_file.py", "python -m pdb large_file.py")
+    pdb_tool.start_pdb(env)
+    pdb_obs = pdb_tool.use(env, "b large_file.py:100")
+    assert (
+        "Pdb command output:\nBreakpoint 5 at large_file.py:100"
+    ) in pdb_obs.observation
+    pdb_obs = pdb_tool.use(env, "c")
+    expected_output = (
+        "Context around the current frame:\n"
+        " 95  	    'Line 95'\n"
+        " 96  	    'Line 96'\n"
+        " 97  	    'Line 97'\n"
+        " 98  	    'Line 98'\n"
+        " 99  	    'Line 99'\n"
+        "100 B->	    'Line 100'\n"
+        "101  	    'Line 101'\n"
+        "102  	    'Line 102'\n"
+        "103  	    'Line 103'\n"
+        "104  	    'Line 104'\n"
+        "105  	    'Line 105'\n"
+    )
+    assert expected_output in pdb_obs.observation
 
-    # Mock PDB list output for lines around 100 - this is what PDB would return
-    # Note: PDB might not include leading spaces for 3-digit numbers
-    mock_list_output = (
-        " 98\t    print('Line 98')\n"
-        " 99\t    print('Line 99')\n"
-        "100\t->  print('Line 100')\n"
-        "101\t    print('Line 101')\n"
-        "102\t    print('Line 102')\n"
+    pdb_obs = pdb_tool.use(env, "b large_file.py:1000")
+    assert (
+        "Pdb command output:\nBreakpoint 6 at large_file.py:1000" in pdb_obs.observation
+    )
+    pdb_obs = pdb_tool.use(env, "c")
+    expected_output = (
+        "Context around the current frame:\n"
+        " 995  	    'Line 995'\n"
+        " 996  	    'Line 996'\n"
+        " 997  	    'Line 997'\n"
+        " 998  	    'Line 998'\n"
+        " 999  	    'Line 999'\n"
+        "1000 B->	    'Line 1000'\n"
+        "1001  	    'Line 1001'\n"
+        "1002  	    'Line 1002'\n"
+        "1003  	    'Line 1003'\n"
+        "1004  	    'Line 1004'\n"
+        "1005  	    'Line 1005'\n"
     )
 
-    # Apply the same indentation logic as in PDBTool.use()
-    indented_lines = []
-    for line in mock_list_output.split("\n"):
-        if line.strip():  # Skip empty lines
-            # Ensure each line starts with exactly 2 spaces for consistent formatting
-            stripped_line = line.lstrip()
-            indented_lines.append("  " + stripped_line)
-        else:
-            indented_lines.append(line)
-
-    indented_output = "\n".join(indented_lines)
-
-    # Verify that all lines have exactly 2 leading spaces for consistency
-    lines = indented_output.split("\n")
-    for line in lines:
-        if line.strip():  # Skip empty lines
-            assert line.startswith(
-                "  "
-            ), f"Line should start with exactly 2 spaces: {repr(line)}"
-
-    # Verify specific formatting for line 100
+    pdb_obs = pdb_tool.use(env, "b large_file.py:2000")
     assert (
-        "  100\t->  print('Line 100')" in indented_output
-    ), f"Line 100 should have 2 leading spaces: {indented_output}"
-
-
-def test_pdb_list_output_indentation_thousand_lines():
-    """Test PDB list output indentation for line numbers around 1000 (4-digit)"""
-    # Test the indentation logic directly without requiring full PDB infrastructure
-
-    # Mock PDB list output for lines around 1000 - this is what PDB would return
-    # Note: PDB might not include leading spaces for 4-digit numbers
-    mock_list_output = (
-        " 998\t    print('Line 998')\n"
-        " 999\t    print('Line 999')\n"
-        "1000\t->  print('Line 1000')\n"
-        "1001\t    print('Line 1001')\n"
-        "1002\t    print('Line 1002')\n"
+        "Pdb command output:\nBreakpoint 7 at large_file.py:2000" in pdb_obs.observation
     )
-
-    # Apply the same indentation logic as in PDBTool.use()
-    indented_lines = []
-    for line in mock_list_output.split("\n"):
-        if line.strip():  # Skip empty lines
-            # Ensure each line starts with exactly 2 spaces for consistent formatting
-            stripped_line = line.lstrip()
-            indented_lines.append("  " + stripped_line)
-        else:
-            indented_lines.append(line)
-
-    indented_output = "\n".join(indented_lines)
-
-    # Verify that all lines have exactly 2 leading spaces for consistency
-    lines = indented_output.split("\n")
-    for line in lines:
-        if line.strip():  # Skip empty lines
-            assert line.startswith(
-                "  "
-            ), f"Line should start with exactly 2 spaces: {repr(line)}"
-
-    # Verify specific formatting for line 1000
-    assert (
-        "  1000\t->  print('Line 1000')" in indented_output
-    ), f"Line 1000 should have 2 leading spaces: {indented_output}"
+    pdb_obs = pdb_tool.use(env, "c")
+    expected_output = (
+        "Context around the current frame:\n"
+        "1995  	    'Line 1995'\n"
+        "1996  	    'Line 1996'\n"
+        "1997  	    'Line 1997'\n"
+        "1998  	    'Line 1998'\n"
+        "1999  	    'Line 1999'\n"
+        "2000 B->	    'Line 2000'\n"
+        "2001  	    if __name__ == '__main__':\n"
+        "2002  	    dummy_function()\n"
+    )
 
 
 def test_use_lists_breakpoints(tmp_path, setup_pdb_repo_env):
