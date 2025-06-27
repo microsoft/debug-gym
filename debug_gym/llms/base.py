@@ -12,7 +12,6 @@ from tenacity import (
     stop_after_attempt,
     wait_random_exponential,
 )
-from termcolor import colored
 
 from debug_gym.gym.envs.env import EnvInfo
 from debug_gym.gym.tools.tool import EnvironmentTool, ToolCall
@@ -361,6 +360,6 @@ class LLM(ABC):
                 "Tool response is empty. The model may not have called a tool."
             )
 
-        self.logger.info(colored(llm_response.tool, "green"))
+        self.logger.info(f"[green]{llm_response.tool}[/green]")
 
         return llm_response

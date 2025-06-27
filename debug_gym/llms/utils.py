@@ -1,5 +1,3 @@
-from termcolor import colored
-
 from debug_gym.logger import DebugGymLogger
 
 
@@ -14,20 +12,20 @@ def print_messages(messages: list[dict], logger: DebugGymLogger):
     for m in messages:
         role = m["role"]
         if role == "tool":
-            logger.info(colored(f"{m['content']}\n", "magenta"))
+            logger.info(f"[magenta]{m['content']}\n[/magenta]")
         elif role == "user":
             if isinstance(m["content"], list):
                 for item in m["content"]:
                     if item["type"] == "tool_result":
-                        logger.info(colored(f"{item["content"]}\n", "magenta"))
+                        logger.info(f"[magenta]{item['content']}\n[/magenta]")
                     else:
-                        logger.info(colored(f"{item}\n", "cyan"))
+                        logger.info(f"[cyan]{item}\n[/cyan]")
             else:
-                logger.info(colored(f"{m['content']}\n", "cyan"))
+                logger.info(f"[cyan]{m['content']}\n[/cyan]")
         elif role == "assistant":
             content = m.get("content", m.get("tool_calls", m))
-            logger.info(colored(f"{content}\n", "green"))
+            logger.info(f"[green]{content}\n[/green]")
         elif role == "system":
-            logger.info(colored(f"{m['content']}\n", "yellow"))
+            logger.info(f"[yellow]{m['content']}\n[/yellow]")
         else:
             raise ValueError(f"Unknown role: {m['content']}")
