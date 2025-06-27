@@ -166,6 +166,13 @@ class DebugGymLogger(logging.Logger):
             rich_handler.setLevel(self.level)
             self.addHandler(rich_handler)
 
+            # Start log listener thread
+            self._log_listener_stop_event = threading.Event()
+            self._log_listener_thread = threading.Thread(
+                target=self._log_listener, daemon=True
+            )
+            self._log_listener_thread.start()
+
         if log_dir:
             log_dir = Path(log_dir)
             log_dir.mkdir(parents=True, exist_ok=True)
@@ -176,6 +183,30 @@ class DebugGymLogger(logging.Logger):
             fh.setFormatter(formatter)
             fh.setLevel(logging.DEBUG)
             self.addHandler(fh)
+
+    def handle(self, record):
+        if self._is_worker:
+            self.LOG_QUEUE.put(record)
+        else:
+            super().handle(record)
+
+    def _log_listener(self):
+        while not self._log_listener_stop_event.is_set():
+            try:
+                record = self.LOG_QUEUE.get(timeout=0.1)
+                super().handle(record)
+            except queue.Empty:
+                continue
+            except EOFError:
+                break
+
+    def close(self):
+        if self._log_listener_thread:
+            self._log_listener_stop_event.set()
+            self._log_listener_thread.join()
+
+    def __del__(self):
+        self.close()
 
     @classmethod
     def set_as_worker(cls):
