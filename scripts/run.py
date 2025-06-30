@@ -132,7 +132,7 @@ def main():
     tasks_succeeded = []
 
     with logger.rich_progress(problems, max_display=10) as progress_bar:
-        if num_workers == 1:
+        if num_workers == 1:  # run sequentially for easier debugging
             for problem in problems:
                 try:
                     success = run_agent(args, problem, config)
@@ -157,7 +157,7 @@ def main():
                     executor.submit(run_agent, args, problem, config): problem
                     for problem in problems
                 }
-                for future in futures:
+                for future in as_completed(futures):
                     if future.cancelled():
                         continue
                     try:
