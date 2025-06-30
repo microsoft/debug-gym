@@ -1,4 +1,5 @@
 import atexit
+import copy
 import os
 import shutil
 import subprocess
@@ -254,6 +255,9 @@ class RepoEnv(TooledEnv):
 
     @staticmethod
     def _prepare_entrypoint(entrypoint):
+        # Remove PYTHONPATH prefix if present
+        if entrypoint.startswith("PYTHONPATH=$PYTHONPATH:$PWD "):
+            entrypoint = entrypoint[len("PYTHONPATH=$PYTHONPATH:$PWD ") :]
         entrypoint_list = entrypoint.split()
         # Handle uv package manager's run command by ensuring the correct interpreter path
         # and explicitly adding 'python' to the execution chain for consistency.
@@ -548,6 +552,24 @@ class RepoEnv(TooledEnv):
         )
 
         return self.infos
+
+    def clone(self):
+        # Create a new instance of RepoEnv
+        new_env = RepoEnv(
+            path=self.path,
+            entrypoint=self.entrypoint,
+            debug_entrypoint=self.debug_entrypoint,
+            max_score=self.max_score,
+            readonly_patterns=None,
+            run_timeout=self.run_timeout,
+            dir_tree_depth=self.dir_tree_depth,
+            terminal=type(self.terminal)(),
+            logger=self.logger,
+        )
+        # Create deep copies of the tools for the cloned environment
+        for tool in self.tools:
+            new_env.add_tool(copy.deepcopy(tool))
+        return new_env
 
     def post_process_event(self, event: Event, source, kwargs, observations):
         """Post-process the event after it has been handled by the tools."""
