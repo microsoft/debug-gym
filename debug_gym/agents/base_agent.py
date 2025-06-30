@@ -209,7 +209,8 @@ class BaseAgent:
         if info.done is True:
             self.logger.report_progress(
                 problem_id=task_name,
-                step=1,  # TODO: zero or one?
+                step=1,
+                total_steps=1,
                 score=info.score,
                 max_score=info.max_score,
                 status="done",

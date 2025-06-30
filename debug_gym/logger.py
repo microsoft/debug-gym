@@ -32,13 +32,18 @@ class StripAnsiFormatter(logging.Formatter):
 
 
 @dataclass(slots=True)  # Slitly faster / memory efficient when using slots
-class ProgressUpdate:
+class TaskProgress:
     problem_id: str
     step: int
     total_steps: int  # Total steps for the problem considering early stopping
     score: int
     max_score: int
     status: str
+
+    @property
+    def completed(self) -> bool:
+        """Check if the task is completed based on its status."""
+        return self.status in ["done", "failed"]
 
 
 class StatusColumn(SpinnerColumn):
@@ -58,48 +63,38 @@ class TaskProgressManager:
 
     def __init__(self, max_display: int = 10) -> None:
         self._max_display = max_display
-        self._tasks: Dict[str, Dict[str, Any]] = {}
+        self._tasks: Dict[str, TaskProgress] = {}
 
     def add_task(self, task_id: str, total_steps: int = 1) -> int:
-        self._tasks[task_id] = dict(
-            id=task_id,
-            total=total_steps,  # Placeholder. Will be updated on advance().
-            completed=0.0,
-            finished=False,
+        self._tasks[task_id] = TaskProgress(
+            problem_id=task_id,
+            step=0,
+            total_steps=total_steps,
+            score=0,
+            max_score=0,
+            status="pending",
         )
         return task_id
 
-    def advance(self, progress_update: ProgressUpdate) -> None:
+    def advance(self, progress_update: TaskProgress) -> None:
         task = self._tasks.get(str(progress_update.problem_id))
         if task:
-            task["total"] = max(task["total"], progress_update.max_score)
-            task["completed"] = min(
-                task["completed"] + progress_update.step, task["total"]
-            )
-            task["finished"] = task["completed"] >= task["total"]
-
-    @property
-    def total_completed(self) -> float:
-        return sum(t["completed"] for t in self._tasks.values())
-
-    @property
-    def total_work(self) -> float:
-        return sum(t["total"] for t in self._tasks.values())
-
-    @property
-    def all_finished(self) -> bool:
-        return all(t["finished"] for t in self._tasks.values())
+            task.step = progress_update.step
+            task.total_steps = progress_update.total_steps
+            task.score = progress_update.score
+            task.max_score = max(task.max_score, progress_update.max_score)
+            task.status = progress_update.status
 
     def _visible(self) -> Dict[str, Dict[str, Any]]:
         """Limits the number of tasks to self._max_display,
         showing pending tasks first."""
         # Get task IDs for pending, then completed tasks
-        pend = [t_id for t_id, t in self._tasks.items() if not t["finished"]]
-        done = [t_id for t_id, t in self._tasks.items() if t["finished"]]
+        pending = [tid for tid, t in self._tasks.items() if not t.completed]
+        completed = [tid for tid, t in self._tasks.items() if t.completed]
         # Limit to max_display tasks, showing pending first
-        visible_task_ids = (pend + done)[: self._max_display]
+        visible_task_ids = (pending + completed)[: self._max_display]
         # Return the actual task data for the visible tasks
-        return {t_id: self._tasks[t_id] for t_id in visible_task_ids}
+        return {tid: self._tasks[tid] for tid in visible_task_ids}
 
     def render(self, *, all_tasks: bool = False) -> Progress:
         progress = Progress(
@@ -113,9 +108,8 @@ class TaskProgressManager:
         tasks = self._tasks if all_tasks else self._visible()
         for task in tasks.values():
             pid = progress.add_task(
-                task["id"], total=task["total"], completed=task["completed"]
+                task.problem_id, completed=task.step, total=task.total_steps
             )
-            progress.update(pid, completed=task["completed"])
         return progress
 
 
@@ -342,7 +336,7 @@ class DebugGymLogger(logging.Logger):
         status: str,
     ) -> None:
         """Send a progress update to the shared queue."""
-        progress_update = ProgressUpdate(
+        progress_update = TaskProgress(
             problem_id=problem_id,
             step=step,
             total_steps=total_steps,
