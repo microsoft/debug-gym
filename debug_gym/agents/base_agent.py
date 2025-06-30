@@ -220,11 +220,12 @@ class BaseAgent:
         )
 
         highscore = info.score
+        max_steps = self.config["max_steps"]
 
-        for step in range(self.config["max_steps"]):
+        for step in range(max_steps):
             highscore = max(highscore, info.score)
             self.logger.info(
-                f"Step: {step} | Score: {info.score}/{info.max_score} ({info.score/info.max_score:.1%}) [Best: {highscore}]"
+                f"[{task_name[:10]:<10}] | Step: {step:<4} | Score: {info.score:>4}/{info.max_score:<4} ({info.score/info.max_score:.1%}) [Best: {highscore}]"
             )
 
             messages = self.build_prompt(info)
@@ -241,10 +242,27 @@ class BaseAgent:
                 self.logger.info(
                     f"Step: {step} | Score: {info.score}/{info.max_score} ({info.score/info.max_score:.1%}) | Reason: {reason}"
                 )
+                self.logger.report_progress(
+                    problem_id=task_name,
+                    step=step + 1,
+                    total_steps=step + 1,  # early stopping
+                    score=info.score,
+                    max_score=info.max_score,
+                    status="done" if info.done else "failed",
+                )
                 break
+            self.logger.report_progress(
+                problem_id=task_name,
+                step=step + 1,
+                total_steps=max_steps,
+                score=info.score,
+                max_score=info.max_score,
+                status="running",
+            )
         self.logger.report_progress(
             problem_id=task_name,
-            step=step + 1,  # TODO: zero or one?
+            step=step + 1,
+            total_steps=max_steps,
             score=info.score,
             max_score=info.max_score,
             status="done" if info.done else "failed",
