@@ -24,13 +24,13 @@ from debug_gym.logger import DebugGymLogger
 logging.getLogger("httpx").setLevel(logging.WARNING)
 
 
-def retry_on_exception(
-    func, exception_filter_func, multiplier=1, max_wait=40, max_attempts=100
+def retry_on_rate_limit(
+    func, is_rate_limit_error_func, multiplier=1, max_wait=40, max_attempts=100
 ):
-    """Executes a function with retry logic for certain exceptions. Never retries on KeyboardInterrupt.
+    """Executes a function with retry logic for rate limits. Never retries on KeyboardInterrupt.
     Args:
         func: The function to execute with retries
-        exception_filter_func: Function that checks if an exception needs to be retried
+        is_rate_limit_error_func: Function that checks if an exception is a rate limit error
         *args, **kwargs: Arguments to pass to the function
 
     Returns:
@@ -39,7 +39,7 @@ def retry_on_exception(
     retry_function = retry(
         retry=(
             retry_if_not_exception_type(KeyboardInterrupt)
-            & retry_if_exception(exception_filter_func)
+            & retry_if_exception(is_rate_limit_error_func)
         ),
         wait=wait_random_exponential(multiplier=multiplier, max=max_wait),
         stop=stop_after_attempt(max_attempts),
@@ -207,29 +207,24 @@ class LLM(ABC):
         )
 
     @classmethod
-    def instantiate(
+    def instantiate_from_config(
         cls,
-        llm_name: str,
-        llm_config_file_path: str | None = None,
+        llm_config: LLMConfig,
         logger: DebugGymLogger | None = None,
     ) -> "LLM":
         """Creates an instance of the appropriate LLM class based on the configuration.
 
         Args:
-            llm_name: Name of the LLM model to instantiate.
-            llm_config_file_path: Optional path to the LLM configuration file.
+            llm_config: LLMConfig object containing the configuration.
             logger: Optional DebugGymLogger for logging.
 
         Returns:
             An instance of the appropriate LLM class.
         """
-        logger = logger or DebugGymLogger("debug-gym")
-        if llm_name == "human":
-            from debug_gym.llms import Human
-
-            return Human(llm_name, logger=logger)
-
-        llm_config = LLMConfigRegistry.from_file(llm_config_file_path)[llm_name]
+        if logger is not "none":
+            logger = logger or DebugGymLogger("debug-gym")
+        else:
+            logger = None
 
         tags = llm_config.tags
         if "azure openai" in tags:
@@ -246,6 +241,45 @@ class LLM(ABC):
             klass = OpenAILLM
         llm = klass(llm_name, logger=logger, llm_config=llm_config)
         return llm
+
+    @classmethod
+    def instantiate(
+        cls,
+        llm_name: str | None = None,
+        llm_config: LLMConfig | None = None,
+        llm_config_file_path: str | None = None,
+        logger: DebugGymLogger | None = None,
+    ) -> "LLM":
+        """Creates an instance of the appropriate LLM class based on the configuration.
+
+        Args:
+            llm_name: Name of the LLM model to instantiate.
+            llm_config_file_path: Optional path to the LLM configuration file.
+            logger: Optional DebugGymLogger for logging.
+
+        Returns:
+            An instance of the appropriate LLM class.
+        """
+        if logger is not "none":
+            logger = logger or DebugGymLogger("debug-gym")
+        else:
+            logger = None
+
+        if llm_name == "human":
+            from debug_gym.llms import Human
+
+            return Human(llm_name, logger=logger)
+
+        if llm_config is None:
+            if llm_config_file_path is None:
+                raise ValueError(
+                    "Either llm_config or llm_config_file_path must be provided."
+                )
+
+            llm_config = LLMConfigRegistry.from_file(llm_config_file_path)[llm_name]
+
+        return cls.instantiate_from_config(llm_config, logger)
+
 
     @abstractmethod
     def generate(self, messages, tools, **kwargs) -> LLMResponse:
