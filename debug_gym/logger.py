@@ -1,18 +1,13 @@
-import atexit
 import logging
 import multiprocessing as mp
 import os
 import queue
-import random
 import threading
-import time
-from concurrent.futures import ProcessPoolExecutor
 from contextlib import contextmanager
 from dataclasses import dataclass
-from logging.handlers import QueueHandler, QueueListener
-from multiprocessing.queues import Queue as MPQueue  # real Queue class for typing
+from multiprocessing.queues import Queue as MPQueue
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict
 
 from rich.live import Live
 from rich.logging import RichHandler
@@ -61,9 +56,11 @@ class StatusColumn(SpinnerColumn):
 class TaskProgressManager:
     """Stores per-task data and renders a Progress widget."""
 
-    def __init__(self, max_display: int = 10) -> None:
+    def __init__(self, problems, max_display: int = 10) -> None:
         self._max_display = max_display
         self._tasks: Dict[str, TaskProgress] = {}
+        for problem in problems:
+            self.add_task(problem)
 
     def add_task(self, task_id: str, total_steps: int = 1) -> int:
         self._tasks[task_id] = TaskProgress(
@@ -136,26 +133,12 @@ class OverallProgressContext:
         )
         self.total = len(problems)
         self.completed = 0
-        stats_text = (
-            "[blue]{running}[/blue] running | "
-            "[yellow]{pending}[/yellow] pending | "
-            "[green]{completed}[/green] completed | "
-            "[red]{failed}[/red] failed"
-        )
         self._overall_task = self.progress.add_task(
-            stats_text,
+            "Overall",  # Placeholder description, will be set by _refresh
             total=self.total,
         )
-        self.tasks_progress = TaskProgressManager(max_display)
-        for problem in problems:
-            self.tasks_progress.add_task(problem)
-
-        self.progress_table = self._make_table(
-            self.progress,
-            self.tasks_progress.render(all_tasks=False),
-            stats=self.get_task_stats()
-        )
-
+        self.tasks_progress = TaskProgressManager(problems, max_display)
+        self.progress_table = self._refresh()
 
         # background thread for progress updates
         self._stop_event = threading.Event()
@@ -174,25 +157,12 @@ class OverallProgressContext:
             f"Advancing progress for problem {progress_update.problem_id}: "
             f"step {progress_update.step}"
         )
-        self.completed += 1 if progress_update.status in ["done", "failed"] else 0
-        self.progress.update(
-            self._overall_task,
-            completed=self.completed,
-        )
+        # Update the task progress
         self.tasks_progress.advance(progress_update)
 
-        # Update the stats text
-        stats = self.get_task_stats()
-        stats_text = (
-            f"[blue]{stats['running']}[/blue] running | "
-            f"[yellow]{stats['pending']}[/yellow] pending | "
-            f"[green]{stats['completed']}[/green] completed | "
-            f"[red]{stats['failed']}[/red] failed"
-        )
-        self.progress.update(
-            self._overall_task,
-            description=stats_text,
-        )
+        # Update overall progress
+        self.completed += 1 if progress_update.status in ["done", "failed"] else 0
+        self._refresh()
 
     def close(self):
         """Stop the listener thread and wait until it exits."""
@@ -206,21 +176,11 @@ class OverallProgressContext:
     def __exit__(self, exc_type, exc, tb):
         self.close()
 
-    def _make_table(self, overall: Progress, jobs: Progress, stats: dict = None) -> Table:
+    def _make_table(self, all_tasks=False) -> Table:
         tbl = Table(show_header=False, show_edge=False)
-
-        # Add stats panel if stats are provided
-        if stats:
-            stats_text = (
-                f"[blue]{stats['running']}[/blue] running | "
-                f"[yellow]{stats['pending']}[/yellow] pending | "
-                f"[green]{stats['completed']}[/green] completed | "
-                f"[red]{stats['failed']}[/red] failed"
-            )
-
         tbl.add_row(
             Panel(
-                overall,
+                self.progress,
                 title=f"Overall ({self.total} tasks)",
                 title_align="left",
                 border_style="green",
@@ -229,11 +189,11 @@ class OverallProgressContext:
         )
         tbl.add_row(
             Panel(
-            jobs,
-            title=f"In progress (displaying {min(self.total, self.max_display)})",
-            title_align="left",
-            border_style="green",
-            padding=(1, 1),
+                self.tasks_progress.render(all_tasks=all_tasks),
+                title=f"In progress (displaying {min(self.total, self.max_display)})",
+                title_align="left",
+                border_style="green",
+                padding=(1, 1),
             )
         )
         return tbl
@@ -247,20 +207,15 @@ class OverallProgressContext:
             f"[green]{stats['completed']}[/green] completed | "
             f"[red]{stats['failed']}[/red] failed"
         )
-
         # Update overall progress with new stats
         self.progress.update(
             self._overall_task,
             description=stats_text,
+            completed=self.completed,
         )
-
-        self._live.update(
-            self._make_table(
-                self.progress,
-                self.tasks_progress.render(all_tasks=all_tasks),
-                stats=self.get_task_stats()
-            )
-        )
+        self.progress_table = self._make_table(all_tasks=all_tasks)
+        self._live.update(self.progress_table)
+        return self.progress_table
 
     def _status_listener(self):
         self.logger.debug("Starting status listener thread...")
@@ -278,10 +233,11 @@ class OverallProgressContext:
 
     def get_task_stats(self):
         """Get statistics about tasks: total, pending, completed, failed."""
-        total = len(self.tasks_progress._tasks)
-        completed = sum(1 for t in self.tasks_progress._tasks.values() if t.status == "done")
-        failed = sum(1 for t in self.tasks_progress._tasks.values() if t.status == "failed")
-        running = sum(1 for t in self.tasks_progress._tasks.values() if t.status == "running")
+        tasks = self.tasks_progress._tasks.values()
+        total = len(tasks)
+        completed = sum(1 for t in tasks if t.status == "done")
+        failed = sum(1 for t in tasks if t.status == "failed")
+        running = sum(1 for t in tasks if t.status == "running")
         pending = total - completed - failed - running
         return {
             "total": total,
@@ -290,7 +246,6 @@ class OverallProgressContext:
             "completed": completed,
             "failed": failed,
         }
-
 
 
 class DebugGymLogger(logging.Logger):
