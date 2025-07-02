@@ -75,8 +75,8 @@ class TaskProgressManager:
         self._progress = Progress(
             StatusColumn(),
             TextColumn("[progress.description]{task.description:<20}"),
-            TextColumn("step {task.completed} / {task.total}"),
-            BarColumn(bar_width=None, pulse_style="green"),
+            TextColumn("Step: [green]{task.completed}[/green]"),
+            BarColumn(bar_width=None),
             TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
             expand=True,
         )
@@ -84,7 +84,7 @@ class TaskProgressManager:
         for problem in problems:
             self.add_task(problem)
 
-    def add_task(self, task_id: str, total_steps: int | None = None) -> int:
+    def add_task(self, task_id: str, total_steps: int = 1) -> int:
         task = TaskProgress(
             problem_id=task_id,
             step=0,
@@ -236,10 +236,10 @@ class OverallProgressContext:
         # Get updated stats
         stats = self.get_task_stats()
         stats_text = (
-            f"[blue]{stats['running']}[/blue] running | "
-            f"[yellow]{stats['pending']}[/yellow] pending | "
-            f"[green]{stats['completed']}[/green] completed | "
-            f"[red]{stats['failed']}[/red] failed"
+            f"Running: [blue]{stats['running']}[/blue] | "
+            f"Pending: [yellow]{stats['pending']}[/yellow] | "
+            f"Completed: [green]{stats['completed']}[/green] | "
+            f"Failed: [red]{stats['failed']}[/red]"
         )
         # Update overall progress with new stats
         self.progress.update(
