@@ -136,14 +136,26 @@ class OverallProgressContext:
         )
         self.total = len(problems)
         self.completed = 0
-        self._overall_task = self.progress.add_task("Overall", total=self.total)
+        stats_text = (
+            "[blue]{running}[/blue] running | "
+            "[yellow]{pending}[/yellow] pending | "
+            "[green]{completed}[/green] completed | "
+            "[red]{failed}[/red] failed"
+        )
+        self._overall_task = self.progress.add_task(
+            stats_text,
+            total=self.total,
+        )
         self.tasks_progress = TaskProgressManager(max_display)
         for problem in problems:
             self.tasks_progress.add_task(problem)
 
         self.progress_table = self._make_table(
-            self.progress, self.tasks_progress.render(all_tasks=False)
+            self.progress,
+            self.tasks_progress.render(all_tasks=False),
+            stats=self.get_task_stats()
         )
+
 
         # background thread for progress updates
         self._stop_event = threading.Event()
@@ -169,6 +181,19 @@ class OverallProgressContext:
         )
         self.tasks_progress.advance(progress_update)
 
+        # Update the stats text
+        stats = self.get_task_stats()
+        stats_text = (
+            f"[blue]{stats['running']}[/blue] running | "
+            f"[yellow]{stats['pending']}[/yellow] pending | "
+            f"[green]{stats['completed']}[/green] completed | "
+            f"[red]{stats['failed']}[/red] failed"
+        )
+        self.progress.update(
+            self._overall_task,
+            description=stats_text,
+        )
+
     def close(self):
         """Stop the listener thread and wait until it exits."""
         self._stop_event.set()
@@ -181,19 +206,59 @@ class OverallProgressContext:
     def __exit__(self, exc_type, exc, tb):
         self.close()
 
-    @staticmethod
-    def _make_table(overall: Progress, jobs: Progress) -> Table:
+    def _make_table(self, overall: Progress, jobs: Progress, stats: dict = None) -> Table:
         tbl = Table(show_header=False, show_edge=False)
+
+        # Add stats panel if stats are provided
+        if stats:
+            stats_text = (
+                f"[blue]{stats['running']}[/blue] running | "
+                f"[yellow]{stats['pending']}[/yellow] pending | "
+                f"[green]{stats['completed']}[/green] completed | "
+                f"[red]{stats['failed']}[/red] failed"
+            )
+
         tbl.add_row(
-            Panel(overall, title="Overall", border_style="green", padding=(1, 0))
+            Panel(
+                overall,
+                title=f"Overall ({self.total} tasks)",
+                title_align="left",
+                border_style="green",
+                padding=(1, 0),
+            )
         )
-        tbl.add_row(Panel(jobs, title="Problems", border_style="green", padding=(1, 1)))
+        tbl.add_row(
+            Panel(
+            jobs,
+            title=f"In progress (displaying {min(self.total, self.max_display)})",
+            title_align="left",
+            border_style="green",
+            padding=(1, 1),
+            )
+        )
         return tbl
 
     def _refresh(self, all_tasks: bool = False):
+        # Get updated stats
+        stats = self.get_task_stats()
+        stats_text = (
+            f"[blue]{stats['running']}[/blue] running | "
+            f"[yellow]{stats['pending']}[/yellow] pending | "
+            f"[green]{stats['completed']}[/green] completed | "
+            f"[red]{stats['failed']}[/red] failed"
+        )
+
+        # Update overall progress with new stats
+        self.progress.update(
+            self._overall_task,
+            description=stats_text,
+        )
+
         self._live.update(
             self._make_table(
-                self.progress, self.tasks_progress.render(all_tasks=all_tasks)
+                self.progress,
+                self.tasks_progress.render(all_tasks=all_tasks),
+                stats=self.get_task_stats()
             )
         )
 
@@ -210,6 +275,22 @@ class OverallProgressContext:
             except EOFError:  # queue closed
                 break
         self.logger.debug("Status listener thread exiting...")
+
+    def get_task_stats(self):
+        """Get statistics about tasks: total, pending, completed, failed."""
+        total = len(self.tasks_progress._tasks)
+        completed = sum(1 for t in self.tasks_progress._tasks.values() if t.status == "done")
+        failed = sum(1 for t in self.tasks_progress._tasks.values() if t.status == "failed")
+        running = sum(1 for t in self.tasks_progress._tasks.values() if t.status == "running")
+        pending = total - completed - failed - running
+        return {
+            "total": total,
+            "pending": pending,
+            "running": running,
+            "completed": completed,
+            "failed": failed,
+        }
+
 
 
 class DebugGymLogger(logging.Logger):
@@ -307,10 +388,6 @@ class DebugGymLogger(logging.Logger):
         correctly and the thread is joined properly."""
         if self._is_worker:
             raise RuntimeError("Cannot use rich_progress in worker processes.")
-        # self._overall_progress = OverallProgressContext(
-        #     problems, max_display, self._live, self.PROGRESS_QUEUE, self
-        # )
-        # return self._overall_progress.progress
         ctx = OverallProgressContext(
             problems, max_display, self._live, self.PROGRESS_QUEUE, self
         )
