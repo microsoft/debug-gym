@@ -39,6 +39,9 @@ base:
 rewrite_agent:
     tools: ["view", "rewrite", "eval"]
 
+rewrite_context_agent:
+    tools: ["view", "rewrite", "eval"]
+
 debug_agent:
     tools: ["pdb", "view", "rewrite", "eval"]
 

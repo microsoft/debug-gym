@@ -184,7 +184,7 @@ class OpenAILLM(LLM):
                 model=self.config.model,
                 messages=messages,
                 tools=self.define_tools(tools),
-                tool_choice="required",
+                tool_choice=kwargs.pop('tool_choice', 'required'),
                 **kwargs,
             )
         except openai.BadRequestError as e:
