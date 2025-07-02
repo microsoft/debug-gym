@@ -49,8 +49,21 @@ class StatusColumn(SpinnerColumn):
         super().__init__(spinner_name=spinner_name, speed=speed)
 
     def render(self, task):
-        # TODO: implement a red ✗ for failed tasks
-        return Text("✓", style="green") if task.finished else super().render(task)
+        if task.finished:
+            if task.fields.get("status") == "failed":
+                return Text("✗", style="red")
+            return Text("✓", style="green")
+        return super().render(task)
+
+
+class ConditionalTextColumn(TextColumn):
+    """A TextColumn that only displays when a condition is met."""
+
+    def render(self, task):
+        # Only show completed/total when total is > 0
+        if task.total and task.total > 0:
+            return super().render(task)
+        return Text("")  # Return empty text when total is not known
 
 
 class TaskProgressManager:
@@ -59,11 +72,20 @@ class TaskProgressManager:
     def __init__(self, problems, max_display: int = 10) -> None:
         self._max_display = max_display
         self._tasks: Dict[str, TaskProgress] = {}
+        self._progress = Progress(
+            StatusColumn(),
+            TextColumn("[progress.description]{task.description:<20}"),
+            TextColumn("step {task.completed} / {task.total}"),
+            BarColumn(bar_width=None, pulse_style="green"),
+            TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+            expand=True,
+        )
+        self._progress_task_ids = {}
         for problem in problems:
             self.add_task(problem)
 
-    def add_task(self, task_id: str, total_steps: int = 1) -> int:
-        self._tasks[task_id] = TaskProgress(
+    def add_task(self, task_id: str, total_steps: int | None = None) -> int:
+        task = TaskProgress(
             problem_id=task_id,
             step=0,
             total_steps=total_steps,
@@ -71,7 +93,12 @@ class TaskProgressManager:
             max_score=0,
             status="pending",
         )
-        return task_id
+        self._tasks[task_id] = task
+        pid = self._progress.add_task(
+            task.problem_id, completed=task.step, total=task.total_steps
+        )
+        self._progress_task_ids[task.problem_id] = pid
+        return pid
 
     def advance(self, progress_update: TaskProgress) -> None:
         task = self._tasks.get(str(progress_update.problem_id))
@@ -79,8 +106,16 @@ class TaskProgressManager:
             task.step = progress_update.step
             task.total_steps = progress_update.total_steps
             task.score = progress_update.score
-            task.max_score = max(task.max_score, progress_update.max_score)
+            task.max_score = progress_update.max_score
             task.status = progress_update.status
+            pid = self._progress_task_ids.get(task.problem_id)
+            if pid is not None:
+                self._progress.update(
+                    pid,
+                    completed=task.step,
+                    total=task.total_steps,
+                    status=task.status,
+                )
 
     def _visible(self) -> Dict[str, Dict[str, Any]]:
         """Limits the number of tasks to self._max_display,
@@ -94,20 +129,20 @@ class TaskProgressManager:
         return {tid: self._tasks[tid] for tid in visible_task_ids}
 
     def render(self, *, all_tasks: bool = False) -> Progress:
-        progress = Progress(
-            StatusColumn(),
-            TextColumn("[progress.description]{task.description:<20}"),
-            BarColumn(bar_width=None),
-            TextColumn("{task.completed}/{task.total}"),
-            TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
-            expand=True,
-        )
         tasks = self._tasks if all_tasks else self._visible()
         for task in tasks.values():
-            pid = progress.add_task(
-                task.problem_id, completed=task.step, total=task.total_steps
-            )
-        return progress
+            pid = self._progress_task_ids.get(task.problem_id)
+            if pid:
+                self._progress.update(
+                    pid,
+                    total=task.total_steps,
+                    status=task.status,
+                )
+                self._progress.update(
+                    pid,
+                    completed=task.step,
+                )
+        return self._progress
 
 
 class OverallProgressContext:
@@ -159,7 +194,6 @@ class OverallProgressContext:
         )
         # Update the task progress
         self.tasks_progress.advance(progress_update)
-
         # Update overall progress
         self.completed += 1 if progress_update.status in ["done", "failed"] else 0
         self._refresh()
@@ -190,7 +224,7 @@ class OverallProgressContext:
         tbl.add_row(
             Panel(
                 self.tasks_progress.render(all_tasks=all_tasks),
-                title=f"In progress (displaying {min(self.total, self.max_display)})",
+                title=f"In progress (max display: {min(self.total, self.max_display)})",
                 title_align="left",
                 border_style="green",
                 padding=(1, 1),

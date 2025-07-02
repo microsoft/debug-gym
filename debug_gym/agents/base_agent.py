@@ -222,7 +222,6 @@ class BaseAgent:
 
         highscore = info.score
         max_steps = self.config["max_steps"]
-
         for step in range(max_steps):
             highscore = max(highscore, info.score)
             self.logger.info(
@@ -246,7 +245,7 @@ class BaseAgent:
                 self.logger.report_progress(
                     problem_id=task_name,
                     step=step + 1,
-                    total_steps=step + 1,  # early stopping
+                    total_steps=step + 1,  # early stop, current step is total steps
                     score=info.score,
                     max_score=info.max_score,
                     status="done" if info.done else "failed",
@@ -263,7 +262,7 @@ class BaseAgent:
         self.logger.report_progress(
             problem_id=task_name,
             step=step + 1,
-            total_steps=max_steps,
+            total_steps=step + 1,
             score=info.score,
             max_score=info.max_score,
             status="done" if info.done else "failed",
