@@ -27,7 +27,9 @@ class AgentTool(EnvironmentTool):
         },
     }
 
-    def __init__(self, history, llm_name=None, llm_config=None, llm_config_file_path=None):
+    def __init__(
+        self, history, llm_name=None, llm_config=None, llm_config_file_path=None
+    ):
         self._history = history
         self.logger = logging.getLogger("agent_logger")
         self._llm = LLM.instantiate(
