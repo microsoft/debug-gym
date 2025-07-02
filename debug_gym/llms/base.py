@@ -24,13 +24,13 @@ from debug_gym.logger import DebugGymLogger
 logging.getLogger("httpx").setLevel(logging.WARNING)
 
 
-def retry_on_rate_limit(
-    func, is_rate_limit_error_func, multiplier=1, max_wait=40, max_attempts=100
+def retry_on_exception(
+    func, exception_filter_func, multiplier=1, max_wait=40, max_attempts=100
 ):
-    """Executes a function with retry logic for rate limits. Never retries on KeyboardInterrupt.
+    """Executes a function with retry logic for certain exceptions. Never retries on KeyboardInterrupt.
     Args:
         func: The function to execute with retries
-        is_rate_limit_error_func: Function that checks if an exception is a rate limit error
+        exception_filter_func: Function that checks if an exception needs to be retried
         *args, **kwargs: Arguments to pass to the function
 
     Returns:
@@ -39,7 +39,7 @@ def retry_on_rate_limit(
     retry_function = retry(
         retry=(
             retry_if_not_exception_type(KeyboardInterrupt)
-            & retry_if_exception(is_rate_limit_error_func)
+            & retry_if_exception(exception_filter_func)
         ),
         wait=wait_random_exponential(multiplier=multiplier, max=max_wait),
         stop=stop_after_attempt(max_attempts),
