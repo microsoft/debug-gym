@@ -83,13 +83,6 @@ class HistoryTracker:
     def clone(self):
         return copy.deepcopy(self)
 
-    def filter_out(self, actions: list[str]):
-        history = HistoryTracker(self.history_steps)
-        for info, llm_response in zip(self.memory, self.prompt_response_pairs):
-            if getattr(info.action, "name", None) not in actions:
-                history.step(info, llm_response)
-        return history
-
 
 def build_history_prompt(
     history: HistoryTracker, llm: LLM, reset_prompt_history_after_rewrite: bool = False
