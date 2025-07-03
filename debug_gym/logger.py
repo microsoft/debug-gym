@@ -343,10 +343,13 @@ class DebugGymLogger(logging.Logger):
             self.addHandler(fh)
 
     def handle(self, record):
+        """Handle a log record. If this is a worker process,
+        log to their own handlers (ex.: a file) and put the
+        record into the log queue for the main process to display
+        logs through Rich."""
         if self._is_worker:
             self.LOG_QUEUE.put(record)
-        else:
-            super().handle(record)
+        super().handle(record)
 
     def _log_listener(self):
         while not self._log_listener_stop_event.is_set():
