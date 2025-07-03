@@ -138,7 +138,7 @@ class AnthropicLLM(LLM):
                 {
                     "role": "user",
                     "content": filter_non_utf8(
-                        "{history_info.step_observation.observation}"
+                        f"{history_info.step_observation.observation}"
                     ),
                 }
             )
