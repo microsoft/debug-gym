@@ -111,7 +111,7 @@ class AnthropicLLM(LLM):
         )
 
     def format_tool_call_history(
-        self, history_info: EnvInfo, response: list[LLMResponse | None]
+        self, history_info: EnvInfo, response: list[LLMResponse]
     ) -> list[dict]:
         _messages = []
         if isinstance(response, list) and len(response) > 0:
