@@ -11,6 +11,7 @@ from typing import Any, Dict
 
 from rich.live import Live
 from rich.logging import RichHandler
+from rich.padding import Padding
 from rich.panel import Panel
 from rich.progress import BarColumn, Progress, SpinnerColumn, TextColumn
 from rich.table import Table
@@ -54,16 +55,6 @@ class StatusColumn(SpinnerColumn):
                 return Text("✗", style="red")
             return Text("✓", style="green")
         return super().render(task)
-
-
-class ConditionalTextColumn(TextColumn):
-    """A TextColumn that only displays when a condition is met."""
-
-    def render(self, task):
-        # Only show completed/total when total is > 0
-        if task.total and task.total > 0:
-            return super().render(task)
-        return Text("")  # Return empty text when total is not known
 
 
 class TaskProgressManager:
@@ -221,16 +212,20 @@ class OverallProgressContext:
                 padding=(1, 0),
             )
         )
+        if self.total <= self.max_display:
+            per_task_title = "In progress:"
+        else:
+            per_task_title = f"In progress (max display {self.max_display}):"
         tbl.add_row(
             Panel(
                 self.tasks_progress.render(all_tasks=all_tasks),
-                title=f"In progress (max display: {min(self.total, self.max_display)})",
+                title=per_task_title,
                 title_align="left",
                 border_style="green",
                 padding=(1, 1),
             )
         )
-        return tbl
+        return Padding(tbl, (1, 0, 0, 0))
 
     def _refresh(self, all_tasks: bool = False):
         # Get updated stats
