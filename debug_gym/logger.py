@@ -135,6 +135,11 @@ class TaskProgressManager:
                 completed=task.step,
                 status=task.status,
             )
+            # Rich doesn't set the task as completed when adding it
+            self._progress.update(
+                pid,
+                completed=task.step,
+            )
             self._progress_task_ids[task.problem_id] = pid
         return self._progress
 
