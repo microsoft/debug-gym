@@ -121,18 +121,21 @@ class TaskProgressManager:
 
     def render(self, *, all_tasks: bool = False) -> Progress:
         tasks = self._tasks if all_tasks else self._visible()
-        for task in tasks.values():
-            pid = self._progress_task_ids.get(task.problem_id)
-            if pid:
-                self._progress.update(
-                    pid,
-                    total=task.total_steps,
-                    status=task.status,
-                )
-                self._progress.update(
-                    pid,
-                    completed=task.step,
-                )
+
+        # Clear the progress bar
+        for task_id in list(self._progress.task_ids):
+            self._progress.remove_task(task_id)
+            self._progress_task_ids.pop(task_id, None)
+
+        # Re-add tasks ordered by status
+        for task_id, task in tasks.items():
+            pid = self._progress.add_task(
+                task.problem_id,
+                total=task.total_steps,
+                completed=task.step,
+                status=task.status,
+            )
+            self._progress_task_ids[task.problem_id] = pid
         return self._progress
 
 
