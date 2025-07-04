@@ -1,3 +1,5 @@
+from rich.markup import escape
+
 from debug_gym.logger import DebugGymLogger
 
 
@@ -12,20 +14,22 @@ def print_messages(messages: list[dict], logger: DebugGymLogger):
     for m in messages:
         role = m["role"]
         if role == "tool":
-            logger.info(f"[magenta]{m['content']}\n[/magenta]")
+            logger.info(f"[magenta]{escape(m['content'])}\n[/magenta]")
         elif role == "user":
             if isinstance(m["content"], list):
                 for item in m["content"]:
                     if item["type"] == "tool_result":
-                        logger.info(f"[magenta]{item['content']}\n[/magenta]")
+                        logger.info(
+                            f"[magenta]{escape(str(item['content']))}\n[/magenta]"
+                        )
                     else:
-                        logger.info(f"[cyan]{item}\n[/cyan]")
+                        logger.info(f"[cyan]{escape(str(item))}\n[/cyan]")
             else:
-                logger.info(f"[cyan]{m['content']}\n[/cyan]")
+                logger.info(f"[cyan]{escape(str(m['content']))}\n[/cyan]")
         elif role == "assistant":
             content = m.get("content", m.get("tool_calls", m))
-            logger.info(f"[green]{content}\n[/green]")
+            logger.info(f"[green]{escape(str(content))}\n[/green]")
         elif role == "system":
-            logger.info(f"[yellow]{m['content']}\n[/yellow]")
+            logger.info(f"[yellow]{escape(str(m['content']))}\n[/yellow]")
         else:
-            raise ValueError(f"Unknown role: {m['content']}")
+            raise ValueError(f"Unknown role: {escape(str(m['content']))}")

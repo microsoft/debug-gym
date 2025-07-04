@@ -4,6 +4,7 @@ import logging
 import openai
 import tiktoken
 from openai import NOT_GIVEN, OpenAI
+from rich.markup import escape
 from transformers import AutoTokenizer
 
 from debug_gym.gym.envs.env import EnvInfo
@@ -102,7 +103,7 @@ class OpenAILLM(LLM):
             need_to_retry = False
 
         logger(
-            f"Error calling {self.model_name}: {exception_full_name!r} {
+            f"Error calling {self.model_name}: {escape(exception_full_name)} {
                 exception.message if hasattr(exception, 'message') else exception
             }"
         )

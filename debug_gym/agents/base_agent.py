@@ -6,6 +6,7 @@ from os.path import join as pjoin
 
 import numpy as np
 from jinja2 import Environment, Template
+from rich.markup import escape
 
 from debug_gym.agents.history_tracker import HistoryTracker, build_history_prompt
 from debug_gym.agents.utils import trim
@@ -141,7 +142,7 @@ class BaseAgent:
                 error_msg = (
                     f"System prompt template file `{system_prompt_template}` not found."
                 )
-                self.logger.error(error_msg)
+                self.logger.error(escape(error_msg))
                 raise FileNotFoundError(error_msg)
             with open(system_prompt_template, "r") as f:
                 system_prompt_template = f.read()
@@ -217,7 +218,8 @@ class BaseAgent:
             )
             return True
         self.logger.info(
-            f"Available tools (in LLM's tool calling format):\n{json.dumps(self.llm.define_tools(info.tools), indent=4)}\n"
+            "Available tools (in LLM's tool calling format):\n"
+            f"{escape(json.dumps(self.llm.define_tools(info.tools), indent=4))}\n"
         )
 
         highscore = info.score

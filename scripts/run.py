@@ -4,6 +4,8 @@ import uuid
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 
+from rich.markup import escape
+
 from debug_gym.agents.base_agent import AGENT_REGISTRY, create_agent
 from debug_gym.agents.utils import load_config
 from debug_gym.gym.envs import select_env
@@ -59,10 +61,10 @@ def run_agent(args, problem, config):
 
     except Exception as e:
         task_logger.error(
-            f"Task Error: {problem} - {e!r}. Run with --very-verbose or check {task_logger.log_file} for more information."
+            f"Task Error: {problem} - {escape(str(e))}. Run with --very-verbose or check {task_logger.log_file} for more information."
         )
         task_logger.debug(
-            f"Task {problem} generated an exception: {e!r}", exc_info=True
+            f"Task {problem} generated an exception: {escape(str(e))}", exc_info=True
         )
         if args.debug:
             raise e
@@ -131,7 +133,7 @@ def main():
     mean_perf = 0
     tasks_succeeded = []
 
-    with logger.rich_progress(problems, max_display=10):
+    with logger.rich_progress(problems, max_display=20):
         if num_workers == 1:  # run sequentially for easier debugging
             for problem in problems:
                 try:

@@ -4,6 +4,7 @@ import subprocess
 
 import datasets
 import docker
+from rich.markup import escape
 from swebench.harness.constants import MAP_REPO_VERSION_TO_SPECS, TestStatus
 from swebench.harness.docker_build import (
     build_env_images,
@@ -155,8 +156,8 @@ class SWEBenchEnv(RepoEnv):
         test_status_map = MAP_REPO_TO_PARSER[self.repo](
             eval_output.output, self.test_spec
         )
-        self.logger.debug(f"fail_to_pass: {self.fail_to_pass}")
-        self.logger.debug(f"Test status map: {test_status_map}")
+        self.logger.debug(f"fail_to_pass: {escape(str(self.fail_to_pass))}")
+        self.logger.debug(f"Test status map: {escape(str(test_status_map))}")
         score = sum(
             1
             for test in self.fail_to_pass

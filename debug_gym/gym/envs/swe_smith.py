@@ -5,13 +5,13 @@ import datasets
 import docker
 import yaml
 from datasets import load_from_disk
+from rich.markup import escape
 from swesmith.build_repo.download_images import DOCKER_ORG, TAG
 from swesmith.constants import MAP_REPO_TO_SPECS
 from swesmith.harness.grading import TestStatus
 from swesmith.harness.log_parsers import MAP_REPO_TO_PARSER, parse_log_pytest
 from swesmith.harness.utils import get_test_command
 from swesmith.utils import get_repo_commit_from_image_name
-from tqdm import tqdm
 
 from debug_gym.constants import DEBUG_GYM_CACHE_DIR
 from debug_gym.gym.entities import EvalOutput
@@ -225,7 +225,7 @@ class SWESmithEnv(SWEBenchEnv):
             if status not in (TestStatus.PASSED.value, TestStatus.XFAIL.value)
         }
         if not_passed_tests:
-            self.logger.debug(f"Not passed tests: {not_passed_tests}")
+            self.logger.debug(f"Not passed tests: {escape(str(not_passed_tests))}")
 
         assert score <= self.max_score
         self.logger.debug(

@@ -11,6 +11,7 @@ import time
 import uuid
 
 import docker
+from rich.markup import escape
 
 from debug_gym.logger import DebugGymLogger
 from debug_gym.utils import strip_ansi
@@ -61,7 +62,7 @@ class ShellSession:
             command = " && ".join(self.session_commands + [command])
             entrypoint = f'{self.shell_command} -c "{command}"'
 
-        self.logger.debug(f"Starting {self} with entrypoint: {entrypoint}")
+        self.logger.debug(f"Starting {self} with entrypoint: {escape(entrypoint)}")
 
         # Prepare the file descriptor
         _server, _client = pty.openpty()
@@ -165,19 +166,19 @@ class ShellSession:
         output = ""
         if not self.is_running:
             output += self.start()
-            self.logger.debug(f"{self}: Initial output: {output!r}")
+            self.logger.debug(f"{self}: Initial output: {escape(output)}")
 
-        self.logger.debug(f"{self}: Running {command!r}")
+        self.logger.debug(f"{self}: Running {escape(str(command))}")
         os.write(self.filedescriptor, command.encode("utf-8") + b"\n")
 
         try:
             output += self.read(read_until=read_until, timeout=timeout)
         except TimeoutError as e:
             self.close()
-            self.logger.debug(f"{e!r}")
+            self.logger.debug(f"{escape(str(e))}")
             raise
 
-        self.logger.debug(f"{self}: Output: {output!r}")
+        self.logger.debug(f"{self}: Output: {escape(output)}")
         return output
 
     def __str__(self):
@@ -244,7 +245,7 @@ class Terminal:
     ) -> tuple[bool, str]:
         """Run a list of commands in the terminal. Return command status and output."""
         command = self.prepare_command(entrypoint)
-        self.logger.debug(f"Running command in terminal: {command}")
+        self.logger.debug(f"Running command in terminal: {escape(str(command))}")
         process = subprocess.Popen(
             command,
             env=self.env_vars,
@@ -263,12 +264,12 @@ class Terminal:
 
         if raises and not success:
             # Command includes the entrypoint + session commands
-            self.logger.debug(f"Failed to run command: {command} {output}")
-            raise ValueError(f"Failed to run command: {entrypoint} ", output)
+            self.logger.debug(f"Failed to run command: {escape(str(command))}")
+            raise ValueError(f"Failed to run command: {escape(str(entrypoint))}")
 
         output = (stdout + stderr).strip("\r\n").strip("\n")
         self.logger.debug(
-            f"Output from terminal with status {process.returncode}:\n{output}"
+            f"Output from terminal with status {process.returncode}:\n{escape(output)}"
         )
         return success, output
 
@@ -412,7 +413,7 @@ class DockerTerminal(Terminal):
         """Run a command in the terminal. Return command status and output."""
         command = self.prepare_command(entrypoint)
 
-        self.logger.debug(f"Exec run: {command}")
+        self.logger.debug(f"Exec run: {escape(str(command))}")
 
         # TODO: docker exec_run timeout?
         status, output = self.container.exec_run(
@@ -427,11 +428,15 @@ class DockerTerminal(Terminal):
 
         if raises and not success:
             # Command includes the entrypoint + session commands
-            self.logger.debug(f"Failed to run command: {command} {output}")
-            raise ValueError(f"Failed to run command: {entrypoint} ", output)
+            self.logger.debug(
+                f"Failed to run command: {escape(str(command))} {escape(output)}"
+            )
+            raise ValueError(
+                f"Failed to run command: {escape(str(entrypoint))} ", escape(output)
+            )
 
         self.logger.debug(
-            f"Output from terminal with status {status}:\n{output.decode()}"
+            f"Output from terminal with status {status}:\n{escape(output.decode())}"
         )
         return success, output.decode().strip("\r\n").strip("\n")
 
@@ -464,7 +469,7 @@ class DockerTerminal(Terminal):
         """Run setup commands if any. If commands fail, stop the container."""
         if self.setup_commands:
             setup_commands = " && ".join(self.setup_commands)
-            self.logger.debug(f"Running setup commands: {setup_commands}")
+            self.logger.debug(f"Running setup commands: {escape(str(setup_commands))}")
             status, output = container.exec_run(
                 ["/bin/bash", "-c", setup_commands],
                 user="root",  # Run as root to allow installations
@@ -474,10 +479,10 @@ class DockerTerminal(Terminal):
             if status != 0:
                 container.stop()
                 raise ValueError(
-                    f"Failed to run setup command: {setup_commands}\n"
-                    f"Output: {output.decode()}"
+                    f"Failed to run setup command: {escape(str(setup_commands))}\n"
+                    f"Output: {escape(output.decode())}"
                 )
-            self.logger.debug(f"Setup commands ran successfully.")
+            self.logger.debug("Setup commands ran successfully.")
 
     def clean_up(self):
         """Clean up the Docker container."""

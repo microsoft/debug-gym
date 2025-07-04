@@ -8,6 +8,7 @@ from glob import glob
 from pathlib import Path
 
 import numpy as np
+from rich.markup import escape
 
 from debug_gym.gym.entities import EvalOutput, Event, Observation
 from debug_gym.gym.terminal import Terminal
@@ -518,7 +519,7 @@ class RepoEnv(TooledEnv):
                     f"with action: {action}.\n{e}"
                 )
                 self.step_observation = Observation("env", error_message)
-                self.logger.debug(error_message)
+                self.logger.debug(escape(error_message))
 
         # Process any events that were queued during tool execution
         self.all_observations = self.process_events()
