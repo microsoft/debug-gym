@@ -81,9 +81,14 @@ class SWESmithEnv(SWEBenchEnv):
         )
         missing_images = tagged_image_names - existing_images
         if missing_images:
-            self.logger.debug(f"Found {len(missing_images)} missing Docker images.")
-            for image_name in tqdm(missing_images, desc="Pulling images for SWE-Smith"):
+            self.logger.info(f"Found {len(missing_images)} missing Docker images.")
+            for image_name in missing_images:
                 docker_hub_image = image_name.replace("__", "_1776_")
+                self.logger.info(
+                    escape(
+                        f"Pulling Docker image `{docker_hub_image}` to `{image_name}`."
+                    )
+                )
                 client.images.pull(docker_hub_image)
                 # Rename images via tagging
                 client.images.get(docker_hub_image).tag(image_name)

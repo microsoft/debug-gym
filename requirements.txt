@@ -4,7 +4,6 @@ azure-identity
 tenacity
 pyyaml
 pytest
-tqdm
 gitignore_parser
 termcolor
 transformers
