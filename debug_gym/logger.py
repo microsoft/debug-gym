@@ -61,9 +61,11 @@ class TaskProgressManager:
     """Stores per-task data and renders a Progress widget."""
 
     def __init__(self, problems, max_display: int = 10) -> None:
-        self._max_display = max_display
+        self.max_display = max_display
         self._tasks: Dict[str, TaskProgress] = {}
-        self._progress = Progress(
+        self._progress_task_ids = {}
+
+        self.progress = Progress(
             StatusColumn(),
             TextColumn("[progress.description]{task.description:<20}"),
             TextColumn("Step: [green]{task.completed}[/green]"),
@@ -71,9 +73,18 @@ class TaskProgressManager:
             TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
             expand=True,
         )
-        self._progress_task_ids = {}
+        self._tasks_panel = Panel(
+            self.progress,
+            title=self._get_tasks_panel_title(),
+            title_align="left",
+            border_style="green",
+            padding=(1, 1),
+        )
+
         for problem in problems:
             self.add_task(problem)
+
+        self.refresh_progress()
 
     def add_task(self, task_id: str, total_steps: int = 1) -> int:
         task = TaskProgress(
@@ -85,7 +96,7 @@ class TaskProgressManager:
             status="pending",
         )
         self._tasks[task_id] = task
-        pid = self._progress.add_task(
+        pid = self.progress.add_task(
             task.problem_id, completed=task.step, total=task.total_steps
         )
         self._progress_task_ids[task.problem_id] = pid
@@ -101,16 +112,33 @@ class TaskProgressManager:
             task.status = progress_update.status
             pid = self._progress_task_ids.get(task.problem_id)
             if pid is not None:
-                self._progress.update(
+                self.progress.update(
                     pid,
                     completed=task.step,
                     total=task.total_steps,
                     status=task.status,
                 )
 
-    def _visible(self) -> Dict[str, Dict[str, Any]]:
-        """Limits the number of tasks to self._max_display,
-        showing pending tasks first."""
+    def refresh_progress(self, all_tasks: bool = False):
+        # Update panel title
+        self._tasks_panel.title = self._get_tasks_panel_title(all_tasks)
+
+        visible_tasks = self._tasks if all_tasks else self._visible_tasks()
+        # Set visibility for each task
+        for task_id, task in self._tasks.items():
+            pid = self._progress_task_ids.get(task_id)
+            if pid is not None:
+                is_visible = task_id in visible_tasks
+                self.progress.update(pid, visible=is_visible)
+
+    def _visible_tasks(self) -> Dict[str, Dict[str, Any]]:
+        """Get visible tasks limited to the maximum display count,
+        showing pending tasks first, then completed tasks.
+
+        Returns:
+            Dict[str, Dict[str, Any]]: A dictionary mapping task IDs to their corresponding
+            task data for visible tasks only.
+        """
         # Get task IDs for pending, then completed tasks
         pending = []
         completed = []
@@ -120,26 +148,16 @@ class TaskProgressManager:
             else:
                 pending.append(tid)
         # Limit to max_display tasks, showing pending first
-        visible_task_ids = (pending + completed)[: self._max_display]
+        visible_task_ids = (pending + completed)[: self.max_display]
         # Return the actual task data for the visible tasks
         return {tid: self._tasks[tid] for tid in visible_task_ids}
 
-    def render(self, *, all_tasks: bool = False) -> Progress:
-        visible_tasks = self._tasks if all_tasks else self._visible()
-
-        # Set visibility for each task
-        for task_id, task in self._tasks.items():
-            pid = self._progress_task_ids.get(task_id)
-            if pid is not None:
-                is_visible = task_id in visible_tasks
-                self._progress.update(
-                    pid,
-                    visible=is_visible,
-                    completed=task.step,
-                    total=task.total_steps,
-                    status=task.status,
-                )
-        return self._progress
+    def _get_tasks_panel_title(self, all_tasks=False):
+        """Helper method to get the appropriate title for the tasks panel."""
+        if all_tasks or self.max_display >= len(self._tasks):
+            return "In progress:"
+        else:
+            return f"In progress (max display {self.max_display}):"
 
     def get_task_stats(self):
         """Get statistics about tasks: total, pending, completed, failed."""
@@ -201,19 +219,12 @@ class OverallProgressContext:
             border_style="green",
             padding=(1, 0),
         )
-        self._tasks_panel = Panel(
-            self.tasks_progress.render(),
-            title=self._get_tasks_panel_title(),
-            title_align="left",
-            border_style="green",
-            padding=(1, 1),
-        )
 
         # Initialize table with panels
         self._table.add_row(self._overall_panel)
-        self._table.add_row(self._tasks_panel)
+        self._table.add_row(self.tasks_progress._tasks_panel)
         self.progress_table = Padding(self._table, (1, 0, 0, 0))
-        self._refresh()
+        self.refresh_progress()
 
         # background thread for progress updates
         self._stop_event = threading.Event()
@@ -222,11 +233,6 @@ class OverallProgressContext:
         )
         self._listener_thread.start()
 
-    @property
-    def is_complete(self) -> bool:
-        """Check if all tasks are completed."""
-        return self.completed >= self.total
-
     def advance(self, progress_update):
         self.logger.debug(
             f"Advancing progress for problem {progress_update.problem_id}: "
@@ -234,7 +240,7 @@ class OverallProgressContext:
         )
         # Update the task progress
         self.tasks_progress.advance(progress_update)
-        # Update overall progress
+        # Update overall progress completion
         self.completed += 1 if progress_update.status in ["done", "failed"] else 0
 
     def close(self):
@@ -249,15 +255,8 @@ class OverallProgressContext:
     def __exit__(self, exc_type, exc, tb):
         self.close()
 
-    def _get_tasks_panel_title(self, all_tasks=False):
-        """Helper method to get the appropriate title for the tasks panel."""
-        if all_tasks or self.total <= self.max_display:
-            return "In progress:"
-        else:
-            return f"In progress (max display {self.max_display}):"
-
-    def _refresh(self, all_tasks: bool = False):
-        # Get updated stats
+    def refresh_progress(self, all_tasks: bool = False):
+        # Update overall progress with new stats
         stats = self.tasks_progress.get_task_stats()
         stats_text = (
             f"Running: [blue]{stats['running']}[/blue] | "
@@ -265,22 +264,13 @@ class OverallProgressContext:
             f"Completed: [green]{stats['completed']}[/green] | "
             f"Failed: [red]{stats['failed']}[/red]"
         )
-        # Update overall progress with new stats
         self.progress.update(
             self._overall_task,
             description=stats_text,
             completed=self.completed,
         )
-        # Update panel titles
-        self._overall_panel.title = f"Overall ({self.total} tasks)"
-        self._tasks_panel.title = self._get_tasks_panel_title(all_tasks)
-
         # Update panel content
-        self._overall_panel.renderable = self.progress
-        self._tasks_panel.renderable = self.tasks_progress.render(all_tasks=all_tasks)
-
-        # Return the existing table with updated panels
-        return self.progress_table
+        self.tasks_progress.refresh_progress(all_tasks=all_tasks)
 
     def _status_listener(self):
         self.logger.debug("Starting status listener thread...")
@@ -293,14 +283,14 @@ class OverallProgressContext:
                 self.advance(progress_update)
                 current_time = time.time()
                 if current_time - last_refresh_time >= refresh_interval:
-                    self._refresh()
+                    self.refresh_progress()
                     last_refresh_time = current_time
             except queue.Empty:
                 continue
             except EOFError:  # queue closed
                 break
         # Final refresh to ensure UI is up-to-date
-        self._refresh(all_tasks=True)
+        self.refresh_progress(all_tasks=True)
         self.logger.debug("Status listener thread exiting...")
 
 
