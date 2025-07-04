@@ -155,31 +155,48 @@ class OpenAILLM(LLM):
         )
 
     def format_tool_call_history(
-        self, history_info: EnvInfo, response: LLMResponse
+        self, history_info: EnvInfo, response: list[LLMResponse]
     ) -> list[dict]:
-        _messages = [
-            {
-                "role": "assistant",
-                "tool_calls": [
-                    {
-                        "type": "function",
-                        "id": response[0].tool.id,
-                        "function": {
-                            "name": response[0].tool.name,
-                            "arguments": json.dumps(response[0].tool.arguments),
+        _messages = []
+        if isinstance(response, list) and len(response) > 0:
+            _messages.append(
+                {
+                    "role": "assistant",
+                    "tool_calls": [
+                        {
+                            "type": "function",
+                            "id": response[0].tool.id,
+                            "function": {
+                                "name": response[0].tool.name,
+                                "arguments": json.dumps(response[0].tool.arguments),
+                            },
                         },
-                    },
-                ],
-            },
-            {
-                "role": "tool",
-                "tool_call_id": history_info.action.id,
-                "name": history_info.action.name,
-                "content": filter_non_utf8(
-                    f"{history_info.step_observation.observation}"
-                ),
-            },
-        ]
+                    ],
+                }
+            )
+        if history_info.action is None:
+            # This is the initial state, no action taken yet
+            _messages.append(
+                {
+                    "role": "user",
+                    "content": filter_non_utf8(
+                        f"{history_info.step_observation.observation}"
+                    ),
+                }
+            )
+        else:
+            # This is a step with an action taken
+            _messages.append(
+                {
+                    "role": "tool",
+                    "tool_call_id": history_info.action.id,
+                    "name": history_info.action.name,
+                    "content": filter_non_utf8(
+                        f"{history_info.step_observation.observation}"
+                    ),
+                }
+            )
+
         return _messages
 
     def generate(self, messages, tools, **kwargs) -> LLMResponse:

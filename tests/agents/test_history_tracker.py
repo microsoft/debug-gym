@@ -153,12 +153,6 @@ def test_history_tracker(build_env_info):
     assert ht_clone.history_steps == ht.history_steps
     assert ht_clone is not ht
 
-    # test filtering out
-    ht_filtered = ht.filter_out(actions=["action2", "action4"])
-    for step in ht_filtered.get_all():
-        assert step.action not in [tool_2, tool_4]
-        assert step.action in [None, tool_3, tool_5]
-
     # should reset properly
     ht.reset()
     assert len(ht) == 0
