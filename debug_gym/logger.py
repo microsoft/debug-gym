@@ -130,15 +130,14 @@ class TaskProgressManager:
             if pid is not None:
                 is_visible = task_id in visible_tasks
                 self.progress.update(pid, visible=is_visible)
+        self.progress.refresh()
 
     def _visible_tasks(self) -> Dict[str, Dict[str, Any]]:
         """Get visible tasks limited to the maximum display count,
-        showing pending tasks first, then completed tasks.
+        showing pending/running tasks first, then completed tasks.
 
-        Returns:
-            Dict[str, Dict[str, Any]]: A dictionary mapping task IDs to their corresponding
-            task data for visible tasks only.
-        """
+        Returns a dictionary mapping task IDs to their corresponding
+        task data for visible tasks only."""
         # Get task IDs for pending, then completed tasks
         pending = []
         completed = []
@@ -269,6 +268,7 @@ class OverallProgressContext:
             description=stats_text,
             completed=self.completed,
         )
+        self.progress.refresh()
         # Update panel content
         self.tasks_progress.refresh_progress(all_tasks=all_tasks)
 
