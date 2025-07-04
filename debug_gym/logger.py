@@ -3,9 +3,9 @@ import multiprocessing as mp
 import os
 import queue
 import threading
+import time
 from contextlib import contextmanager
 from dataclasses import dataclass
-from multiprocessing.queues import Queue as MPQueue
 from pathlib import Path
 from typing import Any, Dict
 
@@ -112,36 +112,56 @@ class TaskProgressManager:
         """Limits the number of tasks to self._max_display,
         showing pending tasks first."""
         # Get task IDs for pending, then completed tasks
-        pending = [tid for tid, t in self._tasks.items() if not t.completed]
-        completed = [tid for tid, t in self._tasks.items() if t.completed]
+        pending = []
+        completed = []
+        for tid, task in self._tasks.items():
+            if task.completed:
+                completed.append(tid)
+            else:
+                pending.append(tid)
         # Limit to max_display tasks, showing pending first
         visible_task_ids = (pending + completed)[: self._max_display]
         # Return the actual task data for the visible tasks
         return {tid: self._tasks[tid] for tid in visible_task_ids}
 
     def render(self, *, all_tasks: bool = False) -> Progress:
-        tasks = self._tasks if all_tasks else self._visible()
+        visible_tasks = self._tasks if all_tasks else self._visible()
 
-        # Clear the progress bar
-        for task_id in list(self._progress.task_ids):
-            self._progress.remove_task(task_id)
-            self._progress_task_ids.pop(task_id, None)
-
-        # Re-add tasks ordered by status
-        for task_id, task in tasks.items():
-            pid = self._progress.add_task(
-                task.problem_id,
-                total=task.total_steps,
-                completed=task.step,
-                status=task.status,
-            )
-            # Rich doesn't set the task as completed when adding it
-            self._progress.update(
-                pid,
-                completed=task.step,
-            )
-            self._progress_task_ids[task.problem_id] = pid
+        # Set visibility for each task
+        for task_id, task in self._tasks.items():
+            pid = self._progress_task_ids.get(task_id)
+            if pid is not None:
+                is_visible = task_id in visible_tasks
+                self._progress.update(
+                    pid,
+                    visible=is_visible,
+                    completed=task.step,
+                    total=task.total_steps,
+                    status=task.status,
+                )
         return self._progress
+
+    def get_task_stats(self):
+        """Get statistics about tasks: total, pending, completed, failed."""
+        # Create a dictionary to count tasks by status
+        status_counts = {"done": 0, "failed": 0, "running": 0, "pending": 0}
+
+        # Count each task by its current status
+        for task in self._tasks.values():
+            # Make sure we have a valid status, defaulting to "pending" if unknown
+            status = task.status if task.status in status_counts else "pending"
+            status_counts[status] += 1
+
+        # Calculate total (should match len(self._tasks) but this is more robust)
+        total = sum(status_counts.values())
+
+        return {
+            "total": total,
+            "pending": status_counts["pending"],
+            "running": status_counts["running"],
+            "completed": status_counts["done"],
+            "failed": status_counts["failed"],
+        }
 
 
 class OverallProgressContext:
@@ -150,7 +170,7 @@ class OverallProgressContext:
         problems,
         max_display: int,
         live: Live,
-        progress_queue: MPQueue,
+        progress_queue: mp.Queue,
         logger: logging.Logger,
     ):
         self.problems = problems
@@ -172,7 +192,28 @@ class OverallProgressContext:
             total=self.total,
         )
         self.tasks_progress = TaskProgressManager(problems, max_display)
-        self.progress_table = self._refresh()
+        # Initialize table and panels once
+        self._table = Table(show_header=False, show_edge=False)
+        self._overall_panel = Panel(
+            self.progress,
+            title=f"Overall ({self.total} tasks)",
+            title_align="left",
+            border_style="green",
+            padding=(1, 0),
+        )
+        self._tasks_panel = Panel(
+            self.tasks_progress.render(),
+            title=self._get_tasks_panel_title(),
+            title_align="left",
+            border_style="green",
+            padding=(1, 1),
+        )
+
+        # Initialize table with panels
+        self._table.add_row(self._overall_panel)
+        self._table.add_row(self._tasks_panel)
+        self.progress_table = Padding(self._table, (1, 0, 0, 0))
+        self._refresh()
 
         # background thread for progress updates
         self._stop_event = threading.Event()
@@ -195,7 +236,6 @@ class OverallProgressContext:
         self.tasks_progress.advance(progress_update)
         # Update overall progress
         self.completed += 1 if progress_update.status in ["done", "failed"] else 0
-        self._refresh()
 
     def close(self):
         """Stop the listener thread and wait until it exits."""
@@ -209,35 +249,16 @@ class OverallProgressContext:
     def __exit__(self, exc_type, exc, tb):
         self.close()
 
-    def _make_table(self, all_tasks=False) -> Table:
-        tbl = Table(show_header=False, show_edge=False)
-        tbl.add_row(
-            Panel(
-                self.progress,
-                title=f"Overall ({self.total} tasks)",
-                title_align="left",
-                border_style="green",
-                padding=(1, 0),
-            )
-        )
-        if self.total <= self.max_display:
-            per_task_title = "In progress:"
+    def _get_tasks_panel_title(self, all_tasks=False):
+        """Helper method to get the appropriate title for the tasks panel."""
+        if all_tasks or self.total <= self.max_display:
+            return "In progress:"
         else:
-            per_task_title = f"In progress (max display {self.max_display}):"
-        tbl.add_row(
-            Panel(
-                self.tasks_progress.render(all_tasks=all_tasks),
-                title=per_task_title,
-                title_align="left",
-                border_style="green",
-                padding=(1, 1),
-            )
-        )
-        return Padding(tbl, (1, 0, 0, 0))
+            return f"In progress (max display {self.max_display}):"
 
     def _refresh(self, all_tasks: bool = False):
         # Get updated stats
-        stats = self.get_task_stats()
+        stats = self.tasks_progress.get_task_stats()
         stats_text = (
             f"Running: [blue]{stats['running']}[/blue] | "
             f"Pending: [yellow]{stats['pending']}[/yellow] | "
@@ -250,39 +271,37 @@ class OverallProgressContext:
             description=stats_text,
             completed=self.completed,
         )
-        self.progress_table = self._make_table(all_tasks=all_tasks)
-        self._live.update(self.progress_table)
+        # Update panel titles
+        self._overall_panel.title = f"Overall ({self.total} tasks)"
+        self._tasks_panel.title = self._get_tasks_panel_title(all_tasks)
+
+        # Update panel content
+        self._overall_panel.renderable = self.progress
+        self._tasks_panel.renderable = self.tasks_progress.render(all_tasks=all_tasks)
+
+        # Return the existing table with updated panels
         return self.progress_table
 
     def _status_listener(self):
         self.logger.debug("Starting status listener thread...")
+        last_refresh_time = 0
+        refresh_interval = 1  # Minimum time between UI refreshes (in seconds)
         while not self._stop_event.is_set():
             try:
                 progress_update = self.progress_queue.get(timeout=0.1)
                 self.logger.info(f"Received progress update: {progress_update}")
                 self.advance(progress_update)
-                self._refresh()
+                current_time = time.time()
+                if current_time - last_refresh_time >= refresh_interval:
+                    self._refresh()
+                    last_refresh_time = current_time
             except queue.Empty:
                 continue
             except EOFError:  # queue closed
                 break
+        # Final refresh to ensure UI is up-to-date
+        self._refresh(all_tasks=True)
         self.logger.debug("Status listener thread exiting...")
-
-    def get_task_stats(self):
-        """Get statistics about tasks: total, pending, completed, failed."""
-        tasks = self.tasks_progress._tasks.values()
-        total = len(tasks)
-        completed = sum(1 for t in tasks if t.status == "done")
-        failed = sum(1 for t in tasks if t.status == "failed")
-        running = sum(1 for t in tasks if t.status == "running")
-        pending = total - completed - failed - running
-        return {
-            "total": total,
-            "pending": pending,
-            "running": running,
-            "completed": completed,
-            "failed": failed,
-        }
 
 
 class DebugGymLogger(logging.Logger):
@@ -290,8 +309,8 @@ class DebugGymLogger(logging.Logger):
     Multiprocess workers can use this logger to log messages and report progress via
     shared queues, which the main process processes and displays in a Rich UI."""
 
-    LOG_QUEUE = mp.Queue()
-    PROGRESS_QUEUE = mp.Queue()
+    LOG_QUEUE = mp.Queue(maxsize=10000)
+    PROGRESS_QUEUE = mp.Queue(maxsize=10000)
     _is_worker = False
 
     def __init__(
@@ -302,13 +321,16 @@ class DebugGymLogger(logging.Logger):
         mode: str = "a",
     ):
         super().__init__(name)
-
         # If var env "DEBUG_GYM_DEBUG" is set, turn on debug mode
         if os.environ.get("DEBUG_GYM_DEBUG"):
             level = logging.DEBUG
 
+        # Prevent the log messages from being propagated to the root logger
+        self.propagate = False
+
         self.level = level
         self.setLevel(self.level)
+        self.log_file = None  # File handler for logging to a file
         self._live = None  # rich live context manager for updating the UI
         if not self._is_worker:
             self._live = Live()
@@ -352,14 +374,15 @@ class DebugGymLogger(logging.Logger):
         super().handle(record)
 
     def _log_listener(self):
-        while not self._log_listener_stop_event.is_set():
-            try:
-                record = self.LOG_QUEUE.get(timeout=0.1)
-                super().handle(record)
-            except queue.Empty:
-                continue
-            except EOFError:
-                break
+        if not self._is_worker:
+            while not self._log_listener_stop_event.is_set():
+                try:
+                    record = self.LOG_QUEUE.get(timeout=0.1)
+                    super().handle(record)
+                except queue.Empty:
+                    continue
+                except EOFError:
+                    break
 
     def close(self):
         if self._log_listener_thread:
@@ -416,5 +439,20 @@ class DebugGymLogger(logging.Logger):
             max_score=max_score,
             status=status,
         )
-        self.PROGRESS_QUEUE.put(progress_update)
-        self.debug(f"Reported progress: {progress_update}")
+        # Put in queue with backoff strategy
+        max_attempts = 5
+        for attempt in range(max_attempts):
+            try:
+                # print(f"PUT: {progress_update}")
+                self.PROGRESS_QUEUE.put(progress_update, timeout=1.0)
+                self.debug(f"Reported progress: {progress_update}")
+                return
+            except queue.Full:
+                # If queue is full, wait with exponential backoff
+                # print("PUT QUEUE FULL")
+                if attempt < max_attempts - 1:  # Don't sleep on the last attempt
+                    time.sleep(0.1 * (2**attempt))
+        # print("FAIL TO PUT")
+        self.warning(
+            f"Failed to report progress for {problem_id} after {max_attempts} attempts"
+        )
