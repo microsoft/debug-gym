@@ -233,14 +233,26 @@ class LLM(ABC):
 
         tags = llm_config.tags
         if "copilot openai" in tags:
-            from debug_gym.llms import CopilotOpenAILLM
+            try:
+                from debug_gym.llms.copilot import CopilotOpenAILLM
 
-            klass = CopilotOpenAILLM
+                klass = CopilotOpenAILLM
+            except ImportError:
+                logger.warning(
+                    "Copilot OpenAI LLM is not available. Falling back to OpenAI LLM."
+                )
+                klass = None
         elif "copilot claude" in tags:
-            from debug_gym.llms import CopilotClaudeLLM
+            try:
+                from debug_gym.llms.copilot import CopilotClaudeLLM
 
-            klass = CopilotClaudeLLM
-        if "azure openai" in tags:
+                klass = CopilotClaudeLLM
+            except ImportError:
+                logger.warning(
+                    "Copilot Claude LLM is not available. Falling back to Claude LLM."
+                )
+                klass = None
+        elif "azure openai" in tags:
             from debug_gym.llms import AzureOpenAILLM
 
             klass = AzureOpenAILLM

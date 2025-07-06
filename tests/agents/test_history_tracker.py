@@ -21,20 +21,44 @@ def test_history_tracker(build_env_info):
     tool_3 = ToolCall(id="3", name="action3", arguments={})
     tool_4 = ToolCall(id="4", name="action4", arguments={"a4_args": "a4_args"})
     tool_5 = ToolCall(id="5", name="action5", arguments={})
+    action_reasoning_2 = "response_2_1"
+    action_reasoning_3 = "response_3_2"
+    action_reasoning_4 = "response_4_1"
+    action_reasoning_5 = "response_5_2"
     env_info_1 = build_env_info(
-        step_observation="obs1", action=None, score=1, rewrite_counter=0
+        step_observation="obs1",
+        action=None,
+        action_reasoning=None,
+        score=1,
+        rewrite_counter=0,
     )
     env_info_2 = build_env_info(
-        step_observation="obs2", action=tool_2, score=2, rewrite_counter=0
+        step_observation="obs2",
+        action=tool_2,
+        action_reasoning=action_reasoning_2,
+        score=2,
+        rewrite_counter=0,
     )
     env_info_3 = build_env_info(
-        step_observation="obs3", action=tool_3, score=3, rewrite_counter=1
+        step_observation="obs3",
+        action=tool_3,
+        action_reasoning=action_reasoning_3,
+        score=3,
+        rewrite_counter=1,
     )
     env_info_4 = build_env_info(
-        step_observation="obs4", action=tool_4, score=4, rewrite_counter=1
+        step_observation="obs4",
+        action=tool_4,
+        action_reasoning=action_reasoning_4,
+        score=4,
+        rewrite_counter=1,
     )
     env_info_5 = build_env_info(
-        step_observation="obs5", action=tool_5, score=5, rewrite_counter=2
+        step_observation="obs5",
+        action=tool_5,
+        action_reasoning=action_reasoning_5,
+        score=5,
+        rewrite_counter=2,
     )
 
     # single prompt format
@@ -79,6 +103,7 @@ def test_history_tracker(build_env_info):
     # json should return the last step by default
     assert ht.json() == {
         "step_id": 4,
+        "reasoning": action_reasoning_5,
         "action": {"id": "5", "name": "action5", "arguments": {}},
         "obs": "obs5",
         "rewrite_consumed": 2,
@@ -87,6 +112,7 @@ def test_history_tracker(build_env_info):
     # json should return the speficied step
     assert ht.json(2) == {
         "step_id": 2,
+        "reasoning": action_reasoning_3,
         "action": {"id": "3", "name": "action3", "arguments": {}},
         "obs": "obs3",
         "rewrite_consumed": 1,
@@ -95,6 +121,7 @@ def test_history_tracker(build_env_info):
     # output token_usage if it exists
     assert ht.json(3) == {
         "step_id": 3,
+        "reasoning": action_reasoning_4,
         "action": {"id": "4", "name": "action4", "arguments": {"a4_args": "a4_args"}},
         "obs": "obs4",
         "prompt_response_pairs": [
@@ -114,6 +141,7 @@ def test_history_tracker(build_env_info):
 
     assert ht.json(2) == {
         "step_id": 2,
+        "reasoning": action_reasoning_3,
         "action": {"id": "3", "name": "action3", "arguments": {}},
         "obs": "obs3",
         "prompt_response_pairs": [
@@ -133,6 +161,7 @@ def test_history_tracker(build_env_info):
     # for 0-th step, prompt-response pairs should be None
     assert ht.json(0) == {
         "step_id": 0,
+        "reasoning": None,
         "action": None,
         "obs": "obs1",
         "prompt_response_pairs": None,
@@ -179,24 +208,28 @@ def test_build_history_prompt(build_env_info, llm_mock):
     )
     env_info_2 = build_env_info(
         step_observation="obs2",
+        action_reasoning="reasoning_2",
         action={"id": "2", "name": "action2", "arguments": {"a2_args": "a2_args"}},
         score=2,
         rewrite_counter=0,
     )
     env_info_3 = build_env_info(
         step_observation="obs3",
+        action_reasoning="reasoning_3",
         action={"id": "3", "name": "action3", "arguments": {}},
         score=3,
         rewrite_counter=0,
     )
     env_info_4 = build_env_info(
         step_observation="obs4",
+        action_reasoning="reasoning_4",
         action={"id": "4", "name": "action4", "arguments": {"a4_args": "a4_args"}},
         score=4,
         rewrite_counter=1,
     )
     env_info_5 = build_env_info(
         step_observation="obs5",
+        action_reasoning="reasoning_5",
         action={"id": "5", "name": "action5", "arguments": {}},
         score=5,
         rewrite_counter=1,

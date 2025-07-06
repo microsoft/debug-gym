@@ -331,6 +331,7 @@ class RepoEnv(TooledEnv):
             eval_observation=Observation("env", self.last_eval.output),
             dir_tree=self.display_files(),
             current_breakpoints=self.current_breakpoints(),
+            action_reasoning=None,
             action=None,
             done=self.done,
             score=self.score,
@@ -503,7 +504,7 @@ class RepoEnv(TooledEnv):
             f"apply_gold_patch is not implemented for {self.__class__.__name__}."
         )
 
-    def step(self, action: ToolCall, action_reasoning: str) -> EnvInfo:
+    def step(self, action: ToolCall, action_reasoning: str = "") -> EnvInfo:
         # given action, return new obs, and update infos
         # the action space is composed of a few smaller action spaces
         self.clear_all_observations()
