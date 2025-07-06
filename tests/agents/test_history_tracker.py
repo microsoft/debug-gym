@@ -93,7 +93,7 @@ def test_history_tracker(build_env_info):
     }
 
     # output token_usage if it exists
-    assert ht.json(3, include_prompt_response_pairs=True) == {
+    assert ht.json(3) == {
         "step_id": 3,
         "action": {"id": "4", "name": "action4", "arguments": {"a4_args": "a4_args"}},
         "obs": "obs4",
@@ -112,8 +112,7 @@ def test_history_tracker(build_env_info):
         "rewrite_consumed": 1,
     }
 
-    # json should return also the prompt-response pairs if include_prompt_response_pairs is True
-    assert ht.json(2, include_prompt_response_pairs=True) == {
+    assert ht.json(2) == {
         "step_id": 2,
         "action": {"id": "3", "name": "action3", "arguments": {}},
         "obs": "obs3",
@@ -132,7 +131,7 @@ def test_history_tracker(build_env_info):
     }
 
     # for 0-th step, prompt-response pairs should be None
-    assert ht.json(0, include_prompt_response_pairs=True) == {
+    assert ht.json(0) == {
         "step_id": 0,
         "action": None,
         "obs": "obs1",

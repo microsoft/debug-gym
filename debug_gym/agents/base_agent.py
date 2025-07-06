@@ -247,7 +247,7 @@ class BaseAgent:
             if debug:
                 breakpoint()
 
-            info = self.env.step(llm_response.tool)
+            info = self.env.step(llm_response.tool, llm_response.response)
             self.history.step(info, llm_response)
 
             if info.done or info.rewrite_counter >= self.config["max_rewrite_steps"]:
@@ -302,10 +302,7 @@ class BaseAgent:
             "logger": str(self.logger.log_file),
         }
         for step_id in range(len(self.history)):
-            step_json = self.history.json(
-                step_id,
-                include_prompt_response_pairs=self.config["log_prompt_response_pairs"],
-            )
+            step_json = self.history.json(step_id)
             jsonl_output["log"].append(step_json)
         os.makedirs(pjoin(self._output_path, task_name), exist_ok=True)
         with open(pjoin(self._output_path, task_name, "debug_gym.jsonl"), "w") as f:

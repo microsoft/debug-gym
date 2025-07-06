@@ -185,3 +185,4 @@ vscode/node_modules
 vscode/package-lock.json
 .vscode
 debug_gym/llms/claude.py
+debug_gym/llms/copilot.py

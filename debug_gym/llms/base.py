@@ -232,6 +232,14 @@ class LLM(ABC):
         llm_config = LLMConfigRegistry.from_file(llm_config_file_path)[llm_name]
 
         tags = llm_config.tags
+        if "copilot openai" in tags:
+            from debug_gym.llms import CopilotOpenAILLM
+
+            klass = CopilotOpenAILLM
+        elif "copilot claude" in tags:
+            from debug_gym.llms import CopilotClaudeLLM
+
+            klass = CopilotClaudeLLM
         if "azure openai" in tags:
             from debug_gym.llms import AzureOpenAILLM
 

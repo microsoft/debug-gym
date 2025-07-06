@@ -120,6 +120,10 @@ class AnthropicLLM(LLM):
                     "role": "assistant",
                     "content": [
                         {
+                            "type": "text",
+                            "text": filter_non_utf8(response[0].response),
+                        },
+                        {
                             "type": "tool_use",
                             "id": response[
                                 0
@@ -128,7 +132,7 @@ class AnthropicLLM(LLM):
                             "input": response[
                                 0
                             ].tool.arguments,  # {'path': 'hangman_test.py'}
-                        }
+                        },
                     ],
                 }
             )
