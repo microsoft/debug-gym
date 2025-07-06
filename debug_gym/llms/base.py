@@ -303,7 +303,7 @@ class LLM(ABC):
 
     @abstractmethod
     def format_tool_call_history(
-        self, history_info: EnvInfo, response: LLMResponse
+        self, history_info: EnvInfo, response: list[LLMResponse]
     ) -> list[dict]:
         """Format the tool call history for different LLMs.
         The method should be overridden by subclasses.
