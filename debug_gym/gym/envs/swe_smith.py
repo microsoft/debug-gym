@@ -5,7 +5,6 @@ import datasets
 import docker
 import yaml
 from datasets import load_from_disk
-from rich.markup import escape
 from swesmith.build_repo.download_images import DOCKER_ORG, TAG
 from swesmith.constants import MAP_REPO_TO_SPECS
 from swesmith.harness.grading import TestStatus
@@ -85,9 +84,7 @@ class SWESmithEnv(SWEBenchEnv):
             for image_name in missing_images:
                 docker_hub_image = image_name.replace("__", "_1776_")
                 self.logger.info(
-                    escape(
-                        f"Pulling Docker image `{docker_hub_image}` to `{image_name}`."
-                    )
+                    f"Pulling Docker image `{docker_hub_image}` to `{image_name}`."
                 )
                 client.images.pull(docker_hub_image)
                 # Rename images via tagging
@@ -230,7 +227,7 @@ class SWESmithEnv(SWEBenchEnv):
             if status not in (TestStatus.PASSED.value, TestStatus.XFAIL.value)
         }
         if not_passed_tests:
-            self.logger.debug(f"Not passed tests: {escape(str(not_passed_tests))}")
+            self.logger.debug(f"Not passed tests: {not_passed_tests}")
 
         assert score <= self.max_score
         self.logger.debug(

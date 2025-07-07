@@ -1,5 +1,3 @@
-from rich.markup import escape
-
 from debug_gym.gym.envs.env import EnvInfo
 from debug_gym.gym.tools.tool import EnvironmentTool, ToolCall
 from debug_gym.gym.utils import filter_non_utf8
@@ -51,10 +49,8 @@ class AnthropicLLM(LLM):
             return response.input_tokens
         except Exception as e:
             self.logger.warning(
-                escape(
-                    f"Error calling Claude token count API: {e!r}. "
-                    f"The message was: {messages}. Will return 0 tokens."
-                )
+                f"Error calling Claude token count API: {e!r}. "
+                f"The message was: {messages}. Will return 0 tokens."
             )
         return 0
 
@@ -70,10 +66,8 @@ class AnthropicLLM(LLM):
         )
 
         self.logger.debug(
-            escape(
-                f"Error calling {self.model_name}: {exception_full_name!r} "
-                f"{exception.message if hasattr(exception, 'message') else exception}"
-            )
+            f"Error calling {self.model_name}: {exception_full_name!r} "
+            f"{exception.message if hasattr(exception, 'message') else exception}"
         )
         return exception_full_name in _errors
 

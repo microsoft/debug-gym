@@ -130,7 +130,11 @@ def test_run_command_with_raise(tmp_path, get_swe_env):
     status, output = swe_env.run_command_with_raise("echo 'Hello World'")
     assert output == "Hello World"
     with pytest.raises(
-        ValueError, match="Failed to run command: cat /non_existent_file"
+        ValueError,
+        match=(
+            "Failed to run command `cat /non_existent_file`:\n"
+            "cat: /non_existent_file: No such file or directory"
+        ),
     ):
         swe_env.run_command_with_raise("cat /non_existent_file")
     # add sudo if apt-get in command
@@ -267,7 +271,7 @@ def test_patch_property(tmp_path, get_swe_env):
 
     # Add the file to git
     swe_env.terminal.run(f"git add {test_file}")
-    swe_env.terminal.run(f"git commit -m 'Add test file'")
+    swe_env.terminal.run("git commit -m 'Add test file'")
 
     # Now modify the file
     modified_content = """def hello_world():

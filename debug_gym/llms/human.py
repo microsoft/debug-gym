@@ -4,7 +4,6 @@ import sys
 from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
-from rich.markup import escape
 
 from debug_gym.gym.envs.env import EnvInfo
 from debug_gym.gym.tools.tool import EnvironmentTool, ToolCall
@@ -555,9 +554,7 @@ class Human(LLM):
                 )
                 action = session.prompt("\n> ")
             else:
-                self.logger.info(
-                    f"Available commands: {escape(str(available_commands))}"
-                )
+                self.logger.info(f"Available commands: {available_commands}")
                 action = input("> ")
 
             parser = CommandParser()
@@ -566,7 +563,7 @@ class Human(LLM):
                 error_message = "\n".join(
                     f"Error at position {pos}: {msg}" for msg, pos in errors
                 )
-                self.logger.error(f"Invalid input: {escape(error_message)}")
+                self.logger.error(f"Invalid input: {error_message}")
                 retry_count += 1
                 continue
 

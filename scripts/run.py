@@ -4,8 +4,6 @@ import uuid
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 
-from rich.markup import escape
-
 from debug_gym.agents.base_agent import AGENT_REGISTRY, create_agent
 from debug_gym.agents.utils import load_config
 from debug_gym.gym.envs import select_env
@@ -61,13 +59,11 @@ def run_agent(args, problem, config):
 
     except Exception as e:
         task_logger.error(
-            escape(
-                f"Task Error: {problem} - {e!r}. Run with --very-verbose "
-                "or check {task_logger.log_file} for more information."
-            )
+            f"Task Error: {problem} - {e!r}. Run with --very-verbose "
+            "or check {task_logger.log_file} for more information."
         )
         task_logger.debug(
-            escape(f"Task {problem} generated an exception: {e!r}", exc_info=True)
+            f"Task {problem} generated an exception: {e!r}", exc_info=True
         )
         if args.debug:
             raise e

@@ -11,6 +11,7 @@ from typing import Any, Dict
 
 from rich.live import Live
 from rich.logging import RichHandler
+from rich.markup import escape
 from rich.padding import Padding
 from rich.panel import Panel
 from rich.progress import BarColumn, Progress, SpinnerColumn, TextColumn
@@ -368,6 +369,10 @@ class DebugGymLogger(logging.Logger):
             while not self._log_listener_stop_event.is_set():
                 try:
                     record = self.LOG_QUEUE.get(timeout=0.1)
+                    # escape the message to avoid issues with Rich
+                    # logger.info(f"[green]{escape(text)}[/green]", extra={"already_escaped": True})
+                    if not getattr(record, "already_escaped", False):
+                        record.msg = escape(record.msg)
                     super().handle(record)
                 except queue.Empty:
                     continue
