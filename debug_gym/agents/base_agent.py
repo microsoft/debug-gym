@@ -134,11 +134,12 @@ class BaseAgent:
         of the LLM's context length, if any."""
         message = filter_non_utf8(message)
         count_tokens = count_tokens or self.llm.count_tokens
-        max_length = (
-            max_length
-            or max_length_percentage * self.llm.context_length
-            or self.llm.context_length
-        )
+        if self.llm.context_length is not None:
+            max_length = (
+                max_length
+                or (max_length_percentage * self.llm.context_length)
+                or self.llm.context_length
+            )
 
         if count_tokens is None or max_length is None or max_length <= 0:
             return message
