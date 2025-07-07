@@ -240,7 +240,7 @@ class LLM(ABC):
 
             klass = OpenAILLM
 
-        llm = klass(llm_config.name, logger=logger, llm_config=llm_config)
+        llm = klass(llm_config.model_name, logger=logger, llm_config=llm_config)
         return llm
 
     @classmethod
