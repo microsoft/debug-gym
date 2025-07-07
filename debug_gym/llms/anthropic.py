@@ -51,9 +51,10 @@ class AnthropicLLM(LLM):
             return response.input_tokens
         except Exception as e:
             self.logger.warning(
-                f"Error calling Claude token count API: {escape(str(e))}. "
-                f"The message was: {escape(str(messages))}."
-                "Will return 0 tokens."
+                escape(
+                    f"Error calling Claude token count API: {e!r}. "
+                    f"The message was: {messages}. Will return 0 tokens."
+                )
             )
         return 0
 
@@ -69,8 +70,10 @@ class AnthropicLLM(LLM):
         )
 
         self.logger.debug(
-            f"Error calling {self.model_name}: {exception_full_name!r} "
-            f"{escape(str(exception.message if hasattr(exception, 'message') else exception))}"
+            escape(
+                f"Error calling {self.model_name}: {exception_full_name!r} "
+                f"{exception.message if hasattr(exception, 'message') else exception}"
+            )
         )
         return exception_full_name in _errors
 

@@ -166,19 +166,19 @@ class ShellSession:
         output = ""
         if not self.is_running:
             output += self.start()
-            self.logger.debug(f"{self}: Initial output: {escape(output)}")
+            self.logger.debug(escape(f"{self}: Initial output: {output!r}"))
 
-        self.logger.debug(f"{self}: Running {escape(str(command))}")
+        self.logger.debug(escape(f"{self}: Running {command!r}"))
         os.write(self.filedescriptor, command.encode("utf-8") + b"\n")
 
         try:
             output += self.read(read_until=read_until, timeout=timeout)
         except TimeoutError as e:
             self.close()
-            self.logger.debug(f"{escape(str(e))}")
+            self.logger.debug(escape(f"{e!r}"))
             raise
 
-        self.logger.debug(f"{self}: Output: {escape(output)}")
+        self.logger.debug(escape(f"{self}: Output: {output!r}"))
         return output
 
     def __str__(self):
