@@ -210,7 +210,7 @@ class LLM(ABC):
     def instantiate_from_config(
         cls,
         llm_config: LLMConfig,
-        logger: DebugGymLogger | None = None,
+        logger: DebugGymLogger | str | None = None,
     ) -> "LLM":
         """Creates an instance of the appropriate LLM class based on the configuration.
 
@@ -271,11 +271,6 @@ class LLM(ABC):
             return Human(llm_name, logger=logger)
 
         if llm_config is None:
-            if llm_config_file_path is None:
-                raise ValueError(
-                    "Either llm_config or llm_config_file_path must be provided."
-                )
-
             llm_config = LLMConfigRegistry.from_file(llm_config_file_path)[llm_name]
 
         return cls.instantiate_from_config(llm_config, logger)
