@@ -178,6 +178,7 @@ def test_format_tool_call_history_initial_state(mock_llm_config, logger_mock):
         eval_observation=Observation(source="tool1", observation=""),
         dir_tree="",
         current_breakpoints="",
+        action_reasoning=None,  # No reasoning yet
         action=None,  # No action taken yet
         instructions={},
         score=0,
@@ -231,6 +232,7 @@ def test_format_tool_call_history_with_action(mock_llm_config, logger_mock):
         eval_observation=Observation(source="tool_456", observation=""),
         dir_tree="",
         current_breakpoints="",
+        action_reasoning="Edited the file to fix the bug",  # Reasoning for action
         action=action,  # Action was taken
         instructions={},
         score=0,
@@ -241,13 +243,10 @@ def test_format_tool_call_history_with_action(mock_llm_config, logger_mock):
     )
 
     # Create LLMResponse with tool call
-    tool_call = ToolCall(
-        id="call_789", name="run", arguments={"command": "python test.py"}
-    )
     llm_response = LLMResponse(
         prompt=[{"role": "user", "content": "test"}],
-        response="test response",
-        tool=tool_call,
+        response="Edited the file to fix the bug",
+        tool=action,
     )
 
     messages = llm.format_tool_call_history(history_info, [llm_response])
@@ -256,12 +255,13 @@ def test_format_tool_call_history_with_action(mock_llm_config, logger_mock):
     # First message should be the assistant's tool call
     assert messages[0]["role"] == "assistant"
     assert messages[0]["tool_calls"][0]["type"] == "function"
-    assert messages[0]["tool_calls"][0]["id"] == "call_789"
-    assert messages[0]["tool_calls"][0]["function"]["name"] == "run"
+    assert messages[0]["tool_calls"][0]["id"] == "call_456"
+    assert messages[0]["tool_calls"][0]["function"]["name"] == "edit"
     assert (
         messages[0]["tool_calls"][0]["function"]["arguments"]
-        == '{"command": "python test.py"}'
+        == '{"path": "test.py", "content": "new content"}'
     )
+    assert messages[0]["content"] == "Edited the file to fix the bug"
 
     # Second message should be the tool result
     assert messages[1]["role"] == "tool"
@@ -291,30 +291,6 @@ def test_format_tool_call_history_complex_arguments(mock_llm_config, logger_mock
     """Test format_tool_call_history with complex nested arguments"""
     llm = OpenAILLM(model_name="openai", logger=logger_mock)
 
-    # Create action that was taken
-    action = ToolCall(
-        id="call_456",
-        name="edit",
-        arguments={"path": "test.py", "content": "new content"},
-    )
-    # Create EnvInfo for initial state
-    history_info = EnvInfo(
-        step_observation=Observation(
-            source="tool_456", observation="Complex operation completed"
-        ),
-        all_observations=[],
-        eval_observation=Observation(source="tool_456", observation=""),
-        dir_tree="",
-        current_breakpoints="",
-        action=action,
-        instructions={},
-        score=0,
-        max_score=100,
-        done=False,
-        rewrite_counter=0,
-        tools=[],
-    )
-
     # Create LLMResponse with complex tool call arguments
     complex_args = {
         "config": {
@@ -324,11 +300,30 @@ def test_format_tool_call_history_complex_arguments(mock_llm_config, logger_mock
         },
         "files": ["test1.py", "test2.py"],
     }
-    tool_call = ToolCall(id="call_complex", name="configure", arguments=complex_args)
+    action = ToolCall(id="call_complex", name="configure", arguments=complex_args)
+    # Create EnvInfo for initial state
+    history_info = EnvInfo(
+        step_observation=Observation(
+            source="tool_456", observation="Complex operation completed"
+        ),
+        all_observations=[],
+        eval_observation=Observation(source="tool_456", observation=""),
+        dir_tree="",
+        current_breakpoints="",
+        action_reasoning="Configured the environment with complex settings",
+        action=action,
+        instructions={},
+        score=0,
+        max_score=100,
+        done=False,
+        rewrite_counter=0,
+        tools=[],
+    )
+
     llm_response = LLMResponse(
         prompt=[{"role": "user", "content": "test"}],
-        response="test response",
-        tool=tool_call,
+        response="Configured the environment with complex settings",
+        tool=action,
     )
 
     messages = llm.format_tool_call_history(history_info, [llm_response])
@@ -341,8 +336,9 @@ def test_format_tool_call_history_complex_arguments(mock_llm_config, logger_mock
     assert messages[0]["tool_calls"][0]["function"]["name"] == "configure"
     parsed_args = json.loads(messages[0]["tool_calls"][0]["function"]["arguments"])
     assert parsed_args == complex_args
+    assert messages[0]["content"] == "Configured the environment with complex settings"
 
     assert messages[1]["role"] == "tool"
-    assert messages[1]["tool_call_id"] == "call_456"
-    assert messages[1]["name"] == "edit"
+    assert messages[1]["tool_call_id"] == "call_complex"
+    assert messages[1]["name"] == "configure"
     assert messages[1]["content"] == "Complex operation completed"

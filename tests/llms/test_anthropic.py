@@ -324,6 +324,7 @@ def test_format_tool_call_history_initial_state(mock_llm_config, logger_mock):
         eval_observation=Observation(source="tool1", observation=""),
         dir_tree="",
         current_breakpoints="",
+        action_reasoning=None,  # No reasoning yet
         action=None,  # No action taken yet
         instructions={},
         score=0,
@@ -366,6 +367,7 @@ def test_format_tool_call_history_with_action(mock_llm_config, logger_mock):
         eval_observation=Observation(source="tool_456", observation=""),
         dir_tree="",
         current_breakpoints="",
+        action_reasoning="Edited the file to fix the bug",
         action=action,  # Action was taken
         instructions={},
         score=0,
@@ -374,15 +376,11 @@ def test_format_tool_call_history_with_action(mock_llm_config, logger_mock):
         rewrite_counter=0,
         tools=[],
     )
-
-    # Create LLMResponse with tool call
-    tool_call = ToolCall(
-        id="tool_789", name="run", arguments={"command": "python test.py"}
-    )
+    # Create LLMResponse with the action
     llm_response = LLMResponse(
         prompt=[{"role": "user", "content": "test"}],
-        response="test response",
-        tool=tool_call,
+        response="Edited the file to fix the bug",
+        tool=action,
     )
 
     messages = llm.format_tool_call_history(history_info, [llm_response])
@@ -390,10 +388,15 @@ def test_format_tool_call_history_with_action(mock_llm_config, logger_mock):
     assert len(messages) == 2
     # First message should be the assistant's tool use
     assert messages[0]["role"] == "assistant"
-    assert messages[0]["content"][0]["type"] == "tool_use"
-    assert messages[0]["content"][0]["id"] == "tool_789"
-    assert messages[0]["content"][0]["name"] == "run"
-    assert messages[0]["content"][0]["input"] == {"command": "python test.py"}
+    assert messages[0]["content"][0]["type"] == "text"
+    assert messages[0]["content"][0]["text"] == "Edited the file to fix the bug"
+    assert messages[0]["content"][1]["type"] == "tool_use"
+    assert messages[0]["content"][1]["id"] == "tool_456"
+    assert messages[0]["content"][1]["name"] == "edit"
+    assert messages[0]["content"][1]["input"] == {
+        "path": "test.py",
+        "content": "new content",
+    }
 
     # Second message should be the tool result
     assert messages[1]["role"] == "user"

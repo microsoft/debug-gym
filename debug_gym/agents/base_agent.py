@@ -134,11 +134,12 @@ class BaseAgent:
         of the LLM's context length, if any."""
         message = filter_non_utf8(message)
         count_tokens = count_tokens or self.llm.count_tokens
-        max_length = (
-            max_length
-            or max_length_percentage * self.llm.context_length
-            or self.llm.context_length
-        )
+        if self.llm.context_length is not None:
+            max_length = (
+                max_length
+                or (max_length_percentage * self.llm.context_length)
+                or self.llm.context_length
+            )
 
         if count_tokens is None or max_length is None or max_length <= 0:
             return message
@@ -247,7 +248,7 @@ class BaseAgent:
             if debug:
                 breakpoint()
 
-            info = self.env.step(llm_response.tool)
+            info = self.env.step(llm_response.tool, llm_response.response)
             self.history.step(info, llm_response)
 
             if info.done or info.rewrite_counter >= self.config["max_rewrite_steps"]:
@@ -302,10 +303,7 @@ class BaseAgent:
             "logger": str(self.logger.log_file),
         }
         for step_id in range(len(self.history)):
-            step_json = self.history.json(
-                step_id,
-                include_prompt_response_pairs=self.config["log_prompt_response_pairs"],
-            )
+            step_json = self.history.json(step_id)
             jsonl_output["log"].append(step_json)
         os.makedirs(pjoin(self._output_path, task_name), exist_ok=True)
         with open(pjoin(self._output_path, task_name, "debug_gym.jsonl"), "w") as f:

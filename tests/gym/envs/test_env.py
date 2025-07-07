@@ -270,7 +270,10 @@ def test_step(
     env = RepoEnv(path=".")
     env.last_eval = EvalOutput(success=False, output="1 failed, 0 passed")
     mock_get_triggered_tools.return_value = None, [mock_pdb_tool, {"command": "b 10"}]
-    infos = env.step({"id": "123", "name": "pdb", "arguments": {"command": "b 10"}})
+    infos = env.step(
+        {"id": "123", "name": "pdb", "arguments": {"command": "b 10"}},
+        "let me set a breakpoint at line 10",
+    )
 
     mock_get_triggered_tools.assert_called_once_with(
         {"id": "123", "name": "pdb", "arguments": {"command": "b 10"}}
@@ -330,6 +333,7 @@ def test_reset(
 |-- subdir/
   |-- subfile1.txt""",
         current_breakpoints="No breakpoints are set.",
+        action_reasoning=None,
         action=None,
         instructions="",
         score=0,
@@ -348,7 +352,7 @@ def test_rewrite_counter(env):
     env.add_tool(rewrite_tool)
 
     rewrite_call = ToolCall(id="rewrite_id", name="rewrite", arguments={})
-    env_info = env.step(rewrite_call)
+    env_info = env.step(rewrite_call, "let me rewrite the code")
     assert env.rewrite_counter == 1
     assert env_info.rewrite_counter == 1
     rewrite_obs = Observation(
@@ -366,7 +370,7 @@ def test_rewrite_counter(env):
             "new_code": "print('Hello')",
         },
     )
-    env_info = env.step(rewrite_call)
+    env_info = env.step(rewrite_call, "let me rewrite the file1.txt")
     assert env.rewrite_counter == 2
     assert env_info.rewrite_counter == 2
     rewrite_obs = Observation(

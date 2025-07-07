@@ -172,6 +172,7 @@ class OpenAILLM(LLM):
                             },
                         },
                     ],
+                    "content": filter_non_utf8(f"{response[0].response}"),
                 }
             )
         if history_info.action is None:
@@ -209,7 +210,7 @@ class OpenAILLM(LLM):
                 model=self.config.model,
                 messages=messages,
                 tools=self.define_tools(tools),
-                tool_choice="required",
+                tool_choice="auto",
                 **kwargs,
             )
         except openai.BadRequestError as e:
