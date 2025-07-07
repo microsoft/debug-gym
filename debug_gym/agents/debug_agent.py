@@ -61,3 +61,18 @@ class Debug_5_Agent(DebugAgent):
                 break
 
         return info.done
+
+@register_agent
+class ExplanationAgent(BaseAgent):
+    name = "explanation_agent"
+    system_prompt = DebugAgent.system_prompt
+    def __init__(self, explanation: str, **kwargs):
+        self.explanation = self.get_explanation_from_file("explanations/single_shot_explanation.txt")
+        self.system_prompt = f"{self.system_prompt} {explanation}"
+        super().__init__(**kwargs)
+    
+    def get_explanation_from_file(self, text_file: str):
+        """Load the explanation from a text file."""
+        with open(text_file, "r") as file:
+            explanation = file.read().strip()
+        return explanation
