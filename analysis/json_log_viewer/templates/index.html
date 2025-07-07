@@ -707,22 +707,22 @@
                         <h3><i class="fas fa-search-plus"></i> Step ${stepId}</h3>
                         
                         <div class="detail-section">
-                            <div class="detail-header expanded" onclick="toggleSection('action-section')">
-                                <span><i class="fas fa-play"></i> Action</span>
-                                <i class="fas fa-chevron-down expand-icon"></i>
-                            </div>
-                            <div class="detail-content expanded" id="action-section">
-                                <div class="json-viewer" id="action-json"></div>
-                            </div>
-                        </div>
-
-                        <div class="detail-section">
                             <div class="detail-header expanded" onclick="toggleSection('reasoning-section')">
                                 <span><i class="fas fa-brain"></i> Reasoning</span>
                                 <i class="fas fa-chevron-down expand-icon"></i>
                             </div>
                             <div class="detail-content expanded" id="reasoning-section">
                                 <div class="json-viewer" style="white-space: pre-wrap;">${data.reasoning || 'None'}</div>
+                            </div>
+                        </div>
+
+                        <div class="detail-section">
+                            <div class="detail-header expanded" onclick="toggleSection('action-section')">
+                                <span><i class="fas fa-play"></i> Action</span>
+                                <i class="fas fa-chevron-down expand-icon"></i>
+                            </div>
+                            <div class="detail-content expanded" id="action-section">
+                                <div class="json-viewer" id="action-json"></div>
                             </div>
                         </div>
 
