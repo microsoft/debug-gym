@@ -110,35 +110,58 @@ class AnthropicLLM(LLM):
         )
 
     def format_tool_call_history(
-        self, history_info: EnvInfo, response: LLMResponse
+        self, history_info: EnvInfo, response: list[LLMResponse]
     ) -> list[dict]:
-        _messages = [
-            {
-                "role": "assistant",
-                "content": [
-                    {
-                        "type": "tool_use",
-                        "id": response[0].tool.id,  # 'toolu_01SdR84CsnTKRpdH4zwFjvGj'
-                        "name": response[0].tool.name,  # 'view'
-                        "input": response[
-                            0
-                        ].tool.arguments,  # {'path': 'hangman_test.py'}
-                    }
-                ],
-            },
-            {
-                "role": "user",
-                "content": [
-                    {
-                        "type": "tool_result",
-                        "tool_use_id": history_info.action.id,  # 'toolu_01SdR84CsnTKRpdH4zwFjvGj'
-                        "content": filter_non_utf8(
-                            f"{history_info.step_observation.observation}"
-                        ),  # 'Viewing `hangman_test.py`. The file is read-only, it is not editable.'
-                    }
-                ],
-            },
-        ]
+        _messages = []
+        if isinstance(response, list) and len(response) > 0:
+            _messages.append(
+                {
+                    "role": "assistant",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": filter_non_utf8(response[0].response),
+                        },
+                        {
+                            "type": "tool_use",
+                            "id": response[
+                                0
+                            ].tool.id,  # 'toolu_01SdR84CsnTKRpdH4zwFjvGj'
+                            "name": response[0].tool.name,  # 'view'
+                            "input": response[
+                                0
+                            ].tool.arguments,  # {'path': 'hangman_test.py'}
+                        },
+                    ],
+                }
+            )
+        if history_info.action is None:
+            # This is the initial state, no action taken yet
+            _messages.append(
+                {
+                    "role": "user",
+                    "content": filter_non_utf8(
+                        f"{history_info.step_observation.observation}"
+                    ),
+                }
+            )
+        else:
+            # This is a step with an action taken
+            _messages.append(
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "tool_result",
+                            "tool_use_id": history_info.action.id,  # 'toolu_01SdR84CsnTKRpdH4zwFjvGj'
+                            "content": filter_non_utf8(
+                                f"{history_info.step_observation.observation}"
+                            ),  # 'Viewing `hangman_test.py`. The file is read-only, it is not editable.'
+                        }
+                    ],
+                }
+            )
+
         return _messages
 
     def generate(self, messages, tools, **kwargs) -> LLMResponse:

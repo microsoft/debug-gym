@@ -24,6 +24,7 @@ class EnvInfo:
     eval_observation: Observation  # last eval observation
     dir_tree: str
     current_breakpoints: str
+    action_reasoning: str | None
     action: ToolCall | None
     instructions: dict
     score: int
@@ -160,6 +161,7 @@ class RepoEnv(TooledEnv):
         auto_list: bool = True,
         terminal: Terminal | None = None,
         logger: DebugGymLogger | None = None,
+        **kwargs,
     ):
         super().__init__()
 
@@ -176,7 +178,8 @@ class RepoEnv(TooledEnv):
         self.logger = logger or DebugGymLogger("debug-gym")
         self.infos: EnvInfo | None = None
         self.rng = None
-        self.tempdir = None
+        self._tempdir = None
+        self.additional_kwargs = kwargs
 
         self.setup_workspace(
             path=path,
@@ -218,10 +221,11 @@ class RepoEnv(TooledEnv):
         self.path = Path(path)
 
         # Create a random temporary folder for storing a backup of the repo.
-        self.tempdir = tempfile.TemporaryDirectory(prefix="RepoEnv-")
-        self.working_dir = Path(self.tempdir.name)
+        self._tempdir = tempfile.TemporaryDirectory(prefix="RepoEnv-")
+        self.working_dir = Path(self._tempdir.name).resolve()
+
         # Make sure to cleanup that folder once done.
-        atexit.register(self.tempdir.cleanup)
+        atexit.register(self._tempdir.cleanup)
 
         self.logger.debug(f"Working directory: {self.working_dir}")
         shutil.copytree(self.path, self.working_dir, dirs_exist_ok=True, symlinks=True)
@@ -268,8 +272,8 @@ class RepoEnv(TooledEnv):
         return entrypoint
 
     def cleanup_workspace(self):
-        if self.tempdir:
-            self.tempdir.cleanup()
+        if self._tempdir:
+            self._tempdir.cleanup()
 
     @property
     def instructions(self) -> str:
@@ -327,6 +331,7 @@ class RepoEnv(TooledEnv):
             eval_observation=Observation("env", self.last_eval.output),
             dir_tree=self.display_files(),
             current_breakpoints=self.current_breakpoints(),
+            action_reasoning=None,
             action=None,
             done=self.done,
             score=self.score,
@@ -499,7 +504,7 @@ class RepoEnv(TooledEnv):
             f"apply_gold_patch is not implemented for {self.__class__.__name__}."
         )
 
-    def step(self, action: ToolCall) -> EnvInfo:
+    def step(self, action: ToolCall, action_reasoning: str = "") -> EnvInfo:
         # given action, return new obs, and update infos
         # the action space is composed of a few smaller action spaces
         self.clear_all_observations()
@@ -535,6 +540,7 @@ class RepoEnv(TooledEnv):
             eval_observation=Observation("env", self.last_eval.output),
             dir_tree=self.display_files(),
             current_breakpoints=self.current_breakpoints(),
+            action_reasoning=action_reasoning,
             action=action,
             instructions=self.instructions,
             score=self.score,

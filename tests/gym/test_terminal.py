@@ -1,5 +1,9 @@
+import platform
+import re
 import subprocess
+import tempfile
 import time
+from pathlib import Path
 
 import docker
 import pytest
@@ -13,12 +17,36 @@ from debug_gym.gym.terminal import (
     select_terminal,
 )
 
+
+def is_docker_running():
+    try:
+        subprocess.check_output(["docker", "ps"])
+        return True
+    except Exception:
+        return False
+
+
 if_docker_running = pytest.mark.skipif(
-    not subprocess.check_output(["docker", "ps"]),
+    not is_docker_running(),
     reason="Docker not running",
 )
 
 
+if_is_linux = pytest.mark.skipif(
+    platform.system() != "Linux",
+    reason="Interactive ShellSession (pty) requires Linux.",
+)
+
+
+@pytest.fixture
+def tmp_dir_prefix(tmp_path):
+    """Expected tmp_dir_prefix for a terminal session."""
+    tmp_dir = tempfile.TemporaryDirectory(prefix="Terminal-")
+    tmp_dir_prefix = str(Path(tmp_dir.name).resolve()).split("Terminal-")[0]
+    return tmp_dir_prefix
+
+
+@if_is_linux
 def test_shell_session_run(tmp_path):
     working_dir = str(tmp_path)
     shell_command = "/bin/bash --noprofile --norc"
@@ -72,13 +100,13 @@ def test_shell_session_timeout(tmp_path):
     assert shell.is_running is False
 
 
-def test_terminal_init():
+def test_terminal_init(tmp_dir_prefix):
     terminal = Terminal()
     assert terminal.session_commands == []
     assert terminal.env_vars["NO_COLOR"] == "1"
     assert terminal.env_vars["PS1"] == DEFAULT_PS1
     assert len(terminal.env_vars) > 2  # NO_COLOR, PS1 + os env vars
-    assert terminal.working_dir.startswith("/tmp/Terminal-")
+    assert terminal.working_dir.startswith(tmp_dir_prefix)
 
 
 def test_terminal_init_no_os_env_vars():
@@ -113,13 +141,13 @@ def test_terminal_run(tmp_path):
     assert terminal.working_dir == working_dir
 
 
-def test_terminal_run_tmp_working_dir(tmp_path):
+def test_terminal_run_tmp_working_dir(tmp_path, tmp_dir_prefix):
     terminal = Terminal()
     entrypoint = "echo 'Hello World'"
     success, output = terminal.run(entrypoint, timeout=1)
     assert success is True
     assert output == "Hello World"
-    assert terminal.working_dir.startswith("/tmp/Terminal-")
+    assert terminal.working_dir.startswith(tmp_dir_prefix)
 
 
 @pytest.mark.parametrize(
@@ -143,7 +171,10 @@ def test_terminal_run_failure(tmp_path):
     entrypoint = "ls non_existent_dir"
     success, output = terminal.run(entrypoint, timeout=1)
     assert success is False
-    assert output == ("ls: cannot access 'non_existent_dir': No such file or directory")
+    # Linux: "ls: cannot access 'non_existent_dir': No such file or directory"
+    # MacOS: "ls: non_existent_dir: No such file or directory"
+    pattern = r"ls:.*non_existent_dir.*No such file or directory"
+    assert re.search(pattern, output)
 
 
 def test_terminal_session(tmp_path):
@@ -168,11 +199,11 @@ def test_terminal_session(tmp_path):
 
 
 @if_docker_running
-def test_docker_terminal_init():
+def test_docker_terminal_init(tmp_dir_prefix):
     terminal = DockerTerminal()
     assert terminal.session_commands == []
     assert terminal.env_vars == {"NO_COLOR": "1", "PS1": DEFAULT_PS1}
-    assert terminal.working_dir.startswith("/tmp/Terminal-")
+    assert terminal.working_dir.startswith(tmp_dir_prefix)
     assert terminal.base_image == "ubuntu:latest"
     assert terminal.volumes[terminal.working_dir] == {
         "bind": terminal.working_dir,
@@ -264,6 +295,7 @@ def test_docker_terminal_read_only_volume(tmp_path):
     assert output == ""
 
 
+@if_is_linux
 @if_docker_running
 def test_docker_terminal_session(tmp_path):
     # same as test_terminal_session but with DockerTerminal

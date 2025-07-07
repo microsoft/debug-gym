@@ -130,10 +130,10 @@ def test_setup_workspace(mock_atexit_register, mock_tempdir, tmp_path):
 
     assert repo_env.path == path_dir
     assert repo_env.working_dir == working_dir
-    assert repo_env.tempdir.startswith("RepoEnv-")
+    assert repo_env._tempdir.startswith("RepoEnv-")
     with open(working_dir / "file.py", "r") as f:
         assert f.read() == file_content
-    mock_atexit_register.assert_called_once_with(repo_env.tempdir.cleanup)
+    mock_atexit_register.assert_called_once_with(repo_env._tempdir.cleanup)
 
 
 @patch("tempfile.TemporaryDirectory")
@@ -156,7 +156,7 @@ def test_cleanup_workspace(mock_tempdir):
     mock_tempdir_instance = MagicMock()
     mock_tempdir.return_value = mock_tempdir_instance
     env = RepoEnv()
-    env.tempdir = mock_tempdir_instance
+    env._tempdir = mock_tempdir_instance
     env.cleanup_workspace()
 
     mock_tempdir_instance.cleanup.assert_called_once()
@@ -270,7 +270,10 @@ def test_step(
     env = RepoEnv(path=".")
     env.last_eval = EvalOutput(success=False, output="1 failed, 0 passed")
     mock_get_triggered_tools.return_value = None, [mock_pdb_tool, {"command": "b 10"}]
-    infos = env.step({"id": "123", "name": "pdb", "arguments": {"command": "b 10"}})
+    infos = env.step(
+        {"id": "123", "name": "pdb", "arguments": {"command": "b 10"}},
+        "let me set a breakpoint at line 10",
+    )
 
     mock_get_triggered_tools.assert_called_once_with(
         {"id": "123", "name": "pdb", "arguments": {"command": "b 10"}}
@@ -324,12 +327,13 @@ def test_reset(
         all_observations=[Observation(source="env", observation="1 failed, 0 passed")],
         eval_observation=Observation(source="env", observation="1 failed, 0 passed"),
         dir_tree=f"""Listing files in the current working directory. (read-only) indicates read-only files. Max depth: 2.
-{env.tempdir.name}/
+{env.working_dir}/
 |-- file1.txt
 |-- file2.txt
 |-- subdir/
   |-- subfile1.txt""",
         current_breakpoints="No breakpoints are set.",
+        action_reasoning=None,
         action=None,
         instructions="",
         score=0,
@@ -348,7 +352,7 @@ def test_rewrite_counter(env):
     env.add_tool(rewrite_tool)
 
     rewrite_call = ToolCall(id="rewrite_id", name="rewrite", arguments={})
-    env_info = env.step(rewrite_call)
+    env_info = env.step(rewrite_call, "let me rewrite the code")
     assert env.rewrite_counter == 1
     assert env_info.rewrite_counter == 1
     rewrite_obs = Observation(
@@ -366,7 +370,7 @@ def test_rewrite_counter(env):
             "new_code": "print('Hello')",
         },
     )
-    env_info = env.step(rewrite_call)
+    env_info = env.step(rewrite_call, "let me rewrite the file1.txt")
     assert env.rewrite_counter == 2
     assert env_info.rewrite_counter == 2
     rewrite_obs = Observation(
@@ -565,7 +569,7 @@ def test_resolve_path(tmp_path, debugignore):
     non_existent_path = env.resolve_path("non_existent_file.txt")
     assert non_existent_path == (env.working_dir / "non_existent_file.txt").resolve()
     # non-existent absolute path
-    non_existent_path = env.resolve_path("/tmp/non_existent_file.txt")
+    non_existent_path = env.resolve_path("/tmp/non_existent_file.txt").resolve()
     assert non_existent_path == Path("/tmp/non_existent_file.txt").resolve()
 
 

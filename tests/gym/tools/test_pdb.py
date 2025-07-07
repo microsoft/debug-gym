@@ -1,4 +1,5 @@
 import copy
+import platform
 import re
 import subprocess
 from unittest.mock import MagicMock
@@ -10,9 +11,24 @@ from debug_gym.gym.envs.env import RepoEnv
 from debug_gym.gym.terminal import DockerTerminal, Terminal
 from debug_gym.gym.tools.pdb import PDBTool
 
+
+def is_docker_running():
+    try:
+        subprocess.check_output(["docker", "ps"])
+        return True
+    except Exception:
+        return False
+
+
 if_docker_running = pytest.mark.skipif(
-    not subprocess.check_output(["docker", "ps"]),
+    not is_docker_running(),
     reason="Docker not running",
+)
+
+
+if_is_linux = pytest.mark.skipif(
+    platform.system() != "Linux",
+    reason="Interactive ShellSession (pty) requires Linux.",
 )
 
 
@@ -79,7 +95,7 @@ def test_pdb_use(tmp_path, setup_test_repo):
     assert "Reached the end of the program. Restarting the debugging session." in output
     assert "pytest/__main__.py" in output
     assert '-> """The pytest entry point."""' in output
-    assert 'Context around the current frame:\n1  ->	"""The pytest entry point.""""'
+    assert 'Context around the current frame:\n  1  ->	"""The pytest entry point.""""'
     assert "(Pdb)" not in output
 
 
@@ -161,10 +177,11 @@ def test_pdb_use_default_environment_entrypoint(tmp_path, setup_test_repo):
     assert "Reached the end of the program. Restarting the debugging session." in output
     assert "pytest/__main__.py" in output
     assert '-> """The pytest entry point."""' in output
-    assert 'Context around the current frame:\n1  ->	"""The pytest entry point.""""'
+    assert 'Context around the current frame:\n  1  ->	"""The pytest entry point.""""'
     assert "(Pdb)" not in output
 
 
+@if_is_linux
 @if_docker_running
 def test_pdb_use_docker_terminal(tmp_path, setup_test_repo):
     """Test PDBTool similar to test_pdb_use but using DockerTerminal"""
@@ -194,7 +211,7 @@ def test_pdb_use_docker_terminal(tmp_path, setup_test_repo):
     assert "Reached the end of the program. Restarting the debugging session." in output
     assert "pytest/__main__.py" in output
     assert '-> """The pytest entry point."""' in output
-    assert 'Context around the current frame:\n1  ->	"""The pytest entry point.""""'
+    assert 'Context around the current frame:\n  1  ->	"""The pytest entry point.""""'
     assert "(Pdb)" not in output
 
 
@@ -458,7 +475,7 @@ def test_use_breakpoints_and_clear(tmp_path, setup_pdb_repo_env):
         ".../pytest/__main__.py\n"
         "\n"
         "Context around the current frame:\n"
-        '1  ->\t"""The pytest entry point."""\r\n'
+        '  1  ->\t"""The pytest entry point."""\r\n'
         "  2  \t\r\n"
         "  3  \tfrom __future__ import annotations\r\n"
         "  4  \t\r\n"
@@ -480,7 +497,7 @@ def test_use_breakpoints_and_clear(tmp_path, setup_pdb_repo_env):
         ".../pytest/__main__.py\n"
         "\n"
         "Context around the current frame:\n"
-        '1  ->\t"""The pytest entry point."""\r\n'
+        '  1  ->\t"""The pytest entry point."""\r\n'
         "  2  \t\r\n"
         "  3  \tfrom __future__ import annotations\r\n"
         "  4  \t\r\n"
@@ -506,7 +523,7 @@ def test_use_b_invalid_file(tmp_path, setup_pdb_repo_env):
         ".../pytest/__main__.py\n"
         "\n"
         "Context around the current frame:\n"
-        '1  ->\t"""The pytest entry point."""\r\n'
+        '  1  ->\t"""The pytest entry point."""\r\n'
         "  2  \t\r\n"
         "  3  \tfrom __future__ import annotations\r\n"
         "  4  \t\r\n"
@@ -595,7 +612,7 @@ def test_use_multiple_commands_only_first_executed(tmp_path, setup_pdb_repo_env)
         ".../pytest/__main__.py\n"
         "\n"
         "Context around the current frame:\n"
-        '1  ->\t"""The pytest entry point."""\r\n'
+        '  1  ->\t"""The pytest entry point."""\r\n'
         "  2  \t\r\n"
         "  3  \tfrom __future__ import annotations\r\n"
         "  4  \t\r\n"
@@ -648,6 +665,79 @@ def test_use_starts_pdb_if_not_running(tmp_path, setup_pdb_repo_env):
     assert "Started PDB" in obs
 
 
+def test_pdb_list_output_indentation(tmp_path, setup_pdb_repo_env):
+    """Test PDB list output indentation for line numbers around 100 (3-digit)"""
+    pdb_tool, env = setup_pdb_repo_env(tmp_path)
+    with (env.working_dir / "large_file.py").open("w") as f:
+        f.write("def dummy_function():\n")
+        f.write("\n".join(f"    'Line {i+1}'" for i in range(1, 2000)))
+        f.write("\n\nif __name__ == '__main__':\n")
+        f.write("    dummy_function()\n")
+    env.set_entrypoints("python large_file.py", "python -m pdb large_file.py")
+    pdb_tool.start_pdb(env)
+    pdb_obs = pdb_tool.use(env, "b large_file.py:100")
+    assert (
+        "Pdb command output:\nBreakpoint 5 at large_file.py:100"
+    ) in pdb_obs.observation
+    pdb_obs = pdb_tool.use(env, "c")
+    expected_output = (
+        "Context around the current frame:\n"
+        " 95  \t    'Line 95'\r\n"
+        " 96  \t    'Line 96'\r\n"
+        " 97  \t    'Line 97'\r\n"
+        " 98  \t    'Line 98'\r\n"
+        " 99  \t    'Line 99'\r\n"
+        "100 B->\t    'Line 100'\r\n"
+        "101  \t    'Line 101'\r\n"
+        "102  \t    'Line 102'\r\n"
+        "103  \t    'Line 103'\r\n"
+        "104  \t    'Line 104'\r\n"
+        "105  \t    'Line 105'\n"
+    )
+    assert expected_output in pdb_obs.observation
+
+    pdb_obs = pdb_tool.use(env, "b large_file.py:1000")
+    assert (
+        "Pdb command output:\nBreakpoint 6 at large_file.py:1000" in pdb_obs.observation
+    )
+    pdb_obs = pdb_tool.use(env, "c")
+    expected_output = (
+        "Context around the current frame:\n"
+        "995  \t    'Line 995'\r\n"
+        "996  \t    'Line 996'\r\n"
+        "997  \t    'Line 997'\r\n"
+        "998  \t    'Line 998'\r\n"
+        "999  \t    'Line 999'\r\n"
+        "1000B->\t    'Line 1000'\r\n"
+        "1001 \t    'Line 1001'\r\n"
+        "1002 \t    'Line 1002'\r\n"
+        "1003 \t    'Line 1003'\r\n"
+        "1004 \t    'Line 1004'\r\n"
+        "1005 \t    'Line 1005'\n"
+    )
+    assert expected_output in pdb_obs.observation
+
+    pdb_obs = pdb_tool.use(env, "b large_file.py:2000")
+    assert (
+        "Pdb command output:\nBreakpoint 7 at large_file.py:2000" in pdb_obs.observation
+    )
+    pdb_obs = pdb_tool.use(env, "c")
+    expected_output = (
+        "Context around the current frame:\n"
+        "1995 \t    'Line 1995'\r\n"
+        "1996 \t    'Line 1996'\r\n"
+        "1997 \t    'Line 1997'\r\n"
+        "1998 \t    'Line 1998'\r\n"
+        "1999 \t    'Line 1999'\r\n"
+        "2000B->\t    'Line 2000'\r\n"
+        "2001 \t\r\n"
+        "2002 \tif __name__ == '__main__':\r\n"
+        "2003 \t    dummy_function()\r\n"
+        "[EOF]\n"
+    )
+    assert expected_output in pdb_obs.observation
+
+
 def test_use_lists_breakpoints(tmp_path, setup_pdb_repo_env):
     pdb_tool, env = setup_pdb_repo_env(tmp_path)
     env.current_breakpoints_state = {"file1.py|||1": "b file1.py:1"}
@@ -677,3 +767,23 @@ def test_use_invalid_command_returns_invalid_message(tmp_path, setup_pdb_repo_en
     pdb_tool.interact_with_pdb = raise_exc
     obs = pdb_tool.use(env, "invalid").observation
     assert "Invalid pdb command: invalid" in obs
+
+
+def test_pdbtool_pickle_roundtrip(tmp_path, setup_pdb_repo_env):
+    """
+    A PDBTool should survive a pickle --> un-pickle cycle.
+    The non-serialisable _session and current_frame_file
+    must be stripped to None, while the rest of the state
+    (e.g. its class-level name) is preserved.
+    """
+    import pickle
+
+    pdb_tool, _env = setup_pdb_repo_env(tmp_path)
+    dumped = pickle.dumps(pdb_tool)
+    rehydrated = pickle.loads(dumped)
+
+    assert rehydrated._session is None
+    assert rehydrated.current_frame_file is None
+
+    assert rehydrated.name == pdb_tool.name
+    assert rehydrated.examples == pdb_tool.examples

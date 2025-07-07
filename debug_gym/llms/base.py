@@ -231,7 +231,27 @@ class LLM(ABC):
         llm_config = LLMConfigRegistry.from_file(llm_config_file_path)[llm_name]
 
         tags = llm_config.tags
-        if "azure openai" in tags:
+        if "copilot openai" in tags:
+            try:
+                from debug_gym.llms.copilot import CopilotOpenAILLM
+
+                klass = CopilotOpenAILLM
+            except ImportError:
+                logger.warning(
+                    "Copilot OpenAI LLM is not available. Falling back to OpenAI LLM."
+                )
+                klass = None
+        elif "copilot claude" in tags:
+            try:
+                from debug_gym.llms.copilot import CopilotClaudeLLM
+
+                klass = CopilotClaudeLLM
+            except ImportError:
+                logger.warning(
+                    "Copilot Claude LLM is not available. Falling back to Claude LLM."
+                )
+                klass = None
+        elif "azure openai" in tags:
             from debug_gym.llms import AzureOpenAILLM
 
             klass = AzureOpenAILLM
@@ -282,7 +302,7 @@ class LLM(ABC):
 
     @abstractmethod
     def format_tool_call_history(
-        self, history_info: EnvInfo, response: LLMResponse
+        self, history_info: EnvInfo, response: list[LLMResponse]
     ) -> list[dict]:
         """Format the tool call history for different LLMs.
         The method should be overridden by subclasses.

@@ -58,7 +58,7 @@ class BaseAgent:
 
     def build_history_prompt(self):
         messages = build_history_prompt(
-            self.history.filter_out(actions=[None]),
+            self.history,
             self.llm,
             self.config["reset_prompt_history_after_rewrite"],
         )
@@ -76,6 +76,14 @@ class BaseAgent:
         """Check if auto eval on rewrite is enabled."""
         return self.config.get("env_kwargs", {}).get("auto_eval_on_rewrite", False)
 
+    def _show_current_breakpoints(self):
+        """Check if current breakpoints should be shown in the system prompt."""
+        return self.config.get("env_kwargs", {}).get("show_current_breakpoints", False)
+
+    def _show_directory_tree(self):
+        """Check if directory tree should be shown in the system prompt."""
+        return self.config.get("env_kwargs", {}).get("show_directory_tree", False)
+
     def shortcut_features(self):
         features = []
         if self._auto_eval_on_rewrite():
@@ -85,7 +93,15 @@ class BaseAgent:
                 "you do not need to call the Eval tool yourself. The evaluation "
                 "output will be updated automatically in the system prompt."
             )
+        if self._show_directory_tree():
+            features.append(
+                f"The environment will show the directory tree of the repository in the system prompt."
+            )
         if self.env.has_tool("pdb"):
+            if self._show_current_breakpoints():
+                features.append(
+                    "The environment will show the current breakpoints in the system prompt."
+                )
             if self.config.get("env_kwargs", {}).get("persistent_breakpoints"):
                 features.append(
                     "The environment will automatically restore existing breakpoints "
@@ -118,11 +134,12 @@ class BaseAgent:
         of the LLM's context length, if any."""
         message = filter_non_utf8(message)
         count_tokens = count_tokens or self.llm.count_tokens
-        max_length = (
-            max_length
-            or max_length_percentage * self.llm.context_length
-            or self.llm.context_length
-        )
+        if self.llm.context_length is not None:
+            max_length = (
+                max_length
+                or (max_length_percentage * self.llm.context_length)
+                or self.llm.context_length
+            )
 
         if count_tokens is None or max_length is None or max_length <= 0:
             return message
@@ -159,11 +176,15 @@ class BaseAgent:
         system_prompt_dict = {
             "Overall task": self.system_prompt,
             "Instructions": info.instructions,
-            "Repo directory tree": self.trim_message(
-                info.dir_tree, max_length_percentage=0.1, where="end"
-            ),
-            "Current breakpoints": info.current_breakpoints,
         }
+
+        if self._show_directory_tree():
+            system_prompt_dict["Repo directory tree"] = self.trim_message(
+                info.dir_tree, max_length_percentage=0.1, where="end"
+            )
+
+        if self._show_current_breakpoints():
+            system_prompt_dict["Current breakpoints"] = info.current_breakpoints
 
         if self._auto_eval_on_rewrite():
             system_prompt_dict["Evaluation output of current code"] = self.trim_message(
@@ -190,7 +211,8 @@ class BaseAgent:
 
     def build_question_prompt(self):
         messages = []
-        messages.append({"role": "user", "content": self.action_prompt})
+        if self.action_prompt is not None:
+            messages.append({"role": "user", "content": self.action_prompt})
         return messages
 
     def build_prompt(self, info):
@@ -235,7 +257,7 @@ class BaseAgent:
             if debug:
                 breakpoint()
 
-            info = self.env.step(llm_response.tool)
+            info = self.env.step(llm_response.tool, llm_response.response)
             self.history.step(info, llm_response)
 
             if info.done or info.rewrite_counter >= self.config["max_rewrite_steps"]:
@@ -314,10 +336,7 @@ class BaseAgent:
             "logger": str(self.logger.log_file),
         }
         for step_id in range(len(self.history)):
-            step_json = self.history.json(
-                step_id,
-                include_prompt_response_pairs=self.config["log_prompt_response_pairs"],
-            )
+            step_json = self.history.json(step_id)
             jsonl_output["log"].append(step_json)
         os.makedirs(pjoin(self._output_path, task_name), exist_ok=True)
         with open(pjoin(self._output_path, task_name, "debug_gym.jsonl"), "w") as f:

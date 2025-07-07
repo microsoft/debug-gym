@@ -496,31 +496,46 @@ class Human(LLM):
         self, history_info: EnvInfo, response: LLMResponse
     ) -> list[dict]:
         """Anthropic-like format for tool call history"""
-        _messages = [
-            {
-                "role": "assistant",
-                "content": [
-                    {
-                        "type": "tool_use",
-                        "id": response[0].tool.id,
-                        "name": response[0].tool.name,
-                        "input": response[0].tool.arguments,
-                    }
-                ],
-            },
-            {
-                "role": "user",
-                "content": [
-                    {
-                        "type": "tool_result",
-                        "tool_use_id": history_info.action.id,
-                        "content": filter_non_utf8(
-                            f"{history_info.step_observation.observation}"
-                        ),
-                    }
-                ],
-            },
-        ]
+        _messages = []
+        if isinstance(response, list) and len(response) > 0:
+            _messages.append(
+                {
+                    "role": "assistant",
+                    "content": [
+                        {
+                            "type": "tool_use",
+                            "id": response[0].tool.id,
+                            "name": response[0].tool.name,
+                            "input": response[0].tool.arguments,
+                        }
+                    ],
+                }
+            )
+        if history_info.action is None:
+            # This is the initial state, no action taken yet
+            _messages.append(
+                {
+                    "role": "user",
+                    "content": filter_non_utf8(
+                        f"{history_info.step_observation.observation}"
+                    ),
+                }
+            )
+        else:
+            _messages.append(
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "tool_result",
+                            "tool_use_id": history_info.action.id,
+                            "content": filter_non_utf8(
+                                f"{history_info.step_observation.observation}"
+                            ),
+                        }
+                    ],
+                },
+            )
         return _messages
 
     def generate(self, messages, tools, **kwargs) -> LLMResponse:
