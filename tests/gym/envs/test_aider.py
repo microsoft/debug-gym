@@ -5,11 +5,12 @@ from debug_gym.gym.tools.tool import ToolCall
 from debug_gym.gym.tools.toolbox import Toolbox
 
 
-@pytest.fixture
-def env(tmp_path):
-    aider_path = tmp_path / ".cache" / "debug_gym" / "exercism"
-    aider_path.mkdir(parents=True, exist_ok=True)
-    AiderBenchmarkEnv.REPO_PATH = aider_path
+@pytest.fixture(scope="session")
+def setup_aider_repo(tmp_path_factory):
+    """Set up a minimal Aider repository for testing,
+    avoiding cloning Aider repo for each test."""
+    aider_path = tmp_path_factory.mktemp("aider_repo")
+    # aider_path.mkdir(parents=True, exist_ok=True)
     repo_path = aider_path / "exercises" / "practice" / "clock"
     repo_path.mkdir(parents=True, exist_ok=True)
     (repo_path / "clock.py").write_text(
@@ -24,6 +25,13 @@ def env(tmp_path):
     )
     (repo_path / ".docs").mkdir(parents=True, exist_ok=True)
     (repo_path / ".docs" / "instructions.md").write_text("What time is it?")
+    # Patch the REPO_PATH in AiderBenchmarkEnv
+    AiderBenchmarkEnv.REPO_PATH = aider_path
+    return aider_path
+
+
+@pytest.fixture
+def env(setup_aider_repo):
     env = AiderBenchmarkEnv()
     env.reset(options={"task_name": "clock"})
     return env
