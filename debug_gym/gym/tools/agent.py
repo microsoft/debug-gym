@@ -1,5 +1,4 @@
 import logging
-from os.path import join as pjoin
 
 from debug_gym.agents.history_tracker import build_history_prompt
 from debug_gym.gym.entities import Observation
