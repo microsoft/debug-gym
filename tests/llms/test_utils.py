@@ -9,7 +9,7 @@ def test_print_messages(logger_mock):
     ]
     print_messages(messages, logger_mock)
     assert logger_mock._log_history == [
-        "[cyan]Hello\n[/cyan]",
-        "[green]Hi\n[/green]",
-        "[yellow]System message\n[/yellow]",
+        "[cyan]Hello[/cyan]",
+        "[cyan]Hi[/cyan]",
+        "[yellow]System message[/yellow]",
     ]

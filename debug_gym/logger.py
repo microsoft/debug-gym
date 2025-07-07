@@ -451,3 +451,12 @@ class DebugGymLogger(logging.Logger):
         self.warning(
             f"Failed to report progress for {problem_id} after {max_attempts} attempts"
         )
+
+
+def log_with_color(logger: DebugGymLogger, message: str, color: str):
+    """Log a message with a specific color, escape it
+    for Rich, and mark it as already escaped for DebugGymLogger."""
+    logger.info(
+        f"[{color}]{escape(message)}[/{color}]",
+        extra={"already_escaped": True},
+    )
