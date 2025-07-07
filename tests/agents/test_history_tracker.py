@@ -1,6 +1,10 @@
+import json
+from unittest.mock import patch
+
 from debug_gym.agents.history_tracker import HistoryTracker, build_history_prompt
 from debug_gym.gym.tools.tool import ToolCall
-from debug_gym.llms.base import LLMResponse
+from debug_gym.llms import OpenAILLM
+from debug_gym.llms.base import LLMConfigRegistry, LLMResponse
 
 
 def test_history_tracker(build_env_info):
@@ -21,20 +25,44 @@ def test_history_tracker(build_env_info):
     tool_3 = ToolCall(id="3", name="action3", arguments={})
     tool_4 = ToolCall(id="4", name="action4", arguments={"a4_args": "a4_args"})
     tool_5 = ToolCall(id="5", name="action5", arguments={})
+    action_reasoning_2 = "response_2_1"
+    action_reasoning_3 = "response_3_2"
+    action_reasoning_4 = "response_4_1"
+    action_reasoning_5 = "response_5_2"
     env_info_1 = build_env_info(
-        step_observation="obs1", action=None, score=1, rewrite_counter=0
+        step_observation="obs1",
+        action=None,
+        action_reasoning=None,
+        score=1,
+        rewrite_counter=0,
     )
     env_info_2 = build_env_info(
-        step_observation="obs2", action=tool_2, score=2, rewrite_counter=0
+        step_observation="obs2",
+        action=tool_2,
+        action_reasoning=action_reasoning_2,
+        score=2,
+        rewrite_counter=0,
     )
     env_info_3 = build_env_info(
-        step_observation="obs3", action=tool_3, score=3, rewrite_counter=1
+        step_observation="obs3",
+        action=tool_3,
+        action_reasoning=action_reasoning_3,
+        score=3,
+        rewrite_counter=1,
     )
     env_info_4 = build_env_info(
-        step_observation="obs4", action=tool_4, score=4, rewrite_counter=1
+        step_observation="obs4",
+        action=tool_4,
+        action_reasoning=action_reasoning_4,
+        score=4,
+        rewrite_counter=1,
     )
     env_info_5 = build_env_info(
-        step_observation="obs5", action=tool_5, score=5, rewrite_counter=2
+        step_observation="obs5",
+        action=tool_5,
+        action_reasoning=action_reasoning_5,
+        score=5,
+        rewrite_counter=2,
     )
 
     # single prompt format
@@ -63,10 +91,10 @@ def test_history_tracker(build_env_info):
     # push some steps and prompt-response pairs
     # at 0-th step, there is no prompt-response pair
     ht.step(env_info_1, None)
-    ht.step(env_info_2, llm_response_2)
-    ht.step(env_info_3, llm_response_3)
-    ht.step(env_info_4, llm_response_4)
-    ht.step(env_info_5, llm_response_5)
+    ht.step(env_info_2, [llm_response_2])
+    ht.step(env_info_3, [llm_response_3])
+    ht.step(env_info_4, [llm_response_4])
+    ht.step(env_info_5, [llm_response_5])
 
     # get_all should return all steps
     assert ht.get_all() == [env_info_1, env_info_2, env_info_3, env_info_4, env_info_5]
@@ -79,22 +107,47 @@ def test_history_tracker(build_env_info):
     # json should return the last step by default
     assert ht.json() == {
         "step_id": 4,
+        "reasoning": action_reasoning_5,
         "action": {"id": "5", "name": "action5", "arguments": {}},
         "obs": "obs5",
         "rewrite_consumed": 2,
+        "prompt_response_pairs": [
+            {
+                "prompt": [
+                    {"role": "user", "content": "prompt_5_1"},
+                    {"role": "assistent", "content": "response_5_1"},
+                    {"role": "user", "content": "prompt_5_2"},
+                ],
+                "response": "response_5_2",
+                "tool": {"id": "5", "name": "action5", "arguments": {}},
+            }
+        ],
     }
 
     # json should return the speficied step
     assert ht.json(2) == {
         "step_id": 2,
+        "reasoning": action_reasoning_3,
         "action": {"id": "3", "name": "action3", "arguments": {}},
         "obs": "obs3",
         "rewrite_consumed": 1,
+        "prompt_response_pairs": [
+            {
+                "prompt": [
+                    {"role": "user", "content": "prompt_3_1"},
+                    {"role": "assistent", "content": "response_3_1"},
+                    {"role": "user", "content": "prompt_3_2"},
+                ],
+                "response": "response_3_2",
+                "tool": {"id": "3", "name": "action3", "arguments": {}},
+            }
+        ],
     }
 
     # output token_usage if it exists
-    assert ht.json(3, include_prompt_response_pairs=True) == {
+    assert ht.json(3) == {
         "step_id": 3,
+        "reasoning": action_reasoning_4,
         "action": {"id": "4", "name": "action4", "arguments": {"a4_args": "a4_args"}},
         "obs": "obs4",
         "prompt_response_pairs": [
@@ -112,28 +165,10 @@ def test_history_tracker(build_env_info):
         "rewrite_consumed": 1,
     }
 
-    # json should return also the prompt-response pairs if include_prompt_response_pairs is True
-    assert ht.json(2, include_prompt_response_pairs=True) == {
-        "step_id": 2,
-        "action": {"id": "3", "name": "action3", "arguments": {}},
-        "obs": "obs3",
-        "prompt_response_pairs": [
-            {
-                "prompt": [
-                    {"role": "user", "content": "prompt_3_1"},
-                    {"role": "assistent", "content": "response_3_1"},
-                    {"role": "user", "content": "prompt_3_2"},
-                ],
-                "response": "response_3_2",
-                "tool": {"id": "3", "name": "action3", "arguments": {}},
-            }
-        ],
-        "rewrite_consumed": 1,
-    }
-
     # for 0-th step, prompt-response pairs should be None
-    assert ht.json(0, include_prompt_response_pairs=True) == {
+    assert ht.json(0) == {
         "step_id": 0,
+        "reasoning": None,
         "action": None,
         "obs": "obs1",
         "prompt_response_pairs": None,
@@ -153,12 +188,6 @@ def test_history_tracker(build_env_info):
     assert ht_clone.history_steps == ht.history_steps
     assert ht_clone is not ht
 
-    # test filtering out
-    ht_filtered = ht.filter_out(actions=["action2", "action4"])
-    for step in ht_filtered.get_all():
-        assert step.action not in [tool_2, tool_4]
-        assert step.action in [None, tool_3, tool_5]
-
     # should reset properly
     ht.reset()
     assert len(ht) == 0
@@ -171,10 +200,28 @@ def test_history_tracker(build_env_info):
     assert ht.json() == {}
 
 
-def test_build_history_prompt(build_env_info, llm_mock):
+@patch.object(
+    LLMConfigRegistry,
+    "from_file",
+    return_value=LLMConfigRegistry.register_all(
+        {
+            "openai": {
+                "model": "openai",
+                "tokenizer": "gpt-4o",
+                "context_limit": 4,
+                "api_key": "test-api-key",
+                "endpoint": "https://test-endpoint",
+                "api_version": "v1",
+                "tags": ["azure openai"],
+            }
+        }
+    ),
+)
+def test_build_history_prompt(mock_llm_config, build_env_info):
     # test with empty history
     ht = HistoryTracker(history_steps=3)
-    messages = build_history_prompt(ht, llm_mock)
+    llm = OpenAILLM("openai")
+    messages = build_history_prompt(ht, llm)
     expected = []
     assert messages == expected
 
@@ -182,72 +229,177 @@ def test_build_history_prompt(build_env_info, llm_mock):
     ht = HistoryTracker(history_steps=3)
     # prepare some data
     env_info_1 = build_env_info(
-        step_observation="obs1", action=None, score=1, rewrite_counter=0
+        step_observation="obs1",
+        action=None,
+        action_reasoning=None,
+        score=1,
+        rewrite_counter=0,
+    )
+
+    action_1 = ToolCall(id="1", name="action1", arguments={"a1_args": "a1_args"})
+    llm_response_1 = LLMResponse(
+        prompt="prompt_1", response="response_1", tool=action_1
     )
     env_info_2 = build_env_info(
         step_observation="obs2",
-        action={"id": "2", "name": "action2", "arguments": {"a2_args": "a2_args"}},
+        action_reasoning="response_1",
+        action=action_1,
         score=2,
         rewrite_counter=0,
     )
+
+    action_2 = ToolCall(id="2", name="action2", arguments={})
+    llm_response_2 = LLMResponse(
+        prompt="prompt_2", response="response_2", tool=action_2
+    )
     env_info_3 = build_env_info(
         step_observation="obs3",
-        action={"id": "3", "name": "action3", "arguments": {}},
+        action_reasoning="response_2",
+        action=action_2,
         score=3,
         rewrite_counter=0,
     )
+
+    action_3 = ToolCall(id="3", name="action3", arguments={})
+    llm_response_3 = LLMResponse(
+        prompt="prompt_3", response="response_3", tool=action_3
+    )
     env_info_4 = build_env_info(
         step_observation="obs4",
-        action={"id": "4", "name": "action4", "arguments": {"a4_args": "a4_args"}},
+        action_reasoning="response_3",
+        action=action_3,
         score=4,
         rewrite_counter=1,
     )
+
+    action_4 = ToolCall(id="4", name="action4", arguments={"a4_args": "a4_args"})
+    llm_response_4 = LLMResponse(
+        prompt="prompt_4", response="response_4", tool=action_4
+    )
     env_info_5 = build_env_info(
         step_observation="obs5",
-        action={"id": "5", "name": "action5", "arguments": {}},
+        action_reasoning="response_4",
+        action=action_4,
         score=5,
         rewrite_counter=1,
     )
 
     # push some steps
     ht.step(env_info_1, None)
-    ht.step(env_info_2, None)
-    ht.step(env_info_3, None)
-    ht.step(env_info_4, None)
-    ht.step(env_info_5, None)
+    ht.step(env_info_2, [llm_response_1])
+    ht.step(env_info_3, [llm_response_2])
+    ht.step(env_info_4, [llm_response_3])
+    ht.step(env_info_5, [llm_response_4])
 
     # reset_prompt_history_after_rewrite is False
-    messages = build_history_prompt(
-        ht, llm_mock, reset_prompt_history_after_rewrite=False
-    )
-
+    messages = build_history_prompt(ht, llm, reset_prompt_history_after_rewrite=False)
     expected = [
-        {"role": "role", "content": {"id": "3", "name": "action3", "arguments": {}}},
         {
-            "role": "role",
-            "content": {
-                "id": "4",
-                "name": "action4",
-                "arguments": {"a4_args": "a4_args"},
-            },
+            "role": "assistant",
+            "tool_calls": [
+                {
+                    "type": "function",
+                    "id": "2",
+                    "function": {
+                        "name": "action2",
+                        "arguments": json.dumps({}),
+                    },
+                },
+            ],
+            "content": "response_2",
         },
-        {"role": "role", "content": {"id": "5", "name": "action5", "arguments": {}}},
+        {
+            "role": "tool",
+            "tool_call_id": "2",
+            "name": "action2",
+            "content": "obs3",
+        },
+        {
+            "role": "assistant",
+            "tool_calls": [
+                {
+                    "type": "function",
+                    "id": "3",
+                    "function": {
+                        "name": "action3",
+                        "arguments": json.dumps({}),
+                    },
+                },
+            ],
+            "content": "response_3",
+        },
+        {
+            "role": "tool",
+            "tool_call_id": "3",
+            "name": "action3",
+            "content": "obs4",
+        },
+        {
+            "role": "assistant",
+            "tool_calls": [
+                {
+                    "type": "function",
+                    "id": "4",
+                    "function": {
+                        "name": "action4",
+                        "arguments": json.dumps({"a4_args": "a4_args"}),
+                    },
+                },
+            ],
+            "content": "response_4",
+        },
+        {
+            "role": "tool",
+            "tool_call_id": "4",
+            "name": "action4",
+            "content": "obs5",
+        },
     ]
+
     assert messages == expected
 
     # reset_prompt_history_after_rewrite is True
-    messages = build_history_prompt(
-        ht, llm_mock, reset_prompt_history_after_rewrite=True
-    )
+    messages = build_history_prompt(ht, llm, reset_prompt_history_after_rewrite=True)
     expected = [
         {
-            "role": "role",
-            "content": {
-                "id": "4",
-                "name": "action4",
-                "arguments": {"a4_args": "a4_args"},
-            },
+            "role": "assistant",
+            "tool_calls": [
+                {
+                    "type": "function",
+                    "id": "3",
+                    "function": {
+                        "name": "action3",
+                        "arguments": json.dumps({}),
+                    },
+                },
+            ],
+            "content": "response_3",
         },
-        {"role": "role", "content": {"id": "5", "name": "action5", "arguments": {}}},
+        {
+            "role": "tool",
+            "tool_call_id": "3",
+            "name": "action3",
+            "content": "obs4",
+        },
+        {
+            "role": "assistant",
+            "tool_calls": [
+                {
+                    "type": "function",
+                    "id": "4",
+                    "function": {
+                        "name": "action4",
+                        "arguments": json.dumps({"a4_args": "a4_args"}),
+                    },
+                },
+            ],
+            "content": "response_4",
+        },
+        {
+            "role": "tool",
+            "tool_call_id": "4",
+            "name": "action4",
+            "content": "obs5",
+        },
     ]
     assert messages == expected

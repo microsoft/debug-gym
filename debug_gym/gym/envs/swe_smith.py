@@ -186,9 +186,11 @@ class SWESmithEnv(SWEBenchEnv):
         self.setup_workspace(
             # Empty folder. The actual codebase will come from the docker image.
             path=SWESmithEnv.DUMMY_DIR,
-            entrypoint=self.test_cmd,
+            # allow traceback to be printed in the output.
+            entrypoint=self.test_cmd.replace("--tb=no", ""),
+            # -s (capture=no) from pytest, allows for debugging with pdb
             # -q (quiet) from pytest, to avoid long pytest output
-            debug_entrypoint=self.test_cmd.replace("pytest", "pytest -q"),
+            debug_entrypoint=self.test_cmd.replace("pytest", "pytest -sq"),
         )
 
         # Those changes depend on the working directory created by setup_workspace.

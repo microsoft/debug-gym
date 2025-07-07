@@ -125,7 +125,8 @@ class SWEBenchEnv(RepoEnv):
         self.setup_workspace(
             # Empty folder. The actual codebase will come from the docker image.
             path=SWEBenchEnv.DUMMY_DIR,
-            entrypoint=entrypoint,
+            # allow traceback to be printed in the output.
+            entrypoint=entrypoint.replace("--tb=no", ""),
             debug_entrypoint=debug_entrypoint,
         )
 
