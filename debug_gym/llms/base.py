@@ -360,6 +360,4 @@ class LLM(ABC):
                 "Tool response is empty. The model may not have called a tool."
             )
 
-        self.logger.info(f"[green]{llm_response.tool}[/green]")
-
         return llm_response
