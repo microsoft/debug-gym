@@ -8,4 +8,8 @@ def test_print_messages(logger_mock):
         {"role": "system", "content": "System message"},
     ]
     print_messages(messages, logger_mock)
-    assert logger_mock._log_history == ["Hello\n", "Hi\n", "System message\n"]
+    assert logger_mock._log_history == [
+        "[cyan]Hello\n[/cyan]",
+        "[green]Hi\n[/green]",
+        "[yellow]System message\n[/yellow]",
+    ]
