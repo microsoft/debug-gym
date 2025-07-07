@@ -717,6 +717,16 @@
                         </div>
 
                         <div class="detail-section">
+                            <div class="detail-header expanded" onclick="toggleSection('reasoning-section')">
+                                <span><i class="fas fa-brain"></i> Reasoning</span>
+                                <i class="fas fa-chevron-down expand-icon"></i>
+                            </div>
+                            <div class="detail-content expanded" id="reasoning-section">
+                                <div class="json-viewer" style="white-space: pre-wrap;">${data.reasoning || 'None'}</div>
+                            </div>
+                        </div>
+
+                        <div class="detail-section">
                             <div class="detail-header expanded" onclick="toggleSection('observation-section')">
                                 <span><i class="fas fa-eye"></i> Observation</span>
                                 <i class="fas fa-chevron-down expand-icon"></i>
