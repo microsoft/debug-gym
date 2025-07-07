@@ -239,7 +239,8 @@ class LLM(ABC):
             from debug_gym.llms import OpenAILLM
 
             klass = OpenAILLM
-        llm = klass(llm_name, logger=logger, llm_config=llm_config)
+
+        llm = klass(llm_config.name, logger=logger, llm_config=llm_config)
         return llm
 
     @classmethod
