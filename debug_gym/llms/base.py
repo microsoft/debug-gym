@@ -280,7 +280,6 @@ class LLM(ABC):
 
         return cls.instantiate_from_config(llm_config, logger)
 
-
     @abstractmethod
     def generate(self, messages, tools, **kwargs) -> LLMResponse:
         """Generate a response given some messages and return it as an LLMResponse object.
