@@ -210,7 +210,7 @@ class LLM(ABC):
     def instantiate_from_config(
         cls,
         llm_config: LLMConfig,
-        logger: DebugGymLogger | str | None = None,
+        logger: DebugGymLogger | None = None,
     ) -> "LLM":
         """Creates an instance of the appropriate LLM class based on the configuration.
 
@@ -221,10 +221,7 @@ class LLM(ABC):
         Returns:
             An instance of the appropriate LLM class.
         """
-        if logger is not "none":
-            logger = logger or DebugGymLogger("debug-gym")
-        else:
-            logger = None
+        logger = logger or DebugGymLogger("debug-gym")
 
         tags = llm_config.tags
         if "copilot openai" in tags:
@@ -281,10 +278,7 @@ class LLM(ABC):
         Returns:
             An instance of the appropriate LLM class.
         """
-        if logger is not "none":
-            logger = logger or DebugGymLogger("debug-gym")
-        else:
-            logger = None
+        logger = logger or DebugGymLogger("debug-gym")
 
         if llm_name == "human":
             from debug_gym.llms import Human
