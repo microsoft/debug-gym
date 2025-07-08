@@ -277,7 +277,7 @@ class BaseAgent:
             self.logger.report_progress(
                 problem_id=task_name,
                 step=step + 1,
-                total_steps=max_steps,
+                total_steps=max_steps + 1,  # keep progress bar running until max_steps
                 score=info.score,
                 max_score=info.max_score,
                 status="running",
