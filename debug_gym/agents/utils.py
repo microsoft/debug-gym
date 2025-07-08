@@ -97,6 +97,14 @@ def trim_prompt_messages(
                 new_messages = new_messages[:1] + [messages[i]] + new_messages[1:]
             new_length += message_lengths[i]
 
+    message_lengths_after_trimming = [
+        count_tokens(get_item(item)) for item in new_messages
+    ]
+    total_length_after_trimming = sum(message_lengths_after_trimming)
+    assert (
+        total_length_after_trimming <= context_length
+    ), f"After trimming, the message length still exceeds: {total_length_after_trimming} > {context_length}!"
+
     return new_messages
 
 
