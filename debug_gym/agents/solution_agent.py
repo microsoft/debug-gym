@@ -11,24 +11,35 @@ class AgentSolution(BaseAgent):
             problem_id=task_name,
             step=1,
             total_steps=1,
-            score=info.score,
-            max_score=info.max_score,
+            score=getattr(info, "score", 0),
+            max_score=getattr(info, "max_score", 0),
             status=status,
         )
 
+    def _env_implements_apply_gold_patch(self):
+        """Fail early if the environment does not implement apply_gold_patch."""
+        return "apply_gold_patch" in type(self.env).__dict__
+
     def run(self, task_name=None, debug=False):
-        self.history.reset()
-        info = self.env.reset(options={"task_name": task_name})
-        self.history.step(info)
-
-        if info.done is True:
-            self._report_progress(task_name, info, "done")
-            return True
-
-        self.logger.info(
-            f"Score: {info.score}/{info.max_score} ({info.score/info.max_score:.1%})"
-        )
+        info = None
         try:
+            if not self._env_implements_apply_gold_patch():
+                raise NotImplementedError(
+                    f"The environment {type(self.env)} is not compatible with SolutionAgent"
+                    "Check the README.md to see which environments are compatible."
+                )
+
+            self.history.reset()
+            info = self.env.reset(options={"task_name": task_name})
+            self.history.step(info)
+
+            if info.done is True:
+                self._report_progress(task_name, info, "done")
+                return True
+
+            self.logger.info(
+                f"Score: {info.score}/{info.max_score} ({info.score/info.max_score:.1%})"
+            )
             # Make a simple pdb call to make sure it is working.
             action = ToolCall(name="pdb", id="pdb", arguments={"command": "help help"})
             pdb_help_info = self.env.step(action, "")
@@ -70,14 +81,7 @@ class AgentSolution(BaseAgent):
                 f"{info.step_observation.observation}"
             )
             self._report_progress(task_name, info, "done")
-            return info.done
-        except NotImplementedError:
-            self._report_progress(task_name, info, "failed")
-            self.logger.error(
-                f"The environment {type(self.env)} is not compatible with SolutionAgent"
-                "Check the README.md to see which environments are compatible."
-            )
-            raise
-        except AssertionError:
+        except Exception:
             self._report_progress(task_name, info, "failed")
             raise
+        return info.done
