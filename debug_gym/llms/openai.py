@@ -102,9 +102,8 @@ class OpenAILLM(LLM):
             need_to_retry = False
 
         logger(
-            f"Error calling {self.model_name}: {exception_full_name!r} {
-                exception.message if hasattr(exception, 'message') else exception
-            }"
+            f"Error calling {self.model_name}: {exception_full_name!r}\n"
+            f"{exception.message if hasattr(exception, 'message') else exception}"
         )
 
         return need_to_retry
