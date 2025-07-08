@@ -47,7 +47,10 @@ def trim_prompt_messages(
     assert len(messages) > 0, "messages should not be empty"
 
     # the last message should be from the user
-    assert messages[-1]["role"] == "user", "the last message should be from the user"
+    assert messages[-1]["role"] in [
+        "user",
+        "tool",
+    ], "the last message should be from the user or the tool"
 
     # context_length should be non-negative
     assert context_length >= 0, "context_length should be non-negative"
