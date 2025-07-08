@@ -406,7 +406,7 @@ class DebugGymLogger(logging.Logger):
                     break
 
     def close(self):
-        if self._log_listener_thread:
+        if getattr(self, "_log_listener_thread", None):
             self._log_listener_stop_event.set()
             self._log_listener_thread.join()
 

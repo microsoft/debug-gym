@@ -199,19 +199,8 @@ def test_log_with_color_escapes_special_characters():
         expected_msg, extra={"already_escaped": True}
     )
 
-    def test_debuggymlogger_basic_logging(monkeypatch):
-        logger = DebugGymLogger("test_logger")
-        mock_handler = MagicMock()
-        logger.addHandler(mock_handler)
-        logger.info("Hello world")
-        # Should call handle on all handlers
-        assert any(
-            call[0][0].msg == "Hello world"
-            for call in mock_handler.handle.call_args_list
-        )
 
-
-def test_debuggymlogger_log_queue_worker(monkeypatch):
+def test_debuggymlogger_log_queue_worker():
     DebugGymLogger.set_as_worker()
     logger = DebugGymLogger("test_worker_logger")
     # Clear the queue before test
@@ -223,7 +212,7 @@ def test_debuggymlogger_log_queue_worker(monkeypatch):
     assert record.msg == "Worker log message"
 
 
-def test_debuggymlogger_report_progress(monkeypatch):
+def test_debuggymlogger_report_progress():
     logger = DebugGymLogger("test_progress_logger")
     # Clear the queue before test
     while not DebugGymLogger.PROGRESS_QUEUE.empty():
@@ -242,17 +231,22 @@ def test_debuggymlogger_report_progress(monkeypatch):
     assert progress.status == "running"
 
 
-def test_debuggymlogger_set_as_worker_resets(monkeypatch):
-    DebugGymLogger._is_worker = False
+def test_debuggymlogger_set_as_worker_resets():
+    logger = DebugGymLogger("test_reset_logger")
+    assert not DebugGymLogger._is_worker
+    assert not logger._is_worker
+    # Set as worker
     DebugGymLogger.set_as_worker()
-    assert DebugGymLogger._is_worker is True
+    assert DebugGymLogger._is_worker
+    assert logger._is_worker
+    another_logger = DebugGymLogger("test_reset_logger")
+    assert another_logger._is_worker
 
 
-def test_debuggymlogger_rich_progress_raises_in_worker(monkeypatch):
+def test_debuggymlogger_rich_progress_raises_in_worker():
     DebugGymLogger.set_as_worker()
     logger = DebugGymLogger("test_rich_progress_logger")
     with pytest.raises(RuntimeError):
         with logger.rich_progress(["p1", "p2"]):
             pass
-    # Reset for other tests
     DebugGymLogger._is_worker = False
