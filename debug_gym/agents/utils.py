@@ -164,6 +164,12 @@ def load_config():
         help="Keep displaying completed tasks in the workers panel.",
     )
     parser.add_argument(
+        "--max-display",
+        type=int,
+        default=20,
+        help="Maximum number of tasks to display in the progress bar.",
+    )
+    parser.add_argument(
         "-p",
         "--params",
         nargs="+",

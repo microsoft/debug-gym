@@ -132,7 +132,7 @@ def main():
     mean_perf = 0
     tasks_succeeded = []
 
-    with logger.rich_progress(problems, max_display=20):
+    with logger.rich_progress(problems, max_display=args.max_display):
         if num_workers == 1:  # run sequentially for easier debugging
             for problem in problems:
                 try:
