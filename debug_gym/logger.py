@@ -348,27 +348,14 @@ class DebugGymLogger(logging.Logger):
         self.level = level
         self.setLevel(self.level)
         self.log_file = None  # File handler for logging to a file
-        self._live = None  # rich live context manager for updating the UI
-        if not self._is_worker:
-            self._live = Live()
-            rich_handler = RichHandler(
-                console=self._live.console,
-                show_time=False,
-                rich_tracebacks=True,
-                markup=True,
-            )
-            rich_handler.setFormatter(
-                logging.Formatter("🐸 [%(name)-12s]: %(message)s")
-            )
-            rich_handler.setLevel(self.level)
-            self.addHandler(rich_handler)
 
-            # Start log listener thread
-            self._log_listener_stop_event = threading.Event()
-            self._log_listener_thread = threading.Thread(
-                target=self._log_listener, daemon=True
-            )
-            self._log_listener_thread.start()
+        # Placeholders for rich live, log listener thread, and stop event
+        # Will be initialized if the logger is the main process logger
+        self._live = None  # rich live context manager for updating the UI
+        self._log_listener_stop_event = None  # Event to stop the log listener thread
+        self._log_listener_thread = None  # Thread to process logs from workers
+        if not self._is_worker:
+            self._initialize_main_logger()
 
         if log_dir:
             log_dir = Path(log_dir)
@@ -380,6 +367,25 @@ class DebugGymLogger(logging.Logger):
             fh.setFormatter(formatter)
             fh.setLevel(logging.DEBUG)
             self.addHandler(fh)
+
+    def _initialize_main_logger(self):
+        self._live = Live()
+        rich_handler = RichHandler(
+            console=self._live.console,
+            show_time=False,
+            rich_tracebacks=True,
+            markup=True,
+        )
+        rich_handler.setFormatter(logging.Formatter("🐸 [%(name)-12s]: %(message)s"))
+        rich_handler.setLevel(self.level)
+        self.addHandler(rich_handler)
+
+        # Start log listener thread
+        self._log_listener_stop_event = threading.Event()
+        self._log_listener_thread = threading.Thread(
+            target=self._log_listener, daemon=True
+        )
+        self._log_listener_thread.start()
 
     def handle(self, record):
         """Handle a log record. If this is a worker process,
@@ -406,7 +412,7 @@ class DebugGymLogger(logging.Logger):
                     break
 
     def close(self):
-        if getattr(self, "_log_listener_thread", None):
+        if self._log_listener_thread is not None:
             self._log_listener_stop_event.set()
             self._log_listener_thread.join()
 

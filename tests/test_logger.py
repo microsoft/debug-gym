@@ -1,4 +1,5 @@
 import logging
+import multiprocessing as mp
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -12,6 +13,19 @@ from debug_gym.logger import (
     TaskProgressManager,
     log_with_color,
 )
+
+
+@pytest.fixture
+def DebugGymLoggerTest():
+    """Create a new DebugGymLogger class for each test to avoid
+    interference between tests when setting as worker."""
+
+    class TestDebugGymLogger(DebugGymLogger):
+        LOG_QUEUE = mp.Queue(maxsize=10000)
+        PROGRESS_QUEUE = mp.Queue(maxsize=10000)
+        _is_worker = False
+
+    yield TestDebugGymLogger
 
 
 def test_task_progress_pending_status():
@@ -200,23 +214,23 @@ def test_log_with_color_escapes_special_characters():
     )
 
 
-def test_debuggymlogger_log_queue_worker():
-    DebugGymLogger.set_as_worker()
-    logger = DebugGymLogger("test_worker_logger")
+def test_debuggymlogger_log_queue_worker(DebugGymLoggerTest):
+    DebugGymLoggerTest.set_as_worker()
+    logger = DebugGymLoggerTest("test_worker_logger")
     # Clear the queue before test
-    while not DebugGymLogger.LOG_QUEUE.empty():
-        DebugGymLogger.LOG_QUEUE.get_nowait()
+    while not DebugGymLoggerTest.LOG_QUEUE.empty():
+        DebugGymLoggerTest.LOG_QUEUE.get_nowait()
     logger.info("Worker log message")
     # Should be in LOG_QUEUE
-    record = DebugGymLogger.LOG_QUEUE.get(timeout=1)
+    record = DebugGymLoggerTest.LOG_QUEUE.get(timeout=1)
     assert record.msg == "Worker log message"
 
 
-def test_debuggymlogger_report_progress():
-    logger = DebugGymLogger("test_progress_logger")
+def test_debuggymlogger_report_progress(DebugGymLoggerTest):
+    logger = DebugGymLoggerTest("test_progress_logger")
     # Clear the queue before test
-    while not DebugGymLogger.PROGRESS_QUEUE.empty():
-        DebugGymLogger.PROGRESS_QUEUE.get_nowait()
+    while not DebugGymLoggerTest.PROGRESS_QUEUE.empty():
+        DebugGymLoggerTest.PROGRESS_QUEUE.get_nowait()
     logger.report_progress(
         problem_id="prob1",
         step=1,
@@ -225,22 +239,10 @@ def test_debuggymlogger_report_progress():
         max_score=10,
         status="running",
     )
-    progress = DebugGymLogger.PROGRESS_QUEUE.get(timeout=1)
+    progress = DebugGymLoggerTest.PROGRESS_QUEUE.get(timeout=1)
     assert progress.problem_id == "prob1"
     assert progress.step == 1
     assert progress.status == "running"
-
-
-@pytest.fixture
-def DebugGymLoggerTest():
-    """Create a new DebugGymLogger class for each test to avoid
-    interference between tests when setting as worker.
-    """
-
-    class TestDebugGymLogger(DebugGymLogger):
-        pass
-
-    yield TestDebugGymLogger
 
 
 def test_debuggymlogger_set_as_worker_resets(DebugGymLoggerTest):
