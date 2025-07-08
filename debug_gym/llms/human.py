@@ -569,9 +569,7 @@ class Human(LLM):
                 )
                 action = session.prompt("\n> ")
             else:
-                self.logger.info(
-                    "\n".join(["Available commands:"] + available_commands)
-                )
+                self.logger.info(f"Available commands: {available_commands}")
                 action = input("> ")
 
             parser = CommandParser()

@@ -50,8 +50,7 @@ class AnthropicLLM(LLM):
         except Exception as e:
             self.logger.warning(
                 f"Error calling Claude token count API: {e!r}. "
-                "The message was: {messages}."
-                "Will return 0 tokens."
+                f"The message was: {messages}. Will return 0 tokens."
             )
         return 0
 

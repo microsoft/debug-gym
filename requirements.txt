@@ -4,7 +4,6 @@ azure-identity
 tenacity
 pyyaml
 pytest
-tqdm
 gitignore_parser
 termcolor
 transformers
@@ -15,3 +14,4 @@ swesmith
 prompt_toolkit
 anthropic>=0.49.0
 jinja2
+rich

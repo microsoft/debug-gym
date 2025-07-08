@@ -26,7 +26,7 @@ class Debug_5_Agent(DebugAgent):
 
         highscore = info.score
 
-        for step in self.logger.tqdm(range(self.config["max_steps"])):
+        for step in range(self.config["max_steps"]):
             highscore = max(highscore, info.score)
             self.logger.info(
                 f"Step: {step} | Score: {info.score}/{info.max_score} ({info.score/info.max_score:.1%}) [Best: {highscore}]"
