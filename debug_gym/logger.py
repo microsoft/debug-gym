@@ -69,7 +69,10 @@ class TaskProgressManager:
         self.progress = Progress(
             StatusColumn(),
             TextColumn("[progress.description]{task.description:<20}"),
-            TextColumn("Step: [green]{task.completed}[/green]"),
+            TextColumn("Step: [green]{task.completed:<4}[/green]  "),
+            TextColumn(
+                "Score: [green]{task.fields[score]:>3}/{task.fields[max_score]:<3}[/green]"
+            ),
             BarColumn(bar_width=None),
             TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
             expand=True,
@@ -98,7 +101,11 @@ class TaskProgressManager:
         )
         self._tasks[task_id] = task
         pid = self.progress.add_task(
-            task.problem_id, completed=task.step, total=task.total_steps
+            task.problem_id,
+            completed=task.step,
+            total=task.total_steps,
+            score=task.score,
+            max_score=task.max_score,
         )
         self._progress_task_ids[task.problem_id] = pid
         return pid
@@ -118,6 +125,8 @@ class TaskProgressManager:
                     completed=task.step,
                     total=task.total_steps,
                     status=task.status,
+                    score=task.score,
+                    max_score=task.max_score,
                 )
 
     def refresh_progress(self, all_tasks: bool = False):
