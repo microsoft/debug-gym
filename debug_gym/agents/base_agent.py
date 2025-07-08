@@ -246,6 +246,7 @@ class BaseAgent:
         highscore = info.score
         max_steps = self.config["max_steps"]
         for step in range(max_steps):
+            self.logger.info(f"\n{'='*20} STEP {step+1} {'='*20}\n")
             highscore = max(highscore, info.score)
             self.logger.info(
                 f"[{task_name[:10]:<10}] | Step: {step:<4} | Score: {info.score:>4}/{info.max_score:<4} ({info.score/info.max_score:.1%}) [Best: {highscore}]"

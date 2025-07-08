@@ -30,6 +30,8 @@ class StripAnsiFormatter(logging.Formatter):
 
 @dataclass(slots=True)  # Slitly faster / memory efficient when using slots
 class TaskProgress:
+    """Data class to communicate task progress information."""
+
     problem_id: str
     step: int
     total_steps: int  # Total steps for the problem considering early stopping
@@ -59,12 +61,16 @@ class StatusColumn(SpinnerColumn):
 
 
 class TaskProgressManager:
-    """Stores per-task data and renders a Progress widget."""
+    """Manages task progress for multiple tasks in a Rich Progress widget.
+    It manages the visibility of tasks based on their status and the
+    maximum number of tasks to display at once. If there are more tasks
+    than the maximum display count, it shows running tasks first,
+    then completed tasks, and hides the rest."""
 
     def __init__(self, problems, max_display: int = 10) -> None:
         self.max_display = max_display
         self._tasks: Dict[str, TaskProgress] = {}
-        self._progress_task_ids = {}
+        self._progress_task_ids = {}  # Maps problem IDs to Rich task IDs
 
         self.progress = Progress(
             StatusColumn(),
@@ -91,6 +97,7 @@ class TaskProgressManager:
         self.refresh_progress()
 
     def add_task(self, task_id: str, total_steps: int = 1) -> int:
+        """Add a new task to the progress manager and return its task ID."""
         task = TaskProgress(
             problem_id=task_id,
             step=0,
@@ -111,6 +118,7 @@ class TaskProgressManager:
         return pid
 
     def advance(self, progress_update: TaskProgress) -> None:
+        """Advance the task progress based on the provided update."""
         task = self._tasks.get(str(progress_update.problem_id))
         if task:
             task.step = progress_update.step
@@ -130,6 +138,8 @@ class TaskProgressManager:
                 )
 
     def refresh_progress(self, all_tasks: bool = False):
+        """Refresh the progress display, updating task visibility and panel title.
+        If `all_tasks` is True, show all tasks regardless of the max-display."""
         # Update panel title
         self._tasks_panel.title = self._get_tasks_panel_title(all_tasks)
 
@@ -164,9 +174,9 @@ class TaskProgressManager:
     def _get_tasks_panel_title(self, all_tasks=False):
         """Helper method to get the appropriate title for the tasks panel."""
         if all_tasks or self.max_display >= len(self._tasks):
-            return "In progress:"
+            return "Tasks:"
         else:
-            return f"In progress (max display {self.max_display}):"
+            return f"In progress (max-display {self.max_display}):"
 
     def get_task_stats(self):
         """Get statistics about tasks: total, pending, completed, failed."""
@@ -192,6 +202,11 @@ class TaskProgressManager:
 
 
 class OverallProgressContext:
+    """Context manager for overall progress tracking across multiple tasks.
+    It manages the Rich Progress display, task progress updates, and handles
+    the background thread for listening to progress updates from worker processes.
+    This class is designed to be used in a 'with' context from the main process."""
+
     def __init__(
         self,
         problems,
@@ -243,6 +258,8 @@ class OverallProgressContext:
         self._listener_thread.start()
 
     def advance(self, progress_update):
+        """Advance the progress for a specific task based on the provided update. Sets
+        task as completed if its status is "done" or "failed" (e.g. early stopping)."""
         self.logger.debug(
             f"Advancing progress for problem {progress_update.problem_id}: "
             f"step {progress_update.step}"
@@ -265,6 +282,7 @@ class OverallProgressContext:
         self.close()
 
     def refresh_progress(self, all_tasks: bool = False):
+        """Refresh the progress display, updating overall and tasks progress."""
         # Update overall progress with new stats
         stats = self.tasks_progress.get_task_stats()
         stats_text = (
@@ -289,7 +307,6 @@ class OverallProgressContext:
         while not self._stop_event.is_set():
             try:
                 progress_update = self.progress_queue.get(timeout=0.1)
-                self.logger.info(f"Received progress update: {progress_update}")
                 self.advance(progress_update)
                 current_time = time.time()
                 if current_time - last_refresh_time >= refresh_interval:
@@ -407,7 +424,8 @@ class DebugGymLogger(logging.Logger):
         """Create a Rich progress bar for the given problems. To be used in a 'with' context.
         The context manager yields a `rich.Progress` but allows rich_progress to close
         the progress bar when the context is exited, ensuring that the UI is updated
-        correctly and the thread is joined properly."""
+        correctly and the thread is joined properly. Only the main process can manage
+        the Rich UI, so this method raises an error if called in a worker process."""
         if self._is_worker:
             raise RuntimeError("Cannot use rich_progress in worker processes.")
         ctx = OverallProgressContext(
@@ -417,7 +435,6 @@ class DebugGymLogger(logging.Logger):
         with self._live:
             # Update the live display with the progress table
             self._live.update(ctx.progress_table)
-
             try:
                 # Yield the context object itself so the caller can access both
                 # the table and progress objects
@@ -433,8 +450,11 @@ class DebugGymLogger(logging.Logger):
         score: int,
         max_score: int,
         status: str,
+        max_attempts: int = 5,
     ) -> None:
-        """Send a progress update to the shared queue."""
+        """Send a progress update to the shared queue for the main process to handle.
+        This method is used by worker processes to report their progress."""
+
         progress_update = TaskProgress(
             problem_id=problem_id,
             step=step,
@@ -444,27 +464,23 @@ class DebugGymLogger(logging.Logger):
             status=status,
         )
         # Put in queue with backoff strategy
-        max_attempts = 5
         for attempt in range(max_attempts):
             try:
-                # print(f"PUT: {progress_update}")
                 self.PROGRESS_QUEUE.put(progress_update, timeout=1.0)
                 self.debug(f"Reported progress: {progress_update}")
                 return
             except queue.Full:
                 # If queue is full, wait with exponential backoff
-                # print("PUT QUEUE FULL")
                 if attempt < max_attempts - 1:  # Don't sleep on the last attempt
                     time.sleep(0.1 * (2**attempt))
-        # print("FAIL TO PUT")
         self.warning(
             f"Failed to report progress for {problem_id} after {max_attempts} attempts"
         )
 
 
 def log_with_color(logger: DebugGymLogger, message: str, color: str):
-    """Log a message with a specific color, escape it
-    for Rich, and mark it as already escaped for DebugGymLogger."""
+    """Log a message with a specific color, escape it for Rich, and mark it
+    as already escaped for DebugGymLogger so it won't be escaped again."""
     logger.info(
         f"[{color}]{escape(message)}[/{color}]",
         extra={"already_escaped": True},
