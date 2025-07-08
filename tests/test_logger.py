@@ -231,22 +231,34 @@ def test_debuggymlogger_report_progress():
     assert progress.status == "running"
 
 
-def test_debuggymlogger_set_as_worker_resets():
-    logger = DebugGymLogger("test_reset_logger")
-    assert not DebugGymLogger._is_worker
+@pytest.fixture
+def DebugGymLoggerTest():
+    """Create a new DebugGymLogger class for each test to avoid
+    interference between tests when setting as worker.
+    """
+
+    class TestDebugGymLogger(DebugGymLogger):
+        pass
+
+    yield TestDebugGymLogger
+
+
+def test_debuggymlogger_set_as_worker_resets(DebugGymLoggerTest):
+    logger = DebugGymLoggerTest("test_reset_logger")
+    assert not DebugGymLoggerTest._is_worker
     assert not logger._is_worker
     # Set as worker
-    DebugGymLogger.set_as_worker()
-    assert DebugGymLogger._is_worker
+    DebugGymLoggerTest.set_as_worker()
+    assert DebugGymLoggerTest._is_worker
     assert logger._is_worker
-    another_logger = DebugGymLogger("test_reset_logger")
+    another_logger = DebugGymLoggerTest("test_reset_logger")
     assert another_logger._is_worker
 
 
-def test_debuggymlogger_rich_progress_raises_in_worker():
-    DebugGymLogger.set_as_worker()
-    logger = DebugGymLogger("test_rich_progress_logger")
+def test_debuggymlogger_rich_progress_raises_in_worker(DebugGymLoggerTest):
+    DebugGymLoggerTest.set_as_worker()
+    logger = DebugGymLoggerTest("test_rich_progress_logger")
     with pytest.raises(RuntimeError):
         with logger.rich_progress(["p1", "p2"]):
             pass
-    DebugGymLogger._is_worker = False
+    DebugGymLoggerTest._is_worker = False
