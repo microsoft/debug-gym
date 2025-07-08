@@ -22,11 +22,20 @@ class Debug_5_Agent(DebugAgent):
 
         if info.done is True:
             # msg = "Environment started with entrypoint passing without errors."
+            self.logger.report_progress(
+                problem_id=task_name,
+                step=1,
+                total_steps=1,
+                score=info.score,
+                max_score=info.max_score,
+                status="done",
+            )
             return True
 
         highscore = info.score
-
-        for step in range(self.config["max_steps"]):
+        max_steps = self.config["max_steps"]
+        for step in range(max_steps):
+            self.logger.info(f"\n{'='*20} STEP {step+1} {'='*20}\n")
             highscore = max(highscore, info.score)
             self.logger.info(
                 f"Step: {step} | Score: {info.score}/{info.max_score} ({info.score/info.max_score:.1%}) [Best: {highscore}]"
@@ -58,6 +67,29 @@ class Debug_5_Agent(DebugAgent):
                 self.logger.info(
                     f"Step: {step} | Score: {info.score}/{info.max_score} ({info.score/info.max_score:.1%}) | Reason: {reason}"
                 )
+                self.logger.report_progress(
+                    problem_id=task_name,
+                    step=step + 1,
+                    total_steps=step + 1,  # early stop, current step is total steps
+                    score=info.score,
+                    max_score=info.max_score,
+                    status="done" if info.done else "failed",
+                )
                 break
-
+            self.logger.report_progress(
+                problem_id=task_name,
+                step=step + 1,
+                total_steps=max_steps + 1,  # keep progress bar running until max_steps
+                score=info.score,
+                max_score=info.max_score,
+                status="running",
+            )
+        self.logger.report_progress(
+            problem_id=task_name,
+            step=step + 1,
+            total_steps=step + 1,
+            score=info.score,
+            max_score=info.max_score,
+            status="done" if info.done else "failed",
+        )
         return info.done

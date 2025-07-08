@@ -95,7 +95,7 @@ class BaseAgent:
             )
         if self._show_directory_tree():
             features.append(
-                f"The environment will show the directory tree of the repository in the system prompt."
+                "The environment will show the directory tree of the repository in the system prompt."
             )
         if self.env.has_tool("pdb"):
             if self._show_current_breakpoints():
@@ -238,6 +238,7 @@ class BaseAgent:
                 status="done",
             )
             return True
+
         self.logger.info(
             "Available tools (in LLM's tool calling format):\n"
             f"{json.dumps(self.llm.define_tools(info.tools), indent=4)}\n"
