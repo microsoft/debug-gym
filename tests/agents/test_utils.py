@@ -269,34 +269,96 @@ def test_trim():
     def count_tokens(text):
         return len(text)
 
-    # Test trimming from the middle
-    assert trim("Hello world", 5, count_tokens) == "He…ld"
+    # Test basic cases - no trimming needed
     assert trim("Hello world", 11, count_tokens) == "Hello world"
+    assert trim("Hello world", 20, count_tokens) == "Hello world"
+    assert trim("Hi", 2, count_tokens) == "Hi"
+    assert trim("Hi", 10, count_tokens) == "Hi"
+    assert trim("A", 1, count_tokens) == "A"  # Exactly fits, no trimming needed
+
+    # Test edge cases
+    assert trim("Hello world", 0, count_tokens) == ""
+    assert trim("", 5, count_tokens) == ""
+    assert trim("", 0, count_tokens) == ""
+
+    # Test cases requiring trimming to single token (ellipsis only)
+    assert trim("Hello world", 1, count_tokens) == "…"
+    assert trim("Hi", 1, count_tokens) == "…"
+    assert trim("ABC", 1, count_tokens) == "…"
+
+    # Test trimming from the middle (default behavior)
+    assert trim("Hello world", 5, count_tokens) == "He…ld"
+    assert trim("Hello world", 6, count_tokens) == "He…rld"
+    assert trim("Hello world", 7, count_tokens) == "Hel…rld"
+    assert trim("123456789", 5, count_tokens) == "12…89"
+    assert trim("123456789", 7, count_tokens) == "123…789"
 
     # Test trimming from the end
     assert trim("Hello world", 5, count_tokens, where="end") == "Hell…"
-    assert trim("Hello world", 11, count_tokens, where="end") == "Hello world"
+    assert trim("Hello world", 6, count_tokens, where="end") == "Hello…"
+    assert trim("Hello world", 7, count_tokens, where="end") == "Hello …"
+    assert trim("123456789", 5, count_tokens, where="end") == "1234…"
 
     # Test trimming from the start
     assert trim("Hello world", 5, count_tokens, where="start") == "…orld"
-    assert trim("Hello world", 11, count_tokens, where="start") == "Hello world"
-
-    # Test trimming with very short max_length
-    assert trim("Hello world", 1, count_tokens) == "…"
-    assert trim("Hello world", 0, count_tokens) == ""
-
-    # Test trimming with exact length
-    assert trim("Hi", 2, count_tokens) == "Hi"
-    assert trim("Hi", 1, count_tokens) == "…"
+    assert trim("Hello world", 6, count_tokens, where="start") == "…world"
+    assert trim("Hello world", 7, count_tokens, where="start") == "… world"
+    assert trim("123456789", 5, count_tokens, where="start") == "…6789"
 
     # Test invalid `where` value
     with pytest.raises(ValueError, match="Invalid value for `where`"):
         trim("Hello world", 5, count_tokens, where="invalid")
 
+    # Test with different token counter
     def another_count_tokens(text):
         return len(text) // 2
 
-    # Test trimming with a different token counter
-    assert trim("1234567890", 3, another_count_tokens) == "12…90"
-    assert trim("1234567890", 4, another_count_tokens) == "123…890"
+    # For "1234567890" (10 chars), another_count_tokens returns 5 tokens
+    # Original text has 5 tokens, so no trimming needed when max_tokens >= 5
     assert trim("1234567890", 5, another_count_tokens) == "1234567890"
+    assert trim("1234567890", 6, another_count_tokens) == "1234567890"
+
+    # When max_tokens < 5, trimming is needed
+    # With max_tokens=4, we need 3 tokens for content + 1 for ellipsis
+    assert (
+        trim("1234567890", 4, another_count_tokens) == "123…67890"
+    )  # Result has 4 tokens
+    assert (
+        trim("1234567890", 3, another_count_tokens) == "123…890"
+    )  # Result has 3 tokens
+    assert trim("1234567890", 2, another_count_tokens) == "1…890"  # Result has 2 tokens
+    assert trim("1234567890", 1, another_count_tokens) == "1…0"  # Result has 1 token
+
+    # Test with different trimming positions using the alternative counter
+    assert (
+        trim("1234567890", 3, another_count_tokens, where="end") == "12345…"
+    )  # Result has 3 tokens
+    assert (
+        trim("1234567890", 3, another_count_tokens, where="start") == "…67890"
+    )  # Result has 3 tokens
+
+    # Test edge case with very short text and alternative counter
+    assert trim("AB", 1, another_count_tokens) == "AB"  # "AB" has 1 token, fits exactly
+    assert (
+        trim("ABCD", 1, another_count_tokens) == "A…D"
+    )  # "ABCD" has 2 tokens, needs trimming to 1
+
+    # Test boundary conditions with precise scenarios
+    def word_count_tokens(text):
+        # Count words as tokens
+        return len(text.split())
+
+    text = "Hello world test example"  # 4 words = 4 tokens
+    assert trim(text, 4, word_count_tokens) == text  # No trimming needed
+    assert (
+        trim(text, 3, word_count_tokens, where="middle") == "Hello … example"
+    )  # Should fit in 3 tokens
+    assert (
+        trim(text, 2, word_count_tokens, where="end") == "Hello …"
+    )  # Should fit in 2 tokens
+    assert (
+        trim(text, 2, word_count_tokens, where="start") == "… example"
+    )  # Should fit in 2 tokens
+
+    # Test very short max_tokens with word counter
+    assert trim("Hello world", 1, word_count_tokens) == "…"  # Only ellipsis fits
