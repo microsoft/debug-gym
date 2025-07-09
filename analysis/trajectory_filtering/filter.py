@@ -265,7 +265,7 @@ def main():
     )
     parser.add_argument(
         "--output-file",
-        help="Custom output file path (default: <exp_path>/filtered_trajectories_<exp_uuid>.json)",
+        help="Custom output file path (default: <exp_path>/all_trajectories_<exp_uuid>.json)",
     )
     parser.add_argument(
         "--create-zip",
