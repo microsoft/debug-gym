@@ -189,7 +189,7 @@ class SWESmithEnv(SWEBenchEnv):
             # Empty folder. The actual codebase will come from the docker image.
             path=SWESmithEnv.DUMMY_DIR,
             # allow traceback to be printed in the output.
-            entrypoint=self.test_cmd.replace("--tb=no", ""),
+            entrypoint=self.test_cmd.replace("--tb=no", "--tb=short"),
             # -s (capture=no) from pytest, allows for debugging with pdb
             # -q (quiet) from pytest, to avoid long pytest output
             debug_entrypoint=self.test_cmd.replace("pytest", "pytest -sq"),

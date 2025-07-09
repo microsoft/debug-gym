@@ -60,7 +60,7 @@ def run_agent(args, problem, config):
     except Exception as e:
         task_logger.error(
             f"Task Error: {problem} - {e!r}. Run with --very-verbose "
-            "or check {task_logger.log_file} for more information."
+            f"or check {task_logger.log_file} for more information."
         )
         task_logger.debug(
             f"Task {problem} generated an exception: {e!r}", exc_info=True
