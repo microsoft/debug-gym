@@ -1,6 +1,5 @@
 from debug_gym.agents.base_agent import BaseAgent, register_agent
 
-
 @register_agent
 class DebugAgent(BaseAgent):
     name = "debug_agent"
@@ -66,9 +65,9 @@ class Debug_5_Agent(DebugAgent):
 class ExplanationAgent(BaseAgent):
     name = "explanation_agent"
     system_prompt = DebugAgent.system_prompt
-    def __init__(self, explanation: str, **kwargs):
-        self.explanation = self.get_explanation_from_file("explanations/single_shot_explanation.txt")
-        self.system_prompt = f"{self.system_prompt} {explanation}"
+    def __init__(self, **kwargs):
+        self.explanation = self.get_explanation_from_file("../generate-explanations/explanations/single_shot_low_level/swe-smith/burnash__gspread.a8be3b96.lm_rewrite__596cni6x/single_shot_explanation_20250704_151835.txt")
+        self.system_prompt = f"{self.system_prompt} {self.explanation}"
         super().__init__(**kwargs)
     
     def get_explanation_from_file(self, text_file: str):

@@ -19,7 +19,7 @@ base:
     }
 
     # LLM configs
-    llm_name: "gpt-4o"
+    llm_name: "qwen3-8b-vllm"
 
     # Agent configs
     random_seed: 42
@@ -45,3 +45,6 @@ debug_5_agent:
 solution_agent:
     llm_name: "human"  # No need for an LLM.
     tools: ["eval", "pdb"]
+
+explanation_agent:
+    tools: ["pdb", "view", "rewrite", "listdir", "eval"]
