@@ -81,3 +81,13 @@ class AiderBenchmarkEnv(RepoEnv):
                 "instructions": instructions,
                 "filename": task_name + ".py",
             }
+
+    def get_problem_ids(self, split_or_problem_id):
+        if split_or_problem_id == "all":
+            return sorted(self.dataset.keys())  # all tasks
+        elif split_or_problem_id in self.dataset:
+            return [split_or_problem_id]  # Single task
+        else:
+            raise ValueError(
+                f"Invalid split or problem id: '{split_or_problem_id}'.\nChoose from: {['all'] + sorted(self.dataset.keys())}"
+            )
