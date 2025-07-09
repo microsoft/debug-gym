@@ -1,6 +1,4 @@
-from termcolor import colored
-
-from debug_gym.logger import DebugGymLogger
+from debug_gym.logger import DebugGymLogger, log_with_color
 
 
 def print_messages(messages: list[dict], logger: DebugGymLogger):
@@ -11,23 +9,31 @@ def print_messages(messages: list[dict], logger: DebugGymLogger):
         cyan: user messages
         yellow: system message
     """
+
     for m in messages:
         role = m["role"]
         if role == "tool":
-            logger.info(colored(f"{m['content']}\n", "magenta"))
+            log_with_color(logger, m["content"], "magenta")
         elif role == "user":
             if isinstance(m["content"], list):
                 for item in m["content"]:
                     if item["type"] == "tool_result":
-                        logger.info(colored(f"{item["content"]}\n", "magenta"))
+                        log_with_color(logger, str(item["content"]), "magenta")
                     else:
-                        logger.info(colored(f"{item}\n", "cyan"))
+                        log_with_color(logger, str(item), "cyan")
             else:
-                logger.info(colored(f"{m['content']}\n", "cyan"))
+                log_with_color(logger, str(m["content"]), "cyan")
         elif role == "assistant":
             content = m.get("content", m.get("tool_calls", m))
-            logger.info(colored(f"{content}\n", "green"))
+            if isinstance(content, list):
+                for item in content:
+                    log_with_color(logger, str(item), "cyan")
+            else:
+                log_with_color(logger, str(content), "cyan")
+        elif role == "assistant":
+            content = m.get("content", m.get("tool_calls", m))
+            log_with_color(logger, str(content), "green")
         elif role == "system":
-            logger.info(colored(f"{m['content']}\n", "yellow"))
+            log_with_color(logger, str(m["content"]), "yellow")
         else:
             raise ValueError(f"Unknown role: {m['content']}")

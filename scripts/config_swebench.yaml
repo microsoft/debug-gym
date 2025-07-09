@@ -27,7 +27,6 @@ base:
     max_rewrite_steps: 10
     memory_size: 20
     save_patch: True
-    log_prompt_response_pairs: True
     reset_prompt_history_after_rewrite: True
     # Optionally loads a custom system prompt template from a file.
     # system_prompt_template_file: "script/templates/system_prompt.jinja"

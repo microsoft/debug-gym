@@ -36,7 +36,7 @@ class HistoryTracker:
     def get_all(self):
         return self.memory
 
-    def json(self, game_step=None, include_prompt_response_pairs=False):
+    def json(self, game_step=None):
         if len(self.memory) == 0:
             return {}
         if game_step is None:
@@ -46,30 +46,29 @@ class HistoryTracker:
             # initial state
             json_out = {
                 "step_id": game_step,
+                "reasoning": None,
                 "action": None,  # env reset
                 "obs": self.memory[0].step_observation.observation,
                 "rewrite_consumed": 0,
+                "prompt_response_pairs": None,
             }
-            if include_prompt_response_pairs:
-                json_out["prompt_response_pairs"] = None
         else:
             json_out = {
                 "step_id": game_step,
+                "reasoning": self.memory[game_step].action_reasoning,
                 "action": asdict(self.memory[game_step].action),
                 "obs": self.memory[game_step].step_observation.observation,
                 "rewrite_consumed": self.memory[game_step].rewrite_counter,
             }
             # prompt_response_pairs could be empty for the initial state
-            prp = self.prompt_response_pairs[game_step]
-
-            if prp and include_prompt_response_pairs:
+            if self.prompt_response_pairs[game_step]:
                 json_out["prompt_response_pairs"] = [
                     # doesn't include None values
                     asdict(
                         p,
                         dict_factory=lambda x: {k: v for (k, v) in x if v is not None},
                     )
-                    for p in prp
+                    for p in self.prompt_response_pairs[game_step]
                 ]
 
         return json_out
@@ -82,13 +81,6 @@ class HistoryTracker:
 
     def clone(self):
         return copy.deepcopy(self)
-
-    def filter_out(self, actions: list[str]):
-        history = HistoryTracker(self.history_steps)
-        for info, llm_response in zip(self.memory, self.prompt_response_pairs):
-            if getattr(info.action, "name", None) not in actions:
-                history.step(info, llm_response)
-        return history
 
 
 def build_history_prompt(

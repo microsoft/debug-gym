@@ -4,9 +4,6 @@ import uuid
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 
-from termcolor import colored
-from tqdm import tqdm
-
 from debug_gym.agents.base_agent import AGENT_REGISTRY, create_agent
 from debug_gym.agents.utils import load_config
 from debug_gym.gym.envs import select_env
@@ -61,8 +58,9 @@ def run_agent(args, problem, config):
         raise BreakTaskLoop
 
     except Exception as e:
-        task_logger.warning(
-            f"Task Error: {problem} - {e!r}. Run with --very-verbose or check {task_logger.log_file} for more information."
+        task_logger.error(
+            f"Task Error: {problem} - {e!r}. Run with --very-verbose "
+            f"or check {task_logger.log_file} for more information."
         )
         task_logger.debug(
             f"Task {problem} generated an exception: {e!r}", exc_info=True
@@ -99,11 +97,11 @@ def main():
     logger = DebugGymLogger("debug-gym", level=args.logging_level)
 
     config["uuid"] = config.get("uuid", str(uuid.uuid4()))
-    logger.warning(f"Experiment log path: {config['output_path']}/{config['uuid']}")
+    logger.info(f"Experiment log path: {config['output_path']}/{config['uuid']}")
 
     # Figure out which problems to solve.
     problems = config.get("problems", ["custom"])
-    if type(problems) == str and "benchmark" in config:
+    if isinstance(problems, str) and "benchmark" in config:
         env = create_env(config, logger=logger)
         if problems == "all":
             problems = sorted(env.dataset.keys())  # all tasks
@@ -128,73 +126,65 @@ def main():
         num_workers = 1
     # make sure number of workers is in range [1, len(problems)]
     num_workers = min(max(1, num_workers), len(problems))
-    logger.warning(f"Running with {num_workers} workers")
+    logger.info(f"Running with {num_workers} workers")
 
     tasks_done = 0
     mean_perf = 0
     tasks_succeeded = []
 
-    if num_workers > 1:
-        # Multi-process
-        with ProcessPoolExecutor(num_workers) as executor:
-            futures = {
-                executor.submit(run_agent, args, problem, config): problem
-                for problem in problems
-            }
-            mean_perf_text = colored(f"{mean_perf}", "green")
-            desc = f"Overall progress ({mean_perf_text} are successful)"
-            pbar = tqdm(as_completed(futures), desc=desc, total=len(problems))
-            for future in pbar:
-                if future.cancelled():
-                    continue
-
+    with logger.rich_progress(problems, max_display=args.max_display):
+        if num_workers == 1:  # run sequentially for easier debugging
+            for problem in problems:
                 try:
-                    problem = futures[future]
-                    success = future.result()
+                    success = run_agent(args, problem, config)
                     mean_perf += success
                     tasks_done += 1
 
                     if success:
                         tasks_succeeded.append(problem)
 
-                    # update message on overall progress bar
-                    mean_perf_text = colored(f"{mean_perf}", "green")
-                    pbar.set_description(
-                        f"Overall tasks done ({mean_perf_text} are successful)"
-                    )
+                    mean_perf_text = f"[green]{mean_perf}[/green]"
+                    logger.info(f"Overall tasks done ({mean_perf_text} are successful)")
                 except (KeyboardInterrupt, BreakTaskLoop) as e:
-                    executor.shutdown(wait=False, cancel_futures=True)
                     raise e
                 except Exception as e:
-                    executor.shutdown(wait=False, cancel_futures=True)
                     raise e
+        else:
+            with ProcessPoolExecutor(
+                num_workers,
+                initializer=DebugGymLogger.set_as_worker,
+            ) as executor:
+                futures = {
+                    executor.submit(run_agent, args, problem, config): problem
+                    for problem in problems
+                }
+                for future in as_completed(futures):
+                    if future.cancelled():
+                        continue
+                    try:
+                        problem = futures[future]
+                        success = future.result()
+                        mean_perf += success
+                        tasks_done += 1
 
-    else:
-        # Single thread
-        mean_perf_text = colored(f"{mean_perf}", "green")
-        desc = f"Overall tasks done ({mean_perf_text} are successful)"
-        pbar = tqdm(problems, desc=desc, total=len(problems))
-        for problem in pbar:
-            try:
-                success = run_agent(args, problem, config)
-                mean_perf += success
-                tasks_done += 1
+                        if success:
+                            tasks_succeeded.append(problem)
 
-                if success:
-                    tasks_succeeded.append(problem)
+                        # update message on overall progress bar
+                        mean_perf_text = f"[green]{mean_perf}[/green]"
+                        logger.info(
+                            f"Overall tasks done ({mean_perf_text} are successful)"
+                        )
+                    except (KeyboardInterrupt, BreakTaskLoop) as e:
+                        executor.shutdown(wait=False, cancel_futures=True)
+                        raise e
+                    except Exception as e:
+                        executor.shutdown(wait=False, cancel_futures=True)
+                        raise e
 
-                # update message on overall progress bar
-                mean_perf_text = colored(f"{mean_perf}", "green")
-                pbar.set_description(
-                    f"Overall tasks done ({mean_perf_text} are successful)"
-                )
-            except (KeyboardInterrupt, BreakTaskLoop) as e:
-                raise e
-            except Exception as e:
-                raise e
-
-        logger.info(f"Tasks that succeeded: {tasks_succeeded}")
-        logger.info(f"Tasks that failed: {set(problems) - set(tasks_succeeded)}")
+    tasks_failed = list(set(problems) - set(tasks_succeeded))
+    logger.info(f"[green]Tasks that succeeded:[/green] {tasks_succeeded}")
+    logger.info(f"[red]Tasks that failed:[/red] {tasks_failed}")
 
 
 if __name__ == "__main__":

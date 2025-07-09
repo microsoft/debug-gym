@@ -1,15 +1,15 @@
 import os
 import subprocess
-from pathlib import Path
 
 import debug_gym.gym.utils as utils
+from debug_gym.constants import DEBUG_GYM_CACHE_DIR
 from debug_gym.gym.entities import EvalOutput
 from debug_gym.gym.envs.env import RepoEnv
 
 
 class AiderBenchmarkEnv(RepoEnv):
     REPO_URL = "https://github.com/exercism/python"
-    REPO_PATH = Path.joinpath(Path.home(), ".cache", "debug_gym", "exercism")
+    REPO_PATH = DEBUG_GYM_CACHE_DIR / "exercism"
 
     @property
     def instructions(self) -> str:

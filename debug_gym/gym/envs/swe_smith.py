@@ -11,7 +11,6 @@ from swesmith.harness.grading import TestStatus
 from swesmith.harness.log_parsers import MAP_REPO_TO_PARSER, parse_log_pytest
 from swesmith.harness.utils import get_test_command
 from swesmith.utils import get_repo_commit_from_image_name
-from tqdm import tqdm
 
 from debug_gym.constants import DEBUG_GYM_CACHE_DIR
 from debug_gym.gym.entities import EvalOutput
@@ -81,9 +80,12 @@ class SWESmithEnv(SWEBenchEnv):
         )
         missing_images = tagged_image_names - existing_images
         if missing_images:
-            self.logger.debug(f"Found {len(missing_images)} missing Docker images.")
-            for image_name in tqdm(missing_images, desc="Pulling images for SWE-Smith"):
+            self.logger.info(f"Found {len(missing_images)} missing Docker images.")
+            for image_name in missing_images:
                 docker_hub_image = image_name.replace("__", "_1776_")
+                self.logger.info(
+                    f"Pulling Docker image `{docker_hub_image}` to `{image_name}`."
+                )
                 client.images.pull(docker_hub_image)
                 # Rename images via tagging
                 client.images.get(docker_hub_image).tag(image_name)
@@ -186,9 +188,11 @@ class SWESmithEnv(SWEBenchEnv):
         self.setup_workspace(
             # Empty folder. The actual codebase will come from the docker image.
             path=SWESmithEnv.DUMMY_DIR,
-            entrypoint=self.test_cmd,
+            # allow traceback to be printed in the output.
+            entrypoint=self.test_cmd.replace("--tb=no", "--tb=short"),
+            # -s (capture=no) from pytest, allows for debugging with pdb
             # -q (quiet) from pytest, to avoid long pytest output
-            debug_entrypoint=self.test_cmd.replace("pytest", "pytest -q"),
+            debug_entrypoint=self.test_cmd.replace("pytest", "pytest -sq"),
         )
 
         # Those changes depend on the working directory created by setup_workspace.
