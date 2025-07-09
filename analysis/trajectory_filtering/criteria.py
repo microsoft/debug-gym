@@ -2,14 +2,14 @@
 Criteria functions for filtering trajectories.
 
 This module contains two types of criteria functions:
-1. Data-level criteria: operate on the full trajectory data dict
-2. Trajectory-level criteria: operate on the trajectory log entries
+1. Outcome criteria: operate on the full trajectory data dict to check outcomes
+2. Behavior pattern criteria: operate on the trajectory log entries to analyze patterns
 
 """
 
 # =============================================================================
-# DATA-LEVEL CRITERIA
-# These functions operate on the full trajectory data dict (not just the log)
+# OUTCOME CRITERIA
+# These functions operate on the full trajectory data dict to check outcomes
 # =============================================================================
 
 
@@ -27,8 +27,8 @@ def has_successful_outcome(trajectory_data):
 
 
 # =============================================================================
-# TRAJECTORY-LEVEL CRITERIA
-# These functions operate on the trajectory log entries (list of steps)
+# BEHAVIOR PATTERN CRITERIA
+# These functions operate on the trajectory log entries to analyze behavior patterns
 # =============================================================================
 
 # PDB-specific criteria
