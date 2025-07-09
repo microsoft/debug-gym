@@ -80,6 +80,16 @@ class SWEBenchEnv(RepoEnv):
                 max_workers=24,
             )
 
+    def get_problem_ids(self, split_or_problem_id):
+        if split_or_problem_id == "all":
+            return sorted(self.dataset.keys())  # all tasks
+        elif split_or_problem_id in self.dataset:
+            return [split_or_problem_id]  # Single task
+        else:
+            raise ValueError(
+                f"Invalid split or problem id: '{split_or_problem_id}'.\nChoose from: {['all'] + sorted(self.dataset.keys())}"
+            )
+
     def setup_task(self, task_name):
         if self.instance_ids:
             if task_name not in self.instance_ids:
