@@ -49,23 +49,46 @@ def test_status_column_render():
     running_task = MagicMock()
     running_task.finished = False
 
-    failed_task = MagicMock()
-    failed_task.finished = True
-    failed_task.fields = {"status": "failed"}
-
     completed_task = MagicMock()
     completed_task.finished = True
-    completed_task.fields = {"status": "done"}
+    completed_task.fields = {"status": "resolved"}
+    completed_result = column.render(completed_task)
+    assert completed_result.plain == "✓"
+    assert "green" in completed_result.style
 
-    # Test rendering for failed task
+    failed_task = MagicMock()
+    failed_task.finished = True
+    failed_task.fields = {"status": "unresolved"}
     failed_result = column.render(failed_task)
     assert failed_result.plain == "✗"
     assert "red" in failed_result.style
 
-    # Test rendering for completed task
-    completed_result = column.render(completed_task)
-    assert completed_result.plain == "✓"
-    assert "green" in completed_result.style
+    skip_resolved_task = MagicMock()
+    skip_resolved_task.finished = True
+    skip_resolved_task.fields = {"status": "skip-resolved"}
+    skip_resolved_result = column.render(skip_resolved_task)
+    assert skip_resolved_result.plain == "✓"
+    assert "yellow" in skip_resolved_result.style
+
+    skip_unresolved_task = MagicMock()
+    skip_unresolved_task.finished = True
+    skip_unresolved_task.fields = {"status": "skip-unresolved"}
+    skip_unresolved_result = column.render(skip_unresolved_task)
+    assert skip_unresolved_result.plain == "✗"
+    assert "yellow" in skip_unresolved_result.style
+
+    error_task = MagicMock()
+    error_task.finished = True
+    error_task.fields = {"status": "error"}
+    error_result = column.render(error_task)
+    assert error_result.plain == "!"
+    assert "magenta" in error_result.style
+
+    unknown_task = MagicMock()
+    unknown_task.finished = True
+    unknown_task.fields = {"status": "unknown-status"}
+    with pytest.raises(ValueError):
+        column.render(unknown_task)
 
 
 def test_strip_ansi_formatter():
