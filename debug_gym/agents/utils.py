@@ -5,96 +5,180 @@ import os
 import yaml
 
 
-def trim(text: str, max_length: int, count_tokens: callable, where: str = "middle"):
-    # Get an approximate number of characters per token ratio in the text.
-    nb_tokens = count_tokens(text=text)
-    if nb_tokens == 0:
+def trim(text: str, max_tokens: int, count_tokens: callable, where: str = "middle"):
+    """Trim text to fit within max_tokens by working directly at the token level."""
+    if max_tokens <= 0:
+        return ""
+
+    nb_tokens = count_tokens(text)
+    if nb_tokens <= max_tokens:
         return text
 
-    chars_per_token = len(text) / nb_tokens
-    # Adjust the max_length based on the chars_per_token ratio.
-    max_length = int(max_length * chars_per_token)
+    ellipsis = "…"  # assume ellipsis is a single token
+    available_tokens = max_tokens - 1  # account for ellipsis
 
-    if len(text) <= max_length:
-        return text
+    def find_char_position_for_tokens(
+        target_tokens: int, from_start: bool = True
+    ) -> int:
+        """Binary search to find character position that gives approximately target_tokens."""
+        left, right = 0, len(text)
+        best_pos = left if from_start else right
 
-    ellipsis = "…"
-    if max_length <= len(ellipsis):
-        return ellipsis[:max_length]
+        while left <= right:
+            mid = (left + right) // 2
+            test_text = text[:mid] if from_start else text[mid:]
+            test_tokens = count_tokens(test_text)
+            if test_tokens <= target_tokens:
+                best_pos = mid
+                if from_start:
+                    left = mid + 1
+                else:
+                    right = mid - 1
+            else:
+                if from_start:
+                    right = mid - 1
+                else:
+                    left = mid + 1
+        return best_pos
 
-    match where:
-        case "end":
-            return text[: max_length - len(ellipsis)] + ellipsis
-        case "start":
-            return ellipsis + text[-(max_length - len(ellipsis)) :]
-        case "middle":
-            half_length = (max_length - len(ellipsis)) // 2
-            return text[:half_length] + ellipsis + text[-half_length:]
-        case _:
-            raise ValueError(f"Invalid value for `where`: {where!r}.")
+    if where == "end":
+        # Keep the beginning, trim the end
+        trim_point = find_char_position_for_tokens(available_tokens, from_start=True)
+        return text[:trim_point] + ellipsis
+    elif where == "start":
+        # Keep the end, trim the beginning
+        trim_point = find_char_position_for_tokens(available_tokens, from_start=False)
+        return ellipsis + text[trim_point:]
+    elif where == "middle":
+        # Keep both ends, trim the middle
+        half_tokens = available_tokens // 2
 
-    return text
+        # Find how much we can keep from the start
+        start_chars = find_char_position_for_tokens(half_tokens, from_start=True)
+
+        # Find how much we can keep from the end with remaining tokens
+        remaining_tokens = available_tokens - count_tokens(text[:start_chars])
+        end_chars = find_char_position_for_tokens(remaining_tokens, from_start=False)
+
+        return text[:start_chars] + ellipsis + text[end_chars:]
+    else:
+        raise ValueError(f"Invalid value for `where`: {where!r}.")
 
 
 def trim_prompt_messages(
     messages: list[dict], context_length: int, count_tokens: callable
 ):
-    # Trim message content to context length
-    # messages: list of dict, each dict has keys "role" and either "content" or "tool_calls"
-    # context_length: int, maximum number of tokens
-    # count_tokens: function, count the number of tokens in a string
-    # messages should not be empty
+    """
+    Trim message on the assistant-tool pair level to fit context length.
+
+    Strategy:
+    1. Keep the system message (assert if system itself is too long)
+    2. Keep as many most recent (assistant, tool) pairs as possible
+    3. Only when we can keep all (assistant, tool) pairs, keep the user message
+
+    Args:
+        messages: List of message dicts with 'role' and 'content'/'tool_calls' keys
+        context_length: Maximum number of tokens allowed
+        count_tokens: Function to count tokens in a string
+
+    Returns:
+        Trimmed list of messages that fit within context_length
+    """
     assert len(messages) > 0, "messages should not be empty"
-
-    # the last message should be from the user
-    assert messages[-1]["role"] == "user", "the last message should be from the user"
-
-    # context_length should be non-negative
+    assert messages[-1]["role"] in [
+        "user",
+        "tool",
+    ], "the last message should be from the user or the tool"
     assert context_length >= 0, "context_length should be non-negative"
 
-    def get_item(item):
-        """From a message, gets it's content, tool_calls, or return the item itself as str."""
-        return str(item.get("content", item.get("tool_calls", item)))
+    def get_message_content(message):
+        """Extract content from a message for token counting."""
+        return str(message.get("content", message.get("tool_calls", message)))
 
-    message_lengths = [count_tokens(get_item(item)) for item in messages]
-    total_length = sum(message_lengths)
-    if total_length <= context_length:
+    def get_message_tokens(message):
+        """Count tokens in a message."""
+        return count_tokens(get_message_content(message))
+
+    # Calculate token count for all messages
+    message_tokens = [get_message_tokens(msg) for msg in messages]
+    total_tokens = sum(message_tokens)
+
+    # If we're already within limit, return as-is
+    if total_tokens <= context_length:
         return messages
 
-    # keep the first (system) message and last (user) message if possible
-    new_messages, new_length = [], 0
-    if messages[0]["role"] == "system":
-        new_messages.append(messages[0])
-        new_length += message_lengths[0]
+    # Find system message
+    system_msg_idx = 0 if messages[0]["role"] == "system" else None
+    system_tokens = message_tokens[0] if system_msg_idx is not None else 0
 
+    # Assert system message fits within context
     assert (
-        new_length <= context_length
-    ), f"The system message exceeds: {new_length} > {context_length}!"
+        system_tokens <= context_length
+    ), f"System message tokens exceed context length: {system_tokens} > {context_length}!"
 
-    new_messages.append(dict(messages[-1]))
-    new_length += message_lengths[-1]
-    if new_length > context_length:
-        token_space_remaining = context_length - (new_length - message_lengths[-1])
-        # just keep the system message and trim the last message
-        new_messages[-1]["content"] = trim(
-            new_messages[-1]["content"],
-            token_space_remaining,
-            count_tokens=count_tokens,
-            where="middle",
-        )
-    else:
-        # adding back the messages in between (from latest to earliest)
-        start = 1 if messages[0]["role"] == "system" else 0
-        for i in range(len(messages) - 2, start, -1):
-            if new_length + message_lengths[i] > context_length:
-                break
-            if start == 0:
-                new_messages = [messages[i]] + new_messages
-            else:
-                new_messages = new_messages[:1] + [messages[i]] + new_messages[1:]
-            new_length += message_lengths[i]
+    # Find user message
+    user_msg_idx = None
+    for i, msg in enumerate(messages):
+        if msg["role"] == "user":
+            user_msg_idx = i
+            break
 
-    return new_messages
+    # Find all (assistant, tool) pairs by going backwards
+    assistant_tool_pairs = []
+    i = len(messages) - 1
+    while i >= 0:
+        if (
+            messages[i]["role"] == "tool"
+            and i > 0
+            and messages[i - 1]["role"] == "assistant"
+        ):
+            assistant_tool_pairs.append((i - 1, i))  # (assistant_idx, tool_idx)
+            i -= 2
+        else:
+            i -= 1
+
+    # Start building result with system message
+    result = []
+    remaining_tokens = context_length
+
+    if system_msg_idx is not None:
+        result.append(messages[system_msg_idx])
+        remaining_tokens -= system_tokens
+
+    # Add as many recent (assistant, tool) pairs as possible
+    included_pairs = []
+    for assistant_idx, tool_idx in assistant_tool_pairs:
+        pair_tokens = message_tokens[assistant_idx] + message_tokens[tool_idx]
+        if pair_tokens <= remaining_tokens:
+            included_pairs.append((assistant_idx, tool_idx))
+            remaining_tokens -= pair_tokens
+        else:
+            break
+
+    # Only include user message if we can fit all (assistant, tool) pairs
+    include_user = False
+    if len(included_pairs) == len(assistant_tool_pairs) and user_msg_idx is not None:
+        user_tokens = message_tokens[user_msg_idx]
+        if user_tokens <= remaining_tokens:
+            include_user = True
+
+    # Build final result
+    if include_user:
+        result.append(messages[user_msg_idx])
+
+    # Sort by assistant index to maintain chronological order
+    included_pairs.sort(key=lambda pair: pair[0])
+    for assistant_idx, tool_idx in included_pairs:
+        result.append(messages[assistant_idx])
+        result.append(messages[tool_idx])
+
+    # Verify final token count
+    final_tokens = sum(get_message_tokens(msg) for msg in result)
+    assert (
+        final_tokens <= context_length
+    ), f"After trimming, the message length still exceeds: {final_tokens} > {context_length}!"
+
+    return result
 
 
 def load_config():

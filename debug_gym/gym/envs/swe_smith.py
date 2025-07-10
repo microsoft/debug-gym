@@ -95,18 +95,18 @@ class SWESmithEnv(SWEBenchEnv):
             self.dataset_splits = yaml.safe_load(f)
             self.excluded_ids = self.dataset_splits.get("excluded", [])
 
-    def get_dataset_split(self, split):
-        if split == "all":
+    def get_problem_ids(self, split_or_problem_id):
+        if split_or_problem_id == "all":
             return sorted(
                 k for k in self.dataset.keys() if k not in self.excluded_ids
             )  # all tasks
-        elif split in self.dataset:
-            return [split]  # Single task
-        elif split in self.dataset_splits:
-            return self.dataset_splits[split]
+        elif split_or_problem_id in self.dataset:
+            return [split_or_problem_id]  # Single task
+        elif split_or_problem_id in self.dataset_splits:
+            return self.dataset_splits[split_or_problem_id]
         else:
             raise ValueError(
-                f"Invalid split '{split}'. Available splits are: {['all'] + sorted(self.dataset_splits.keys())}"
+                f"Invalid split or problem id: '{split_or_problem_id}'. Available splits are: {['all'] + sorted(self.dataset_splits.keys())}"
             )
 
     def setup_task(self, task_name):
@@ -189,7 +189,7 @@ class SWESmithEnv(SWEBenchEnv):
             # Empty folder. The actual codebase will come from the docker image.
             path=SWESmithEnv.DUMMY_DIR,
             # allow traceback to be printed in the output.
-            entrypoint=self.test_cmd.replace("--tb=no", ""),
+            entrypoint=self.test_cmd.replace("--tb=no", "--tb=short"),
             # -s (capture=no) from pytest, allows for debugging with pdb
             # -q (quiet) from pytest, to avoid long pytest output
             debug_entrypoint=self.test_cmd.replace("pytest", "pytest -sq"),

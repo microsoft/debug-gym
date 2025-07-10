@@ -71,7 +71,7 @@ def run_agent(args, problem, config):
     except Exception as e:
         task_logger.error(
             f"Task Error: {problem} - {e!r}. Run with --very-verbose "
-            "or check {task_logger.log_file} for more information."
+            f"or check {task_logger.log_file} for more information."
         )
         task_logger.debug(
             f"Task {problem} generated an exception: {e!r}", exc_info=True
@@ -114,10 +114,7 @@ def main():
     problems = config.get("problems", ["custom"])
     if isinstance(problems, str) and "benchmark" in config:
         env = create_env(config, logger=logger)
-        if problems == "all":
-            problems = sorted(env.dataset.keys())  # all tasks
-        else:
-            problems = env.get_dataset_split(problems)
+        problems = env.get_problem_ids(split_or_problem_id=problems)
 
     if args.list:
         print(f"\n# Available problems in {config.get('benchmark', 'config')}:")
