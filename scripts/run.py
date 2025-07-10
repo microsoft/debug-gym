@@ -9,6 +9,8 @@ from debug_gym.agents.utils import load_config
 from debug_gym.gym.envs import select_env
 from debug_gym.gym.terminal import select_terminal
 from debug_gym.gym.tools.toolbox import Toolbox
+from debug_gym.llms.base import LLM
+from debug_gym.llms.human import Human
 from debug_gym.logger import DebugGymLogger
 
 
@@ -40,12 +42,21 @@ def run_agent(args, problem, config):
 
         env = create_env(config, task_logger)
         add_tools(env, config, task_logger)
+
+        llm = LLM.instantiate(
+            llm_name=config["llm_name"],
+            llm_config_file_path=config.get("llm_config_file_path"),
+            logger=task_logger,
+        )
+
         agent = create_agent(
             config["agent_type"],
             config=config,
             env=env,
+            llm=llm,
             logger=task_logger,
         )
+
         success = agent.run(task_name=problem, debug=args.debug)
 
         # optionally apply patch
@@ -119,6 +130,15 @@ def main():
             print(f" - {agent}")
 
         return
+
+    llm = LLM.instantiate(
+        llm_name=config["llm_name"],
+        llm_config_file_path=config.get("llm_config_file_path"),
+        logger=None,
+    )
+    # Stop live progress to avoid conflicts with Human mode (prompt_toolkit)
+    if isinstance(llm, Human):
+        logger.set_no_live()
 
     num_workers = args.num_workers or int(os.environ.get("DEBUG_GYM_WORKERS", 1))
     if args.debug:

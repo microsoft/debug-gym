@@ -352,6 +352,7 @@ class DebugGymLogger(logging.Logger):
         # Placeholders for rich live, log listener thread, and stop event
         # Will be initialized if the logger is the main process logger
         self._live = None  # rich live context manager for updating the UI
+        self.no_live = False  # Flag to disable live updates
         self._log_listener_stop_event = None  # Event to stop the log listener thread
         self._log_listener_thread = None  # Thread to process logs from workers
         if not self._is_worker:
@@ -425,6 +426,10 @@ class DebugGymLogger(logging.Logger):
         progress updates to the queues, letting the main process handle them."""
         cls._is_worker = True
 
+    def set_no_live(self):
+        """Set the logger to not use the Rich Live display."""
+        self.no_live = True
+
     @contextmanager
     def rich_progress(self, problems, max_display: int = 10):
         """Create a Rich progress bar for the given problems. To be used in a 'with' context.
@@ -441,6 +446,9 @@ class DebugGymLogger(logging.Logger):
         with self._live:
             # Update the live display with the progress table
             self._live.update(ctx.progress_table)
+            if self.no_live:
+                # Stop live updates after the first update
+                self._live.stop()
             try:
                 # Yield the context object itself so the caller can access both
                 # the table and progress objects
