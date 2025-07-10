@@ -30,7 +30,7 @@ class SWESmithEnv(SWEBenchEnv):
         dataset_id: str = "SWE-bench/SWE-smith",
         dataset_revision: str = "699b53400d3855206a0fbf3ff4beaf1a52f4f232",
         split: str = "train",
-        instance_ids: list[str] | None = None,
+        problems: list[str] | None = None,
         terminal: Terminal | None = None,
         **kwargs,
     ):
@@ -38,7 +38,7 @@ class SWESmithEnv(SWEBenchEnv):
         super().__init__(
             dataset_id=dataset_id,
             split=split,
-            instance_ids=instance_ids,
+            problems=problems,
             terminal=terminal,
             **kwargs,
         )
@@ -63,13 +63,13 @@ class SWESmithEnv(SWEBenchEnv):
         # To avoid concurrency issues, we will clone all the repos in the dataset.
         swesmith_repos = set(self.ds["repo"])
         image_names = set(self.ds["image_name"])
-        if self.instance_ids:
-            # If instance_ids are provided, filter the dataset to only include those repos.
+        if self.problems:
+            # If problems are provided, filter the dataset to only include those repos.
             swesmith_repos = set(
-                self.ds[self.dataset[id]]["repo"] for id in self.instance_ids
+                self.ds[self.dataset[id]]["repo"] for id in self.problems if id in self.dataset
             )
             image_names = set(
-                self.ds[self.dataset[id]]["image_name"] for id in self.instance_ids
+                self.ds[self.dataset[id]]["image_name"] for id in self.problems if id in self.dataset
             )
         self.logger.debug(
             f"Loaded {len(self.ds)} tasks accross {len(swesmith_repos)} repos from {self.dataset_id}."
@@ -101,13 +101,9 @@ class SWESmithEnv(SWEBenchEnv):
 
     def get_problem_ids(self, split_or_problem_id):
         if split_or_problem_id == "all":
-            all_tasks = sorted(
+            return sorted(
                 k for k in self.dataset.keys() if k not in self.excluded_ids
             )  # all tasks
-            # If instance_ids is provided, filter to only include those tasks
-            if self.instance_ids is not None:
-                all_tasks = [task for task in all_tasks if task in self.instance_ids]
-            return all_tasks
         elif split_or_problem_id in self.dataset:
             return [split_or_problem_id]  # Single task
         elif split_or_problem_id in self.dataset_splits:
@@ -118,11 +114,11 @@ class SWESmithEnv(SWEBenchEnv):
             )
 
     def setup_task(self, task_name):
-        if self.instance_ids:
-            if task_name not in self.instance_ids:
+        if self.problems:
+            if task_name not in self.problems:
                 raise ValueError(
-                    f"Task `{task_name}` was not found in instance_ids. The available tasks are: {self.instance_ids}.\n"
-                    "Please provide a valid task or initialize the environment without instance_ids to load all tasks."
+                    f"Task `{task_name}` was not found in problems. The available tasks are: {self.problems}.\n"
+                    "Please provide a valid task or initialize the environment without problems to load all tasks."
                 )
 
         self.task_name = task_name

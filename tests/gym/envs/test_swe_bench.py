@@ -31,7 +31,7 @@ def build_swe_env_once(tmp_path_factory, worker_id):
     """Build the SWEBench docker image only once.
     Do not run this fixture directly, use get_swe_env instead.
     """
-    _build_swe_env = lambda: SWEBenchEnv(instance_ids=["astropy__astropy-14096"])
+    _build_swe_env = lambda: SWEBenchEnv(problems=["astropy__astropy-14096"])
     if worker_id == "master":
         # Not running with pytest-xdist or we are in the master process
         _build_swe_env()
@@ -49,11 +49,11 @@ def get_swe_env(build_swe_env_once):
     """Instantiate a SWEBenchEnv instance after building the SWEBench docker image."""
 
     def _swe_env(working_dir=None, map_host_uid_gid=True, **kwargs):
-        instance_ids = ["astropy__astropy-14096"]
+        problems = ["astropy__astropy-14096"]
         terminal = DockerTerminal(
             path=working_dir, map_host_uid_gid=map_host_uid_gid, **kwargs
         )
-        env = SWEBenchEnv(instance_ids=instance_ids, terminal=terminal)
+        env = SWEBenchEnv(problems=problems, terminal=terminal)
         return env
 
     return _swe_env
@@ -350,30 +350,3 @@ def test_get_problem_ids(get_swe_env):
     ):
         swe_env.get_problem_ids(invalid_task_name)
 
-
-def test_get_problem_ids_with_instance_ids(get_swe_env):
-    """Test that get_problem_ids respects instance_ids parameter."""
-    swe_env = get_swe_env()
-    
-    # Mock dataset for testing
-    swe_env.dataset = {
-        "task_1": {"repo": "test/repo1"},
-        "task_2": {"repo": "test/repo2"}, 
-        "task_3": {"repo": "test/repo3"},
-        "task_4": {"repo": "test/repo4"},
-    }
-    
-    # Test with instance_ids filtering
-    swe_env.instance_ids = ["task_1", "task_3"]
-    problem_ids = swe_env.get_problem_ids("all")
-    assert problem_ids == ["task_1", "task_3"]
-    
-    # Test with instance_ids including non-existent task
-    swe_env.instance_ids = ["task_1", "task_5"]
-    problem_ids = swe_env.get_problem_ids("all")
-    assert problem_ids == ["task_1"]
-    
-    # Test with instance_ids set to None (should return all tasks)
-    swe_env.instance_ids = None
-    problem_ids = swe_env.get_problem_ids("all")
-    assert problem_ids == ["task_1", "task_2", "task_3", "task_4"]
