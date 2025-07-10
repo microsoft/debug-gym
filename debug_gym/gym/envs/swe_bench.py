@@ -31,7 +31,7 @@ class SWEBenchEnv(RepoEnv):
         dataset_id: str = "princeton-nlp/SWE-bench_Verified",
         # dataset_id: str = "princeton-nlp/SWE-bench_lite",
         split: str = "test",
-        instance_ids: list[str] | None = None,
+        problems: list[str] | None = None,
         terminal: Terminal | None = None,
         **kwargs,
     ):
@@ -43,7 +43,7 @@ class SWEBenchEnv(RepoEnv):
 
         self.dataset_id = dataset_id
         self.split = split
-        self.instance_ids = instance_ids
+        self.problems = problems
         self.DUMMY_DIR.mkdir(parents=True, exist_ok=True)
 
         self.load_dataset()
@@ -59,7 +59,7 @@ class SWEBenchEnv(RepoEnv):
         self.dataset = {row["instance_id"]: row for row in self.ds.sort("instance_id")}
 
         swebench_instances = load_swebench_dataset(
-            name=self.dataset_id, instance_ids=self.instance_ids
+            name=self.dataset_id, instance_ids=self.problems
         )
         docker_client = docker.from_env()
 
@@ -82,11 +82,7 @@ class SWEBenchEnv(RepoEnv):
 
     def get_problem_ids(self, split_or_problem_id):
         if split_or_problem_id == "all":
-            all_tasks = sorted(self.dataset.keys())  # all tasks
-            # If instance_ids is provided, filter to only include those tasks
-            if self.instance_ids is not None:
-                all_tasks = [task for task in all_tasks if task in self.instance_ids]
-            return all_tasks
+            return sorted(self.dataset.keys())  # all tasks
         elif split_or_problem_id in self.dataset:
             return [split_or_problem_id]  # Single task
         else:
@@ -95,11 +91,11 @@ class SWEBenchEnv(RepoEnv):
             )
 
     def setup_task(self, task_name):
-        if self.instance_ids:
-            if task_name not in self.instance_ids:
+        if self.problems:
+            if task_name not in self.problems:
                 raise ValueError(
-                    f"Task `{task_name}` was not found in instance_ids. The available tasks are: {self.instance_ids}.\n"
-                    "Please provide a valid task or initialize the environment without instance_ids to load all tasks."
+                    f"Task `{task_name}` was not found in problems. The available tasks are: {self.problems}.\n"
+                    "Please provide a valid task or initialize the environment without problems to load all tasks."
                 )
         self.task_name = task_name
         self.ds_row = self.dataset[self.task_name]
