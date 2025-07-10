@@ -140,15 +140,19 @@ def test_task_progress_manager_advance():
 
 def test_task_progress_manager_get_task_stats():
     # Test that TaskProgressManager.get_task_stats returns correct stats
-    problems = ["p1", "p2", "p3", "p4"]
+    problems = ["p1", "p2", "p3", "p4", "p5", "p6", "p7", "p8"]
     manager = TaskProgressManager(problems, max_display=5)
 
     # Set up tasks with different statuses
     updates = [
-        TaskProgress("p1", 10, 10, 100, 100, "done"),
-        TaskProgress("p2", 5, 10, 50, 100, "failed"),
+        TaskProgress("p1", 10, 10, 100, 100, "resolved"),
+        TaskProgress("p2", 5, 10, 50, 100, "unresolved"),
         TaskProgress("p3", 3, 10, 30, 100, "running"),
-        TaskProgress("p4", 0, 10, 0, 100, "pending"),
+        TaskProgress("p4", 3, 10, 30, 100, "running"),
+        TaskProgress("p5", 0, 10, 0, 100, "pending"),
+        TaskProgress("p6", 0, 10, 0, 100, "skip-resolved"),
+        TaskProgress("p7", 0, 10, 0, 100, "skip-unresolved"),
+        TaskProgress("p8", 0, 10, 0, 100, "error"),
     ]
 
     for update in updates:
@@ -156,11 +160,14 @@ def test_task_progress_manager_get_task_stats():
 
     # Get stats and check they're correct
     stats = manager.get_task_stats()
-    assert stats["total"] == 4
+    assert stats["total"] == 8
     assert stats["pending"] == 1
-    assert stats["running"] == 1
-    assert stats["completed"] == 1
-    assert stats["failed"] == 1
+    assert stats["running"] == 2
+    assert stats["resolved"] == 1
+    assert stats["unresolved"] == 1
+    assert stats["skip-resolved"] == 1
+    assert stats["skip-unresolved"] == 1
+    assert stats["error"] == 1
 
 
 @pytest.mark.parametrize(

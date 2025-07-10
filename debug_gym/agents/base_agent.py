@@ -235,7 +235,7 @@ class BaseAgent:
                 total_steps=1,
                 score=info.score,
                 max_score=info.max_score,
-                status="done",
+                status="resolved",
             )
             return True
 
@@ -273,7 +273,7 @@ class BaseAgent:
                     total_steps=step + 1,  # early stop, current step is total steps
                     score=info.score,
                     max_score=info.max_score,
-                    status="done" if info.done else "failed",
+                    status="resolved" if info.done else "unresolved",
                 )
                 break
             self.logger.report_progress(
@@ -290,7 +290,7 @@ class BaseAgent:
             total_steps=step + 1,
             score=info.score,
             max_score=info.max_score,
-            status="done" if info.done else "failed",
+            status="resolved" if info.done else "unresolved",
         )
         return info.done
 
