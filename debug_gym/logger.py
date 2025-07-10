@@ -220,7 +220,7 @@ class OverallProgressContext:
         self._live = live
         self.progress_queue = progress_queue
         self.logger = logger
-        self.progress = Progress(  # TODO: rename to overall_progress
+        self.overall_progress = Progress(
             SpinnerColumn(),
             TextColumn("[progress.description]{task.description}"),
             BarColumn(bar_width=None),
@@ -229,7 +229,7 @@ class OverallProgressContext:
         )
         self.total = len(problems)
         self.completed = 0
-        self._overall_task = self.progress.add_task(
+        self._overall_task = self.overall_progress.add_task(
             "Overall",  # Placeholder description, will be set by _refresh
             total=self.total,
         )
@@ -237,7 +237,7 @@ class OverallProgressContext:
         # Initialize table and panels once
         self._table = Table(show_header=False, show_edge=False)
         self._overall_panel = Panel(
-            self.progress,
+            self.overall_progress,
             title=f"Overall ({self.total} tasks)",
             title_align="left",
             border_style="green",
@@ -291,12 +291,12 @@ class OverallProgressContext:
             f"Completed: [green]{stats['completed']}[/green] | "
             f"Failed: [red]{stats['failed']}[/red]"
         )
-        self.progress.update(
+        self.overall_progress.update(
             self._overall_task,
             description=stats_text,
             completed=self.completed,
         )
-        self.progress.refresh()
+        self.overall_progress.refresh()
         # Update panel content
         self.tasks_progress.refresh_progress(all_tasks=all_tasks)
 
