@@ -42,21 +42,39 @@ class TaskProgress:
     @property
     def completed(self) -> bool:
         """Check if the task is completed based on its status."""
-        return self.status in ["done", "failed"]
+        return self.status in (
+            "resolved",
+            "unresolved",
+            "skip-resolved",
+            "skip-unresolved",
+            "error",
+        )
 
 
 class StatusColumn(SpinnerColumn):
     """Custom status column. Spinner while task is running,
-    green ✓ when completed or red ✗ when failed."""
+    green ✓ when resolved, red ✗ when unresolved,
+    yellow ✓ when skip-resolved, yellow ✗ when skip-unresolved,
+    magenta ! when error."""
 
     def __init__(self, spinner_name: str = "dots", speed: float = 1.0):
         super().__init__(spinner_name=spinner_name, speed=speed)
 
     def render(self, task):
+        status = task.fields.get("status")
         if task.finished:
-            if task.fields.get("status") == "failed":
+            if status == "resolved":
+                return Text("✓", style="green")
+            elif status == "unresolved":
                 return Text("✗", style="red")
-            return Text("✓", style="green")
+            elif status == "skip-unresolved":
+                return Text("✗", style="yellow")
+            elif status == "skip-resolved":
+                return Text("✓", style="yellow")
+            elif status == "error":
+                return Text("!", style="magenta")
+            else:
+                raise ValueError(f"Unknown task status: `{status}`. ")
         return super().render(task)
 
 
@@ -179,9 +197,18 @@ class TaskProgressManager:
             return f"In progress (max-display {self.max_display}):"
 
     def get_task_stats(self):
-        """Get statistics about tasks: total, pending, completed, failed."""
+        """Get statistics about tasks: total, pending, running,
+        resolved, unresolved, error, skip-resolved, skip-unresolved."""
         # Create a dictionary to count tasks by status
-        status_counts = {"done": 0, "failed": 0, "running": 0, "pending": 0}
+        status_counts = {
+            "running": 0,
+            "pending": 0,
+            "resolved": 0,
+            "unresolved": 0,
+            "skip-resolved": 0,
+            "skip-unresolved": 0,
+            "error": 0,
+        }
 
         # Count each task by its current status
         for task in self._tasks.values():
@@ -190,15 +217,8 @@ class TaskProgressManager:
             status_counts[status] += 1
 
         # Calculate total (should match len(self._tasks) but this is more robust)
-        total = sum(status_counts.values())
-
-        return {
-            "total": total,
-            "pending": status_counts["pending"],
-            "running": status_counts["running"],
-            "completed": status_counts["done"],
-            "failed": status_counts["failed"],
-        }
+        status_counts["total"] = sum(status_counts.values())
+        return status_counts
 
 
 class OverallProgressContext:
@@ -257,9 +277,9 @@ class OverallProgressContext:
         )
         self._listener_thread.start()
 
-    def advance(self, progress_update):
+    def advance(self, progress_update: TaskProgress):
         """Advance the progress for a specific task based on the provided update. Sets
-        task as completed if its status is "done" or "failed" (e.g. early stopping)."""
+        task as completed if its status is completed (e.g. early stopping)."""
         self.logger.debug(
             f"Advancing progress for problem {progress_update.problem_id}: "
             f"step {progress_update.step}"
@@ -267,7 +287,7 @@ class OverallProgressContext:
         # Update the task progress
         self.tasks_progress.advance(progress_update)
         # Update overall progress completion
-        self.completed += 1 if progress_update.status in ["done", "failed"] else 0
+        self.completed += 1 if progress_update.completed else 0
 
     def close(self):
         """Stop the listener thread and wait until it exits."""
@@ -288,8 +308,8 @@ class OverallProgressContext:
         stats_text = (
             f"Running: [blue]{stats['running']}[/blue] | "
             f"Pending: [yellow]{stats['pending']}[/yellow] | "
-            f"Completed: [green]{stats['completed']}[/green] | "
-            f"Failed: [red]{stats['failed']}[/red]"
+            f"Resolved: [green]{stats['resolved'] + stats['skip-resolved']}[/green] | "
+            f"Unresolved: [red]{stats['unresolved'] + stats['skip-unresolved']}[/red]"
         )
         self.overall_progress.update(
             self._overall_task,
