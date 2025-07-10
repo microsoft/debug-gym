@@ -35,6 +35,15 @@ def run_agent(args, problem, config):
 
             task_logger.debug(f"Previous run success: {success}")
             if not args.force_failed or success:
+                status = "skip-resolved" if success else "skip-unresolved"
+                task_logger.report_progress(
+                    problem_id=problem,
+                    step=1,
+                    total_steps=1,
+                    score=100,
+                    max_score=100,
+                    status=status,
+                )
                 task_logger.info("Skipped, already done.")
                 return success
 
