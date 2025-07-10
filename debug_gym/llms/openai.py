@@ -222,7 +222,7 @@ class OpenAILLM(LLM):
             raise
 
         # LLM may select multiple tool calls, we only care about the first action
-        if response.choices[0].message.tool_calls is None:
+        if not response.choices[0].message.tool_calls:
             # LLM failed to call a tool
             tool_call = None
         else:
