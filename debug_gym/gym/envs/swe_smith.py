@@ -101,9 +101,13 @@ class SWESmithEnv(SWEBenchEnv):
 
     def get_problem_ids(self, split_or_problem_id):
         if split_or_problem_id == "all":
-            return sorted(
+            all_tasks = sorted(
                 k for k in self.dataset.keys() if k not in self.excluded_ids
             )  # all tasks
+            # If instance_ids is provided, filter to only include those tasks
+            if self.instance_ids is not None:
+                all_tasks = [task for task in all_tasks if task in self.instance_ids]
+            return all_tasks
         elif split_or_problem_id in self.dataset:
             return [split_or_problem_id]  # Single task
         elif split_or_problem_id in self.dataset_splits:

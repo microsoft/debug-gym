@@ -258,3 +258,36 @@ def test_get_problem_ids_all(get_swe_env):
     swe_env.dataset_splits = {"split_1": ["task_1"]}
     with pytest.raises(ValueError, match="Invalid split or problem id: 'invalid_id'"):
         swe_env.get_problem_ids("invalid_id")
+
+
+def test_get_problem_ids_with_instance_ids(get_swe_env):
+    """Test that get_problem_ids respects instance_ids parameter."""
+    swe_env = get_swe_env()
+    swe_env.excluded_ids = ["excluded_task_1", "excluded_task_2"]
+    swe_env.dataset = {
+        "task_1": 0,
+        "task_2": 1,
+        "task_3": 2,
+        "excluded_task_1": 3,
+        "excluded_task_2": 4,
+    }
+    
+    # Test with instance_ids filtering
+    swe_env.instance_ids = ["task_1", "task_3"]
+    problem_ids = swe_env.get_problem_ids("all")
+    assert problem_ids == ["task_1", "task_3"]
+    
+    # Test with instance_ids including non-existent task
+    swe_env.instance_ids = ["task_1", "task_5"]
+    problem_ids = swe_env.get_problem_ids("all")
+    assert problem_ids == ["task_1"]
+    
+    # Test with instance_ids including excluded task
+    swe_env.instance_ids = ["excluded_task_1"]
+    problem_ids = swe_env.get_problem_ids("all")
+    assert problem_ids == []
+    
+    # Test with instance_ids set to None (should return all non-excluded tasks)
+    swe_env.instance_ids = None
+    problem_ids = swe_env.get_problem_ids("all")
+    assert problem_ids == ["task_1", "task_2", "task_3"]
