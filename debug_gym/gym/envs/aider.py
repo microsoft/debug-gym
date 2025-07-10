@@ -1,15 +1,15 @@
 import os
 import subprocess
-from pathlib import Path
 
 import debug_gym.gym.utils as utils
+from debug_gym.constants import DEBUG_GYM_CACHE_DIR
 from debug_gym.gym.entities import EvalOutput
 from debug_gym.gym.envs.env import RepoEnv
 
 
 class AiderBenchmarkEnv(RepoEnv):
     REPO_URL = "https://github.com/exercism/python"
-    REPO_PATH = Path.joinpath(Path.home(), ".cache", "debug_gym", "exercism")
+    REPO_PATH = DEBUG_GYM_CACHE_DIR / "exercism"
 
     @property
     def instructions(self) -> str:
@@ -81,3 +81,13 @@ class AiderBenchmarkEnv(RepoEnv):
                 "instructions": instructions,
                 "filename": task_name + ".py",
             }
+
+    def get_problem_ids(self, split_or_problem_id):
+        if split_or_problem_id == "all":
+            return sorted(self.dataset.keys())  # all tasks
+        elif split_or_problem_id in self.dataset:
+            return [split_or_problem_id]  # Single task
+        else:
+            raise ValueError(
+                f"Invalid split or problem id: '{split_or_problem_id}'.\nChoose from: {['all'] + sorted(self.dataset.keys())}"
+            )

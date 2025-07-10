@@ -58,7 +58,7 @@ class BaseAgent:
 
     def build_history_prompt(self):
         messages = build_history_prompt(
-            self.history.filter_out(actions=[None]),
+            self.history,
             self.llm,
             self.config["reset_prompt_history_after_rewrite"],
         )
@@ -95,7 +95,7 @@ class BaseAgent:
             )
         if self._show_directory_tree():
             features.append(
-                f"The environment will show the directory tree of the repository in the system prompt."
+                "The environment will show the directory tree of the repository in the system prompt."
             )
         if self.env.has_tool("pdb"):
             if self._show_current_breakpoints():
@@ -134,11 +134,12 @@ class BaseAgent:
         of the LLM's context length, if any."""
         message = filter_non_utf8(message)
         count_tokens = count_tokens or self.llm.count_tokens
-        max_length = (
-            max_length
-            or max_length_percentage * self.llm.context_length
-            or self.llm.context_length
-        )
+        if self.llm.context_length is not None:
+            max_length = (
+                max_length
+                or (max_length_percentage * self.llm.context_length)
+                or self.llm.context_length
+            )
 
         if count_tokens is None or max_length is None or max_length <= 0:
             return message
@@ -228,17 +229,28 @@ class BaseAgent:
         self.history.step(info, None)
 
         if info.done is True:
+            self.logger.report_progress(
+                problem_id=task_name,
+                step=1,
+                total_steps=1,
+                score=info.score,
+                max_score=info.max_score,
+                status="done",
+            )
             return True
+
         self.logger.info(
-            f"Available tools (in LLM's tool calling format):\n{json.dumps(self.llm.define_tools(info.tools), indent=4)}\n"
+            "Available tools (in LLM's tool calling format):\n"
+            f"{json.dumps(self.llm.define_tools(info.tools), indent=4)}\n"
         )
 
         highscore = info.score
-
-        for step in self.logger.tqdm(range(self.config["max_steps"])):
+        max_steps = self.config["max_steps"]
+        for step in range(max_steps):
+            self.logger.info(f"\n{'='*20} STEP {step+1} {'='*20}\n")
             highscore = max(highscore, info.score)
             self.logger.info(
-                f"Step: {step} | Score: {info.score}/{info.max_score} ({info.score/info.max_score:.1%}) [Best: {highscore}]"
+                f"[{task_name[:10]:<10}] | Step: {step:<4} | Score: {info.score:>4}/{info.max_score:<4} ({info.score/info.max_score:.1%}) [Best: {highscore}]"
             )
 
             messages = self.build_prompt(info)
@@ -247,7 +259,7 @@ class BaseAgent:
             if debug:
                 breakpoint()
 
-            info = self.env.step(llm_response.tool)
+            info = self.env.step(llm_response.tool, llm_response.response)
             self.history.step(info, llm_response)
 
             if info.done or info.rewrite_counter >= self.config["max_rewrite_steps"]:
@@ -255,7 +267,31 @@ class BaseAgent:
                 self.logger.info(
                     f"Step: {step} | Score: {info.score}/{info.max_score} ({info.score/info.max_score:.1%}) | Reason: {reason}"
                 )
+                self.logger.report_progress(
+                    problem_id=task_name,
+                    step=step + 1,
+                    total_steps=step + 1,  # early stop, current step is total steps
+                    score=info.score,
+                    max_score=info.max_score,
+                    status="done" if info.done else "failed",
+                )
                 break
+            self.logger.report_progress(
+                problem_id=task_name,
+                step=step + 1,
+                total_steps=max_steps + 1,  # keep progress bar running until max_steps
+                score=info.score,
+                max_score=info.max_score,
+                status="running",
+            )
+        self.logger.report_progress(
+            problem_id=task_name,
+            step=step + 1,
+            total_steps=step + 1,
+            score=info.score,
+            max_score=info.max_score,
+            status="done" if info.done else "failed",
+        )
         return info.done
 
     def apply_patch(self, patch_path: str) -> bool:
@@ -302,10 +338,7 @@ class BaseAgent:
             "logger": str(self.logger.log_file),
         }
         for step_id in range(len(self.history)):
-            step_json = self.history.json(
-                step_id,
-                include_prompt_response_pairs=self.config["log_prompt_response_pairs"],
-            )
+            step_json = self.history.json(step_id)
             jsonl_output["log"].append(step_json)
         os.makedirs(pjoin(self._output_path, task_name), exist_ok=True)
         with open(pjoin(self._output_path, task_name, "debug_gym.jsonl"), "w") as f:

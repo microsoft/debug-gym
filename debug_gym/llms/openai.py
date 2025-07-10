@@ -102,9 +102,8 @@ class OpenAILLM(LLM):
             need_to_retry = False
 
         logger(
-            f"Error calling {self.model_name}: {exception_full_name!r} {
-                exception.message if hasattr(exception, 'message') else exception
-            }"
+            f"Error calling {self.model_name}: {exception_full_name!r}\n"
+            f"{exception.message if hasattr(exception, 'message') else exception}"
         )
 
         return need_to_retry
@@ -155,31 +154,49 @@ class OpenAILLM(LLM):
         )
 
     def format_tool_call_history(
-        self, history_info: EnvInfo, response: LLMResponse
+        self, history_info: EnvInfo, response: list[LLMResponse]
     ) -> list[dict]:
-        _messages = [
-            {
-                "role": "assistant",
-                "tool_calls": [
-                    {
-                        "type": "function",
-                        "id": response[0].tool.id,
-                        "function": {
-                            "name": response[0].tool.name,
-                            "arguments": json.dumps(response[0].tool.arguments),
+        _messages = []
+        if isinstance(response, list) and len(response) > 0:
+            _messages.append(
+                {
+                    "role": "assistant",
+                    "tool_calls": [
+                        {
+                            "type": "function",
+                            "id": response[0].tool.id,
+                            "function": {
+                                "name": response[0].tool.name,
+                                "arguments": json.dumps(response[0].tool.arguments),
+                            },
                         },
-                    },
-                ],
-            },
-            {
-                "role": "tool",
-                "tool_call_id": history_info.action.id,
-                "name": history_info.action.name,
-                "content": filter_non_utf8(
-                    f"{history_info.step_observation.observation}"
-                ),
-            },
-        ]
+                    ],
+                    "content": filter_non_utf8(f"{response[0].response}"),
+                }
+            )
+        if history_info.action is None:
+            # This is the initial state, no action taken yet
+            _messages.append(
+                {
+                    "role": "user",
+                    "content": filter_non_utf8(
+                        f"{history_info.step_observation.observation}"
+                    ),
+                }
+            )
+        else:
+            # This is a step with an action taken
+            _messages.append(
+                {
+                    "role": "tool",
+                    "tool_call_id": history_info.action.id,
+                    "name": history_info.action.name,
+                    "content": filter_non_utf8(
+                        f"{history_info.step_observation.observation}"
+                    ),
+                }
+            )
+
         return _messages
 
     def generate(self, messages, tools, **kwargs) -> LLMResponse:
@@ -192,7 +209,7 @@ class OpenAILLM(LLM):
                 model=self.config.model,
                 messages=messages,
                 tools=self.define_tools(tools),
-                tool_choice="required",
+                tool_choice="auto",
                 **kwargs,
             )
         except openai.BadRequestError as e:
@@ -202,7 +219,7 @@ class OpenAILLM(LLM):
             raise
 
         # LLM may select multiple tool calls, we only care about the first action
-        if response.choices[0].message.tool_calls is None:
+        if not response.choices[0].message.tool_calls:
             # LLM failed to call a tool
             tool_call = None
         else:
