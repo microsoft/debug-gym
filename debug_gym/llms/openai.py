@@ -217,6 +217,7 @@ class OpenAILLM(LLM):
             if e.code in [
                 "context_length_exceeded",
                 "model_max_prompt_tokens_exceeded",
+                "string_above_max_length",
             ]:
                 raise ContextLengthExceededError
             raise
