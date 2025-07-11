@@ -209,10 +209,6 @@ def main():
                         executor.shutdown(wait=False, cancel_futures=True)
                         raise e
 
-    tasks_failed = list(set(problems) - set(tasks_succeeded))
-    logger.info(f"[green]Tasks that succeeded:[/green] {tasks_succeeded}")
-    logger.info(f"[red]Tasks that failed:[/red] {tasks_failed}")
-
 
 if __name__ == "__main__":
     main()
