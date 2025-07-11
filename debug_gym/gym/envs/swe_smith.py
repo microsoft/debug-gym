@@ -1,3 +1,4 @@
+from concurrent.futures import ThreadPoolExecutor
 from importlib.resources import files as importlib_files
 from pathlib import Path
 
@@ -6,11 +7,8 @@ import docker
 import yaml
 from datasets import load_from_disk
 from swesmith.build_repo.download_images import DOCKER_ORG, TAG
-from swesmith.constants import MAP_REPO_TO_SPECS
 from swesmith.harness.grading import TestStatus
-from swesmith.harness.log_parsers import MAP_REPO_TO_PARSER, parse_log_pytest
-from swesmith.harness.utils import get_test_command
-from swesmith.utils import get_repo_commit_from_image_name
+from swesmith.profiles import global_registry
 
 from debug_gym.constants import DEBUG_GYM_CACHE_DIR
 from debug_gym.gym.entities import EvalOutput
@@ -73,7 +71,7 @@ class SWESmithEnv(SWEBenchEnv):
 
         # Download all images needed for SWE-Smith.
         client = docker.from_env()
-        tagged_image_names = set(f"{DOCKER_ORG}/{name}:{TAG}" for name in image_names)
+        tagged_image_names = set(f"{name}:{TAG}" for name in image_names)
 
         existing_images = set(
             tag for image in client.images.list() for tag in image.tags
@@ -82,13 +80,8 @@ class SWESmithEnv(SWEBenchEnv):
         if missing_images:
             self.logger.info(f"Found {len(missing_images)} missing Docker images.")
             for image_name in missing_images:
-                docker_hub_image = image_name.replace("__", "_1776_")
-                self.logger.info(
-                    f"Pulling Docker image `{docker_hub_image}` to `{image_name}`."
-                )
-                client.images.pull(docker_hub_image)
-                # Rename images via tagging
-                client.images.get(docker_hub_image).tag(image_name)
+                self.logger.info(f"Pulling Docker image `{image_name}`.")
+                client.images.pull(image_name)
 
         # Load dataset splits.
         with open(SWESmithEnv.CONFIG) as f:
@@ -123,14 +116,18 @@ class SWESmithEnv(SWEBenchEnv):
         self.branch_name = self.ds_row["instance_id"]
         self.test_patch = self.ds_row["patch"]
         self.image_name = self.ds_row["image_name"]
-        self.repo, self.commit = get_repo_commit_from_image_name(self.image_name)
-        self.install_configs = MAP_REPO_TO_SPECS[self.repo][self.commit]
+
+        self.repo_profile = global_registry[task_name]
+        self.commit = self.repo_profile.commit
+        self.package_name = self.repo_profile.repo
+
+        self.install_configs = {"install": self.repo_profile.install_cmds}
         self.base_image = f"{DOCKER_ORG}/{self.image_name}:{TAG}"
-        self.package_name = self.repo.split("/")[1]
-        self.test_cmd, self.test_directives = get_test_command(self.ds_row)
+        self.test_cmd = self.repo_profile.test_cmd
+        self.test_directives = self.repo_profile._get_f2p_test_files(self.ds_row)
         self.fail_to_pass = self.ds_row["FAIL_TO_PASS"]
         self.pass_to_pass = self.ds_row["PASS_TO_PASS"]
-        self.log_parser = MAP_REPO_TO_PARSER.get(self.repo, parse_log_pytest)
+        self.log_parser = self.repo_profile.log_parser
 
         if self.package_name == "python-colorlog":
             self.package_name = "colorlog"
@@ -160,11 +157,6 @@ class SWESmithEnv(SWEBenchEnv):
         elif self.package_name == "conan":
             # Skip system packages installation (they are already installed in the Docker image).
             self.install_configs["install"] = ["python -m pip install ."]
-        elif self.package_name == "autograd":
-            # Disable pytest-xdist which interfers with pytest output.
-            self.test_cmd = self.test_cmd.replace("--verbose", "-n 0 --verbose")
-            # Since disabling pytest-xdist, no need for a special log parser.
-            self.log_parser = parse_log_pytest
 
         # Filter out the command that removes tests files.
         self.install_configs["install"] = [

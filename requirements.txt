@@ -10,7 +10,7 @@ transformers
 tiktoken
 docker
 swebench==4.0.3
-swesmith==0.0.4
+swesmith #==0.0.5
 prompt_toolkit
 anthropic>=0.49.0
 jinja2
