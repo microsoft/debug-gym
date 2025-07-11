@@ -28,11 +28,13 @@ class SWESmithEnv(SWEBenchEnv):
     def __init__(
         self,
         dataset_id: str = "SWE-bench/SWE-smith",
+        dataset_revision: str = "699b53400d3855206a0fbf3ff4beaf1a52f4f232",
         split: str = "train",
         instance_ids: list[str] | None = None,
         terminal: Terminal | None = None,
         **kwargs,
     ):
+        self.dataset_revision = dataset_revision
         super().__init__(
             dataset_id=dataset_id,
             split=split,
@@ -52,7 +54,9 @@ class SWESmithEnv(SWEBenchEnv):
             self.ds = load_from_disk(self.dataset_id)[self.split]
         else:
             # Loading from HuggingFace or a folder.
-            self.ds = datasets.load_dataset(self.dataset_id)[self.split]
+            self.ds = datasets.load_dataset(
+                self.dataset_id, revision=self.dataset_revision
+            )[self.split]
 
         self.dataset = {id: i for i, id in enumerate(self.ds["instance_id"])}
 
