@@ -4,6 +4,7 @@ import sys
 from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
+from rich.console import Console
 
 from debug_gym.gym.envs.env import EnvInfo
 from debug_gym.gym.tools.tool import EnvironmentTool, ToolCall
@@ -549,14 +550,12 @@ class Human(LLM):
     def __call__(self, messages, tools, *args, **kwargs) -> LLMResponse:
         print_messages(messages, self.logger)
         all_tools = self.define_tools(tools)
-        available_commands = [json.dumps(t) for t in all_tools]
         tool_call = None
         retry_count = 0
         action = ""
 
         while tool_call is None and retry_count < self.max_retries:
             if prompt_toolkit_available:
-
                 # Create a prompt session with completion and validation
                 session = PromptSession(
                     completer=DynamicToolCommandCompleter(tools=all_tools),
@@ -569,8 +568,17 @@ class Human(LLM):
                 )
                 action = session.prompt("\n> ")
             else:
-                self.logger.info(f"Available commands: {available_commands}")
-                action = input("> ")
+                console = Console()
+                console.print("[bold green]Available commands:[/bold green]")
+                for cmd in all_tools:
+                    console.print(
+                        f"\n[cyan][bold]{cmd['name']}[/bold][/cyan]: {cmd['description']}"
+                    )
+                console.print(
+                    "\n[bold green]Provide the command and its arguments in the following format:[/bold green]"
+                    "[italic]command argument1=value1 argument2=value2[/italic]"
+                )
+                action = console.input("[bold]> [/bold]")
 
             parser = CommandParser()
             command, args, errors = parser.parse_command(action)

@@ -35,16 +35,13 @@ class BaseAgent:
         self,
         config: dict,
         env: RepoEnv,
+        llm: LLM | None = None,
         logger: DebugGymLogger | None = None,
     ):
         self.config = config
         self.env = env
         self.logger = logger or DebugGymLogger("debug-gym")
-        self.llm = LLM.instantiate(
-            llm_name=self.config["llm_name"],
-            llm_config_file_path=self.config.get("llm_config_file_path"),
-            logger=self.logger,
-        )
+        self.llm = llm
         self._uuid = self.config.get("uuid", str(uuid.uuid4()))
         self._output_path = pjoin(self.config["output_path"], self._uuid)
 
