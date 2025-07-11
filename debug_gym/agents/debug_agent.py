@@ -1,4 +1,5 @@
 from debug_gym.agents.base_agent import BaseAgent, register_agent
+import glob
 
 @register_agent
 class DebugAgent(BaseAgent):
@@ -97,13 +98,44 @@ class Debug_5_Agent(DebugAgent):
 class ExplanationAgent(BaseAgent):
     name = "explanation_agent"
     system_prompt = DebugAgent.system_prompt
+    explanation_base_path = "../generate-explanations/new_explanations_with_pdb_tool_calls/single_shot_low_level/swe-smith/burnash__gspread.a8be3b96.lm_rewrite__596cni6x/single_shot_explanation_20250711_151945.txt"
+    
     def __init__(self, **kwargs):
-        self.explanation = self.get_explanation_from_file("../generate-explanations/explanations/single_shot_low_level/swe-smith/burnash__gspread.a8be3b96.lm_rewrite__596cni6x/single_shot_explanation_20250704_151835.txt")
+        filepath = "../generate-explanations/new_explanations_proper_pdb/single_shot_low_level/swe-smith/burnash__gspread.a8be3b96.lm_rewrite__596cni6x/single_shot_explanation_20250711_170309.txt"
+        self.explanation = self.get_explanation_from_file(filepath)
         self.system_prompt = f"{self.system_prompt} {self.explanation}"
         super().__init__(**kwargs)
+    
+    def get_explanation_for_task(self, task_name: str):
+        """Get the explanation for a specific task."""
+        paths = glob.glob(f"{self.explanation_base_path}/{task_name}/single_shot_explanation*.txt")
+        if not paths:
+            raise FileNotFoundError(f"No explanation files found for task: {task_name}")
+        path = sorted(paths)[-1]
+        explanation = self.get_explanation_from_file(path)
+        return explanation
+    
+    # def run(self, task_name=None, debug=False):
+    #     # Get the explanation for this specific task
+    #     explanation = self.get_explanation_for_task(task_name)
+        
+    #     # Update system prompt with task-specific explanation
+    #     original_system_prompt = self.system_prompt
+    #     self.system_prompt = f"{DebugAgent.system_prompt} {explanation}"
+        
+    #     # Call parent's run method
+    #     result = super().run(task_name=task_name, debug=debug)
+        
+    #     # Restore original system prompt
+    #     self.system_prompt = original_system_prompt
+        
+    #     return result
     
     def get_explanation_from_file(self, text_file: str):
         """Load the explanation from a text file."""
         with open(text_file, "r") as file:
             explanation = file.read().strip()
-        return explanation
+            delimiter = "="*80
+            explanation = explanation.split(delimiter)
+            print(f"Loaded explanation from {text_file}: {explanation[-1]}")
+        return explanation[-1]
