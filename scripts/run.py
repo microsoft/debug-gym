@@ -142,8 +142,9 @@ def main():
         llm_config_file_path=config.get("llm_config_file_path"),
         logger=None,
     )
-    # Stop live progress to avoid conflicts with Human mode (prompt_toolkit)
-    if isinstance(llm, Human):
+    # Stop live progress display if --no-live-display is set
+    # or in Human mode (avoid conflicts with prompt_toolkit)
+    if args.no_live_display or isinstance(llm, Human):
         logger.set_no_live()
 
     num_workers = args.num_workers or int(os.environ.get("DEBUG_GYM_WORKERS", 1))

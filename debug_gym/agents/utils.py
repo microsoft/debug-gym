@@ -248,6 +248,11 @@ def load_config():
         help="Keep displaying completed tasks in the workers panel.",
     )
     parser.add_argument(
+        "--no-live-display",
+        action="store_true",
+        help="Disable rich live progress display.",
+    )
+    parser.add_argument(
         "--max-display",
         type=int,
         default=20,
