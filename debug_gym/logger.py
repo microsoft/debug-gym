@@ -443,7 +443,7 @@ class DebugGymLogger(logging.Logger):
             self.addHandler(fh)
 
     def _initialize_main_logger(self):
-        self._live = Live()
+        self._live = Live(transient=True)
         rich_handler = RichHandler(
             console=self._live.console,
             show_time=False,

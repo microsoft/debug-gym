@@ -303,7 +303,7 @@ class BaseAgent:
             self.logger.report_progress(
                 problem_id=task_name,
                 step=step + 1,
-                total_steps=max_steps + 1,
+                total_steps=step + 1,
                 score=info.score if info else 0,
                 max_score=info.max_score if info else 1,
                 status="error",
