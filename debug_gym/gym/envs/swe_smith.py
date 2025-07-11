@@ -73,7 +73,7 @@ class SWESmithEnv(SWEBenchEnv):
 
         # Download all images needed for SWE-Smith.
         client = docker.from_env()
-        tagged_image_names = set(f"{DOCKER_ORG}/{name}:{TAG}" for name in image_names)
+        tagged_image_names = set(f"{name}:{TAG}" for name in image_names)
 
         existing_images = set(
             tag for image in client.images.list() for tag in image.tags
@@ -82,13 +82,8 @@ class SWESmithEnv(SWEBenchEnv):
         if missing_images:
             self.logger.info(f"Found {len(missing_images)} missing Docker images.")
             for image_name in missing_images:
-                docker_hub_image = image_name.replace("__", "_1776_")
-                self.logger.info(
-                    f"Pulling Docker image `{docker_hub_image}` to `{image_name}`."
-                )
-                client.images.pull(docker_hub_image)
-                # Rename images via tagging
-                client.images.get(docker_hub_image).tag(image_name)
+                self.logger.info(f"Pulling Docker image `{image_name}`.")
+                client.images.pull(image_name)
 
         # Load dataset splits.
         with open(SWESmithEnv.CONFIG) as f:
