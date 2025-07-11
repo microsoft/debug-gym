@@ -220,76 +220,95 @@ class BaseAgent:
         return messages
 
     def run(self, task_name=None, debug=False):
-        self.history.reset()
-        info = self.env.reset(options={"task_name": task_name})
-        # initial state does not have prompt and response
-        self.history.step(info, None)
-
-        if info.done is True:
-            self.logger.report_progress(
-                problem_id=task_name,
-                step=1,
-                total_steps=1,
-                score=info.score,
-                max_score=info.max_score,
-                status="done",
-            )
-            return True
-
-        self.logger.info(
-            "Available tools (in LLM's tool calling format):\n"
-            f"{json.dumps(self.llm.define_tools(info.tools), indent=4)}\n"
-        )
-
-        highscore = info.score
+        step = 0
         max_steps = self.config["max_steps"]
-        for step in range(max_steps):
-            self.logger.info(f"\n{'='*20} STEP {step+1} {'='*20}\n")
-            highscore = max(highscore, info.score)
+        try:
+            self.history.reset()
+            info = self.env.reset(options={"task_name": task_name})
+            # initial state does not have prompt and response
+            self.history.step(info, None)
+
+            if info.done is True:
+                self.logger.report_progress(
+                    problem_id=task_name,
+                    step=1,
+                    total_steps=1,
+                    score=info.score,
+                    max_score=info.max_score,
+                    status="resolved",
+                )
+                return True
+
             self.logger.info(
-                f"[{task_name[:10]:<10}] | Step: {step:<4} | Score: {info.score:>4}/{info.max_score:<4} ({info.score/info.max_score:.1%}) [Best: {highscore}]"
+                "Available tools (in LLM's tool calling format):\n"
+                f"{json.dumps(self.llm.define_tools(info.tools), indent=4)}\n"
             )
 
-            messages = self.build_prompt(info)
-            llm_response = self.llm(messages, info.tools)
-
-            if debug:
-                breakpoint()
-
-            info = self.env.step(llm_response.tool, llm_response.response)
-            self.history.step(info, llm_response)
-
-            if info.done or info.rewrite_counter >= self.config["max_rewrite_steps"]:
-                reason = "done" if info.done else "max_rewrite_steps reached"
+            highscore = info.score
+            for step in range(max_steps):
+                self.logger.info(f"\n{'='*20} STEP {step+1} {'='*20}\n")
+                highscore = max(highscore, info.score)
                 self.logger.info(
-                    f"Step: {step} | Score: {info.score}/{info.max_score} ({info.score/info.max_score:.1%}) | Reason: {reason}"
+                    f"[{task_name[:10]:<10}] | Step: {step:<4} | Score: {info.score:>4}/{info.max_score:<4} ({info.score/info.max_score:.1%}) [Best: {highscore}]"
                 )
+
+                messages = self.build_prompt(info)
+                llm_response = self.llm(messages, info.tools)
+
+                if debug:
+                    breakpoint()
+
+                info = self.env.step(llm_response.tool, llm_response.response)
+                self.history.step(info, llm_response)
+
+                if (
+                    info.done
+                    or info.rewrite_counter >= self.config["max_rewrite_steps"]
+                ):
+                    reason = "done" if info.done else "max_rewrite_steps reached"
+                    self.logger.info(
+                        f"Step: {step} | Score: {info.score}/{info.max_score} ({info.score/info.max_score:.1%}) | Reason: {reason}"
+                    )
+                    # early stop, set current step and total steps to be the same
+                    self.logger.report_progress(
+                        problem_id=task_name,
+                        step=step + 1,
+                        total_steps=step + 1,
+                        score=info.score,
+                        max_score=info.max_score,
+                        status="resolved" if info.done else "unresolved",
+                    )
+                    break
+                # keep progress bar running until max_steps is reached
                 self.logger.report_progress(
                     problem_id=task_name,
                     step=step + 1,
-                    total_steps=step + 1,  # early stop, current step is total steps
+                    total_steps=max_steps + 1,
                     score=info.score,
                     max_score=info.max_score,
-                    status="done" if info.done else "failed",
+                    status="running",
                 )
-                break
+            # max_steps was reached, task was either resolved or unresolved
             self.logger.report_progress(
                 problem_id=task_name,
                 step=step + 1,
-                total_steps=max_steps + 1,  # keep progress bar running until max_steps
+                total_steps=step + 1,
                 score=info.score,
                 max_score=info.max_score,
-                status="running",
+                status="resolved" if info.done else "unresolved",
             )
-        self.logger.report_progress(
-            problem_id=task_name,
-            step=step + 1,
-            total_steps=step + 1,
-            score=info.score,
-            max_score=info.max_score,
-            status="done" if info.done else "failed",
-        )
-        return info.done
+            return info.done
+        except Exception:
+            # report any error that happens during the run
+            self.logger.report_progress(
+                problem_id=task_name,
+                step=step + 1,
+                total_steps=step + 1,
+                score=info.score if info else 0,
+                max_score=info.max_score if info else 1,
+                status="error",
+            )
+            raise
 
     def apply_patch(self, patch_path: str) -> bool:
         patch_command = ["patch", "-p1"]
