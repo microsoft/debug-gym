@@ -19,6 +19,9 @@ class BreakTaskLoop(Exception):
 
 
 def run_agent(args, problem, config):
+    # Flag to not report errors from the agent, since they report
+    # errors themselves and we want to avoid double reporting.
+    report_progress_error = True
     exp_path = Path(config["output_path"]) / config["uuid"] / problem
 
     task_logger = DebugGymLogger(
@@ -66,7 +69,11 @@ def run_agent(args, problem, config):
             logger=task_logger,
         )
 
-        success = agent.run(task_name=problem, debug=args.debug)
+        try:
+            success = agent.run(task_name=problem, debug=args.debug)
+        except:
+            report_progress_error = False
+            raise
 
         # optionally apply patch
         if config["save_patch"]:
@@ -85,6 +92,15 @@ def run_agent(args, problem, config):
         task_logger.debug(
             f"Task {problem} generated an exception: {e!r}", exc_info=True
         )
+        if report_progress_error:
+            task_logger.report_progress(
+                problem_id=problem,
+                step=1,
+                total_steps=1,
+                score=0,
+                max_score=1,
+                status="error",
+            )
         if args.debug:
             raise e
 
@@ -178,8 +194,7 @@ def main():
                     raise e
         else:
             with ProcessPoolExecutor(
-                num_workers,
-                initializer=DebugGymLogger.set_as_worker,
+                num_workers, initializer=DebugGymLogger.set_as_worker
             ) as executor:
                 futures = {
                     executor.submit(run_agent, args, problem, config): problem
