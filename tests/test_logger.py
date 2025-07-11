@@ -41,6 +41,48 @@ def test_task_progress_pending_status():
     assert task_pending.completed is False
 
 
+@pytest.mark.parametrize(
+    "status,expected_marker",
+    [
+        ("resolved", "✓"),
+        ("unresolved", "✗"),
+        ("skip-resolved", "✓"),
+        ("skip-unresolved", "✗"),
+        ("error", "!"),
+        ("running", "⠋"),
+        ("pending", "⠋"),
+    ],
+)
+def test_taskprogress_marker_valid(status, expected_marker):
+    assert TaskProgress.marker(status) == expected_marker
+
+
+def test_taskprogress_marker_invalid():
+    with pytest.raises(ValueError):
+        TaskProgress.marker("not-a-status")
+
+
+@pytest.mark.parametrize(
+    "status,expected_color",
+    [
+        ("resolved", "green"),
+        ("unresolved", "red"),
+        ("skip-resolved", "yellow"),
+        ("skip-unresolved", "yellow"),
+        ("error", "magenta"),
+        ("running", "blue"),
+        ("pending", "yellow"),
+    ],
+)
+def test_taskprogress_color_valid(status, expected_color):
+    assert TaskProgress.color(status) == expected_color
+
+
+def test_taskprogress_color_invalid():
+    with pytest.raises(ValueError):
+        TaskProgress.color("not-a-status")
+
+
 def test_status_column_render():
     # Test the StatusColumn renders correctly for different task states
     column = StatusColumn()
@@ -159,6 +201,65 @@ def test_task_progress_manager_advance():
         args, kwargs = mock_update.call_args
         assert kwargs["completed"] == 5
         assert kwargs["status"] == "running"
+
+
+def test_group_tasks_by_status_basic():
+    # Test that group_tasks_by_status groups tasks correctly by their status
+    problems = ["p1", "p2", "p3", "p4"]
+    manager = TaskProgressManager(problems)
+    # Set up tasks with different statuses
+    updates = [
+        TaskProgress("p1", 1, 10, 10, 100, "resolved"),
+        TaskProgress("p2", 2, 10, 20, 100, "running"),
+        TaskProgress("p3", 0, 10, 0, 100, "pending"),
+        TaskProgress("p4", 0, 10, 0, 100, "error"),
+    ]
+    for update in updates:
+        manager.advance(update)
+    grouped = manager.group_tasks_by_status()
+    assert grouped["resolved"] == ["p1"]
+    assert grouped["running"] == ["p2"]
+    assert grouped["pending"] == ["p3"]
+    assert grouped["error"] == ["p4"]
+    # All other statuses should be empty lists
+    for status in TaskProgress.statuses():
+        if status not in ["resolved", "running", "pending", "error"]:
+            assert grouped[status] == []
+
+
+def test_group_tasks_by_status_with_unknown_status():
+    # Test that a task with an unknown status is grouped under "pending"
+    problems = ["p1"]
+    manager = TaskProgressManager(problems)
+    # Manually set an unknown status
+    manager._tasks["p1"].status = "not-a-status"
+    grouped = manager.group_tasks_by_status()
+    # Should be grouped under "pending"
+    assert grouped["pending"] == ["p1"]
+    # All other statuses should be empty
+    for status in TaskProgress.statuses():
+        if status != "pending":
+            assert grouped[status] == []
+
+
+def test_group_tasks_by_status_multiple_tasks_same_status():
+    # Test that multiple tasks with the same status are grouped together
+    problems = ["p1", "p2", "p3"]
+    manager = TaskProgressManager(problems)
+    updates = [
+        TaskProgress("p1", 1, 10, 10, 100, "running"),
+        TaskProgress("p2", 2, 10, 20, 100, "running"),
+        TaskProgress("p3", 0, 10, 0, 100, "pending"),
+    ]
+    for update in updates:
+        manager.advance(update)
+    grouped = manager.group_tasks_by_status()
+    assert set(grouped["running"]) == {"p1", "p2"}
+    assert grouped["pending"] == ["p3"]
+    # All other statuses should be empty
+    for status in TaskProgress.statuses():
+        if status not in ["running", "pending"]:
+            assert grouped[status] == []
 
 
 def test_task_progress_manager_get_task_stats():
