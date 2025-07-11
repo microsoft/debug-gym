@@ -12,84 +12,103 @@ class Debug_5_Agent(DebugAgent):
     name: str = "debug_5_agent"
 
     def run(self, task_name=None, debug=False):
-        # remove the pdb tool from the environment
-        pdb_tool = self.env.remove_tool("pdb")
-
-        self.history.reset()
-        info = self.env.reset(options={"task_name": task_name})
-        # initial state does not have prompt and response
-        self.history.step(info, None)
-
-        if info.done is True:
-            # msg = "Environment started with entrypoint passing without errors."
-            self.logger.report_progress(
-                problem_id=task_name,
-                step=1,
-                total_steps=1,
-                score=info.score,
-                max_score=info.max_score,
-                status="resolved",
-            )
-            return True
-
-        highscore = info.score
+        step = 0
         max_steps = self.config["max_steps"]
-        for step in range(max_steps):
-            self.logger.info(f"\n{'='*20} STEP {step+1} {'='*20}\n")
-            highscore = max(highscore, info.score)
-            self.logger.info(
-                f"Step: {step} | Score: {info.score}/{info.max_score} ({info.score/info.max_score:.1%}) [Best: {highscore}]"
-            )
+        try:
+            # remove the pdb tool from the environment
+            pdb_tool = self.env.remove_tool("pdb")
 
-            messages = self.build_prompt(info)
-            llm_response = self.llm(messages, info.tools)
+            self.history.reset()
+            info = self.env.reset(options={"task_name": task_name})
+            # initial state does not have prompt and response
+            self.history.step(info, None)
 
-            if debug:
-                breakpoint()
-
-            info = self.env.step(llm_response.tool, llm_response.response)
-
-            # re-introduce pdb tool at the right time
-            if (
-                info.rewrite_counter >= self.config["n_rewrites_before_pdb"]
-                and pdb_tool.name not in self.env.tools
-            ):
-                self.env.add_tool(pdb_tool)
-                pdb_tool.start_pdb()
-                # update info tools related fields after adding pdb so it's included when building the next prompt
-                info.instructions = self.env.instructions
-                info.tools = self.env.tools
-
-            self.history.step(info, llm_response)
-
-            if info.done or info.rewrite_counter >= self.config["max_rewrite_steps"]:
-                reason = "done" if info.done else "max_rewrite_steps reached"
-                self.logger.info(
-                    f"Step: {step} | Score: {info.score}/{info.max_score} ({info.score/info.max_score:.1%}) | Reason: {reason}"
+            if info.done is True:
+                # msg = "Environment started with entrypoint passing without errors."
+                self.logger.report_progress(
+                    problem_id=task_name,
+                    step=1,
+                    total_steps=1,
+                    score=info.score,
+                    max_score=info.max_score,
+                    status="resolved",
                 )
+                return True
+
+            highscore = info.score
+            for step in range(max_steps):
+                self.logger.info(f"\n{'='*20} STEP {step+1} {'='*20}\n")
+                highscore = max(highscore, info.score)
+                self.logger.info(
+                    f"Step: {step} | Score: {info.score}/{info.max_score} ({info.score/info.max_score:.1%}) [Best: {highscore}]"
+                )
+
+                messages = self.build_prompt(info)
+                llm_response = self.llm(messages, info.tools)
+
+                if debug:
+                    breakpoint()
+
+                info = self.env.step(llm_response.tool, llm_response.response)
+
+                # re-introduce pdb tool at the right time
+                if (
+                    info.rewrite_counter >= self.config["n_rewrites_before_pdb"]
+                    and pdb_tool.name not in self.env.tools
+                ):
+                    self.env.add_tool(pdb_tool)
+                    pdb_tool.start_pdb()
+                    # update info tools related fields after adding pdb so it's included when building the next prompt
+                    info.instructions = self.env.instructions
+                    info.tools = self.env.tools
+
+                self.history.step(info, llm_response)
+
+                if (
+                    info.done
+                    or info.rewrite_counter >= self.config["max_rewrite_steps"]
+                ):
+                    reason = "done" if info.done else "max_rewrite_steps reached"
+                    self.logger.info(
+                        f"Step: {step} | Score: {info.score}/{info.max_score} ({info.score/info.max_score:.1%}) | Reason: {reason}"
+                    )
+                    # early stop, set current step and total steps to be the same
+                    self.logger.report_progress(
+                        problem_id=task_name,
+                        step=step + 1,
+                        total_steps=step + 1,
+                        score=info.score,
+                        max_score=info.max_score,
+                        status="resolved" if info.done else "unresolved",
+                    )
+                    break
+                # keep progress bar running until max_steps is reached
                 self.logger.report_progress(
                     problem_id=task_name,
                     step=step + 1,
-                    total_steps=step + 1,  # early stop, current step is total steps
+                    total_steps=max_steps + 1,
                     score=info.score,
                     max_score=info.max_score,
-                    status="resolved" if info.done else "unresolved",
+                    status="running",
                 )
-                break
+            # max_steps was reached, task was either resolved or unresolved
             self.logger.report_progress(
                 problem_id=task_name,
                 step=step + 1,
-                total_steps=max_steps + 1,  # keep progress bar running until max_steps
+                total_steps=step + 1,
                 score=info.score,
                 max_score=info.max_score,
-                status="running",
+                status="resolved" if info.done else "unresolved",
             )
-        self.logger.report_progress(
-            problem_id=task_name,
-            step=step + 1,
-            total_steps=step + 1,
-            score=info.score,
-            max_score=info.max_score,
-            status="resolved" if info.done else "unresolved",
-        )
-        return info.done
+            return info.done
+        except Exception:
+            # report any error that happens during the run
+            self.logger.report_progress(
+                problem_id=task_name,
+                step=step + 1,
+                total_steps=max_steps + 1,
+                score=info.score if info else 0,
+                max_score=info.max_score if info else 1,
+                status="error",
+            )
+            raise
