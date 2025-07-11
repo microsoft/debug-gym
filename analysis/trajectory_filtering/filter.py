@@ -336,7 +336,7 @@ def main():
     # Replace slashes in exp_uuid for filename
     safe_exp_uuid = args.exp_uuid.replace("/", "_")
     output_file = args.output_file or os.path.join(
-        exps_dir, f"filtered_trajectories_{safe_exp_uuid}.json"
+        exps_dir, f"all_trajectories_{safe_exp_uuid}.json"
     )
 
     # Get current time in Eastern Time
