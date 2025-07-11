@@ -158,6 +158,7 @@ def main():
         llm_config_file_path=config.get("llm_config_file_path"),
         logger=None,
     )
+
     # Stop live progress display if --no-live-display is set
     # or in Human mode (avoid conflicts with prompt_toolkit)
     if args.no_live_display or isinstance(llm, Human):
