@@ -12,7 +12,7 @@ from debug_gym.llms.base import LLM
 class AgentTool(EnvironmentTool):
     name: str = "agent"
     examples = [
-        """agent(query="") Executes query to send to this specialized agent.\n"""
+        """agent(query="") Send a query to this specialized agent.\n"""
     ]
     description = (
         "This tool allows to call a large language model specialized agent, and therefore to query for information and exploit capabilities in the model.\n"
