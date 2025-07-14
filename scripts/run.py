@@ -55,6 +55,16 @@ def run_agent(args, problem, config):
     )
     try:
         previous_run = exp_path / "debug_gym.jsonl"
+
+        task_logger.report_progress(
+            problem_id=problem,
+            step=0,
+            total_steps=1,
+            score=0,
+            max_score=100,
+            status="running",
+        )
+
         if not args.force_all and os.path.exists(previous_run):
             task_logger.debug(f"Previous run found: {previous_run}")
             with open(previous_run) as reader:
