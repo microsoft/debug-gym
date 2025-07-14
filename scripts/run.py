@@ -66,7 +66,7 @@ def run_agent(args, problem, config):
                     max_score=100,
                     status=status,
                 )
-                task_logger.info("Skipped, already done.")
+                task_logger.debug("Skipped, already done.")
                 return success
 
         env = create_env(config, task_logger)
@@ -203,23 +203,11 @@ def main():
     num_workers = min(max(1, num_workers), len(problems))
     logger.info(f"Running with {num_workers} workers")
 
-    tasks_done = 0
-    mean_perf = 0
-    tasks_succeeded = []
-
     with logger.rich_progress(problems, max_display=args.max_display):
         if num_workers == 1:  # run sequentially for easier debugging
             for problem in problems:
                 try:
                     success = run_agent(args, problem, config)
-                    mean_perf += success
-                    tasks_done += 1
-
-                    if success:
-                        tasks_succeeded.append(problem)
-
-                    mean_perf_text = f"[green]{mean_perf}[/green]"
-                    logger.info(f"Overall tasks done ({mean_perf_text} are successful)")
                 except AgentTimeoutException:
                     pass  # Handleled in run_agent, just continue
                 except (KeyboardInterrupt, Exception) as e:
@@ -238,17 +226,6 @@ def main():
                     try:
                         problem = futures[future]
                         success = future.result()
-                        mean_perf += success
-                        tasks_done += 1
-
-                        if success:
-                            tasks_succeeded.append(problem)
-
-                        # update message on overall progress bar
-                        mean_perf_text = f"[green]{mean_perf}[/green]"
-                        logger.info(
-                            f"Overall tasks done ({mean_perf_text} are successful)"
-                        )
                     except AgentTimeoutException:
                         pass  # Handled in run_agent, just continue
                     except (KeyboardInterrupt, Exception) as e:

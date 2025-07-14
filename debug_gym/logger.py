@@ -94,7 +94,7 @@ class TaskProgress:
         elif status == "skip-unresolved":
             return "yellow"
         elif status == "error":
-            return "magenta"
+            return "red"
         elif status == "running":
             return "blue"
         elif status == "pending":
@@ -330,7 +330,14 @@ class OverallProgressContext:
         # Update the task progress
         self.tasks_progress.advance(progress_update)
         # Update overall progress completion
-        self.completed += 1 if progress_update.completed else 0
+        if progress_update.completed:
+            self.completed += 1
+            log_with_color(
+                self.logger,
+                f"{TaskProgress.marker(progress_update.status)} {progress_update.status}: "
+                f" task {progress_update.problem_id}.",
+                TaskProgress.color(progress_update.status),
+            )
 
     def close(self):
         """Stop the listener thread and wait until it exits."""
@@ -352,7 +359,8 @@ class OverallProgressContext:
             f"running: [blue]{stats['running']}[/blue] | "
             f"pending: [yellow]{stats['pending']}[/yellow] | "
             f"resolved: [green]{stats['resolved'] + stats['skip-resolved']}[/green] | "
-            f"unresolved: [red]{stats['unresolved'] + stats['skip-unresolved']}[/red]"
+            f"unresolved: [red]{stats['unresolved'] + stats['skip-unresolved']}[/red] | "
+            f"error: [red]{stats['error']}[/red]"
         )
         self.overall_progress.update(
             self._overall_task,
