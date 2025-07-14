@@ -69,7 +69,7 @@ def test_taskprogress_marker_invalid():
         ("unresolved", "red"),
         ("skip-resolved", "yellow"),
         ("skip-unresolved", "yellow"),
-        ("error", "magenta"),
+        ("error", "red"),
         ("running", "blue"),
         ("pending", "yellow"),
     ],
@@ -124,7 +124,7 @@ def test_status_column_render():
     error_task.fields = {"status": "error"}
     error_result = column.render(error_task)
     assert error_result.plain == "!"
-    assert "magenta" in error_result.style
+    assert "red" in error_result.style
 
     unknown_task = MagicMock()
     unknown_task.finished = True
