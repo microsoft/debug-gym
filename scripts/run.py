@@ -19,6 +19,9 @@ class BreakTaskLoop(Exception):
 
 
 def run_agent(args, problem, config):
+    # Flag to not report errors from the agent, since they report
+    # errors themselves and we want to avoid double reporting.
+    report_progress_error = True
     exp_path = Path(config["output_path"]) / config["uuid"] / problem
 
     task_logger = DebugGymLogger(
@@ -37,6 +40,15 @@ def run_agent(args, problem, config):
 
             task_logger.debug(f"Previous run success: {success}")
             if not args.force_failed or success:
+                status = "skip-resolved" if success else "skip-unresolved"
+                task_logger.report_progress(
+                    problem_id=problem,
+                    step=1,
+                    total_steps=1,
+                    score=100,
+                    max_score=100,
+                    status=status,
+                )
                 task_logger.info("Skipped, already done.")
                 return success
 
@@ -57,7 +69,11 @@ def run_agent(args, problem, config):
             logger=task_logger,
         )
 
-        success = agent.run(task_name=problem, debug=args.debug)
+        try:
+            success = agent.run(task_name=problem, debug=args.debug)
+        except:
+            report_progress_error = False
+            raise
 
         # optionally apply patch
         if config["save_patch"]:
@@ -76,6 +92,15 @@ def run_agent(args, problem, config):
         task_logger.debug(
             f"Task {problem} generated an exception: {e!r}", exc_info=True
         )
+        if report_progress_error:
+            task_logger.report_progress(
+                problem_id=problem,
+                step=1,
+                total_steps=1,
+                score=0,
+                max_score=1,
+                status="error",
+            )
         if args.debug:
             raise e
 
@@ -133,8 +158,10 @@ def main():
         llm_config_file_path=config.get("llm_config_file_path"),
         logger=None,
     )
-    # Stop live progress to avoid conflicts with Human mode (prompt_toolkit)
-    if isinstance(llm, Human):
+
+    # Stop live progress display if --no-live-display is set
+    # or in Human mode (avoid conflicts with prompt_toolkit)
+    if args.no_live_display or isinstance(llm, Human):
         logger.set_no_live()
 
     num_workers = args.num_workers or int(os.environ.get("DEBUG_GYM_WORKERS", 1))
@@ -168,8 +195,7 @@ def main():
                     raise e
         else:
             with ProcessPoolExecutor(
-                num_workers,
-                initializer=DebugGymLogger.set_as_worker,
+                num_workers, initializer=DebugGymLogger.set_as_worker
             ) as executor:
                 futures = {
                     executor.submit(run_agent, args, problem, config): problem
@@ -198,10 +224,6 @@ def main():
                     except Exception as e:
                         executor.shutdown(wait=False, cancel_futures=True)
                         raise e
-
-    tasks_failed = list(set(problems) - set(tasks_succeeded))
-    logger.info(f"[green]Tasks that succeeded:[/green] {tasks_succeeded}")
-    logger.info(f"[red]Tasks that failed:[/red] {tasks_failed}")
 
 
 if __name__ == "__main__":

@@ -41,6 +41,48 @@ def test_task_progress_pending_status():
     assert task_pending.completed is False
 
 
+@pytest.mark.parametrize(
+    "status,expected_marker",
+    [
+        ("resolved", "✓"),
+        ("unresolved", "✗"),
+        ("skip-resolved", "✓"),
+        ("skip-unresolved", "✗"),
+        ("error", "!"),
+        ("running", "⠋"),
+        ("pending", "⠋"),
+    ],
+)
+def test_taskprogress_marker_valid(status, expected_marker):
+    assert TaskProgress.marker(status) == expected_marker
+
+
+def test_taskprogress_marker_invalid():
+    with pytest.raises(ValueError):
+        TaskProgress.marker("not-a-status")
+
+
+@pytest.mark.parametrize(
+    "status,expected_color",
+    [
+        ("resolved", "green"),
+        ("unresolved", "red"),
+        ("skip-resolved", "yellow"),
+        ("skip-unresolved", "yellow"),
+        ("error", "magenta"),
+        ("running", "blue"),
+        ("pending", "yellow"),
+    ],
+)
+def test_taskprogress_color_valid(status, expected_color):
+    assert TaskProgress.color(status) == expected_color
+
+
+def test_taskprogress_color_invalid():
+    with pytest.raises(ValueError):
+        TaskProgress.color("not-a-status")
+
+
 def test_status_column_render():
     # Test the StatusColumn renders correctly for different task states
     column = StatusColumn()
@@ -49,23 +91,46 @@ def test_status_column_render():
     running_task = MagicMock()
     running_task.finished = False
 
-    failed_task = MagicMock()
-    failed_task.finished = True
-    failed_task.fields = {"status": "failed"}
-
     completed_task = MagicMock()
     completed_task.finished = True
-    completed_task.fields = {"status": "done"}
+    completed_task.fields = {"status": "resolved"}
+    completed_result = column.render(completed_task)
+    assert completed_result.plain == "✓"
+    assert "green" in completed_result.style
 
-    # Test rendering for failed task
+    failed_task = MagicMock()
+    failed_task.finished = True
+    failed_task.fields = {"status": "unresolved"}
     failed_result = column.render(failed_task)
     assert failed_result.plain == "✗"
     assert "red" in failed_result.style
 
-    # Test rendering for completed task
-    completed_result = column.render(completed_task)
-    assert completed_result.plain == "✓"
-    assert "green" in completed_result.style
+    skip_resolved_task = MagicMock()
+    skip_resolved_task.finished = True
+    skip_resolved_task.fields = {"status": "skip-resolved"}
+    skip_resolved_result = column.render(skip_resolved_task)
+    assert skip_resolved_result.plain == "✓"
+    assert "yellow" in skip_resolved_result.style
+
+    skip_unresolved_task = MagicMock()
+    skip_unresolved_task.finished = True
+    skip_unresolved_task.fields = {"status": "skip-unresolved"}
+    skip_unresolved_result = column.render(skip_unresolved_task)
+    assert skip_unresolved_result.plain == "✗"
+    assert "yellow" in skip_unresolved_result.style
+
+    error_task = MagicMock()
+    error_task.finished = True
+    error_task.fields = {"status": "error"}
+    error_result = column.render(error_task)
+    assert error_result.plain == "!"
+    assert "magenta" in error_result.style
+
+    unknown_task = MagicMock()
+    unknown_task.finished = True
+    unknown_task.fields = {"status": "unknown-status"}
+    with pytest.raises(ValueError):
+        column.render(unknown_task)
 
 
 def test_strip_ansi_formatter():
@@ -138,17 +203,80 @@ def test_task_progress_manager_advance():
         assert kwargs["status"] == "running"
 
 
+def test_group_tasks_by_status_basic():
+    # Test that group_tasks_by_status groups tasks correctly by their status
+    problems = ["p1", "p2", "p3", "p4"]
+    manager = TaskProgressManager(problems)
+    # Set up tasks with different statuses
+    updates = [
+        TaskProgress("p1", 1, 10, 10, 100, "resolved"),
+        TaskProgress("p2", 2, 10, 20, 100, "running"),
+        TaskProgress("p3", 0, 10, 0, 100, "pending"),
+        TaskProgress("p4", 0, 10, 0, 100, "error"),
+    ]
+    for update in updates:
+        manager.advance(update)
+    grouped = manager.group_tasks_by_status()
+    assert grouped["resolved"] == ["p1"]
+    assert grouped["running"] == ["p2"]
+    assert grouped["pending"] == ["p3"]
+    assert grouped["error"] == ["p4"]
+    # All other statuses should be empty lists
+    for status in TaskProgress.statuses():
+        if status not in ["resolved", "running", "pending", "error"]:
+            assert grouped[status] == []
+
+
+def test_group_tasks_by_status_with_unknown_status():
+    # Test that a task with an unknown status is grouped under "pending"
+    problems = ["p1"]
+    manager = TaskProgressManager(problems)
+    # Manually set an unknown status
+    manager._tasks["p1"].status = "not-a-status"
+    grouped = manager.group_tasks_by_status()
+    # Should be grouped under "pending"
+    assert grouped["pending"] == ["p1"]
+    # All other statuses should be empty
+    for status in TaskProgress.statuses():
+        if status != "pending":
+            assert grouped[status] == []
+
+
+def test_group_tasks_by_status_multiple_tasks_same_status():
+    # Test that multiple tasks with the same status are grouped together
+    problems = ["p1", "p2", "p3"]
+    manager = TaskProgressManager(problems)
+    updates = [
+        TaskProgress("p1", 1, 10, 10, 100, "running"),
+        TaskProgress("p2", 2, 10, 20, 100, "running"),
+        TaskProgress("p3", 0, 10, 0, 100, "pending"),
+    ]
+    for update in updates:
+        manager.advance(update)
+    grouped = manager.group_tasks_by_status()
+    assert set(grouped["running"]) == {"p1", "p2"}
+    assert grouped["pending"] == ["p3"]
+    # All other statuses should be empty
+    for status in TaskProgress.statuses():
+        if status not in ["running", "pending"]:
+            assert grouped[status] == []
+
+
 def test_task_progress_manager_get_task_stats():
     # Test that TaskProgressManager.get_task_stats returns correct stats
-    problems = ["p1", "p2", "p3", "p4"]
+    problems = ["p1", "p2", "p3", "p4", "p5", "p6", "p7", "p8"]
     manager = TaskProgressManager(problems, max_display=5)
 
     # Set up tasks with different statuses
     updates = [
-        TaskProgress("p1", 10, 10, 100, 100, "done"),
-        TaskProgress("p2", 5, 10, 50, 100, "failed"),
+        TaskProgress("p1", 10, 10, 100, 100, "resolved"),
+        TaskProgress("p2", 5, 10, 50, 100, "unresolved"),
         TaskProgress("p3", 3, 10, 30, 100, "running"),
-        TaskProgress("p4", 0, 10, 0, 100, "pending"),
+        TaskProgress("p4", 3, 10, 30, 100, "running"),
+        TaskProgress("p5", 0, 10, 0, 100, "pending"),
+        TaskProgress("p6", 0, 10, 0, 100, "skip-resolved"),
+        TaskProgress("p7", 0, 10, 0, 100, "skip-unresolved"),
+        TaskProgress("p8", 0, 10, 0, 100, "error"),
     ]
 
     for update in updates:
@@ -156,11 +284,14 @@ def test_task_progress_manager_get_task_stats():
 
     # Get stats and check they're correct
     stats = manager.get_task_stats()
-    assert stats["total"] == 4
+    assert stats["total"] == 8
     assert stats["pending"] == 1
-    assert stats["running"] == 1
-    assert stats["completed"] == 1
-    assert stats["failed"] == 1
+    assert stats["running"] == 2
+    assert stats["resolved"] == 1
+    assert stats["unresolved"] == 1
+    assert stats["skip-resolved"] == 1
+    assert stats["skip-unresolved"] == 1
+    assert stats["error"] == 1
 
 
 @pytest.mark.parametrize(
