@@ -31,8 +31,9 @@ def set_signal(timeout_seconds):
         """Signal handler for timeout."""
         raise AgentTimeoutException
 
-    signal.signal(signal.SIGALRM, timeout_handler)
-    signal.alarm(timeout_seconds)
+    if timeout_seconds > 0:
+        signal.signal(signal.SIGALRM, timeout_handler)
+        signal.alarm(timeout_seconds)
 
 
 def run_agent(args, problem, config):

@@ -246,8 +246,8 @@ def load_config():
         "-t",
         "--timeout",
         type=int,
-        default=1200,
-        help="Timeout in seconds for each problem. Default: 1200 sec (20 min).",
+        default=0,
+        help="Timeout in seconds for each problem. Default: 0 seconds (no timeout).",
     )
     parser.add_argument(
         "--keep-completed-tasks",
