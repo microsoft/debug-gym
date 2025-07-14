@@ -1,5 +1,6 @@
 import json
 import os
+import signal
 import uuid
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
@@ -14,13 +15,30 @@ from debug_gym.llms.human import Human
 from debug_gym.logger import DebugGymLogger
 
 
-class BreakTaskLoop(Exception):
+class AgentTimeoutException(BaseException):
+    """Custom exception to handle timeouts in agent
+    execution. Inherits from BaseException to ensure
+    it is not caught by agent exception handling."""
+
     pass
 
 
+def set_signal(timeout_seconds):
+    """Set a signal handler for timeouts.
+    Only works on Unix-like systems."""
+
+    def timeout_handler(signum, frame):
+        """Signal handler for timeout."""
+        raise AgentTimeoutException
+
+    signal.signal(signal.SIGALRM, timeout_handler)
+    signal.alarm(timeout_seconds)
+
+
 def run_agent(args, problem, config):
-    # Flag to not report errors from the agent, since they report
-    # errors themselves and we want to avoid double reporting.
+    set_signal(args.timeout)
+    success = True
+    env = None
     report_progress_error = True
     exp_path = Path(config["output_path"]) / config["uuid"] / problem
 
@@ -30,7 +48,6 @@ def run_agent(args, problem, config):
         level=args.logging_level,
         mode="w" if args.force_all else "a",
     )
-    env = None
     try:
         previous_run = exp_path / "debug_gym.jsonl"
         if not args.force_all and os.path.exists(previous_run):
@@ -71,6 +88,21 @@ def run_agent(args, problem, config):
 
         try:
             success = agent.run(task_name=problem, debug=args.debug)
+        except AgentTimeoutException:
+            task_logger.error(
+                f"Timeout: Problem `{problem}` exceeded "
+                f"the time limit of {args.timeout} seconds."
+            )
+            task_logger.report_progress(
+                problem_id=problem,
+                step=1,
+                total_steps=1,
+                score=0,
+                max_score=1,
+                status="error",
+            )
+            success = False
+            raise
         except:
             report_progress_error = False
             raise
@@ -81,8 +113,6 @@ def run_agent(args, problem, config):
 
         # save log
         agent.log(task_name=problem)
-    except KeyboardInterrupt:
-        raise BreakTaskLoop
 
     except Exception as e:
         task_logger.error(
@@ -106,6 +136,8 @@ def run_agent(args, problem, config):
 
         success = False
     finally:
+        # Close env and cancel any pending alarm
+        signal.alarm(0)
         if env:
             env.close()
 
@@ -188,9 +220,9 @@ def main():
 
                     mean_perf_text = f"[green]{mean_perf}[/green]"
                     logger.info(f"Overall tasks done ({mean_perf_text} are successful)")
-                except (KeyboardInterrupt, BreakTaskLoop) as e:
-                    raise e
-                except Exception as e:
+                except AgentTimeoutException:
+                    pass  # Handleled in run_agent, just continue
+                except (KeyboardInterrupt, Exception) as e:
                     raise e
         else:
             with ProcessPoolExecutor(
@@ -217,10 +249,9 @@ def main():
                         logger.info(
                             f"Overall tasks done ({mean_perf_text} are successful)"
                         )
-                    except (KeyboardInterrupt, BreakTaskLoop) as e:
-                        executor.shutdown(wait=False, cancel_futures=True)
-                        raise e
-                    except Exception as e:
+                    except AgentTimeoutException:
+                        pass  # Handled in run_agent, just continue
+                    except (KeyboardInterrupt, Exception) as e:
                         executor.shutdown(wait=False, cancel_futures=True)
                         raise e
 
