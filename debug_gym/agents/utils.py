@@ -243,6 +243,13 @@ def load_config():
         help="Force running only problems that have failed.",
     )
     parser.add_argument(
+        "-t",
+        "--timeout",
+        type=int,
+        default=1200,
+        help="Timeout in seconds for each problem. Default: 1200 sec (20 min).",
+    )
+    parser.add_argument(
         "--keep-completed-tasks",
         action="store_true",
         help="Keep displaying completed tasks in the workers panel.",
