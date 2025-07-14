@@ -43,7 +43,7 @@ def run_agent(args, problem, config):
     # Flag to not report errors from the agent, since they report
     # errors themselves and we want to avoid double reporting.
     report_progress_error = True
-    
+
     exp_path = Path(config["output_path"]) / config["uuid"] / problem
 
     task_logger = DebugGymLogger(
