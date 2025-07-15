@@ -49,3 +49,10 @@ debug_5_agent:
 
 explanation_agent:
     tools: ["pdb", "view", "rewrite", "eval"]
+
+no_strategy_agent:
+    tools: ["pdb", "view", "rewrite", "eval"]
+    # If True, the agent will automatically call the Explain tool after a successful rewrite.
+    # Optionally loads a custom system prompt template from a file.
+    # system_prompt_template_file: "script/templates/system_prompt_explanation.jinja"
+    # If True, the agent will automatically call the Explain tool after a successful rewrite.

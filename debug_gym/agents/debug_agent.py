@@ -103,7 +103,7 @@ class ExplanationAgent(BaseAgent):
     def __init__(self, **kwargs):
         filepath = "../generate-explanations/new_explanations_proper_pdb/single_shot_low_level/swe-smith/burnash__gspread.a8be3b96.lm_rewrite__596cni6x/single_shot_explanation_20250711_170309.txt"
         self.explanation = self.get_explanation_from_file(filepath)
-        self.system_prompt = f"{self.system_prompt} {self.explanation}"
+        self.system_prompt = f"{self.system_prompt} {self.explanation} Follow similar steps as the above to debug the code and use the same level high level understanding of information retrieval and debugging."
         super().__init__(**kwargs)
     
     def get_explanation_for_task(self, task_name: str):
@@ -139,3 +139,8 @@ class ExplanationAgent(BaseAgent):
             explanation = explanation.split(delimiter)
             print(f"Loaded explanation from {text_file}: {explanation[-1]}")
         return explanation[-1]
+
+@register_agent    
+class NoStrategyAgent(BaseAgent):
+    name = "no_strategy_agent"
+    system_prompt = "You are a debugging agent specialized in fixing Python programs. Your goal is to debug a Python program to make sure it can pass a set of test functions. You have access to a set of tools including the pdb debugger to help you investigate the code before proposing a patch. Think step-by-step but avoid overthinking."
