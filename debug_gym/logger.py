@@ -14,7 +14,7 @@ from rich.logging import RichHandler
 from rich.markup import escape
 from rich.padding import Padding
 from rich.panel import Panel
-from rich.progress import BarColumn, Progress, SpinnerColumn, TextColumn
+from rich.progress import BarColumn, Progress, SpinnerColumn, Task, TextColumn
 from rich.table import Table
 from rich.text import Text
 
@@ -38,6 +38,7 @@ class TaskProgress:
     score: int
     max_score: int
     status: str
+    logfile: str = ""
 
     @property
     def completed(self) -> bool:
@@ -111,17 +112,18 @@ class StatusColumn(SpinnerColumn):
     def __init__(self, spinner_name: str = "dots", speed: float = 1.0):
         super().__init__(spinner_name=spinner_name, speed=speed)
 
-    def render(self, task):
-        status = task.fields.get("status")
-        if task.finished:
-            return Text(
-                TaskProgress.marker(status),
-                style=TaskProgress.color(status),
-            )
-        # pending or running, return the spinner colored accordingly
-        text = super().render(task)
-        text.style = TaskProgress.color(status) if status else "yellow"
-        return text
+    def render(self, task: Task):
+        status = task.fields["status"]
+        if status == "running":
+            text = super().render(task)
+            text.style = TaskProgress.color(status)
+            return text
+
+        # If task is not running, return a static text based on status.
+        return Text(
+            TaskProgress.marker(status),
+            style=TaskProgress.color(status),
+        )
 
 
 class TaskProgressManager:
@@ -139,6 +141,7 @@ class TaskProgressManager:
         self.progress = Progress(
             StatusColumn(),
             TextColumn("[progress.description]{task.description:<20}"),
+            TextColumn("[blue]{task.fields[logfile]}[/blue]"),
             TextColumn("Step: [green]{task.completed:<4}[/green]  "),
             TextColumn(
                 "Score: [green]{task.fields[score]:>3}/{task.fields[max_score]:<3}[/green]"
@@ -169,14 +172,17 @@ class TaskProgressManager:
             score=0,
             max_score=0,
             status="pending",
+            logfile="",
         )
         self._tasks[task_id] = task
         pid = self.progress.add_task(
             task.problem_id,
+            status=task.status,
             completed=task.step,
             total=task.total_steps,
             score=task.score,
             max_score=task.max_score,
+            logfile=task.logfile,
         )
         self._progress_task_ids[task.problem_id] = pid
         return pid
@@ -190,6 +196,7 @@ class TaskProgressManager:
             task.score = progress_update.score
             task.max_score = progress_update.max_score
             task.status = progress_update.status
+            task.logfile = progress_update.logfile
             pid = self._progress_task_ids.get(task.problem_id)
             if pid is not None:
                 self.progress.update(
@@ -199,6 +206,7 @@ class TaskProgressManager:
                     status=task.status,
                     score=task.score,
                     max_score=task.max_score,
+                    logfile=task.logfile,
                 )
 
     def refresh_progress(self, all_tasks: bool = False):
@@ -383,16 +391,11 @@ class OverallProgressContext:
 
     def _status_listener(self):
         self.logger.debug("Starting status listener thread...")
-        last_refresh_time = 0
-        refresh_interval = 1  # Minimum time between UI refreshes (in seconds)
         while not self._stop_event.is_set():
             try:
                 progress_update = self.progress_queue.get(timeout=0.1)
                 self.advance(progress_update)
-                current_time = time.time()
-                if current_time - last_refresh_time >= refresh_interval:
-                    self.refresh_progress()
-                    last_refresh_time = current_time
+                self.refresh_progress()
             except queue.Empty:
                 continue
             except EOFError:  # queue closed
@@ -441,7 +444,7 @@ class DebugGymLogger(logging.Logger):
             self._initialize_file_handler(name, log_dir, mode)
 
     def _initialize_main_logger(self, level):
-        self._live = Live(transient=True)
+        self._live = Live(transient=True, refresh_per_second=2)
         rich_handler = RichHandler(
             console=self._live.console,
             show_time=False,
@@ -556,6 +559,11 @@ class DebugGymLogger(logging.Logger):
         """Send a progress update to the shared queue for the main process to handle.
         This method is used by worker processes to report their progress."""
 
+        # Get log file path relative to the current working directory if it exists.
+        logfile = ""
+        if self.log_file:
+            logfile = rf"\[{self.log_file.relative_to(os.getcwd())}]"
+
         progress_update = TaskProgress(
             problem_id=problem_id,
             step=step,
@@ -563,6 +571,7 @@ class DebugGymLogger(logging.Logger):
             score=score,
             max_score=max_score,
             status=status,
+            logfile=logfile,
         )
         # Put in queue with backoff strategy
         for attempt in range(max_attempts):
