@@ -14,7 +14,7 @@ from rich.logging import RichHandler
 from rich.markup import escape
 from rich.padding import Padding
 from rich.panel import Panel
-from rich.progress import BarColumn, Progress, SpinnerColumn, TextColumn
+from rich.progress import BarColumn, Progress, SpinnerColumn, Task, TextColumn
 from rich.table import Table
 from rich.text import Text
 
@@ -112,17 +112,18 @@ class StatusColumn(SpinnerColumn):
     def __init__(self, spinner_name: str = "dots", speed: float = 1.0):
         super().__init__(spinner_name=spinner_name, speed=speed)
 
-    def render(self, task):
-        status = task.fields.get("status")
-        if task.finished or status == "pending":
-            return Text(
-                TaskProgress.marker(status),
-                style=TaskProgress.color(status),
-            )
-        # running, return the spinner colored accordingly
-        text = super().render(task)
-        text.style = TaskProgress.color(status) if status else "yellow"
-        return text
+    def render(self, task: Task):
+        status = task.fields["status"]
+        if status == "running":
+            text = super().render(task)
+            text.style = TaskProgress.color(status)
+            return text
+
+        # If task is not running, return a static text based on status.
+        return Text(
+            TaskProgress.marker(status),
+            style=TaskProgress.color(status),
+        )
 
 
 class TaskProgressManager:

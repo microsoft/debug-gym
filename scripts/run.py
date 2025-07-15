@@ -103,6 +103,18 @@ def run_agent(args, problem, config):
 
         try:
             success = agent.run(task_name=problem, debug=args.debug)
+        except KeyboardInterrupt:
+            task_logger.error("Agent run was interrupted by user.")
+            task_logger.report_progress(
+                problem_id=problem,
+                step=1,
+                total_steps=1,
+                score=0,
+                max_score=1,
+                status="error",
+            )
+            success = False
+            raise
         except AgentTimeoutException:
             task_logger.error(
                 f"Timeout: Problem `{problem}` exceeded "
