@@ -31,7 +31,7 @@ def build_swe_env_once(tmp_path_factory, worker_id):
     """Build the SWEBench docker image only once.
     Do not run this fixture directly, use get_swe_env instead.
     """
-    _build_swe_env = lambda: SWEBenchEnv(instance_ids=["astropy__astropy-14096"])
+    _build_swe_env = lambda: SWEBenchEnv(problems=["astropy__astropy-14096"])
     if worker_id == "master":
         # Not running with pytest-xdist or we are in the master process
         _build_swe_env()
@@ -49,11 +49,11 @@ def get_swe_env(build_swe_env_once):
     """Instantiate a SWEBenchEnv instance after building the SWEBench docker image."""
 
     def _swe_env(working_dir=None, map_host_uid_gid=True, **kwargs):
-        instance_ids = ["astropy__astropy-14096"]
+        problems = ["astropy__astropy-14096"]
         terminal = DockerTerminal(
             path=working_dir, map_host_uid_gid=map_host_uid_gid, **kwargs
         )
-        env = SWEBenchEnv(instance_ids=instance_ids, terminal=terminal)
+        env = SWEBenchEnv(problems=problems, terminal=terminal)
         return env
 
     return _swe_env
@@ -349,3 +349,4 @@ def test_get_problem_ids(get_swe_env):
         ValueError, match=f"Invalid split or problem id: '{invalid_task_name}'"
     ):
         swe_env.get_problem_ids(invalid_task_name)
+
