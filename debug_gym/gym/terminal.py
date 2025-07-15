@@ -9,6 +9,7 @@ import tempfile
 import termios
 import time
 import uuid
+from pathlib import Path
 
 import docker
 
@@ -215,9 +216,9 @@ class Terminal:
     def working_dir(self):
         """Lazy initialization of the working directory."""
         if self._working_dir is None:
-            temp_dir = tempfile.TemporaryDirectory(prefix="Terminal-")
-            atexit.register(temp_dir.cleanup)
-            self._working_dir = temp_dir.name
+            _tempdir = tempfile.TemporaryDirectory(prefix="Terminal-")
+            atexit.register(_tempdir.cleanup)
+            self._working_dir = str(Path(_tempdir.name).resolve())
             self.logger.debug(f"Using temporary working directory: {self._working_dir}")
         return self._working_dir
 
@@ -263,8 +264,8 @@ class Terminal:
 
         if raises and not success:
             # Command includes the entrypoint + session commands
-            self.logger.debug(f"Failed to run command: {command} {output}")
-            raise ValueError(f"Failed to run command: {entrypoint} ", output)
+            self.logger.debug(f"Failed to run command: {command}")
+            raise ValueError(f"Failed to run command: {entrypoint}")
 
         output = (stdout + stderr).strip("\r\n").strip("\n")
         self.logger.debug(
@@ -337,7 +338,7 @@ class DockerTerminal(Terminal):
         self.setup_commands = setup_commands or []
         self.volumes = volumes or {}
         self.map_host_uid_gid = map_host_uid_gid
-        self.docker_client = docker.from_env()
+        self.docker_client = docker.from_env(timeout=600)
         self.host_uid = os.getuid()
         self.host_gid = os.getgid()
         self._container = None
@@ -424,16 +425,15 @@ class DockerTerminal(Terminal):
             stderr=True,
         )
         success = status == 0
+        output = output.decode().strip("\r\n").strip("\n")
 
         if raises and not success:
             # Command includes the entrypoint + session commands
-            self.logger.debug(f"Failed to run command: {command} {output}")
-            raise ValueError(f"Failed to run command: {entrypoint} ", output)
+            self.logger.debug(f"Failed to run command `{command}`:\n{output}")
+            raise ValueError(f"Failed to run command `{entrypoint}`:\n{output}")
 
-        self.logger.debug(
-            f"Output from terminal with status {status}:\n{output.decode()}"
-        )
-        return success, output.decode().strip("\r\n").strip("\n")
+        self.logger.debug(f"Output from terminal with status `{status}`:\n{output}")
+        return success, output
 
     def setup_container(self) -> docker.models.containers.Container:
         # Create and start a container mounting volumes and setting environment variables
@@ -451,6 +451,7 @@ class DockerTerminal(Terminal):
             tty=True,
             stdin_open=True,
             network_mode="host",
+            mem_limit="16G",
         )
         container_name = f"debug_gym_{container.name}"
         container.rename(container_name)
@@ -477,7 +478,7 @@ class DockerTerminal(Terminal):
                     f"Failed to run setup command: {setup_commands}\n"
                     f"Output: {output.decode()}"
                 )
-            self.logger.debug(f"Setup commands ran successfully.")
+            self.logger.debug("Setup commands ran successfully.")
 
     def clean_up(self):
         """Clean up the Docker container."""

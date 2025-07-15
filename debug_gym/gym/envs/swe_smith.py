@@ -11,7 +11,6 @@ from swesmith.harness.grading import TestStatus
 from swesmith.harness.log_parsers import MAP_REPO_TO_PARSER, parse_log_pytest
 from swesmith.harness.utils import get_test_command
 from swesmith.utils import get_repo_commit_from_image_name
-from tqdm import tqdm
 
 from debug_gym.constants import DEBUG_GYM_CACHE_DIR
 from debug_gym.gym.entities import EvalOutput
@@ -29,11 +28,13 @@ class SWESmithEnv(SWEBenchEnv):
     def __init__(
         self,
         dataset_id: str = "SWE-bench/SWE-smith",
+        dataset_revision: str = "699b53400d3855206a0fbf3ff4beaf1a52f4f232",
         split: str = "train",
         instance_ids: list[str] | None = None,
         terminal: Terminal | None = None,
         **kwargs,
     ):
+        self.dataset_revision = dataset_revision
         super().__init__(
             dataset_id=dataset_id,
             split=split,
@@ -53,19 +54,29 @@ class SWESmithEnv(SWEBenchEnv):
             self.ds = load_from_disk(self.dataset_id)[self.split]
         else:
             # Loading from HuggingFace or a folder.
-            self.ds = datasets.load_dataset(self.dataset_id)[self.split]
+            self.ds = datasets.load_dataset(
+                self.dataset_id, revision=self.dataset_revision
+            )[self.split]
 
         self.dataset = {id: i for i, id in enumerate(self.ds["instance_id"])}
 
         # To avoid concurrency issues, we will clone all the repos in the dataset.
         swesmith_repos = set(self.ds["repo"])
+        image_names = set(self.ds["image_name"])
+        if self.instance_ids:
+            # If instance_ids are provided, filter the dataset to only include those repos.
+            swesmith_repos = set(
+                self.ds[self.dataset[id]]["repo"] for id in self.instance_ids
+            )
+            image_names = set(
+                self.ds[self.dataset[id]]["image_name"] for id in self.instance_ids
+            )
         self.logger.debug(
             f"Loaded {len(self.ds)} tasks accross {len(swesmith_repos)} repos from {self.dataset_id}."
         )
 
         # Download all images needed for SWE-Smith.
         client = docker.from_env()
-        image_names = set(self.ds["image_name"])
         tagged_image_names = set(f"{DOCKER_ORG}/{name}:{TAG}" for name in image_names)
 
         existing_images = set(
@@ -73,9 +84,12 @@ class SWESmithEnv(SWEBenchEnv):
         )
         missing_images = tagged_image_names - existing_images
         if missing_images:
-            self.logger.debug(f"Found {len(missing_images)} missing Docker images.")
-            for image_name in tqdm(missing_images, desc="Pulling images for SWE-Smith"):
+            self.logger.info(f"Found {len(missing_images)} missing Docker images.")
+            for image_name in missing_images:
                 docker_hub_image = image_name.replace("__", "_1776_")
+                self.logger.info(
+                    f"Pulling Docker image `{docker_hub_image}` to `{image_name}`."
+                )
                 client.images.pull(docker_hub_image)
                 # Rename images via tagging
                 client.images.get(docker_hub_image).tag(image_name)
@@ -85,18 +99,18 @@ class SWESmithEnv(SWEBenchEnv):
             self.dataset_splits = yaml.safe_load(f)
             self.excluded_ids = self.dataset_splits.get("excluded", [])
 
-    def get_dataset_split(self, split):
-        if split == "all":
+    def get_problem_ids(self, split_or_problem_id):
+        if split_or_problem_id == "all":
             return sorted(
                 k for k in self.dataset.keys() if k not in self.excluded_ids
             )  # all tasks
-        elif split in self.dataset:
-            return [split]  # Single task
-        elif split in self.dataset_splits:
-            return self.dataset_splits[split]
+        elif split_or_problem_id in self.dataset:
+            return [split_or_problem_id]  # Single task
+        elif split_or_problem_id in self.dataset_splits:
+            return self.dataset_splits[split_or_problem_id]
         else:
             raise ValueError(
-                f"Invalid split '{split}'. Available splits are: {['all'] + sorted(self.dataset_splits.keys())}"
+                f"Invalid split or problem id: '{split_or_problem_id}'. Available splits are: {['all'] + sorted(self.dataset_splits.keys())}"
             )
 
     def setup_task(self, task_name):
@@ -178,9 +192,11 @@ class SWESmithEnv(SWEBenchEnv):
         self.setup_workspace(
             # Empty folder. The actual codebase will come from the docker image.
             path=SWESmithEnv.DUMMY_DIR,
-            entrypoint=self.test_cmd,
+            # allow traceback to be printed in the output.
+            entrypoint=self.test_cmd.replace("--tb=no", "--tb=short"),
+            # -s (capture=no) from pytest, allows for debugging with pdb
             # -q (quiet) from pytest, to avoid long pytest output
-            debug_entrypoint=self.test_cmd.replace("pytest", "pytest -q"),
+            debug_entrypoint=self.test_cmd.replace("pytest", "pytest -sq"),
         )
 
         # Those changes depend on the working directory created by setup_workspace.

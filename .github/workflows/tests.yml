@@ -12,11 +12,12 @@ on:
 jobs:
   tests:
     name: Test
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         language: [ "python" ]
+        os: [ubuntu-latest]
 
     steps:
       - name: Checkout repository
@@ -30,11 +31,22 @@ jobs:
         run: |
           pip install --upgrade pip
           pip install -e '.[dev]'
-      - name: Test with pytest - PR
-        if: github.event_name == 'pull_request'
+      - name: Get changed files related to SWE-Bench or SWE-Smith
+        id: changed-files-specific
+        uses: tj-actions/changed-files@v46.0.5
+        with:
+          files: |
+            debug_gym/gym/envs/swe_*.py
+            tests/gym/envs/test_swe_*.py
+      - name: Test - PR - Fast
+        if: github.event_name == 'pull_request' && steps.changed-files-specific.outputs.any_changed != 'true'
         run: |
-          DEBUG_GYM_DEBUG=1 pytest -vv -n 16 -k "not test_swe_bench and not test_swe_smith" --cov=debug_gym --cov-report=term-missing --cov-fail-under=80 --timeout=300
-      - name: Test with pytest
+          DEBUG_GYM_DEBUG=1 pytest -vv -n 16 -k "not test_swe_bench and not test_swe_smith" --cov=debug_gym --cov-report=term-missing --cov-fail-under=80 --timeout=600
+      - name: Test - PR - Slow
+        if: github.event_name == 'pull_request' && steps.changed-files-specific.outputs.any_changed == 'true'
+        run: |
+          DEBUG_GYM_DEBUG=1 pytest -vv -n 16 --cov=debug_gym --cov-report=term-missing --cov-fail-under=85 --timeout=600
+      - name: Test - main
         if: github.event_name != 'pull_request'
         run: |
           DEBUG_GYM_DEBUG=1 pytest -vv -n 16 --cov=debug_gym --cov-report=term-missing --cov-fail-under=85 --timeout=600

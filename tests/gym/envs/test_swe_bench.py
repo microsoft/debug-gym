@@ -10,8 +10,17 @@ from debug_gym.gym.terminal import DockerTerminal
 from debug_gym.gym.tools.tool import ToolCall
 from debug_gym.gym.tools.toolbox import Toolbox
 
+
+def is_docker_running():
+    try:
+        subprocess.check_output(["docker", "ps"])
+        return True
+    except Exception:
+        return False
+
+
 if_docker_running = pytest.mark.skipif(
-    not subprocess.check_output(["docker", "ps"]),
+    not is_docker_running(),
     reason="Docker not running",
 )
 
@@ -76,7 +85,7 @@ def test_load_dataset(tmp_path, get_swe_env):
 def test_instructions(get_swe_env):
     swe_env = get_swe_env()
     swe_env.ds_row = {"problem_statement": "Test problem statement"}
-    expected_instructions = {"Problem description": "Test problem statement"}
+    expected_instructions = "Test problem statement"
     assert swe_env.instructions == expected_instructions
 
 
@@ -130,7 +139,11 @@ def test_run_command_with_raise(tmp_path, get_swe_env):
     status, output = swe_env.run_command_with_raise("echo 'Hello World'")
     assert output == "Hello World"
     with pytest.raises(
-        ValueError, match="Failed to run command: cat /non_existent_file"
+        ValueError,
+        match=(
+            "Failed to run command `cat /non_existent_file`:\n"
+            "cat: /non_existent_file: No such file or directory"
+        ),
     ):
         swe_env.run_command_with_raise("cat /non_existent_file")
     # add sudo if apt-get in command
@@ -267,7 +280,7 @@ def test_patch_property(tmp_path, get_swe_env):
 
     # Add the file to git
     swe_env.terminal.run(f"git add {test_file}")
-    swe_env.terminal.run(f"git commit -m 'Add test file'")
+    swe_env.terminal.run("git commit -m 'Add test file'")
 
     # Now modify the file
     modified_content = """def hello_world():
@@ -309,3 +322,30 @@ def test_apply_gold_patch(tmp_path, get_swe_env):
     score = swe_env.calculate_score(eval_output)
 
     assert score == swe_env.max_score
+
+
+def test_get_problem_ids(get_swe_env):
+    swe_env = get_swe_env()
+
+    # Test retrieving all problem IDs
+    problem_ids = swe_env.get_problem_ids("all")
+    assert isinstance(problem_ids, list), "Expected a list of problem IDs"
+    assert len(problem_ids) > 0, "Expected at least one problem ID"
+    assert all(
+        isinstance(pid, str) for pid in problem_ids
+    ), "All problem IDs should be strings"
+    assert sorted(problem_ids) == problem_ids, "Problem IDs should be sorted"
+
+    # Test retrieving a single valid problem ID
+    task_name = "astropy__astropy-14096"
+    problem_ids = swe_env.get_problem_ids(task_name)
+    assert isinstance(problem_ids, list), "Expected a list of problem IDs"
+    assert len(problem_ids) == 1, "Expected exactly one problem ID"
+    assert problem_ids[0] == task_name, f"Expected problem ID to be {task_name}"
+
+    # Test retrieving an invalid problem ID
+    invalid_task_name = "non_existent_task"
+    with pytest.raises(
+        ValueError, match=f"Invalid split or problem id: '{invalid_task_name}'"
+    ):
+        swe_env.get_problem_ids(invalid_task_name)

@@ -47,7 +47,7 @@ def mini_nightmare_env(mock_open, mock_tempdir, mock_exists, tmp_path):
 
 def test_instructions(mini_nightmare_env):
     mini_nightmare_env.current_sample = {"instructions": "Test instructions"}
-    expected_instructions = {"Problem description": "Test instructions"}
+    expected_instructions = "Test instructions"
     assert mini_nightmare_env.instructions == expected_instructions
 
 
@@ -75,7 +75,7 @@ def test_reset(
     }
     options = {"task_name": "test_task"}
     infos = mini_nightmare_env.reset(options=options)
-    assert infos.instructions["Problem description"] == "Test instructions"
+    assert infos.instructions == "Test instructions"
     assert infos.step_observation == Observation(
         source="env",
         observation="collected 10 items, 5 failed, 5 passed ...",

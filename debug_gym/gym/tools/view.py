@@ -15,7 +15,7 @@ class ViewTool(EnvironmentTool):
         """view(path="src/main.py", start=514) to show the content of a file called 'main.py' in a subdirectory called 'src', starting from line 514 to the end of the file. The content will be annotated with line numbers and current breakpoints.""",
     ]
     description = (
-        "Specify a file path to set as current working file. The file path should be relative to the root directory of the repository."
+        "Specify a file path to view its content. The file path should be relative to the root directory of the repository."
         + "\nExamples (for demonstration purposes only, you need to adjust the tool calling format according to your specific syntax):\n"
         + "\n".join(examples)
     )
@@ -59,6 +59,9 @@ class ViewTool(EnvironmentTool):
         except FileNotFoundError as e:
             return Observation(self.name, f"View failed. Error message:\n{str(e)}")
         file_lines = file_content.splitlines()
+
+        if not file_lines:
+            return Observation(self.name, f"The file `{new_file}` is empty.")
 
         # Convert 1-based line numbers to 0-based indices
         s = (start - 1) if start is not None else 0

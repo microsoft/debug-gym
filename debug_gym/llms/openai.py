@@ -13,7 +13,7 @@ from debug_gym.llms.base import (
     LLM,
     ContextLengthExceededError,
     LLMResponse,
-    retry_on_rate_limit,
+    retry_on_exception,
 )
 from debug_gym.llms.constants import LLM_API_KEY_PLACEHOLDER, LLM_ENDPOINT_PLACEHOLDER
 
@@ -58,9 +58,9 @@ class OpenAILLM(LLM):
                     )
         return self._tk_func(text)
 
-    def is_rate_limit_error(self, exception) -> bool:
+    def need_to_be_retried(self, exception) -> bool:
         # List of fully qualified names of RateLimitError exceptions from various libraries
-        rate_limit_errors = [
+        _errors = [
             "openai.APIStatusError",
             "openai.APITimeoutError",
             "openai.error.Timeout",
@@ -71,13 +71,14 @@ class OpenAILLM(LLM):
             "openai.APIConnectionError",
             "openai.RateLimitError",
             "openai.PermissionDeniedError",
+            "openai.BadRequestError",
             # Add more as needed
         ]
         exception_full_name = (
             f"{exception.__class__.__module__}.{exception.__class__.__name__}"
         )
 
-        is_error = exception_full_name in rate_limit_errors
+        need_to_retry = exception_full_name in _errors
         logger = self.logger.debug
 
         # Ignore error that are not rate limit errors
@@ -90,16 +91,22 @@ class OpenAILLM(LLM):
                     and "A previous prompt was too large." in exception.message
                 )
             ):
-                is_error = False
+                need_to_retry = False
                 logger = self.logger.warning
+        if (
+            exception_full_name == "openai.BadRequestError"
+            and len(self.config.tags) > 0
+            and "vllm" not in self.config.tags
+        ):
+            # only retry when a such error occurs on a model hosting on vllm
+            need_to_retry = False
 
         logger(
-            f"Error calling {self.model_name}: {exception_full_name!r} {
-                exception.message if hasattr(exception, 'message') else exception
-            }"
+            f"Error calling {self.model_name}: {exception_full_name!r}\n"
+            f"{exception.message if hasattr(exception, 'message') else exception}"
         )
 
-        return is_error
+        return need_to_retry
 
     def define_tools(self, tool_call_list: list[EnvironmentTool]) -> list[dict]:
         """Translates the list of tools into a format that is specifically defined by each LLM.
@@ -147,44 +154,62 @@ class OpenAILLM(LLM):
         )
 
     def format_tool_call_history(
-        self, history_info: EnvInfo, response: LLMResponse
+        self, history_info: EnvInfo, response: list[LLMResponse]
     ) -> list[dict]:
-        _messages = [
-            {
-                "role": "assistant",
-                "tool_calls": [
-                    {
-                        "type": "function",
-                        "id": response[0].tool.id,
-                        "function": {
-                            "name": response[0].tool.name,
-                            "arguments": json.dumps(response[0].tool.arguments),
+        _messages = []
+        if isinstance(response, list) and len(response) > 0:
+            _messages.append(
+                {
+                    "role": "assistant",
+                    "tool_calls": [
+                        {
+                            "type": "function",
+                            "id": response[0].tool.id,
+                            "function": {
+                                "name": response[0].tool.name,
+                                "arguments": json.dumps(response[0].tool.arguments),
+                            },
                         },
-                    },
-                ],
-            },
-            {
-                "role": "tool",
-                "tool_call_id": history_info.action.id,
-                "name": history_info.action.name,
-                "content": filter_non_utf8(
-                    f"{history_info.step_observation.observation}"
-                ),
-            },
-        ]
+                    ],
+                    "content": filter_non_utf8(f"{response[0].response}"),
+                }
+            )
+        if history_info.action is None:
+            # This is the initial state, no action taken yet
+            _messages.append(
+                {
+                    "role": "user",
+                    "content": filter_non_utf8(
+                        f"{history_info.step_observation.observation}"
+                    ),
+                }
+            )
+        else:
+            # This is a step with an action taken
+            _messages.append(
+                {
+                    "role": "tool",
+                    "tool_call_id": history_info.action.id,
+                    "name": history_info.action.name,
+                    "content": filter_non_utf8(
+                        f"{history_info.step_observation.observation}"
+                    ),
+                }
+            )
+
         return _messages
 
     def generate(self, messages, tools, **kwargs) -> LLMResponse:
         # set max tokens if not provided
         kwargs["max_tokens"] = kwargs.get("max_tokens", NOT_GIVEN)
         try:
-            response = retry_on_rate_limit(
-                self.client.chat.completions.create, self.is_rate_limit_error
+            response = retry_on_exception(
+                self.client.chat.completions.create, self.need_to_be_retried
             )(
                 model=self.config.model,
                 messages=messages,
                 tools=self.define_tools(tools),
-                tool_choice="required",
+                tool_choice="auto",
                 **kwargs,
             )
         except openai.BadRequestError as e:
@@ -194,7 +219,7 @@ class OpenAILLM(LLM):
             raise
 
         # LLM may select multiple tool calls, we only care about the first action
-        if response.choices[0].message.tool_calls is None:
+        if not response.choices[0].message.tool_calls:
             # LLM failed to call a tool
             tool_call = None
         else:

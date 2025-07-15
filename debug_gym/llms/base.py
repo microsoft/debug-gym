@@ -11,7 +11,6 @@ from tenacity import (
     stop_after_attempt,
     wait_random_exponential,
 )
-from termcolor import colored
 
 from debug_gym.gym.envs.env import EnvInfo
 from debug_gym.gym.tools.tool import EnvironmentTool, ToolCall
@@ -20,13 +19,13 @@ from debug_gym.llms.utils import print_messages
 from debug_gym.logger import DebugGymLogger
 
 
-def retry_on_rate_limit(
-    func, is_rate_limit_error_func, multiplier=1, max_wait=40, max_attempts=100
+def retry_on_exception(
+    func, exception_filter_func, multiplier=1, max_wait=40, max_attempts=100
 ):
-    """Executes a function with retry logic for rate limits. Never retries on KeyboardInterrupt.
+    """Executes a function with retry logic for certain exceptions. Never retries on KeyboardInterrupt.
     Args:
         func: The function to execute with retries
-        is_rate_limit_error_func: Function that checks if an exception is a rate limit error
+        exception_filter_func: Function that checks if an exception needs to be retried
         *args, **kwargs: Arguments to pass to the function
 
     Returns:
@@ -35,7 +34,7 @@ def retry_on_rate_limit(
     retry_function = retry(
         retry=(
             retry_if_not_exception_type(KeyboardInterrupt)
-            & retry_if_exception(is_rate_limit_error_func)
+            & retry_if_exception(exception_filter_func)
         ),
         wait=wait_random_exponential(multiplier=multiplier, max=max_wait),
         stop=stop_after_attempt(max_attempts),
@@ -228,7 +227,27 @@ class LLM(ABC):
         llm_config = LLMConfigRegistry.from_file(llm_config_file_path)[llm_name]
 
         tags = llm_config.tags
-        if "azure openai" in tags:
+        if "copilot openai" in tags:
+            try:
+                from debug_gym.llms.copilot import CopilotOpenAILLM
+
+                klass = CopilotOpenAILLM
+            except ImportError:
+                logger.warning(
+                    "Copilot OpenAI LLM is not available. Falling back to OpenAI LLM."
+                )
+                klass = None
+        elif "copilot claude" in tags:
+            try:
+                from debug_gym.llms.copilot import CopilotClaudeLLM
+
+                klass = CopilotClaudeLLM
+            except ImportError:
+                logger.warning(
+                    "Copilot Claude LLM is not available. Falling back to Claude LLM."
+                )
+                klass = None
+        elif "azure openai" in tags:
             from debug_gym.llms import AzureOpenAILLM
 
             klass = AzureOpenAILLM
@@ -279,7 +298,7 @@ class LLM(ABC):
 
     @abstractmethod
     def format_tool_call_history(
-        self, history_info: EnvInfo, response: LLMResponse
+        self, history_info: EnvInfo, response: list[LLMResponse]
     ) -> list[dict]:
         """Format the tool call history for different LLMs.
         The method should be overridden by subclasses.
@@ -356,7 +375,5 @@ class LLM(ABC):
             self.logger.warning(
                 "Tool response is empty. The model may not have called a tool."
             )
-
-        self.logger.info(colored(llm_response.tool, "green"))
 
         return llm_response

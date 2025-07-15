@@ -12,7 +12,7 @@ from debug_gym.llms.base import (
     LLMConfigRegistry,
     LLMResponse,
     TokenUsage,
-    retry_on_rate_limit,
+    retry_on_exception,
 )
 
 
@@ -161,11 +161,11 @@ def test_llm_response_init_with_prompt_and_response_only():
     assert llm_response.token_usage is None
 
 
-def test_retry_on_rate_limit_success_after_retry():
+def test_retry_on_exception_success_after_retry():
     mock_func = MagicMock(side_effect=[ValueError(), OSError(), "success"])
     mock_is_rate_limit_error = MagicMock(return_value=True)
 
-    result = retry_on_rate_limit(mock_func, mock_is_rate_limit_error)("test_arg")
+    result = retry_on_exception(mock_func, mock_is_rate_limit_error)("test_arg")
 
     assert result == "success"
     assert mock_func.call_count == 3
@@ -173,24 +173,24 @@ def test_retry_on_rate_limit_success_after_retry():
     assert mock_is_rate_limit_error.call_count == 2
 
 
-def test_retry_on_rate_limit_raises_error():
+def test_retry_on_exception_raises_error():
     mock_func = MagicMock(side_effect=[ValueError(), OSError(), "success"])
     mock_is_rate_limit_error = lambda e: isinstance(e, ValueError)
 
     with pytest.raises(OSError):
-        retry_on_rate_limit(mock_func, mock_is_rate_limit_error)("test_arg")
+        retry_on_exception(mock_func, mock_is_rate_limit_error)("test_arg")
 
     assert mock_func.call_count == 2
     mock_func.assert_called_with("test_arg")
 
 
-def test_retry_on_rate_limit_skip_keyboard_interrupt():
+def test_retry_on_exception_skip_keyboard_interrupt():
     mock_func = MagicMock(side_effect=KeyboardInterrupt())
     mock_is_rate_limit_error = MagicMock()
 
     # Do not retry on KeyboardInterrupt and let it propagate
     with pytest.raises(KeyboardInterrupt):
-        retry_on_rate_limit(mock_func, mock_is_rate_limit_error)("test_arg")
+        retry_on_exception(mock_func, mock_is_rate_limit_error)("test_arg")
 
     mock_func.assert_called_once_with("test_arg")
     # The error checker should never be called for KeyboardInterrupt

@@ -1,7 +1,12 @@
 from debug_gym.gym.envs.env import EnvInfo
 from debug_gym.gym.tools.tool import EnvironmentTool, ToolCall
 from debug_gym.gym.utils import filter_non_utf8
-from debug_gym.llms.base import LLM, LLMResponse, retry_on_rate_limit
+from debug_gym.llms.base import (
+    LLM,
+    ContextLengthExceededError,
+    LLMResponse,
+    retry_on_exception,
+)
 from debug_gym.llms.constants import LLM_API_KEY_PLACEHOLDER
 
 
@@ -45,13 +50,12 @@ class AnthropicLLM(LLM):
         except Exception as e:
             self.logger.warning(
                 f"Error calling Claude token count API: {e!r}. "
-                "The message was: {messages}."
-                "Will return 0 tokens."
+                f"The message was: {messages}. Will return 0 tokens."
             )
         return 0
 
-    def is_rate_limit_error(self, exception) -> bool:
-        rate_limit_errors = [
+    def need_to_be_retried(self, exception) -> bool:
+        _errors = [
             "anthropic.RateLimitError",
             "anthropic.OverloadedError",
             "anthropic._exceptions.OverloadedError",
@@ -65,7 +69,7 @@ class AnthropicLLM(LLM):
             f"Error calling {self.model_name}: {exception_full_name!r} "
             f"{exception.message if hasattr(exception, 'message') else exception}"
         )
-        return exception_full_name in rate_limit_errors
+        return exception_full_name in _errors
 
     def define_tools(self, tool_call_list: list[EnvironmentTool]) -> list[dict]:
         """Translates the list of tools into a format that is specifically defined by each LLM.
@@ -106,35 +110,58 @@ class AnthropicLLM(LLM):
         )
 
     def format_tool_call_history(
-        self, history_info: EnvInfo, response: LLMResponse
+        self, history_info: EnvInfo, response: list[LLMResponse]
     ) -> list[dict]:
-        _messages = [
-            {
-                "role": "assistant",
-                "content": [
-                    {
-                        "type": "tool_use",
-                        "id": response[0].tool.id,  # 'toolu_01SdR84CsnTKRpdH4zwFjvGj'
-                        "name": response[0].tool.name,  # 'view'
-                        "input": response[
-                            0
-                        ].tool.arguments,  # {'path': 'hangman_test.py'}
-                    }
-                ],
-            },
-            {
-                "role": "user",
-                "content": [
-                    {
-                        "type": "tool_result",
-                        "tool_use_id": history_info.action.id,  # 'toolu_01SdR84CsnTKRpdH4zwFjvGj'
-                        "content": filter_non_utf8(
-                            f"{history_info.step_observation.observation}"
-                        ),  # 'Viewing `hangman_test.py`. The file is read-only, it is not editable.'
-                    }
-                ],
-            },
-        ]
+        _messages = []
+        if isinstance(response, list) and len(response) > 0:
+            _messages.append(
+                {
+                    "role": "assistant",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": filter_non_utf8(response[0].response),
+                        },
+                        {
+                            "type": "tool_use",
+                            "id": response[
+                                0
+                            ].tool.id,  # 'toolu_01SdR84CsnTKRpdH4zwFjvGj'
+                            "name": response[0].tool.name,  # 'view'
+                            "input": response[
+                                0
+                            ].tool.arguments,  # {'path': 'hangman_test.py'}
+                        },
+                    ],
+                }
+            )
+        if history_info.action is None:
+            # This is the initial state, no action taken yet
+            _messages.append(
+                {
+                    "role": "user",
+                    "content": filter_non_utf8(
+                        f"{history_info.step_observation.observation}"
+                    ),
+                }
+            )
+        else:
+            # This is a step with an action taken
+            _messages.append(
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "tool_result",
+                            "tool_use_id": history_info.action.id,  # 'toolu_01SdR84CsnTKRpdH4zwFjvGj'
+                            "content": filter_non_utf8(
+                                f"{history_info.step_observation.observation}"
+                            ),  # 'Viewing `hangman_test.py`. The file is read-only, it is not editable.'
+                        }
+                    ],
+                }
+            )
+
         return _messages
 
     def generate(self, messages, tools, **kwargs) -> LLMResponse:
@@ -166,8 +193,8 @@ class AnthropicLLM(LLM):
 
         try:
             # https://docs.anthropic.com/en/docs/agents-and-tools/tool-use/overview
-            response = retry_on_rate_limit(
-                self.client.messages.create, self.is_rate_limit_error
+            response = retry_on_exception(
+                self.client.messages.create, self.need_to_be_retried
             )(
                 model=self.config.model,
                 system=system_prompt,

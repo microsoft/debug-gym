@@ -67,6 +67,9 @@ debug_gym
 
 `debug_gym.llms` are the different LLM backends that can be used to instantiate agents. Currently, we support OpenAI, Azure OpenAI, and Anthropic.
 
+> [!WARNING]
+> `debug-gym` has limited support on non-Linux platforms. Interactive terminal sessions using PTY (pseudo-terminal) in Docker are not fully supported on macOS or Windows. As a result, the `pdb` tool (see [2.1. Environment and Tools](#21-environment-and-tools)) only works on Linux.
+
 ---
 
 #### 2.1. Environment and Tools
@@ -137,11 +140,72 @@ We provide a human mode that enables developers to manually interact with `debug
 
 #### 3.3. Overriding Values in Config
 
-`-p` is a handy way to override values defined in config. For example, the below command will run rewrite_agent agent on Aider with human mode (while in config file it specifies gpt-4o).
+The `-p` flag is a handy way to override values defined in the config file. For example, the command below will run the rewrite_agent agent on Aider with human mode (even if the config file specifies gpt-4o). The command also overrides the default system prompt (see below for more information).
 
-    python scripts/run.py scripts/config_aider.yaml --agent rewrite_agent -v -p rewrite_agent.llm_name="human"
+    python scripts/run.py scripts/config_aider.yaml \
+        --agent debug_agent \
+        -v \
+        -p debug_agent.llm_name="human" \
+        -p debug_agent.system_prompt_template_file="scripts/templates/human_friendly_system_prompt.jinja"
 
-#### 3.4. Debugging a Custom Repository
+
+#### 3.4. Customizing the System Prompt with Jinja Templates
+
+`debug-gym` allows you to fully customize the system prompt by providing a [Jinja](https://jinja.palletsprojects.com/) template file. This enables you to control the format and content of the prompt sent to the LLM, making it easier to adapt the environment to your specific needs or research experiments.
+
+To use a custom system prompt template, specify the path to your Jinja template file in your agent's configuration under `system_prompt_template_file`. For example:
+
+```yaml
+debug_agent:
+  system_prompt_template_file: scripts/templates/custom_system_prompt.jinja
+```
+
+Alternatively, you can provide a custom template from the command line with `-p <agent>.system_prompt_template_file="<path/to/template.jinja>"` (see above).
+
+Within your Jinja template, you have access to the `agent` and `info` objects, which provide all relevant context about the current environment and agent state.
+
+#### Custom Jinja Filters
+
+In addition to all [built-in Jinja filters](https://jinja.palletsprojects.com/en/stable/templates/#list-of-builtin-filters), two custom filters are available for use in your template:
+
+- **`to_pretty_json`**: Converts a Python object to a pretty-printed JSON string. Useful for displaying structured data in a readable format.
+    ```jinja
+    {{ info.tools | to_pretty_json }}
+    ```
+
+- **`trim_message`**: Trims a string to fit within a token or character limit, also filtering out non-UTF8 characters. This is helpful for ensuring that large outputs (such as directory trees or evaluation results) do not exceed the LLM's context window. The `trim_message` filter accepts the following arguments to control how messages are trimmed:
+    - **`max_length`**: The maximum number of tokens to keep in the message. If the message exceeds this length, it will be trimmed.
+    - **`max_length_percentage`**: Instead of specifying an absolute number, you can provide a percentage (e.g., `0.1` for 10%) of the LLM's context window. The message will be trimmed to fit within this percentage of the model's maximum context length.
+    - **`where`**: Specifies where to trim the message if it exceeds the limit. The default is `"middle"`, which trims from the middle of the message. Other options are `start` or `end`.
+
+    ```jinja
+    {{ info.dir_tree | trim_message(max_length_percentage=0.1, where="end") }}
+    ```
+
+#### Example Template
+
+```jinja
+System Prompt for Debug-Gym
+
+Task: {{ agent.system_prompt }}
+
+Instructions:
+{{ info.instructions }}
+
+Directory Tree:
+{{ info.dir_tree | trim_message(max_length=1000) }}
+
+Current Breakpoints:
+{{ info.current_breakpoints | to_pretty_json }}
+
+{% if agent.shortcut_features() %}
+Shortcut Features:
+{{ agent.shortcut_features() | to_pretty_json }}
+{% endif %}
+```
+
+
+#### 3.5. Debugging a Custom Repository
 
 Modify `scripts/config.yaml`, especially the `env_kwargs` to set the path and entrypoint of the custom repository. We assume there is a `.debugignore` file and a `.debugreadonly` within the repository that labels files/folders that are not seen or not editable, respectively.
 
@@ -149,16 +213,16 @@ As an example, we provide a buggy pytorch code repository in `data/pytorch`.
 
     python scripts/run.py scripts/config.yaml --agent <agent name>
 
-#### 3.5. Debugging a Custom SWE-Smith Instance
+#### 3.6. Debugging a Custom SWE-Smith Instance
 
 [SWE-Smith](https://github.com/SWE-bench/SWE-smith) allows to generate new buggy code instances. Give a custom HuggingFace dataset (either local or remote) that has a similar structure as [SWE-bench/SWE-smith](https://huggingface.co/datasets/SWE-bench/SWE-smith), one can override the `-p base.env_kwargs.dataset_id=<dataset_id>` in the command line to run the agent on that dataset. For example, to run on a local dataset:
 
     python scripts/run.py scripts/config_swesmith.yaml --agent <agent name> -p base.env_kwargs.dataset_id="path/to/local/dataset"
 
-#### 3.6. Design Your Own Tool
+#### 3.7. Design Your Own Tool
 `debug-gym`'s modular design makes it extensible. Users are encouraged to extend `debug-gym` to their specific usecases, for example by creating new tools that diversify an agent's action and observation spaces. For detailed instruction on designing new tools that are `debug-gym`-compatible, please refer to the [Technical Report](https://arxiv.org/abs/2503.21557).
 
-#### 3.7. Analysis and Visualization
+#### 3.8. Analysis and Visualization
 
 We provide a set of scripts to help analyze the log files (e.g., the `.jsonl` files) generated by the agent.
 - In the `analysis` folder, we provide scripts that used to generate the corresponding figures in our technical report.

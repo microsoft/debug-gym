@@ -5,11 +5,12 @@ from debug_gym.gym.tools.tool import ToolCall
 from debug_gym.gym.tools.toolbox import Toolbox
 
 
-@pytest.fixture
-def env(tmp_path):
-    aider_path = tmp_path / ".cache" / "debug_gym" / "exercism"
-    aider_path.mkdir(parents=True, exist_ok=True)
-    AiderBenchmarkEnv.REPO_PATH = aider_path
+@pytest.fixture(scope="session")
+def setup_aider_repo(tmp_path_factory):
+    """Set up a minimal Aider repository for testing,
+    avoiding cloning Aider repo for each test."""
+    aider_path = tmp_path_factory.mktemp("aider_repo")
+    # aider_path.mkdir(parents=True, exist_ok=True)
     repo_path = aider_path / "exercises" / "practice" / "clock"
     repo_path.mkdir(parents=True, exist_ok=True)
     (repo_path / "clock.py").write_text(
@@ -24,6 +25,13 @@ def env(tmp_path):
     )
     (repo_path / ".docs").mkdir(parents=True, exist_ok=True)
     (repo_path / ".docs" / "instructions.md").write_text("What time is it?")
+    # Patch the REPO_PATH in AiderBenchmarkEnv
+    AiderBenchmarkEnv.REPO_PATH = aider_path
+    return aider_path
+
+
+@pytest.fixture
+def env(setup_aider_repo):
     env = AiderBenchmarkEnv()
     env.reset(options={"task_name": "clock"})
     return env
@@ -92,4 +100,23 @@ def test_steps(env):
 
 
 def test_instructions(env):
-    assert env.instructions == {"Problem description": "What time is it?"}
+    assert env.instructions == "What time is it?"
+
+
+def test_get_problem_ids(env):
+    # Test retrieving all problem IDs
+    all_problem_ids = env.get_problem_ids("all")
+    assert isinstance(all_problem_ids, list)
+    assert len(all_problem_ids) > 0
+    assert all(isinstance(problem_id, str) for problem_id in all_problem_ids)
+
+    # Test retrieving a single valid problem ID
+    valid_problem_id = all_problem_ids[0]
+    single_problem_id = env.get_problem_ids(valid_problem_id)
+    assert isinstance(single_problem_id, list)
+    assert len(single_problem_id) == 1
+    assert single_problem_id[0] == valid_problem_id
+
+    # Test retrieving an invalid problem ID
+    with pytest.raises(ValueError, match="Invalid split or problem id: 'invalid_id'"):
+        env.get_problem_ids("invalid_id")

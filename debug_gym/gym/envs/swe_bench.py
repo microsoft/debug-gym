@@ -44,18 +44,15 @@ class SWEBenchEnv(RepoEnv):
         self.dataset_id = dataset_id
         self.split = split
         self.instance_ids = instance_ids
-        SWEBenchEnv.DUMMY_DIR.mkdir(parents=True, exist_ok=True)
+        self.DUMMY_DIR.mkdir(parents=True, exist_ok=True)
 
         self.load_dataset()
         self.session_commands = []
         self.test_directives = []
 
     @property
-    def instructions(self):
-        return {
-            **super().instructions,
-            "Problem description": self.ds_row["problem_statement"],
-        }
+    def instructions(self) -> str:
+        return self.ds_row["problem_statement"]
 
     def load_dataset(self):
         self.ds = datasets.load_dataset(self.dataset_id)[self.split]
@@ -81,6 +78,16 @@ class SWEBenchEnv(RepoEnv):
                 swebench_instances,
                 force_rebuild=False,
                 max_workers=24,
+            )
+
+    def get_problem_ids(self, split_or_problem_id):
+        if split_or_problem_id == "all":
+            return sorted(self.dataset.keys())  # all tasks
+        elif split_or_problem_id in self.dataset:
+            return [split_or_problem_id]  # Single task
+        else:
+            raise ValueError(
+                f"Invalid split or problem id: '{split_or_problem_id}'.\nChoose from: {['all'] + sorted(self.dataset.keys())}"
             )
 
     def setup_task(self, task_name):
@@ -128,7 +135,8 @@ class SWEBenchEnv(RepoEnv):
         self.setup_workspace(
             # Empty folder. The actual codebase will come from the docker image.
             path=SWEBenchEnv.DUMMY_DIR,
-            entrypoint=entrypoint,
+            # allow traceback to be printed in the output.
+            entrypoint=entrypoint.replace("--tb=no", "--tb=short"),
             debug_entrypoint=debug_entrypoint,
         )
 
@@ -185,10 +193,10 @@ class SWEBenchEnv(RepoEnv):
         )
 
         # Install sudo.
-        self.terminal.run(f"apt update && apt install -y sudo", user="root")
+        self.terminal.run("apt update && apt install -y sudo", user="root")
         # Add the user to sudoers.
         self.terminal.run(
-            f"echo 'debug_gym_user ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/debug_gym_user",
+            "echo 'debug_gym_user ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/debug_gym_user",
             user="root",
         )
 
@@ -217,7 +225,7 @@ class SWEBenchEnv(RepoEnv):
         self.terminal.run(f"chmod -R a+rw {self.working_dir}")
 
         self.terminal.session_commands.append("source /opt/miniconda3/bin/activate")
-        self.terminal.session_commands.append(f"conda activate testbed")
+        self.terminal.session_commands.append("conda activate testbed")
 
         self.run_install()
         self.run_post_install()
@@ -225,8 +233,8 @@ class SWEBenchEnv(RepoEnv):
         # Apply the test patch directly.
         self.terminal.run(f"git apply - <<'EOF'\n{self.test_patch}\nEOF")
 
-        self.terminal.run(f"git config user.name 'debug-gym'")
-        self.terminal.run(f"git config user.email '<>'")
+        self.terminal.run("git config user.name 'debug-gym'")
+        self.terminal.run("git config user.email '<>'")
         self.terminal.run(f"git commit -am 'Applying test patch for {self.task_name}'")
 
         # Rebuild the debug ignore and read-only files.
@@ -238,12 +246,12 @@ class SWEBenchEnv(RepoEnv):
         )
         self.setup_file_filters()  # Need to refresh the file filters after re-creating ignore files.
 
-        self.terminal.run(f"git add .debugignore")
-        self.terminal.run(f"git add .debugreadonly")
-        self.terminal.run(f"git commit -am 'Add debug-gym ignore and read-only files'")
+        self.terminal.run("git add .debugignore")
+        self.terminal.run("git add .debugreadonly")
+        self.terminal.run("git commit -am 'Add debug-gym ignore and read-only files'")
 
         # Remove the remote so the agent won't see newer commits.
-        self.terminal.run(f"git remote remove origin")
+        self.terminal.run("git remote remove origin")
 
     def reset(self, *, options: dict | None = None):
         # TODO: support reset current task, i.e. no options provided.

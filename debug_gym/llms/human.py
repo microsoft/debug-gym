@@ -5,6 +5,7 @@ import sys
 from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
+from rich.console import Console
 
 from debug_gym.gym.envs.env import EnvInfo
 from debug_gym.gym.tools.tool import EnvironmentTool, ToolCall
@@ -503,31 +504,46 @@ class Human(LLM):
         self, history_info: EnvInfo, response: LLMResponse
     ) -> list[dict]:
         """Anthropic-like format for tool call history"""
-        _messages = [
-            {
-                "role": "assistant",
-                "content": [
-                    {
-                        "type": "tool_use",
-                        "id": response[0].tool.id,
-                        "name": response[0].tool.name,
-                        "input": response[0].tool.arguments,
-                    }
-                ],
-            },
-            {
-                "role": "user",
-                "content": [
-                    {
-                        "type": "tool_result",
-                        "tool_use_id": history_info.action.id,
-                        "content": filter_non_utf8(
-                            f"{history_info.step_observation.observation}"
-                        ),
-                    }
-                ],
-            },
-        ]
+        _messages = []
+        if isinstance(response, list) and len(response) > 0:
+            _messages.append(
+                {
+                    "role": "assistant",
+                    "content": [
+                        {
+                            "type": "tool_use",
+                            "id": response[0].tool.id,
+                            "name": response[0].tool.name,
+                            "input": response[0].tool.arguments,
+                        }
+                    ],
+                }
+            )
+        if history_info.action is None:
+            # This is the initial state, no action taken yet
+            _messages.append(
+                {
+                    "role": "user",
+                    "content": filter_non_utf8(
+                        f"{history_info.step_observation.observation}"
+                    ),
+                }
+            )
+        else:
+            _messages.append(
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "tool_result",
+                            "tool_use_id": history_info.action.id,
+                            "content": filter_non_utf8(
+                                f"{history_info.step_observation.observation}"
+                            ),
+                        }
+                    ],
+                },
+            )
         return _messages
 
     def generate(self, messages, tools, **kwargs) -> LLMResponse:
@@ -541,14 +557,12 @@ class Human(LLM):
     def __call__(self, messages, tools, *args, **kwargs) -> LLMResponse:
         print_messages(messages, self.logger)
         all_tools = self.define_tools(tools)
-        available_commands = [json.dumps(t) for t in all_tools]
         tool_call = None
         retry_count = 0
         action = ""
 
         while tool_call is None and retry_count < self.max_retries:
             if prompt_toolkit_available:
-
                 # Create a prompt session with completion and validation
                 session = PromptSession(
                     completer=DynamicToolCommandCompleter(tools=all_tools),
@@ -561,10 +575,17 @@ class Human(LLM):
                 )
                 action = session.prompt("\n> ")
             else:
-                self.logger.info(
-                    "\n".join(["Available commands:"] + available_commands)
+                console = Console()
+                console.print("[bold green]Available commands:[/bold green]")
+                for cmd in all_tools:
+                    console.print(
+                        f"\n[cyan][bold]{cmd['name']}[/bold][/cyan]: {cmd['description']}"
+                    )
+                console.print(
+                    "\n[bold green]Provide the command and its arguments in the following format:[/bold green]"
+                    "[italic]command argument1=value1 argument2=value2[/italic]"
                 )
-                action = input("> ")
+                action = console.input("[bold]> [/bold]")
 
             parser = CommandParser()
             command, args, errors = parser.parse_command(action)
