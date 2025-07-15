@@ -1,5 +1,6 @@
 import json
 import os
+import signal
 import uuid
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
@@ -14,11 +15,36 @@ from debug_gym.llms.human import Human
 from debug_gym.logger import DebugGymLogger
 
 
-class BreakTaskLoop(Exception):
+class AgentTimeoutException(BaseException):
+    """Custom exception to handle timeouts in agent
+    execution. Inherits from BaseException to ensure
+    it is not caught by agent exception handling."""
+
     pass
 
 
+def set_signal(timeout_seconds):
+    """Set a signal handler for timeouts.
+    Only works on Unix-like systems."""
+
+    def timeout_handler(signum, frame):
+        """Signal handler for timeout."""
+        raise AgentTimeoutException
+
+    if timeout_seconds > 0:
+        signal.signal(signal.SIGALRM, timeout_handler)
+        signal.alarm(timeout_seconds)
+
+
 def run_agent(args, problem, config):
+    set_signal(args.timeout)
+    success = True
+    env = None
+
+    # Flag to not report errors from the agent, since they report
+    # errors themselves and we want to avoid double reporting.
+    report_progress_error = True
+
     exp_path = Path(config["output_path"]) / config["uuid"] / problem
 
     task_logger = DebugGymLogger(
@@ -27,7 +53,6 @@ def run_agent(args, problem, config):
         level=args.logging_level,
         mode="w" if args.force_all else "a",
     )
-    env = None
     try:
         previous_run = exp_path / "debug_gym.jsonl"
         if not args.force_all and os.path.exists(previous_run):
@@ -37,7 +62,16 @@ def run_agent(args, problem, config):
 
             task_logger.debug(f"Previous run success: {success}")
             if not args.force_failed or success:
-                task_logger.info("Skipped, already done.")
+                status = "skip-resolved" if success else "skip-unresolved"
+                task_logger.report_progress(
+                    problem_id=problem,
+                    step=1,
+                    total_steps=1,
+                    score=100,
+                    max_score=100,
+                    status=status,
+                )
+                task_logger.debug("Skipped, already done.")
                 return success
 
         env = create_env(config, task_logger)
@@ -57,7 +91,26 @@ def run_agent(args, problem, config):
             logger=task_logger,
         )
 
-        success = agent.run(task_name=problem, debug=args.debug)
+        try:
+            success = agent.run(task_name=problem, debug=args.debug)
+        except AgentTimeoutException:
+            task_logger.error(
+                f"Timeout: Problem `{problem}` exceeded "
+                f"the time limit of {args.timeout} seconds."
+            )
+            task_logger.report_progress(
+                problem_id=problem,
+                step=1,
+                total_steps=1,
+                score=0,
+                max_score=1,
+                status="error",
+            )
+            success = False
+            raise
+        except:
+            report_progress_error = False
+            raise
 
         # optionally apply patch
         if config["save_patch"]:
@@ -65,8 +118,6 @@ def run_agent(args, problem, config):
 
         # save log
         agent.log(task_name=problem)
-    except KeyboardInterrupt:
-        raise BreakTaskLoop
 
     except Exception as e:
         task_logger.error(
@@ -76,11 +127,22 @@ def run_agent(args, problem, config):
         task_logger.debug(
             f"Task {problem} generated an exception: {e!r}", exc_info=True
         )
+        if report_progress_error:
+            task_logger.report_progress(
+                problem_id=problem,
+                step=1,
+                total_steps=1,
+                score=0,
+                max_score=1,
+                status="error",
+            )
         if args.debug:
             raise e
 
         success = False
     finally:
+        # Close env and cancel any pending alarm
+        signal.alarm(0)
         if env:
             env.close()
 
@@ -133,8 +195,10 @@ def main():
         llm_config_file_path=config.get("llm_config_file_path"),
         logger=None,
     )
-    # Stop live progress to avoid conflicts with Human mode (prompt_toolkit)
-    if isinstance(llm, Human):
+
+    # Stop live progress display if --no-live-display is set
+    # or in Human mode (avoid conflicts with prompt_toolkit)
+    if args.no_live_display or isinstance(llm, Human):
         logger.set_no_live()
 
     num_workers = args.num_workers or int(os.environ.get("DEBUG_GYM_WORKERS", 1))
@@ -145,31 +209,18 @@ def main():
     num_workers = min(max(1, num_workers), len(problems))
     logger.info(f"Running with {num_workers} workers")
 
-    tasks_done = 0
-    mean_perf = 0
-    tasks_succeeded = []
-
     with logger.rich_progress(problems, max_display=args.max_display):
         if num_workers == 1:  # run sequentially for easier debugging
             for problem in problems:
                 try:
                     success = run_agent(args, problem, config)
-                    mean_perf += success
-                    tasks_done += 1
-
-                    if success:
-                        tasks_succeeded.append(problem)
-
-                    mean_perf_text = f"[green]{mean_perf}[/green]"
-                    logger.info(f"Overall tasks done ({mean_perf_text} are successful)")
-                except (KeyboardInterrupt, BreakTaskLoop) as e:
-                    raise e
-                except Exception as e:
+                except AgentTimeoutException:
+                    pass  # Handleled in run_agent, just continue
+                except (KeyboardInterrupt, Exception) as e:
                     raise e
         else:
             with ProcessPoolExecutor(
-                num_workers,
-                initializer=DebugGymLogger.set_as_worker,
+                num_workers, initializer=DebugGymLogger.set_as_worker
             ) as executor:
                 futures = {
                     executor.submit(run_agent, args, problem, config): problem
@@ -181,27 +232,11 @@ def main():
                     try:
                         problem = futures[future]
                         success = future.result()
-                        mean_perf += success
-                        tasks_done += 1
-
-                        if success:
-                            tasks_succeeded.append(problem)
-
-                        # update message on overall progress bar
-                        mean_perf_text = f"[green]{mean_perf}[/green]"
-                        logger.info(
-                            f"Overall tasks done ({mean_perf_text} are successful)"
-                        )
-                    except (KeyboardInterrupt, BreakTaskLoop) as e:
+                    except AgentTimeoutException:
+                        pass  # Handled in run_agent, just continue
+                    except (KeyboardInterrupt, Exception) as e:
                         executor.shutdown(wait=False, cancel_futures=True)
                         raise e
-                    except Exception as e:
-                        executor.shutdown(wait=False, cancel_futures=True)
-                        raise e
-
-    tasks_failed = list(set(problems) - set(tasks_succeeded))
-    logger.info(f"[green]Tasks that succeeded:[/green] {tasks_succeeded}")
-    logger.info(f"[red]Tasks that failed:[/red] {tasks_failed}")
 
 
 if __name__ == "__main__":

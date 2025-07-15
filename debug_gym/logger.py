@@ -42,22 +42,86 @@ class TaskProgress:
     @property
     def completed(self) -> bool:
         """Check if the task is completed based on its status."""
-        return self.status in ["done", "failed"]
+        return self.status in (
+            "resolved",
+            "unresolved",
+            "skip-resolved",
+            "skip-unresolved",
+            "error",
+        )
+
+    @classmethod
+    def statuses(cls):
+        """Return the valid statuses for tasks."""
+        return (
+            "running",
+            "pending",
+            "resolved",
+            "unresolved",
+            "skip-resolved",
+            "skip-unresolved",
+            "error",
+        )
+
+    @classmethod
+    def marker(cls, status: str) -> str:
+        """Return a marker for the task based on its status."""
+        if status == "resolved":
+            return "✓"
+        elif status == "unresolved":
+            return "✗"
+        elif status == "skip-resolved":
+            return "✓"
+        elif status == "skip-unresolved":
+            return "✗"
+        elif status == "error":
+            return "!"
+        elif status == "running":
+            return "⠋"
+        elif status == "pending":
+            return "⠋"
+        raise ValueError(f"Unknown task status: `{status}`. ")
+
+    @classmethod
+    def color(cls, status: str) -> str:
+        """Return the color for a given status."""
+        if status == "resolved":
+            return "green"
+        elif status == "unresolved":
+            return "red"
+        elif status == "skip-resolved":
+            return "yellow"
+        elif status == "skip-unresolved":
+            return "yellow"
+        elif status == "error":
+            return "red"
+        elif status == "running":
+            return "blue"
+        elif status == "pending":
+            return "yellow"
+        raise ValueError(f"Unknown task status: `{status}`. ")
 
 
 class StatusColumn(SpinnerColumn):
-    """Custom status column. Spinner while task is running,
-    green ✓ when completed or red ✗ when failed."""
+    """Custom status column. magenta ! when error,
+    yellow spinner pending, blue spinner running,
+    green ✓ when resolved, red ✗ when unresolved,
+    yellow ✓ when skip-resolved, yellow ✗ when skip-unresolved."""
 
     def __init__(self, spinner_name: str = "dots", speed: float = 1.0):
         super().__init__(spinner_name=spinner_name, speed=speed)
 
     def render(self, task):
+        status = task.fields.get("status")
         if task.finished:
-            if task.fields.get("status") == "failed":
-                return Text("✗", style="red")
-            return Text("✓", style="green")
-        return super().render(task)
+            return Text(
+                TaskProgress.marker(status),
+                style=TaskProgress.color(status),
+            )
+        # pending or running, return the spinner colored accordingly
+        text = super().render(task)
+        text.style = TaskProgress.color(status) if status else "yellow"
+        return text
 
 
 class TaskProgressManager:
@@ -178,27 +242,26 @@ class TaskProgressManager:
         else:
             return f"In progress (max-display {self.max_display}):"
 
-    def get_task_stats(self):
-        """Get statistics about tasks: total, pending, completed, failed."""
-        # Create a dictionary to count tasks by status
-        status_counts = {"done": 0, "failed": 0, "running": 0, "pending": 0}
-
+    def group_tasks_by_status(self) -> Dict[str, list[TaskProgress]]:
+        """Group tasks by their current status."""
+        tasks_per_status = {status: [] for status in TaskProgress.statuses()}
         # Count each task by its current status
         for task in self._tasks.values():
             # Make sure we have a valid status, defaulting to "pending" if unknown
-            status = task.status if task.status in status_counts else "pending"
-            status_counts[status] += 1
+            status = (
+                task.status if task.status in TaskProgress.statuses() else "pending"
+            )
+            tasks_per_status[status].append(task.problem_id)
+        return tasks_per_status
 
+    def get_task_stats(self):
+        """Get statistics about tasks: total, pending, running,
+        resolved, unresolved, error, skip-resolved, skip-unresolved."""
+        # Create a dictionary to count tasks by status
+        status_counts = {s: len(t) for s, t in self.group_tasks_by_status().items()}
         # Calculate total (should match len(self._tasks) but this is more robust)
-        total = sum(status_counts.values())
-
-        return {
-            "total": total,
-            "pending": status_counts["pending"],
-            "running": status_counts["running"],
-            "completed": status_counts["done"],
-            "failed": status_counts["failed"],
-        }
+        status_counts["total"] = sum(status_counts.values())
+        return status_counts
 
 
 class OverallProgressContext:
@@ -257,9 +320,9 @@ class OverallProgressContext:
         )
         self._listener_thread.start()
 
-    def advance(self, progress_update):
+    def advance(self, progress_update: TaskProgress):
         """Advance the progress for a specific task based on the provided update. Sets
-        task as completed if its status is "done" or "failed" (e.g. early stopping)."""
+        task as completed if its status is completed (e.g. early stopping)."""
         self.logger.debug(
             f"Advancing progress for problem {progress_update.problem_id}: "
             f"step {progress_update.step}"
@@ -267,7 +330,14 @@ class OverallProgressContext:
         # Update the task progress
         self.tasks_progress.advance(progress_update)
         # Update overall progress completion
-        self.completed += 1 if progress_update.status in ["done", "failed"] else 0
+        if progress_update.completed:
+            self.completed += 1
+            log_with_color(
+                self.logger,
+                f"{TaskProgress.marker(progress_update.status)} {progress_update.status}: "
+                f" task {progress_update.problem_id}.",
+                TaskProgress.color(progress_update.status),
+            )
 
     def close(self):
         """Stop the listener thread and wait until it exits."""
@@ -286,10 +356,11 @@ class OverallProgressContext:
         # Update overall progress with new stats
         stats = self.tasks_progress.get_task_stats()
         stats_text = (
-            f"Running: [blue]{stats['running']}[/blue] | "
-            f"Pending: [yellow]{stats['pending']}[/yellow] | "
-            f"Completed: [green]{stats['completed']}[/green] | "
-            f"Failed: [red]{stats['failed']}[/red]"
+            f"running: [blue]{stats['running']}[/blue] | "
+            f"pending: [yellow]{stats['pending']}[/yellow] | "
+            f"resolved: [green]{stats['resolved'] + stats['skip-resolved']}[/green] | "
+            f"unresolved: [red]{stats['unresolved'] + stats['skip-unresolved']}[/red] | "
+            f"error: [red]{stats['error']}[/red]"
         )
         self.overall_progress.update(
             self._overall_task,
@@ -299,6 +370,16 @@ class OverallProgressContext:
         self.overall_progress.refresh()
         # Update panel content
         self.tasks_progress.refresh_progress(all_tasks=all_tasks)
+
+    def status_report(self):
+        """Prints the current progress table and tasks grouped by status."""
+        self._live.console.print(self.progress_table)
+        grouped_tasks = self.tasks_progress.group_tasks_by_status()
+        self._live.console.print("\n")
+        for status, tasks in grouped_tasks.items():
+            if tasks:
+                self._live.console.print(Padding(f"{status}: {tasks}", (0, 1)))
+        self._live.console.print("\n")
 
     def _status_listener(self):
         self.logger.debug("Starting status listener thread...")
@@ -370,7 +451,7 @@ class DebugGymLogger(logging.Logger):
             self.addHandler(fh)
 
     def _initialize_main_logger(self):
-        self._live = Live()
+        self._live = Live(transient=True)
         rich_handler = RichHandler(
             console=self._live.console,
             show_time=False,
@@ -431,7 +512,7 @@ class DebugGymLogger(logging.Logger):
         self.no_live = True
 
     @contextmanager
-    def rich_progress(self, problems, max_display: int = 10):
+    def rich_progress(self, problems, max_display: int = 10, final_report: bool = True):
         """Create a Rich progress bar for the given problems. To be used in a 'with' context.
         The context manager yields a `rich.Progress` but allows rich_progress to close
         the progress bar when the context is exited, ensuring that the UI is updated
@@ -454,7 +535,10 @@ class DebugGymLogger(logging.Logger):
                 # the table and progress objects
                 yield ctx
             finally:  # executed when the caller leaves the with-block
+                # Close the context manager, which will stop the listener thread
                 ctx.close()  # sets _stop_event and join()s the thread
+        if final_report:
+            ctx.status_report()
 
     def report_progress(
         self,
