@@ -426,8 +426,7 @@ class DebugGymLogger(logging.Logger):
         # Prevent the log messages from being propagated to the root logger
         self.propagate = False
 
-        self.level = level
-        self.setLevel(self.level)
+        self.setLevel(level)  # Set logger level, might be overridden by file handler
         self.log_file = None  # File handler for logging to a file
 
         # Placeholders for rich live, log listener thread, and stop event
@@ -437,20 +436,11 @@ class DebugGymLogger(logging.Logger):
         self._log_listener_stop_event = None  # Event to stop the log listener thread
         self._log_listener_thread = None  # Thread to process logs from workers
         if not self._is_worker:
-            self._initialize_main_logger()
-
+            self._initialize_main_logger(level)
         if log_dir:
-            log_dir = Path(log_dir)
-            log_dir.mkdir(parents=True, exist_ok=True)
+            self._initialize_file_handler(name, log_dir, mode)
 
-            self.log_file = (log_dir / f"{name}.log").absolute()
-            fh = logging.FileHandler(self.log_file, mode=mode)
-            formatter = StripAnsiFormatter("%(asctime)s %(levelname)-8s %(message)s")
-            fh.setFormatter(formatter)
-            fh.setLevel(logging.DEBUG)
-            self.addHandler(fh)
-
-    def _initialize_main_logger(self):
+    def _initialize_main_logger(self, level):
         self._live = Live(transient=True)
         rich_handler = RichHandler(
             console=self._live.console,
@@ -459,7 +449,7 @@ class DebugGymLogger(logging.Logger):
             markup=True,
         )
         rich_handler.setFormatter(logging.Formatter("🐸 [%(name)-12s]: %(message)s"))
-        rich_handler.setLevel(self.level)
+        rich_handler.setLevel(level)
         self.addHandler(rich_handler)
 
         # Start log listener thread
@@ -468,6 +458,19 @@ class DebugGymLogger(logging.Logger):
             target=self._log_listener, daemon=True
         )
         self._log_listener_thread.start()
+
+    def _initialize_file_handler(self, name: str, log_dir: str, mode: str):
+        self.setLevel(logging.DEBUG)  # Ensure logger operates at DEBUG level
+        log_dir = Path(log_dir)
+        log_dir.mkdir(parents=True, exist_ok=True)
+
+        self.log_file = (log_dir / f"{name}.log").absolute()
+        fh = logging.FileHandler(self.log_file, mode=mode)
+        formatter = StripAnsiFormatter("%(asctime)s %(levelname)-8s %(message)s")
+        fh.setFormatter(formatter)
+        fh.setLevel(logging.DEBUG)
+        self.addHandler(fh)
+        self.info(f"Logging `{name}` to file: {self.log_file}")
 
     def handle(self, record):
         """Handle a log record. If this is a worker process,
