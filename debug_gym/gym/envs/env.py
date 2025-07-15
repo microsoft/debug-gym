@@ -37,6 +37,7 @@ class EnvInfo:
 class EventHooks:
     def __init__(self):
         self.event_listeners = {event: [] for event in Event}
+        self.event_listeners_muted = {event: [] for event in Event}
 
     def subscribe(self, event: Event, tool: "Tool"):
         if event not in self.event_listeners:
@@ -49,6 +50,20 @@ class EventHooks:
 
     def unsubscribe(self, event: Event, tool):
         self.event_listeners[event].remove(tool)
+
+    def mute(self, event: Event):
+        """Mute all tools for the given event."""
+        if event not in self.event_listeners_muted:
+            raise ValueError(f"Unknown event type: {event}")
+        self.event_listeners_muted[event] = self.event_listeners[event][:]
+        self.event_listeners[event] = []
+
+    def unmute(self, event: Event):
+        """Unmute all tools for the given event."""
+        if event not in self.event_listeners_muted:
+            raise ValueError(f"Unknown event type: {event}")
+        self.event_listeners[event] = self.event_listeners_muted[event][:]
+        self.event_listeners_muted[event] = []
 
     def notify(
         self, environment, event: Event, source=None, **kwargs
@@ -554,23 +569,6 @@ class RepoEnv(TooledEnv):
         )
 
         return self.infos
-
-    def clone(self):
-        # Create a new instance of RepoEnv
-        new_env = RepoEnv(
-            path=self.path,
-            entrypoint=self.entrypoint,
-            debug_entrypoint=self.debug_entrypoint,
-            max_score=self.max_score,
-            readonly_patterns=None,
-            run_timeout=self.run_timeout,
-            dir_tree_depth=self.dir_tree_depth,
-            terminal=Terminal(),
-            logger=self.logger,
-        )
-        for tool in self.tools:
-            new_env.add_tool(tool)
-        return new_env
 
     def post_process_event(self, event: Event, source, kwargs, observations):
         """Post-process the event after it has been handled by the tools."""

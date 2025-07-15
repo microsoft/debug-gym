@@ -405,6 +405,20 @@ class OverallProgressContext:
         self.logger.debug("Status listener thread exiting...")
 
 
+class IconFilter(logging.Filter):
+    def __init__(self, *args, icon="🐸", **kwargs):
+        super().__init__(*args, **kwargs)
+        self.icon = icon
+
+    def filter(self, record):
+        if not hasattr(record, "icon"):
+            # If the record does not have an icon attribute, set it
+            # This allows the icon to be used in log messages
+            record.icon = self.icon
+
+        return True
+
+
 class DebugGymLogger(logging.Logger):
     """A multiprocess friendly logger that integrates with Rich for progress reporting.
     Multiprocess workers can use this logger to log messages and report progress via
@@ -420,6 +434,7 @@ class DebugGymLogger(logging.Logger):
         log_dir: str | None = None,
         level: str | int = logging.INFO,
         mode: str = "a",
+        icon: str = "🐸",
     ):
         super().__init__(name)
         # If var env "DEBUG_GYM_DEBUG" is set, turn on debug mode
@@ -428,6 +443,8 @@ class DebugGymLogger(logging.Logger):
 
         # Prevent the log messages from being propagated to the root logger
         self.propagate = False
+        self.icon_filter = IconFilter(icon=icon)
+        self.addFilter(self.icon_filter)
 
         self.setLevel(level)  # Set logger level, might be overridden by file handler
         self.log_file = None  # File handler for logging to a file
@@ -443,6 +460,16 @@ class DebugGymLogger(logging.Logger):
         if log_dir:
             self._initialize_file_handler(name, log_dir, mode)
 
+    @property
+    def icon(self):
+        """Get the icon used in log messages."""
+        return self.icon_filter.icon
+
+    @icon.setter
+    def icon(self, icon: str):
+        """Set the icon for the logger. This will update the icon used in log messages."""
+        self.icon_filter.icon = icon
+
     def _initialize_main_logger(self, level):
         self._live = Live(transient=True, refresh_per_second=2)
         rich_handler = RichHandler(
@@ -451,7 +478,9 @@ class DebugGymLogger(logging.Logger):
             rich_tracebacks=True,
             markup=True,
         )
-        rich_handler.setFormatter(logging.Formatter("🐸 [%(name)-12s]: %(message)s"))
+        rich_handler.setFormatter(
+            logging.Formatter(r"%(icon)s \[%(name)-12s]: %(message)s")
+        )
         rich_handler.setLevel(level)
         self.addHandler(rich_handler)
 
@@ -481,6 +510,7 @@ class DebugGymLogger(logging.Logger):
         record into the log queue for the main process to display
         logs through Rich."""
         if self._is_worker:
+            # record.args.append(self.icon)
             self.LOG_QUEUE.put(record)
         super().handle(record)
 
