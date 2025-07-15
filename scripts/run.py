@@ -145,8 +145,6 @@ def run_agent(args, problem, config):
         signal.alarm(0)
         if env:
             env.close()
-
-    task_logger.info(f"Completed, log saved at: {task_logger.log_file}")
     return success
 
 
