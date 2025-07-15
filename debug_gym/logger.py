@@ -390,16 +390,11 @@ class OverallProgressContext:
 
     def _status_listener(self):
         self.logger.debug("Starting status listener thread...")
-        last_refresh_time = 0
-        refresh_interval = 0  # 1  # Minimum time between UI refreshes (in seconds)
         while not self._stop_event.is_set():
             try:
                 progress_update = self.progress_queue.get(timeout=0.1)
                 self.advance(progress_update)
-                current_time = time.time()
-                if current_time - last_refresh_time >= refresh_interval:
-                    self.refresh_progress()
-                    last_refresh_time = current_time
+                self.refresh_progress()
             except queue.Empty:
                 continue
             except EOFError:  # queue closed
