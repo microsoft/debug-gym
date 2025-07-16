@@ -23,6 +23,7 @@ jobs:
       - name: Install dependencies
         run: |
           pip install --upgrade pip
+          pip install build
           pip install -e '.[dev]'
 
       - name: Save version and commit hash
