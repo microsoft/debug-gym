@@ -13,6 +13,7 @@ from swesmith.harness.utils import get_test_command
 from swesmith.utils import get_repo_commit_from_image_name
 
 from debug_gym.constants import DEBUG_GYM_CACHE_DIR
+from debug_gym.gym.terminal import with_retry
 from debug_gym.gym.entities import EvalOutput
 from debug_gym.gym.envs.swe_bench import SWEBenchEnv
 from debug_gym.gym.terminal import Terminal
@@ -76,7 +77,7 @@ class SWESmithEnv(SWEBenchEnv):
         )
 
         # Download all images needed for SWE-Smith.
-        client = docker.from_env()
+        client = with_retry(lambda: docker.from_env(timeout=600), max_retries=3, base_delay=10)
         tagged_image_names = set(f"{DOCKER_ORG}/{name}:{TAG}" for name in image_names)
 
         existing_images = set(

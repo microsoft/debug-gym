@@ -3,6 +3,7 @@ import errno
 import fcntl
 import os
 import pty
+import random
 import shlex
 import subprocess
 import tempfile
@@ -19,6 +20,40 @@ from debug_gym.utils import strip_ansi
 DEFAULT_TIMEOUT = 300
 DEFAULT_PS1 = "DEBUG_GYM_PS1"
 DISABLE_ECHO_COMMAND = "stty -echo"
+
+
+def with_retry(func, max_retries=3, base_delay=1, backoff_factor=2):
+    """
+    Retry a function with exponential backoff.
+    
+    Args:
+        func: Function to retry
+        max_retries: Maximum number of retry attempts
+        base_delay: Base delay in seconds
+        backoff_factor: Multiplier for delay between retries
+        
+    Returns:
+        Result of the function call
+        
+    Raises:
+        The last exception if all retries fail
+    """
+    last_exception = None
+    
+    for attempt in range(max_retries + 1):  # +1 for initial attempt
+        try:
+            return func()
+        except (docker.errors.APIError, docker.errors.DockerException, ConnectionError) as e:
+            last_exception = e
+            if attempt == max_retries:
+                raise e
+            
+            # Calculate delay with jitter
+            delay = base_delay * (backoff_factor ** attempt) + random.uniform(0, 1)
+            time.sleep(delay)
+    
+    # This should never be reached, but just in case
+    raise last_exception
 
 
 class ShellSession:
@@ -338,7 +373,11 @@ class DockerTerminal(Terminal):
         self.setup_commands = setup_commands or []
         self.volumes = volumes or {}
         self.map_host_uid_gid = map_host_uid_gid
-        self.docker_client = docker.from_env(timeout=600)
+        self.docker_client = with_retry(
+            lambda: docker.from_env(timeout=600), 
+            max_retries=3, 
+            base_delay=10
+        )
         self.host_uid = os.getuid()
         self.host_gid = os.getgid()
         self._container = None
@@ -438,23 +477,31 @@ class DockerTerminal(Terminal):
     def setup_container(self) -> docker.models.containers.Container:
         # Create and start a container mounting volumes and setting environment variables
         self.logger.debug(f"Setting up container with base image: {self.base_image}")
-        container = self.docker_client.containers.run(
-            image=self.base_image,
-            command="sleep infinity",  # Keep the container running
-            working_dir=self.working_dir,
-            volumes=self.volumes,
-            environment=self.env_vars,
-            user=self.user_map(),
-            detach=True,
-            auto_remove=True,
-            remove=True,
-            tty=True,
-            stdin_open=True,
-            network_mode="host",
-            mem_limit="16G",
-        )
+        
+        def _create_container():
+            return self.docker_client.containers.run(
+                image=self.base_image,
+                command="sleep infinity",  # Keep the container running
+                working_dir=self.working_dir,
+                volumes=self.volumes,
+                environment=self.env_vars,
+                user=self.user_map(),
+                detach=True,
+                auto_remove=True,
+                remove=True,
+                tty=True,
+                stdin_open=True,
+                network_mode="host",
+                mem_limit="16G",
+            )
+        
+        container = with_retry(_create_container, max_retries=3, base_delay=10)
         container_name = f"debug_gym_{container.name}"
-        container.rename(container_name)
+        
+        def _rename_container():
+            container.rename(container_name)
+        
+        with_retry(_rename_container, max_retries=2, base_delay=10)
         container.reload()
         self._run_setup_commands(container)
         self.logger.debug(f"Container {container_name} started successfully.")
@@ -466,12 +513,16 @@ class DockerTerminal(Terminal):
         if self.setup_commands:
             setup_commands = " && ".join(self.setup_commands)
             self.logger.debug(f"Running setup commands: {setup_commands}")
-            status, output = container.exec_run(
-                ["/bin/bash", "-c", setup_commands],
-                user="root",  # Run as root to allow installations
-                workdir=self.working_dir,
-                environment=self.env_vars,
-            )
+            
+            def _exec_setup_commands():
+                return container.exec_run(
+                    ["/bin/bash", "-c", setup_commands],
+                    user="root",  # Run as root to allow installations
+                    workdir=self.working_dir,
+                    environment=self.env_vars,
+                )
+            
+            status, output = with_retry(_exec_setup_commands, max_retries=2, base_delay=10)
             if status != 0:
                 container.stop()
                 raise ValueError(

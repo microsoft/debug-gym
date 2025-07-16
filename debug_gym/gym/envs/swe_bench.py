@@ -13,6 +13,8 @@ from swebench.harness.docker_build import (
 from swebench.harness.log_parsers import MAP_REPO_TO_PARSER
 from swebench.harness.test_spec.python import get_test_directives
 from swebench.harness.test_spec.test_spec import make_test_spec
+
+from debug_gym.gym.terminal import with_retry
 from swebench.harness.utils import load_swebench_dataset
 
 from debug_gym.constants import DEBUG_GYM_CACHE_DIR
@@ -61,7 +63,7 @@ class SWEBenchEnv(RepoEnv):
         swebench_instances = load_swebench_dataset(
             name=self.dataset_id, instance_ids=self.instance_ids
         )
-        docker_client = docker.from_env()
+        docker_client = with_retry(lambda: docker.from_env(timeout=600), max_retries=3, base_delay=10)
 
         try:
             env_configs_to_build = get_env_configs_to_build(
