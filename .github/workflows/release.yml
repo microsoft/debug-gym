@@ -1,12 +1,9 @@
 name: PyPI Release
 
-# on:
-#   push:
-#     tags:
-#       - 'v*'  # Only publish on version tags
 on:
-  pull_request:
-    branches: [ "main" ]
+  push:
+    tags:
+      - '*'
 
 jobs:
   build-and-publish:
