@@ -57,6 +57,7 @@ class GuidedRewriteAgent(RewriteAgent):
     def run(self, task_name=None, debug=False):
         step = 0
         max_steps = self.config["max_steps"]
+        info = None
         try:
             self.history.reset()
             info = self.env.reset(options={"task_name": task_name})
@@ -146,14 +147,15 @@ class GuidedRewriteAgent(RewriteAgent):
             )
 
             return info.done
-        except Exception:
+        except Exception as e:
             # report any error that happens during the run
-            self.logger.report_progress(
-                problem_id=task_name,
-                step=step + 1,
-                total_steps=step + 1,
-                score=info.score if info else 0,
-                max_score=info.max_score if info else 1,
-                status="error",
-            )
+            if info:
+                self.logger.report_progress(
+                    problem_id=task_name,
+                    step=step + 1,
+                    total_steps=step + 1,
+                    score=info.score if info else 0,
+                    max_score=info.max_score if info else 1,
+                    status="error",
+                )
             raise
