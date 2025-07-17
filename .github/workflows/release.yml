@@ -15,7 +15,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Fetch all tags
+          fetch-tags: true  # Fetch all tags so we can get the latest version
 
       - name: Set up Python
         uses: actions/setup-python@v5
