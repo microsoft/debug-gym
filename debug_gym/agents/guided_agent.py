@@ -121,11 +121,11 @@ class GuidedRewriteAgent(RewriteAgent):
                     llm_info = self.try_rewrite_and_rollback(llm, info)
                     if llm_info.done:
                         solved = llm_info
-                        msg = f"[green]*** The rewrite-only agent with {llm.model_name} managed to solve the task with the current context. ***[/green]"
-                        llm.logger.error(msg)
+                        msg = f"[green] ✅ The rewrite-only agent with {llm.model_name} managed to solve the task with the current context. ✅ [/green]"
+                        llm.logger.info(msg)
                     else:
-                        msg = f"[red]*** The rewrite-only agent with {llm.model_name} failed to solve the task with the current context. ***[/red]"
-                        llm.logger.error(msg)
+                        msg = f"[red] ❌ The rewrite-only agent with {llm.model_name} failed to solve the task with the current context. ❌ [/red]"
+                        llm.logger.info(msg)
 
                 if solved is not None:
                     llm_info = solved
