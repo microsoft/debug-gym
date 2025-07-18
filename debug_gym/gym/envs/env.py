@@ -520,6 +520,9 @@ class RepoEnv(TooledEnv):
             try:
                 # tool_kwargs is a dict, so we need to unpack it
                 self.step_observation = triggered_tool(self, **tool_kwargs)
+            except KeyboardInterrupt:
+                self.logger.error("Step was interrupted by user.")
+                raise
             except BaseException as e:
                 error_message = (
                     f"Error while using tool {triggered_tool.name} "
