@@ -457,7 +457,7 @@ class DockerTerminal(Terminal):
         container.rename(container_name)
         container.reload()
         self._run_setup_commands(container)
-        self.logger.debug(f"Container {container_name} started successfully.")
+        self.logger.debug(f"{container} ({container_name}) started successfully.")
         atexit.register(self.clean_up)
         return container
 
@@ -465,7 +465,7 @@ class DockerTerminal(Terminal):
         """Run setup commands if any. If commands fail, stop the container."""
         if self.setup_commands:
             setup_commands = " && ".join(self.setup_commands)
-            self.logger.debug(f"Running setup commands: {setup_commands}")
+            self.logger.debug(f"{container} Running setup commands: {setup_commands}")
             status, output = container.exec_run(
                 ["/bin/bash", "-c", setup_commands],
                 user="root",  # Run as root to allow installations

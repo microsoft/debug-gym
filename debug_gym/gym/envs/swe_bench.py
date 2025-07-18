@@ -147,15 +147,6 @@ class SWEBenchEnv(RepoEnv):
             self.test_spec, docker.from_env(), logger=None, nocache=False
         )
 
-    @property
-    def patch(self):
-        command = "git diff"
-        result = subprocess.run(
-            command.split(), cwd=self.working_dir, text=True, capture_output=True
-        )
-        # patch = result.stdout.replace(str(self.working_dir), str(self.path))
-        return result.stdout
-
     def apply_gold_patch(self):
         self.logger.info(f"Applying gold patch to {self.working_dir}.")
         command = self.git_apply_cmd + f" <<'EOF'\n{self.gold_patch}\nEOF"

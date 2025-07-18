@@ -1,5 +1,6 @@
 import datetime
 import json
+import logging  # Set logging level down to WARNING for endpoint queries.
 import os
 import signal
 import subprocess
@@ -9,6 +10,9 @@ from pathlib import Path
 
 from debug_gym import version as dg_version
 from debug_gym.agents.base_agent import AGENT_REGISTRY, create_agent
+
+logging.getLogger("httpx").setLevel(logging.WARNING)
+
 from debug_gym.agents.utils import load_config
 from debug_gym.gym.envs import select_env
 from debug_gym.gym.terminal import select_terminal

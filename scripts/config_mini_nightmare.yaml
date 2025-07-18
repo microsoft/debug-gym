@@ -20,7 +20,7 @@ base:
         # session_commands define commands that are always executed before starting a shell session or running a single command in the terminal.
         # session_commands:["conda activate aider"],
         # setup_commands define commands that are executed only once when the terminal is created. This is only supported for Docker terminal.
-        setup_commands: ["pip install pytest pandas"],
+        setup_commands: ["apt update", "apt install -y git", "pip install pytest pandas"],
     }
 
     # LLM configs
@@ -45,3 +45,8 @@ debug_agent:
 debug_5_agent:
     n_rewrites_before_pdb: 5
     tools: ["pdb", "view", "rewrite", "eval"]
+
+guided_agent:
+    llm_name: "human"
+    tools: ["pdb", "view", "rewrite", "eval"]
+    llms: ["gpt-4o", "gpt-4o-mini"]

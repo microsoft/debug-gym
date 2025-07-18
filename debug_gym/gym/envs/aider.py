@@ -5,11 +5,23 @@ import debug_gym.gym.utils as utils
 from debug_gym.constants import DEBUG_GYM_CACHE_DIR
 from debug_gym.gym.entities import EvalOutput
 from debug_gym.gym.envs.env import RepoEnv
+from debug_gym.gym.terminal import DockerTerminal, Terminal
 
 
 class AiderBenchmarkEnv(RepoEnv):
     REPO_URL = "https://github.com/exercism/python"
     REPO_PATH = DEBUG_GYM_CACHE_DIR / "exercism"
+
+    def __init__(
+        self,
+        terminal: Terminal | None = None,
+        **kwargs,
+    ):
+        terminal = terminal or DockerTerminal(logger=kwargs.get("logger"))
+        if not isinstance(terminal, DockerTerminal):
+            raise ValueError("AiderBenchmarkEnv only supports DockerTerminal.")
+
+        super().__init__(terminal=terminal, **kwargs)
 
     @property
     def instructions(self) -> str:
@@ -31,11 +43,29 @@ class AiderBenchmarkEnv(RepoEnv):
         self.last_eval = EvalOutput(success, output)
         return self.last_eval
 
+    def setup_terminal(self):
+        self.logger.info(f"Configuring docker container: {self.terminal.container}")
+
+        self.terminal.run("git init")
+        self.terminal.run("git config user.name 'debug-gym'")
+        self.terminal.run("git config user.email '<>'")
+
+        self.terminal.run("git add *.py")
+        self.terminal.run("git commit -am 'Init'")
+
+        self.terminal.run("git add .debugignore")
+        self.terminal.run("git add .debugreadonly")
+        self.terminal.run("git commit -am 'Add debug-gym ignore and read-only files'")
+
     def reset(self, *, options: dict = None):
         options = options or {}
         self.current_sample = self.dataset[options["task_name"]]
         directory = self.current_sample["base_directory"]
         self.setup_workspace(directory, entrypoint=self.entrypoint)
+        from ipdb import set_trace
+
+        set_trace()
+        self.setup_terminal()
         infos = super().reset(options=options)
         return infos
 
