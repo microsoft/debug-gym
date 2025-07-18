@@ -231,7 +231,13 @@ class RepoEnv(TooledEnv):
         atexit.register(self._tempdir.cleanup)
 
         self.logger.debug(f"Working directory: {self.working_dir}")
-        shutil.copytree(self.path, self.working_dir, dirs_exist_ok=True, symlinks=True)
+        shutil.copytree(
+            self.path,
+            self.working_dir,
+            dirs_exist_ok=True,
+            symlinks=True,
+            ignore=shutil.ignore_patterns("__pycache__", "*.pyc"),
+        )
 
         self.setup_file_filters(readonly_patterns, ignore_patterns)
 

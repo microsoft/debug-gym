@@ -146,14 +146,15 @@ def test_pdb_pass_empty_path_if_in_session(tmp_path, setup_test_repo):
     )
     pdb = PDBTool()
     _ = pdb.start_pdb(environment)
+    wd = environment.working_dir
 
     obs = pdb.use(environment, command="b test_pass.py:1").observation
-    assert obs.startswith("Pdb command output:\nBreakpoint 1 at test_pass.py:1")
+    assert obs.startswith(f"Pdb command output:\nBreakpoint 1 at {wd}/test_pass.py:1")
     obs = pdb.use(environment, command="c").observation
     assert "1 B->\tdef test_pass():" in obs
     # Now try to set a breakpoint without specifying the file, it should pass
     obs = pdb.use(environment, command="b 2").observation
-    assert obs.startswith("Pdb command output:\nBreakpoint 2 at test_pass.py:2")
+    assert obs.startswith(f"Pdb command output:\nBreakpoint 2 at {wd}/test_pass.py:2")
 
 
 def test_pdb_use_default_environment_entrypoint(tmp_path, setup_test_repo):
@@ -241,7 +242,9 @@ def test_pdb_add_new_breakpoint_relative_path(tmp_path, setup_pdb_repo_env):
     breakpoints_state = copy.deepcopy(env.current_breakpoints_state)
     wd = env.working_dir
     pdb_obs = pdb_tool.use(env, "b file1.py:25")
-    assert "Pdb command output:\nBreakpoint 5 at file1.py:25" in pdb_obs.observation
+    assert (
+        f"Pdb command output:\nBreakpoint 5 at {wd}/file1.py:25" in pdb_obs.observation
+    )
     new_breakpoint = {f"{wd}/file1.py|||25": f"b {wd}/file1.py:25"}
     expected_state = breakpoints_state | new_breakpoint
     assert env.current_breakpoints_state == expected_state
@@ -252,7 +255,9 @@ def test_pdb_add_new_breakpoint_absolute_path(tmp_path, setup_pdb_repo_env):
     breakpoints_state = copy.deepcopy(env.current_breakpoints_state)
     wd = env.working_dir
     pdb_obs = pdb_tool.use(env, f"b {wd}/file1.py:25")
-    assert "Pdb command output:\nBreakpoint 5 at file1.py:25" in pdb_obs.observation
+    assert (
+        f"Pdb command output:\nBreakpoint 5 at {wd}/file1.py:25" in pdb_obs.observation
+    )
     new_breakpoint = {f"{wd}/file1.py|||25": f"b {wd}/file1.py:25"}
     expected_state = breakpoints_state | new_breakpoint
     assert env.current_breakpoints_state == expected_state
@@ -261,8 +266,11 @@ def test_pdb_add_new_breakpoint_absolute_path(tmp_path, setup_pdb_repo_env):
 def test_pdb_add_existing_breakpoint(tmp_path, setup_pdb_repo_env):
     pdb_tool, env = setup_pdb_repo_env(tmp_path)
     breakpoints_state = copy.deepcopy(env.current_breakpoints_state)
-    pdb_obs = pdb_tool.use(env, "b file1.py:10")
-    assert "Pdb command output:\nBreakpoint 5 at file1.py:10" in pdb_obs.observation
+    wd = env.working_dir
+    pdb_obs = pdb_tool.use(env, f"b {wd}/file1.py:10")
+    assert (
+        f"Pdb command output:\nBreakpoint 5 at {wd}/file1.py:10" in pdb_obs.observation
+    )
     assert env.current_breakpoints_state == breakpoints_state
 
 
@@ -276,7 +284,7 @@ def test_pdb_clear_specific(tmp_path, setup_pdb_repo_env):
         f"{wd}/file2.py|||15": f"b {wd}/file2.py:15",
     }
     assert pdb_obs.observation.startswith(
-        "Pdb command output:\nDeleted breakpoint 2 at file1.py:20\n\nCurrent frame:"
+        f"Pdb command output:\nDeleted breakpoint 2 at {wd}/file1.py:20\n\nCurrent frame:"
     )
     assert env.current_breakpoints_state == expected_state
 
@@ -287,9 +295,10 @@ def test_pdb_clear_not_found(
 ):
     pdb_tool, env = setup_pdb_repo_env(tmp_path)
     breakpoints_state = copy.deepcopy(env.current_breakpoints_state)
+    wd = env.working_dir
     pdb_obs = pdb_tool.use(env, "cl file1.py:8")
     assert pdb_obs.observation.startswith(
-        "Pdb command output:\n*** There is no breakpoint at file1.py:8"
+        f"Pdb command output:\n*** There is no breakpoint at {wd}/file1.py:8"
     )
     assert env.current_breakpoints_state == breakpoints_state
 
@@ -568,19 +577,22 @@ def test_use_pdb_syntax_error(tmp_path, setup_pdb_repo_env):
 
 def test_set_current_frame_file_sets_file(tmp_path, setup_pdb_repo_env):
     pdb_tool, env = setup_pdb_repo_env(tmp_path)
+    wd = env.working_dir
     # First stop at pytest main file
     assert "pytest/__main__.py" in pdb_tool.current_frame_file
     # pdb_tool.use calls pdb_tool.set_current_frame_file(env)
     obs = pdb_tool.use(env, "b test_fail.py:2")
-    assert "Pdb command output:\nBreakpoint 5 at test_fail.py:2" in obs.observation
+    assert (
+        f"Pdb command output:\nBreakpoint 5 at {wd}/test_fail.py:2" in obs.observation
+    )
     # no `continue` command, so current_frame_file should still be pytest main file
     assert "pytest/__main__.py" in pdb_tool.current_frame_file
     obs = pdb_tool.use(env, "c")
     # At this point, current_frame_file should be set to the file where the breakpoint was set
-    assert pdb_tool.current_frame_file == f"{env.working_dir}/test_fail.py"
+    assert pdb_tool.current_frame_file == f"{wd}/test_fail.py"
     # observation should contain the test file
-    assert f"Current frame:\n{env.working_dir}/test_fail.py" in obs.observation
-    assert "> test_fail.py(2)" in obs.observation
+    assert f"Current frame:\n{wd}/test_fail.py" in obs.observation
+    assert f"> {wd}/test_fail.py(2)" in obs.observation
 
 
 def test_set_current_frame_file_sets_and_returns(tmp_path, setup_pdb_repo_env):
@@ -600,6 +612,7 @@ def test_set_current_frame_file_sets_and_returns(tmp_path, setup_pdb_repo_env):
 def test_use_multiple_commands_only_first_executed(tmp_path, setup_pdb_repo_env):
     pdb_tool, env = setup_pdb_repo_env(tmp_path)
     env.current_breakpoints_state = {}
+    wd = env.working_dir
     pdb_tool.restart_pdb(env)
     pdb_obs = pdb_tool.use(env, "b")
     obs = clean_up_pytest_path(pdb_obs.observation)
@@ -627,7 +640,7 @@ def test_use_multiple_commands_only_first_executed(tmp_path, setup_pdb_repo_env)
     assert pdb_obs.source == "pdb"
     assert pdb_obs.observation.startswith(
         "Multiple commands are not supported. Only the first command will be executed.\n"
-        "Pdb command output:\nBreakpoint 1 at file1.py:1\n"
+        f"Pdb command output:\nBreakpoint 1 at {wd}/file1.py:1\n"
         "\n"
         "Current frame:"
     )
@@ -668,7 +681,8 @@ def test_use_starts_pdb_if_not_running(tmp_path, setup_pdb_repo_env):
 def test_pdb_list_output_indentation(tmp_path, setup_pdb_repo_env):
     """Test PDB list output indentation for line numbers around 100 (3-digit)"""
     pdb_tool, env = setup_pdb_repo_env(tmp_path)
-    with (env.working_dir / "large_file.py").open("w") as f:
+    wd = env.working_dir
+    with (wd / "large_file.py").open("w") as f:
         f.write("def dummy_function():\n")
         f.write("\n".join(f"    'Line {i+1}'" for i in range(1, 2000)))
         f.write("\n\nif __name__ == '__main__':\n")
@@ -677,7 +691,7 @@ def test_pdb_list_output_indentation(tmp_path, setup_pdb_repo_env):
     pdb_tool.start_pdb(env)
     pdb_obs = pdb_tool.use(env, "b large_file.py:100")
     assert (
-        "Pdb command output:\nBreakpoint 5 at large_file.py:100"
+        f"Pdb command output:\nBreakpoint 5 at {wd}/large_file.py:100"
     ) in pdb_obs.observation
     pdb_obs = pdb_tool.use(env, "c")
     expected_output = (
@@ -698,7 +712,8 @@ def test_pdb_list_output_indentation(tmp_path, setup_pdb_repo_env):
 
     pdb_obs = pdb_tool.use(env, "b large_file.py:1000")
     assert (
-        "Pdb command output:\nBreakpoint 6 at large_file.py:1000" in pdb_obs.observation
+        f"Pdb command output:\nBreakpoint 6 at {wd}/large_file.py:1000"
+        in pdb_obs.observation
     )
     pdb_obs = pdb_tool.use(env, "c")
     expected_output = (
@@ -719,7 +734,8 @@ def test_pdb_list_output_indentation(tmp_path, setup_pdb_repo_env):
 
     pdb_obs = pdb_tool.use(env, "b large_file.py:2000")
     assert (
-        "Pdb command output:\nBreakpoint 7 at large_file.py:2000" in pdb_obs.observation
+        f"Pdb command output:\nBreakpoint 7 at {wd}/large_file.py:2000"
+        in pdb_obs.observation
     )
     pdb_obs = pdb_tool.use(env, "c")
     expected_output = (
