@@ -214,10 +214,15 @@ class OpenAILLM(LLM):
             )
         except openai.BadRequestError as e:
             # Handle specific error for context length exceeded, otherwise just propagate the error
-            if e.code == "context_length_exceeded":
+            if e.code in [
+                "context_length_exceeded",
+                "model_max_prompt_tokens_exceeded",
+                "string_above_max_length",
+            ]:
+                raise ContextLengthExceededError
+            if "maximum context length" in e.message:
                 raise ContextLengthExceededError
             raise
-
         # LLM may select multiple tool calls, we only care about the first action
         if not response.choices[0].message.tool_calls:
             # LLM failed to call a tool

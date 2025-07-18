@@ -6,12 +6,6 @@ import pandas as pd
 from termcolor import colored
 
 
-def map_uuid(input):
-    if "pdb_agent_" in input:
-        input = input.replace("pdb_agent_", "pdb_")
-    return input
-
-
 def main(args):
     # Collect all *.jsonl files in the output directory
     for jsonl_name in ["froggy.jsonl", "debug_gym.jsonl"]:
@@ -23,11 +17,18 @@ def main(args):
                 with open(log_file, "r") as f:
                     data = json.load(f)
 
+                # Extract the relative path from the log file path
+                log_path = Path(log_file)
+                relative_path = log_path.relative_to(args.path).parent
+
                 result = {
                     "success": data["success"],
-                    "uuid": map_uuid(data["uuid"]),
+                    "uuid": data["uuid"],
                     "agent_type": data["agent_type"],
                     "problem": data["problem"],
+                    "path": str(relative_path).split("/")[
+                        0
+                    ],  # Get the first part of the path
                 }
                 results.append(result)
 
@@ -50,16 +51,18 @@ def main(args):
 
     df = pd.DataFrame(results)
 
-    # Group by agent type and uuid
-    grouped = df.groupby(["agent_type", "uuid"])
+    # Group by agent type, path, and uuid
+    grouped = df.groupby(["agent_type", "path", "uuid"])
 
     # Print success rate for each agent
-    for agent_type, group in grouped:
+    for (agent_type, path, uuid), group in grouped:
         total = len(group)
         nb_successes = group["success"].sum()
         success_rate = nb_successes / total
         print(
-            colored(f"{agent_type}: {success_rate:.2%} ({nb_successes} out of {total})")
+            colored(
+                f"{agent_type} ({path}) {uuid}: {success_rate:.2%} ({nb_successes} out of {total})"
+            )
         )
 
 
