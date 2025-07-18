@@ -192,11 +192,6 @@ def dump_experiment_info(config: dict, args: dict):
     """Dump experiment information to a JSONL file.
     Each line is one experiment run with its metadata."""
 
-    try:  # Get debug-gym version
-        debug_gym_version = dg_version.__version__
-    except Exception:
-        debug_gym_version = ""
-
     try:  # Get git commit hash
         git_hash = (
             subprocess.check_output(
@@ -216,7 +211,7 @@ def dump_experiment_info(config: dict, args: dict):
         git_diff = ""
 
     version_info = {
-        "debug_gym_version": debug_gym_version,
+        "debug_gym_version": dg_version.__version__,
         "datetime": datetime.datetime.now().isoformat(),
         "git_hash": git_hash,
         "git_diff": git_diff,
