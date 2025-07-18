@@ -74,6 +74,9 @@ class MiniNightmareEnv(RepoEnv):
         directory = self.current_sample["base_directory"]
         self.setup_workspace(directory, entrypoint=self.entrypoint)
         self.setup_terminal()
+        from ipdb import set_trace
+
+        set_trace()
         infos = super().reset(options=options)
         return infos
 
