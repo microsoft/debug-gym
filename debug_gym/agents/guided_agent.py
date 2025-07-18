@@ -1,6 +1,7 @@
 import logging
 
 from debug_gym.agents.base_agent import register_agent
+from debug_gym.agents.history_tracker import build_history_prompt
 from debug_gym.agents.rewrite_agent import RewriteAgent
 from debug_gym.gym.entities import Event
 from debug_gym.gym.tools.tool import ToolCall
@@ -38,8 +39,23 @@ class GuidedRewriteAgent(RewriteAgent):
             icon="👤",
         )
 
+    def build_prompt(self, info, llm):
+        messages = []
+        messages.extend(self.build_system_prompt(info))
+        messages.extend(self.build_history_prompt(llm))
+        messages.extend(self.build_question_prompt())
+        return messages
+
+    def build_history_prompt(self, llm):
+        messages = build_history_prompt(
+            self.history,
+            llm,
+            self.config["reset_prompt_history_after_rewrite"],
+        )
+        return messages
+
     def try_rewrite_and_rollback(self, llm, last_info):
-        prompt = self.build_prompt(last_info)
+        prompt = self.build_prompt(last_info, llm)
 
         # Git commit the current state before trying to rewrite.
         self.env.terminal.run("git add . && git commit -m 'Before rewrite attempt'")
@@ -116,7 +132,7 @@ class GuidedRewriteAgent(RewriteAgent):
                     break
 
                 # If the LLM did not manage to solve the task, we continue with the guided approach.
-                prompt = self.build_prompt(info)
+                prompt = self.build_prompt(info, self.llm)
                 guide_response = self.llm(prompt, info.tools)
 
                 if debug:
