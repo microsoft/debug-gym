@@ -509,10 +509,12 @@ class RepoEnv(TooledEnv):
 
     @property
     def patch(self):
-        command = ["git", "diff", "--no-index", self.path, self.working_dir]
-        result = subprocess.run(command, text=True, capture_output=True)
-        patch = result.stdout.replace(str(self.working_dir), str(self.path))
-        return patch
+        success, output = self.terminal.run("git diff")
+        if not success:
+            self.logger.error("Failed to get git diff. {output}")
+            return None
+
+        return output
 
     def apply_gold_patch(self):
         raise NotImplementedError(

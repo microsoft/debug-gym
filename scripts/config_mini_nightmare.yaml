@@ -4,7 +4,7 @@ base:
     benchmark: "mini_nightmare"
     problems: "all"  # list of problems, e.g., ["config"], or "all"
     env_kwargs: {
-        "entrypoint": "python -m pytest -s test.py",
+        "entrypoint": "python -m pytest --tb=no -s test.py",
         "dir_tree_depth": 1,
         "run_timeout": 30,
         # shortcut features
@@ -47,4 +47,6 @@ debug_5_agent:
     tools: ["pdb", "view", "rewrite", "eval"]
 
 guided_agent:
+    llm_name: "human"
     tools: ["pdb", "view", "rewrite", "eval"]
+    llms: ["gpt-4o", "gpt-4o-mini"]
