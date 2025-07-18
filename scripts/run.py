@@ -1,11 +1,14 @@
+import datetime
 import json
 import logging  # Set logging level down to WARNING for endpoint queries.
 import os
 import signal
+import subprocess
 import uuid
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 
+from debug_gym import version as dg_version
 from debug_gym.agents.base_agent import AGENT_REGISTRY, create_agent
 
 logging.getLogger("httpx").setLevel(logging.WARNING)
@@ -189,12 +192,55 @@ def add_tools(env, config: dict, logger: DebugGymLogger):
         logger.debug(f"Adding tool to toolbox: {tool_instantiated.__class__.__name__}")
 
 
+def dump_experiment_info(config: dict, args: dict):
+    """Dump experiment information to a JSONL file.
+    Each line is one experiment run with its metadata."""
+
+    try:  # Get git commit hash
+        git_hash = (
+            subprocess.check_output(
+                ["git", "rev-parse", "HEAD"], cwd=os.path.dirname(__file__)
+            )
+            .decode()
+            .strip()
+        )
+    except Exception:
+        git_hash = ""
+
+    try:  # Get git diff
+        git_diff = subprocess.check_output(
+            ["git", "diff"], cwd=os.path.dirname(__file__)
+        ).decode()
+    except Exception:
+        git_diff = ""
+
+    version_info = {
+        "debug_gym_version": dg_version.__version__,
+        "datetime": datetime.datetime.now().isoformat(),
+        "git_hash": git_hash,
+        "git_diff": git_diff,
+        "config": config,
+        "args": vars(args),
+        "python_version": os.sys.version,
+    }
+
+    file = Path(config["output_path"]) / config["uuid"] / "experiment_info.jsonl"
+    with open(file, "a") as f:
+        f.write(f"{json.dumps(version_info)}\n")
+
+
 def main():
     config, args = load_config()
     logger = DebugGymLogger("debug-gym", level=args.logging_level)
 
     config["uuid"] = config.get("uuid", str(uuid.uuid4()))
-    logger.info(f"Experiment log path: {config['output_path']}/{config['uuid']}")
+
+    exp_output_path = Path(config["output_path"]) / config["uuid"]
+    exp_output_path.mkdir(parents=True, exist_ok=True)
+
+    logger.info(f"Experiment log path: {exp_output_path}")
+
+    dump_experiment_info(config, args)
 
     # Figure out which problems to solve.
     problems = config.get("problems", ["custom"])

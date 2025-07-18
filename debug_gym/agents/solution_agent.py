@@ -18,15 +18,15 @@ class AgentSolution(BaseAgent):
 
     def _env_implements_apply_gold_patch(self):
         """Fail early if the environment does not implement apply_gold_patch."""
-        return "apply_gold_patch" in type(self.env).__dict__
+        return hasattr(self.env, "apply_gold_patch")
 
     def run(self, task_name=None, debug=False):
         info = None
         try:
             if not self._env_implements_apply_gold_patch():
                 raise NotImplementedError(
-                    f"The environment {type(self.env)} is not compatible with SolutionAgent"
-                    "Check the README.md to see which environments are compatible."
+                    f"The environment {type(self.env)} is not compatible with SolutionAgent."
+                    " Check the README.md to see which environments are compatible."
                 )
 
             self.history.reset()

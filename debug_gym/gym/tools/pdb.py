@@ -156,8 +156,6 @@ class PDBTool(EnvironmentTool):
         else:  # other pdb commands, send directly
             try:
                 pdb_out = self.interact_with_pdb(command, environment.run_timeout)
-                # remove the working dir from the output
-                # pdb_out = pdb_out.replace(f"{environment.working_dir}/", "")
                 if pdb_out in (
                     "End of file",
                     "Blank or comment",
