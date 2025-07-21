@@ -172,6 +172,10 @@ def trim_prompt_messages(
         result.append(messages[assistant_idx])
         result.append(messages[tool_idx])
 
+    assert (
+        len(result) > 0
+    ), f"After trimming, no messages fit within context length: {context_length}!"
+
     # Verify final token count
     final_tokens = sum(get_message_tokens(msg) for msg in result)
     assert (
