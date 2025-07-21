@@ -1,5 +1,7 @@
 from debug_gym.agents.base_agent import BaseAgent, register_agent
 import glob
+from debug_gym.gym.utils import filter_non_utf8
+
 
 @register_agent
 class DebugAgent(BaseAgent):
@@ -98,21 +100,38 @@ class Debug_5_Agent(DebugAgent):
 class ExplanationAgent(BaseAgent):
     name = "explanation_agent"
     system_prompt = DebugAgent.system_prompt
-    explanation_base_path = "../generate-explanations/new_explanations_with_pdb_tool_calls/single_shot_low_level/swe-smith/burnash__gspread.a8be3b96.lm_rewrite__596cni6x/single_shot_explanation_20250711_151945.txt"
+    explanation_base_path = "../generate-explanations/explanations/failure_critiques/"
     
-    def __init__(self, **kwargs):
-        filepath = "../generate-explanations/new_explanations_proper_pdb/single_shot_low_level/swe-smith/burnash__gspread.a8be3b96.lm_rewrite__596cni6x/single_shot_explanation_20250711_170309.txt"
-        self.explanation = self.get_explanation_from_file(filepath)
-        self.system_prompt = f"{self.system_prompt} {self.explanation} Follow similar steps as the above to debug the code and use the same level high level understanding of information retrieval and debugging."
-        super().__init__(**kwargs)
+    # def __init__(self, **kwargs):
+    #     filepath = "../generate-explanations/new_explanations_proper_pdb/single_shot_low_level/swe-smith/burnash__gspread.a8be3b96.lm_rewrite__596cni6x/single_shot_explanation_20250711_170309.txt"
+    #     self.explanation = self.get_explanation_from_file(filepath)
+    #     self.system_prompt = f"{self.system_prompt} {self.explanation} Follow similar steps as the above to debug the code and use the same level high level understanding of information retrieval and debugging."
+    #     super().__init__(**kwargs)
+
+    def build_system_prompt(self, info):
+        """Build the system prompt with the explanation."""
+        system_prompt_template = self._load_system_prompt_template()
+        if system_prompt_template is not None:
+            system_prompt = system_prompt_template.render(agent=self, info=info)
+        else:
+            system_prompt = self._default_system_prompt(info)
+        try:
+            explanation = self.get_explanation_for_task(self.env.task_name)
+            system_prompt = f"{system_prompt} {explanation} Use this general advice to assist in your debugging process."
+        except FileNotFoundError as e:
+            self.logger.error(f"Explanation file not found: {e}")
+            system_prompt = f"{system_prompt} [No explanation found]"
+        messages = [{"role": "system", "content": filter_non_utf8(system_prompt)}]
+        return messages
     
     def get_explanation_for_task(self, task_name: str):
         """Get the explanation for a specific task."""
-        paths = glob.glob(f"{self.explanation_base_path}/{task_name}/single_shot_explanation*.txt")
-        if not paths:
-            raise FileNotFoundError(f"No explanation files found for task: {task_name}")
-        path = sorted(paths)[-1]
-        explanation = self.get_explanation_from_file(path)
+        # paths = glob.glob(f"{self.explanation_base_path}/{task_name}_system_prompt.txt")
+        # if not paths:
+        #     raise FileNotFoundError(f"No explanation files found for task: {task_name}")
+        # path = sorted(paths)[-1]
+        filepath =f"{self.explanation_base_path}/{task_name}_system_prompt.txt"
+        explanation = self.get_explanation_from_file(filepath)
         return explanation
     
     # def run(self, task_name=None, debug=False):
@@ -137,8 +156,26 @@ class ExplanationAgent(BaseAgent):
             explanation = file.read().strip()
             delimiter = "="*80
             explanation = explanation.split(delimiter)
-            print(f"Loaded explanation from {text_file}: {explanation[-1]}")
+            # print(f"Loaded explanation from {text_file}: {explanation[-1]}")
         return explanation[-1]
+
+class GenericCritiqueAgent(ExplanationAgent):
+    name = "generic_critique_agent"
+    system_prompt = DebugAgent.system_prompt
+    explanation_base_path = "../generate-explanations/explanations/failure_critiques/"
+    
+    def get_explanation_for_task(self, task_name: str):
+        """Get the explanation for a specific task."""
+        # paths = glob.glob(f"{self.explanation_base_path}/{task_name}_system_prompt.txt")
+        # if not paths:
+        #     raise FileNotFoundError(f"No explanation files found for task: {task_name}")
+        # path = sorted(paths)[-1]
+        filepath =f"{self.explanation_base_path}/generic_critique.txt"
+        explanation = self.get_explanation_from_file(filepath)
+        return explanation
+    
+    
+    
 
 @register_agent    
 class NoStrategyAgent(BaseAgent):

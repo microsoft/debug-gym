@@ -2,7 +2,7 @@ base:
     # Environment configs
     output_path: "exps/swesmith"
     benchmark: "swesmith"
-    problems: "test-125"
+    problems: ['martinblech__xmltodict.0952f382.func_pm_op_change_const__ujosjqxw', 'django__channels.a144b4b8.combine_file__36w5u7ml', 'cantools__cantools.0c6a7871.func_pm_remove_assign__0d3u2d21','pyutils__line_profiler.a646bf0f.func_pm_class_rm_base__9i2l3vx9', 'mido__mido.a0158ff9.func_pm_ctrl_invert_if__9g33cwti']
     env_kwargs: {
         "dir_tree_depth": 1,
         "run_timeout": 300,
@@ -47,6 +47,9 @@ solution_agent:
     tools: ["eval", "pdb"]
 
 explanation_agent:
+    tools: ["pdb", "view", "rewrite", "listdir", "eval"]
+
+generic_critique_agent:
     tools: ["pdb", "view", "rewrite", "listdir", "eval"]
 
 no_strategy_agent:
