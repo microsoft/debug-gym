@@ -228,7 +228,13 @@ class RepoEnv(TooledEnv):
         atexit.register(self._tempdir.cleanup)
 
         self.logger.debug(f"Working directory: {self.working_dir}")
-        shutil.copytree(self.path, self.working_dir, dirs_exist_ok=True, symlinks=True)
+        shutil.copytree(
+            self.path,
+            self.working_dir,
+            dirs_exist_ok=True,
+            symlinks=True,
+            ignore=shutil.ignore_patterns("__pycache__", "*.pyc"),
+        )
 
         self.setup_file_filters(readonly_patterns, ignore_patterns)
 
@@ -517,6 +523,9 @@ class RepoEnv(TooledEnv):
             try:
                 # tool_kwargs is a dict, so we need to unpack it
                 self.step_observation = triggered_tool(self, **tool_kwargs)
+            except KeyboardInterrupt:
+                self.logger.error("Step was interrupted by user.")
+                raise
             except BaseException as e:
                 error_message = (
                     f"Error while using tool {triggered_tool.name} "

@@ -18,15 +18,15 @@ class AgentSolution(BaseAgent):
 
     def _env_implements_apply_gold_patch(self):
         """Fail early if the environment does not implement apply_gold_patch."""
-        return "apply_gold_patch" in type(self.env).__dict__
+        return hasattr(self.env, "apply_gold_patch")
 
     def run(self, task_name=None, debug=False):
         info = None
         try:
             if not self._env_implements_apply_gold_patch():
                 raise NotImplementedError(
-                    f"The environment {type(self.env)} is not compatible with SolutionAgent"
-                    "Check the README.md to see which environments are compatible."
+                    f"The environment {type(self.env)} is not compatible with SolutionAgent."
+                    " Check the README.md to see which environments are compatible."
                 )
 
             self.history.reset()
@@ -34,7 +34,7 @@ class AgentSolution(BaseAgent):
             self.history.step(info)
 
             if info.done is True:
-                self._report_progress(task_name, info, "done")
+                self._report_progress(task_name, info, "resolved")
                 return True
 
             self.logger.info(
@@ -80,8 +80,9 @@ class AgentSolution(BaseAgent):
                 "The task is not done after applying the gold patch.\n"
                 f"{info.step_observation.observation}"
             )
-            self._report_progress(task_name, info, "done")
+            status = "resolved" if info.done else "unresolved"
+            self._report_progress(task_name, info, status)
         except Exception:
-            self._report_progress(task_name, info, "failed")
+            self._report_progress(task_name, info, "error")
             raise
         return info.done

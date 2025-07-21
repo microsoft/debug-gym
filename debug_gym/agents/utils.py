@@ -243,9 +243,21 @@ def load_config():
         help="Force running only problems that have failed.",
     )
     parser.add_argument(
+        "-t",
+        "--timeout",
+        type=int,
+        default=0,
+        help="Timeout in seconds for each problem. Default: 0 seconds (no timeout).",
+    )
+    parser.add_argument(
         "--keep-completed-tasks",
         action="store_true",
         help="Keep displaying completed tasks in the workers panel.",
+    )
+    parser.add_argument(
+        "--no-live-display",
+        action="store_true",
+        help="Disable rich live progress display.",
     )
     parser.add_argument(
         "--max-display",
