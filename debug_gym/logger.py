@@ -413,6 +413,15 @@ class DebugGymLogger(logging.Logger):
     LOG_QUEUE = mp.Queue(maxsize=10000)
     PROGRESS_QUEUE = mp.Queue(maxsize=10000)
     _is_worker = False
+    _instance = None
+
+    def __new__(cls, *args, **kwargs):
+        """Ensure only one instance of the logger is created (singleton pattern)."""
+        if cls._instance is None:
+            cls._instance = super(DebugGymLogger, cls).__new__(cls)
+            cls._instance._initialized = False
+
+        return cls._instance
 
     def __init__(
         self,
@@ -421,6 +430,9 @@ class DebugGymLogger(logging.Logger):
         level: str | int = logging.INFO,
         mode: str = "a",
     ):
+        if hasattr(self, "_initialized") and self._initialized:
+            return  # Already initialized
+
         super().__init__(name)
         # If var env "DEBUG_GYM_DEBUG" is set, turn on debug mode
         if os.environ.get("DEBUG_GYM_DEBUG"):
@@ -442,6 +454,8 @@ class DebugGymLogger(logging.Logger):
             self._initialize_main_logger(level)
         if log_dir:
             self._initialize_file_handler(name, log_dir, mode)
+
+        self._initialized = True
 
     def _initialize_main_logger(self, level):
         self._live = Live(transient=True, refresh_per_second=2)
