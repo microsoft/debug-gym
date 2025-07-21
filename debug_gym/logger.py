@@ -476,22 +476,20 @@ class DebugGymLogger(logging.Logger):
     LOG_QUEUE = mp.Queue(maxsize=10000)
     PROGRESS_QUEUE = mp.Queue(maxsize=10000)
     _is_worker = False
-    _instance = None  # Singleton instance
 
-    @property
-    def is_worker(self):
-        return self._is_worker
+    @classmethod
+    def is_worker(cls):
+        return cls._is_worker
 
-    @property
-    def is_main(self):
-        return not self._is_worker
+    @classmethod
+    def is_main(cls):
+        return not cls._is_worker
 
-    def __new__(cls, *args, **kwargs):
-        """Singleton pattern to ensure only one instance of
-        DebugGymLogger exists per process."""
-        if cls._instance is None:
-            cls._instance = super(DebugGymLogger, cls).__new__(cls)
-        return cls._instance
+    @classmethod
+    def set_as_worker(cls):
+        """Set the logger as a worker logger, which means it will put logs and
+        progress updates to the queues, letting the main process handle them."""
+        cls._is_worker = True
 
     def __init__(
         self,
@@ -516,13 +514,13 @@ class DebugGymLogger(logging.Logger):
         self.no_live = False  # Flag to disable live updates
         self._log_listener_stop_event = None  # Event to stop the log listener thread
         self._log_listener_thread = None  # Thread to process logs from workers
-        if self.is_main:
+        if self.is_main():
             self._initialize_main_logger(level)
         self.log_file = None  # File handler for logging to a file
         self.log_dir = Path(log_dir) if log_dir else None
         if self.log_dir:  # Directory to store log files
             self.log_dir.mkdir(parents=True, exist_ok=True)
-            if self.is_worker:
+            if self.is_worker():
                 self._initialize_file_handler(name, mode)
             self.info(f"Logging to directory: {self.log_dir}")
 
@@ -560,12 +558,12 @@ class DebugGymLogger(logging.Logger):
         log to their own handlers (ex.: a file) and put the
         record into the log queue for the main process to display
         logs through Rich."""
-        if self.is_worker:
+        if self.is_worker():
             self.LOG_QUEUE.put(record)
         super().handle(record)
 
     def _log_listener(self):
-        if self.is_main:
+        if self.is_main():
             while not self._log_listener_stop_event.is_set():
                 try:
                     record = self.LOG_QUEUE.get(timeout=0.1)
@@ -587,12 +585,6 @@ class DebugGymLogger(logging.Logger):
     def __del__(self):
         self.close()
 
-    @classmethod
-    def set_as_worker(cls):
-        """Set the logger as a worker logger, which means it will put logs and
-        progress updates to the queues, letting the main process handle them."""
-        cls._is_worker = True
-
     def set_no_live(self):
         """Set the logger to not use the Rich Live display."""
         self.no_live = True
@@ -604,7 +596,7 @@ class DebugGymLogger(logging.Logger):
         the progress bar when the context is exited, ensuring that the UI is updated
         correctly and the thread is joined properly. Only the main process can manage
         the Rich UI, so this method raises an error if called in a worker process."""
-        if self.is_worker:
+        if self.is_worker():
             raise RuntimeError("Cannot use rich_progress in worker processes.")
         ctx = OverallProgressContext(
             problems, max_display, self._live, self.PROGRESS_QUEUE, self

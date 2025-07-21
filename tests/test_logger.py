@@ -389,14 +389,14 @@ def test_debuggymlogger_report_progress(DebugGymLoggerTest):
 
 def test_debuggymlogger_set_as_worker_resets(DebugGymLoggerTest):
     logger = DebugGymLoggerTest("test_reset_logger")
-    assert DebugGymLoggerTest.is_main
-    assert logger.is_main
+    assert DebugGymLoggerTest.is_main()
+    assert logger.is_main()
     # Set as worker
     DebugGymLoggerTest.set_as_worker()
-    assert DebugGymLoggerTest.is_worker
-    assert logger.is_worker
+    assert DebugGymLoggerTest.is_worker()
+    assert logger.is_worker()
     another_logger = DebugGymLoggerTest("test_reset_logger")
-    assert another_logger.is_worker
+    assert another_logger.is_worker()
 
 
 def test_debuggymlogger_rich_progress_raises_in_worker(DebugGymLoggerTest):
