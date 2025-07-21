@@ -1,5 +1,6 @@
 import logging
 import multiprocessing as mp
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -11,6 +12,7 @@ from debug_gym.logger import (
     StripAnsiFormatter,
     TaskProgress,
     TaskProgressManager,
+    log_file_path,
     log_with_color,
 )
 
@@ -152,10 +154,11 @@ def test_strip_ansi_formatter():
     assert result == "Red text"
 
 
-def test_task_progress_manager_initialization():
+def test_task_progress_manager_initialization(DebugGymLoggerTest):
     # Test that TaskProgressManager initializes correctly
+    logger = DebugGymLoggerTest("test_logger")
     problems = ["problem1", "problem2"]
-    manager = TaskProgressManager(problems)
+    manager = TaskProgressManager(problems, logger=logger)
 
     # Check that tasks were added for each problem
     assert len(manager._tasks) == 2
@@ -168,10 +171,11 @@ def test_task_progress_manager_initialization():
     assert "problem2" in manager._progress_task_ids
 
 
-def test_task_progress_manager_advance():
+def test_task_progress_manager_advance(DebugGymLoggerTest):
     # Test that TaskProgressManager.advance updates task state correctly
+    logger = DebugGymLoggerTest("test_logger")
     problems = ["problem1"]
-    manager = TaskProgressManager(problems)
+    manager = TaskProgressManager(problems, logger=logger)
 
     # Initial state
     assert manager._tasks["problem1"].step == 0
@@ -203,10 +207,11 @@ def test_task_progress_manager_advance():
         assert kwargs["status"] == "running"
 
 
-def test_group_tasks_by_status_basic():
+def test_group_tasks_by_status_basic(DebugGymLoggerTest):
     # Test that group_tasks_by_status groups tasks correctly by their status
+    logger = DebugGymLoggerTest("test_logger")
     problems = ["p1", "p2", "p3", "p4"]
-    manager = TaskProgressManager(problems)
+    manager = TaskProgressManager(problems, logger=logger)
     # Set up tasks with different statuses
     updates = [
         TaskProgress("p1", 1, 10, 10, 100, "resolved"),
@@ -227,10 +232,11 @@ def test_group_tasks_by_status_basic():
             assert grouped[status] == []
 
 
-def test_group_tasks_by_status_with_unknown_status():
+def test_group_tasks_by_status_with_unknown_status(DebugGymLoggerTest):
     # Test that a task with an unknown status is grouped under "pending"
+    logger = DebugGymLoggerTest("test_logger")
     problems = ["p1"]
-    manager = TaskProgressManager(problems)
+    manager = TaskProgressManager(problems, logger=logger)
     # Manually set an unknown status
     manager._tasks["p1"].status = "not-a-status"
     grouped = manager.group_tasks_by_status()
@@ -262,10 +268,11 @@ def test_group_tasks_by_status_multiple_tasks_same_status():
             assert grouped[status] == []
 
 
-def test_task_progress_manager_get_task_stats():
+def test_task_progress_manager_get_task_stats(DebugGymLoggerTest):
     # Test that TaskProgressManager.get_task_stats returns correct stats
+    logger = DebugGymLoggerTest("test_logger")
     problems = ["p1", "p2", "p3", "p4", "p5", "p6", "p7", "p8"]
-    manager = TaskProgressManager(problems, max_display=5)
+    manager = TaskProgressManager(problems, max_display=5, logger=logger)
 
     # Set up tasks with different statuses
     updates = [
@@ -394,3 +401,30 @@ def test_debuggymlogger_rich_progress_raises_in_worker(DebugGymLoggerTest):
     with pytest.raises(RuntimeError):
         with logger.rich_progress(["p1", "p2"]):
             pass
+
+
+def test_log_file_path_absolute(tmp_path):
+    log_dir = tmp_path / "logs"
+    log_dir.mkdir()
+    problem_id = "prob1"
+    result = log_file_path(log_dir, problem_id)
+    assert result == (log_dir / "prob1.log").absolute()
+    assert result.is_absolute()
+
+
+def test_log_file_path_relative(tmp_path, monkeypatch):
+    log_dir = tmp_path / "logs"
+    log_dir.mkdir()
+    problem_id = "prob2"
+    # Change cwd to tmp_path for relative path calculation
+    monkeypatch.chdir(tmp_path)
+    result = log_file_path(log_dir, problem_id, relative=True)
+    assert result == Path("logs") / "prob2.log"
+
+
+def test_log_file_path_relative_outside_cwd(tmp_path):
+    log_dir = tmp_path / "logs"
+    log_dir.mkdir()
+    problem_id = "prob5"
+    result = log_file_path(log_dir, problem_id, relative=True)
+    assert result == log_dir / "prob5.log"

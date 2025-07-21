@@ -130,7 +130,11 @@ class StatusColumn(SpinnerColumn):
 def log_file_path(log_dir, problem_id, relative=False) -> Path:
     logfile = (Path(log_dir) / f"{problem_id}.log").absolute()
     if relative:
-        logfile = logfile.relative_to(os.getcwd())
+        try:
+            logfile = logfile.relative_to(os.getcwd())
+        except ValueError:
+            # If the log_dir is not a subdir of the cwd, return the absolute path
+            pass
     return logfile
 
 
@@ -455,10 +459,6 @@ class DebugGymLogger(logging.Logger):
     def is_worker(self):
         return self._is_worker
 
-    @is_worker.setter
-    def is_worker(self, value: bool):
-        self._is_worker = value
-
     @property
     def is_main(self):
         return not self._is_worker
@@ -561,7 +561,7 @@ class DebugGymLogger(logging.Logger):
     def set_as_worker(cls):
         """Set the logger as a worker logger, which means it will put logs and
         progress updates to the queues, letting the main process handle them."""
-        cls.is_worker = True
+        cls._is_worker = True
 
     def set_no_live(self):
         """Set the logger to not use the Rich Live display."""
