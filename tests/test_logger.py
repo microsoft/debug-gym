@@ -450,9 +450,9 @@ def test_dump_task_status_creates_json_file(tmp_path, DebugGymLoggerTest):
         status="unresolved",
         logdir=str(logdir),
     )
-    # Should create status.json in logdir
+    # Should create problem1_status.json in logdir
     manager.dump_task_status(task)
-    status_path = logdir / "status.json"
+    status_path = status_json_path(logdir, "problem1")
     assert status_path.exists()
     # Check contents
     with open(status_path, "r") as f:

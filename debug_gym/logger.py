@@ -268,12 +268,16 @@ class TaskProgressManager:
                 )
 
     def dump_task_status(self, task: TaskProgress):
-        if task.logdir:
-            status_path = status_json_path(task.logdir, task.problem_id)
-            task_dict = asdict(task)
-            self.logger.debug(f"Dumping task status to JSON: {status_path}")
-            with open(status_path, "w") as f:
-                json.dump(task_dict, f)
+        if not task.logdir:
+            self.logger.warning(
+                f"No logdir set for task {task.problem_id}. "
+                "Skipping task status dump."
+            )
+        status_path = status_json_path(task.logdir, task.problem_id)
+        task_dict = asdict(task)
+        self.logger.debug(f"Dumping task status to JSON: {status_path}")
+        with open(status_path, "w") as f:
+            json.dump(task_dict, f)
 
     def refresh_progress(self, all_tasks: bool = False):
         """Refresh the progress display, updating task visibility and panel title.
@@ -472,6 +476,7 @@ class DebugGymLogger(logging.Logger):
     LOG_QUEUE = mp.Queue(maxsize=10000)
     PROGRESS_QUEUE = mp.Queue(maxsize=10000)
     _is_worker = False
+    _instance = None  # Singleton instance
 
     @property
     def is_worker(self):
@@ -480,6 +485,13 @@ class DebugGymLogger(logging.Logger):
     @property
     def is_main(self):
         return not self._is_worker
+
+    def __new__(cls, *args, **kwargs):
+        """Singleton pattern to ensure only one instance of
+        DebugGymLogger exists per process."""
+        if cls._instance is None:
+            cls._instance = super(DebugGymLogger, cls).__new__(cls)
+        return cls._instance
 
     def __init__(
         self,
