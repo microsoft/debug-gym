@@ -378,14 +378,14 @@ def test_debuggymlogger_report_progress(DebugGymLoggerTest):
 
 def test_debuggymlogger_set_as_worker_resets(DebugGymLoggerTest):
     logger = DebugGymLoggerTest("test_reset_logger")
-    assert not DebugGymLoggerTest._is_worker
-    assert not logger._is_worker
+    assert DebugGymLoggerTest.is_main
+    assert logger.is_main
     # Set as worker
     DebugGymLoggerTest.set_as_worker()
-    assert DebugGymLoggerTest._is_worker
-    assert logger._is_worker
+    assert DebugGymLoggerTest.is_worker
+    assert logger.is_worker
     another_logger = DebugGymLoggerTest("test_reset_logger")
-    assert another_logger._is_worker
+    assert another_logger.is_worker
 
 
 def test_debuggymlogger_rich_progress_raises_in_worker(DebugGymLoggerTest):
@@ -394,4 +394,3 @@ def test_debuggymlogger_rich_progress_raises_in_worker(DebugGymLoggerTest):
     with pytest.raises(RuntimeError):
         with logger.rich_progress(["p1", "p2"]):
             pass
-    DebugGymLoggerTest._is_worker = False
