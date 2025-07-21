@@ -8,6 +8,7 @@ from debug_gym.gym.tools.tool import EnvironmentTool
 from debug_gym.llms import AnthropicLLM, AzureOpenAILLM, Human, OpenAILLM
 from debug_gym.llms.base import (
     LLM,
+    ContextLengthExceededError,
     LLMConfig,
     LLMConfigRegistry,
     LLMResponse,
@@ -469,3 +470,172 @@ def test_llm_init_with_both_config_types(logger_mock, llm_class_mock):
         "Both llm_config and llm_config_file are provided, using llm_config."
         in logger_mock._log_history
     )
+
+
+@patch.object(
+    LLMConfigRegistry,
+    "from_file",
+    return_value=LLMConfigRegistry.register_all(
+        {
+            "llm-mock": {
+                "model": "llm-mock",
+                "context_limit": 4,
+                "tokenizer": "test-tokenizer",
+                "tags": [],
+            }
+        }
+    ),
+)
+def test_context_length_exceeded_prevents_infinite_recursion(
+    mock_llm_config, logger_mock, llm_class_mock
+):
+    """Test that ContextLengthExceededError handling prevents infinite recursion."""
+
+    class ContextErrorLLM(llm_class_mock):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self.generate_call_count = 0
+
+        def generate(self, messages, tools, **kwargs):
+            self.generate_call_count += 1
+            # Always raise ContextLengthExceededError to test the fix
+            raise ContextLengthExceededError("Context length exceeded")
+
+    llm = ContextErrorLLM("llm-mock", logger=logger_mock)
+    messages = [{"role": "user", "content": "Long message"}]
+
+    # Mock trim_prompt_messages to return the same messages (no reduction)
+    with patch("debug_gym.agents.utils.trim_prompt_messages") as mock_trim:
+        mock_trim.return_value = messages
+
+        # Should raise ContextLengthExceededError, not RecursionError
+        with pytest.raises(
+            ContextLengthExceededError, match="Unable to reduce prompt size"
+        ):
+            llm(messages, tools)
+
+    # Should only try once due to no improvement in trimming
+    assert llm.generate_call_count == 1
+
+    # Should log the "Prompt is too long" message
+    prompt_too_long_calls = [
+        msg for msg in logger_mock._log_history if "Prompt is too long" in msg
+    ]
+    assert len(prompt_too_long_calls) == 1
+
+
+@patch.object(
+    LLMConfigRegistry,
+    "from_file",
+    return_value=LLMConfigRegistry.register_all(
+        {
+            "llm-mock": {
+                "model": "llm-mock",
+                "context_limit": 4,
+                "tokenizer": "test-tokenizer",
+                "tags": [],
+            }
+        }
+    ),
+)
+def test_context_length_exceeded_with_successful_truncation(
+    mock_llm_config, logger_mock, llm_class_mock
+):
+    """Test that successful truncation logs both messages correctly."""
+
+    class ContextErrorThenSuccessLLM(llm_class_mock):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self.generate_call_count = 0
+
+        def generate(self, messages, tools, **kwargs):
+            self.generate_call_count += 1
+            if self.generate_call_count == 1:
+                raise ContextLengthExceededError("Context length exceeded")
+
+            # Success on second call
+            return super().generate(messages, tools, **kwargs)
+
+    llm = ContextErrorThenSuccessLLM("llm-mock", logger=logger_mock)
+    messages = [{"role": "user", "content": "Long message"}]
+
+    # Mock trim_prompt_messages to return shorter messages
+    with patch("debug_gym.agents.utils.trim_prompt_messages") as mock_trim:
+        shorter_messages = [{"role": "user", "content": "Short"}]
+        mock_trim.return_value = shorter_messages
+
+        # Should succeed
+        response = llm(messages, tools)
+        assert response.response == "Test response"
+
+    # Should try twice: fail once, then succeed
+    assert llm.generate_call_count == 2
+
+    # Should log both "Prompt is too long" and "Prompt truncated" messages
+    prompt_too_long_calls = [
+        msg for msg in logger_mock._log_history if "Prompt is too long" in msg
+    ]
+    prompt_truncated_calls = [
+        msg for msg in logger_mock._log_history if "Prompt truncated" in msg
+    ]
+
+    assert (
+        len(prompt_too_long_calls) == 1
+    ), f"Expected 1 'Prompt is too long' call, got {len(prompt_too_long_calls)}"
+    assert (
+        len(prompt_truncated_calls) == 1
+    ), f"Expected 1 'Prompt truncated' call, got {len(prompt_truncated_calls)}"
+
+
+@patch.object(
+    LLMConfigRegistry,
+    "from_file",
+    return_value=LLMConfigRegistry.register_all(
+        {
+            "llm-mock": {
+                "model": "llm-mock",
+                "context_limit": 4,
+                "tokenizer": "test-tokenizer",
+                "tags": [],
+            }
+        }
+    ),
+)
+def test_context_length_exceeded_max_retries(
+    mock_llm_config, logger_mock, llm_class_mock
+):
+    """Test that max_retries prevents infinite attempts."""
+
+    class AlwaysContextErrorLLM(llm_class_mock):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self.generate_call_count = 0
+
+        def generate(self, messages, tools, **kwargs):
+            self.generate_call_count += 1
+            raise ContextLengthExceededError("Context length exceeded")
+
+    llm = AlwaysContextErrorLLM("llm-mock", logger=logger_mock)
+    messages = [{"role": "user", "content": "Long message"}]
+
+    # Mock trim_prompt_messages to return different messages each time
+    with patch("debug_gym.agents.utils.trim_prompt_messages") as mock_trim:
+        trim_results = [
+            [{"role": "user", "content": "Medium"}],  # First trim
+            [{"role": "user", "content": "Short"}],  # Second trim
+            [{"role": "user", "content": "Tiny"}],  # Third trim
+        ]
+        mock_trim.side_effect = trim_results
+
+        # Should exhaust retries and raise error
+        with pytest.raises(
+            ContextLengthExceededError,
+            match="Unable to reduce prompt size after 3 attempts",
+        ):
+            llm(messages, tools)
+
+    # Should try 4 times total (initial + 3 retries)
+    assert llm.generate_call_count == 4
+
+    # Should call trim 3 times
+    assert mock_trim.call_count == 3
