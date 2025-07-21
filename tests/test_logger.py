@@ -1,5 +1,7 @@
+import json
 import logging
 import multiprocessing as mp
+from dataclasses import asdict
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -428,3 +430,34 @@ def test_log_file_path_relative_outside_cwd(tmp_path):
     problem_id = "prob5"
     result = log_file_path(log_dir, problem_id, relative=True)
     assert result == log_dir / "prob5.log"
+
+
+def test_dump_task_status_creates_json_file(tmp_path, DebugGymLoggerTest):
+    logdir = tmp_path / "logdir"
+    logdir.mkdir()
+    logger = DebugGymLoggerTest("test_logger")
+    problems = ["problem1", "problem2"]
+    manager = TaskProgressManager(problems, logger=logger)
+
+    task = TaskProgress(
+        problem_id="problem1",
+        step=3,
+        total_steps=10,
+        score=7,
+        max_score=10,
+        status="unresolved",
+        logdir=str(logdir),
+    )
+    # Should create status.json in logdir
+    manager.dump_task_status(task)
+    status_path = logdir / "status.json"
+    assert status_path.exists()
+    # Check contents
+    with open(status_path, "r") as f:
+        data = json.load(f)
+    assert data["problem_id"] == "problem1"
+    assert data["step"] == 3
+    assert data["status"] == "unresolved"
+    assert data["logdir"] == str(logdir)
+
+    assert data == asdict(task)
