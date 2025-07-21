@@ -14,8 +14,10 @@ from debug_gym.logger import (
     StripAnsiFormatter,
     TaskProgress,
     TaskProgressManager,
+    load_previous_run_status,
     log_file_path,
     log_with_color,
+    status_json_path,
 )
 
 
@@ -372,7 +374,7 @@ def test_debuggymlogger_report_progress(DebugGymLoggerTest):
     while not DebugGymLoggerTest.PROGRESS_QUEUE.empty():
         DebugGymLoggerTest.PROGRESS_QUEUE.get_nowait()
     logger.report_progress(
-        problem_id="prob1",
+        problem_id="problem1",
         step=1,
         total_steps=10,
         score=5,
@@ -380,7 +382,7 @@ def test_debuggymlogger_report_progress(DebugGymLoggerTest):
         status="running",
     )
     progress = DebugGymLoggerTest.PROGRESS_QUEUE.get(timeout=1)
-    assert progress.problem_id == "prob1"
+    assert progress.problem_id == "problem1"
     assert progress.step == 1
     assert progress.status == "running"
 
@@ -408,20 +410,20 @@ def test_debuggymlogger_rich_progress_raises_in_worker(DebugGymLoggerTest):
 def test_log_file_path_absolute(tmp_path):
     log_dir = tmp_path / "logs"
     log_dir.mkdir()
-    problem_id = "prob1"
+    problem_id = "problem1"
     result = log_file_path(log_dir, problem_id)
-    assert result == (log_dir / "prob1.log").absolute()
+    assert result == (log_dir / "problem1.log").absolute()
     assert result.is_absolute()
 
 
 def test_log_file_path_relative(tmp_path, monkeypatch):
     log_dir = tmp_path / "logs"
     log_dir.mkdir()
-    problem_id = "prob2"
+    problem_id = "problem2"
     # Change cwd to tmp_path for relative path calculation
     monkeypatch.chdir(tmp_path)
     result = log_file_path(log_dir, problem_id, relative=True)
-    assert result == Path("logs") / "prob2.log"
+    assert result == Path("logs") / "problem2.log"
 
 
 def test_log_file_path_relative_outside_cwd(tmp_path):
@@ -461,3 +463,43 @@ def test_dump_task_status_creates_json_file(tmp_path, DebugGymLoggerTest):
     assert data["logdir"] == str(logdir)
 
     assert data == asdict(task)
+
+
+def test_status_json_path(tmp_path):
+    log_dir = tmp_path / "logs"
+    log_dir.mkdir()
+    problem_id = "problem1"
+    expected = log_dir / "problem1_status.json"
+    result = status_json_path(log_dir, problem_id)
+    assert result == expected
+
+    problem_id = "problem2"
+    result = load_previous_run_status(str(log_dir), problem_id)
+    assert result is None
+
+
+def test_load_previous_run_status_loads_taskprogress(tmp_path):
+    log_dir = tmp_path / "logs"
+    log_dir.mkdir()
+    problem_id = "problem1"
+    status_path = status_json_path(log_dir, problem_id)
+    data = {
+        "problem_id": problem_id,
+        "step": 2,
+        "total_steps": 5,
+        "score": 10,
+        "max_score": 20,
+        "status": "running",
+        "logdir": str(log_dir),
+    }
+    with open(status_path, "w") as f:
+        json.dump(data, f)
+    result = load_previous_run_status(str(log_dir), problem_id)
+    assert isinstance(result, TaskProgress)
+    assert result.problem_id == problem_id
+    assert result.step == 2
+    assert result.total_steps == 5
+    assert result.score == 10
+    assert result.max_score == 20
+    assert result.status == "running"
+    assert result.logdir == str(log_dir)

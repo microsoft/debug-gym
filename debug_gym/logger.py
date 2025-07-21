@@ -128,6 +128,9 @@ class StatusColumn(SpinnerColumn):
 
 
 def log_file_path(log_dir, problem_id, relative=False) -> Path:
+    """Return the path to the log file for a given problem. If `relative` is True,
+    it returns a relative path from the current working directory. If the log_dir
+    is not a subdir of the cwd, returns the absolute path."""
     logfile = (Path(log_dir) / f"{problem_id}.log").absolute()
     if relative:
         try:
@@ -136,6 +139,21 @@ def log_file_path(log_dir, problem_id, relative=False) -> Path:
             # If the log_dir is not a subdir of the cwd, return the absolute path
             pass
     return logfile
+
+
+def status_json_path(log_dir, problem_id) -> Path:
+    """Return the path to the status.json file for a given problem."""
+    return Path(log_dir) / f"{problem_id}_status.json"
+
+
+def load_previous_run_status(log_dir: str, problem_id: str) -> TaskProgress | None:
+    """Load the previous run progress from a JSON file."""
+    status_path = status_json_path(log_dir, problem_id)
+    if status_path.exists():
+        with open(status_path, "r") as f:
+            data = json.load(f)
+            return TaskProgress(**data)
+    return None
 
 
 class TaskProgressManager:
@@ -251,7 +269,7 @@ class TaskProgressManager:
 
     def dump_task_status(self, task: TaskProgress):
         if task.logdir:
-            status_path = Path(task.logdir) / "status.json"
+            status_path = status_json_path(task.logdir, task.problem_id)
             task_dict = asdict(task)
             self.logger.debug(f"Dumping task status to JSON: {status_path}")
             with open(status_path, "w") as f:
