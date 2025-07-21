@@ -228,13 +228,10 @@ def dump_experiment_info(config: dict, args: dict):
 def main():
     config, args = load_config()
     config["uuid"] = config.get("uuid", str(uuid.uuid4()))
-
     exp_output_path = Path(config["output_path"]) / config["uuid"]
     exp_output_path.mkdir(parents=True, exist_ok=True)
     logger = DebugGymLogger("debug-gym", level=args.logging_level)
-
     logger.info(f"Experiment log path: {exp_output_path}")
-
     dump_experiment_info(config, args)
 
     # Figure out which problems to solve.
