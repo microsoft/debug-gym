@@ -16,6 +16,7 @@ from debug_gym.constants import DEBUG_GYM_CACHE_DIR
 from debug_gym.gym.entities import EvalOutput
 from debug_gym.gym.envs.swe_bench import SWEBenchEnv
 from debug_gym.gym.terminal import Terminal
+from debug_gym.gym.utils import filter_problems
 
 
 class SWESmithEnv(SWEBenchEnv):
@@ -30,7 +31,6 @@ class SWESmithEnv(SWEBenchEnv):
         dataset_id: str = "SWE-bench/SWE-smith",
         dataset_revision: str = "699b53400d3855206a0fbf3ff4beaf1a52f4f232",
         split: str = "train",
-        problems: list[str] | None = None,
         terminal: Terminal | None = None,
         **kwargs,
     ):
@@ -38,12 +38,11 @@ class SWESmithEnv(SWEBenchEnv):
         super().__init__(
             dataset_id=dataset_id,
             split=split,
-            problems=problems,
             terminal=terminal,
             **kwargs,
         )
 
-    def load_dataset(self):
+    def load_dataset(self, problems: str | list[str] | None = None):
         if Path(self.dataset_id).is_file() and self.dataset_id.endswith(".json"):
             # Loading from local JSON file.
             self.ds = datasets.load_dataset("json", data_files=self.dataset_id)[
@@ -58,21 +57,18 @@ class SWESmithEnv(SWEBenchEnv):
                 self.dataset_id, revision=self.dataset_revision
             )[self.split]
 
-        self.dataset = {id: i for i, id in enumerate(self.ds["instance_id"])}
+        # Load custom dataset splits from config.
+        with open(SWESmithEnv.CONFIG) as f:
+            custom_splits = yaml.safe_load(f)
+            excluded_ids = custom_splits.get("excluded", [])
 
-        # To avoid concurrency issues, we will clone all the repos in the dataset.
-        swesmith_repos = set(self.ds["repo"])
-        image_names = set(self.ds["image_name"])
-        if self.problems:
-            # If problems are provided, filter the dataset to only include those repos.
-            swesmith_repos = set(
-                self.ds[self.dataset[id]]["repo"] for id in self.problems if id in self.dataset
-            )
-            image_names = set(
-                self.ds[self.dataset[id]]["image_name"] for id in self.problems if id in self.dataset
-            )
+        dataset = {id: i for i, id in enumerate(self.ds["instance_id"])}
+        problems = filter_problems(dataset, problems, custom_splits, excluded_ids)
+        dataset = {id: i for id, i in dataset.items() if id in problems}
+
+        image_names = set(self.ds[dataset[id]]["image_name"] for id in dataset)
         self.logger.debug(
-            f"Loaded {len(self.ds)} tasks accross {len(swesmith_repos)} repos from {self.dataset_id}."
+            f"Loaded {len(self.ds)} tasks accross {len(image_names)} Docker images from {self.dataset_id}."
         )
 
         # Download all images needed for SWE-Smith.
@@ -94,32 +90,14 @@ class SWESmithEnv(SWEBenchEnv):
                 # Rename images via tagging
                 client.images.get(docker_hub_image).tag(image_name)
 
-        # Load dataset splits.
-        with open(SWESmithEnv.CONFIG) as f:
-            self.dataset_splits = yaml.safe_load(f)
-            self.excluded_ids = self.dataset_splits.get("excluded", [])
-
-    def get_problem_ids(self, split_or_problem_id):
-        if split_or_problem_id == "all":
-            return sorted(
-                k for k in self.dataset.keys() if k not in self.excluded_ids
-            )  # all tasks
-        elif split_or_problem_id in self.dataset:
-            return [split_or_problem_id]  # Single task
-        elif split_or_problem_id in self.dataset_splits:
-            return self.dataset_splits[split_or_problem_id]
-        else:
-            raise ValueError(
-                f"Invalid split or problem id: '{split_or_problem_id}'. Available splits are: {['all'] + sorted(self.dataset_splits.keys())}"
-            )
+        return dataset
 
     def setup_task(self, task_name):
-        if self.problems:
-            if task_name not in self.problems:
-                raise ValueError(
-                    f"Task `{task_name}` was not found in problems. The available tasks are: {self.problems}.\n"
-                    "Please provide a valid task or initialize the environment without problems to load all tasks."
-                )
+        if task_name not in self.dataset:
+            raise ValueError(
+                f"Task `{task_name}` was not found in dataset. The available tasks are: {self.dataset}.\n"
+                "Please provide a valid task or initialize the environment without problems to load all tasks."
+            )
 
         self.task_name = task_name
         self.ds_row = self.ds[self.dataset[self.task_name]]

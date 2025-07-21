@@ -176,7 +176,12 @@ def run_agent(args, problem, config):
 def create_env(config: dict, logger: DebugGymLogger):
     terminal = select_terminal(config.get("terminal"), logger)
     env_class = select_env(config.get("benchmark"))
-    env = env_class(**config["env_kwargs"], terminal=terminal, logger=logger)
+    env = env_class(
+        **config["env_kwargs"],
+        problems=config.get("problems", ["custom"]),
+        terminal=terminal,
+        logger=logger,
+    )
     return env
 
 
@@ -238,11 +243,9 @@ def main():
 
     dump_experiment_info(config, args)
 
-    # Figure out which problems to solve.
-    problems = config.get("problems", ["custom"])
-    if isinstance(problems, str) and "benchmark" in config:
-        env = create_env(config, logger=logger)
-        problems = env.get_problem_ids(split_or_problem_id=problems)
+    # Create the environment to get the list of problems to run.
+    env = create_env(config, logger=logger)
+    problems = sorted(env.dataset)
 
     if args.list:
         print(f"\n# Available problems in {config.get('benchmark', 'config')}:")

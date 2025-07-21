@@ -258,5 +258,3 @@ def test_get_problem_ids_all(get_swe_env):
     swe_env.dataset_splits = {"split_1": ["task_1"]}
     with pytest.raises(ValueError, match="Invalid split or problem id: 'invalid_id'"):
         swe_env.get_problem_ids("invalid_id")
-
-
