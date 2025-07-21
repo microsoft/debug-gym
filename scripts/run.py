@@ -259,7 +259,7 @@ def main():
     llm = LLM.instantiate(
         llm_name=config["llm_name"],
         llm_config_file_path=config.get("llm_config_file_path"),
-        logger=None,
+        logger=logger,
     )
 
     # Stop live progress display if --no-live-display is set
