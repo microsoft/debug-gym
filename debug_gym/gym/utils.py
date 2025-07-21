@@ -216,6 +216,7 @@ def filter_problems(
 ) -> dict[str, Any]:
     excluded_ids = excluded_ids or []
     custom_splits = custom_splits or {}
+    problems = "all" if problems is None else problems
 
     if not isinstance(problems, str):
         # Check that all problems are valid task names.
@@ -231,8 +232,8 @@ def filter_problems(
 
         return problems  # Assuming a list of problem IDs.
 
-    if problems == "all" or problems is None:
-        return sorted(k for k in dataset if k not in excluded_ids)
+    if problems == "all":
+        return [k for k in dataset if k not in excluded_ids]
     elif problems in dataset:
         return [problems]  # Single task
     elif problems in custom_splits:
