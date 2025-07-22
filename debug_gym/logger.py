@@ -229,7 +229,7 @@ class TaskProgressManager:
             total=task.total_steps,
             score=task.score,
             max_score=task.max_score,
-            logfile=task._log_file_path,
+            logfile=task.log_file_path,
         )
         self._progress_task_ids[task.problem_id] = pid
         return pid
@@ -264,7 +264,7 @@ class TaskProgressManager:
                     status=task.status,
                     score=task.score,
                     max_score=task.max_score,
-                    logfile=self._log_file_path,
+                    logfile=self.log_file_path,
                 )
 
     def dump_task_status(self, task: TaskProgress):
