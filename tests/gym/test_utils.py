@@ -11,6 +11,7 @@ from debug_gym.gym.utils import (
     extract_max_score_from_pytest_output,
     extract_reward_from_pytest_output,
     filter_non_utf8,
+    filter_problems,
     is_subdirectory,
     make_file_matcher,
     show_line_number,
@@ -710,3 +711,88 @@ def test_cleanup_pytest_output():
     cleaned_message = cleanup_pytest_output(message)
     expected = "\nSomething else\n"
     assert cleaned_message == expected
+
+
+def test_filter_problems():
+    dataset = [f"problem{i+1}" for i in range(5)]
+
+    # Test retrieving all problem IDs
+    problem_ids = filter_problems(dataset, problems="all")
+    assert isinstance(problem_ids, list), "Expected a list of problem IDs"
+    assert len(problem_ids) == len(dataset), "Expected all problem IDs"
+    assert all(
+        isinstance(pid, str) for pid in problem_ids
+    ), "All problem IDs should be strings"
+
+    # Test retrieving a single valid problem ID
+    task_name = dataset[4]  # e.g., "problem4"
+    problem_ids = filter_problems(dataset, problems=task_name)
+    assert isinstance(problem_ids, list), "Expected a list of problem IDs"
+    assert len(problem_ids) == 1, "Expected exactly one problem ID"
+    assert problem_ids[0] == task_name, f"Expected problem ID to be {task_name}"
+
+    # Test retrieving an invalid problem ID
+    invalid_task_name = "non_existent_task"
+    with pytest.raises(
+        ValueError, match=f"Invalid split or problem id: '{invalid_task_name}'"
+    ):
+        filter_problems(dataset, problems=invalid_task_name)
+
+    # Test with empty dataset
+    empty_dataset = []
+    assert filter_problems(empty_dataset, problems="all") == []
+
+    # Test with duplicate items in dataset
+    duplicate_dataset = ["problem1", "problem2", "problem1", "problem3"]
+    result = filter_problems(duplicate_dataset, problems="all")
+    assert result == duplicate_dataset  # Should preserve duplicates and order
+
+    # Test with excluded_ids
+    result = filter_problems(
+        dataset, problems="all", excluded_ids=["problem2", "problem4"]
+    )
+    assert result == ["problem1", "problem3", "problem5"]
+
+    # Test with custom_splits
+    custom_splits = {
+        "easy": ["problem1", "problem2"],
+        "mixed": ["problem1", "problem3", "problem5"],
+    }
+    result = filter_problems(dataset, problems="easy", custom_splits=custom_splits)
+    assert result == ["problem1", "problem2"]
+
+    result = filter_problems(dataset, problems="mixed", custom_splits=custom_splits)
+    assert result == ["problem1", "problem3", "problem5"]
+
+    # Test with excluded_ids and custom_splits combined
+    result = filter_problems(
+        dataset, problems="all", excluded_ids=["problem2"], custom_splits=custom_splits
+    )
+    assert result == ["problem1", "problem3", "problem4", "problem5"]
+
+    # Test error cases
+    # Invalid problem ID in list
+    with pytest.raises(ValueError, match="Invalid problem id: 'nonexistent'"):
+        filter_problems(dataset, problems=["problem1", "nonexistent"])
+
+    # Invalid problem ID as string
+    with pytest.raises(ValueError, match="Invalid split or problem id: 'nonexistent'"):
+        filter_problems(dataset, problems="nonexistent")
+
+    # Duplicate problem IDs in list
+    with pytest.raises(ValueError, match="Duplicate problem IDs found in the list"):
+        filter_problems(dataset, problems=["problem1", "problem2", "problem1"])
+
+    # Test edge case: excluded_ids with custom split that includes excluded items
+    custom_splits_with_excluded = {"test_split": ["problem1", "problem2", "problem3"]}
+    result = filter_problems(
+        dataset,
+        problems="test_split",
+        custom_splits=custom_splits_with_excluded,
+        excluded_ids=["problem2"],  # excluded_ids only affects "all"
+    )
+    assert result == [
+        "problem1",
+        "problem2",
+        "problem3",
+    ]  # excluded_ids doesn't affect custom splits
