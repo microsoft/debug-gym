@@ -37,6 +37,7 @@ class EnvInfo:
 class EventHooks:
     def __init__(self):
         self.event_listeners = {event: [] for event in Event}
+        self.event_listeners_muted = {event: [] for event in Event}
 
     def subscribe(self, event: Event, tool: "Tool"):
         if event not in self.event_listeners:
@@ -49,6 +50,20 @@ class EventHooks:
 
     def unsubscribe(self, event: Event, tool):
         self.event_listeners[event].remove(tool)
+
+    def mute(self, event: Event):
+        """Mute all tools for the given event."""
+        if event not in self.event_listeners_muted:
+            raise ValueError(f"Unknown event type: {event}")
+        self.event_listeners_muted[event] = self.event_listeners[event][:]
+        self.event_listeners[event] = []
+
+    def unmute(self, event: Event):
+        """Unmute all tools for the given event."""
+        if event not in self.event_listeners_muted:
+            raise ValueError(f"Unknown event type: {event}")
+        self.event_listeners[event] = self.event_listeners_muted[event][:]
+        self.event_listeners_muted[event] = []
 
     def notify(
         self, environment, event: Event, source=None, **kwargs
@@ -502,10 +517,12 @@ class RepoEnv(TooledEnv):
 
     @property
     def patch(self):
-        command = ["git", "diff", "--no-index", self.path, self.working_dir]
-        result = subprocess.run(command, text=True, capture_output=True)
-        patch = result.stdout.replace(str(self.working_dir), str(self.path))
-        return patch
+        success, output = self.terminal.run("git diff")
+        if not success:
+            self.logger.error("Failed to get git diff. {output}")
+            return None
+
+        return output
 
     def apply_gold_patch(self):
         raise NotImplementedError(

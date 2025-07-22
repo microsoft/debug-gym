@@ -1,4 +1,3 @@
-import logging
 import os
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
@@ -18,9 +17,6 @@ from debug_gym.gym.tools.tool import EnvironmentTool, ToolCall
 from debug_gym.llms.constants import DEFAULT_LLM_CONFIG
 from debug_gym.llms.utils import print_messages
 from debug_gym.logger import DebugGymLogger
-
-# Set logging level down to WARNING for endpoint queries.
-logging.getLogger("httpx").setLevel(logging.WARNING)
 
 
 def retry_on_exception(
