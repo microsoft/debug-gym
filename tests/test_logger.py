@@ -139,6 +139,33 @@ def test_status_column_render():
         column.render(unknown_task)
 
 
+def test_task_log_file_path(tmp_path):
+    log_dir = tmp_path / "logs"
+    task = TaskProgress(
+        problem_id="test_task",
+        step=0,
+        total_steps=10,
+        score=0,
+        max_score=100,
+        status="pending",
+        logdir=str(log_dir),
+    )
+    expected_path = str(log_dir / "test_task.log")
+    assert task.log_file_path == expected_path
+
+
+def test_task_log_file_path_empty_dir():
+    task = TaskProgress(
+        problem_id="test_task",
+        step=0,
+        total_steps=10,
+        score=0,
+        max_score=100,
+        status="pending",
+    )
+    assert task.log_file_path == ""
+
+
 def test_strip_ansi_formatter():
     # Test that the StripAnsiFormatter removes ANSI color codes
     formatter = StripAnsiFormatter("%(message)s")

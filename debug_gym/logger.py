@@ -103,6 +103,20 @@ class TaskProgress:
             return "yellow"
         raise ValueError(f"Unknown task status: `{status}`. ")
 
+    @property
+    def log_file_path(self) -> str:
+        return (
+            str(
+                log_file_path(
+                    self.logdir,
+                    self.problem_id,
+                    relative=True,
+                )
+            )
+            if self.logdir
+            else ""
+        )
+
 
 class StatusColumn(SpinnerColumn):
     """Custom status column. magenta ! when error,
@@ -196,20 +210,6 @@ class TaskProgressManager:
 
         self.refresh_progress()
 
-    @staticmethod
-    def _log_file_path(progress_update: TaskProgress) -> str:
-        return (
-            str(
-                log_file_path(
-                    progress_update.logdir,
-                    progress_update.problem_id,
-                    relative=True,
-                )
-            )
-            if progress_update.logdir
-            else ""
-        )
-
     def add_task(self, task_id: str, total_steps: int = 1) -> int:
         """Add a new task to the progress manager and return its task ID."""
         task = TaskProgress(
@@ -229,7 +229,7 @@ class TaskProgressManager:
             total=task.total_steps,
             score=task.score,
             max_score=task.max_score,
-            logfile=self._log_file_path(task),
+            logfile=task._log_file_path,
         )
         self._progress_task_ids[task.problem_id] = pid
         return pid
@@ -264,7 +264,7 @@ class TaskProgressManager:
                     status=task.status,
                     score=task.score,
                     max_score=task.max_score,
-                    logfile=self._log_file_path(task),
+                    logfile=self._log_file_path,
                 )
 
     def dump_task_status(self, task: TaskProgress):
