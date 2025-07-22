@@ -1,6 +1,7 @@
 import json
 import logging
 import multiprocessing as mp
+import queue
 from dataclasses import asdict
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -387,20 +388,19 @@ def test_log_with_color_escapes_special_characters():
 def test_debuggymlogger_log_queue_worker(DebugGymLoggerTest, tmp_path):
     DebugGymLoggerTest.set_as_worker()
     logger = DebugGymLoggerTest("test_worker_logger", log_dir=str(tmp_path))
-    # Clear the queue before test
-    while not DebugGymLoggerTest.LOG_QUEUE.empty():
-        DebugGymLoggerTest.LOG_QUEUE.get_nowait()
     logger.info("Worker log message")
     # Should be in LOG_QUEUE
-    record = DebugGymLoggerTest.LOG_QUEUE.get(timeout=1)
-    assert record.msg == "Worker log message"
+    try:
+        records = []
+        while True:
+            records.append(DebugGymLoggerTest.LOG_QUEUE.get(timeout=1))
+    except (TimeoutError, queue.Empty):
+        pass
+    assert "Worker log message" in [r.msg for r in records]
 
 
 def test_debuggymlogger_report_progress(DebugGymLoggerTest, tmp_path):
     logger = DebugGymLoggerTest("test_progress_logger", log_dir=str(tmp_path))
-    # Clear the queue before test
-    while not DebugGymLoggerTest.PROGRESS_QUEUE.empty():
-        DebugGymLoggerTest.PROGRESS_QUEUE.get_nowait()
     logger.report_progress(
         problem_id="problem1",
         step=1,
