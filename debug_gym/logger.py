@@ -273,6 +273,7 @@ class TaskProgressManager:
                 f"No logdir set for task {task.problem_id}. "
                 "Skipping task status dump."
             )
+            return
         status_path = status_json_path(task.logdir, task.problem_id)
         task_dict = asdict(task)
         self.logger.debug(f"Dumping task status to JSON: {status_path}")
