@@ -264,7 +264,7 @@ class TaskProgressManager:
                     status=task.status,
                     score=task.score,
                     max_score=task.max_score,
-                    logfile=self.log_file_path,
+                    logfile=task.log_file_path,
                 )
 
     def dump_task_status(self, task: TaskProgress):

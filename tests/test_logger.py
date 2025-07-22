@@ -34,6 +34,12 @@ def DebugGymLoggerTest():
     yield TestDebugGymLogger
 
 
+@pytest.fixture
+def debug_gym_loogger(tmp_path, DebugGymLoggerTest):
+    logger = DebugGymLoggerTest("test_logger", log_dir=str(tmp_path))
+    yield logger
+
+
 def test_task_progress_pending_status():
     # Test a task in 'pending' status
     task_pending = TaskProgress(
@@ -185,11 +191,10 @@ def test_strip_ansi_formatter():
     assert result == "Red text"
 
 
-def test_task_progress_manager_initialization(DebugGymLoggerTest):
+def test_task_progress_manager_initialization(debug_gym_loogger):
     # Test that TaskProgressManager initializes correctly
-    logger = DebugGymLoggerTest("test_logger")
     problems = ["problem1", "problem2"]
-    manager = TaskProgressManager(problems, logger=logger)
+    manager = TaskProgressManager(problems, logger=debug_gym_loogger)
 
     # Check that tasks were added for each problem
     assert len(manager._tasks) == 2
@@ -202,11 +207,10 @@ def test_task_progress_manager_initialization(DebugGymLoggerTest):
     assert "problem2" in manager._progress_task_ids
 
 
-def test_task_progress_manager_advance(DebugGymLoggerTest):
+def test_task_progress_manager_advance(debug_gym_loogger):
     # Test that TaskProgressManager.advance updates task state correctly
-    logger = DebugGymLoggerTest("test_logger")
     problems = ["problem1"]
-    manager = TaskProgressManager(problems, logger=logger)
+    manager = TaskProgressManager(problems, logger=debug_gym_loogger)
 
     # Initial state
     assert manager._tasks["problem1"].step == 0
@@ -238,11 +242,10 @@ def test_task_progress_manager_advance(DebugGymLoggerTest):
         assert kwargs["status"] == "running"
 
 
-def test_group_tasks_by_status_basic(DebugGymLoggerTest):
+def test_group_tasks_by_status_basic(debug_gym_loogger):
     # Test that group_tasks_by_status groups tasks correctly by their status
-    logger = DebugGymLoggerTest("test_logger")
     problems = ["p1", "p2", "p3", "p4"]
-    manager = TaskProgressManager(problems, logger=logger)
+    manager = TaskProgressManager(problems, logger=debug_gym_loogger)
     # Set up tasks with different statuses
     updates = [
         TaskProgress("p1", 1, 10, 10, 100, "resolved"),
@@ -263,11 +266,10 @@ def test_group_tasks_by_status_basic(DebugGymLoggerTest):
             assert grouped[status] == []
 
 
-def test_group_tasks_by_status_with_unknown_status(DebugGymLoggerTest):
+def test_group_tasks_by_status_with_unknown_status(debug_gym_loogger):
     # Test that a task with an unknown status is grouped under "pending"
-    logger = DebugGymLoggerTest("test_logger")
     problems = ["p1"]
-    manager = TaskProgressManager(problems, logger=logger)
+    manager = TaskProgressManager(problems, logger=debug_gym_loogger)
     # Manually set an unknown status
     manager._tasks["p1"].status = "not-a-status"
     grouped = manager.group_tasks_by_status()
@@ -299,11 +301,10 @@ def test_group_tasks_by_status_multiple_tasks_same_status():
             assert grouped[status] == []
 
 
-def test_task_progress_manager_get_task_stats(DebugGymLoggerTest):
+def test_task_progress_manager_get_task_stats(debug_gym_loogger):
     # Test that TaskProgressManager.get_task_stats returns correct stats
-    logger = DebugGymLoggerTest("test_logger")
     problems = ["p1", "p2", "p3", "p4", "p5", "p6", "p7", "p8"]
-    manager = TaskProgressManager(problems, max_display=5, logger=logger)
+    manager = TaskProgressManager(problems, max_display=5, logger=debug_gym_loogger)
 
     # Set up tasks with different statuses
     updates = [
@@ -383,9 +384,9 @@ def test_log_with_color_escapes_special_characters():
     )
 
 
-def test_debuggymlogger_log_queue_worker(DebugGymLoggerTest):
+def test_debuggymlogger_log_queue_worker(DebugGymLoggerTest, tmp_path):
     DebugGymLoggerTest.set_as_worker()
-    logger = DebugGymLoggerTest("test_worker_logger")
+    logger = DebugGymLoggerTest("test_worker_logger", log_dir=str(tmp_path))
     # Clear the queue before test
     while not DebugGymLoggerTest.LOG_QUEUE.empty():
         DebugGymLoggerTest.LOG_QUEUE.get_nowait()
@@ -395,8 +396,8 @@ def test_debuggymlogger_log_queue_worker(DebugGymLoggerTest):
     assert record.msg == "Worker log message"
 
 
-def test_debuggymlogger_report_progress(DebugGymLoggerTest):
-    logger = DebugGymLoggerTest("test_progress_logger")
+def test_debuggymlogger_report_progress(DebugGymLoggerTest, tmp_path):
+    logger = DebugGymLoggerTest("test_progress_logger", log_dir=str(tmp_path))
     # Clear the queue before test
     while not DebugGymLoggerTest.PROGRESS_QUEUE.empty():
         DebugGymLoggerTest.PROGRESS_QUEUE.get_nowait()
@@ -414,21 +415,21 @@ def test_debuggymlogger_report_progress(DebugGymLoggerTest):
     assert progress.status == "running"
 
 
-def test_debuggymlogger_set_as_worker_resets(DebugGymLoggerTest):
-    logger = DebugGymLoggerTest("test_reset_logger")
+def test_debuggymlogger_set_as_worker_resets(DebugGymLoggerTest, tmp_path):
+    logger = DebugGymLoggerTest("test_reset_logger", log_dir=str(tmp_path))
     assert DebugGymLoggerTest.is_main()
     assert logger.is_main()
     # Set as worker
     DebugGymLoggerTest.set_as_worker()
     assert DebugGymLoggerTest.is_worker()
     assert logger.is_worker()
-    another_logger = DebugGymLoggerTest("test_reset_logger")
+    another_logger = DebugGymLoggerTest("test_reset_logger", log_dir=str(tmp_path))
     assert another_logger.is_worker()
 
 
-def test_debuggymlogger_rich_progress_raises_in_worker(DebugGymLoggerTest):
+def test_debuggymlogger_rich_progress_raises_in_worker(DebugGymLoggerTest, tmp_path):
     DebugGymLoggerTest.set_as_worker()
-    logger = DebugGymLoggerTest("test_rich_progress_logger")
+    logger = DebugGymLoggerTest("test_rich_progress_logger", log_dir=str(tmp_path))
     with pytest.raises(RuntimeError):
         with logger.rich_progress(["p1", "p2"]):
             pass
@@ -461,12 +462,11 @@ def test_log_file_path_relative_outside_cwd(tmp_path):
     assert result == log_dir / "prob5.log"
 
 
-def test_dump_task_status_creates_json_file(tmp_path, DebugGymLoggerTest):
+def test_dump_task_status_creates_json_file(tmp_path, debug_gym_loogger):
     logdir = tmp_path / "logdir"
     logdir.mkdir()
-    logger = DebugGymLoggerTest("test_logger")
     problems = ["problem1", "problem2"]
-    manager = TaskProgressManager(problems, logger=logger)
+    manager = TaskProgressManager(problems, logger=debug_gym_loogger)
 
     task = TaskProgress(
         problem_id="problem1",
