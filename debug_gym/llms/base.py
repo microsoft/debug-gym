@@ -348,8 +348,7 @@ class LLM(ABC):
             if not messages:
                 raise ValueError("No messages provided for generation.")
 
-            max_retries = 3  # Prevent infinite recursion
-
+            max_retries = 1  # Prevent infinite recursion
             for retry_count in range(max_retries + 1):
                 try:
                     llm_response = self.generate(messages, tools, **kwargs)
