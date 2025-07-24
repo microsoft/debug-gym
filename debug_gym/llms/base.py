@@ -347,24 +347,57 @@ class LLM(ABC):
             """Generate a response. If context length is exceeded, apply trim_prompt_messages and retry."""
             if not messages:
                 raise ValueError("No messages provided for generation.")
-            try:
-                llm_response = self.generate(messages, tools, **kwargs)
-            except ContextLengthExceededError:
-                self.logger.info(
-                    f"Prompt is too long. {self.model_name} only allows for {self.context_length:,} tokens."
-                )
-                messages = trim_prompt_messages(
-                    messages, self.context_length, self.count_tokens
-                )
-                llm_response = generate_with_drop_message_and_retry(
-                    messages, tools, **kwargs
-                )
-                self.logger.info(
-                    f"Prompt truncated to {llm_response.token_usage.prompt:,} tokens."
-                )
 
-            print_messages(messages, self.logger)
-            return llm_response
+            max_retries = 1  # Prevent infinite recursion
+            for retry_count in range(max_retries + 1):
+                try:
+                    llm_response = self.generate(messages, tools, **kwargs)
+
+                    # If we had to trim messages, log the successful truncation
+                    if retry_count > 0:
+                        self.logger.info(
+                            f"Prompt truncated to {llm_response.token_usage.prompt:,} tokens."
+                        )
+                    return llm_response
+
+                except ContextLengthExceededError:
+                    if retry_count >= max_retries:
+                        # Exhausted all retries
+                        self.logger.info(
+                            f"Unable to reduce prompt size after {max_retries} attempts. "
+                            f"Prompt still exceeds {self.context_length:,} token limit."
+                        )
+                        raise ContextLengthExceededError(
+                            f"Unable to reduce prompt size after {max_retries} attempts. "
+                            f"Prompt still exceeds {self.context_length:,} token limit."
+                        )
+
+                    self.logger.info(
+                        f"Prompt is too long. {self.model_name} only allows for {self.context_length:,} tokens."
+                    )
+
+                    # Trim messages and try again
+                    trimmed_messages = trim_prompt_messages(
+                        messages, self.context_length, self.count_tokens
+                    )
+
+                    if not trimmed_messages:
+                        raise ValueError(
+                            "No messages provided for generation after trimming."
+                        )
+
+                    # Check if trimming actually reduced the size
+                    if trimmed_messages == messages:
+                        self.logger.info(
+                            "Unable to reduce prompt size. trim_prompt_messages returned the same messages. "
+                            f"Prompt exceeds {self.context_length:,} token limit."
+                        )
+                        raise ContextLengthExceededError(
+                            f"Unable to reduce prompt size. trim_prompt_messages returned the same messages. "
+                            f"Prompt exceeds {self.context_length:,} token limit."
+                        )
+
+                    messages = trimmed_messages
 
         llm_response = generate_with_drop_message_and_retry(messages, tools, **kwargs)
 
