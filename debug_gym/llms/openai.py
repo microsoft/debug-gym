@@ -220,7 +220,10 @@ class OpenAILLM(LLM):
                 "string_above_max_length",
             ]:
                 raise ContextLengthExceededError
-            if "maximum context length" in e.message:
+            if (
+                e.code == "invalid_request_body"
+                and "maximum context length" in e.message
+            ):
                 raise ContextLengthExceededError
             raise
         # LLM may select multiple tool calls, we only care about the first action
