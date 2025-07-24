@@ -164,6 +164,7 @@ class RepoEnv(TooledEnv):
         auto_list: bool = True,
         terminal: Terminal | None = None,
         logger: DebugGymLogger | None = None,
+        problems: str | list[str] | None = None,
         **kwargs,
     ):
         super().__init__()
@@ -191,6 +192,7 @@ class RepoEnv(TooledEnv):
             readonly_patterns=readonly_patterns,
         )
         self._reset_env_state()
+        self.dataset = self.load_dataset(problems)
 
     def _reset_env_state(self):
         """Reset the environment state to the initial state."""
@@ -573,3 +575,6 @@ class RepoEnv(TooledEnv):
         self.cleanup_workspace()
         if self.terminal:
             self.terminal.close()
+
+    def load_dataset(self, problems: str | list[str] | None = None):
+        return {"custom": None}

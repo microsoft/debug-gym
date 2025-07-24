@@ -19,7 +19,7 @@ from debug_gym.constants import DEBUG_GYM_CACHE_DIR
 from debug_gym.gym.entities import EvalOutput
 from debug_gym.gym.envs.env import RepoEnv
 from debug_gym.gym.terminal import DockerTerminal, Terminal
-from debug_gym.gym.utils import create_ignore_file
+from debug_gym.gym.utils import create_ignore_file, filter_problems
 
 
 class SWEBenchEnv(RepoEnv):
@@ -31,7 +31,6 @@ class SWEBenchEnv(RepoEnv):
         dataset_id: str = "princeton-nlp/SWE-bench_Verified",
         # dataset_id: str = "princeton-nlp/SWE-bench_lite",
         split: str = "test",
-        instance_ids: list[str] | None = None,
         terminal: Terminal | None = None,
         **kwargs,
     ):
@@ -39,27 +38,26 @@ class SWEBenchEnv(RepoEnv):
         if not isinstance(terminal, DockerTerminal):
             raise ValueError("SWEBenchEnv only supports DockerTerminal.")
 
-        super().__init__(terminal=terminal, **kwargs)
-
+        self.DUMMY_DIR.mkdir(parents=True, exist_ok=True)
         self.dataset_id = dataset_id
         self.split = split
-        self.instance_ids = instance_ids
-        self.DUMMY_DIR.mkdir(parents=True, exist_ok=True)
-
-        self.load_dataset()
         self.session_commands = []
         self.test_directives = []
+
+        super().__init__(terminal=terminal, **kwargs)
 
     @property
     def instructions(self) -> str:
         return self.ds_row["problem_statement"]
 
-    def load_dataset(self):
+    def load_dataset(self, problems: str | list[str] | None = None):
         self.ds = datasets.load_dataset(self.dataset_id)[self.split]
-        self.dataset = {row["instance_id"]: row for row in self.ds.sort("instance_id")}
+        dataset = {id: i for i, id in enumerate(self.ds["instance_id"])}
+        problems = filter_problems(dataset, problems)
+        dataset = {id: i for id, i in dataset.items() if id in problems}
 
         swebench_instances = load_swebench_dataset(
-            name=self.dataset_id, instance_ids=self.instance_ids
+            name=self.dataset_id, instance_ids=list(dataset)
         )
         docker_client = docker.from_env()
 
@@ -80,25 +78,17 @@ class SWEBenchEnv(RepoEnv):
                 max_workers=24,
             )
 
-    def get_problem_ids(self, split_or_problem_id):
-        if split_or_problem_id == "all":
-            return sorted(self.dataset.keys())  # all tasks
-        elif split_or_problem_id in self.dataset:
-            return [split_or_problem_id]  # Single task
-        else:
-            raise ValueError(
-                f"Invalid split or problem id: '{split_or_problem_id}'.\nChoose from: {['all'] + sorted(self.dataset.keys())}"
-            )
+        return dataset
 
     def setup_task(self, task_name):
-        if self.instance_ids:
-            if task_name not in self.instance_ids:
-                raise ValueError(
-                    f"Task `{task_name}` was not found in instance_ids. The available tasks are: {self.instance_ids}.\n"
-                    "Please provide a valid task or initialize the environment without instance_ids to load all tasks."
-                )
+        if task_name not in self.dataset:
+            raise ValueError(
+                f"Task `{task_name}` was not found in dataset. The available tasks are: {self.dataset}.\n"
+                "Please provide a valid task or initialize the environment without problems to load all tasks."
+            )
+
         self.task_name = task_name
-        self.ds_row = self.dataset[self.task_name]
+        self.ds_row = self.ds[self.dataset[self.task_name]]
         self.repo = self.ds_row["repo"]
         self.package_name = self.repo.split("/")[1]
         self.version = self.ds_row["version"]
