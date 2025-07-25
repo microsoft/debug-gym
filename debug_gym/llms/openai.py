@@ -234,9 +234,22 @@ class OpenAILLM(LLM):
             tool_call = response.choices[0].message.tool_calls[0]
             assert tool_call.type == "function"
 
+        # In openai call, the content is in response.choices[0].message.content
+        # In some models hosted on vllm, e.g., qwen-3, there could be content in both
+        # response.choices[0].message.content and response.choices[0].message.reasoning_content
+        # https://qwen.readthedocs.io/en/latest/deployment/vllm.html#parsing-thinking-content
+        _content = response.choices[0].message.content or ""
+        if hasattr(response.choices[0].message, "reasoning_content"):
+            _content = "\n".join(
+                [
+                    _content,
+                    response.choices[0].message.reasoning_content or "",
+                ]
+            ).strip()
+
         llm_response = LLMResponse(
             prompt=messages,
-            response=response.choices[0].message.content,
+            response=_content,
             tool=self.parse_tool_call_response(tool_call),
             prompt_token_count=response.usage.prompt_tokens,
             response_token_count=response.usage.completion_tokens,
