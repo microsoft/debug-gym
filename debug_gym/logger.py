@@ -1,3 +1,4 @@
+import json
 import logging
 import multiprocessing as mp
 import os
@@ -5,7 +6,7 @@ import queue
 import threading
 import time
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Dict
 
@@ -38,7 +39,7 @@ class TaskProgress:
     score: int
     max_score: int
     status: str
-    logfile: str = ""
+    logdir: str = ""
 
     @property
     def completed(self) -> bool:
@@ -102,6 +103,20 @@ class TaskProgress:
             return "yellow"
         raise ValueError(f"Unknown task status: `{status}`. ")
 
+    @property
+    def log_file_path(self) -> str:
+        return (
+            str(
+                log_file_path(
+                    self.logdir,
+                    self.problem_id,
+                    relative=True,
+                )
+            )
+            if self.logdir
+            else ""
+        )
+
 
 class StatusColumn(SpinnerColumn):
     """Custom status column. magenta ! when error,
@@ -126,6 +141,35 @@ class StatusColumn(SpinnerColumn):
         )
 
 
+def log_file_path(log_dir, problem_id, relative=False) -> Path:
+    """Return the path to the log file for a given problem. If `relative` is True,
+    it returns a relative path from the current working directory. If the log_dir
+    is not a subdir of the cwd, returns the absolute path."""
+    logfile = (Path(log_dir) / f"{problem_id}.log").absolute()
+    if relative:
+        try:
+            logfile = logfile.relative_to(os.getcwd())
+        except ValueError:
+            # If the log_dir is not a subdir of the cwd, return the absolute path
+            pass
+    return logfile
+
+
+def status_json_path(log_dir, problem_id) -> Path:
+    """Return the path to the status.json file for a given problem."""
+    return Path(log_dir) / f"{problem_id}_status.json"
+
+
+def load_previous_run_status(log_dir: str, problem_id: str) -> TaskProgress | None:
+    """Load the previous run progress from a JSON file."""
+    status_path = status_json_path(log_dir, problem_id)
+    if status_path.exists():
+        with open(status_path, "r") as f:
+            data = json.load(f)
+            return TaskProgress(**data)
+    return None
+
+
 class TaskProgressManager:
     """Manages task progress for multiple tasks in a Rich Progress widget.
     It manages the visibility of tasks based on their status and the
@@ -133,8 +177,11 @@ class TaskProgressManager:
     than the maximum display count, it shows running tasks first,
     then completed tasks, and hides the rest."""
 
-    def __init__(self, problems, max_display: int = 10) -> None:
+    def __init__(
+        self, problems, max_display: int = 10, logger: "DebugGymLogger" = None
+    ) -> None:
         self.max_display = max_display
+        self.logger = logger
         self._tasks: Dict[str, TaskProgress] = {}
         self._progress_task_ids = {}  # Maps problem IDs to Rich task IDs
 
@@ -172,7 +219,7 @@ class TaskProgressManager:
             score=0,
             max_score=0,
             status="pending",
-            logfile="",
+            logdir="",
         )
         self._tasks[task_id] = task
         pid = self.progress.add_task(
@@ -182,7 +229,7 @@ class TaskProgressManager:
             total=task.total_steps,
             score=task.score,
             max_score=task.max_score,
-            logfile=task.logfile,
+            logfile=task.log_file_path,
         )
         self._progress_task_ids[task.problem_id] = pid
         return pid
@@ -191,12 +238,23 @@ class TaskProgressManager:
         """Advance the task progress based on the provided update."""
         task = self._tasks.get(str(progress_update.problem_id))
         if task:
+            # Update the cached task (TaskProgress) with the new progress
             task.step = progress_update.step
             task.total_steps = progress_update.total_steps
             task.score = progress_update.score
             task.max_score = progress_update.max_score
             task.status = progress_update.status
-            task.logfile = progress_update.logfile
+            task.logdir = progress_update.logdir
+            # Log and dump final status
+            if progress_update.completed:
+                log_with_color(
+                    self.logger,
+                    f"{TaskProgress.marker(task.status)} {task.status}: "
+                    f" task {task.problem_id}.",
+                    TaskProgress.color(task.status),
+                )
+                self.dump_task_status(task)
+            # Update the Rich task
             pid = self._progress_task_ids.get(task.problem_id)
             if pid is not None:
                 self.progress.update(
@@ -206,8 +264,21 @@ class TaskProgressManager:
                     status=task.status,
                     score=task.score,
                     max_score=task.max_score,
-                    logfile=task.logfile,
+                    logfile=task.log_file_path,
                 )
+
+    def dump_task_status(self, task: TaskProgress):
+        if not task.logdir:
+            self.logger.warning(
+                f"No logdir set for task {task.problem_id}. "
+                "Skipping task status dump."
+            )
+            return
+        status_path = status_json_path(task.logdir, task.problem_id)
+        task_dict = asdict(task)
+        self.logger.debug(f"Dumping task status to JSON: {status_path}")
+        with open(status_path, "w") as f:
+            json.dump(task_dict, f)
 
     def refresh_progress(self, all_tasks: bool = False):
         """Refresh the progress display, updating task visibility and panel title.
@@ -284,7 +355,7 @@ class OverallProgressContext:
         max_display: int,
         live: Live,
         progress_queue: mp.Queue,
-        logger: logging.Logger,
+        logger: "DebugGymLogger",
     ):
         self.problems = problems
         self.max_display = max_display
@@ -304,7 +375,7 @@ class OverallProgressContext:
             "Overall",  # Placeholder description, will be set by _refresh
             total=self.total,
         )
-        self.tasks_progress = TaskProgressManager(problems, max_display)
+        self.tasks_progress = TaskProgressManager(problems, max_display, logger)
         # Initialize table and panels once
         self._table = Table(show_header=False, show_edge=False)
         self._overall_panel = Panel(
@@ -338,14 +409,7 @@ class OverallProgressContext:
         # Update the task progress
         self.tasks_progress.advance(progress_update)
         # Update overall progress completion
-        if progress_update.completed:
-            self.completed += 1
-            log_with_color(
-                self.logger,
-                f"{TaskProgress.marker(progress_update.status)} {progress_update.status}: "
-                f" task {progress_update.problem_id}.",
-                TaskProgress.color(progress_update.status),
-            )
+        self.completed += 1 if progress_update.completed else 0
 
     def close(self):
         """Stop the listener thread and wait until it exits."""
@@ -414,6 +478,20 @@ class DebugGymLogger(logging.Logger):
     PROGRESS_QUEUE = mp.Queue(maxsize=10000)
     _is_worker = False
 
+    @classmethod
+    def is_worker(cls):
+        return cls._is_worker
+
+    @classmethod
+    def is_main(cls):
+        return not cls._is_worker
+
+    @classmethod
+    def set_as_worker(cls):
+        """Set the logger as a worker logger, which means it will put logs and
+        progress updates to the queues, letting the main process handle them."""
+        cls._is_worker = True
+
     def __init__(
         self,
         name: str,
@@ -430,7 +508,6 @@ class DebugGymLogger(logging.Logger):
         self.propagate = False
 
         self.setLevel(level)  # Set logger level, might be overridden by file handler
-        self.log_file = None  # File handler for logging to a file
 
         # Placeholders for rich live, log listener thread, and stop event
         # Will be initialized if the logger is the main process logger
@@ -438,10 +515,15 @@ class DebugGymLogger(logging.Logger):
         self.no_live = False  # Flag to disable live updates
         self._log_listener_stop_event = None  # Event to stop the log listener thread
         self._log_listener_thread = None  # Thread to process logs from workers
-        if not self._is_worker:
+        if self.is_main():
             self._initialize_main_logger(level)
-        if log_dir:
-            self._initialize_file_handler(name, log_dir, mode)
+        self.log_file = None  # File handler for logging to a file
+        self.log_dir = Path(log_dir) if log_dir else None
+        if self.log_dir:  # Directory to store log files
+            self.log_dir.mkdir(parents=True, exist_ok=True)
+            if self.is_worker():
+                self._initialize_file_handler(name, mode)
+            self.info(f"Logging to directory: {self.log_dir}")
 
     def _initialize_main_logger(self, level):
         self._live = Live(transient=True, refresh_per_second=2)
@@ -462,12 +544,9 @@ class DebugGymLogger(logging.Logger):
         )
         self._log_listener_thread.start()
 
-    def _initialize_file_handler(self, name: str, log_dir: str, mode: str):
+    def _initialize_file_handler(self, name: str, mode: str):
         self.setLevel(logging.DEBUG)  # Ensure logger operates at DEBUG level
-        log_dir = Path(log_dir)
-        log_dir.mkdir(parents=True, exist_ok=True)
-
-        self.log_file = (log_dir / f"{name}.log").absolute()
+        self.log_file = log_file_path(self.log_dir, name)
         fh = logging.FileHandler(self.log_file, mode=mode)
         formatter = StripAnsiFormatter("%(asctime)s %(levelname)-8s %(message)s")
         fh.setFormatter(formatter)
@@ -480,12 +559,12 @@ class DebugGymLogger(logging.Logger):
         log to their own handlers (ex.: a file) and put the
         record into the log queue for the main process to display
         logs through Rich."""
-        if self._is_worker:
+        if self.is_worker():
             self.LOG_QUEUE.put(record)
         super().handle(record)
 
     def _log_listener(self):
-        if not self._is_worker:
+        if self.is_main():
             while not self._log_listener_stop_event.is_set():
                 try:
                     record = self.LOG_QUEUE.get(timeout=0.1)
@@ -507,12 +586,6 @@ class DebugGymLogger(logging.Logger):
     def __del__(self):
         self.close()
 
-    @classmethod
-    def set_as_worker(cls):
-        """Set the logger as a worker logger, which means it will put logs and
-        progress updates to the queues, letting the main process handle them."""
-        cls._is_worker = True
-
     def set_no_live(self):
         """Set the logger to not use the Rich Live display."""
         self.no_live = True
@@ -524,7 +597,7 @@ class DebugGymLogger(logging.Logger):
         the progress bar when the context is exited, ensuring that the UI is updated
         correctly and the thread is joined properly. Only the main process can manage
         the Rich UI, so this method raises an error if called in a worker process."""
-        if self._is_worker:
+        if self.is_worker():
             raise RuntimeError("Cannot use rich_progress in worker processes.")
         ctx = OverallProgressContext(
             problems, max_display, self._live, self.PROGRESS_QUEUE, self
@@ -558,12 +631,6 @@ class DebugGymLogger(logging.Logger):
     ) -> None:
         """Send a progress update to the shared queue for the main process to handle.
         This method is used by worker processes to report their progress."""
-
-        # Get log file path relative to the current working directory if it exists.
-        logfile = ""
-        if self.log_file:
-            logfile = rf"\[{self.log_file.relative_to(os.getcwd())}]"
-
         progress_update = TaskProgress(
             problem_id=problem_id,
             step=step,
@@ -571,7 +638,7 @@ class DebugGymLogger(logging.Logger):
             score=score,
             max_score=max_score,
             status=status,
-            logfile=logfile,
+            logdir=str(self.log_dir) if self.log_dir else "",
         )
         # Put in queue with backoff strategy
         for attempt in range(max_attempts):
