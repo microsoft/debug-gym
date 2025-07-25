@@ -413,4 +413,9 @@ class LLM(ABC):
                 "Tool response is empty. The model may not have called a tool."
             )
 
+        print_messages(messages, self.logger)
+        self.logger.info(
+            f"LLM response - reasoning: {llm_response.response}\n"
+            f"LLM response - tool call: {llm_response.tool}"
+        )
         return llm_response

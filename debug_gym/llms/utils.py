@@ -30,9 +30,6 @@ def print_messages(messages: list[dict], logger: DebugGymLogger):
                     log_with_color(logger, str(item), "cyan")
             else:
                 log_with_color(logger, str(content), "cyan")
-        elif role == "assistant":
-            content = m.get("content", m.get("tool_calls", m))
-            log_with_color(logger, str(content), "green")
         elif role == "system":
             log_with_color(logger, str(m["content"]), "yellow")
         else:
