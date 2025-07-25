@@ -221,6 +221,7 @@ class BaseAgent:
 
     def run(self, task_name=None, debug=False):
         step = 0
+        info = None
         max_steps = self.config["max_steps"]
         try:
             self.history.reset()
