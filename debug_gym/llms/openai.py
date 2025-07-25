@@ -235,7 +235,7 @@ class OpenAILLM(LLM):
             assert tool_call.type == "function"
 
         # In openai call, the content is in response.choices[0].message.content
-        # In some models hosted on vllm, e.g., qwen-3, there could be content in both
+        # In some models hosted on vllm, e.g., qwen-3, there could be content in both (when reasoning is enabled)
         # response.choices[0].message.content and response.choices[0].message.reasoning_content
         # https://qwen.readthedocs.io/en/latest/deployment/vllm.html#parsing-thinking-content
         _content = response.choices[0].message.content or ""
