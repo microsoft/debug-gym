@@ -45,3 +45,7 @@ debug_5_agent:
 solution_agent:
     llm_name: "human"  # No need for an LLM.
     tools: ["eval", "pdb"]
+
+grep_agent:
+    agent_type: "rewrite_agent"
+    tools: ["grep", "view", "rewrite", "listdir", "eval"]
