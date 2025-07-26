@@ -15,7 +15,7 @@ from debug_gym.gym.terminal import select_terminal
 from debug_gym.gym.tools.toolbox import Toolbox
 from debug_gym.llms.base import LLM
 from debug_gym.llms.human import Human
-from debug_gym.logger import DebugGymLogger
+from debug_gym.logger import DebugGymLogger, load_previous_run_status
 
 
 class AgentTimeoutException(BaseException):
@@ -48,44 +48,43 @@ def run_agent(args, problem, config):
     # errors themselves and we want to avoid double reporting.
     report_progress_error = True
 
-    exp_path = Path(config["output_path"]) / config["uuid"] / problem
+    exp_path = Path(config["output_path"]) / config["uuid"]
+    problem_path = exp_path / problem
 
     task_logger = DebugGymLogger(
         problem,
-        log_dir=exp_path,
+        log_dir=problem_path,
         level=args.logging_level,
         mode="w" if args.force_all else "a",
     )
     try:
-        previous_run = exp_path / "debug_gym.jsonl"
+        previous_run = load_previous_run_status(exp_path, problem)
+        if not args.force_all and previous_run is not None:
+            task_logger.debug(f"Previous run found: {problem_path}")
+            success = previous_run.status in ["resolved", "skip-resolved"]
+            task_logger.debug(f"Previous run status: {previous_run.status}")
+            if not args.force_failed or success:
+                status = "skip-resolved" if success else "skip-unresolved"
+                task_logger.report_progress(
+                    problem_id=previous_run.problem_id,
+                    step=previous_run.step,
+                    total_steps=previous_run.total_steps,
+                    score=previous_run.score,
+                    max_score=previous_run.max_score,
+                    status=status,
+                    logdir=previous_run.logdir,
+                )
+                task_logger.debug(f"Skipping {problem}, already done.")
+                return success
 
         task_logger.report_progress(
             problem_id=problem,
             step=0,
             total_steps=1,
             score=0,
-            max_score=100,
+            max_score=1,
             status="running",
         )
-
-        if not args.force_all and os.path.exists(previous_run):
-            task_logger.debug(f"Previous run found: {previous_run}")
-            with open(previous_run) as reader:
-                success = json.load(reader)["success"]
-
-            task_logger.debug(f"Previous run success: {success}")
-            if not args.force_failed or success:
-                status = "skip-resolved" if success else "skip-unresolved"
-                task_logger.report_progress(
-                    problem_id=problem,
-                    step=1,
-                    total_steps=1,
-                    score=100,
-                    max_score=100,
-                    status=status,
-                )
-                task_logger.debug("Skipped, already done.")
-                return success
 
         env = create_env(config, task_logger)
         add_tools(env, config, task_logger)
@@ -232,15 +231,11 @@ def dump_experiment_info(config: dict, args: dict):
 
 def main():
     config, args = load_config()
-    logger = DebugGymLogger("debug-gym", level=args.logging_level)
-
     config["uuid"] = config.get("uuid", str(uuid.uuid4()))
-
     exp_output_path = Path(config["output_path"]) / config["uuid"]
     exp_output_path.mkdir(parents=True, exist_ok=True)
-
+    logger = DebugGymLogger("debug-gym", level=args.logging_level)
     logger.info(f"Experiment log path: {exp_output_path}")
-
     dump_experiment_info(config, args)
 
     # Create the environment to get the list of problems to run.
