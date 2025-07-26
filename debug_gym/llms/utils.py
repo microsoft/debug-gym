@@ -12,7 +12,7 @@ def print_messages(messages: list[dict], logger: DebugGymLogger):
     for m in messages:
         role = m["role"]
         if role == "tool":
-            log_with_color(logger, m["content"], "magenta")
+            log_with_color(logger, m["content"], "green")
         elif role == "user":
             if isinstance(m["content"], list):
                 for item in m["content"]:
