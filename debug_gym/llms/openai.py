@@ -171,7 +171,7 @@ class OpenAILLM(LLM):
                             },
                         },
                     ],
-                    "content": filter_non_utf8(f"{response[0].response}"),
+                    "content": filter_non_utf8(response[0].response),
                 }
             )
         if history_info.action is None:
@@ -180,7 +180,7 @@ class OpenAILLM(LLM):
                 {
                     "role": "user",
                     "content": filter_non_utf8(
-                        f"{history_info.step_observation.observation}"
+                        history_info.step_observation.observation
                     ),
                 }
             )
@@ -192,7 +192,7 @@ class OpenAILLM(LLM):
                     "tool_call_id": history_info.action.id,
                     "name": history_info.action.name,
                     "content": filter_non_utf8(
-                        f"{history_info.step_observation.observation}"
+                        history_info.step_observation.observation
                     ),
                 }
             )
