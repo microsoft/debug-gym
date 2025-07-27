@@ -26,7 +26,12 @@ class RAGAgent(BaseAgent):
         super().__init__(config, env, llm, logger)
 
         # Initialize configuration parameters
-        self.num_examples = self.config.get("num_examples", 1)
+        self.rag_num_retrievals = self.config.get(
+            "rag_num_retrievals", 1
+        )  # how many examples to retrieve
+        self.rag_indexing_method = self.parse_indexing_method(
+            self.config.get("rag_indexing_method", None)
+        )  # how to index the conversation history
         self.sentence_encoder_model = self.config.get(
             "sentence_encoder_model", "Qwen/Qwen3-Embedding-0.6B"
         )
@@ -45,6 +50,32 @@ class RAGAgent(BaseAgent):
 
         if self.dataset is not None:
             self._initialize_rag()
+
+    def parse_indexing_method(self, method: str):
+        """Parse the indexing method from the configuration.
+        The input string should be in the format of "method-step".
+        Step indicates how many assistant-user pairs to use for indexing.
+        If step is not provided, it defaults to 1.
+        supported methods:
+        - observation: use the observation as the query
+        - tool_name: use the tool name as the query
+        - tool_call: use the entire tool call (including arguments) as the query
+        For example, "tool_name-5" means to use the concatenation of the last 5 tool names as the query.
+        """
+        assert method is not None, "rag_indexing_method must be provided in the config"
+
+        method, step = method.rsplit("-", 1) if "-" in method else (method, 1)
+        assert method in [
+            "observation",
+            "tool_name",
+            "tool_call",
+        ], f"Invalid rag_indexing_method: {method}. Supported methods: observation, tool_name, tool_call"
+        assert (
+            step.isdigit()
+        ), f"Invalid step value: {step}. It should be a positive integer."
+        step = int(step)
+        assert step > 0, "Step must be a positive integer."
+        return [method, step]
 
     def load_experience_trajectory_from_file(
         self, file_path: str, max_examples: int = None
@@ -65,7 +96,7 @@ class RAGAgent(BaseAgent):
                         if (
                             "follows_proper_debugging_workflow"
                             not in satisfied_criteria
-                            and "has_successful_outcome" not in satisfied_criteria
+                            or "has_successful_outcome" not in satisfied_criteria
                         ):
                             continue
                         self.experience_trajectories.append(experience_json["messages"])
@@ -109,7 +140,7 @@ class RAGAgent(BaseAgent):
 
     def _retrieve_relevant_examples(self, query_text: str):
         """Retrieve relevant examples based on query text."""
-        if self.retriever is None or self.num_examples <= 0:
+        if self.retriever is None or self.rag_num_retrievals <= 0:
             return [], []
 
         # Encode the query
@@ -119,7 +150,7 @@ class RAGAgent(BaseAgent):
 
         # Retrieve similar examples
         distances, indices = self.retriever.retrieve(
-            np.array([query_representation]), topk=self.num_examples
+            np.array([query_representation]), topk=self.rag_num_retrievals
         )
 
         # Extract the examples
