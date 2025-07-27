@@ -2,7 +2,33 @@ import argparse
 import logging
 import os
 
+import faiss
 import yaml
+from sentence_transformers import SentenceTransformer
+
+
+class SentenceEncoder:
+    def __init__(self, model_name="Qwen/Qwen3-Embedding-0.6B"):
+        self.model = SentenceTransformer(model_name)
+
+    def encode_sentence(self, sentence_list, batch_size=32):
+        embeddings = self.model.encode(
+            sentence_list, batch_size=batch_size, convert_to_numpy=True
+        )
+        return embeddings
+
+
+class FaissRetriever:
+    def __init__(self, encoding_dim):
+        self.index = faiss.IndexFlatL2(encoding_dim)
+
+    def add(self, sentence_representations):
+        self.index.add(sentence_representations)
+        # print("we have in total %s indices..." % self.index.ntotal)
+
+    def retrieve(self, query_representations, topk):
+        distance, indices = self.index.search(query_representations, topk)  # search
+        return distance, indices
 
 
 def trim(text: str, max_tokens: int, count_tokens: callable, where: str = "middle"):
