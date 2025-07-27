@@ -1,6 +1,12 @@
+import json
+
 import numpy as np
 
 from debug_gym.agents.base_agent import BaseAgent, register_agent
+from debug_gym.agents.experience_loader import (
+    ExperienceDataset,
+    load_experience_from_file,
+)
 from debug_gym.agents.utils import FaissRetriever, SentenceEncoder
 from debug_gym.gym.utils import filter_non_utf8
 
@@ -21,19 +27,16 @@ class RAGAgent(BaseAgent):
 
         # Initialize configuration parameters
         self.num_examples = self.config.get("num_examples", 1)
-        self.sentence_encoder_type = self.config.get(
-            "sentence_encoder", "sentence-transformer"
-        )
         self.sentence_encoder_model = self.config.get(
             "sentence_encoder_model", "Qwen/Qwen3-Embedding-0.6B"
         )
 
         # Initialize RAG components if dataset is provided
-        experience_path = self.config.get("experience_path", None)
+        experience_trajectory_path = self.config.get("experience_trajectory_path", None)
         assert (
-            experience_path is not None
+            experience_trajectory_path is not None
         ), "Experience path must be provided in the config"
-        self.experience = self.load_experience_from_file(experience_path)
+        self.load_experience_trajectory_from_file(experience_trajectory_path)
 
         self.encoder = None
         self.retriever = None
@@ -43,8 +46,33 @@ class RAGAgent(BaseAgent):
         if self.dataset is not None:
             self._initialize_rag()
 
-    def load_experience_from_file(self, path):
-        pass
+    def load_experience_trajectory_from_file(
+        self, file_path: str, max_examples: int = None
+    ):
+        """Load experience trajectories from a JSONL file."""
+        self.experience_trajectories = []
+        try:
+            with open(file_path, "r", encoding="utf-8") as f:
+                for line_num, line in enumerate(f, 1):
+                    if max_examples and line_num > max_examples:
+                        break
+                    try:
+                        experience_json = json.loads(line.strip())
+                        # filter out trajectories that failed to meet criteria
+                        satisfied_criteria = experience_json.get(
+                            "satisfied_criteria", []
+                        )
+                        if (
+                            "follows_proper_debugging_workflow"
+                            not in satisfied_criteria
+                            and "has_successful_outcome" not in satisfied_criteria
+                        ):
+                            continue
+                        self.experience_trajectories.append(experience_json["messages"])
+                    except json.JSONDecodeError:
+                        self.logger.warning(f"Skipping invalid JSON on line {line_num}")
+        except Exception as e:
+            self.logger.error(f"Error loading experience trajectories from file: {e}")
 
     def _initialize_rag(self):
         """Initialize the RAG components: encoder and retriever."""
@@ -168,3 +196,44 @@ class RAGAgent(BaseAgent):
             self.retriever = None
             self.data_sentence = None
             self.data_label = None
+
+    @classmethod
+    def from_experience_file(
+        cls,
+        experience_file_path: str,
+        config: dict,
+        env,
+        llm=None,
+        logger=None,
+        max_examples: int = None,
+    ):
+        """
+        Create a RAG agent from an experience file.
+
+        Args:
+            experience_file_path: Path to the JSONL file containing debugging experiences
+            config: Agent configuration
+            env: Environment instance
+            llm: Language model instance
+            logger: Logger instance
+            max_examples: Maximum number of examples to load from the file
+
+        Returns:
+            RAGAgent instance with loaded experiences
+        """
+        # Create dataset from experience file
+        dataset = ExperienceDataset(experience_file_path, max_examples=max_examples)
+
+        # Create and return RAG agent
+        return cls(config=config, env=env, llm=llm, logger=logger, dataset=dataset)
+
+    def load_experiences_from_file(self, file_path: str, max_examples: int = None):
+        """
+        Load experiences from a file and reinitialize RAG components.
+
+        Args:
+            file_path: Path to the JSONL file containing debugging experiences
+            max_examples: Maximum number of examples to load
+        """
+        dataset = ExperienceDataset(file_path, max_examples=max_examples)
+        self.set_dataset(dataset)
