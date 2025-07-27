@@ -3,10 +3,6 @@ import json
 import numpy as np
 
 from debug_gym.agents.base_agent import BaseAgent, register_agent
-from debug_gym.agents.experience_loader import (
-    ExperienceDataset,
-    load_experience_from_file,
-)
 from debug_gym.agents.utils import FaissRetriever, SentenceEncoder
 from debug_gym.gym.utils import filter_non_utf8
 
@@ -35,21 +31,20 @@ class RAGAgent(BaseAgent):
         self.sentence_encoder_model = self.config.get(
             "sentence_encoder_model", "Qwen/Qwen3-Embedding-0.6B"
         )
-
-        # Initialize RAG components if dataset is provided
         experience_trajectory_path = self.config.get("experience_trajectory_path", None)
         assert (
             experience_trajectory_path is not None
         ), "Experience path must be provided in the config"
+        # Load experience trajectories from file
         self.load_experience_trajectory_from_file(experience_trajectory_path)
+        # Build retrieval dataset
+        self.build_retrieval_dataset()
+        # Initialize encoder
+        self.encoder = SentenceEncoder(model_name=self.sentence_encoder_model)
+        # Build index
+        self._build_index()
 
-        self.encoder = None
-        self.retriever = None
-        self.data_sentence = None
-        self.data_label = None
-
-        if self.dataset is not None:
-            self._initialize_rag()
+        self._initialize_rag()
 
     def parse_indexing_method(self, method: str):
         """Parse the indexing method from the configuration.
@@ -57,9 +52,10 @@ class RAGAgent(BaseAgent):
         Step indicates how many assistant-user pairs to use for indexing.
         If step is not provided, it defaults to 1.
         supported methods:
-        - observation: use the observation as the query
+        - observation: use the observation (user or tool response) as the query
         - tool_name: use the tool name as the query
         - tool_call: use the entire tool call (including arguments) as the query
+        - tool_call_with_reasoning: use the tool call with reasoning as the query
         For example, "tool_name-5" means to use the concatenation of the last 5 tool names as the query.
         """
         assert method is not None, "rag_indexing_method must be provided in the config"
@@ -69,6 +65,7 @@ class RAGAgent(BaseAgent):
             "observation",
             "tool_name",
             "tool_call",
+            "tool_call_with_reasoning",
         ], f"Invalid rag_indexing_method: {method}. Supported methods: observation, tool_name, tool_call"
         assert (
             step.isdigit()
@@ -105,41 +102,143 @@ class RAGAgent(BaseAgent):
         except Exception as e:
             self.logger.error(f"Error loading experience trajectories from file: {e}")
 
-    def _initialize_rag(self):
-        """Initialize the RAG components: encoder and retriever."""
-        self.logger.info("Initializing RAG components...")
+    def build_retrieval_dataset(self):
+        """Build a dataset for retrieval based on the loaded experience trajectories and the indexing method.
+        For example, given a trajectory of messages:
+        [sys, user, assistant1, tool1, assistant2, tool2, user, assistant3],
+        if method=tool_call, and step=2, the dataset will contain:
+        input: assistant1; label: assistant2, (when there are less than 2 step, we use all the available steps)
+        input: assistant1, assistant2; label: assistant3,
+        """
 
-        # Get data from dataset
-        self.data_sentence, self.data_label = self.dataset.get_data("train")
-        self.logger.info(f"Loaded {len(self.data_sentence)} training examples")
+        def find_last_k_messages_with_role(trajectory, role, k):
+            """Find the last k messages with the specified role in the trajectory."""
+            if isinstance(role, str):
+                role = [role]
+            messages = [msg for msg in trajectory if msg["role"] in role]
+            return messages[-k:] if len(messages) >= k else messages
 
-        # Initialize encoder
-        self.encoder = SentenceEncoder(model_name=self.sentence_encoder_model)
+        method, step = self.rag_indexing_method
+        self.data_input, self.data_label = [], []
+        delimiter = " <STEP_DELIMITER> "
 
-        # Build index
-        self._build_index()
+        for trajectory in self.experience_trajectories:
+            for i in range(len(trajectory)):
+                # skip non-assistant messages because assistant messages are the labels
+                if not trajectory[i]["role"] != "assistant":
+                    continue
+                # skip the assistant message if it does not have a tool call
+                if "tool_calls" not in trajectory[i] or not trajectory[i]["tool_calls"]:
+                    continue
+                if (
+                    "function" not in trajectory[i]["tool_calls"][0]
+                    or not trajectory[i]["tool_calls"][0]["function"]
+                ):
+                    continue
+                label = json.dumps(trajectory[i]["tool_calls"][0]["function"])
+                match method:
+                    case "observation":
+                        input_list = find_last_k_messages_with_role(
+                            trajectory[:i], ["user", "tool"], step
+                        )
+                        if not input_list:
+                            continue
+                        input_list = [msg["content"] for msg in input_list]
+                        input = delimiter.join(input_list)
+                    case "tool_name":
+                        input_list = find_last_k_messages_with_role(
+                            trajectory[:i], "assistant", step
+                        )
+                        if not input_list:
+                            continue
+                        tool_name_list = []
+                        for msg in input_list:
+                            if "tool_calls" in msg and msg["tool_calls"]:
+                                if (
+                                    "function" in msg["tool_calls"][0]
+                                    and msg["tool_calls"][0]["function"]
+                                ):
+                                    tool_name = msg["tool_calls"][0].get("name", "")
+                                    if tool_name:
+                                        tool_name_list.append(tool_name)
+                        if not tool_name_list:
+                            continue
+                        input = delimiter.join(tool_name_list)
+                    case "tool_call":
+                        input_list = find_last_k_messages_with_role(
+                            trajectory[:i], "assistant", step
+                        )
+                        if not input_list:
+                            continue
+                        tool_call_list = []
+                        for msg in input_list:
+                            if "tool_calls" in msg and msg["tool_calls"]:
+                                if (
+                                    "function" in msg["tool_calls"][0]
+                                    and msg["tool_calls"][0]["function"]
+                                ):
+                                    tool_call = json.dumps(
+                                        msg["tool_calls"][0]["function"]
+                                    )
+                                    tool_call_list.append(tool_call)
+                        if not tool_call_list:
+                            continue
+                        input = delimiter.join(tool_call_list)
+                    case "tool_call_with_reasoning":
+                        input_list = find_last_k_messages_with_role(
+                            trajectory[:i], "assistant", step
+                        )
+                        if not input_list:
+                            continue
+                        tool_call_with_reasoning_list = []
+                        for msg in input_list:
+                            tmp = {}
+                            if "tool_calls" in msg and msg["tool_calls"]:
+                                if (
+                                    "function" in msg["tool_calls"][0]
+                                    and msg["tool_calls"][0]["function"]
+                                ):
+                                    tmp["tool_calls"] = msg["tool_calls"][0]["function"]
+                            if "content" in msg:
+                                tmp["content"] = msg["content"]
+                            if tmp:
+                                tool_call_with_reasoning_list.append(json.dumps(tmp))
+                        if not tool_call_with_reasoning_list:
+                            continue
+                        input = delimiter.join(tool_call_with_reasoning_list)
+                    case _:
+                        raise ValueError(
+                            f"Invalid rag_indexing_method: {method}. Supported methods: observation, tool_name, tool_call, tool_call_with_reasoning"
+                        )
+                self.data_input.append(input)
+                self.data_label.append(label)
+        self.logger.info(
+            f"Built retrieval dataset with {len(self.data_input)} examples using method: {method}, step: {step}"
+        )
 
     def _build_index(self):
         """Build the vector index for retrieval."""
         self.logger.info("Building vector index...")
 
         # Encode all training sentences
-        train_sentence_representations = self.encoder.encode_sentence(
-            self.data_sentence, batch_size=32
+        input_representations = self.encoder.encode_sentence(
+            self.data_input, batch_size=32
         )
 
         # Initialize retriever
-        encoding_dim = train_sentence_representations.shape[1]
+        encoding_dim = input_representations.shape[1]
         self.retriever = FaissRetriever(encoding_dim)
 
         # Add representations to index
-        self.retriever.add(train_sentence_representations)
+        self.retriever.add(input_representations)
         self.logger.info(
-            f"Built index with {len(self.data_sentence)} examples, embedding dim: {encoding_dim}"
+            f"Built index with {len(self.data_input)} examples, embedding dim: {encoding_dim}"
         )
 
     def _retrieve_relevant_examples(self, query_text: str):
-        """Retrieve relevant examples based on query text."""
+        """Retrieve relevant examples based on query text.
+        The query text is converted from the the agent's history based on the indexing method.
+        """
         if self.retriever is None or self.rag_num_retrievals <= 0:
             return [], []
 
@@ -163,108 +262,3 @@ class RAGAgent(BaseAgent):
                 relevant_labels.append(self.data_label[idx])
 
         return relevant_sentences, relevant_labels
-
-    def _format_retrieved_examples(self, sentences, labels):
-        """Format retrieved examples for inclusion in prompt."""
-        if not sentences:
-            return ""
-
-        examples_text = "\n\n--- Retrieved Similar Examples ---\n"
-        for i, (sentence, label) in enumerate(zip(sentences, labels), 1):
-            examples_text += f"\nExample {i}:\n"
-            examples_text += f"Context: {sentence}\n"
-            examples_text += f"Solution: {label}\n"
-        examples_text += "\n--- End of Retrieved Examples ---\n"
-
-        return examples_text
-
-    def build_system_prompt(self, info):
-        """Override to include RAG retrieved examples in system prompt."""
-        # Get the base system prompt
-        base_messages = super().build_system_prompt(info)
-
-        # If RAG is not initialized, return base prompt
-        if self.retriever is None:
-            return base_messages
-
-        # Create query text from current context
-        query_parts = []
-        if hasattr(info, "instructions") and info.instructions:
-            query_parts.append(info.instructions)
-        if hasattr(info, "observation") and info.observation:
-            query_parts.append(str(info.observation))
-
-        query_text = " ".join(query_parts)
-
-        # Retrieve relevant examples
-        if query_text.strip():
-            relevant_sentences, relevant_labels = self._retrieve_relevant_examples(
-                query_text
-            )
-            examples_text = self._format_retrieved_examples(
-                relevant_sentences, relevant_labels
-            )
-
-            # Add examples to system prompt
-            if examples_text and base_messages:
-                original_content = base_messages[0]["content"]
-                enhanced_content = original_content + "\n" + examples_text
-                # Trim if necessary
-                enhanced_content = self.trim_message(
-                    enhanced_content, max_length_percentage=0.9
-                )
-                base_messages[0]["content"] = filter_non_utf8(enhanced_content)
-
-        return base_messages
-
-    def set_dataset(self, dataset):
-        """Set dataset and reinitialize RAG components."""
-        self.dataset = dataset
-        if dataset is not None:
-            self._initialize_rag()
-        else:
-            self.encoder = None
-            self.retriever = None
-            self.data_sentence = None
-            self.data_label = None
-
-    @classmethod
-    def from_experience_file(
-        cls,
-        experience_file_path: str,
-        config: dict,
-        env,
-        llm=None,
-        logger=None,
-        max_examples: int = None,
-    ):
-        """
-        Create a RAG agent from an experience file.
-
-        Args:
-            experience_file_path: Path to the JSONL file containing debugging experiences
-            config: Agent configuration
-            env: Environment instance
-            llm: Language model instance
-            logger: Logger instance
-            max_examples: Maximum number of examples to load from the file
-
-        Returns:
-            RAGAgent instance with loaded experiences
-        """
-        # Create dataset from experience file
-        dataset = ExperienceDataset(experience_file_path, max_examples=max_examples)
-
-        # Create and return RAG agent
-        return cls(config=config, env=env, llm=llm, logger=logger, dataset=dataset)
-
-    def load_experiences_from_file(self, file_path: str, max_examples: int = None):
-        """
-        Load experiences from a file and reinitialize RAG components.
-
-        Args:
-            file_path: Path to the JSONL file containing debugging experiences
-            max_examples: Maximum number of examples to load
-        """
-        dataset = ExperienceDataset(file_path, max_examples=max_examples)
-        self.set_dataset(dataset)
