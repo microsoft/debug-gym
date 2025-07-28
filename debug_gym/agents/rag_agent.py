@@ -226,7 +226,7 @@ class RAGAgent(DebugAgent):
 
         # Encode all training sentences
         input_representations = self.encoder.encode_sentence(
-            self.data_input, batch_size=32
+            self.data_input, batch_size=16
         )
 
         # Initialize retriever
