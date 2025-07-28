@@ -32,7 +32,7 @@ class HistoryTracker:
                 response.prompt = [
                     msg
                     for msg in response.prompt
-                    if not getattr(msg, "debug_gym_ignore", False)
+                    if not msg.get("debug_gym_ignore", False)
                 ]
             push_response.append(response)
         self.prompt_response_pairs.append(copy.deepcopy(push_response))
