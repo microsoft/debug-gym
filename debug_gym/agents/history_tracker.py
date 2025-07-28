@@ -24,18 +24,7 @@ class HistoryTracker:
         llm_responses = llm_responses or []
         if not isinstance(llm_responses, list):
             llm_responses = [llm_responses]
-        # remove messages being labeled as debug_gym_ignore
-        push_response = []
-        for response in llm_responses:
-            if isinstance(response.prompt, list):
-                # if the prompt is a list, we assume it's a multi-turn conversation
-                response.prompt = [
-                    msg
-                    for msg in response.prompt
-                    if not msg.get("debug_gym_ignore", False)
-                ]
-            push_response.append(response)
-        self.prompt_response_pairs.append(copy.deepcopy(push_response))
+        self.prompt_response_pairs.append(copy.deepcopy(llm_responses))
 
     def get(self):
         # return the history_steps latest steps
