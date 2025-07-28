@@ -59,7 +59,7 @@ class RAGAgent(DebugAgent):
         """
         assert method is not None, "rag_indexing_method must be provided in the config"
 
-        method, step = method.rsplit("-", 1) if "-" in method else (method, 1)
+        method, step = method.rsplit("-", 1) if "-" in method else (method, "1")
         assert method in [
             "observation",
             "tool_name",
@@ -124,7 +124,7 @@ class RAGAgent(DebugAgent):
         for trajectory in self.experience_trajectories:
             for i in range(len(trajectory)):
                 # skip non-assistant messages because assistant messages are the labels
-                if not trajectory[i]["role"] != "assistant":
+                if trajectory[i]["role"] != "assistant":
                     continue
                 # skip the assistant message if it does not have a tool call
                 if "tool_calls" not in trajectory[i] or not trajectory[i]["tool_calls"]:
@@ -257,15 +257,15 @@ class RAGAgent(DebugAgent):
         )
 
         # Extract the examples
-        relevant_sentences = []
+        relevant_inputs = []
         relevant_labels = []
 
         for i, idx in enumerate(indices[0]):
-            if idx < len(self.data_sentence):  # Safety check
-                relevant_sentences.append(self.data_sentence[idx])
+            if idx < len(self.data_input):  # Safety check
+                relevant_inputs.append(self.data_input[idx])
                 relevant_labels.append(self.data_label[idx])
 
-        return relevant_sentences, relevant_labels
+        return relevant_inputs, relevant_labels
 
     def extract_query_text_from_history(self):
         """Extract the query text from the agent's history based on the indexing method."""
