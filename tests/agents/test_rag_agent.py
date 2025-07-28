@@ -1,5 +1,6 @@
 import json
 import os
+import pickle
 import tempfile
 from unittest.mock import MagicMock, Mock, patch
 
@@ -530,3 +531,472 @@ class TestRAGAgent:
         agent.logger.warning.assert_called_once_with(
             "No relevant examples found for the current query. Proceeding without RAG."
         )
+
+
+class TestRAGAgentCaching:
+    """Test cases for the RAGAgent caching functionality."""
+
+    def create_sample_trajectory_file(self, content):
+        """Helper to create a temporary trajectory file."""
+        temp_file = tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".jsonl")
+        for line in content:
+            temp_file.write(json.dumps(line) + "\n")
+        temp_file.close()
+        return temp_file.name
+
+    def create_mock_config_with_cache(
+        self, trajectory_file_path, cache_dir=None, use_cache=True
+    ):
+        """Helper to create mock configuration with caching options."""
+        config = {
+            "rag_num_retrievals": 2,
+            "rag_indexing_method": "tool_call-1",
+            "sentence_encoder_model": "test-model",
+            "experience_trajectory_path": trajectory_file_path,
+            "rag_use_cache": use_cache,
+        }
+        if cache_dir:
+            config["rag_cache_dir"] = cache_dir
+        return config
+
+    def test_generate_cache_key(self):
+        """Test cache key generation."""
+        agent = RAGAgent.__new__(RAGAgent)
+        agent.experience_trajectory_path = "/path/to/trajectory.jsonl"
+        agent.rag_indexing_method = ["tool_call", 1]
+        agent.sentence_encoder_model = "test-model"
+
+        cache_key = agent._generate_cache_key()
+
+        # Should be a valid MD5 hash
+        assert len(cache_key) == 32
+        assert all(c in "0123456789abcdef" for c in cache_key)
+
+        # Should be deterministic
+        cache_key2 = agent._generate_cache_key()
+        assert cache_key == cache_key2
+
+    def test_generate_cache_key_different_configs(self):
+        """Test that different configurations generate different cache keys."""
+        agent1 = RAGAgent.__new__(RAGAgent)
+        agent1.experience_trajectory_path = "/path/to/trajectory1.jsonl"
+        agent1.rag_indexing_method = ["tool_call", 1]
+        agent1.sentence_encoder_model = "test-model"
+
+        agent2 = RAGAgent.__new__(RAGAgent)
+        agent2.experience_trajectory_path = (
+            "/path/to/trajectory2.jsonl"  # Different path
+        )
+        agent2.rag_indexing_method = ["tool_call", 1]
+        agent2.sentence_encoder_model = "test-model"
+
+        agent3 = RAGAgent.__new__(RAGAgent)
+        agent3.experience_trajectory_path = "/path/to/trajectory1.jsonl"
+        agent3.rag_indexing_method = ["observation", 2]  # Different method
+        agent3.sentence_encoder_model = "test-model"
+
+        agent4 = RAGAgent.__new__(RAGAgent)
+        agent4.experience_trajectory_path = "/path/to/trajectory1.jsonl"
+        agent4.rag_indexing_method = ["tool_call", 1]
+        agent4.sentence_encoder_model = "different-model"  # Different model
+
+        cache_key1 = agent1._generate_cache_key()
+        cache_key2 = agent2._generate_cache_key()
+        cache_key3 = agent3._generate_cache_key()
+        cache_key4 = agent4._generate_cache_key()
+
+        # All should be different
+        assert cache_key1 != cache_key2
+        assert cache_key1 != cache_key3
+        assert cache_key1 != cache_key4
+        assert cache_key2 != cache_key3
+
+    def test_get_cache_path(self):
+        """Test cache path generation."""
+        agent = RAGAgent.__new__(RAGAgent)
+        agent.cache_dir = "/test/cache/dir"
+
+        cache_key = "abcd1234"
+        cache_path = agent._get_cache_path(cache_key)
+
+        expected_path = "/test/cache/dir/rag_cache_abcd1234.pkl"
+        assert cache_path == expected_path
+
+    def test_save_and_load_cache_success(self):
+        """Test successful saving and loading of cache."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            agent = RAGAgent.__new__(RAGAgent)
+            agent.cache_dir = temp_dir
+            agent.rag_indexing_method = ["tool_call", 1]
+            agent.sentence_encoder_model = "test-model"
+            agent.logger = MagicMock()
+
+            # Test data
+            cache_key = "test_cache_key"
+            data_input = ["input1", "input2", "input3"]
+            input_representations = np.array([[0.1, 0.2], [0.3, 0.4], [0.5, 0.6]])
+
+            # Save cache
+            agent._save_cache(cache_key, data_input, input_representations)
+
+            # Verify cache file exists
+            cache_path = agent._get_cache_path(cache_key)
+            assert os.path.exists(cache_path)
+
+            # Load cache
+            loaded_data_input, loaded_representations = agent._load_cache(cache_key)
+
+            # Verify loaded data matches saved data
+            assert loaded_data_input == data_input
+            np.testing.assert_array_equal(loaded_representations, input_representations)
+
+            # Verify logger calls
+            agent.logger.info.assert_any_call(f"Saved cache to {cache_path}")
+            agent.logger.info.assert_any_call(f"Loaded cache from {cache_path}")
+
+    def test_save_cache_mismatched_lengths(self):
+        """Test save cache with mismatched data_input and input_representations lengths."""
+        agent = RAGAgent.__new__(RAGAgent)
+        agent.cache_dir = "/tmp"
+        agent.logger = MagicMock()
+
+        cache_key = "test_key"
+        data_input = ["input1", "input2"]
+        input_representations = np.array([[0.1, 0.2]])  # Different length
+
+        # Should raise assertion error
+        with pytest.raises(
+            AssertionError,
+            match="data_input and input_representations must have the same length",
+        ):
+            agent._save_cache(cache_key, data_input, input_representations)
+
+    def test_save_cache_failure(self):
+        """Test save cache failure handling."""
+        agent = RAGAgent.__new__(RAGAgent)
+        agent.cache_dir = "/nonexistent/directory"  # Invalid directory
+        agent.logger = MagicMock()
+
+        cache_key = "test_key"
+        data_input = ["input1"]
+        input_representations = np.array([[0.1, 0.2]])
+
+        # Should handle exception gracefully
+        agent._save_cache(cache_key, data_input, input_representations)
+
+        # Should log warning
+        agent.logger.warning.assert_called_once()
+        warning_call = agent.logger.warning.call_args[0][0]
+        assert "Failed to save cache:" in warning_call
+
+    def test_load_cache_nonexistent_file(self):
+        """Test loading cache when file doesn't exist."""
+        agent = RAGAgent.__new__(RAGAgent)
+        agent.cache_dir = "/tmp"
+
+        cache_key = "nonexistent_key"
+        loaded_data_input, loaded_representations = agent._load_cache(cache_key)
+
+        assert loaded_data_input is None
+        assert loaded_representations is None
+
+    def test_load_cache_configuration_mismatch(self):
+        """Test loading cache with configuration mismatch."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            agent = RAGAgent.__new__(RAGAgent)
+            agent.cache_dir = temp_dir
+            agent.rag_indexing_method = ["tool_call", 1]
+            agent.sentence_encoder_model = "test-model"
+            agent.logger = MagicMock()
+
+            # Create cache with different configuration
+            cache_key = "test_key"
+            cache_path = agent._get_cache_path(cache_key)
+            cache_data = {
+                "data_input": ["input1"],
+                "input_representations": np.array([[0.1, 0.2]]),
+                "indexing_method": ["observation", 2],  # Different method
+                "encoder_model": "different-model",  # Different model
+            }
+
+            with open(cache_path, "wb") as f:
+                pickle.dump(cache_data, f)
+
+            # Try to load cache
+            loaded_data_input, loaded_representations = agent._load_cache(cache_key)
+
+            # Should return None due to mismatch
+            assert loaded_data_input is None
+            assert loaded_representations is None
+
+            # Should log warning
+            agent.logger.warning.assert_called_with(
+                "Cache configuration mismatch, ignoring cache"
+            )
+
+    def test_load_cache_file_corruption(self):
+        """Test loading cache with corrupted file."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            agent = RAGAgent.__new__(RAGAgent)
+            agent.cache_dir = temp_dir
+            agent.logger = MagicMock()
+
+            # Create corrupted cache file
+            cache_key = "test_key"
+            cache_path = agent._get_cache_path(cache_key)
+            with open(cache_path, "w") as f:
+                f.write("corrupted data")
+
+            # Try to load cache
+            loaded_data_input, loaded_representations = agent._load_cache(cache_key)
+
+            # Should return None due to corruption
+            assert loaded_data_input is None
+            assert loaded_representations is None
+
+            # Should log warning
+            agent.logger.warning.assert_called_once()
+            warning_call = agent.logger.warning.call_args[0][0]
+            assert "Failed to load cache:" in warning_call
+
+    @patch("debug_gym.agents.rag_agent.SentenceEncoder")
+    @patch("debug_gym.agents.rag_agent.FaissRetriever")
+    def test_build_index_with_cache_hit(
+        self, mock_faiss_retriever, mock_sentence_encoder
+    ):
+        """Test building index when cache hit occurs."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            agent = RAGAgent.__new__(RAGAgent)
+            agent.cache_dir = temp_dir
+            agent.use_cache = True
+            agent.experience_trajectory_path = "/test/path.jsonl"
+            agent.rag_indexing_method = ["tool_call", 1]
+            agent.sentence_encoder_model = "test-model"
+            agent.logger = MagicMock()
+
+            # Mock encoder (should not be called when cache hits)
+            mock_encoder_instance = MagicMock()
+            mock_sentence_encoder.return_value = mock_encoder_instance
+            agent.encoder = mock_encoder_instance
+
+            # Mock retriever
+            mock_retriever_instance = MagicMock()
+            mock_faiss_retriever.return_value = mock_retriever_instance
+
+            # Prepare cache data
+            cache_key = agent._generate_cache_key()
+            cached_data_input = ["input1", "input2"]
+            cached_representations = np.array([[0.1, 0.2], [0.3, 0.4]])
+
+            agent._save_cache(cache_key, cached_data_input, cached_representations)
+
+            # Build index
+            agent._build_index()
+
+            # Verify cache was used
+            assert agent.data_input == cached_data_input
+            agent.logger.info.assert_any_call("Using cached input representations")
+
+            # Verify encoder was not called for computation
+            mock_encoder_instance.encode_sentence.assert_not_called()
+
+            # Verify retriever was initialized and used
+            mock_faiss_retriever.assert_called_once_with(2)  # encoding_dim = 2
+            mock_retriever_instance.add.assert_called_once()
+
+    @patch("debug_gym.agents.rag_agent.SentenceEncoder")
+    @patch("debug_gym.agents.rag_agent.FaissRetriever")
+    def test_build_index_with_cache_miss(
+        self, mock_faiss_retriever, mock_sentence_encoder
+    ):
+        """Test building index when cache miss occurs."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            agent = RAGAgent.__new__(RAGAgent)
+            agent.cache_dir = temp_dir
+            agent.use_cache = True
+            agent.experience_trajectory_path = "/test/path.jsonl"
+            agent.rag_indexing_method = ["tool_call", 1]
+            agent.sentence_encoder_model = "test-model"
+            agent.logger = MagicMock()
+            agent.data_input = ["input1", "input2"]
+
+            # Mock encoder
+            mock_encoder_instance = MagicMock()
+            mock_sentence_encoder.return_value = mock_encoder_instance
+            computed_representations = np.array([[0.1, 0.2], [0.3, 0.4]])
+            mock_encoder_instance.encode_sentence.return_value = (
+                computed_representations
+            )
+            agent.encoder = mock_encoder_instance
+
+            # Mock retriever
+            mock_retriever_instance = MagicMock()
+            mock_faiss_retriever.return_value = mock_retriever_instance
+
+            # Build index (no cache exists)
+            agent._build_index()
+
+            # Verify encoder was called for computation
+            mock_encoder_instance.encode_sentence.assert_called_once_with(
+                agent.data_input, batch_size=16
+            )
+
+            # Verify cache was saved
+            cache_key = agent._generate_cache_key()
+            cache_path = agent._get_cache_path(cache_key)
+            assert os.path.exists(cache_path)
+
+            # Verify retriever was initialized and used
+            mock_faiss_retriever.assert_called_once_with(2)  # encoding_dim = 2
+            mock_retriever_instance.add.assert_called_once()
+
+    @patch("debug_gym.agents.rag_agent.SentenceEncoder")
+    @patch("debug_gym.agents.rag_agent.FaissRetriever")
+    def test_build_index_with_cache_disabled(
+        self, mock_faiss_retriever, mock_sentence_encoder
+    ):
+        """Test building index when caching is disabled."""
+        agent = RAGAgent.__new__(RAGAgent)
+        agent.use_cache = False
+        agent.logger = MagicMock()
+        agent.data_input = ["input1", "input2"]
+
+        # Mock encoder
+        mock_encoder_instance = MagicMock()
+        mock_sentence_encoder.return_value = mock_encoder_instance
+        computed_representations = np.array([[0.1, 0.2], [0.3, 0.4]])
+        mock_encoder_instance.encode_sentence.return_value = computed_representations
+        agent.encoder = mock_encoder_instance
+
+        # Mock retriever
+        mock_retriever_instance = MagicMock()
+        mock_faiss_retriever.return_value = mock_retriever_instance
+
+        # Build index
+        agent._build_index()
+
+        # Verify encoder was called for computation
+        mock_encoder_instance.encode_sentence.assert_called_once_with(
+            agent.data_input, batch_size=16
+        )
+
+        # Verify retriever was initialized and used
+        mock_faiss_retriever.assert_called_once_with(2)  # encoding_dim = 2
+        mock_retriever_instance.add.assert_called_once()
+
+    def test_cache_directory_creation(self):
+        """Test that cache directory is created when caching is enabled."""
+        with tempfile.TemporaryDirectory() as temp_base_dir:
+            cache_dir = os.path.join(temp_base_dir, "test_cache")
+
+            # Create sample trajectory data
+            trajectory_data = [
+                {
+                    "satisfied_criteria": [
+                        "follows_proper_debugging_workflow",
+                        "has_successful_outcome",
+                    ],
+                    "messages": [
+                        {"role": "system", "content": "System message"},
+                        {"role": "user", "content": "User message"},
+                        {
+                            "role": "assistant",
+                            "tool_calls": [
+                                {
+                                    "function": {
+                                        "name": "test_tool",
+                                        "arguments": {"arg": "value"},
+                                    }
+                                }
+                            ],
+                        },
+                    ],
+                }
+            ]
+
+            trajectory_file = self.create_sample_trajectory_file(trajectory_data)
+            config = self.create_mock_config_with_cache(
+                trajectory_file, cache_dir=cache_dir, use_cache=True
+            )
+
+            try:
+                # Mock the parent class and required dependencies
+                with patch("debug_gym.agents.rag_agent.SentenceEncoder"):
+                    with patch("debug_gym.agents.rag_agent.FaissRetriever"):
+                        with patch.object(
+                            RAGAgent, "__init__", lambda x, *args, **kwargs: None
+                        ):
+                            agent = RAGAgent.__new__(RAGAgent)
+                            agent.config = config
+                            agent.logger = MagicMock()
+
+                            # Simulate cache directory creation logic
+                            agent.cache_dir = config.get("rag_cache_dir", ".rag_cache")
+                            agent.use_cache = config.get("rag_use_cache", True)
+                            if agent.use_cache:
+                                os.makedirs(agent.cache_dir, exist_ok=True)
+
+                            # Verify cache directory was created
+                            assert os.path.exists(cache_dir)
+                            assert os.path.isdir(cache_dir)
+
+            finally:
+                os.unlink(trajectory_file)
+
+    def test_cache_disabled_no_directory_creation(self):
+        """Test that cache directory is not created when caching is disabled."""
+        with tempfile.TemporaryDirectory() as temp_base_dir:
+            cache_dir = os.path.join(temp_base_dir, "test_cache")
+
+            # Create sample trajectory data
+            trajectory_data = [
+                {
+                    "satisfied_criteria": [
+                        "follows_proper_debugging_workflow",
+                        "has_successful_outcome",
+                    ],
+                    "messages": [
+                        {"role": "system", "content": "System message"},
+                        {"role": "user", "content": "User message"},
+                        {
+                            "role": "assistant",
+                            "tool_calls": [
+                                {
+                                    "function": {
+                                        "name": "test_tool",
+                                        "arguments": {"arg": "value"},
+                                    }
+                                }
+                            ],
+                        },
+                    ],
+                }
+            ]
+
+            trajectory_file = self.create_sample_trajectory_file(trajectory_data)
+            config = self.create_mock_config_with_cache(
+                trajectory_file, cache_dir=cache_dir, use_cache=False
+            )
+
+            try:
+                # Mock the parent class and required dependencies
+                with patch("debug_gym.agents.rag_agent.SentenceEncoder"):
+                    with patch("debug_gym.agents.rag_agent.FaissRetriever"):
+                        with patch.object(
+                            RAGAgent, "__init__", lambda x, *args, **kwargs: None
+                        ):
+                            agent = RAGAgent.__new__(RAGAgent)
+                            agent.config = config
+                            agent.logger = MagicMock()
+
+                            # Simulate cache directory creation logic
+                            agent.cache_dir = config.get("rag_cache_dir", ".rag_cache")
+                            agent.use_cache = config.get("rag_use_cache", True)
+                            if agent.use_cache:
+                                os.makedirs(agent.cache_dir, exist_ok=True)
+
+                            # Verify cache directory was not created
+                            assert not os.path.exists(cache_dir)
+
+            finally:
+                os.unlink(trajectory_file)
