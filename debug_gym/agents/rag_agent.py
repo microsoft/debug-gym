@@ -11,6 +11,7 @@ from debug_gym.gym.utils import filter_non_utf8
 class RAGAgent(BaseAgent):
     name = "rag_agent"
     system_prompt = "You are a debugging agent specialized in fixing Python programs. Your goal is to debug a Python program to make sure it can pass a set of test functions. You have access to a set of tools including the pdb debugger to help you investigate the code before proposing a patch. While the code may seem familiar to you from your training, you should not assume you know the code. Instead, you must use the pdb debugger to investigate the code and understand the potential bugs. A common debugging workflow is to 1) find suspicious files and lines (from error messages or test failures); 2) set breakpoints at suspicious places; 3) continue execution so the frame is at the breakpoint you set; 4) then print necessary values to identify the bugs. Once you have gained enough information, propose a rewriting patch to fix the bugs. Avoid rewriting the entire code, focus on the bugs only. You can only call one tool at a time. Do not repeat your previous action, especially if it returned tool calling errors or it resulted in information that you already know. You can think step by step to help you make the decision at every step, but you must be concise and avoid overthinking. If you are confident that you have enough information, propose a patch to fix the bugs by calling the rewrite tool. If you are not sure, continue using the pdb tool to gather more information before proposing a patch. After every rewrite, it's always a good idea to call the eval tool to execute the new code and check if it passes the tests; if it does not, the tool will return the error messages, which you can use to continue debugging. Output both your thinking process (if any) and the tool call in the response. "
+    delimiter = " <STEP_DELIMITER> "
 
     def __init__(
         self,
@@ -43,8 +44,6 @@ class RAGAgent(BaseAgent):
         self.encoder = SentenceEncoder(model_name=self.sentence_encoder_model)
         # Build index
         self._build_index()
-
-        self._initialize_rag()
 
     def parse_indexing_method(self, method: str):
         """Parse the indexing method from the configuration.
@@ -108,6 +107,7 @@ class RAGAgent(BaseAgent):
         [sys, user, assistant1, tool1, assistant2, tool2, user, assistant3],
         if method=tool_call, and step=2, the dataset will contain:
         input: assistant1; label: assistant2, (when there are less than 2 step, we use all the available steps)
+        input: assistant2; label: assistant3,
         input: assistant1, assistant2; label: assistant3,
         """
 
@@ -120,7 +120,6 @@ class RAGAgent(BaseAgent):
 
         method, step = self.rag_indexing_method
         self.data_input, self.data_label = [], []
-        delimiter = " <STEP_DELIMITER> "
 
         for trajectory in self.experience_trajectories:
             for i in range(len(trajectory)):
@@ -136,84 +135,89 @@ class RAGAgent(BaseAgent):
                 ):
                     continue
                 label = json.dumps(trajectory[i]["tool_calls"][0]["function"])
-                match method:
-                    case "observation":
-                        input_list = find_last_k_messages_with_role(
-                            trajectory[:i], ["user", "tool"], step
-                        )
-                        if not input_list:
-                            continue
-                        input_list = [msg["content"] for msg in input_list]
-                        input = delimiter.join(input_list)
-                    case "tool_name":
-                        input_list = find_last_k_messages_with_role(
-                            trajectory[:i], "assistant", step
-                        )
-                        if not input_list:
-                            continue
-                        tool_name_list = []
-                        for msg in input_list:
-                            if "tool_calls" in msg and msg["tool_calls"]:
-                                if (
-                                    "function" in msg["tool_calls"][0]
-                                    and msg["tool_calls"][0]["function"]
-                                ):
-                                    tool_name = msg["tool_calls"][0].get("name", "")
-                                    if tool_name:
-                                        tool_name_list.append(tool_name)
-                        if not tool_name_list:
-                            continue
-                        input = delimiter.join(tool_name_list)
-                    case "tool_call":
-                        input_list = find_last_k_messages_with_role(
-                            trajectory[:i], "assistant", step
-                        )
-                        if not input_list:
-                            continue
-                        tool_call_list = []
-                        for msg in input_list:
-                            if "tool_calls" in msg and msg["tool_calls"]:
-                                if (
-                                    "function" in msg["tool_calls"][0]
-                                    and msg["tool_calls"][0]["function"]
-                                ):
-                                    tool_call = json.dumps(
-                                        msg["tool_calls"][0]["function"]
+                for __step in range(1, step + 1):
+                    match method:
+                        case "observation":
+                            input_list = find_last_k_messages_with_role(
+                                trajectory[:i], ["user", "tool"], __step
+                            )
+                            if not input_list:
+                                continue
+                            input_list = [msg["content"] for msg in input_list]
+                            input = self.delimiter.join(input_list)
+                        case "tool_name":
+                            input_list = find_last_k_messages_with_role(
+                                trajectory[:i], "assistant", __step
+                            )
+                            if not input_list:
+                                continue
+                            tool_name_list = []
+                            for msg in input_list:
+                                if "tool_calls" in msg and msg["tool_calls"]:
+                                    if (
+                                        "function" in msg["tool_calls"][0]
+                                        and msg["tool_calls"][0]["function"]
+                                    ):
+                                        tool_name = msg["tool_calls"][0].get("name", "")
+                                        if tool_name:
+                                            tool_name_list.append(tool_name)
+                            if not tool_name_list:
+                                continue
+                            input = self.delimiter.join(tool_name_list)
+                        case "tool_call":
+                            input_list = find_last_k_messages_with_role(
+                                trajectory[:i], "assistant", __step
+                            )
+                            if not input_list:
+                                continue
+                            tool_call_list = []
+                            for msg in input_list:
+                                if "tool_calls" in msg and msg["tool_calls"]:
+                                    if (
+                                        "function" in msg["tool_calls"][0]
+                                        and msg["tool_calls"][0]["function"]
+                                    ):
+                                        tool_call = json.dumps(
+                                            msg["tool_calls"][0]["function"]
+                                        )
+                                        tool_call_list.append(tool_call)
+                            if not tool_call_list:
+                                continue
+                            input = self.delimiter.join(tool_call_list)
+                        case "tool_call_with_reasoning":
+                            input_list = find_last_k_messages_with_role(
+                                trajectory[:i], "assistant", __step
+                            )
+                            if not input_list:
+                                continue
+                            tool_call_with_reasoning_list = []
+                            for msg in input_list:
+                                tmp = {}
+                                if "tool_calls" in msg and msg["tool_calls"]:
+                                    if (
+                                        "function" in msg["tool_calls"][0]
+                                        and msg["tool_calls"][0]["function"]
+                                    ):
+                                        tmp["tool_calls"] = msg["tool_calls"][0][
+                                            "function"
+                                        ]
+                                if "content" in msg:
+                                    tmp["content"] = msg["content"]
+                                if tmp:
+                                    tool_call_with_reasoning_list.append(
+                                        json.dumps(tmp)
                                     )
-                                    tool_call_list.append(tool_call)
-                        if not tool_call_list:
-                            continue
-                        input = delimiter.join(tool_call_list)
-                    case "tool_call_with_reasoning":
-                        input_list = find_last_k_messages_with_role(
-                            trajectory[:i], "assistant", step
-                        )
-                        if not input_list:
-                            continue
-                        tool_call_with_reasoning_list = []
-                        for msg in input_list:
-                            tmp = {}
-                            if "tool_calls" in msg and msg["tool_calls"]:
-                                if (
-                                    "function" in msg["tool_calls"][0]
-                                    and msg["tool_calls"][0]["function"]
-                                ):
-                                    tmp["tool_calls"] = msg["tool_calls"][0]["function"]
-                            if "content" in msg:
-                                tmp["content"] = msg["content"]
-                            if tmp:
-                                tool_call_with_reasoning_list.append(json.dumps(tmp))
-                        if not tool_call_with_reasoning_list:
-                            continue
-                        input = delimiter.join(tool_call_with_reasoning_list)
-                    case _:
-                        raise ValueError(
-                            f"Invalid rag_indexing_method: {method}. Supported methods: observation, tool_name, tool_call, tool_call_with_reasoning"
-                        )
-                self.data_input.append(input)
-                self.data_label.append(label)
+                            if not tool_call_with_reasoning_list:
+                                continue
+                            input = self.delimiter.join(tool_call_with_reasoning_list)
+                        case _:
+                            raise ValueError(
+                                f"Invalid rag_indexing_method: {method}. Supported methods: observation, tool_name, tool_call, tool_call_with_reasoning"
+                            )
+                    self.data_input.append(filter_non_utf8(input))
+                    self.data_label.append(filter_non_utf8(label))
         self.logger.info(
-            f"Built retrieval dataset with {len(self.data_input)} examples using method: {method}, step: {step}"
+            f"Built retrieval dataset with {len(self.data_input)} examples using method: {method}, max step: {step}"
         )
 
     def _build_index(self):
@@ -262,3 +266,46 @@ class RAGAgent(BaseAgent):
                 relevant_labels.append(self.data_label[idx])
 
         return relevant_sentences, relevant_labels
+
+    def extract_query_text_from_history(self):
+        """Extract the query text from the agent's history based on the indexing method."""
+        method, step = self.rag_indexing_method
+        history, _ = self.history.get()  # list[EnvInfo]
+        history = history[-step:]
+        if len(history) == 0:
+            return None
+        match method:
+            case "observation":
+                observation_list = [
+                    item.step_observation.observation for item in history
+                ]
+                query_text = self.delimiter.join(observation_list)
+            case "tool_name":
+                tool_name_list = [item.action.name for item in history]
+                query_text = self.delimiter.join(tool_name_list)
+            case "tool_call":
+                tool_call_list = [
+                    json.dumps(
+                        {"name": item.action.name, "arguments": item.action.arguments}
+                    )
+                    for item in history
+                ]
+                query_text = self.delimiter.join(tool_call_list)
+            case "tool_call_with_reasoning":
+                tool_call_with_reasoning_list = []
+                for item in history:
+                    _tmp = {
+                        "tool_calls": {
+                            "name": item.action.name,
+                            "arguments": item.action.arguments,
+                        },
+                    }
+                    if item.action.reasoning:
+                        _tmp["reasoning"] = item.action.reasoning
+                    tool_call_with_reasoning_list.append(json.dumps(_tmp))
+                query_text = self.delimiter.join(tool_call_with_reasoning_list)
+            case _:
+                raise ValueError(
+                    f"Invalid rag_indexing_method: {method}. Supported methods: observation, tool_name, tool_call, tool_call_with_reasoning"
+                )
+        return filter_non_utf8(query_text)
