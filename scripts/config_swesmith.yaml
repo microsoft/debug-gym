@@ -45,3 +45,10 @@ debug_5_agent:
 solution_agent:
     llm_name: "human"  # No need for an LLM.
     tools: ["eval", "pdb"]
+
+rag_agent:
+    tools: ["pdb", "view", "rewrite", "listdir", "eval"]
+    rag_num_retrievals: 1
+    rag_indexing_method: "tool_call-3"  # method-#history_steps, methods: "observation", "tool_name", "tool_call", "tool_call_with_reasoning"
+    sentence_encoder_model: "Qwen/Qwen3-Embedding-0.6B"
+    experience_trajectory_path: "exp/sft_data/d1_full_truncated_30k_jul9.jsonl"
