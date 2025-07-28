@@ -1,4 +1,7 @@
+import hashlib
 import json
+import os
+import pickle
 
 import numpy as np
 
@@ -10,6 +13,19 @@ from debug_gym.gym.utils import filter_non_utf8
 
 @register_agent
 class RAGAgent(DebugAgent):
+    """
+    RAG (Retrieval-Augmented Generation) Agent that uses cached embeddings for efficiency.
+
+    Cache configuration options:
+    - rag_cache_dir: Directory to store cached embeddings (default: ".rag_cache")
+    - rag_use_cache: Whether to use caching (default: True)
+
+    The agent will automatically cache computed embeddings based on:
+    - Experience trajectory file path and modification time
+    - RAG indexing method
+    - Sentence encoder model
+    """
+
     name = "rag_agent"
     delimiter = " <STEP_DELIMITER> "
 
@@ -32,12 +48,20 @@ class RAGAgent(DebugAgent):
         self.sentence_encoder_model = self.config.get(
             "sentence_encoder_model", "Qwen/Qwen3-Embedding-0.6B"
         )
-        experience_trajectory_path = self.config.get("experience_trajectory_path", None)
+        # Cache directory for storing computed representations
+        self.cache_dir = self.config.get("rag_cache_dir", ".rag_cache")
+        self.use_cache = self.config.get("rag_use_cache", True)
+        if self.use_cache:
+            os.makedirs(self.cache_dir, exist_ok=True)
+
+        self.experience_trajectory_path = self.config.get(
+            "experience_trajectory_path", None
+        )
         assert (
-            experience_trajectory_path is not None
+            self.experience_trajectory_path is not None
         ), "Experience path must be provided in the config"
         # Load experience trajectories from file
-        self.load_experience_trajectory_from_file(experience_trajectory_path)
+        self.load_experience_trajectory_from_file(self.experience_trajectory_path)
         # Build retrieval dataset
         self.build_retrieval_dataset()
         # Initialize encoder
@@ -220,14 +244,95 @@ class RAGAgent(DebugAgent):
             f"Built retrieval dataset with {len(self.data_input)} examples using method: {method}, max step: {step}"
         )
 
+    def _generate_cache_key(self):
+        """Generate a unique cache key based on trajectory path, indexing method, and encoder model."""
+        # Create a string that uniquely identifies the configuration
+        config_str = f"{self.experience_trajectory_path}_{self.rag_indexing_method}_{self.sentence_encoder_model}"
+
+        # Generate a hash of the configuration
+        cache_key = hashlib.md5(config_str.encode()).hexdigest()
+        return cache_key
+
+    def _get_cache_path(self, cache_key: str):
+        """Get the full path for the cache file."""
+        return os.path.join(self.cache_dir, f"rag_cache_{cache_key}.pkl")
+
+    def _save_cache(
+        self, cache_key: str, data_input: list, input_representations: np.ndarray
+    ):
+        """Save data_input and input_representations to cache."""
+        cache_path = self._get_cache_path(cache_key)
+        assert len(data_input) == len(
+            input_representations
+        ), "data_input and input_representations must have the same length."
+        try:
+            cache_data = {
+                "data_input": data_input,
+                "input_representations": input_representations,
+                "indexing_method": self.rag_indexing_method,
+                "encoder_model": self.sentence_encoder_model,
+            }
+            with open(cache_path, "wb") as f:
+                pickle.dump(cache_data, f)
+            self.logger.info(f"Saved cache to {cache_path}")
+        except Exception as e:
+            self.logger.warning(f"Failed to save cache: {e}")
+
+    def _load_cache(self, cache_key: str):
+        """Load data_input and input_representations from cache."""
+        cache_path = self._get_cache_path(cache_key)
+        if not os.path.exists(cache_path):
+            return None, None
+
+        try:
+            with open(cache_path, "rb") as f:
+                cache_data = pickle.load(f)
+
+            # Verify cache consistency
+            if (
+                cache_data.get("indexing_method") != self.rag_indexing_method
+                or cache_data.get("encoder_model") != self.sentence_encoder_model
+            ):
+                self.logger.warning("Cache configuration mismatch, ignoring cache")
+                return None, None
+
+            self.logger.info(f"Loaded cache from {cache_path}")
+            return (cache_data["data_input"], cache_data["input_representations"])
+        except Exception as e:
+            self.logger.warning(f"Failed to load cache: {e}")
+            return None, None
+
     def _build_index(self):
-        """Build the vector index for retrieval."""
+        """Build the vector index for retrieval with caching support."""
         self.logger.info("Building vector index...")
 
-        # Encode all training sentences
-        input_representations = self.encoder.encode_sentence(
-            self.data_input, batch_size=16
-        )
+        input_representations = None
+
+        # Try to use cache if enabled
+        if self.use_cache:
+            # Generate cache key
+            cache_key = self._generate_cache_key()
+
+            # Try to load from cache
+            cached_data_input, cached_representations = self._load_cache(cache_key)
+
+            if cached_data_input is not None and cached_representations is not None:
+                # Use cached data
+                self.data_input = cached_data_input
+                input_representations = cached_representations
+                self.logger.info("Using cached input representations")
+
+        # Compute representations if not loaded from cache
+        if input_representations is None:
+            self.logger.info(
+                "Computing input representations (this may take time with GPU)..."
+            )
+            input_representations = self.encoder.encode_sentence(
+                self.data_input, batch_size=16
+            )
+            # Save to cache if caching is enabled
+            if self.use_cache:
+                self._save_cache(cache_key, self.data_input, input_representations)
 
         # Initialize retriever
         encoding_dim = input_representations.shape[1]
@@ -281,7 +386,7 @@ class RAGAgent(DebugAgent):
                 ]
                 query_text = self.delimiter.join(observation_list)
             case "tool_name":
-                tool_name_list = [item.action.name for item in history]
+                tool_name_list = [item.action.name for item in history if item.action]
                 query_text = self.delimiter.join(tool_name_list)
             case "tool_call":
                 tool_call_list = [
@@ -289,19 +394,20 @@ class RAGAgent(DebugAgent):
                         {"name": item.action.name, "arguments": item.action.arguments}
                     )
                     for item in history
+                    if item.action
                 ]
                 query_text = self.delimiter.join(tool_call_list)
             case "tool_call_with_reasoning":
                 tool_call_with_reasoning_list = []
                 for item in history:
-                    _tmp = {
-                        "tool_calls": {
+                    _tmp = {}
+                    if item.action:
+                        _tmp["tool_calls"] = {
                             "name": item.action.name,
                             "arguments": item.action.arguments,
-                        },
-                    }
-                    if item.action.reasoning:
-                        _tmp["reasoning"] = item.action.reasoning
+                        }
+                    if item.action_reasoning:
+                        _tmp["content"] = item.action_reasoning
                     tool_call_with_reasoning_list.append(json.dumps(_tmp))
                 query_text = self.delimiter.join(tool_call_with_reasoning_list)
             case _:

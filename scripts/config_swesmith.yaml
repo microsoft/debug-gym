@@ -52,3 +52,5 @@ rag_agent:
     rag_indexing_method: "tool_call-3"  # method-#history_steps, methods: "observation", "tool_name", "tool_call", "tool_call_with_reasoning"
     sentence_encoder_model: "Qwen/Qwen3-Embedding-0.6B"
     experience_trajectory_path: "exps/sft_data/d1_full_truncated_30k_jul9.jsonl"
+    rag_cache_dir: ".rag_cache"
+    rag_use_cache: true
