@@ -2,15 +2,15 @@ import json
 
 import numpy as np
 
-from debug_gym.agents.base_agent import BaseAgent, register_agent
+from debug_gym.agents.base_agent import register_agent
+from debug_gym.agents.debug_agent import DebugAgent
 from debug_gym.agents.utils import FaissRetriever, SentenceEncoder
 from debug_gym.gym.utils import filter_non_utf8
 
 
 @register_agent
-class RAGAgent(BaseAgent):
+class RAGAgent(DebugAgent):
     name = "rag_agent"
-    system_prompt = "You are a debugging agent specialized in fixing Python programs. Your goal is to debug a Python program to make sure it can pass a set of test functions. You have access to a set of tools including the pdb debugger to help you investigate the code before proposing a patch. While the code may seem familiar to you from your training, you should not assume you know the code. Instead, you must use the pdb debugger to investigate the code and understand the potential bugs. A common debugging workflow is to 1) find suspicious files and lines (from error messages or test failures); 2) set breakpoints at suspicious places; 3) continue execution so the frame is at the breakpoint you set; 4) then print necessary values to identify the bugs. Once you have gained enough information, propose a rewriting patch to fix the bugs. Avoid rewriting the entire code, focus on the bugs only. You can only call one tool at a time. Do not repeat your previous action, especially if it returned tool calling errors or it resulted in information that you already know. You can think step by step to help you make the decision at every step, but you must be concise and avoid overthinking. If you are confident that you have enough information, propose a patch to fix the bugs by calling the rewrite tool. If you are not sure, continue using the pdb tool to gather more information before proposing a patch. After every rewrite, it's always a good idea to call the eval tool to execute the new code and check if it passes the tests; if it does not, the tool will return the error messages, which you can use to continue debugging. Output both your thinking process (if any) and the tool call in the response. "
     delimiter = " <STEP_DELIMITER> "
 
     def __init__(
@@ -309,3 +309,25 @@ class RAGAgent(BaseAgent):
                     f"Invalid rag_indexing_method: {method}. Supported methods: observation, tool_name, tool_call, tool_call_with_reasoning"
                 )
         return filter_non_utf8(query_text)
+
+    def build_question_prompt(self):
+        # Extract the query text from the history
+        query_text = self.extract_query_text_from_history()
+        if query_text is None:
+            return []
+        # Retrieve relevant examples
+        _, relevant_examples = self._retrieve_relevant_examples(query_text)
+        if not relevant_examples:
+            self.logger.warning(
+                "No relevant examples found for the current query. Proceeding without RAG."
+            )
+            return []
+        # Build the question prompt with retrieved examples
+        content = "I have retrieved some relevant examples to help you make a decision. Note that these examples are not guaranteed to be correct, but they can give you some hints on how to proceed. Here are the examples:\n"
+        for idx, example in enumerate(relevant_examples):
+            content += f"\nExample {idx + 1}:\n{json.dumps(example, indent=2)}\n"
+
+        # debug_gym_ignore is used to prevent the history tracker from saving this message
+        # so that we don't have to record the retrieved examples after every step in the history
+        messages = [{"role": "user", "content": content, "debug_gym_ignore": True}]
+        return messages
