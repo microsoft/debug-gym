@@ -429,7 +429,8 @@ class RAGAgent(DebugAgent):
             )
             return []
         # Build the question prompt with retrieved examples
-        content = "I have retrieved some relevant examples to help you make a decision. Note that these examples are not guaranteed to be correct, but they can give you some hints on how to proceed. Here are the examples:\n"
+        content = "I have retrieved some relevant examples to help you make a decision. Note that these examples are not guaranteed to be correct or applicable to the current situation, but you can use them as references if you are unsure about the next step. "
+        content += "You can ignore the examples that are not relevant to the current situation. Here are the examples:\n"
         for idx, example in enumerate(relevant_examples):
             content += f"\nExample {idx + 1}:\n{json.dumps(example, indent=2)}\n"
 
