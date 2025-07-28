@@ -47,6 +47,6 @@ debug_5_agent:
     tools: ["pdb", "view", "rewrite", "eval"]
 
 guided_agent:
-    llm_name: "human"
+    llm_name: "gpt-4o"
     tools: ["pdb", "view", "rewrite", "eval"]
-    llms: ["gpt-4o", "gpt-4o-mini"]
+    llms: ["gpt-4o", "gpt-4o"]
