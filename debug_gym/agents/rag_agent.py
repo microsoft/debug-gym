@@ -362,8 +362,7 @@ class RAGAgent(DebugAgent):
         )
 
         # Extract the examples
-        relevant_inputs = []
-        relevant_labels = []
+        relevant_inputs, relevant_labels = [], []
 
         for i, idx in enumerate(indices[0]):
             if idx < len(self.data_input):  # Safety check
@@ -428,11 +427,17 @@ class RAGAgent(DebugAgent):
                 "No relevant examples found for the current query. Proceeding without RAG."
             )
             return []
+
         # Build the question prompt with retrieved examples
         content = "I have retrieved some relevant examples to help you make a decision. Note that these examples are not guaranteed to be correct or applicable to the current situation, but you can use them as references if you are unsure about the next step. "
         content += "You can ignore the examples that are not relevant to the current situation. Here are the examples:\n"
-        for idx, example in enumerate(relevant_examples):
-            content += f"\nExample {idx + 1}:\n{json.dumps(example, indent=2)}\n"
+        deduplicate = set()
+        for example in relevant_examples:
+            _ex = json.dumps(example, indent=2)
+            if _ex in deduplicate:
+                continue
+            content += f"\nExample {len(deduplicate) + 1}:\n{_ex}\n"
+            deduplicate.add(_ex)
 
         # debug_gym_ignore is used to prevent the history tracker from saving this message
         # so that we don't have to record the retrieved examples after every step in the history

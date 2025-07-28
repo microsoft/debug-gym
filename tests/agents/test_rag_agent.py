@@ -532,6 +532,71 @@ class TestRAGAgent:
             "No relevant examples found for the current query. Proceeding without RAG."
         )
 
+    def test_build_question_prompt_deduplication(self):
+        """Test that duplicate examples are properly deduplicated in question prompt."""
+        agent = RAGAgent.__new__(RAGAgent)
+        agent.logger = MagicMock()
+
+        # Create duplicate examples - same JSON content but different objects
+        duplicate_example = {"name": "test_function", "arguments": {"param": "value"}}
+        unique_example = {"name": "other_function", "arguments": {"param": "different"}}
+
+        # Mock extract_query_text_from_history
+        with patch.object(
+            agent, "extract_query_text_from_history", return_value="test query"
+        ):
+            # Mock _retrieve_relevant_examples to return duplicates
+            with patch.object(
+                agent,
+                "_retrieve_relevant_examples",
+                return_value=(
+                    [],
+                    [
+                        duplicate_example,
+                        duplicate_example,
+                        unique_example,
+                        duplicate_example,
+                    ],
+                ),
+            ):
+                result = agent.build_question_prompt()
+
+        assert len(result) == 1
+        assert result[0]["role"] == "user"
+        content = result[0]["content"]
+
+        # Check that duplicates are properly removed
+        # Count occurrences of each example in the content
+        duplicate_json = json.dumps(duplicate_example, indent=2)
+        unique_json = json.dumps(unique_example, indent=2)
+
+        # The duplicate example should appear only once despite being in the list 3 times
+        duplicate_count = content.count(duplicate_json)
+        unique_count = content.count(unique_json)
+
+        assert (
+            duplicate_count == 1
+        ), f"Expected duplicate example to appear once, but found {duplicate_count} times"
+        assert (
+            unique_count == 1
+        ), f"Expected unique example to appear once, but found {unique_count} times"
+
+        # Check that we have exactly 2 examples (deduplicated)
+        example_count = content.count("Example ")
+        assert (
+            example_count == 2
+        ), f"Expected 2 examples after deduplication, but found {example_count}"
+
+        # Verify the content structure
+        assert "retrieved some relevant examples" in content
+        assert "Example 1:" in content
+        # the second unique example gets "Example 3:" label (index 2 + 1)
+        assert "Example 2:" in content
+        # Verify that Example 2 and Example 4 are not present (they were duplicates that got skipped)
+        assert "Example 3:" not in content
+        assert "Example 4:" not in content
+        assert result[0]["debug_gym_ignore"] is True
+
 
 class TestRAGAgentCaching:
     """Test cases for the RAGAgent caching functionality."""
