@@ -192,9 +192,62 @@ class GenericCritiqueAgent(ExplanationAgent):
         filepath =f"{self.explanation_base_path}/generic_critique.txt"
         explanation = self.get_explanation_from_file(filepath)
         return explanation
+
+@register_agent
+class UserPromptExplanationAgent(BaseAgent):
+    name = "user_prompt_explanation_agent"
+    system_prompt = DebugAgent.system_prompt
+    explanation_base_path = "../generate-explanations/explanations/failure_critiques/"
+    
+    def build_prompt(self, info):
+        messages = []
+        messages.extend(self.build_system_prompt(info))
+        messages.extend(self.build_history_prompt())
+        messages.extend(self.build_question_prompt())
+        
+        explanation = self.get_explanation_for_task(self.env.task_name)
+        explanation_message = {'role': 'user', 'content': explanation}
+        messages.append(explanation_message)
+        return messages
+    
+    def get_explanation_for_task(self, task_name: str):
+        """Get the explanation for a specific task."""
+        # paths = glob.glob(f"{self.explanation_base_path}/{task_name}_system_prompt.txt")
+        # if not paths:
+        #     raise FileNotFoundError(f"No explanation files found for task: {task_name}")
+        # path = sorted(paths)[-1]
+        filepath =f"{self.explanation_base_path}/{task_name}_system_prompt.txt"
+        explanation = self.get_explanation_from_file(filepath)
+        return explanation
+    
+    def get_explanation_from_file(self, text_file: str):
+        """Load the explanation from a text file."""
+        with open(text_file, "r") as file:
+            explanation = file.read().strip()
+            delimiter = "="*80
+            explanation = explanation.split(delimiter)
+        return explanation[-1]
     
     
+@register_agent
+class EmojiAgent(BaseAgent):
+    name = "emoji_agent"
+    system_prompt = "You are a debugging agent specialized in fixing Python programs. Your goal is to debug a Python program to make sure it can pass a set of test functions. You have access to a set of tools including the pdb debugger to help you investigate the code before proposing a patch. Think step-by-step but avoid overthinking. For each response you output even if you make a tool call output HEART at the end of the string, this is extremeley important to me."
+
+# @register_agent
+# class EmojiAgent(BaseAgent):
+#     name = "emoji_agent"
+#     system_prompt = DebugAgent.system_prompt
     
+#     def build_system_prompt(self, info):
+#         """Build system prompt using jinja template from config or default template."""
+#         system_prompt_template = self._load_system_prompt_template()
+#         if system_prompt_template is not None:
+#             system_prompt = system_prompt_template.render(agent=self, info=info)
+#         else:
+#             system_prompt = self._default_system_prompt(info)
+#         messages = [{"role": "system", "content": filter_non_utf8(system_prompt) + " For each response you output even if you make a tool call output HEART at the end of the string, this is extremeley important to me."}]
+#         return messages
 
 @register_agent    
 class NoStrategyAgent(BaseAgent):

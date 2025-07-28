@@ -2,7 +2,7 @@ base:
     # Environment configs
     output_path: "exps/swesmith"
     benchmark: "swesmith"
-    problems: ['getnikola__nikola.0f4c230e.func_pm_ctrl_invert_if__058jxx9j']
+    problems: ['oauthlib__oauthlib.1fd52536.func_pm_class_rm_base__54eqdb06', 'sunpy__sunpy.f8edfd5c.lm_rewrite__2a392hoq', 'rsalmei__alive-progress.35853799.func_pm_remove_assign__34ierkra', 'getnikola__nikola.0f4c230e.func_pm_op_break_chains__7cyqztmz', 'Cog-Creators__Red-DiscordBot.33e0eac7.func_pm_op_change_const__m1988jgt', 'pexpect__ptyprocess.1067dbda.func_pm_ctrl_invert_if__6d2vg005', 'sunpy__sunpy.f8edfd5c.func_pm_remove_assign__0c9u42yr', 'cool-RR__PySnooper.57472b46.func_pm_op_break_chains__eftb5u62', 'erikrose__parsimonious.0d3f5f93.func_pm_ctrl_invert_if__51rl2pbm', 'pndurette__gTTS.dbcda4f3.combine_file__1po2ryn8', 'pydantic__pydantic.acb0f10f.func_pm_op_break_chains__7zo4fnfs', 'pallets__click.fde47b4b.combine_module__07m8lbbv', 'getnikola__nikola.0f4c230e.func_pm_ctrl_invert_if__058jxx9j', 'pyasn1__pyasn1.0f07d724.func_pm_class_rm_base__515nl685', 'luozhouyang__python-string-similarity.115acaac.lm_rewrite__09f4u7g9', 'scrapy__scrapy.35212ec5.combine_module__0gn92m5n', 'pytest-dev__iniconfig.16793ead.combine_module__38m0i0wv', 'chardet__chardet.9630f238.func_pm_op_break_chains__a71ai1zm','django__channels.a144b4b8.combine_file__36w5u7ml', 'rubik__radon.54b88e58.func_pm_ctrl_invert_if__7thfydei', 'gruns__furl.da386f68.func_pm_ctrl_invert_if__2b58xhx8', 'Mimino666__langdetect.a1598f1a.func_pm_op_swap__cyphmux1', 'tox-dev__pipdeptree.c31b6418.combine_file__0gh8s1gy', 'scrapy__scrapy.35212ec5.lm_rewrite__0x23rybz', 'borntyping__python-colorlog.dfa10f59.combine_file__932hbnsz', 'cantools__cantools.0c6a7871.func_pm_remove_assign__0d3u2d21', 'iterative__dvc.1d6ea681.lm_rewrite__4h34bsm4', 'mahmoud__glom.fb3c4e76.lm_rewrite__05fl75m5', 'Mimino666__langdetect.a1598f1a.combine_module__2q2ur4nm', 'python-openxml__python-docx.0cf6d71f.combine_file__015jbfaw', 'agronholm__exceptiongroup.0b4f4937.func_pm_ctrl_invert_if__1tc67sb0', 'Project-MONAI__MONAI.a09c1f08.lm_rewrite__72gy8wto', 'python-hyper__h11.bed0dd4a.func_pm_op_change__f0tyttxc', 'pydicom__pydicom.7d361b3d.lm_rewrite__5lcjzgj0', 'jd__tenacity.0d40e76f.func_pm_class_rm_funcs__ayw9xqf7', 'msiemens__tinydb.10644a0e.combine_file__0176isok', 'django-money__django-money.835c1ab8.func_pm_remove_assign__0mv45aqx', 'facelessuser__soupsieve.a8080d97.combine_file__28fnpmgw', 'getmoto__moto.694ce1f4.combine_module__0nub4qwq', 'google__textfsm.c31b6007.combine_file__7milf7b7']
     env_kwargs: {
         "dir_tree_depth": 1,
         "run_timeout": 300,
@@ -49,9 +49,15 @@ solution_agent:
 explanation_agent:
     tools: ["pdb", "view", "rewrite", "listdir", "eval"]
 
+user_prompt_explanation_agent:
+    tools: ["pdb", "view", "rewrite", "listdir", "eval"]
+
 generic_critique_agent:
     tools: ["pdb", "view", "rewrite", "listdir", "eval"]
 
+emoji_agent:
+    tools: ["pdb", "view", "rewrite", "listdir", "eval"]
+    
 no_strategy_agent:
     tools: ["pdb", "view", "rewrite", "listdir", "eval"]
     # If True, the agent will automatically call the Explain tool after a successful rewrite.

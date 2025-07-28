@@ -11,10 +11,10 @@ problem='pndurette__gTTS.dbcda4f3.lm_rewrite__4m80szt9'
 for i in $(seq 1 $K); do
     echo "Running case $i..."
     # Run the debugging agent and capture its output
-    python scripts/run.py scripts/config_swesmith.yaml --agent explanation_agent -p base.problems='cantools__cantools.0c6a7871.func_pm_remove_assign__0d3u2d21' -p base.llm_name="gpt-4o" -p base.output_path="exps/gpt-4o-critique/cantools/" -p base.uuid="critique_4o_$i"
+    python scripts/run.py scripts/config_swesmith.yaml --agent user_prompt_explanation_agent -p base.llm_name="gpt-4o" -p base.output_path="exps/jul24/gpt-4o-fails/user_explanation_agent" -p base.uuid="user_prompt_explanation_4o_$i" -n 20
     # echo "Output for test case $i:"
     # echo "$OUTPUT"
-    sleep 60
+    sleep 15
 done
 
 # Evaluate the performance of the debugging agent
