@@ -1,33 +1,58 @@
 import argparse
+import contextlib
 import logging
 import os
+import sys
 
 import faiss
 import yaml
 from sentence_transformers import SentenceTransformer
 
 
+@contextlib.contextmanager
+def suppress_stdout_stderr():
+    """Context manager to suppress stdout and stderr output."""
+    with open(os.devnull, "w") as devnull:
+        old_stdout = sys.stdout
+        old_stderr = sys.stderr
+        try:
+            sys.stdout = devnull
+            sys.stderr = devnull
+            yield
+        finally:
+            sys.stdout = old_stdout
+            sys.stderr = old_stderr
+
+
 class SentenceEncoder:
     def __init__(self, model_name="Qwen/Qwen3-Embedding-0.6B"):
-        self.model = SentenceTransformer(model_name)
+        with suppress_stdout_stderr():
+            self.model = SentenceTransformer(model_name)
 
     def encode_sentence(self, sentence_list, batch_size=32):
+        # Suppress output during encoding
         embeddings = self.model.encode(
             sentence_list, batch_size=batch_size, convert_to_numpy=True
         )
         return embeddings
 
+    def encode_sentence_querying(self, sentence_list, batch_size=32):
+        with suppress_stdout_stderr():
+            return self.encode_sentence(sentence_list, batch_size=batch_size)
+
 
 class FaissRetriever:
     def __init__(self, encoding_dim):
-        self.index = faiss.IndexFlatL2(encoding_dim)
+        with suppress_stdout_stderr():
+            self.index = faiss.IndexFlatL2(encoding_dim)
 
     def add(self, sentence_representations):
-        self.index.add(sentence_representations)
-        # print("we have in total %s indices..." % self.index.ntotal)
+        with suppress_stdout_stderr():
+            self.index.add(sentence_representations)
 
     def retrieve(self, query_representations, topk):
-        distance, indices = self.index.search(query_representations, topk)  # search
+        with suppress_stdout_stderr():
+            distance, indices = self.index.search(query_representations, topk)
         return distance, indices
 
 

@@ -377,9 +377,9 @@ class RAGAgent(DebugAgent):
             return [], []
 
         # Encode the query
-        query_representation = self.encoder.encode_sentence([query_text], batch_size=1)[
-            0
-        ]
+        query_representation = self.encoder.encode_sentence_querying(
+            [query_text], batch_size=1
+        )[0]
 
         # Retrieve similar examples
         distances, indices = self.retriever.retrieve(

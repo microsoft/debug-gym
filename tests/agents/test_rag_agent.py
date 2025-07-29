@@ -633,9 +633,13 @@ class TestRAGAgentCaching:
 
         cache_key = agent._generate_cache_key()
 
-        # Should be a valid MD5 hash
-        assert len(cache_key) == 32
-        assert all(c in "0123456789abcdef" for c in cache_key)
+        # Should be a human-readable string with expected components
+        assert isinstance(cache_key, str)
+        assert len(cache_key) > 0
+        # Should contain sanitized components
+        assert "trajectory" in cache_key
+        assert "tool_call-1" in cache_key
+        assert "test-model" in cache_key
 
         # Should be deterministic
         cache_key2 = agent._generate_cache_key()
