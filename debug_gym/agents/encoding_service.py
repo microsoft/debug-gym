@@ -22,6 +22,8 @@ class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
     """Thread pool server to handle multiple requests concurrently."""
 
     daemon_threads = True
+    timeout = 300  # 5 minutes timeout for socket operations
+    allow_reuse_address = True
 
 
 class EncodingServiceHandler(BaseHTTPRequestHandler):
@@ -29,6 +31,7 @@ class EncodingServiceHandler(BaseHTTPRequestHandler):
 
     def __init__(self, encoder, *args, **kwargs):
         self.encoder = encoder
+        self.logger = DebugGymLogger("EncodingService")
         super().__init__(*args, **kwargs)
 
     def do_GET(self):
@@ -60,6 +63,11 @@ class EncodingServiceHandler(BaseHTTPRequestHandler):
                     self.send_error(400, "No texts provided")
                     return
 
+                # Log the request for debugging
+                self.logger.info(
+                    f"Processing encoding request: {len(texts)} texts, batch_size={batch_size}, is_query={is_query}"
+                )
+
                 # Encode the texts
                 if is_query:
                     embeddings = self.encoder.encode_sentence_querying(
@@ -80,20 +88,22 @@ class EncodingServiceHandler(BaseHTTPRequestHandler):
 
                 self.send_response(200)
                 self.send_header("Content-type", "application/json")
+                self.send_header("Connection", "keep-alive")
                 self.end_headers()
                 self.wfile.write(json.dumps(response_data).encode("utf-8"))
+                self.logger.info("Encoding request completed successfully")
 
             else:
                 self.send_error(404, "Endpoint not found")
 
         except Exception as e:
+            self.logger.error(f"Error processing encoding request: {str(e)}")
             self.send_error(500, f"Internal server error: {str(e)}")
 
     def log_message(self, format, *args):
         """Override to use proper logging instead of stderr."""
-        # Use a simple logger for HTTP server messages
-        logger = DebugGymLogger("EncodingService")
-        logger.info(f"EncodingService: {format % args}")
+        # Use the instance logger for HTTP server messages
+        self.logger.info(f"EncodingService: {format % args}")
 
 
 class EncodingService:
@@ -137,7 +147,7 @@ class EncodingService:
 class EncodingServiceClient:
     """Client for interacting with the encoding service."""
 
-    def __init__(self, host: str = "localhost", port: int = 8765, timeout: int = 30):
+    def __init__(self, host: str = "localhost", port: int = 8765, timeout: int = 120):
         self.base_url = f"http://{host}:{port}"
         self.timeout = timeout
         self.logger = DebugGymLogger(__name__)
@@ -163,17 +173,30 @@ class EncodingServiceClient:
         """Encode sentences using the service."""
         data = {"texts": texts, "batch_size": batch_size, "is_query": False}
 
-        response = requests.post(
-            f"{self.base_url}/encode", json=data, timeout=self.timeout
-        )
-
-        if response.status_code != 200:
-            raise RuntimeError(
-                f"Encoding service error: {response.status_code} - {response.text}"
+        try:
+            response = requests.post(
+                f"{self.base_url}/encode",
+                json=data,
+                timeout=self.timeout,
+                headers={"Connection": "keep-alive"},
             )
 
-        result = response.json()
-        return np.array(result["embeddings"])
+            if response.status_code != 200:
+                raise RuntimeError(
+                    f"Encoding service error: {response.status_code} - {response.text}"
+                )
+
+            result = response.json()
+            return np.array(result["embeddings"])
+        except requests.exceptions.ConnectionError as e:
+            self.logger.error(f"Connection error to encoding service: {e}")
+            raise RuntimeError(f"Failed to connect to encoding service: {e}")
+        except requests.exceptions.Timeout as e:
+            self.logger.error(f"Timeout error from encoding service: {e}")
+            raise RuntimeError(f"Encoding service timeout: {e}")
+        except Exception as e:
+            self.logger.error(f"Unexpected error from encoding service: {e}")
+            raise
 
     def encode_sentence_querying(
         self, texts: List[str], batch_size: int = 16
@@ -181,17 +204,30 @@ class EncodingServiceClient:
         """Encode query sentences using the service."""
         data = {"texts": texts, "batch_size": batch_size, "is_query": True}
 
-        response = requests.post(
-            f"{self.base_url}/encode", json=data, timeout=self.timeout
-        )
-
-        if response.status_code != 200:
-            raise RuntimeError(
-                f"Encoding service error: {response.status_code} - {response.text}"
+        try:
+            response = requests.post(
+                f"{self.base_url}/encode",
+                json=data,
+                timeout=self.timeout,
+                headers={"Connection": "keep-alive"},
             )
 
-        result = response.json()
-        return np.array(result["embeddings"])
+            if response.status_code != 200:
+                raise RuntimeError(
+                    f"Encoding service error: {response.status_code} - {response.text}"
+                )
+
+            result = response.json()
+            return np.array(result["embeddings"])
+        except requests.exceptions.ConnectionError as e:
+            self.logger.error(f"Connection error to encoding service: {e}")
+            raise RuntimeError(f"Failed to connect to encoding service: {e}")
+        except requests.exceptions.Timeout as e:
+            self.logger.error(f"Timeout error from encoding service: {e}")
+            raise RuntimeError(f"Encoding service timeout: {e}")
+        except Exception as e:
+            self.logger.error(f"Unexpected error from encoding service: {e}")
+            raise
 
 
 def start_encoding_service_standalone(

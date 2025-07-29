@@ -54,3 +54,6 @@ rag_agent:
     experience_trajectory_path: "exps/sft_data/d1_full_truncated_30k_jul9.jsonl"
     rag_cache_dir: ".rag_cache"
     rag_use_cache: true
+    rag_use_encoding_service: true
+    rag_encoding_service_host: "localhost"
+    rag_encoding_service_port: 8765
