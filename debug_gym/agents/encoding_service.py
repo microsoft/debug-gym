@@ -5,18 +5,17 @@ loading multiple copies of the model in memory.
 """
 
 import json
-import logging
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from socketserver import ThreadingMixIn
 from typing import List, Optional
-from urllib.parse import parse_qs, urlparse
 
 import numpy as np
 import requests
 
 from debug_gym.agents.utils import SentenceEncoder
+from debug_gym.logger import DebugGymLogger
 
 
 class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
@@ -92,7 +91,9 @@ class EncodingServiceHandler(BaseHTTPRequestHandler):
 
     def log_message(self, format, *args):
         """Override to use proper logging instead of stderr."""
-        logging.info(f"EncodingService: {format % args}")
+        # Use a simple logger for HTTP server messages
+        logger = DebugGymLogger("EncodingService")
+        logger.info(f"EncodingService: {format % args}")
 
 
 class EncodingService:
@@ -105,7 +106,7 @@ class EncodingService:
         self.encoder = None
         self.server = None
         self.server_thread = None
-        self.logger = logging.getLogger(__name__)
+        self.logger = DebugGymLogger(__name__)
 
     def start_service(self):
         """Start the encoding service."""
@@ -139,7 +140,7 @@ class EncodingServiceClient:
     def __init__(self, host: str = "localhost", port: int = 8765, timeout: int = 30):
         self.base_url = f"http://{host}:{port}"
         self.timeout = timeout
-        self.logger = logging.getLogger(__name__)
+        self.logger = DebugGymLogger(__name__)
 
     def is_service_available(self) -> bool:
         """Check if the encoding service is available."""
@@ -197,7 +198,6 @@ def start_encoding_service_standalone(
     model_name: str, port: int = 8765, host: str = "localhost"
 ):
     """Standalone function to start the encoding service."""
-    logging.basicConfig(level=logging.INFO)
     service = EncodingService(model_name, port, host)
 
     try:

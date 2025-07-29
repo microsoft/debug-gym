@@ -4,8 +4,6 @@ This allows multiple agents to share the same cached representations without
 loading multiple copies into memory.
 """
 
-import json
-import logging
 import os
 import pickle
 import threading
@@ -15,6 +13,7 @@ from typing import Dict, List, Optional, Tuple
 import numpy as np
 
 from debug_gym.gym.utils import filter_non_utf8
+from debug_gym.logger import DebugGymLogger
 
 
 class SharedCacheManager:
@@ -26,7 +25,7 @@ class SharedCacheManager:
         self.lock = threading.RLock()
         self.access_times: Dict[str, float] = {}
         self.max_cache_size = 5  # Maximum number of different caches to keep in memory
-        self.logger = logging.getLogger(__name__)
+        self.logger = DebugGymLogger(__name__)
 
         os.makedirs(cache_dir, exist_ok=True)
 
@@ -212,7 +211,7 @@ class BatchProcessor:
         self.lock = threading.Lock()
         self.processing_thread = None
         self.stop_event = threading.Event()
-        self.logger = logging.getLogger(__name__)
+        self.logger = DebugGymLogger(__name__)
 
     def start(self):
         """Start the batch processing thread."""
