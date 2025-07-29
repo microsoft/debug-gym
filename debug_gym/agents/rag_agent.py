@@ -1,7 +1,7 @@
-import hashlib
 import json
 import os
 import pickle
+import re
 
 import numpy as np
 
@@ -158,7 +158,10 @@ class RAGAgent(DebugAgent):
                     or not trajectory[i]["tool_calls"][0]["function"]
                 ):
                     continue
-                label = json.dumps(trajectory[i]["tool_calls"][0]["function"])
+                _label = {"tool_calls": trajectory[i]["tool_calls"][0]["function"]}
+                if "content" in trajectory[i]:
+                    _label["content"] = trajectory[i]["content"]
+                label = json.dumps(_label)
                 for __step in range(1, step + 1):
                     match method:
                         case "observation":
@@ -245,12 +248,34 @@ class RAGAgent(DebugAgent):
         )
 
     def _generate_cache_key(self):
-        """Generate a unique cache key based on trajectory path, indexing method, and encoder model."""
-        # Create a string that uniquely identifies the configuration
-        config_str = f"{self.experience_trajectory_path}_{self.rag_indexing_method}_{self.sentence_encoder_model}"
+        """Generate a human-readable cache key based on trajectory path, indexing method, and encoder model."""
+        # Extract filename from trajectory path
+        trajectory_filename = os.path.basename(self.experience_trajectory_path)
+        if trajectory_filename.endswith(".jsonl"):
+            trajectory_filename = trajectory_filename[:-6]  # Remove .jsonl extension
 
-        # Generate a hash of the configuration
-        cache_key = hashlib.md5(config_str.encode()).hexdigest()
+        # Create indexing method string
+        method, step = self.rag_indexing_method
+        indexing_str = f"{method}-{step}"
+
+        # Extract model name (last part after /)
+        model_name = (
+            self.sentence_encoder_model.split("/")[-1]
+            if "/" in self.sentence_encoder_model
+            else self.sentence_encoder_model
+        )
+
+        # Sanitize strings for filename safety
+        def sanitize_for_filename(s):
+            # Replace problematic characters with underscores
+            return re.sub(r"[^\w\-.]", "_", s)
+
+        trajectory_clean = sanitize_for_filename(trajectory_filename)
+        indexing_clean = sanitize_for_filename(indexing_str)
+        model_clean = sanitize_for_filename(model_name)
+
+        # Create interpretable cache key
+        cache_key = f"{trajectory_clean}_{indexing_clean}_{model_clean}"
         return cache_key
 
     def _get_cache_path(self, cache_key: str):
