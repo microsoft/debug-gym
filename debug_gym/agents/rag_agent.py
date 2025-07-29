@@ -7,6 +7,8 @@ import numpy as np
 
 from debug_gym.agents.base_agent import register_agent
 from debug_gym.agents.debug_agent import DebugAgent
+from debug_gym.agents.encoding_service import EncodingServiceClient
+from debug_gym.agents.shared_cache import get_shared_cache_manager
 from debug_gym.agents.utils import FaissRetriever, SentenceEncoder
 from debug_gym.gym.utils import filter_non_utf8
 
@@ -19,11 +21,18 @@ class RAGAgent(DebugAgent):
     Cache configuration options:
     - rag_cache_dir: Directory to store cached embeddings (default: ".rag_cache")
     - rag_use_cache: Whether to use caching (default: True)
+    - rag_use_encoding_service: Whether to use the encoding service (default: True)
+    - rag_encoding_service_host: Host for encoding service (default: "localhost")
+    - rag_encoding_service_port: Port for encoding service (default: 8765)
 
     The agent will automatically cache computed embeddings based on:
     - Experience trajectory file path and modification time
     - RAG indexing method
     - Sentence encoder model
+
+    For parallel execution efficiency:
+    - Uses shared cache manager to avoid loading multiple copies of embeddings
+    - Can use encoding service to avoid loading multiple copies of the model
     """
 
     name = "rag_agent"
@@ -51,8 +60,19 @@ class RAGAgent(DebugAgent):
         # Cache directory for storing computed representations
         self.cache_dir = self.config.get("rag_cache_dir", ".rag_cache")
         self.use_cache = self.config.get("rag_use_cache", True)
+
+        # Encoding service configuration
+        self.use_encoding_service = self.config.get("rag_use_encoding_service", True)
+        self.encoding_service_host = self.config.get(
+            "rag_encoding_service_host", "localhost"
+        )
+        self.encoding_service_port = self.config.get("rag_encoding_service_port", 8765)
+
+        # Initialize shared cache manager
         if self.use_cache:
-            os.makedirs(self.cache_dir, exist_ok=True)
+            self.cache_manager = get_shared_cache_manager(self.cache_dir)
+        else:
+            self.cache_manager = None
 
         self.experience_trajectory_path = self.config.get(
             "experience_trajectory_path", None
@@ -64,8 +84,8 @@ class RAGAgent(DebugAgent):
         self.load_experience_trajectory_from_file(self.experience_trajectory_path)
         # Build retrieval dataset
         self.build_retrieval_dataset()
-        # Initialize encoder
-        self.encoder = SentenceEncoder(model_name=self.sentence_encoder_model)
+        # Initialize encoder (either service client or local)
+        self._initialize_encoder()
         # Build index
         self._build_index()
 
@@ -247,6 +267,30 @@ class RAGAgent(DebugAgent):
             f"Built retrieval dataset with {len(self.data_input)} examples using method: {method}, max step: {step}"
         )
 
+    def _initialize_encoder(self):
+        """Initialize encoder (either service client or local instance)."""
+        if self.use_encoding_service:
+            self.encoder_client = EncodingServiceClient(
+                host=self.encoding_service_host, port=self.encoding_service_port
+            )
+
+            # Check if service is available
+            if self.encoder_client.is_service_available():
+                self.logger.info(
+                    f"Using encoding service at {self.encoding_service_host}:{self.encoding_service_port}"
+                )
+                self.encoder = self.encoder_client
+            else:
+                self.logger.warning(
+                    f"Encoding service not available at {self.encoding_service_host}:{self.encoding_service_port}, "
+                    "falling back to local encoder"
+                )
+                self.use_encoding_service = False
+                self.encoder = SentenceEncoder(model_name=self.sentence_encoder_model)
+        else:
+            self.logger.info("Using local sentence encoder")
+            self.encoder = SentenceEncoder(model_name=self.sentence_encoder_model)
+
     def _generate_cache_key(self):
         """Generate a human-readable cache key based on trajectory path, indexing method, and encoder model."""
         # Extract filename from trajectory path
@@ -286,78 +330,48 @@ class RAGAgent(DebugAgent):
         self, cache_key: str, data_input: list, input_representations: np.ndarray
     ):
         """Save data_input and input_representations to cache."""
-        cache_path = self._get_cache_path(cache_key)
-        assert len(data_input) == len(
-            input_representations
-        ), "data_input and input_representations must have the same length."
-        try:
-            cache_data = {
-                "data_input": data_input,
-                "input_representations": input_representations,
-                "indexing_method": self.rag_indexing_method,
-                "encoder_model": self.sentence_encoder_model,
-            }
-            with open(cache_path, "wb") as f:
-                pickle.dump(cache_data, f)
-            self.logger.info(f"Saved cache to {cache_path}")
-        except Exception as e:
-            self.logger.warning(f"Failed to save cache: {e}")
+        # This method is now handled by the shared cache manager
+        # keeping for backward compatibility but functionality moved to shared_cache
+        pass
 
     def _load_cache(self, cache_key: str):
         """Load data_input and input_representations from cache."""
-        cache_path = self._get_cache_path(cache_key)
-        if not os.path.exists(cache_path):
-            return None, None
-
-        try:
-            with open(cache_path, "rb") as f:
-                cache_data = pickle.load(f)
-
-            # Verify cache consistency
-            if (
-                cache_data.get("indexing_method") != self.rag_indexing_method
-                or cache_data.get("encoder_model") != self.sentence_encoder_model
-            ):
-                self.logger.warning("Cache configuration mismatch, ignoring cache")
-                return None, None
-
-            self.logger.info(f"Loaded cache from {cache_path}")
-            return (cache_data["data_input"], cache_data["input_representations"])
-        except Exception as e:
-            self.logger.warning(f"Failed to load cache: {e}")
-            return None, None
+        # This method is now handled by the shared cache manager
+        # keeping for backward compatibility but functionality moved to shared_cache
+        return None, None
 
     def _build_index(self):
-        """Build the vector index for retrieval with caching support."""
+        """Build the vector index for retrieval with shared caching support."""
         self.logger.info("Building vector index...")
 
         input_representations = None
 
-        # Try to use cache if enabled
-        if self.use_cache:
-            # Generate cache key
+        # Use shared cache manager if caching is enabled
+        if self.use_cache and self.cache_manager:
             cache_key = self._generate_cache_key()
 
-            # Try to load from cache
-            cached_data_input, cached_representations = self._load_cache(cache_key)
+            def compute_embeddings(data_input):
+                """Callback function to compute embeddings."""
+                return self.encoder.encode_sentence(data_input, batch_size=16)
 
-            if cached_data_input is not None and cached_representations is not None:
-                # Use cached data
-                self.data_input = cached_data_input
-                input_representations = cached_representations
-                self.logger.info("Using cached input representations")
-
-        # Compute representations if not loaded from cache
-        if input_representations is None:
+            # Use shared cache manager
+            self.data_input, input_representations = (
+                self.cache_manager.load_or_create_cache(
+                    cache_key=cache_key,
+                    indexing_method=self.rag_indexing_method,
+                    encoder_model=self.sentence_encoder_model,
+                    data_input=self.data_input,
+                    compute_callback=compute_embeddings,
+                )
+            )
+        else:
+            # Compute representations without caching
             self.logger.info(
                 "Computing input representations (this may take time with GPU)..."
             )
             input_representations = self.encoder.encode_sentence(
                 self.data_input, batch_size=16
             )
-            # Save to cache if caching is enabled
-            if self.use_cache:
-                self._save_cache(cache_key, self.data_input, input_representations)
 
         # Initialize retriever
         encoding_dim = input_representations.shape[1]
@@ -377,9 +391,16 @@ class RAGAgent(DebugAgent):
             return [], []
 
         # Encode the query
-        query_representation = self.encoder.encode_sentence_querying(
-            [query_text], batch_size=1
-        )[0]
+        if self.use_encoding_service and hasattr(
+            self.encoder, "encode_sentence_querying"
+        ):
+            query_representation = self.encoder.encode_sentence_querying(
+                [query_text], batch_size=1
+            )[0]
+        else:
+            query_representation = self.encoder.encode_sentence_querying(
+                [query_text], batch_size=1
+            )[0]
 
         # Retrieve similar examples
         distances, indices = self.retriever.retrieve(
