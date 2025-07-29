@@ -44,6 +44,10 @@ class CacheGenerator:
             "rag_use_encoding_service": use_encoding_service,
             "rag_encoding_service_host": encoding_service_host,
             "rag_encoding_service_port": encoding_service_port,
+            # Required by base agent
+            "output_path": "/tmp/cache_generator_output",
+            "random_seed": 42,
+            "memory_size": 100,
         }
 
         self.max_examples = max_examples
