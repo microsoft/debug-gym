@@ -322,24 +322,6 @@ class RAGAgent(DebugAgent):
         cache_key = f"{trajectory_clean}_{indexing_clean}_{model_clean}"
         return cache_key
 
-    def _get_cache_path(self, cache_key: str):
-        """Get the full path for the cache file."""
-        return os.path.join(self.cache_dir, f"rag_cache_{cache_key}.pkl")
-
-    def _save_cache(
-        self, cache_key: str, data_input: list, input_representations: np.ndarray
-    ):
-        """Save data_input and input_representations to cache."""
-        # This method is now handled by the shared cache manager
-        # keeping for backward compatibility but functionality moved to shared_cache
-        pass
-
-    def _load_cache(self, cache_key: str):
-        """Load data_input and input_representations from cache."""
-        # This method is now handled by the shared cache manager
-        # keeping for backward compatibility but functionality moved to shared_cache
-        return None, None
-
     def _build_index(self):
         """Build the vector index for retrieval with shared caching support."""
         self.logger.info("Building vector index...")
