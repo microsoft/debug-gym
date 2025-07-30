@@ -38,6 +38,7 @@ class CacheGenerator:
         config = {
             "experience_trajectory_path": experience_trajectory_path,
             "rag_indexing_method": rag_indexing_method,
+            "rag_indexing_batch_size": batch_size,
             "sentence_encoder_model": sentence_encoder_model,
             "rag_cache_dir": cache_dir,
             "rag_use_cache": True,

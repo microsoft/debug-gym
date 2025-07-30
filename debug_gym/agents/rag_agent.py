@@ -54,6 +54,7 @@ class RAGAgent(DebugAgent):
         self.rag_indexing_method = self.parse_indexing_method(
             self.config.get("rag_indexing_method", None)
         )  # how to index the conversation history
+        self.rag_indexing_batch_size = self.config.get("rag_indexing_batch_size", 16)
         self.sentence_encoder_model = self.config.get(
             "sentence_encoder_model", "Qwen/Qwen3-Embedding-0.6B"
         )
@@ -339,7 +340,9 @@ class RAGAgent(DebugAgent):
 
             def compute_embeddings(data_input):
                 """Callback function to compute embeddings."""
-                return self.encoder.encode_sentence(data_input, batch_size=16)
+                return self.encoder.encode_sentence(
+                    data_input, batch_size=self.rag_indexing_batch_size
+                )
 
             # Use shared cache manager
             self.data_input, input_representations = (
@@ -357,7 +360,7 @@ class RAGAgent(DebugAgent):
                 "Computing input representations (this may take time with GPU)..."
             )
             input_representations = self.encoder.encode_sentence(
-                self.data_input, batch_size=16
+                self.data_input, batch_size=self.rag_indexing_batch_size
             )
 
         # Initialize retriever
