@@ -32,7 +32,9 @@ class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
     daemon_threads = True
     timeout = 60
     allow_reuse_address = True
-    request_queue_size = 32
+    request_queue_size = (
+        128  # Increase queue size for better handling of concurrent requests
+    )
 
     def server_bind(self):
         """Override to set socket options."""
@@ -41,6 +43,10 @@ class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
         HTTPServer.server_bind(self)
         self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+        # Set socket timeout to prevent hanging connections
+        self.socket.settimeout(30)
+        # Enable keepalive to detect broken connections
+        self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
 
 
 class RetrievalServiceHandler(BaseHTTPRequestHandler):
@@ -55,25 +61,64 @@ class RetrievalServiceHandler(BaseHTTPRequestHandler):
         """Override to reduce logging noise."""
         pass
 
+    def safe_send_response(self, code, message=None):
+        """Safely send response without raising exceptions on broken connections."""
+        try:
+            self.send_response(code, message)
+            return True
+        except (BrokenPipeError, ConnectionResetError):
+            self.logger.debug("Client disconnected during response send")
+            return False
+        except Exception as e:
+            self.logger.debug(f"Error sending response: {str(e)}")
+            return False
+
+    def safe_send_error(self, code, message=None):
+        """Safely send error response without raising exceptions on broken connections."""
+        try:
+            self.send_error(code, message)
+        except (BrokenPipeError, ConnectionResetError):
+            self.logger.debug("Client disconnected during error send")
+        except Exception as e:
+            self.logger.debug(f"Error sending error response: {str(e)}")
+
+    def safe_write_response(self, data):
+        """Safely write response data without raising exceptions on broken connections."""
+        try:
+            response_bytes = json.dumps(data).encode("utf-8")
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(response_bytes)))
+            self.send_header("Connection", "close")
+            self.end_headers()
+            self.wfile.write(response_bytes)
+            self.wfile.flush()
+            return True
+        except (BrokenPipeError, ConnectionResetError):
+            self.logger.debug("Client disconnected during response write")
+            return False
+        except Exception as e:
+            self.logger.debug(f"Error writing response: {str(e)}")
+            return False
+
     def do_GET(self):
         """Handle GET requests (health checks)."""
         try:
             if self.path == "/health":
-                self.send_response(200)
-                self.send_header("Content-type", "application/json")
-                self.end_headers()
-                self.wfile.write(json.dumps({"status": "healthy"}).encode("utf-8"))
+                if self.safe_send_response(200):
+                    self.safe_write_response({"status": "healthy"})
             elif self.path == "/indexes":
                 # List available indexes
                 indexes = list(self.retrieval_manager.indexes.keys())
-                self.send_response(200)
-                self.send_header("Content-type", "application/json")
-                self.end_headers()
-                self.wfile.write(json.dumps({"indexes": indexes}).encode("utf-8"))
+                if self.safe_send_response(200):
+                    self.safe_write_response({"indexes": indexes})
             else:
-                self.send_error(404, "Endpoint not found")
+                self.safe_send_error(404, "Endpoint not found")
+        except (BrokenPipeError, ConnectionResetError) as e:
+            # Client disconnected, log and ignore
+            self.logger.debug(f"Client disconnected: {str(e)}")
         except Exception as e:
-            self.send_error(500, f"Internal server error: {str(e)}")
+            self.logger.error(f"Error processing GET request: {str(e)}")
+            self.safe_send_error(500, f"Internal server error: {str(e)}")
 
     def do_POST(self):
         """Handle POST requests for retrieval operations."""
@@ -89,14 +134,14 @@ class RetrievalServiceHandler(BaseHTTPRequestHandler):
             elif self.path == "/check_index":
                 self._handle_check_index(data)
             else:
-                self.send_error(404, "Endpoint not found")
+                self.safe_send_error(404, "Endpoint not found")
 
+        except (BrokenPipeError, ConnectionResetError) as e:
+            # Client disconnected, log and ignore
+            self.logger.debug(f"Client disconnected during POST: {str(e)}")
         except Exception as e:
             self.logger.error(f"Error processing request: {str(e)}")
-            try:
-                self.send_error(500, f"Internal server error: {str(e)}")
-            except:
-                pass
+            self.safe_send_error(500, f"Internal server error: {str(e)}")
 
     def _handle_retrieve(self, data):
         """Handle retrieval requests."""
@@ -105,7 +150,7 @@ class RetrievalServiceHandler(BaseHTTPRequestHandler):
         num_retrievals = data.get("num_retrievals", 1)
 
         if not index_key or not query_text:
-            self.send_error(400, "index_key and query_text are required")
+            self.safe_send_error(400, "index_key and query_text are required")
             return
 
         self.logger.info(
@@ -118,27 +163,21 @@ class RetrievalServiceHandler(BaseHTTPRequestHandler):
             )
 
             response_data = {"relevant_examples": relevant_examples}
-            response_bytes = json.dumps(response_data).encode("utf-8")
 
-            self.send_response(200)
-            self.send_header("Content-Type", "application/json")
-            self.send_header("Content-Length", str(len(response_bytes)))
-            self.send_header("Connection", "close")
-            self.end_headers()
+            if self.safe_send_response(200):
+                if self.safe_write_response(response_data):
+                    try:
+                        self.connection.shutdown(1)
+                    except:
+                        pass
+                    self.logger.info("Retrieval request completed successfully")
 
-            self.wfile.write(response_bytes)
-            self.wfile.flush()
-
-            try:
-                self.connection.shutdown(1)
-            except:
-                pass
-
-            self.logger.info("Retrieval request completed successfully")
-
+        except (BrokenPipeError, ConnectionResetError) as e:
+            # Client disconnected while processing retrieval
+            self.logger.debug(f"Client disconnected during retrieval: {str(e)}")
         except Exception as e:
             self.logger.error(f"Error during retrieval: {str(e)}")
-            self.send_error(500, f"Retrieval error: {str(e)}")
+            self.safe_send_error(500, f"Retrieval error: {str(e)}")
 
     def _handle_build_index(self, data):
         """Handle index building requests."""
@@ -157,7 +196,7 @@ class RetrievalServiceHandler(BaseHTTPRequestHandler):
                 sentence_encoder_model,
             ]
         ):
-            self.send_error(400, "Missing required parameters for index building")
+            self.safe_send_error(400, "Missing required parameters for index building")
             return
 
         self.logger.info(f"Building index '{index_key}'")
@@ -173,59 +212,50 @@ class RetrievalServiceHandler(BaseHTTPRequestHandler):
             )
 
             response_data = {"success": success, "index_key": index_key}
-            response_bytes = json.dumps(response_data).encode("utf-8")
 
-            self.send_response(200)
-            self.send_header("Content-Type", "application/json")
-            self.send_header("Content-Length", str(len(response_bytes)))
-            self.send_header("Connection", "close")
-            self.end_headers()
+            if self.safe_send_response(200):
+                if self.safe_write_response(response_data):
+                    try:
+                        self.connection.shutdown(1)
+                    except:
+                        pass
+                    self.logger.info(
+                        f"Index building completed successfully for '{index_key}'"
+                    )
 
-            self.wfile.write(response_bytes)
-            self.wfile.flush()
-
-            try:
-                self.connection.shutdown(1)
-            except:
-                pass
-
-            self.logger.info(f"Index building completed successfully for '{index_key}'")
-
+        except (BrokenPipeError, ConnectionResetError) as e:
+            # Client disconnected while building index
+            self.logger.debug(f"Client disconnected during index building: {str(e)}")
         except Exception as e:
             self.logger.error(f"Error building index: {str(e)}")
-            self.send_error(500, f"Index building error: {str(e)}")
+            self.safe_send_error(500, f"Index building error: {str(e)}")
 
     def _handle_check_index(self, data):
         """Handle index existence check requests."""
         index_key = data.get("index_key")
 
         if not index_key:
-            self.send_error(400, "index_key is required")
+            self.safe_send_error(400, "index_key is required")
             return
 
         try:
             exists = self.retrieval_manager.has_index(index_key)
 
             response_data = {"exists": exists, "index_key": index_key}
-            response_bytes = json.dumps(response_data).encode("utf-8")
 
-            self.send_response(200)
-            self.send_header("Content-Type", "application/json")
-            self.send_header("Content-Length", str(len(response_bytes)))
-            self.send_header("Connection", "close")
-            self.end_headers()
+            if self.safe_send_response(200):
+                if self.safe_write_response(response_data):
+                    try:
+                        self.connection.shutdown(1)
+                    except:
+                        pass
 
-            self.wfile.write(response_bytes)
-            self.wfile.flush()
-
-            try:
-                self.connection.shutdown(1)
-            except:
-                pass
-
+        except (BrokenPipeError, ConnectionResetError) as e:
+            # Client disconnected while checking index
+            self.logger.debug(f"Client disconnected during index check: {str(e)}")
         except Exception as e:
             self.logger.error(f"Error checking index: {str(e)}")
-            self.send_error(500, f"Index check error: {str(e)}")
+            self.safe_send_error(500, f"Index check error: {str(e)}")
 
 
 class RetrievalManager:
