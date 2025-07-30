@@ -16,9 +16,6 @@ class TestEncodingService:
         mock_encoder.encode_sentence.return_value = np.array(
             [[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]], dtype=np.float32
         )
-        mock_encoder.encode_sentence_querying.return_value = np.array(
-            [[0.7, 0.8, 0.9]], dtype=np.float32
-        )
         return mock_encoder
 
     def test_encoding_service_initialization(self):
@@ -100,11 +97,16 @@ class TestEncodingService:
                 # Get the actual port assigned
                 actual_port = service.server.server_address[1]
 
+                # Give the server a moment to fully start
+                import time
+
+                time.sleep(0.1)
+
                 # Test encoding endpoint
-                data = {"texts": ["Hello", "World"], "batch_size": 2, "is_query": False}
+                data = {"texts": ["Hello", "World"], "batch_size": 2}
 
                 response = requests.post(
-                    f"http://localhost:{actual_port}/encode", json=data, timeout=5
+                    f"http://localhost:{actual_port}/encode", json=data, timeout=15
                 )
 
                 assert response.status_code == 200
@@ -124,51 +126,10 @@ class TestEncodingService:
                 )
 
             finally:
-                service.stop_service()
+                # Add small delay before stopping to ensure response is fully sent
+                import time
 
-    def test_encoding_service_encode_querying_endpoint(self):
-        """Test the encode_querying endpoint."""
-        mock_encoder = self.create_mock_encoder()
-        expected_embeddings = np.array(
-            [[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]], dtype=np.float32
-        )
-        mock_encoder.encode_sentence_querying.return_value = expected_embeddings
-
-        with patch(
-            "debug_gym.agents.encoding_service.SentenceEncoder",
-            return_value=mock_encoder,
-        ):
-            service = EncodingService(model_name="test-model", host="localhost", port=0)
-            service.start_service()
-
-            try:
-                # Get the actual port assigned
-                actual_port = service.server.server_address[1]
-
-                # Test encoding endpoint with is_query=True
-                data = {"texts": ["Query text"], "batch_size": 1, "is_query": True}
-
-                response = requests.post(
-                    f"http://localhost:{actual_port}/encode", json=data, timeout=5
-                )
-
-                assert response.status_code == 200
-                result = response.json()
-
-                # Check structure
-                assert "embeddings" in result
-                assert "shape" in result
-
-                # Check embeddings
-                embeddings = np.array(result["embeddings"], dtype=np.float32)
-                np.testing.assert_array_equal(embeddings, expected_embeddings)
-
-                # Verify mock was called correctly
-                mock_encoder.encode_sentence_querying.assert_called_once_with(
-                    ["Query text"], batch_size=1
-                )
-
-            finally:
+                time.sleep(0.1)
                 service.stop_service()
 
     def test_encoding_service_error_handling(self):
@@ -188,7 +149,7 @@ class TestEncodingService:
                 actual_port = service.server.server_address[1]
 
                 # Test error handling
-                data = {"texts": ["Hello"], "batch_size": 1, "is_query": False}
+                data = {"texts": ["Hello"], "batch_size": 1}
 
                 response = requests.post(
                     f"http://localhost:{actual_port}/encode", json=data, timeout=5
@@ -207,7 +168,7 @@ class TestEncodingServiceClient:
         """Test client initialization."""
         client = EncodingServiceClient(host="localhost", port=8765)
         assert client.base_url == "http://localhost:8765"
-        assert client.timeout == 30
+        assert client.timeout == 120
 
     @patch("requests.get")
     def test_is_service_available_success(self, mock_get):
@@ -250,28 +211,8 @@ class TestEncodingServiceClient:
 
         mock_post.assert_called_once_with(
             "http://localhost:8765/encode",
-            json={"texts": ["Hello", "World"], "batch_size": 2, "is_query": False},
-            timeout=30,
-        )
-
-    @patch("requests.post")
-    def test_encode_sentence_querying_success(self, mock_post):
-        """Test successful query encoding."""
-        mock_response = Mock()
-        mock_response.status_code = 200
-        mock_response.json.return_value = {"embeddings": [[0.7, 0.8, 0.9]]}
-        mock_post.return_value = mock_response
-
-        client = EncodingServiceClient(host="localhost", port=8765)
-        result = client.encode_sentence_querying(["Query"], batch_size=1)
-
-        expected = np.array([[0.7, 0.8, 0.9]])
-        np.testing.assert_array_equal(result, expected)
-
-        mock_post.assert_called_once_with(
-            "http://localhost:8765/encode",
-            json={"texts": ["Query"], "batch_size": 1, "is_query": True},
-            timeout=30,
+            json={"texts": ["Hello", "World"], "batch_size": 2},
+            timeout=120,
         )
 
     @patch("requests.post")

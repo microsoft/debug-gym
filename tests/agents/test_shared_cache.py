@@ -346,38 +346,14 @@ class TestBatchProcessor:
         self.processor.start()
 
         # Submit requests
-        self.processor.encode_async("text1", callback, is_query=False)
-        self.processor.encode_async("text2", callback, is_query=False)
+        self.processor.encode_async("text1", callback)
+        self.processor.encode_async("text2", callback)
 
         # Wait for processing
         time.sleep(0.1)
 
         assert len(results) == 2
         assert self.mock_encoder.encode_sentence.call_count == 1
-
-    def test_query_vs_document_encoding(self):
-        """Test that query and document encoding use different methods."""
-        self.mock_encoder.encode_sentence.return_value = [np.array([1, 2, 3])]
-        self.mock_encoder.encode_sentence_querying.return_value = [np.array([4, 5, 6])]
-
-        results = []
-
-        def callback(embedding, error=None):
-            results.append(embedding)
-
-        self.processor.start()
-
-        # Submit document request first and wait for processing
-        self.processor.encode_async("document", callback, is_query=False)
-        time.sleep(0.05)  # Wait for document to be processed
-
-        # Submit query request and wait for processing
-        self.processor.encode_async("query", callback, is_query=True)
-        time.sleep(0.05)  # Wait for query to be processed
-
-        # Should call both methods
-        assert self.mock_encoder.encode_sentence.call_count == 1
-        assert self.mock_encoder.encode_sentence_querying.call_count == 1
 
     def test_error_handling(self):
         """Test error handling in batch processing."""
@@ -393,7 +369,7 @@ class TestBatchProcessor:
                 results.append(embedding)
 
         self.processor.start()
-        self.processor.encode_async("text", callback, is_query=False)
+        self.processor.encode_async("text", callback)
 
         time.sleep(0.1)
 

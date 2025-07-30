@@ -67,6 +67,9 @@ class RAGAgent(DebugAgent):
             "rag_encoding_service_host", "localhost"
         )
         self.encoding_service_port = self.config.get("rag_encoding_service_port", 8765)
+        self.encoding_service_timeout = self.config.get(
+            "rag_encoding_service_timeout", 120
+        )
 
         # Initialize shared cache manager
         if self.use_cache:
@@ -271,7 +274,9 @@ class RAGAgent(DebugAgent):
         """Initialize encoder (either service client or local instance)."""
         if self.use_encoding_service:
             self.encoder_client = EncodingServiceClient(
-                host=self.encoding_service_host, port=self.encoding_service_port
+                host=self.encoding_service_host,
+                port=self.encoding_service_port,
+                timeout=self.encoding_service_timeout,
             )
 
             # Check if service is available
@@ -373,9 +378,9 @@ class RAGAgent(DebugAgent):
             return [], []
 
         # Encode the query
-        query_representation = self.encoder.encode_sentence_querying(
-            [query_text], batch_size=1
-        )[0]
+        query_representation = self.encoder.encode_sentence([query_text], batch_size=1)[
+            0
+        ]
 
         # Retrieve similar examples
         distances, indices = self.retriever.retrieve(
@@ -404,9 +409,13 @@ class RAGAgent(DebugAgent):
                 observation_list = [
                     item.step_observation.observation for item in history
                 ]
+                if not observation_list:
+                    return None
                 query_text = self.delimiter.join(observation_list)
             case "tool_name":
                 tool_name_list = [item.action.name for item in history if item.action]
+                if not tool_name_list:
+                    return None
                 query_text = self.delimiter.join(tool_name_list)
             case "tool_call":
                 tool_call_list = [
@@ -416,6 +425,8 @@ class RAGAgent(DebugAgent):
                     for item in history
                     if item.action
                 ]
+                if not tool_call_list:
+                    return None
                 query_text = self.delimiter.join(tool_call_list)
             case "tool_call_with_reasoning":
                 tool_call_with_reasoning_list = []
@@ -428,7 +439,11 @@ class RAGAgent(DebugAgent):
                         }
                     if item.action_reasoning:
                         _tmp["content"] = item.action_reasoning
+                    if not _tmp:
+                        continue
                     tool_call_with_reasoning_list.append(json.dumps(_tmp))
+                if not tool_call_with_reasoning_list:
+                    return None
                 query_text = self.delimiter.join(tool_call_with_reasoning_list)
             case _:
                 raise ValueError(

@@ -26,8 +26,7 @@ def suppress_stdout_stderr():
 
 class SentenceEncoder:
     def __init__(self, model_name="Qwen/Qwen3-Embedding-0.6B"):
-        with suppress_stdout_stderr():
-            self.model = SentenceTransformer(model_name)
+        self.model = SentenceTransformer(model_name)
 
     def encode_sentence(self, sentence_list, batch_size=32):
         # Suppress output during encoding
@@ -35,10 +34,6 @@ class SentenceEncoder:
             sentence_list, batch_size=batch_size, convert_to_numpy=True
         )
         return embeddings
-
-    def encode_sentence_querying(self, sentence_list, batch_size=32):
-        with suppress_stdout_stderr():
-            return self.encode_sentence(sentence_list, batch_size=batch_size)
 
 
 class FaissRetriever:

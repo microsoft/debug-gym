@@ -856,9 +856,6 @@ class TestRAGAgentCaching:
             mock_client.encode_sentence.return_value = np.random.rand(1, 768).astype(
                 np.float32
             )
-            mock_client.encode_sentence_querying.return_value = np.random.rand(
-                1, 768
-            ).astype(np.float32)
 
             config = {
                 "rag_num_retrievals": 1,
@@ -889,6 +886,7 @@ class TestRAGAgentCaching:
                         agent.use_encoding_service = True
                         agent.encoding_service_host = "localhost"
                         agent.encoding_service_port = 8765
+                        agent.encoding_service_timeout = 120
                         agent.experience_trajectory_path = trajectory_file
 
                         agent.load_experience_trajectory_from_file(trajectory_file)
@@ -978,6 +976,7 @@ class TestRAGAgentCaching:
                             agent.use_encoding_service = True
                             agent.encoding_service_host = "localhost"
                             agent.encoding_service_port = 8765
+                            agent.encoding_service_timeout = 120
                             agent.experience_trajectory_path = trajectory_file
 
                             agent.load_experience_trajectory_from_file(trajectory_file)

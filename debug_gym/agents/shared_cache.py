@@ -12,7 +12,6 @@ from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 
-from debug_gym.gym.utils import filter_non_utf8
 from debug_gym.logger import DebugGymLogger
 
 
@@ -196,83 +195,3 @@ def get_shared_cache_manager(cache_dir: str = ".rag_cache") -> SharedCacheManage
         if cache_dir not in _shared_cache_managers:
             _shared_cache_managers[cache_dir] = SharedCacheManager(cache_dir)
         return _shared_cache_managers[cache_dir]
-
-
-class BatchProcessor:
-    """Process multiple encoding requests in batches for efficiency."""
-
-    def __init__(
-        self, encoder_client, max_batch_size: int = 64, max_wait_time: float = 0.1
-    ):
-        self.encoder_client = encoder_client
-        self.max_batch_size = max_batch_size
-        self.max_wait_time = max_wait_time
-        self.pending_requests = []
-        self.lock = threading.Lock()
-        self.processing_thread = None
-        self.stop_event = threading.Event()
-        self.logger = DebugGymLogger(__name__)
-
-    def start(self):
-        """Start the batch processing thread."""
-        self.processing_thread = threading.Thread(target=self._process_batches)
-        self.processing_thread.daemon = True
-        self.processing_thread.start()
-
-    def stop(self):
-        """Stop the batch processing."""
-        self.stop_event.set()
-        if self.processing_thread:
-            self.processing_thread.join()
-
-    def _process_batches(self):
-        """Main batch processing loop."""
-        while not self.stop_event.is_set():
-            with self.lock:
-                if not self.pending_requests:
-                    continue
-
-                # Take a batch of requests
-                batch = self.pending_requests[: self.max_batch_size]
-                self.pending_requests = self.pending_requests[self.max_batch_size :]
-
-            if batch:
-                self._process_batch(batch)
-
-            time.sleep(self.max_wait_time)
-
-    def _process_batch(self, batch):
-        """Process a batch of requests."""
-        try:
-            # Separate texts and callbacks
-            texts = [req["text"] for req in batch]
-            is_query = batch[0]["is_query"]  # Assume all in batch have same type
-
-            # Encode all texts at once
-            if is_query:
-                embeddings = self.encoder_client.encode_sentence_querying(texts)
-            else:
-                embeddings = self.encoder_client.encode_sentence(texts)
-
-            # Return results to callbacks
-            for i, req in enumerate(batch):
-                try:
-                    req["callback"](embeddings[i])
-                except Exception as e:
-                    self.logger.error(f"Error in callback: {e}")
-
-        except Exception as e:
-            self.logger.error(f"Error processing batch: {e}")
-            # Return errors to callbacks
-            for req in batch:
-                try:
-                    req["callback"](None, error=str(e))
-                except:
-                    pass
-
-    def encode_async(self, text: str, callback: callable, is_query: bool = False):
-        """Add an encoding request to the batch queue."""
-        with self.lock:
-            self.pending_requests.append(
-                {"text": text, "callback": callback, "is_query": is_query}
-            )

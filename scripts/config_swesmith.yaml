@@ -57,3 +57,4 @@ rag_agent:
     rag_use_encoding_service: true
     rag_encoding_service_host: "localhost"
     rag_encoding_service_port: 8765
+    rag_encoding_service_timeout: 300  # Timeout for the encoding service in seconds
