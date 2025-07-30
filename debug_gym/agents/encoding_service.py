@@ -22,9 +22,19 @@ class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
     """Thread pool server to handle multiple requests concurrently."""
 
     daemon_threads = True
-    timeout = 30  # Reduced timeout for socket operations
+    timeout = 60  # Increased timeout for socket operations
     allow_reuse_address = True
-    request_queue_size = 5  # Limit queue size to prevent hanging connections
+    request_queue_size = 10  # Increased queue size
+
+    def server_bind(self):
+        """Override to set socket options."""
+        import socket
+
+        HTTPServer.server_bind(self)
+        # Enable SO_REUSEADDR
+        self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        # Set TCP_NODELAY to avoid Nagle's algorithm delays
+        self.socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
 
 
 class EncodingServiceHandler(BaseHTTPRequestHandler):
@@ -34,6 +44,10 @@ class EncodingServiceHandler(BaseHTTPRequestHandler):
         self.encoder = encoder
         self.logger = DebugGymLogger("EncodingService")
         super().__init__(*args, **kwargs)
+
+    def log_request(self, code="-", size="-"):
+        """Override to reduce logging noise."""
+        pass
 
     def do_GET(self):
         """Handle GET requests (health checks)."""
@@ -78,20 +92,26 @@ class EncodingServiceHandler(BaseHTTPRequestHandler):
                     "shape": list(embeddings.shape),
                 }
 
-                # Convert to JSON bytes first to get the content length
+                # Convert to JSON bytes
                 response_bytes = json.dumps(response_data).encode("utf-8")
 
+                # Send response headers
                 self.send_response(200)
-                self.send_header("Content-type", "application/json")
+                self.send_header("Content-Type", "application/json")
                 self.send_header("Content-Length", str(len(response_bytes)))
-                self.send_header(
-                    "Connection", "close"
-                )  # Close connection after response
+                self.send_header("Connection", "close")
                 self.end_headers()
 
-                # Write the response and flush immediately
+                # Write response and ensure it's sent
                 self.wfile.write(response_bytes)
                 self.wfile.flush()
+
+                # Important: close the connection explicitly
+                try:
+                    self.connection.shutdown(1)  # SHUT_WR
+                except:
+                    pass
+
                 self.logger.info("Encoding request completed successfully")
 
             else:
@@ -99,12 +119,10 @@ class EncodingServiceHandler(BaseHTTPRequestHandler):
 
         except Exception as e:
             self.logger.error(f"Error processing encoding request: {str(e)}")
-            self.send_error(500, f"Internal server error: {str(e)}")
-
-    def log_message(self, format, *args):
-        """Override to use proper logging instead of stderr."""
-        # Use the instance logger for HTTP server messages
-        self.logger.info(f"EncodingService: {format % args}")
+            try:
+                self.send_error(500, f"Internal server error: {str(e)}")
+            except:
+                pass  # Connection might already be closed
 
 
 class EncodingService:
