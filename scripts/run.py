@@ -59,7 +59,12 @@ def run_agent(args, problem, config):
     )
     try:
         previous_run = load_previous_run_status(problem_path, problem)
-        if not args.force_all and previous_run is not None:
+        if (
+            not args.force_all
+            and previous_run is not None
+            and previous_run.status
+            in ["resolved", "skip-resolved", "unresolved", "skip-unresolved"]
+        ):
             task_logger.debug(f"Previous run found: {problem_path}")
             success = previous_run.status in ["resolved", "skip-resolved"]
             task_logger.debug(f"Previous run status: {previous_run.status}")
