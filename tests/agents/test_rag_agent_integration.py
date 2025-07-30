@@ -66,7 +66,6 @@ class TestRAGAgentIntegration:
             "rag_indexing_method": "tool_call-1",
             "sentence_encoder_model": "test-model",
             "experience_trajectory_path": trajectory_file_path,
-            "rag_use_retrieval_service": True,
             "rag_retrieval_service_host": "localhost",
             "rag_retrieval_service_port": 8766,
             "rag_retrieval_service_timeout": 120,
@@ -120,7 +119,6 @@ class TestRAGAgentIntegration:
             # Verify initialization
             assert agent.config == config
             assert hasattr(agent, "retrieval_client")
-            assert agent.use_retrieval_service is True
 
         finally:
             os.unlink(trajectory_file)
@@ -212,43 +210,6 @@ class TestRAGAgentIntegration:
             query_text="test query",
             num_retrievals=2,
         )
-
-    @patch("debug_gym.agents.debug_agent.DebugAgent.__init__")
-    def test_local_retrieval_not_supported(self, mock_debug_agent_init):
-        """Test that local retrieval raises NotImplementedError."""
-        trajectory_data = self.create_sample_trajectory_data()
-        trajectory_file = self.create_sample_trajectory_file(trajectory_data)
-        config = self.create_mock_config(trajectory_file)
-        config["rag_use_retrieval_service"] = False  # Disable retrieval service
-
-        try:
-            # Create mocks
-            mock_env = MagicMock()
-            mock_llm = MagicMock()
-            mock_logger = MagicMock()
-
-            # Mock the base class initialization
-            def mock_init(
-                instance_config, instance_env, instance_llm=None, instance_logger=None
-            ):
-                pass
-
-            mock_debug_agent_init.side_effect = mock_init
-
-            # Pre-create instance and set attributes manually
-            agent = RAGAgent.__new__(RAGAgent)
-            agent.config = config
-            agent.env = mock_env
-            agent.llm = mock_llm
-            agent.logger = mock_logger
-
-            with pytest.raises(
-                NotImplementedError, match="Local retrieval is no longer supported"
-            ):
-                RAGAgent.__init__(agent, config, mock_env, mock_llm, mock_logger)
-
-        finally:
-            os.unlink(trajectory_file)
 
     @patch("debug_gym.agents.rag_agent.RetrievalServiceClient")
     def test_build_question_prompt_basic(self, mock_client_class):

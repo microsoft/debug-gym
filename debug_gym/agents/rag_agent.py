@@ -14,7 +14,7 @@ class RAGAgent(DebugAgent):
     RAG (Retrieval-Augmented Generation) Agent that uses a retrieval service for efficiency.
 
     Retrieval service configuration options:
-    - rag_use_retrieval_service: Whether to use the retrieval service (default: True)
+
     - rag_retrieval_service_host: Host for retrieval service (default: "localhost")
     - rag_retrieval_service_port: Port for retrieval service (default: 8766)
     - rag_retrieval_service_timeout: Timeout for retrieval service requests (default: 120)
@@ -57,7 +57,6 @@ class RAGAgent(DebugAgent):
         self.use_cache = self.config.get("rag_use_cache", True)
 
         # Retrieval service configuration
-        self.use_retrieval_service = self.config.get("rag_use_retrieval_service", True)
         self.retrieval_service_host = self.config.get(
             "rag_retrieval_service_host", "localhost"
         )
@@ -76,12 +75,7 @@ class RAGAgent(DebugAgent):
         ), "Experience path must be provided in the config"
 
         # Initialize retrieval service client
-        if self.use_retrieval_service:
-            self._initialize_retrieval_service()
-        else:
-            raise NotImplementedError(
-                "Local retrieval is no longer supported. Please use retrieval service."
-            )
+        self._initialize_retrieval_service()
 
     def parse_indexing_method(self, method: str):
         """Parse the indexing method from the configuration.

@@ -56,7 +56,6 @@ rag_agent:
     rag_cache_dir: ".rag_cache"
     rag_use_cache: true
     # Retrieval service configuration
-    rag_use_retrieval_service: true
     rag_retrieval_service_host: "localhost"
     rag_retrieval_service_port: 8766
     rag_retrieval_service_timeout: 300  # Timeout for the retrieval service in seconds

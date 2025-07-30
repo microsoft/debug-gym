@@ -47,7 +47,6 @@ rag_agent:
     experience_trajectory_path: "path/to/your/experience.jsonl"
     
     # Retrieval service configuration
-    rag_use_retrieval_service: true
     rag_retrieval_service_host: "localhost"
     rag_retrieval_service_port: 8766
     rag_retrieval_service_timeout: 300
@@ -132,8 +131,7 @@ python scripts/run.py --config scripts/config_swesmith.yaml --agent rag_agent
 The new retrieval service is designed to be a drop-in replacement for the local retrieval logic. Simply:
 
 1. Start the retrieval service
-2. Update your configuration to set `rag_use_retrieval_service: true`
-3. Run your RAG agents as usual
+2. Run your RAG agents as usual
 
 The agents will automatically connect to the service and behave identically to the local retrieval implementation.
 
