@@ -1,0 +1,9 @@
+# Example configuration for retrieval service
+# This config can be used when starting the retrieval service
+
+# Cache configuration
+rag_cache_dir: ".rag_cache"
+rag_use_cache: true
+
+# Sentence encoder model
+sentence_encoder_model: "Qwen/Qwen3-Embedding-0.6B"

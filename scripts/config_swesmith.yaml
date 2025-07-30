@@ -55,7 +55,8 @@ rag_agent:
     experience_trajectory_path: "exps/sft_data/d1_full_truncated_30k_jul9.jsonl"
     rag_cache_dir: ".rag_cache"
     rag_use_cache: true
-    rag_use_encoding_service: true
-    rag_encoding_service_host: "localhost"
-    rag_encoding_service_port: 8765
-    rag_encoding_service_timeout: 300  # Timeout for the encoding service in seconds
+    # Retrieval service configuration
+    rag_use_retrieval_service: true
+    rag_retrieval_service_host: "localhost"
+    rag_retrieval_service_port: 8766
+    rag_retrieval_service_timeout: 300  # Timeout for the retrieval service in seconds
