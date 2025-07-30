@@ -9,7 +9,6 @@ providing a simplified architecture without external encoding service dependenci
 
 import json
 import os
-import pickle
 import re
 import threading
 import time

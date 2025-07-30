@@ -1,9 +1,6 @@
 import json
 import os
-import pickle
 import re
-
-import numpy as np
 
 from debug_gym.agents.base_agent import register_agent
 from debug_gym.agents.debug_agent import DebugAgent

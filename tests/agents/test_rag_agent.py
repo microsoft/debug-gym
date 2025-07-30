@@ -1,6 +1,5 @@
 import json
 import os
-import pickle
 import tempfile
 from unittest.mock import MagicMock, Mock, patch
 
