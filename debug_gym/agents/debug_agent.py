@@ -212,10 +212,6 @@ class UserPromptExplanationAgent(BaseAgent):
     
     def get_explanation_for_task(self, task_name: str):
         """Get the explanation for a specific task."""
-        # paths = glob.glob(f"{self.explanation_base_path}/{task_name}_system_prompt.txt")
-        # if not paths:
-        #     raise FileNotFoundError(f"No explanation files found for task: {task_name}")
-        # path = sorted(paths)[-1]
         filepath =f"{self.explanation_base_path}/{task_name}_system_prompt.txt"
         explanation = self.get_explanation_from_file(filepath)
         return explanation
