@@ -238,6 +238,9 @@ class RetrievalManager:
             {}
         )  # index_key -> {"retriever": FaissRetriever, "data_input": List[str], "data_label": List[str]}
 
+        # Thread lock for index operations to prevent race conditions
+        self.index_lock = threading.RLock()
+
         # Cache configuration
         self.cache_dir = self.config.get("rag_cache_dir", ".rag_cache")
         self.use_cache = self.config.get("rag_use_cache", True)
@@ -257,7 +260,8 @@ class RetrievalManager:
 
     def has_index(self, index_key: str) -> bool:
         """Check if an index exists."""
-        return index_key in self.indexes
+        with self.index_lock:
+            return index_key in self.indexes
 
     def _initialize_encoder(self):
         """Initialize local sentence encoder."""
@@ -468,88 +472,93 @@ class RetrievalManager:
         use_cache: bool = True,
     ) -> bool:
         """Build a retrieval index."""
-        try:
-            # Check if index already exists
-            if self.has_index(index_key):
-                self.logger.info(f"Index '{index_key}' already exists, skipping build")
-                return True
+        with self.index_lock:
+            try:
+                # Check if index already exists (double-check pattern)
+                if index_key in self.indexes:
+                    self.logger.info(
+                        f"Index '{index_key}' already exists, skipping build"
+                    )
+                    return True
 
-            self.logger.info(f"Building index '{index_key}'...")
+                self.logger.info(f"Building index '{index_key}'...")
 
-            # Update encoder if a different model is requested
-            if sentence_encoder_model != self.sentence_encoder_model:
-                self.logger.info(
-                    f"Switching to encoder model: {sentence_encoder_model}"
-                )
-                self.sentence_encoder_model = sentence_encoder_model
-                self.encoder = SentenceEncoder(model_name=sentence_encoder_model)
+                # Update encoder if a different model is requested
+                if sentence_encoder_model != self.sentence_encoder_model:
+                    self.logger.info(
+                        f"Switching to encoder model: {sentence_encoder_model}"
+                    )
+                    self.sentence_encoder_model = sentence_encoder_model
+                    self.encoder = SentenceEncoder(model_name=sentence_encoder_model)
 
-            # Parse indexing method
-            parsed_method = self.parse_indexing_method(rag_indexing_method)
+                # Parse indexing method
+                parsed_method = self.parse_indexing_method(rag_indexing_method)
 
-            # Load experience trajectories
-            experience_trajectories = self.load_experience_trajectory_from_file(
-                experience_trajectory_path
-            )
-
-            # Build retrieval dataset
-            data_input, data_label = self.build_retrieval_dataset(
-                experience_trajectories, parsed_method
-            )
-
-            if not data_input:
-                self.logger.warning(f"No data found for index '{index_key}'")
-                return False
-
-            # Compute or load embeddings
-            input_representations = None
-
-            if use_cache and self.cache_manager:
-                cache_key = self._generate_cache_key(
-                    experience_trajectory_path, parsed_method, sentence_encoder_model
+                # Load experience trajectories
+                experience_trajectories = self.load_experience_trajectory_from_file(
+                    experience_trajectory_path
                 )
 
-                def compute_embeddings(data_input):
-                    """Callback function to compute embeddings."""
-                    return self.encoder.encode_sentence(
+                # Build retrieval dataset
+                data_input, data_label = self.build_retrieval_dataset(
+                    experience_trajectories, parsed_method
+                )
+
+                if not data_input:
+                    self.logger.warning(f"No data found for index '{index_key}'")
+                    return False
+
+                # Compute or load embeddings
+                input_representations = None
+
+                if use_cache and self.cache_manager:
+                    cache_key = self._generate_cache_key(
+                        experience_trajectory_path,
+                        parsed_method,
+                        sentence_encoder_model,
+                    )
+
+                    def compute_embeddings(data_input):
+                        """Callback function to compute embeddings."""
+                        return self.encoder.encode_sentence(
+                            data_input, batch_size=rag_indexing_batch_size
+                        )
+
+                    data_input, input_representations = (
+                        self.cache_manager.load_or_create_cache(
+                            cache_key=cache_key,
+                            indexing_method=parsed_method,
+                            encoder_model=sentence_encoder_model,
+                            data_input=data_input,
+                            compute_callback=compute_embeddings,
+                        )
+                    )
+                else:
+                    self.logger.info("Computing input representations...")
+                    input_representations = self.encoder.encode_sentence(
                         data_input, batch_size=rag_indexing_batch_size
                     )
 
-                data_input, input_representations = (
-                    self.cache_manager.load_or_create_cache(
-                        cache_key=cache_key,
-                        indexing_method=parsed_method,
-                        encoder_model=sentence_encoder_model,
-                        data_input=data_input,
-                        compute_callback=compute_embeddings,
-                    )
+                # Build index
+                encoding_dim = input_representations.shape[1]
+                retriever = FaissRetriever(encoding_dim)
+                retriever.add(input_representations)
+
+                # Store index
+                self.indexes[index_key] = {
+                    "retriever": retriever,
+                    "data_input": data_input,
+                    "data_label": data_label,
+                }
+
+                self.logger.info(
+                    f"Built index '{index_key}' with {len(data_input)} examples, embedding dim: {encoding_dim}"
                 )
-            else:
-                self.logger.info("Computing input representations...")
-                input_representations = self.encoder.encode_sentence(
-                    data_input, batch_size=rag_indexing_batch_size
-                )
+                return True
 
-            # Build index
-            encoding_dim = input_representations.shape[1]
-            retriever = FaissRetriever(encoding_dim)
-            retriever.add(input_representations)
-
-            # Store index
-            self.indexes[index_key] = {
-                "retriever": retriever,
-                "data_input": data_input,
-                "data_label": data_label,
-            }
-
-            self.logger.info(
-                f"Built index '{index_key}' with {len(data_input)} examples, embedding dim: {encoding_dim}"
-            )
-            return True
-
-        except Exception as e:
-            self.logger.error(f"Error building index '{index_key}': {str(e)}")
-            return False
+            except Exception as e:
+                self.logger.error(f"Error building index '{index_key}': {str(e)}")
+                return False
 
     def retrieve(
         self, index_key: str, query_text: str, num_retrievals: int = 1
