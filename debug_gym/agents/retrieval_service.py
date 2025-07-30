@@ -32,7 +32,7 @@ class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
     daemon_threads = True
     timeout = 60
     allow_reuse_address = True
-    request_queue_size = 10
+    request_queue_size = 32
 
     def server_bind(self):
         """Override to set socket options."""
@@ -577,7 +577,7 @@ class RetrievalManager:
         # Check query length to prevent potential memory issues
         # Most sentence transformers have token limits around 512-8192 tokens
         # Roughly estimate ~4 chars per token as a safety check
-        max_query_chars = 32000  # Conservative limit for ~8k tokens
+        max_query_chars = 16000  # Conservative limit for ~4k tokens
         if len(query_text) > max_query_chars:
             self.logger.warning(
                 f"Query text too long ({len(query_text)} chars > {max_query_chars}), "
