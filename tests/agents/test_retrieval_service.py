@@ -449,15 +449,14 @@ class TestRetrievalServiceClient:
 
     @patch("requests.post")
     def test_retrieve_connection_error(self, mock_post):
-        """Test retrieval with connection error."""
+        """Test retrieval with connection error returns empty list."""
         mock_post.side_effect = requests.ConnectionError("Connection failed")
 
         client = RetrievalServiceClient()
 
-        with pytest.raises(
-            RuntimeError, match="Failed to connect to retrieval service"
-        ):
-            client.retrieve("test_index", "test query")
+        # Should return empty list instead of raising exception
+        results = client.retrieve("test_index", "test query")
+        assert results == []
 
     @patch("requests.get")
     def test_list_indexes(self, mock_get):
@@ -573,3 +572,83 @@ class TestRetrievalServiceIntegration:
 
         finally:
             os.unlink(trajectory_file)
+
+    @patch("debug_gym.agents.retrieval_service.FaissRetriever")
+    @patch("debug_gym.agents.retrieval_service.SentenceEncoder")
+    def test_retrieve_encoding_error_handling(
+        self, mock_sentence_encoder, mock_faiss_retriever
+    ):
+        """Test that encoding errors are handled gracefully and return empty list."""
+        config = {"rag_use_cache": False}
+
+        mock_encoder_instance = MagicMock()
+        mock_sentence_encoder.return_value = mock_encoder_instance
+
+        # First call for building index
+        mock_encoder_instance.encode_sentence.return_value = np.array([[0.1, 0.2, 0.3]])
+
+        mock_retriever_instance = MagicMock()
+        mock_faiss_retriever.return_value = mock_retriever_instance
+
+        manager = RetrievalManager(config)
+
+        # Set up a minimal index
+        manager.indexes["test_index"] = {
+            "retriever": mock_retriever_instance,
+            "data_input": ["test input"],
+            "data_label": ["test label"],
+        }
+
+        # Test GPU memory error
+        mock_encoder_instance.encode_sentence.side_effect = RuntimeError(
+            "CUDA out of memory"
+        )
+        results = manager.retrieve("test_index", "test query", num_retrievals=1)
+        assert results == []
+
+        # Test token length error
+        mock_encoder_instance.encode_sentence.side_effect = ValueError(
+            "Token limit exceeded"
+        )
+        results = manager.retrieve("test_index", "test query", num_retrievals=1)
+        assert results == []
+
+        # Test generic error
+        mock_encoder_instance.encode_sentence.side_effect = Exception(
+            "Generic encoding error"
+        )
+        results = manager.retrieve("test_index", "test query", num_retrievals=1)
+        assert results == []
+
+    @patch("debug_gym.agents.retrieval_service.SentenceEncoder")
+    def test_retrieve_long_query_truncation(self, mock_sentence_encoder):
+        """Test that overly long queries are truncated."""
+        config = {"rag_use_cache": False}
+
+        mock_encoder_instance = MagicMock()
+        mock_sentence_encoder.return_value = mock_encoder_instance
+        mock_encoder_instance.encode_sentence.return_value = np.array([[0.1, 0.2, 0.3]])
+
+        manager = RetrievalManager(config)
+
+        # Set up a minimal index
+        mock_retriever = MagicMock()
+        mock_retriever.retrieve.return_value = (np.array([[0.1]]), np.array([[0]]))
+        manager.indexes["test_index"] = {
+            "retriever": mock_retriever,
+            "data_input": ["test input"],
+            "data_label": ["test label"],
+        }
+
+        # Create a very long query (over 32000 characters)
+        long_query = "a" * 35000
+
+        results = manager.retrieve("test_index", long_query, num_retrievals=1)
+
+        # Should still work, but query should be truncated
+        assert len(results) <= 1
+
+        # Verify the encoder was called with truncated text
+        called_args = mock_encoder_instance.encode_sentence.call_args
+        encoded_text = called_args[0][0][0]  # First arg, first batch item
+        assert len(encoded_text) <= 32000

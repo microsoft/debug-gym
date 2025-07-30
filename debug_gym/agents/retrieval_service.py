@@ -523,23 +523,57 @@ class RetrievalManager:
         if retriever is None or num_retrievals <= 0:
             return []
 
-        # Encode the query
-        query_representation = self.encoder.encode_sentence([query_text], batch_size=1)[
-            0
-        ]
+        # Check query length to prevent potential memory issues
+        # Most sentence transformers have token limits around 512-8192 tokens
+        # Roughly estimate ~4 chars per token as a safety check
+        max_query_chars = 32000  # Conservative limit for ~8k tokens
+        if len(query_text) > max_query_chars:
+            self.logger.warning(
+                f"Query text too long ({len(query_text)} chars > {max_query_chars}), "
+                f"truncating to prevent encoding issues"
+            )
+            query_text = query_text[:max_query_chars]
 
-        # Retrieve similar examples
-        distances, indices = retriever.retrieve(
-            np.array([query_representation]), topk=num_retrievals
-        )
+        try:
+            # Encode the query - this can fail due to GPU memory issues or long queries
+            query_representation = self.encoder.encode_sentence(
+                [query_text], batch_size=1
+            )[0]
+        except Exception as e:
+            # Handle various encoding errors including GPU memory issues
+            error_msg = str(e).lower()
+            if any(
+                keyword in error_msg
+                for keyword in ["cuda", "memory", "gpu", "out of memory", "oom"]
+            ):
+                self.logger.warning(f"GPU memory error during query encoding: {e}")
+            elif "token" in error_msg and (
+                "limit" in error_msg or "length" in error_msg or "maximum" in error_msg
+            ):
+                self.logger.warning(f"Query too long for encoding model: {e}")
+            else:
+                self.logger.warning(f"Error encoding query text: {e}")
 
-        # Extract the examples
-        relevant_examples = []
-        for i, idx in enumerate(indices[0]):
-            if idx < len(data_label):
-                relevant_examples.append(data_label[idx])
+            # Return empty list when encoding fails
+            return []
 
-        return relevant_examples
+        try:
+            # Retrieve similar examples
+            distances, indices = retriever.retrieve(
+                np.array([query_representation]), topk=num_retrievals
+            )
+
+            # Extract the examples
+            relevant_examples = []
+            for i, idx in enumerate(indices[0]):
+                if idx < len(data_label):
+                    relevant_examples.append(data_label[idx])
+
+            return relevant_examples
+
+        except Exception as e:
+            self.logger.warning(f"Error during retrieval: {e}")
+            return []
 
 
 class RetrievalService:
@@ -667,19 +701,23 @@ class RetrievalServiceClient:
             )
 
             if response.status_code != 200:
-                raise RuntimeError(
+                self.logger.warning(
                     f"Retrieval service error: {response.status_code} - {response.text}"
                 )
+                return []
 
             result = response.json()
             return result.get("relevant_examples", [])
 
         except requests.exceptions.ConnectionError as e:
-            self.logger.error(f"Connection error to retrieval service: {e}")
-            raise RuntimeError(f"Failed to connect to retrieval service: {e}")
+            self.logger.warning(f"Connection error to retrieval service: {e}")
+            return []
         except requests.exceptions.Timeout as e:
-            self.logger.error(f"Timeout error from retrieval service: {e}")
-            raise RuntimeError(f"Retrieval service timeout: {e}")
+            self.logger.warning(f"Timeout error from retrieval service: {e}")
+            return []
+        except Exception as e:
+            self.logger.warning(f"Unexpected error from retrieval service: {e}")
+            return []
         except Exception as e:
             self.logger.error(f"Unexpected error from retrieval service: {e}")
             raise
