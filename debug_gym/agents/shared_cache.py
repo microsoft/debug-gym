@@ -1,7 +1,8 @@
 """
 Shared cache manager for RAG agent representations.
-This allows multiple agents to share the same cached representations without
-loading multiple copies into memory.
+This allows multiple RAG agents within the same process to share cached embeddings
+without loading multiple copies into memory. Uses a singleton pattern to ensure
+one cache manager per cache directory, with thread-safe access for concurrent agents.
 """
 
 import os
@@ -16,7 +17,13 @@ from debug_gym.logger import DebugGymLogger
 
 
 class SharedCacheManager:
-    """Thread-safe cache manager for sharing embeddings across multiple RAG agents."""
+    """
+    Thread-safe cache manager for sharing embeddings across multiple RAG agents.
+
+    This cache manager is shared at the process level - multiple RAG agents
+    within the same retrieval service process will share the same cache instance,
+    avoiding duplicate memory usage for identical embeddings.
+    """
 
     def __init__(self, cache_dir: str = ".rag_cache"):
         self.cache_dir = cache_dir
