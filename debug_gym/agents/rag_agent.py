@@ -164,6 +164,13 @@ class RAGAgent(DebugAgent):
 
     def _build_index_on_service(self):
         """Build the index on the retrieval service."""
+        # First check if the index already exists
+        if self.retrieval_client.check_index(self.index_key):
+            self.logger.info(
+                f"Index '{self.index_key}' already exists on retrieval service, skipping build"
+            )
+            return
+
         self.logger.info(f"Building index '{self.index_key}' on retrieval service...")
 
         # Reconstruct indexing method string for the service

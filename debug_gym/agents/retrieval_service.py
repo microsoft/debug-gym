@@ -86,6 +86,8 @@ class RetrievalServiceHandler(BaseHTTPRequestHandler):
                 self._handle_retrieve(data)
             elif self.path == "/build_index":
                 self._handle_build_index(data)
+            elif self.path == "/check_index":
+                self._handle_check_index(data)
             else:
                 self.send_error(404, "Endpoint not found")
 
@@ -193,6 +195,38 @@ class RetrievalServiceHandler(BaseHTTPRequestHandler):
             self.logger.error(f"Error building index: {str(e)}")
             self.send_error(500, f"Index building error: {str(e)}")
 
+    def _handle_check_index(self, data):
+        """Handle index existence check requests."""
+        index_key = data.get("index_key")
+
+        if not index_key:
+            self.send_error(400, "index_key is required")
+            return
+
+        try:
+            exists = self.retrieval_manager.has_index(index_key)
+
+            response_data = {"exists": exists, "index_key": index_key}
+            response_bytes = json.dumps(response_data).encode("utf-8")
+
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(response_bytes)))
+            self.send_header("Connection", "close")
+            self.end_headers()
+
+            self.wfile.write(response_bytes)
+            self.wfile.flush()
+
+            try:
+                self.connection.shutdown(1)
+            except:
+                pass
+
+        except Exception as e:
+            self.logger.error(f"Error checking index: {str(e)}")
+            self.send_error(500, f"Index check error: {str(e)}")
+
 
 class RetrievalManager:
     """Manages multiple retrieval indexes and handles retrieval operations."""
@@ -220,6 +254,10 @@ class RetrievalManager:
 
         # Initialize encoder
         self._initialize_encoder()
+
+    def has_index(self, index_key: str) -> bool:
+        """Check if an index exists."""
+        return index_key in self.indexes
 
     def _initialize_encoder(self):
         """Initialize local sentence encoder."""
@@ -431,6 +469,11 @@ class RetrievalManager:
     ) -> bool:
         """Build a retrieval index."""
         try:
+            # Check if index already exists
+            if self.has_index(index_key):
+                self.logger.info(f"Index '{index_key}' already exists, skipping build")
+                return True
+
             self.logger.info(f"Building index '{index_key}'...")
 
             # Update encoder if a different model is requested
@@ -637,6 +680,27 @@ class RetrievalServiceClient:
                 return True
             time.sleep(1)
         return False
+
+    def check_index(self, index_key: str) -> bool:
+        """Check if an index exists on the retrieval service."""
+        data = {"index_key": index_key}
+
+        try:
+            response = requests.post(
+                f"{self.base_url}/check_index",
+                json=data,
+                timeout=self.timeout,
+            )
+
+            if response.status_code != 200:
+                return False
+
+            result = response.json()
+            return result.get("exists", False)
+
+        except Exception as e:
+            self.logger.error(f"Error checking index: {e}")
+            return False
 
     def build_index(
         self,
