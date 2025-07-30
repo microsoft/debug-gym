@@ -72,7 +72,6 @@ def run_agent(args, problem, config):
                     score=previous_run.score,
                     max_score=previous_run.max_score,
                     status=status,
-                    logdir=previous_run.logdir,
                 )
                 task_logger.debug(f"Skipping {problem}, already done.")
                 return success
