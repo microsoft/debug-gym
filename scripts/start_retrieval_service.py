@@ -23,6 +23,7 @@ def main():
     if args.config:
         with open(args.config, "r") as f:
             config = yaml.safe_load(f)
+            config = config.get("rag_agent", {})
 
     start_retrieval_service_standalone(config, args.port, args.host)
 

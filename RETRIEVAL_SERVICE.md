@@ -28,7 +28,7 @@ Manages vector indexes, handles retrieval requests, and performs sentence encodi
 
 **Start command:**
 ```bash
-python scripts/start_retrieval_service.py --port 8766 --config scripts/config_retrieval_service.yaml
+python scripts/start_retrieval_service.py --port 8766 --config scripts/config_swesmith.yaml
 ```
 
 ## Configuration
@@ -59,10 +59,10 @@ rag_agent:
 
 ### Retrieval Service Configuration
 
-Create a configuration file for the retrieval service:
+The retrieval service uses the same configuration as the RAG agents. You can use `config_swesmith.yaml` which already contains all the necessary parameters:
 
 ```yaml
-# config_retrieval_service.yaml
+# From config_swesmith.yaml - rag_agent section
 rag_cache_dir: ".rag_cache"
 rag_use_cache: true
 sentence_encoder_model: "Qwen/Qwen3-Embedding-0.6B"
@@ -73,7 +73,7 @@ sentence_encoder_model: "Qwen/Qwen3-Embedding-0.6B"
 ### 1. Start the Retrieval Service
 
 ```bash
-python scripts/start_retrieval_service.py --config scripts/config_retrieval_service.yaml
+python scripts/start_retrieval_service.py --config scripts/config_swesmith.yaml
 ```
 
 ### 2. Run RAG Agents
