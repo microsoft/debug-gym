@@ -57,7 +57,6 @@ def main():
 
     enable_hang_detection = not args.no_hang_detection
 
-    print(f"Starting retrieval service on {args.host}:{args.port}")
     if enable_hang_detection:
         hang_timeout = config.get("hang_detection_timeout", 300)
         check_interval = config.get("watchdog_check_interval", 150)

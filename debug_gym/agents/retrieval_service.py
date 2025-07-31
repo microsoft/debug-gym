@@ -780,6 +780,10 @@ class RetrievalService:
 
         self._update_health_ping()
         self.logger.info(f"Retrieval service started on {self.host}:{self.port}")
+        if enable_hang_detection:
+            self.logger.info(
+                "Hang detection enabled - service will restart if unresponsive"
+            )
 
     def stop_service(self):
         """Stop the retrieval service."""
@@ -961,19 +965,11 @@ def start_retrieval_service_standalone(
 
     try:
         service.start_service(enable_hang_detection=enable_hang_detection)
-        print(f"Retrieval service running on {host}:{port}")
-        if enable_hang_detection:
-            print(
-                "Hang detection enabled - service will auto-restart if it becomes unresponsive"
-            )
-        print("Press Ctrl+C to stop the service")
-
         # Keep the service running
         while True:
             time.sleep(1)
 
     except KeyboardInterrupt:
-        print("\nShutting down retrieval service...")
         service.stop_service()
 
 
