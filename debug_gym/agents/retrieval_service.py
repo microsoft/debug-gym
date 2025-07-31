@@ -10,6 +10,7 @@ providing a simplified architecture without external encoding service dependenci
 import json
 import os
 import re
+import signal
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -55,6 +56,7 @@ class RetrievalServiceHandler(BaseHTTPRequestHandler):
     def __init__(self, retrieval_manager, *args, **kwargs):
         self.retrieval_manager = retrieval_manager
         self.logger = DebugGymLogger("RetrievalService")
+        self.service = None  # Will be set by the service
         super().__init__(*args, **kwargs)
 
     def log_request(self, code="-", size="-"):
@@ -102,10 +104,15 @@ class RetrievalServiceHandler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         """Handle GET requests (health checks)."""
+        if self.service:
+            self.service._update_health_ping()
+
         try:
             if self.path == "/health":
                 if self.safe_send_response(200):
-                    self.safe_write_response({"status": "healthy"})
+                    self.safe_write_response(
+                        {"status": "healthy", "timestamp": time.time()}
+                    )
             elif self.path == "/indexes":
                 # List available indexes
                 indexes = list(self.retrieval_manager.indexes.keys())
@@ -122,6 +129,9 @@ class RetrievalServiceHandler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         """Handle POST requests for retrieval operations."""
+        if self.service:
+            self.service._update_health_ping()
+
         try:
             content_length = int(self.headers["Content-Length"])
             post_data = self.rfile.read(content_length)
@@ -671,29 +681,112 @@ class RetrievalService:
         self.server_thread = None
         self.logger = DebugGymLogger(__name__)
 
-    def start_service(self):
-        """Start the retrieval service."""
-        self.logger.info("Initializing retrieval manager...")
-        self.retrieval_manager = RetrievalManager(self.config)
+        # Simple hang detection
+        self.last_health_ping = time.time()
+        self.watchdog_thread = None
+        self._shutdown_event = threading.Event()
 
-        # Create a handler class with the retrieval manager
+    def _update_health_ping(self):
+        """Update the last health ping timestamp."""
+        self.last_health_ping = time.time()
+
+    def _watchdog_monitor(self):
+        """Simple watchdog that restarts if service becomes unresponsive."""
+        self.logger.info("Starting hang detection watchdog")
+
+        while not self._shutdown_event.is_set():
+            try:
+                # Check if we haven't received any health pings recently (60 seconds)
+                if time.time() - self.last_health_ping > 60:
+                    self.logger.error("Service appears hung - restarting...")
+                    self._restart_service()
+                    break
+
+                # Check if server thread died
+                if self.server_thread and not self.server_thread.is_alive():
+                    self.logger.error("Server thread died - restarting...")
+                    self._restart_service()
+                    break
+
+                # Check every 30 seconds
+                self._shutdown_event.wait(30)
+
+            except Exception as e:
+                self.logger.error(f"Error in watchdog: {e}")
+                self._shutdown_event.wait(5)
+
+    def _restart_service(self):
+        """Restart the service."""
+        self.logger.info("Restarting service...")
+        try:
+            # Stop current service
+            if self.server:
+                self.server.shutdown()
+                self.server.server_close()
+
+            # Wait a moment
+            time.sleep(2)
+
+            # Start new service
+            self._start_server()
+            self.logger.info("Service restarted successfully")
+
+        except Exception as e:
+            self.logger.error(f"Failed to restart service: {e}")
+
+    def _start_server(self):
+        """Start the HTTP server."""
+
         def handler_factory(*args, **kwargs):
-            return RetrievalServiceHandler(self.retrieval_manager, *args, **kwargs)
+            handler = RetrievalServiceHandler(self.retrieval_manager, *args, **kwargs)
+            handler.service = self  # Allow handler to ping health
+            return handler
 
         self.server = ThreadedHTTPServer((self.host, self.port), handler_factory)
         self.server_thread = threading.Thread(target=self.server.serve_forever)
         self.server_thread.daemon = True
         self.server_thread.start()
 
+    def start_service(self, enable_hang_detection: bool = True):
+        """Start the retrieval service."""
+        self.logger.info("Initializing retrieval manager...")
+        self.retrieval_manager = RetrievalManager(self.config)
+
+        # Start HTTP server
+        self._start_server()
+
+        # Start simple watchdog if enabled
+        if enable_hang_detection:
+            self._shutdown_event.clear()
+            self.watchdog_thread = threading.Thread(target=self._watchdog_monitor)
+            self.watchdog_thread.daemon = True
+            self.watchdog_thread.start()
+
+        self._update_health_ping()
         self.logger.info(f"Retrieval service started on {self.host}:{self.port}")
 
     def stop_service(self):
         """Stop the retrieval service."""
+        self.logger.info("Stopping retrieval service...")
+
+        # Stop watchdog
+        self._shutdown_event.set()
+
+        # Stop server
         if self.server:
-            self.server.shutdown()
-            self.server.server_close()
-        if self.server_thread:
-            self.server_thread.join()
+            try:
+                self.server.shutdown()
+                self.server.server_close()
+            except Exception as e:
+                self.logger.warning(f"Error stopping server: {e}")
+
+        # Wait for threads
+        if self.server_thread and self.server_thread.is_alive():
+            self.server_thread.join(timeout=5)
+
+        if self.watchdog_thread and self.watchdog_thread.is_alive():
+            self.watchdog_thread.join(timeout=5)
+
         self.logger.info("Retrieval service stopped")
 
 
@@ -842,14 +935,21 @@ class RetrievalServiceClient:
 
 
 def start_retrieval_service_standalone(
-    config: dict, port: int = 8766, host: str = "localhost"
+    config: dict,
+    port: int = 8766,
+    host: str = "localhost",
+    enable_hang_detection: bool = True,
 ):
-    """Standalone function to start the retrieval service."""
+    """Standalone function to start the retrieval service with optional hang detection."""
     service = RetrievalService(config, port, host)
 
     try:
-        service.start_service()
+        service.start_service(enable_hang_detection=enable_hang_detection)
         print(f"Retrieval service running on {host}:{port}")
+        if enable_hang_detection:
+            print(
+                "Hang detection enabled - service will auto-restart if it becomes unresponsive"
+            )
         print("Press Ctrl+C to stop the service")
 
         # Keep the service running
@@ -868,6 +968,11 @@ if __name__ == "__main__":
     parser.add_argument("--port", type=int, default=8766, help="Port to run on")
     parser.add_argument("--host", default="localhost", help="Host to bind to")
     parser.add_argument("--config", help="Path to config file")
+    parser.add_argument(
+        "--no-hang-detection",
+        action="store_true",
+        help="Disable hang detection and auto-restart",
+    )
 
     args = parser.parse_args()
 
@@ -877,4 +982,8 @@ if __name__ == "__main__":
         with open(args.config, "r") as f:
             config = yaml.safe_load(f)
 
-    start_retrieval_service_standalone(config, args.port, args.host)
+    enable_hang_detection = not args.no_hang_detection
+
+    start_retrieval_service_standalone(
+        config, args.port, args.host, enable_hang_detection=enable_hang_detection
+    )
