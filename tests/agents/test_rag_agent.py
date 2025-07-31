@@ -32,9 +32,8 @@ class TestRAGAgent:
             "experience_trajectory_path": trajectory_file_path,
         }
 
-    @patch("debug_gym.agents.rag_agent.SentenceEncoder")
-    @patch("debug_gym.agents.rag_agent.FaissRetriever")
-    def test_init_with_valid_config(self, mock_faiss_retriever, mock_sentence_encoder):
+    @patch("debug_gym.agents.rag_agent.RetrievalServiceClient")
+    def test_init_with_valid_config(self, mock_retrieval_client_class):
         """Test RAGAgent initialization with valid configuration."""
         # Create sample trajectory data
         trajectory_data = [
@@ -65,29 +64,24 @@ class TestRAGAgent:
         config = self.create_mock_config(trajectory_file)
 
         try:
-            # Mock dependencies
+            # Mock the retrieval service client
+            mock_client = MagicMock()
+            mock_client.is_service_available.return_value = True
+            mock_client.build_index.return_value = True
+            mock_retrieval_client_class.return_value = mock_client
+
+            # Mock the environment and other dependencies
+            mock_env = MagicMock()
             mock_logger = MagicMock()
 
-            mock_encoder_instance = MagicMock()
-            mock_sentence_encoder.return_value = mock_encoder_instance
-            mock_encoder_instance.encode_sentence.return_value = np.array(
-                [[0.1, 0.2, 0.3]]
-            )
+            # Initialize agent (this will now use the retrieval service)
+            agent = RAGAgent.__new__(RAGAgent)
+            agent.config = config
+            agent.logger = mock_logger
 
-            mock_retriever_instance = MagicMock()
-            mock_faiss_retriever.return_value = mock_retriever_instance
-
-            # Initialize agent
-            with patch.object(RAGAgent, "__init__", lambda x, *args, **kwargs: None):
-                agent = RAGAgent.__new__(RAGAgent)
-                agent.config = config
-                agent.logger = mock_logger
-                agent.experience_trajectories = []
-                agent.data_input = []
-                agent.data_label = []
-
-                # Test methods individually
-                agent.parse_indexing_method(config["rag_indexing_method"])
+            # Test that parse_indexing_method works
+            result = agent.parse_indexing_method(config["rag_indexing_method"])
+            assert result == ["tool_call", 1]
 
         finally:
             os.unlink(trajectory_file)
@@ -137,7 +131,12 @@ class TestRAGAgent:
         with pytest.raises(AssertionError, match="Step must be a positive integer"):
             agent.parse_indexing_method("tool_call-0")
 
-    def test_load_experience_trajectory_from_file_valid(self):
+    # NOTE: These tests are for obsolete functionality that was moved to the retrieval service
+    # The load_experience_trajectory_from_file method no longer exists on RAGAgent
+    # and is now handled by the RetrievalManager in the retrieval service.
+
+    @pytest.mark.skip(reason="Obsolete functionality moved to retrieval service")
+    def test_load_experience_trajectory_from_file_valid_OBSOLETE(self):
         """Test loading valid experience trajectories."""
         agent = RAGAgent.__new__(RAGAgent)
         agent.logger = MagicMock()
@@ -175,7 +174,8 @@ class TestRAGAgent:
         finally:
             os.unlink(trajectory_file)
 
-    def test_load_experience_trajectory_from_file_filtering(self):
+    @pytest.mark.skip(reason="Obsolete functionality moved to retrieval service")
+    def test_load_experience_trajectory_from_file_filtering_OBSOLETE(self):
         """Test filtering of experience trajectories based on criteria."""
         agent = RAGAgent.__new__(RAGAgent)
         agent.logger = MagicMock()
@@ -220,7 +220,8 @@ class TestRAGAgent:
         finally:
             os.unlink(trajectory_file)
 
-    def test_load_experience_trajectory_from_file_max_examples(self):
+    @pytest.mark.skip(reason="Obsolete functionality moved to retrieval service")
+    def test_load_experience_trajectory_from_file_max_examples_OBSOLETE(self):
         """Test loading with max_examples limit."""
         agent = RAGAgent.__new__(RAGAgent)
         agent.logger = MagicMock()
@@ -252,7 +253,8 @@ class TestRAGAgent:
         finally:
             os.unlink(trajectory_file)
 
-    def test_load_experience_trajectory_from_file_invalid_json(self):
+    @pytest.mark.skip(reason="Obsolete functionality moved to retrieval service")
+    def test_load_experience_trajectory_from_file_invalid_json_OBSOLETE(self):
         """Test handling of invalid JSON in trajectory file."""
         agent = RAGAgent.__new__(RAGAgent)
         agent.logger = MagicMock()
@@ -385,97 +387,54 @@ class TestRAGAgent:
         result = agent.extract_query_text_from_history()
         assert result is None
 
-    @patch("debug_gym.agents.rag_agent.SentenceEncoder")
-    @patch("debug_gym.agents.rag_agent.FaissRetriever")
-    def test_retrieve_relevant_examples(
-        self, mock_faiss_retriever, mock_sentence_encoder
-    ):
-        """Test retrieving relevant examples."""
+    def test_retrieve_relevant_examples(self):
+        """Test retrieving relevant examples using retrieval service."""
         agent = RAGAgent.__new__(RAGAgent)
         agent.rag_num_retrievals = 2
+        agent.index_key = "test_index"
+        agent.logger = MagicMock()
 
-        # Mock encoder
-        mock_encoder_instance = MagicMock()
-        mock_sentence_encoder.return_value = mock_encoder_instance
-        mock_encoder_instance.encode_sentence.return_value = np.array([[0.1, 0.2, 0.3]])
-        agent.encoder = mock_encoder_instance
+        # Mock the retrieval client
+        mock_client = MagicMock()
+        mock_client.retrieve.return_value = ["example1", "example2"]
+        agent.retrieval_client = mock_client
 
-        # Mock retriever
-        mock_retriever_instance = MagicMock()
-        mock_retriever_instance.retrieve.return_value = (
-            np.array([[0.1, 0.3]]),
-            np.array([[0, 1]]),
+        # Test retrieval
+        result = agent._retrieve_relevant_examples("test query")
+
+        # Verify the retrieval service was called correctly
+        mock_client.retrieve.assert_called_once_with(
+            index_key="test_index", query_text="test query", num_retrievals=2
         )
-        agent.retriever = mock_retriever_instance
-
-        # Mock data - using data_input instead of data_sentence (bug in original code)
-        agent.data_input = ["sentence 1", "sentence 2", "sentence 3"]
-        agent.data_label = ["label 1", "label 2", "label 3"]
-
-        # Patch the method to use data_input instead of data_sentence
-        def patched_retrieve(query_text):
-            if agent.retriever is None or agent.rag_num_retrievals <= 0:
-                return [], []
-
-            query_representation = agent.encoder.encode_sentence(
-                [query_text], batch_size=1
-            )[0]
-            distances, indices = agent.retriever.retrieve(
-                np.array([query_representation]), topk=agent.rag_num_retrievals
-            )
-
-            relevant_sentences = []
-            relevant_labels = []
-
-            for i, idx in enumerate(indices[0]):
-                if idx < len(
-                    agent.data_input
-                ):  # Fixed: use data_input instead of data_sentence
-                    relevant_sentences.append(agent.data_input[idx])
-                    relevant_labels.append(agent.data_label[idx])
-
-            return relevant_sentences, relevant_labels
-
-        agent._retrieve_relevant_examples = patched_retrieve
-
-        query_text = "test query"
-        relevant_sentences, relevant_labels = agent._retrieve_relevant_examples(
-            query_text
-        )
-
-        # Verify encoder was called
-        mock_encoder_instance.encode_sentence.assert_called_once_with(
-            [query_text], batch_size=1
-        )
-
-        # Verify retriever was called
-        mock_retriever_instance.retrieve.assert_called_once()
-
-        # Check results
-        assert relevant_sentences == ["sentence 1", "sentence 2"]
-        assert relevant_labels == ["label 1", "label 2"]
+        assert result == ["example1", "example2"]
 
     def test_retrieve_relevant_examples_no_retriever(self):
-        """Test retrieving when retriever is None."""
+        """Test retrieving when retrieval client has an error."""
         agent = RAGAgent.__new__(RAGAgent)
-        agent.retriever = None
         agent.rag_num_retrievals = 2
+        agent.index_key = "test_index"
+        agent.logger = MagicMock()
 
-        relevant_sentences, relevant_labels = agent._retrieve_relevant_examples("test")
+        # Mock the retrieval client to raise an error
+        mock_client = MagicMock()
+        mock_client.retrieve.side_effect = Exception("Service error")
+        agent.retrieval_client = mock_client
 
-        assert relevant_sentences == []
-        assert relevant_labels == []
+        result = agent._retrieve_relevant_examples("test")
+
+        assert result == []
+        agent.logger.error.assert_called_once_with(
+            "Error retrieving examples: Service error"
+        )
 
     def test_retrieve_relevant_examples_zero_retrievals(self):
         """Test retrieving when rag_num_retrievals is 0."""
         agent = RAGAgent.__new__(RAGAgent)
-        agent.retriever = MagicMock()
         agent.rag_num_retrievals = 0
 
-        relevant_sentences, relevant_labels = agent._retrieve_relevant_examples("test")
+        result = agent._retrieve_relevant_examples("test")
 
-        assert relevant_sentences == []
-        assert relevant_labels == []
+        assert result == []
 
     def test_build_question_prompt_with_examples(self):
         """Test building question prompt with retrieved examples."""
@@ -490,7 +449,7 @@ class TestRAGAgent:
             with patch.object(
                 agent,
                 "_retrieve_relevant_examples",
-                return_value=([], ["example1", "example2"]),
+                return_value=["example1", "example2"],
             ):
                 result = agent.build_question_prompt()
 
@@ -521,9 +480,7 @@ class TestRAGAgent:
             agent, "extract_query_text_from_history", return_value="test query"
         ):
             # Mock _retrieve_relevant_examples to return empty results
-            with patch.object(
-                agent, "_retrieve_relevant_examples", return_value=([], [])
-            ):
+            with patch.object(agent, "_retrieve_relevant_examples", return_value=[]):
                 result = agent.build_question_prompt()
 
         assert result == []
@@ -548,15 +505,12 @@ class TestRAGAgent:
             with patch.object(
                 agent,
                 "_retrieve_relevant_examples",
-                return_value=(
-                    [],
-                    [
-                        duplicate_example,
-                        duplicate_example,
-                        unique_example,
-                        duplicate_example,
-                    ],
-                ),
+                return_value=[
+                    duplicate_example,
+                    duplicate_example,
+                    unique_example,
+                    duplicate_example,
+                ],
             ):
                 result = agent.build_question_prompt()
 
@@ -623,6 +577,9 @@ class TestRAGAgentCaching:
             config["rag_cache_dir"] = cache_dir
         return config
 
+    @pytest.mark.skip(
+        reason="Obsolete functionality - caching moved to retrieval service"
+    )
     def test_generate_cache_key(self):
         """Test cache key generation."""
         agent = RAGAgent.__new__(RAGAgent)
@@ -644,6 +601,9 @@ class TestRAGAgentCaching:
         cache_key2 = agent._generate_cache_key()
         assert cache_key == cache_key2
 
+    @pytest.mark.skip(
+        reason="Obsolete functionality - caching moved to retrieval service"
+    )
     def test_generate_cache_key_different_configs(self):
         """Test that different configurations generate different cache keys."""
         agent1 = RAGAgent.__new__(RAGAgent)
@@ -693,6 +653,9 @@ class TestRAGAgentCaching:
 
     @patch("debug_gym.agents.rag_agent.SentenceEncoder")
     @patch("debug_gym.agents.rag_agent.FaissRetriever")
+    @pytest.mark.skip(
+        reason="Obsolete functionality - caching moved to retrieval service"
+    )
     def test_build_index_with_cache_hit(
         self, mock_faiss_retriever, mock_sentence_encoder
     ):
@@ -739,6 +702,9 @@ class TestRAGAgentCaching:
 
     @patch("debug_gym.agents.rag_agent.SentenceEncoder")
     @patch("debug_gym.agents.rag_agent.FaissRetriever")
+    @pytest.mark.skip(
+        reason="Obsolete functionality - caching moved to retrieval service"
+    )
     def test_build_index_with_cache_miss(
         self, mock_faiss_retriever, mock_sentence_encoder
     ):
@@ -787,6 +753,9 @@ class TestRAGAgentCaching:
 
     @patch("debug_gym.agents.rag_agent.SentenceEncoder")
     @patch("debug_gym.agents.rag_agent.FaissRetriever")
+    @pytest.mark.skip(
+        reason="Obsolete functionality - caching moved to retrieval service"
+    )
     def test_build_index_with_cache_disabled(
         self, mock_faiss_retriever, mock_sentence_encoder
     ):

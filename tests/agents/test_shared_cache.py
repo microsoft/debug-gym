@@ -11,11 +11,7 @@ from unittest.mock import Mock
 import numpy as np
 import pytest
 
-from debug_gym.agents.shared_cache import (
-    BatchProcessor,
-    SharedCacheManager,
-    get_shared_cache_manager,
-)
+from debug_gym.agents.shared_cache import SharedCacheManager, get_shared_cache_manager
 
 
 class TestSharedCacheManager:
@@ -297,82 +293,3 @@ class TestGetSharedCacheManager:
 
         assert manager1 is manager2
         assert manager1.cache_dir == ".rag_cache"
-
-
-class TestBatchProcessor:
-    """Test cases for BatchProcessor."""
-
-    def setup_method(self):
-        """Set up test environment."""
-        self.mock_encoder = Mock()
-        self.processor = BatchProcessor(
-            encoder_client=self.mock_encoder, max_batch_size=2, max_wait_time=0.01
-        )
-
-    def teardown_method(self):
-        """Clean up test environment."""
-        if self.processor:
-            self.processor.stop()
-
-    def test_initialization(self):
-        """Test batch processor initialization."""
-        assert self.processor.encoder_client == self.mock_encoder
-        assert self.processor.max_batch_size == 2
-        assert self.processor.max_wait_time == 0.01
-
-    def test_start_stop(self):
-        """Test starting and stopping the batch processor."""
-        assert self.processor.processing_thread is None
-
-        self.processor.start()
-        assert self.processor.processing_thread is not None
-        assert self.processor.processing_thread.is_alive()
-
-        self.processor.stop()
-        assert not self.processor.processing_thread.is_alive()
-
-    def test_batch_processing(self):
-        """Test that requests are processed in batches."""
-        self.mock_encoder.encode_sentence.return_value = [
-            np.array([1, 2, 3]),
-            np.array([4, 5, 6]),
-        ]
-
-        results = []
-
-        def callback(embedding, error=None):
-            results.append(embedding)
-
-        self.processor.start()
-
-        # Submit requests
-        self.processor.encode_async("text1", callback)
-        self.processor.encode_async("text2", callback)
-
-        # Wait for processing
-        time.sleep(0.1)
-
-        assert len(results) == 2
-        assert self.mock_encoder.encode_sentence.call_count == 1
-
-    def test_error_handling(self):
-        """Test error handling in batch processing."""
-        self.mock_encoder.encode_sentence.side_effect = Exception("Test error")
-
-        results = []
-        errors = []
-
-        def callback(embedding, error=None):
-            if error:
-                errors.append(error)
-            else:
-                results.append(embedding)
-
-        self.processor.start()
-        self.processor.encode_async("text", callback)
-
-        time.sleep(0.1)
-
-        assert len(errors) == 1
-        assert len(results) == 0
-        assert "Test error" in errors[0]
