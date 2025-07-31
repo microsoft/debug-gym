@@ -398,7 +398,9 @@ class RetrievalManager:
                                         "function" in msg["tool_calls"][0]
                                         and msg["tool_calls"][0]["function"]
                                     ):
-                                        tool_name = msg["tool_calls"][0].get("name", "")
+                                        tool_name = msg["tool_calls"][0][
+                                            "function"
+                                        ].get("name", "")
                                         if tool_name:
                                             tool_name_list.append(tool_name)
                             if not tool_name_list:

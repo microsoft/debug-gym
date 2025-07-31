@@ -50,23 +50,24 @@ class CacheGenerator:
 
     def generate_cache(self):
         """Generate and save the input-representation cache."""
-        # First, we need to load the experience trajectory data
-        experience_data = self._load_experience_data()
-
-        if not experience_data:
+        # Validate the experience trajectory file
+        if not os.path.exists(self.experience_trajectory_path):
             self.logger.error(
-                "No data to process. Check your experience trajectory file and indexing method."
+                f"Experience trajectory file not found: {self.experience_trajectory_path}"
             )
             return False
-
-        self.logger.info(f"Processing {len(experience_data)} examples")
 
         # Use retrieval manager to build index (this will cache embeddings)
         index_name = f"cache_gen_{self.rag_indexing_method}_{self.sentence_encoder_model.replace('/', '_')}"
 
         self.logger.info(f"Building index: {index_name}")
         success = self.retrieval_manager.build_index(
-            index_name, experience_data, self.rag_indexing_method
+            index_key=index_name,
+            experience_trajectory_path=self.experience_trajectory_path,
+            rag_indexing_method=self.rag_indexing_method,
+            sentence_encoder_model=self.sentence_encoder_model,
+            rag_indexing_batch_size=self.batch_size,
+            use_cache=True,
         )
 
         if success:
@@ -75,62 +76,6 @@ class CacheGenerator:
         else:
             self.logger.error("Cache generation failed!")
             return False
-
-    def _load_experience_data(self):
-        """Load experience trajectory data."""
-        try:
-            import json
-
-            self.logger.info(
-                f"Loading experience data from: {self.experience_trajectory_path}"
-            )
-
-            with open(self.experience_trajectory_path, "r") as f:
-                data = json.load(f)
-
-            # Extract input data based on indexing method
-            if self.rag_indexing_method == "history":
-                # For history indexing, we want the complete problem-solving sequences
-                experience_data = []
-                for episode in data:
-                    if "history" in episode:
-                        experience_data.append(str(episode["history"]))
-                    elif "trajectory" in episode:
-                        experience_data.append(str(episode["trajectory"]))
-                    else:
-                        # Fallback: use the entire episode as a string
-                        experience_data.append(str(episode))
-
-            elif self.rag_indexing_method == "action":
-                # For action indexing, extract individual actions
-                experience_data = []
-                for episode in data:
-                    if "history" in episode:
-                        for step in episode["history"]:
-                            if "action" in step:
-                                experience_data.append(str(step["action"]))
-                    elif "trajectory" in episode:
-                        for step in episode["trajectory"]:
-                            if "action" in step:
-                                experience_data.append(str(step["action"]))
-
-            else:
-                self.logger.warning(
-                    f"Unknown indexing method: {self.rag_indexing_method}, using full episodes"
-                )
-                experience_data = [str(episode) for episode in data]
-
-            # Apply max_examples limit if specified
-            if self.max_examples and len(experience_data) > self.max_examples:
-                self.logger.info(f"Limiting to first {self.max_examples} examples")
-                experience_data = experience_data[: self.max_examples]
-
-            self.logger.info(f"Loaded {len(experience_data)} data points")
-            return experience_data
-
-        except Exception as e:
-            self.logger.error(f"Failed to load experience data: {e}")
-            return []
 
 
 def main():
