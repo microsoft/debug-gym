@@ -323,6 +323,79 @@ class TestRetrievalManager:
         with pytest.raises(ValueError, match="Index 'nonexistent' not found"):
             manager.retrieve("nonexistent", "test query")
 
+    @patch("debug_gym.agents.retrieval_service.FaissRetriever")
+    @patch("debug_gym.agents.retrieval_service.SentenceEncoder")
+    def test_concurrent_build_index_same_key(
+        self, mock_sentence_encoder, mock_faiss_retriever
+    ):
+        """Test that concurrent builds of the same index are handled correctly."""
+        config = {"rag_use_cache": False}
+
+        mock_encoder_instance = MagicMock()
+        mock_sentence_encoder.return_value = mock_encoder_instance
+        mock_encoder_instance.encode_sentence.return_value = np.array(
+            [[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]]
+        )
+
+        mock_retriever_instance = MagicMock()
+        mock_faiss_retriever.return_value = mock_retriever_instance
+
+        manager = RetrievalManager(config)
+
+        trajectory_data = self.create_sample_trajectory_data()
+        trajectory_file = self.create_sample_trajectory_file(trajectory_data)
+
+        try:
+            # Test that building the same index twice skips the second build
+            success1 = manager.build_index(
+                index_key="test_index",
+                experience_trajectory_path=trajectory_file,
+                rag_indexing_method="tool_call-1",
+                sentence_encoder_model="test-model",
+                use_cache=False,
+            )
+
+            success2 = manager.build_index(
+                index_key="test_index",
+                experience_trajectory_path=trajectory_file,
+                rag_indexing_method="tool_call-1",
+                sentence_encoder_model="test-model",
+                use_cache=False,
+            )
+
+            assert success1 is True
+            assert success2 is True  # Should succeed but skip actual build
+            assert "test_index" in manager.indexes
+
+            # Verify the building_indexes set is clean
+            assert "test_index" not in manager.building_indexes
+
+        finally:
+            os.unlink(trajectory_file)
+
+    @patch("debug_gym.agents.retrieval_service.SentenceEncoder")
+    def test_building_indexes_cleanup_on_error(self, mock_sentence_encoder):
+        """Test that building_indexes set is cleaned up on error."""
+        config = {"rag_use_cache": False}
+
+        mock_encoder_instance = MagicMock()
+        mock_sentence_encoder.return_value = mock_encoder_instance
+
+        manager = RetrievalManager(config)
+
+        # Test with nonexistent file to trigger error
+        success = manager.build_index(
+            index_key="test_index",
+            experience_trajectory_path="/nonexistent/file.jsonl",
+            rag_indexing_method="tool_call-1",
+            sentence_encoder_model="test-model",
+            use_cache=False,
+        )
+
+        assert success is False
+        # Verify the building_indexes set is cleaned up after error
+        assert "test_index" not in manager.building_indexes
+
 
 class TestRetrievalService:
     """Test cases for the RetrievalService class."""

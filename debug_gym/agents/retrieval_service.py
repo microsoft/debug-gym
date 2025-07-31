@@ -281,6 +281,9 @@ class RetrievalManager:
         # Thread lock for index operations to prevent race conditions
         self.index_lock = threading.RLock()
 
+        # Track indexes currently being built to prevent duplicate builds
+        self.building_indexes = set()
+
         # Cache configuration
         self.cache_dir = self.config.get("rag_cache_dir", ".rag_cache")
         self.use_cache = self.config.get("rag_use_cache", True)
@@ -514,77 +517,112 @@ class RetrievalManager:
         use_cache: bool = True,
     ) -> bool:
         """Build a retrieval index."""
+        # First check if index already exists or is being built
         with self.index_lock:
-            try:
-                # Check if index already exists (double-check pattern)
+            if index_key in self.indexes:
+                self.logger.info(f"Index '{index_key}' already exists, skipping build")
+                return True
+
+            if index_key in self.building_indexes:
+                self.logger.info(
+                    f"Index '{index_key}' is already being built by another thread, waiting..."
+                )
+                # Wait for the other thread to finish building
+                while index_key in self.building_indexes:
+                    self.index_lock.release()
+                    time.sleep(0.1)  # Brief wait
+                    self.index_lock.acquire()
+
+                # Check if it was successfully built
                 if index_key in self.indexes:
-                    self.logger.info(
-                        f"Index '{index_key}' already exists, skipping build"
-                    )
+                    self.logger.info(f"Index '{index_key}' was built by another thread")
                     return True
-
-                self.logger.info(f"Building index '{index_key}'...")
-
-                # Update encoder if a different model is requested
-                if sentence_encoder_model != self.sentence_encoder_model:
-                    self.logger.info(
-                        f"Switching to encoder model: {sentence_encoder_model}"
-                    )
-                    self.sentence_encoder_model = sentence_encoder_model
-                    self.encoder = SentenceEncoder(model_name=sentence_encoder_model)
-
-                # Parse indexing method
-                parsed_method = self.parse_indexing_method(rag_indexing_method)
-
-                # Load experience trajectories
-                experience_trajectories = self.load_experience_trajectory_from_file(
-                    experience_trajectory_path
-                )
-
-                # Build retrieval dataset
-                data_input, data_label = self.build_retrieval_dataset(
-                    experience_trajectories, parsed_method
-                )
-
-                if not data_input:
-                    self.logger.warning(f"No data found for index '{index_key}'")
-                    return False
-
-                # Compute or load embeddings
-                input_representations = None
-
-                if use_cache and self.cache_manager:
-                    cache_key = self._generate_cache_key(
-                        experience_trajectory_path,
-                        parsed_method,
-                        sentence_encoder_model,
-                    )
-
-                    def compute_embeddings(data_input):
-                        """Callback function to compute embeddings."""
-                        return self.encoder.encode_sentence(
-                            data_input, batch_size=rag_indexing_batch_size
-                        )
-
-                    data_input, input_representations = (
-                        self.cache_manager.load_or_create_cache(
-                            cache_key=cache_key,
-                            indexing_method=parsed_method,
-                            encoder_model=sentence_encoder_model,
-                            data_input=data_input,
-                            compute_callback=compute_embeddings,
-                        )
-                    )
                 else:
-                    self.logger.info("Computing input representations...")
-                    input_representations = self.encoder.encode_sentence(
+                    self.logger.warning(
+                        f"Index '{index_key}' build failed in another thread, retrying..."
+                    )
+
+            # Mark this index as being built
+            self.building_indexes.add(index_key)
+
+        try:
+            self.logger.info(f"Building index '{index_key}'...")
+
+            # Update encoder if a different model is requested
+            # Do this outside the lock to avoid blocking other operations
+            if sentence_encoder_model != self.sentence_encoder_model:
+                self.logger.info(
+                    f"Switching to encoder model: {sentence_encoder_model}"
+                )
+                self.sentence_encoder_model = sentence_encoder_model
+                self.encoder = SentenceEncoder(model_name=sentence_encoder_model)
+
+            # Parse indexing method
+            parsed_method = self.parse_indexing_method(rag_indexing_method)
+
+            # Load experience trajectories
+            experience_trajectories = self.load_experience_trajectory_from_file(
+                experience_trajectory_path
+            )
+
+            # Build retrieval dataset
+            data_input, data_label = self.build_retrieval_dataset(
+                experience_trajectories, parsed_method
+            )
+
+            if not data_input:
+                self.logger.warning(f"No data found for index '{index_key}'")
+                # Make sure to remove from building set when no data is found
+                with self.index_lock:
+                    self.building_indexes.discard(index_key)
+                return False
+
+            # Compute or load embeddings
+            input_representations = None
+
+            if use_cache and self.cache_manager:
+                cache_key = self._generate_cache_key(
+                    experience_trajectory_path,
+                    parsed_method,
+                    sentence_encoder_model,
+                )
+
+                def compute_embeddings(data_input):
+                    """Callback function to compute embeddings."""
+                    return self.encoder.encode_sentence(
                         data_input, batch_size=rag_indexing_batch_size
                     )
 
-                # Build index
-                encoding_dim = input_representations.shape[1]
-                retriever = FaissRetriever(encoding_dim)
-                retriever.add(input_representations)
+                data_input, input_representations = (
+                    self.cache_manager.load_or_create_cache(
+                        cache_key=cache_key,
+                        indexing_method=parsed_method,
+                        encoder_model=sentence_encoder_model,
+                        data_input=data_input,
+                        compute_callback=compute_embeddings,
+                    )
+                )
+            else:
+                self.logger.info("Computing input representations...")
+                input_representations = self.encoder.encode_sentence(
+                    data_input, batch_size=rag_indexing_batch_size
+                )
+
+            # Build index
+            encoding_dim = input_representations.shape[1]
+            retriever = FaissRetriever(encoding_dim)
+            retriever.add(input_representations)
+
+            # Only acquire lock when storing the final index to minimize lock time
+            with self.index_lock:
+                # Double-check that index wasn't built by another thread while we were working
+                if index_key in self.indexes:
+                    self.logger.info(
+                        f"Index '{index_key}' was built by another thread, using existing index"
+                    )
+                    # Remove from building set
+                    self.building_indexes.discard(index_key)
+                    return True
 
                 # Store index
                 self.indexes[index_key] = {
@@ -593,14 +631,20 @@ class RetrievalManager:
                     "data_label": data_label,
                 }
 
-                self.logger.info(
-                    f"Built index '{index_key}' with {len(data_input)} examples, embedding dim: {encoding_dim}"
-                )
-                return True
+                # Remove from building set
+                self.building_indexes.discard(index_key)
 
-            except Exception as e:
-                self.logger.error(f"Error building index '{index_key}': {str(e)}")
-                return False
+            self.logger.info(
+                f"Built index '{index_key}' with {len(data_input)} examples, embedding dim: {encoding_dim}"
+            )
+            return True
+
+        except Exception as e:
+            # Make sure to remove from building set on error
+            with self.index_lock:
+                self.building_indexes.discard(index_key)
+            self.logger.error(f"Error building index '{index_key}': {str(e)}")
+            return False
 
     def retrieve(
         self, index_key: str, query_text: str, num_retrievals: int = 1
