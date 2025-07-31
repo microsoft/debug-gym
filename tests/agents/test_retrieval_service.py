@@ -483,6 +483,8 @@ class TestThreadedHTTPServer:
 
     def test_server_bind_socket_options(self):
         """Test that server_bind sets the correct socket options."""
+        import socket
+
         with patch.object(HTTPServer, "server_bind") as mock_super_bind:
             with patch("socket.socket") as mock_socket:
                 mock_socket_instance = MagicMock()
@@ -501,11 +503,11 @@ class TestThreadedHTTPServer:
                 # Verify HTTPServer.server_bind was called once after reset
                 mock_super_bind.assert_called_once()
 
-                # Verify socket options were set (using actual socket constant values)
+                # Verify socket options were set (using platform-independent socket constants)
                 expected_calls = [
-                    (65535, 4, 1),  # SOL_SOCKET, SO_REUSEADDR, 1
-                    (6, 1, 1),  # IPPROTO_TCP, TCP_NODELAY, 1
-                    (65535, 8, 1),  # SOL_SOCKET, SO_KEEPALIVE, 1
+                    (socket.SOL_SOCKET, socket.SO_REUSEADDR, 1),
+                    (socket.IPPROTO_TCP, socket.TCP_NODELAY, 1),
+                    (socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1),
                 ]
 
                 actual_calls = [
