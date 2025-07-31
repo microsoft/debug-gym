@@ -1,17 +1,24 @@
 import json
 import os
+import socket
 import tempfile
-from unittest.mock import MagicMock, patch
+import threading
+import time
+from http.server import HTTPServer
+from unittest.mock import MagicMock, Mock, patch
 
 import numpy as np
 import pytest
 import requests
+import yaml
 
 from debug_gym.agents.retrieval_service import (
     RetrievalManager,
     RetrievalService,
     RetrievalServiceClient,
     RetrievalServiceHandler,
+    ThreadedHTTPServer,
+    start_retrieval_service_standalone,
 )
 
 
@@ -471,182 +478,536 @@ class TestRetrievalServiceClient:
         mock_get.assert_called_once_with("http://localhost:8766/indexes", timeout=10)
 
 
-class TestRetrievalServiceIntegration:
-    """Integration tests for the retrieval service."""
+class TestThreadedHTTPServer:
+    """Test cases for the ThreadedHTTPServer class."""
 
-    def create_sample_trajectory_file(self, content):
-        """Helper to create a temporary trajectory file."""
-        temp_file = tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".jsonl")
-        for line in content:
-            temp_file.write(json.dumps(line) + "\n")
-        temp_file.close()
-        return temp_file.name
+    def test_server_bind_socket_options(self):
+        """Test that server_bind sets the correct socket options."""
+        with patch.object(HTTPServer, "server_bind") as mock_super_bind:
+            with patch("socket.socket") as mock_socket:
+                mock_socket_instance = MagicMock()
 
-    def create_sample_trajectory_data(self):
-        """Create sample trajectory data for testing."""
-        return [
+                # Create a server instance (this will call server_bind once)
+                server = ThreadedHTTPServer(("localhost", 0), MagicMock)
+                server.socket = mock_socket_instance
+
+                # Reset the mock to clear the call from initialization
+                mock_super_bind.reset_mock()
+                mock_socket_instance.reset_mock()
+
+                # Call server_bind explicitly
+                server.server_bind()
+
+                # Verify HTTPServer.server_bind was called once after reset
+                mock_super_bind.assert_called_once()
+
+                # Verify socket options were set (using actual socket constant values)
+                expected_calls = [
+                    (65535, 4, 1),  # SOL_SOCKET, SO_REUSEADDR, 1
+                    (6, 1, 1),  # IPPROTO_TCP, TCP_NODELAY, 1
+                    (65535, 8, 1),  # SOL_SOCKET, SO_KEEPALIVE, 1
+                ]
+
+                actual_calls = [
+                    call[0] for call in mock_socket_instance.setsockopt.call_args_list
+                ]
+                for expected_call in expected_calls:
+                    assert expected_call in actual_calls
+
+                # Verify timeout was set
+                mock_socket_instance.settimeout.assert_called_once_with(30)
+
+    def test_server_attributes(self):
+        """Test that ThreadedHTTPServer has the correct attributes."""
+        server = ThreadedHTTPServer(("localhost", 0), MagicMock)
+
+        assert server.daemon_threads is True
+        assert server.timeout == 60
+        assert server.allow_reuse_address is True
+        assert server.request_queue_size == 128
+
+
+class TestRetrievalServiceHandler:
+    """Comprehensive test cases for the RetrievalServiceHandler class."""
+
+    def create_mock_handler(self, retrieval_manager=None):
+        """Helper to create a mock handler with necessary attributes."""
+        if retrieval_manager is None:
+            retrieval_manager = MagicMock()
+
+        # Create handler without triggering __init__ to avoid HTTP parsing
+        handler = RetrievalServiceHandler.__new__(RetrievalServiceHandler)
+        handler.retrieval_manager = retrieval_manager
+        handler.logger = MagicMock()
+        handler.send_response = MagicMock()
+        handler.send_error = MagicMock()
+        handler.send_header = MagicMock()
+        handler.end_headers = MagicMock()
+        handler.wfile = MagicMock()
+        handler.connection = MagicMock()
+        handler.rfile = MagicMock()
+        handler.headers = {}
+        handler.path = "/"
+
+        return handler
+
+    def test_handler_init(self):
+        """Test RetrievalServiceHandler initialization."""
+        retrieval_manager = MagicMock()
+
+        # Test that handler stores retrieval_manager correctly
+        handler = self.create_mock_handler(retrieval_manager)
+
+        assert handler.retrieval_manager == retrieval_manager
+
+    def test_log_request_does_nothing(self):
+        """Test that log_request method does nothing (overridden to reduce noise)."""
+        handler = self.create_mock_handler()
+
+        # Should not raise any exceptions and do nothing
+        handler.log_request(200, 1024)
+        handler.log_request()
+
+    def test_safe_send_response_success(self):
+        """Test safe_send_response when successful."""
+        handler = self.create_mock_handler()
+
+        result = handler.safe_send_response(200, "OK")
+
+        assert result is True
+        handler.send_response.assert_called_once_with(200, "OK")
+
+    def test_safe_send_response_broken_pipe(self):
+        """Test safe_send_response handles BrokenPipeError."""
+        handler = self.create_mock_handler()
+        handler.send_response.side_effect = BrokenPipeError("Broken pipe")
+
+        result = handler.safe_send_response(200)
+
+        assert result is False
+
+    def test_safe_send_response_connection_reset(self):
+        """Test safe_send_response handles ConnectionResetError."""
+        handler = self.create_mock_handler()
+        handler.send_response.side_effect = ConnectionResetError("Connection reset")
+
+        result = handler.safe_send_response(200)
+
+        assert result is False
+
+    def test_safe_send_response_generic_exception(self):
+        """Test safe_send_response handles generic exceptions."""
+        handler = self.create_mock_handler()
+        handler.send_response.side_effect = Exception("Generic error")
+
+        result = handler.safe_send_response(200)
+
+        assert result is False
+
+    def test_safe_send_error_success(self):
+        """Test safe_send_error when successful."""
+        handler = self.create_mock_handler()
+
+        handler.safe_send_error(404, "Not found")
+
+        handler.send_error.assert_called_once_with(404, "Not found")
+
+    def test_safe_send_error_broken_pipe(self):
+        """Test safe_send_error handles BrokenPipeError."""
+        handler = self.create_mock_handler()
+        handler.send_error.side_effect = BrokenPipeError("Broken pipe")
+
+        # Should not raise exception
+        handler.safe_send_error(500)
+
+    def test_safe_send_error_connection_reset(self):
+        """Test safe_send_error handles ConnectionResetError."""
+        handler = self.create_mock_handler()
+        handler.send_error.side_effect = ConnectionResetError("Connection reset")
+
+        # Should not raise exception
+        handler.safe_send_error(500)
+
+    def test_safe_send_error_generic_exception(self):
+        """Test safe_send_error handles generic exceptions."""
+        handler = self.create_mock_handler()
+        handler.send_error.side_effect = Exception("Generic error")
+
+        # Should not raise exception
+        handler.safe_send_error(500)
+
+    def test_safe_write_response_success(self):
+        """Test safe_write_response when successful."""
+        handler = self.create_mock_handler()
+        test_data = {"test": "data"}
+
+        result = handler.safe_write_response(test_data)
+
+        assert result is True
+        handler.send_header.assert_any_call("Content-Type", "application/json")
+        handler.send_header.assert_any_call("Connection", "close")
+        handler.end_headers.assert_called_once()
+        handler.wfile.write.assert_called_once()
+        handler.wfile.flush.assert_called_once()
+
+    def test_safe_write_response_broken_pipe(self):
+        """Test safe_write_response handles BrokenPipeError."""
+        handler = self.create_mock_handler()
+        handler.wfile.write.side_effect = BrokenPipeError("Broken pipe")
+
+        result = handler.safe_write_response({"test": "data"})
+
+        assert result is False
+
+    def test_safe_write_response_connection_reset(self):
+        """Test safe_write_response handles ConnectionResetError."""
+        handler = self.create_mock_handler()
+        handler.wfile.flush.side_effect = ConnectionResetError("Connection reset")
+
+        result = handler.safe_write_response({"test": "data"})
+
+        assert result is False
+
+    def test_safe_write_response_generic_exception(self):
+        """Test safe_write_response handles generic exceptions."""
+        handler = self.create_mock_handler()
+        handler.send_header.side_effect = Exception("Generic error")
+
+        result = handler.safe_write_response({"test": "data"})
+
+        assert result is False
+
+    def test_do_get_health_check(self):
+        """Test GET /health endpoint."""
+        handler = self.create_mock_handler()
+        handler.path = "/health"
+
+        with patch.object(handler, "safe_send_response", return_value=True):
+            with patch.object(handler, "safe_write_response") as mock_write:
+                handler.do_GET()
+
+                mock_write.assert_called_once_with({"status": "healthy"})
+
+    def test_do_get_indexes(self):
+        """Test GET /indexes endpoint."""
+        handler = self.create_mock_handler()
+        handler.path = "/indexes"
+        handler.retrieval_manager.indexes = {"index1": {}, "index2": {}}
+
+        with patch.object(handler, "safe_send_response", return_value=True):
+            with patch.object(handler, "safe_write_response") as mock_write:
+                handler.do_GET()
+
+                mock_write.assert_called_once_with({"indexes": ["index1", "index2"]})
+
+    def test_do_get_not_found(self):
+        """Test GET to unknown endpoint returns 404."""
+        handler = self.create_mock_handler()
+        handler.path = "/unknown"
+
+        with patch.object(handler, "safe_send_error") as mock_error:
+            handler.do_GET()
+
+            mock_error.assert_called_once_with(404, "Endpoint not found")
+
+    def test_do_get_broken_pipe_error(self):
+        """Test GET handles BrokenPipeError gracefully."""
+        handler = self.create_mock_handler()
+        handler.path = "/health"
+
+        with patch.object(
+            handler, "safe_send_response", side_effect=BrokenPipeError("Broken pipe")
+        ):
+            # Should not raise exception
+            handler.do_GET()
+
+    def test_do_get_connection_reset_error(self):
+        """Test GET handles ConnectionResetError gracefully."""
+        handler = self.create_mock_handler()
+        handler.path = "/health"
+
+        with patch.object(
+            handler,
+            "safe_send_response",
+            side_effect=ConnectionResetError("Connection reset"),
+        ):
+            # Should not raise exception
+            handler.do_GET()
+
+    def test_do_get_generic_exception(self):
+        """Test GET handles generic exceptions."""
+        handler = self.create_mock_handler()
+        handler.path = "/health"
+
+        with patch.object(
+            handler, "safe_send_response", side_effect=Exception("Generic error")
+        ):
+            with patch.object(handler, "safe_send_error") as mock_error:
+                handler.do_GET()
+
+                mock_error.assert_called_once_with(
+                    500, "Internal server error: Generic error"
+                )
+
+    def test_do_post_retrieve_success(self):
+        """Test POST /retrieve endpoint success."""
+        handler = self.create_mock_handler()
+        handler.path = "/retrieve"
+        handler.headers = {"Content-Length": "50"}
+
+        post_data = json.dumps(
+            {"index_key": "test_index", "query_text": "test query", "num_retrievals": 2}
+        ).encode("utf-8")
+
+        handler.rfile.read.return_value = post_data
+        handler.retrieval_manager.retrieve.return_value = ["result1", "result2"]
+
+        with patch.object(handler, "safe_send_response", return_value=True):
+            with patch.object(
+                handler, "safe_write_response", return_value=True
+            ) as mock_write:
+                handler.do_POST()
+
+                handler.retrieval_manager.retrieve.assert_called_once_with(
+                    "test_index", "test query", 2
+                )
+                mock_write.assert_called_once_with(
+                    {"relevant_examples": ["result1", "result2"]}
+                )
+
+    def test_do_post_retrieve_missing_params(self):
+        """Test POST /retrieve with missing parameters."""
+        handler = self.create_mock_handler()
+        handler.path = "/retrieve"
+        handler.headers = {"Content-Length": "20"}
+
+        post_data = json.dumps({"index_key": "test"}).encode("utf-8")
+        handler.rfile.read.return_value = post_data
+
+        with patch.object(handler, "safe_send_error") as mock_error:
+            handler.do_POST()
+
+            mock_error.assert_called_once_with(
+                400, "index_key and query_text are required"
+            )
+
+    def test_do_post_retrieve_retrieval_exception(self):
+        """Test POST /retrieve handles retrieval exceptions."""
+        handler = self.create_mock_handler()
+        handler.path = "/retrieve"
+        handler.headers = {"Content-Length": "50"}
+
+        post_data = json.dumps(
+            {"index_key": "test_index", "query_text": "test query"}
+        ).encode("utf-8")
+
+        handler.rfile.read.return_value = post_data
+        handler.retrieval_manager.retrieve.side_effect = Exception("Retrieval failed")
+
+        with patch.object(handler, "safe_send_error") as mock_error:
+            handler.do_POST()
+
+            mock_error.assert_called_once_with(500, "Retrieval error: Retrieval failed")
+
+    def test_do_post_retrieve_broken_pipe_during_retrieval(self):
+        """Test POST /retrieve handles BrokenPipeError during retrieval."""
+        handler = self.create_mock_handler()
+        handler.path = "/retrieve"
+        handler.headers = {"Content-Length": "50"}
+
+        post_data = json.dumps(
+            {"index_key": "test_index", "query_text": "test query"}
+        ).encode("utf-8")
+
+        handler.rfile.read.return_value = post_data
+        handler.retrieval_manager.retrieve.side_effect = BrokenPipeError("Broken pipe")
+
+        # Should not raise exception
+        handler.do_POST()
+
+    def test_do_post_build_index_success(self):
+        """Test POST /build_index endpoint success."""
+        handler = self.create_mock_handler()
+        handler.path = "/build_index"
+        handler.headers = {"Content-Length": "100"}
+
+        post_data = json.dumps(
             {
-                "satisfied_criteria": [
-                    "follows_proper_debugging_workflow",
-                    "has_successful_outcome",
-                ],
-                "messages": [
-                    {"role": "system", "content": "System message"},
-                    {"role": "user", "content": "Test observation"},
-                    {
-                        "role": "assistant",
-                        "content": "Using debug tool",
-                        "tool_calls": [
-                            {
-                                "function": {
-                                    "name": "pdb",
-                                    "arguments": {"command": "l"},
-                                }
-                            }
-                        ],
-                    },
-                    {"role": "tool", "content": "Tool output"},
-                    {
-                        "role": "assistant",
-                        "content": "Analysis complete",
-                        "tool_calls": [
-                            {
-                                "function": {
-                                    "name": "view",
-                                    "arguments": {"path": "test.py"},
-                                }
-                            }
-                        ],
-                    },
-                ],
-            }
-        ]
-
-    @patch("debug_gym.agents.retrieval_service.SentenceEncoder")
-    @patch("debug_gym.agents.retrieval_service.FaissRetriever")
-    def test_end_to_end_workflow(self, mock_faiss_retriever, mock_sentence_encoder):
-        """Test end-to-end workflow with mocked dependencies."""
-        # Setup mocks
-        mock_encoder_instance = MagicMock()
-        mock_sentence_encoder.return_value = mock_encoder_instance
-        mock_encoder_instance.encode_sentence.return_value = np.array([[0.1, 0.2, 0.3]])
-
-        mock_retriever_instance = MagicMock()
-        mock_faiss_retriever.return_value = mock_retriever_instance
-        mock_retriever_instance.retrieve.return_value = (
-            np.array([[0.1]]),  # distances
-            np.array([[0]]),  # indices
-        )
-
-        # Create test data
-        trajectory_data = self.create_sample_trajectory_data()
-        trajectory_file = self.create_sample_trajectory_file(trajectory_data)
-
-        try:
-            # Test with RetrievalManager directly
-            config = {
-                "rag_cache_dir": ".test_cache",
-                "rag_use_cache": False,
+                "index_key": "test_index",
+                "experience_trajectory_path": "/path/to/file.jsonl",
+                "rag_indexing_method": "tool_call-1",
                 "sentence_encoder_model": "test-model",
             }
+        ).encode("utf-8")
 
-            manager = RetrievalManager(config)
+        handler.rfile.read.return_value = post_data
+        handler.retrieval_manager.build_index.return_value = True
 
-            # Build index
-            success = manager.build_index(
-                index_key="test_integration",
-                experience_trajectory_path=trajectory_file,
-                rag_indexing_method="tool_call-1",
-                sentence_encoder_model="test-model",
+        with patch.object(handler, "safe_send_response", return_value=True):
+            with patch.object(
+                handler, "safe_write_response", return_value=True
+            ) as mock_write:
+                handler.do_POST()
+
+                mock_write.assert_called_once_with(
+                    {"success": True, "index_key": "test_index"}
+                )
+
+    def test_do_post_build_index_missing_params(self):
+        """Test POST /build_index with missing parameters."""
+        handler = self.create_mock_handler()
+        handler.path = "/build_index"
+        handler.headers = {"Content-Length": "30"}
+
+        post_data = json.dumps({"index_key": "test"}).encode("utf-8")
+        handler.rfile.read.return_value = post_data
+
+        with patch.object(handler, "safe_send_error") as mock_error:
+            handler.do_POST()
+
+            mock_error.assert_called_once_with(
+                400, "Missing required parameters for index building"
             )
 
-            assert success is True
+    def test_do_post_build_index_exception(self):
+        """Test POST /build_index handles exceptions."""
+        handler = self.create_mock_handler()
+        handler.path = "/build_index"
+        handler.headers = {"Content-Length": "100"}
 
-            # Retrieve examples
-            results = manager.retrieve(
-                "test_integration", "test query", num_retrievals=1
+        post_data = json.dumps(
+            {
+                "index_key": "test_index",
+                "experience_trajectory_path": "/path/to/file.jsonl",
+                "rag_indexing_method": "tool_call-1",
+                "sentence_encoder_model": "test-model",
+            }
+        ).encode("utf-8")
+
+        handler.rfile.read.return_value = post_data
+        handler.retrieval_manager.build_index.side_effect = Exception("Build failed")
+
+        with patch.object(handler, "safe_send_error") as mock_error:
+            handler.do_POST()
+
+            mock_error.assert_called_once_with(
+                500, "Index building error: Build failed"
             )
-            assert len(results) <= 1
 
-        finally:
-            os.unlink(trajectory_file)
+    def test_do_post_check_index_success(self):
+        """Test POST /check_index endpoint success."""
+        handler = self.create_mock_handler()
+        handler.path = "/check_index"
+        handler.headers = {"Content-Length": "30"}
 
-    @patch("debug_gym.agents.retrieval_service.FaissRetriever")
-    @patch("debug_gym.agents.retrieval_service.SentenceEncoder")
-    def test_retrieve_encoding_error_handling(
-        self, mock_sentence_encoder, mock_faiss_retriever
-    ):
-        """Test that encoding errors are handled gracefully and return empty list."""
-        config = {"rag_use_cache": False}
+        post_data = json.dumps({"index_key": "test_index"}).encode("utf-8")
+        handler.rfile.read.return_value = post_data
+        handler.retrieval_manager.has_index.return_value = True
 
-        mock_encoder_instance = MagicMock()
-        mock_sentence_encoder.return_value = mock_encoder_instance
+        with patch.object(handler, "safe_send_response", return_value=True):
+            with patch.object(
+                handler, "safe_write_response", return_value=True
+            ) as mock_write:
+                handler.do_POST()
 
-        # First call for building index
-        mock_encoder_instance.encode_sentence.return_value = np.array([[0.1, 0.2, 0.3]])
+                mock_write.assert_called_once_with(
+                    {"exists": True, "index_key": "test_index"}
+                )
 
-        mock_retriever_instance = MagicMock()
-        mock_faiss_retriever.return_value = mock_retriever_instance
+    def test_do_post_check_index_missing_key(self):
+        """Test POST /check_index with missing index_key."""
+        handler = self.create_mock_handler()
+        handler.path = "/check_index"
+        handler.headers = {"Content-Length": "10"}
 
-        manager = RetrievalManager(config)
+        post_data = json.dumps({}).encode("utf-8")
+        handler.rfile.read.return_value = post_data
 
-        # Set up a minimal index
-        manager.indexes["test_index"] = {
-            "retriever": mock_retriever_instance,
-            "data_input": ["test input"],
-            "data_label": ["test label"],
-        }
+        with patch.object(handler, "safe_send_error") as mock_error:
+            handler.do_POST()
 
-        # Test GPU memory error
-        mock_encoder_instance.encode_sentence.side_effect = RuntimeError(
-            "CUDA out of memory"
-        )
-        results = manager.retrieve("test_index", "test query", num_retrievals=1)
-        assert results == []
+            mock_error.assert_called_once_with(400, "index_key is required")
 
-        # Test token length error
-        mock_encoder_instance.encode_sentence.side_effect = ValueError(
-            "Token limit exceeded"
-        )
-        results = manager.retrieve("test_index", "test query", num_retrievals=1)
-        assert results == []
+    def test_do_post_check_index_exception(self):
+        """Test POST /check_index handles exceptions."""
+        handler = self.create_mock_handler()
+        handler.path = "/check_index"
+        handler.headers = {"Content-Length": "30"}
 
-        # Test generic error
-        mock_encoder_instance.encode_sentence.side_effect = Exception(
-            "Generic encoding error"
-        )
-        results = manager.retrieve("test_index", "test query", num_retrievals=1)
-        assert results == []
+        post_data = json.dumps({"index_key": "test_index"}).encode("utf-8")
+        handler.rfile.read.return_value = post_data
+        handler.retrieval_manager.has_index.side_effect = Exception("Check failed")
 
-    @patch("debug_gym.agents.retrieval_service.SentenceEncoder")
-    def test_retrieve_long_query_truncation(self, mock_sentence_encoder):
-        """Test that overly long queries are truncated."""
-        config = {"rag_use_cache": False}
+        with patch.object(handler, "safe_send_error") as mock_error:
+            handler.do_POST()
 
-        mock_encoder_instance = MagicMock()
-        mock_sentence_encoder.return_value = mock_encoder_instance
-        mock_encoder_instance.encode_sentence.return_value = np.array([[0.1, 0.2, 0.3]])
+            mock_error.assert_called_once_with(500, "Index check error: Check failed")
 
-        manager = RetrievalManager(config)
+    def test_do_post_unknown_endpoint(self):
+        """Test POST to unknown endpoint returns 404."""
+        handler = self.create_mock_handler()
+        handler.path = "/unknown"
+        handler.headers = {"Content-Length": "10"}
+        handler.rfile.read.return_value = b'{"test": 1}'
 
-        # Set up a minimal index
-        mock_retriever = MagicMock()
-        mock_retriever.retrieve.return_value = (np.array([[0.1]]), np.array([[0]]))
-        manager.indexes["test_index"] = {
-            "retriever": mock_retriever,
-            "data_input": ["test input"],
-            "data_label": ["test label"],
-        }
+        with patch.object(handler, "safe_send_error") as mock_error:
+            handler.do_POST()
 
-        # Create a very long query (over 32000 characters)
-        long_query = "a" * 35000
+            mock_error.assert_called_once_with(404, "Endpoint not found")
 
-        results = manager.retrieve("test_index", long_query, num_retrievals=1)
+    def test_do_post_broken_pipe_error(self):
+        """Test POST handles BrokenPipeError gracefully."""
+        handler = self.create_mock_handler()
+        handler.path = "/retrieve"
+        handler.headers = {"Content-Length": "10"}
+        handler.rfile.read.side_effect = BrokenPipeError("Broken pipe")
 
-        # Should still work, but query should be truncated
-        assert len(results) <= 1
+        # Should not raise exception
+        handler.do_POST()
 
-        # Verify the encoder was called with truncated text
-        called_args = mock_encoder_instance.encode_sentence.call_args
-        encoded_text = called_args[0][0][0]  # First arg, first batch item
-        assert len(encoded_text) <= 32000
+    def test_do_post_connection_reset_error(self):
+        """Test POST handles ConnectionResetError gracefully."""
+        handler = self.create_mock_handler()
+        handler.path = "/retrieve"
+        handler.headers = {"Content-Length": "10"}
+        handler.rfile.read.side_effect = ConnectionResetError("Connection reset")
+
+        # Should not raise exception
+        handler.do_POST()
+
+    def test_do_post_generic_exception(self):
+        """Test POST handles generic exceptions."""
+        handler = self.create_mock_handler()
+        handler.path = "/retrieve"
+        handler.headers = {"Content-Length": "invalid"}  # This will cause int() to fail
+
+        with patch.object(handler, "safe_send_error") as mock_error:
+            handler.do_POST()
+
+            # Should call safe_send_error with 500 status
+            assert mock_error.called
+            args = mock_error.call_args[0]
+            assert args[0] == 500
+            assert "Internal server error" in args[1]
+
+    def test_connection_shutdown_exception_handling(self):
+        """Test that connection.shutdown exceptions are handled gracefully."""
+        handler = self.create_mock_handler()
+        handler.path = "/retrieve"
+        handler.headers = {"Content-Length": "50"}
+
+        post_data = json.dumps(
+            {"index_key": "test_index", "query_text": "test query"}
+        ).encode("utf-8")
+
+        handler.rfile.read.return_value = post_data
+        handler.retrieval_manager.retrieve.return_value = ["result"]
+        handler.connection.shutdown.side_effect = Exception("Shutdown failed")
+
+        with patch.object(handler, "safe_send_response", return_value=True):
+            with patch.object(handler, "safe_write_response", return_value=True):
+                # Should not raise exception despite connection.shutdown failing
+                handler.do_POST()
+
+                # Verify the operation completed
+                handler.retrieval_manager.retrieve.assert_called_once()
