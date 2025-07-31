@@ -681,10 +681,19 @@ class RetrievalService:
         self.server_thread = None
         self.logger = DebugGymLogger(__name__)
 
-        # Simple hang detection
+        # Simple hang detection with configurable timeouts
         self.last_health_ping = time.time()
         self.watchdog_thread = None
         self._shutdown_event = threading.Event()
+
+        # Configurable timeout settings
+        self.hang_detection_timeout = config.get(
+            "hang_detection_timeout", 300
+        )  # seconds to consider hung (5 minutes)
+        self.watchdog_check_interval = config.get(
+            "watchdog_check_interval", 150
+        )  # how often to check (2.5 minutes)
+        self.restart_delay = config.get("restart_delay", 2)  # delay before restart
 
     def _update_health_ping(self):
         """Update the last health ping timestamp."""
@@ -692,13 +701,18 @@ class RetrievalService:
 
     def _watchdog_monitor(self):
         """Simple watchdog that restarts if service becomes unresponsive."""
-        self.logger.info("Starting hang detection watchdog")
+        self.logger.info(
+            f"Starting hang detection watchdog "
+            f"(timeout: {self.hang_detection_timeout}s, check interval: {self.watchdog_check_interval}s)"
+        )
 
         while not self._shutdown_event.is_set():
             try:
-                # Check if we haven't received any health pings recently (60 seconds)
-                if time.time() - self.last_health_ping > 60:
-                    self.logger.error("Service appears hung - restarting...")
+                # Check if we haven't received any health pings recently
+                if time.time() - self.last_health_ping > self.hang_detection_timeout:
+                    self.logger.error(
+                        f"Service appears hung - no activity for {self.hang_detection_timeout}s, restarting..."
+                    )
                     self._restart_service()
                     break
 
@@ -708,8 +722,8 @@ class RetrievalService:
                     self._restart_service()
                     break
 
-                # Check every 30 seconds
-                self._shutdown_event.wait(30)
+                # Check at configured interval
+                self._shutdown_event.wait(self.watchdog_check_interval)
 
             except Exception as e:
                 self.logger.error(f"Error in watchdog: {e}")
@@ -717,15 +731,17 @@ class RetrievalService:
 
     def _restart_service(self):
         """Restart the service."""
-        self.logger.info("Restarting service...")
+        self.logger.info(
+            f"Restarting service (restart delay: {self.restart_delay}s)..."
+        )
         try:
             # Stop current service
             if self.server:
                 self.server.shutdown()
                 self.server.server_close()
 
-            # Wait a moment
-            time.sleep(2)
+            # Wait configured delay before restart
+            time.sleep(self.restart_delay)
 
             # Start new service
             self._start_server()

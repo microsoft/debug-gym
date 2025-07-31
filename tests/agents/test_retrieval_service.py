@@ -541,6 +541,7 @@ class TestRetrievalServiceHandler:
         handler = RetrievalServiceHandler.__new__(RetrievalServiceHandler)
         handler.retrieval_manager = retrieval_manager
         handler.logger = MagicMock()
+        handler.service = None  # Set service attribute (used by hang detection)
         handler.send_response = MagicMock()
         handler.send_error = MagicMock()
         handler.send_header = MagicMock()
@@ -688,7 +689,14 @@ class TestRetrievalServiceHandler:
             with patch.object(handler, "safe_write_response") as mock_write:
                 handler.do_GET()
 
-                mock_write.assert_called_once_with({"status": "healthy"})
+                # Check that the response was called once
+                mock_write.assert_called_once()
+                # Get the actual call arguments
+                call_args = mock_write.call_args[0][0]
+                # Check that status is healthy and timestamp is present
+                assert call_args["status"] == "healthy"
+                assert "timestamp" in call_args
+                assert isinstance(call_args["timestamp"], (int, float))
 
     def test_do_get_indexes(self):
         """Test GET /indexes endpoint."""
