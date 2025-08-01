@@ -392,9 +392,9 @@ def test_llm_with_reasoning_content(mock_llm_config, mock_openai, logger_mock):
     messages = [{"role": "user", "content": "Test with reasoning"}]
     llm_response = llm(messages, tools)
 
-    # The response should combine both content and reasoning_content
-    expected_response = "Regular response\nLet me think about this step by step..."
-    assert llm_response.response == expected_response
+    # The response should be the regular content, reasoning should be separate
+    assert llm_response.response == "Regular response"
+    assert llm_response.reasoning_response == "Let me think about this step by step..."
     assert llm_response.prompt == messages
     assert llm_response.tool == ToolCall(
         id="test_id", name="test_tool", arguments={"arg1": "test"}
@@ -443,8 +443,9 @@ def test_llm_with_only_reasoning_content(mock_llm_config, mock_openai, logger_mo
     messages = [{"role": "user", "content": "Test reasoning only"}]
     llm_response = llm(messages, tools)
 
-    # The response should be just the reasoning content
-    assert llm_response.response == "Reasoning only response"
+    # The response should be empty content, reasoning should be in reasoning_response
+    assert llm_response.response == ""
+    assert llm_response.reasoning_response == "Reasoning only response"
 
 
 @patch("openai.resources.chat.completions.Completions.create")
