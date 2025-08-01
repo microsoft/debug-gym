@@ -5,9 +5,18 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from debug_gym.agents.rag_agent import RAGAgent
+try:
+    from debug_gym.agents.rag_agent import RAGAgent
+
+    RETRIEVAL_SERVICE_AVAILABLE = True
+except ImportError:
+    RAGAgent = None
+    RETRIEVAL_SERVICE_AVAILABLE = False
 
 
+@pytest.mark.skipif(
+    not RETRIEVAL_SERVICE_AVAILABLE, reason="Retrieval service not available"
+)
 class TestRAGAgentIntegration:
     """Simplified integration tests for the RAGAgent class using retrieval service."""
 

@@ -9,11 +9,11 @@ from debug_gym.gym.utils import filter_non_utf8
 # Import from standalone retrieval service
 try:
     from retrieval_service.client import RetrievalServiceClient
+
+    RETRIEVAL_SERVICE_AVAILABLE = True
 except ImportError:
-    raise ImportError(
-        "The standalone retrieval service is required for RAG functionality. "
-        "Please install it by running: pip install retrieval-service"
-    )
+    RetrievalServiceClient = None
+    RETRIEVAL_SERVICE_AVAILABLE = False
 
 
 @register_agent
@@ -46,6 +46,13 @@ class RAGAgent(DebugAgent):
         llm=None,
         logger=None,
     ):
+        # Check if retrieval service is available before proceeding
+        if not RETRIEVAL_SERVICE_AVAILABLE:
+            raise ImportError(
+                "The standalone retrieval service is required for RAG functionality. "
+                "Please install it by running: pip install retrieval-service"
+            )
+
         super().__init__(config, env, llm, logger)
 
         # Initialize configuration parameters

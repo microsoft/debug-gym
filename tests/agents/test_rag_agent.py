@@ -6,12 +6,22 @@ from unittest.mock import MagicMock, Mock, patch
 import numpy as np
 import pytest
 
-from debug_gym.agents.rag_agent import RAGAgent
+try:
+    from debug_gym.agents.rag_agent import RAGAgent
+
+    RETRIEVAL_SERVICE_AVAILABLE = True
+except ImportError:
+    RAGAgent = None
+    RETRIEVAL_SERVICE_AVAILABLE = False
+
 from debug_gym.gym.entities import Observation
 from debug_gym.gym.envs.env import EnvInfo
 from debug_gym.gym.tools.tool import ToolCall
 
 
+@pytest.mark.skipif(
+    not RETRIEVAL_SERVICE_AVAILABLE, reason="Retrieval service not available"
+)
 class TestRAGAgent:
     """Test cases for the RAGAgent class."""
 
