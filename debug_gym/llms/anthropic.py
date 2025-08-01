@@ -141,7 +141,7 @@ class AnthropicLLM(LLM):
                 {
                     "role": "user",
                     "content": filter_non_utf8(
-                        f"{history_info.step_observation.observation}"
+                        history_info.step_observation.observation
                     ),
                 }
             )
@@ -155,7 +155,7 @@ class AnthropicLLM(LLM):
                             "type": "tool_result",
                             "tool_use_id": history_info.action.id,  # 'toolu_01SdR84CsnTKRpdH4zwFjvGj'
                             "content": filter_non_utf8(
-                                f"{history_info.step_observation.observation}"
+                                history_info.step_observation.observation
                             ),  # 'Viewing `hangman_test.py`. The file is read-only, it is not editable.'
                         }
                     ],

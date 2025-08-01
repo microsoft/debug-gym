@@ -1,5 +1,9 @@
+import json
 import logging
 import multiprocessing as mp
+import queue
+from dataclasses import asdict
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -11,7 +15,10 @@ from debug_gym.logger import (
     StripAnsiFormatter,
     TaskProgress,
     TaskProgressManager,
+    load_previous_run_status,
+    log_file_path,
     log_with_color,
+    status_json_path,
 )
 
 
@@ -26,6 +33,12 @@ def DebugGymLoggerTest():
         _is_worker = False
 
     yield TestDebugGymLogger
+
+
+@pytest.fixture
+def debug_gym_loogger(tmp_path, DebugGymLoggerTest):
+    logger = DebugGymLoggerTest("test_logger", log_dir=str(tmp_path))
+    yield logger
 
 
 def test_task_progress_pending_status():
@@ -133,6 +146,33 @@ def test_status_column_render():
         column.render(unknown_task)
 
 
+def test_task_log_file_path(tmp_path):
+    log_dir = tmp_path / "logs"
+    task = TaskProgress(
+        problem_id="test_task",
+        step=0,
+        total_steps=10,
+        score=0,
+        max_score=100,
+        status="pending",
+        logdir=str(log_dir),
+    )
+    expected_path = str(log_dir / "test_task.log")
+    assert task.log_file_path == expected_path
+
+
+def test_task_log_file_path_empty_dir():
+    task = TaskProgress(
+        problem_id="test_task",
+        step=0,
+        total_steps=10,
+        score=0,
+        max_score=100,
+        status="pending",
+    )
+    assert task.log_file_path == ""
+
+
 def test_strip_ansi_formatter():
     # Test that the StripAnsiFormatter removes ANSI color codes
     formatter = StripAnsiFormatter("%(message)s")
@@ -152,10 +192,10 @@ def test_strip_ansi_formatter():
     assert result == "Red text"
 
 
-def test_task_progress_manager_initialization():
+def test_task_progress_manager_initialization(debug_gym_loogger):
     # Test that TaskProgressManager initializes correctly
     problems = ["problem1", "problem2"]
-    manager = TaskProgressManager(problems)
+    manager = TaskProgressManager(problems, logger=debug_gym_loogger)
 
     # Check that tasks were added for each problem
     assert len(manager._tasks) == 2
@@ -168,10 +208,10 @@ def test_task_progress_manager_initialization():
     assert "problem2" in manager._progress_task_ids
 
 
-def test_task_progress_manager_advance():
+def test_task_progress_manager_advance(debug_gym_loogger):
     # Test that TaskProgressManager.advance updates task state correctly
     problems = ["problem1"]
-    manager = TaskProgressManager(problems)
+    manager = TaskProgressManager(problems, logger=debug_gym_loogger)
 
     # Initial state
     assert manager._tasks["problem1"].step == 0
@@ -203,10 +243,10 @@ def test_task_progress_manager_advance():
         assert kwargs["status"] == "running"
 
 
-def test_group_tasks_by_status_basic():
+def test_group_tasks_by_status_basic(debug_gym_loogger):
     # Test that group_tasks_by_status groups tasks correctly by their status
     problems = ["p1", "p2", "p3", "p4"]
-    manager = TaskProgressManager(problems)
+    manager = TaskProgressManager(problems, logger=debug_gym_loogger)
     # Set up tasks with different statuses
     updates = [
         TaskProgress("p1", 1, 10, 10, 100, "resolved"),
@@ -227,10 +267,10 @@ def test_group_tasks_by_status_basic():
             assert grouped[status] == []
 
 
-def test_group_tasks_by_status_with_unknown_status():
+def test_group_tasks_by_status_with_unknown_status(debug_gym_loogger):
     # Test that a task with an unknown status is grouped under "pending"
     problems = ["p1"]
-    manager = TaskProgressManager(problems)
+    manager = TaskProgressManager(problems, logger=debug_gym_loogger)
     # Manually set an unknown status
     manager._tasks["p1"].status = "not-a-status"
     grouped = manager.group_tasks_by_status()
@@ -262,10 +302,10 @@ def test_group_tasks_by_status_multiple_tasks_same_status():
             assert grouped[status] == []
 
 
-def test_task_progress_manager_get_task_stats():
+def test_task_progress_manager_get_task_stats(debug_gym_loogger):
     # Test that TaskProgressManager.get_task_stats returns correct stats
     problems = ["p1", "p2", "p3", "p4", "p5", "p6", "p7", "p8"]
-    manager = TaskProgressManager(problems, max_display=5)
+    manager = TaskProgressManager(problems, max_display=5, logger=debug_gym_loogger)
 
     # Set up tasks with different statuses
     updates = [
@@ -345,25 +385,24 @@ def test_log_with_color_escapes_special_characters():
     )
 
 
-def test_debuggymlogger_log_queue_worker(DebugGymLoggerTest):
+def test_debuggymlogger_log_queue_worker(DebugGymLoggerTest, tmp_path):
     DebugGymLoggerTest.set_as_worker()
-    logger = DebugGymLoggerTest("test_worker_logger")
-    # Clear the queue before test
-    while not DebugGymLoggerTest.LOG_QUEUE.empty():
-        DebugGymLoggerTest.LOG_QUEUE.get_nowait()
+    logger = DebugGymLoggerTest("test_worker_logger", log_dir=str(tmp_path))
     logger.info("Worker log message")
     # Should be in LOG_QUEUE
-    record = DebugGymLoggerTest.LOG_QUEUE.get(timeout=1)
-    assert record.msg == "Worker log message"
+    try:
+        records = []
+        while True:
+            records.append(DebugGymLoggerTest.LOG_QUEUE.get(timeout=1))
+    except (TimeoutError, queue.Empty):
+        pass
+    assert "Worker log message" in [r.msg for r in records]
 
 
-def test_debuggymlogger_report_progress(DebugGymLoggerTest):
-    logger = DebugGymLoggerTest("test_progress_logger")
-    # Clear the queue before test
-    while not DebugGymLoggerTest.PROGRESS_QUEUE.empty():
-        DebugGymLoggerTest.PROGRESS_QUEUE.get_nowait()
+def test_debuggymlogger_report_progress(DebugGymLoggerTest, tmp_path):
+    logger = DebugGymLoggerTest("test_progress_logger", log_dir=str(tmp_path))
     logger.report_progress(
-        problem_id="prob1",
+        problem_id="problem1",
         step=1,
         total_steps=10,
         score=5,
@@ -371,27 +410,123 @@ def test_debuggymlogger_report_progress(DebugGymLoggerTest):
         status="running",
     )
     progress = DebugGymLoggerTest.PROGRESS_QUEUE.get(timeout=1)
-    assert progress.problem_id == "prob1"
+    assert progress.problem_id == "problem1"
     assert progress.step == 1
     assert progress.status == "running"
 
 
-def test_debuggymlogger_set_as_worker_resets(DebugGymLoggerTest):
-    logger = DebugGymLoggerTest("test_reset_logger")
-    assert not DebugGymLoggerTest._is_worker
-    assert not logger._is_worker
+def test_debuggymlogger_set_as_worker_resets(DebugGymLoggerTest, tmp_path):
+    logger = DebugGymLoggerTest("test_reset_logger", log_dir=str(tmp_path))
+    assert DebugGymLoggerTest.is_main()
+    assert logger.is_main()
     # Set as worker
     DebugGymLoggerTest.set_as_worker()
-    assert DebugGymLoggerTest._is_worker
-    assert logger._is_worker
-    another_logger = DebugGymLoggerTest("test_reset_logger")
-    assert another_logger._is_worker
+    assert DebugGymLoggerTest.is_worker()
+    assert logger.is_worker()
+    another_logger = DebugGymLoggerTest("test_reset_logger", log_dir=str(tmp_path))
+    assert another_logger.is_worker()
 
 
-def test_debuggymlogger_rich_progress_raises_in_worker(DebugGymLoggerTest):
+def test_debuggymlogger_rich_progress_raises_in_worker(DebugGymLoggerTest, tmp_path):
     DebugGymLoggerTest.set_as_worker()
-    logger = DebugGymLoggerTest("test_rich_progress_logger")
+    logger = DebugGymLoggerTest("test_rich_progress_logger", log_dir=str(tmp_path))
     with pytest.raises(RuntimeError):
         with logger.rich_progress(["p1", "p2"]):
             pass
-    DebugGymLoggerTest._is_worker = False
+
+
+def test_log_file_path_absolute(tmp_path):
+    log_dir = tmp_path / "logs"
+    log_dir.mkdir()
+    problem_id = "problem1"
+    result = log_file_path(log_dir, problem_id)
+    assert result == (log_dir / "problem1.log").absolute()
+    assert result.is_absolute()
+
+
+def test_log_file_path_relative(tmp_path, monkeypatch):
+    log_dir = tmp_path / "logs"
+    log_dir.mkdir()
+    problem_id = "problem2"
+    # Change cwd to tmp_path for relative path calculation
+    monkeypatch.chdir(tmp_path)
+    result = log_file_path(log_dir, problem_id, relative=True)
+    assert result == Path("logs") / "problem2.log"
+
+
+def test_log_file_path_relative_outside_cwd(tmp_path):
+    log_dir = tmp_path / "logs"
+    log_dir.mkdir()
+    problem_id = "prob5"
+    result = log_file_path(log_dir, problem_id, relative=True)
+    assert result == log_dir / "prob5.log"
+
+
+def test_dump_task_status_creates_json_file(tmp_path, debug_gym_loogger):
+    logdir = tmp_path / "logdir"
+    logdir.mkdir()
+    problems = ["problem1", "problem2"]
+    manager = TaskProgressManager(problems, logger=debug_gym_loogger)
+
+    task = TaskProgress(
+        problem_id="problem1",
+        step=3,
+        total_steps=10,
+        score=7,
+        max_score=10,
+        status="unresolved",
+        logdir=str(logdir),
+    )
+    # Should create problem1_status.json in logdir
+    manager.dump_task_status(task)
+    status_path = status_json_path(logdir, "problem1")
+    assert status_path.exists()
+    # Check contents
+    with open(status_path, "r") as f:
+        data = json.load(f)
+    assert data["problem_id"] == "problem1"
+    assert data["step"] == 3
+    assert data["status"] == "unresolved"
+    assert data["logdir"] == str(logdir)
+
+    assert data == asdict(task)
+
+
+def test_status_json_path(tmp_path):
+    log_dir = tmp_path / "logs"
+    log_dir.mkdir()
+    problem_id = "problem1"
+    expected = log_dir / "problem1_status.json"
+    result = status_json_path(log_dir, problem_id)
+    assert result == expected
+
+    problem_id = "problem2"
+    result = load_previous_run_status(str(log_dir), problem_id)
+    assert result is None
+
+
+def test_load_previous_run_status_loads_taskprogress(tmp_path):
+    log_dir = tmp_path / "logs"
+    log_dir.mkdir()
+    problem_id = "problem1"
+    status_path = status_json_path(log_dir, problem_id)
+    data = {
+        "problem_id": problem_id,
+        "step": 2,
+        "total_steps": 5,
+        "score": 10,
+        "max_score": 20,
+        "status": "running",
+        "logdir": str(log_dir),
+    }
+    with open(status_path, "w") as f:
+        json.dump(data, f)
+    result = load_previous_run_status(str(log_dir), problem_id)
+    assert isinstance(result, TaskProgress)
+    assert result.problem_id == problem_id
+    assert result.step == 2
+    assert result.total_steps == 5
+    assert result.score == 10
+    assert result.max_score == 20
+    assert result.status == "running"
+    assert result.logdir == str(log_dir)
