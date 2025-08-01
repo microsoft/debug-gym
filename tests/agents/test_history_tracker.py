@@ -25,48 +25,57 @@ def test_history_tracker(build_env_info):
     tool_3 = ToolCall(id="3", name="action3", arguments={})
     tool_4 = ToolCall(id="4", name="action4", arguments={"a4_args": "a4_args"})
     tool_5 = ToolCall(id="5", name="action5", arguments={})
-    action_reasoning_2 = "response_2_1"
-    action_reasoning_3 = "response_3_2"
-    action_reasoning_4 = "response_4_1"
-    action_reasoning_5 = "response_5_2"
+    action_content_2 = "content_2_1"
+    action_content_3 = "content_3_2"
+    action_content_4 = "content_4_1"
+    action_content_5 = "content_5_2"
+    action_reasoning_2 = "reasoning_2_1"
+    action_reasoning_3 = "reasoning_3_2"
+    action_reasoning_4 = "reasoning_4_1"
+    action_reasoning_5 = "reasoning_5_2"
     env_info_1 = build_env_info(
         step_observation="obs1",
-        action=None,
+        action_tool_call=None,
         action_reasoning=None,
+        action_content=None,
         score=1,
         rewrite_counter=0,
     )
     env_info_2 = build_env_info(
         step_observation="obs2",
-        action=tool_2,
+        action_tool_call=tool_2,
         action_reasoning=action_reasoning_2,
+        action_content=action_content_2,
         score=2,
         rewrite_counter=0,
     )
     env_info_3 = build_env_info(
         step_observation="obs3",
-        action=tool_3,
+        action_tool_call=tool_3,
         action_reasoning=action_reasoning_3,
+        action_content=action_content_3,
         score=3,
         rewrite_counter=1,
     )
     env_info_4 = build_env_info(
         step_observation="obs4",
-        action=tool_4,
+        action_tool_call=tool_4,
         action_reasoning=action_reasoning_4,
+        action_content=action_content_4,
         score=4,
         rewrite_counter=1,
     )
     env_info_5 = build_env_info(
         step_observation="obs5",
-        action=tool_5,
+        action_tool_call=tool_5,
         action_reasoning=action_reasoning_5,
+        action_content=action_content_5,
         score=5,
         rewrite_counter=2,
     )
 
     # single prompt format
-    llm_response_2 = LLMResponse("prompt_2_1", "response_2_1", tool_2)
+    llm_response_2 = LLMResponse("prompt_2_1", "response_2_1", tool=tool_2)
     # list of messages format
     llm_response_3 = LLMResponse(
         prompt=[
@@ -74,17 +83,25 @@ def test_history_tracker(build_env_info):
             {"role": "assistent", "content": "response_3_1"},
             {"role": "user", "content": "prompt_3_2"},
         ],
-        response="response_3_2",
+        response="content_3_2",
+        reasoning_response="reasoning_3_2",
         tool=tool_3,
     )
-    llm_response_4 = LLMResponse("prompt_4_1", "response_4_1", tool_4, 4321, 1234)
+    llm_response_4 = LLMResponse(
+        "prompt_4_1",
+        "response_4_1",
+        tool=tool_4,
+        prompt_token_count=4321,
+        response_token_count=1234,
+    )
     llm_response_5 = LLMResponse(
         prompt=[
             {"role": "user", "content": "prompt_5_1"},
             {"role": "assistent", "content": "response_5_1"},
             {"role": "user", "content": "prompt_5_2"},
         ],
-        response="response_5_2",
+        response="content_5_2",
+        reasoning_response="reasoning_5_2",
         tool=tool_5,
     )
 
@@ -108,6 +125,7 @@ def test_history_tracker(build_env_info):
     assert ht.json() == {
         "step_id": 4,
         "reasoning": action_reasoning_5,
+        "content": action_content_5,
         "action": {"id": "5", "name": "action5", "arguments": {}},
         "obs": "obs5",
         "rewrite_consumed": 2,
@@ -118,7 +136,8 @@ def test_history_tracker(build_env_info):
                     {"role": "assistent", "content": "response_5_1"},
                     {"role": "user", "content": "prompt_5_2"},
                 ],
-                "response": "response_5_2",
+                "response": "content_5_2",
+                "reasoning_response": "reasoning_5_2",
                 "tool": {"id": "5", "name": "action5", "arguments": {}},
             }
         ],
@@ -128,6 +147,7 @@ def test_history_tracker(build_env_info):
     assert ht.json(2) == {
         "step_id": 2,
         "reasoning": action_reasoning_3,
+        "content": action_content_3,
         "action": {"id": "3", "name": "action3", "arguments": {}},
         "obs": "obs3",
         "rewrite_consumed": 1,
@@ -138,7 +158,8 @@ def test_history_tracker(build_env_info):
                     {"role": "assistent", "content": "response_3_1"},
                     {"role": "user", "content": "prompt_3_2"},
                 ],
-                "response": "response_3_2",
+                "response": "content_3_2",
+                "reasoning_response": "reasoning_3_2",
                 "tool": {"id": "3", "name": "action3", "arguments": {}},
             }
         ],
@@ -148,6 +169,7 @@ def test_history_tracker(build_env_info):
     assert ht.json(3) == {
         "step_id": 3,
         "reasoning": action_reasoning_4,
+        "content": action_content_4,
         "action": {"id": "4", "name": "action4", "arguments": {"a4_args": "a4_args"}},
         "obs": "obs4",
         "prompt_response_pairs": [
@@ -169,6 +191,7 @@ def test_history_tracker(build_env_info):
     assert ht.json(0) == {
         "step_id": 0,
         "reasoning": None,
+        "content": None,
         "action": None,
         "obs": "obs1",
         "prompt_response_pairs": None,
@@ -230,8 +253,9 @@ def test_build_history_prompt(mock_llm_config, build_env_info):
     # prepare some data
     env_info_1 = build_env_info(
         step_observation="obs1",
-        action=None,
+        action_tool_call=None,
         action_reasoning=None,
+        action_content=None,
         score=1,
         rewrite_counter=0,
     )
@@ -243,7 +267,8 @@ def test_build_history_prompt(mock_llm_config, build_env_info):
     env_info_2 = build_env_info(
         step_observation="obs2",
         action_reasoning="response_1",
-        action=action_1,
+        action_content="response_1",
+        action_tool_call=action_1,
         score=2,
         rewrite_counter=0,
     )
@@ -255,7 +280,8 @@ def test_build_history_prompt(mock_llm_config, build_env_info):
     env_info_3 = build_env_info(
         step_observation="obs3",
         action_reasoning="response_2",
-        action=action_2,
+        action_content="response_2",
+        action_tool_call=action_2,
         score=3,
         rewrite_counter=0,
     )
@@ -267,7 +293,8 @@ def test_build_history_prompt(mock_llm_config, build_env_info):
     env_info_4 = build_env_info(
         step_observation="obs4",
         action_reasoning="response_3",
-        action=action_3,
+        action_content="response_3",
+        action_tool_call=action_3,
         score=4,
         rewrite_counter=1,
     )
@@ -279,7 +306,8 @@ def test_build_history_prompt(mock_llm_config, build_env_info):
     env_info_5 = build_env_info(
         step_observation="obs5",
         action_reasoning="response_4",
-        action=action_4,
+        action_content="response_4",
+        action_tool_call=action_4,
         score=5,
         rewrite_counter=1,
     )

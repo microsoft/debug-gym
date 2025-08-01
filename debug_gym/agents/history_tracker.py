@@ -47,6 +47,7 @@ class HistoryTracker:
             json_out = {
                 "step_id": game_step,
                 "reasoning": None,
+                "content": None,
                 "action": None,  # env reset
                 "obs": self.memory[0].step_observation.observation,
                 "rewrite_consumed": 0,
@@ -55,8 +56,9 @@ class HistoryTracker:
         else:
             json_out = {
                 "step_id": game_step,
+                "content": self.memory[game_step].action_content,
                 "reasoning": self.memory[game_step].action_reasoning,
-                "action": asdict(self.memory[game_step].action),
+                "action": asdict(self.memory[game_step].action_tool_call),
                 "obs": self.memory[game_step].step_observation.observation,
                 "rewrite_consumed": self.memory[game_step].rewrite_counter,
             }

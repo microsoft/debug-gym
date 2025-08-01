@@ -158,23 +158,30 @@ class OpenAILLM(LLM):
     ) -> list[dict]:
         _messages = []
         if isinstance(response, list) and len(response) > 0:
-            _messages.append(
-                {
-                    "role": "assistant",
-                    "tool_calls": [
-                        {
-                            "type": "function",
-                            "id": response[0].tool.id,
-                            "function": {
-                                "name": response[0].tool.name,
-                                "arguments": json.dumps(response[0].tool.arguments),
-                            },
+            _response = {
+                "role": "assistant",
+                "tool_calls": [
+                    {
+                        "type": "function",
+                        "id": response[0].tool.id,
+                        "function": {
+                            "name": response[0].tool.name,
+                            "arguments": json.dumps(response[0].tool.arguments),
                         },
-                    ],
-                    "content": filter_non_utf8(response[0].response),
-                }
-            )
-        if history_info.action is None:
+                    },
+                ],
+                "content": filter_non_utf8(f"{response[0].response}"),
+            }
+            if response[0].reasoning_response:
+                _response["reasoning_content"] = filter_non_utf8(
+                    f"{response[0].reasoning_response}"
+                )
+            _messages.append(_response)
+        if (
+            history_info.action_tool_call is None
+            and history_info.action_content is None
+            and history_info.action_reasoning is None
+        ):
             # This is the initial state, no action taken yet
             _messages.append(
                 {
@@ -189,8 +196,8 @@ class OpenAILLM(LLM):
             _messages.append(
                 {
                     "role": "tool",
-                    "tool_call_id": history_info.action.id,
-                    "name": history_info.action.name,
+                    "tool_call_id": history_info.action_tool_call.id,
+                    "name": history_info.action_tool_call.name,
                     "content": filter_non_utf8(
                         history_info.step_observation.observation
                     ),
@@ -234,9 +241,19 @@ class OpenAILLM(LLM):
             tool_call = response.choices[0].message.tool_calls[0]
             assert tool_call.type == "function"
 
+        # In openai call, the content is in response.choices[0].message.content
+        # In some models hosted on vllm, e.g., qwen-3, there could be content in both (when reasoning is enabled)
+        # response.choices[0].message.content and response.choices[0].message.reasoning_content
+        # https://qwen.readthedocs.io/en/latest/deployment/vllm.html#parsing-thinking-content
+        _content = response.choices[0].message.content
+        _reasoning_content = None
+        if hasattr(response.choices[0].message, "reasoning_content"):
+            _reasoning_content = response.choices[0].message.reasoning_content
+
         llm_response = LLMResponse(
             prompt=messages,
-            response=response.choices[0].message.content,
+            response=_content,
+            reasoning_response=_reasoning_content,
             tool=self.parse_tool_call_response(tool_call),
             prompt_token_count=response.usage.prompt_tokens,
             response_token_count=response.usage.completion_tokens,

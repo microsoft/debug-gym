@@ -42,7 +42,7 @@ class AgentSolution(BaseAgent):
             )
             # Make a simple pdb call to make sure it is working.
             action = ToolCall(name="pdb", id="pdb", arguments={"command": "help help"})
-            pdb_help_info = self.env.step(action, "")
+            pdb_help_info = self.env.step(action, None, None)
             assert "h(elp)" in pdb_help_info.step_observation.observation, (
                 "PDB command did not return expected help message.\n"
                 f"{pdb_help_info.step_observation.observation}"
@@ -50,7 +50,7 @@ class AgentSolution(BaseAgent):
 
             # Send a pdb continue command, and check the output matches the one from env.reset.
             action = ToolCall(name="pdb", id="pdb", arguments={"command": "continue"})
-            pdb_continue_info = self.env.step(action, "")
+            pdb_continue_info = self.env.step(action, None, None)
 
             assert (
                 "Reached the end of the program. Restarting the debugging session."
@@ -69,7 +69,7 @@ class AgentSolution(BaseAgent):
                 breakpoint()
 
             action = ToolCall(name="eval", id="eval", arguments={})
-            info = self.env.step(action, "")
+            info = self.env.step(action, None, None)
 
             self.history.step(info)
 

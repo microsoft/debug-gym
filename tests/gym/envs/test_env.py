@@ -252,7 +252,9 @@ def test_display_files_read_only(env):
 @patch.object(RepoEnv, "has_tool", return_value=False)
 @patch.object(RepoEnv, "eval")
 @patch.object(RepoEnv, "display_files")
+@patch.object(RepoEnv, "setup_workspace")
 def test_step(
+    mock_setup_workspace,
     mock_display_files,
     mock_eval,
     mock_has_tool,
@@ -269,15 +271,15 @@ def test_step(
 
     env = RepoEnv(path=".")
     env.last_eval = EvalOutput(success=False, output="1 failed, 0 passed")
+    tool_call = ToolCall(id="123", name="pdb", arguments={"command": "b 10"})
     mock_get_triggered_tools.return_value = None, [mock_pdb_tool, {"command": "b 10"}]
     infos = env.step(
-        {"id": "123", "name": "pdb", "arguments": {"command": "b 10"}},
+        tool_call,
         "let me set a breakpoint at line 10",
+        "some reasoning",
     )
 
-    mock_get_triggered_tools.assert_called_once_with(
-        {"id": "123", "name": "pdb", "arguments": {"command": "b 10"}}
-    )
+    mock_get_triggered_tools.assert_called_once_with(tool_call)
     mock_pdb_tool.assert_called_once_with(env, command="b 10")
     assert infos.step_observation == observation
     assert infos.score == 0
@@ -334,7 +336,8 @@ def test_reset(
   |-- subfile1.txt""",
         current_breakpoints="No breakpoints are set.",
         action_reasoning=None,
-        action=None,
+        action_content=None,
+        action_tool_call=None,
         instructions="",
         score=0,
         max_score=1,

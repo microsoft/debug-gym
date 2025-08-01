@@ -55,7 +55,7 @@ def llm_class_mock():
             return response
 
         def format_tool_call_history(self, history_info, response):
-            return [{"role": "role", "content": history_info.action}]
+            return [{"role": "role", "content": history_info.action_tool_call}]
 
     return LLMMock
 
@@ -96,8 +96,9 @@ def build_env_info():
         eval_observation="eval_observation",
         dir_tree="dir_tree",
         current_breakpoints="current_breakpoints",
-        action="action",
+        action_tool_call="action",
         action_reasoning="",
+        action_content="",
         instructions=None,
         score=5,
         max_score=10,
@@ -112,7 +113,8 @@ def build_env_info():
             dir_tree=dir_tree,
             current_breakpoints=current_breakpoints,
             action_reasoning=action_reasoning,
-            action=action,
+            action_content=action_content,
+            action_tool_call=action_tool_call,
             instructions=instructions if instructions is not None else {},
             score=score,
             max_score=max_score,

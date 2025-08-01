@@ -150,14 +150,16 @@ class TokenUsage:
 @dataclass
 class LLMResponse:
     prompt: list[dict] | str  # either a string or a list of messages.
-    response: str
+    response: str | None
+    reasoning_response: str | None
     tool: ToolCall
     token_usage: TokenUsage | None = None
 
     def __init__(
         self,
         prompt: list[dict] | str,
-        response: str,
+        response: str = None,
+        reasoning_response: str = None,
         tool: ToolCall = None,
         prompt_token_count: int = None,
         response_token_count: int = None,
@@ -165,6 +167,7 @@ class LLMResponse:
     ):
         self.prompt = prompt
         self.response = response
+        self.reasoning_response = reasoning_response
         self.tool = tool
         if prompt_token_count is not None and response_token_count is not None:
             self.token_usage = TokenUsage(prompt_token_count, response_token_count)
@@ -415,7 +418,8 @@ class LLM(ABC):
 
         print_messages(messages, self.logger)
         self.logger.info(
-            f"LLM response - reasoning: {llm_response.response}\n"
+            f"LLM response - reasoning: {llm_response.reasoning_response}\n"
+            f"LLM response - content: {llm_response.response}\n"
             f"LLM response - tool call: {llm_response.tool}"
         )
         return llm_response
