@@ -85,51 +85,35 @@ class GrepTool(EnvironmentTool):
                 )
                 files_searched = 1
             else:
-                # Search directory recursively
-                for root, dirs, files in os.walk(search_path):
-                    # Skip hidden directories and common build/cache directories
-                    dirs[:] = [
-                        d
-                        for d in dirs
-                        if not d.startswith(".")
-                        and d
-                        not in {
-                            "__pycache__",
-                            "node_modules",
-                            "tmp",
-                            ".git",
-                            ".venv",
-                            "venv",
-                            "build",
-                            "dist",
-                        }
-                    ]
+                # Search directory recursively using environment's file visibility rules
+                from debug_gym.gym.utils import _walk
 
-                    for file in files:
-                        if files_searched >= max_files:
-                            break
+                for file_path in _walk(
+                    search_path, depth=None, skip=environment._is_ignored_func
+                ):
+                    if files_searched >= max_files:
+                        break
 
-                        # Skip binary files and common non-text files
-                        if self._is_text_file(file):
-                            file_path = os.path.join(root, file)
-                            try:
-                                file_results = self._search_file(
-                                    file_path,
-                                    compiled_pattern,
-                                    line_numbers,
-                                    max_results - len(results),
-                                    environment,
-                                )
-                                results.extend(file_results)
-                                files_searched += 1
+                    # Only search files, not directories
+                    if file_path.is_file():
+                        try:
+                            file_results = self._search_file(
+                                str(file_path),
+                                compiled_pattern,
+                                line_numbers,
+                                max_results - len(results),
+                                environment,
+                            )
+                            results.extend(file_results)
+                            files_searched += 1
 
-                                if len(results) >= max_results:
-                                    break
-                            except Exception as e:
-                                # Skip files that can't be read
-                                continue
+                            if len(results) >= max_results:
+                                break
+                        except Exception as e:
+                            # Skip files that can't be read (binary files, permission errors, etc.)
+                            continue
 
-                    if files_searched >= max_files or len(results) >= max_results:
+                    if len(results) >= max_results:
                         break
 
         except Exception as e:
@@ -189,114 +173,8 @@ class GrepTool(EnvironmentTool):
                             clean_line = clean_line[:197] + "..."
 
                         results.append((file_path, line_num, clean_line))
-        except (UnicodeDecodeError, PermissionError):
-            # Skip files that can't be read as text
+        except (UnicodeDecodeError, PermissionError, IsADirectoryError, OSError):
+            # Skip files that can't be read as text (binary files, permission errors, etc.)
             pass
 
         return results
-
-    def _is_text_file(self, filename):
-        """Check if a file is likely to be a text file based on its extension."""
-        text_extensions = {
-            ".py",
-            ".js",
-            ".ts",
-            ".html",
-            ".css",
-            ".md",
-            ".txt",
-            ".json",
-            ".xml",
-            ".yaml",
-            ".yml",
-            ".sh",
-            ".bash",
-            ".zsh",
-            ".fish",
-            ".ps1",
-            ".bat",
-            ".cmd",
-            ".sql",
-            ".r",
-            ".R",
-            ".c",
-            ".cpp",
-            ".h",
-            ".hpp",
-            ".java",
-            ".go",
-            ".rs",
-            ".php",
-            ".rb",
-            ".pl",
-            ".scala",
-            ".swift",
-            ".kt",
-            ".dart",
-            ".lua",
-            ".vim",
-            ".emacs",
-            ".ini",
-            ".cfg",
-            ".conf",
-            ".log",
-            ".csv",
-            ".tsv",
-            ".rst",
-            ".tex",
-            ".latex",
-            ".bib",
-            ".dockerfile",
-            ".gitignore",
-            ".gitattributes",
-            ".editorconfig",
-            ".prettierrc",
-            ".eslintrc",
-            ".pylintrc",
-            ".toml",
-            ".lock",
-            ".requirements",
-            ".pipfile",
-            ".poetry",
-            ".gradle",
-            ".maven",
-            ".makefile",
-            ".cmake",
-            ".ninja",
-            ".gyp",
-            ".gn",
-            ".bzl",
-            ".bazel",
-            ".ant",
-        }
-
-        # Files without extension that are usually text
-        text_files = {
-            "README",
-            "LICENSE",
-            "CHANGELOG",
-            "CONTRIBUTING",
-            "INSTALL",
-            "NEWS",
-            "AUTHORS",
-            "COPYING",
-            "NOTICE",
-            "TODO",
-            "BUGS",
-            "MANIFEST",
-            "Makefile",
-            "Dockerfile",
-            "Vagrantfile",
-            "Gemfile",
-            "Rakefile",
-            "Procfile",
-        }
-
-        name = os.path.basename(filename)
-        _, ext = os.path.splitext(filename)
-
-        return (
-            ext.lower() in text_extensions
-            or name in text_files
-            or name.upper() in text_files
-        )
