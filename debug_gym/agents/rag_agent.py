@@ -4,8 +4,16 @@ import re
 
 from debug_gym.agents.base_agent import register_agent
 from debug_gym.agents.debug_agent import DebugAgent
-from debug_gym.agents.retrieval_service import RetrievalServiceClient
 from debug_gym.gym.utils import filter_non_utf8
+
+# Import from standalone retrieval service
+try:
+    from retrieval_service.client import RetrievalServiceClient
+except ImportError:
+    raise ImportError(
+        "The standalone retrieval service is required for RAG functionality. "
+        "Please install it by running: pip install retrieval-service"
+    )
 
 
 @register_agent
@@ -218,51 +226,48 @@ class RAGAgent(DebugAgent):
         history = history[-step:]
         if len(history) == 0:
             return None
-        match method:
-            case "observation":
-                observation_list = [
-                    item.step_observation.observation for item in history
-                ]
-                if not observation_list:
-                    return None
-                query_text = self.delimiter.join(observation_list)
-            case "tool_name":
-                tool_name_list = [item.action.name for item in history if item.action]
-                if not tool_name_list:
-                    return None
-                query_text = self.delimiter.join(tool_name_list)
-            case "tool_call":
-                tool_call_list = [
-                    json.dumps(
-                        {"name": item.action.name, "arguments": item.action.arguments}
-                    )
-                    for item in history
-                    if item.action
-                ]
-                if not tool_call_list:
-                    return None
-                query_text = self.delimiter.join(tool_call_list)
-            case "tool_call_with_reasoning":
-                tool_call_with_reasoning_list = []
-                for item in history:
-                    _tmp = {}
-                    if item.action:
-                        _tmp["tool_calls"] = {
-                            "name": item.action.name,
-                            "arguments": item.action.arguments,
-                        }
-                    if item.action_reasoning:
-                        _tmp["content"] = item.action_reasoning
-                    if not _tmp:
-                        continue
-                    tool_call_with_reasoning_list.append(json.dumps(_tmp))
-                if not tool_call_with_reasoning_list:
-                    return None
-                query_text = self.delimiter.join(tool_call_with_reasoning_list)
-            case _:
-                raise ValueError(
-                    f"Invalid rag_indexing_method: {method}. Supported methods: observation, tool_name, tool_call, tool_call_with_reasoning"
+        if method == "observation":
+            observation_list = [item.step_observation.observation for item in history]
+            if not observation_list:
+                return None
+            query_text = self.delimiter.join(observation_list)
+        elif method == "tool_name":
+            tool_name_list = [item.action.name for item in history if item.action]
+            if not tool_name_list:
+                return None
+            query_text = self.delimiter.join(tool_name_list)
+        elif method == "tool_call":
+            tool_call_list = [
+                json.dumps(
+                    {"name": item.action.name, "arguments": item.action.arguments}
                 )
+                for item in history
+                if item.action
+            ]
+            if not tool_call_list:
+                return None
+            query_text = self.delimiter.join(tool_call_list)
+        elif method == "tool_call_with_reasoning":
+            tool_call_with_reasoning_list = []
+            for item in history:
+                _tmp = {}
+                if item.action:
+                    _tmp["tool_calls"] = {
+                        "name": item.action.name,
+                        "arguments": item.action.arguments,
+                    }
+                if item.action_reasoning:
+                    _tmp["content"] = item.action_reasoning
+                if not _tmp:
+                    continue
+                tool_call_with_reasoning_list.append(json.dumps(_tmp))
+            if not tool_call_with_reasoning_list:
+                return None
+            query_text = self.delimiter.join(tool_call_with_reasoning_list)
+        else:
+            raise ValueError(
+                f"Invalid rag_indexing_method: {method}. Supported methods: observation, tool_name, tool_call, tool_call_with_reasoning"
+            )
         return filter_non_utf8(query_text)
 
     def build_question_prompt(self):

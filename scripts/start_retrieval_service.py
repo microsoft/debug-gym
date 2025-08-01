@@ -1,13 +1,80 @@
 #!/usr/bin/env python3
 """
-Script to start the retrieval service with hang detection support.
+Script to start the standalone retrieval service.
+
+Note: This script is deprecated. The retrieval service has been moved to a standalone package.
+Please use the standalone retrieval service instead:
+
+1. Install: pip install retrieval-service
+2. Start: python -m retrieval_service.quick_start --port 8766
+
+Or use the standalone service directly from the retrieval_service repository.
 """
 
 import argparse
+import subprocess
+import sys
 
-import yaml
 
-from debug_gym.agents.retrieval_service import start_retrieval_service_standalone
+def main():
+    parser = argparse.ArgumentParser(
+        description="Start standalone retrieval service (deprecated script)"
+    )
+    parser.add_argument("--port", type=int, default=8766, help="Port to run on")
+    parser.add_argument("--config", help="Path to config file")
+    parser.add_argument(
+        "--no-hang-detection",
+        action="store_true",
+        help="Disable hang detection and auto-restart",
+    )
+
+    args = parser.parse_args()
+
+    print("=" * 80)
+    print("DEPRECATION WARNING:")
+    print("This script is deprecated. The retrieval service has been moved to a")
+    print("standalone package for better modularity and maintainability.")
+    print()
+    print("Please use the standalone retrieval service instead:")
+    print("1. Install: pip install retrieval-service")
+    print("2. Or clone: git clone <retrieval-service-repo>")
+    print("3. Start: python quick_start.py --port", args.port)
+    if args.config:
+        print(f"   With config: python quick_start.py --config {args.config}")
+    if args.no_hang_detection:
+        print("   Without hang detection: python quick_start.py --no-hang-detection")
+    print()
+    print("For more information, see the retrieval service documentation.")
+    print("=" * 80)
+
+    # Try to start the standalone service if it's available
+    try:
+        import retrieval_service.quick_start
+
+        print("Found standalone retrieval service, attempting to start...")
+
+        cmd = [
+            sys.executable,
+            "-m",
+            "retrieval_service.quick_start",
+            "--port",
+            str(args.port),
+        ]
+        if args.config:
+            cmd.extend(["--config", args.config])
+        if args.no_hang_detection:
+            cmd.append("--no-hang-detection")
+
+        subprocess.run(cmd)
+    except ImportError:
+        print("ERROR: Standalone retrieval service not found.")
+        print("Please install it with: pip install retrieval-service")
+        print("Or follow the installation instructions above.")
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()
 
 
 def main():
