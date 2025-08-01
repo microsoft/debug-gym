@@ -101,7 +101,67 @@ We provide the below LLM-based agents, they all have minimal design and serve th
 | `debug_agent` | `pdb`, `rewrite`, `view`, `eval` | A minimal agent that dumps all available information into its prompt and queries the LLM to generate a command. |
 | `rewrite_agent` | `rewrite`, `view`, `eval`  | A `debug_agent` but `pdb` tool is disabled (an agent keeps rewriting). |
 | `debug_5_agent` | `pdb`, `rewrite`, `view`, `eval`  | A `debug_agent`, but `pdb` tool is only enabled after certain amount of rewrites. |
+| `rag_agent` | `pdb`, `rewrite`, `view`, `eval` | A retrieval-augmented agent that uses similar debugging examples from past trajectories. **Requires separate retrieval service setup** - see [RAG Agent Setup](#rag-agent-setup) below. |
 | `solution_agent` | `pdb`, `eval`  | An oracle agent that applies a gold patch (only works with `swebench` and `swesmith` benchmarks for now). The agent checks that tests are failing before applying the patch, and passing after. It also checks that `pdb` tool can be used as expected. |
+
+---
+
+<details>
+<summary><strong>RAG Agent Setup</strong> (Click to expand)</summary>
+
+#### 2.2.1. RAG Agent Setup
+
+The `rag_agent` requires a separate retrieval service to function. This service handles embedding generation, caching, and similarity search for retrieving relevant debugging examples.
+
+**Setup Instructions:**
+
+1. **Install the retrieval service:**
+   ```bash
+   git clone https://github.com/xingdi-eric-yuan/retriever_service
+   cd retriever_service
+   pip install -e .
+   ```
+
+2. **Configure the retrieval service:**
+   Edit `config.yaml` in the retriever service directory:
+   ```yaml
+   # Model and processing settings (configured server-side)
+   sentence_encoder_model: "Qwen/Qwen3-Embedding-0.6B"
+   rag_cache_dir: ".rag_cache"
+   rag_use_cache: true
+   rag_indexing_batch_size: 1000
+   
+   # Service settings
+   default_port: 8766
+   default_host: "localhost"
+   ```
+
+3. **Start the retrieval service:**
+   ```bash
+   python quick_start.py
+   ```
+   The service will start on `http://localhost:8766`
+
+4. **Configure the RAG agent in debug-gym:**
+   In your debug-gym config file (e.g., `scripts/config_swesmith.yaml`):
+   ```yaml
+   rag_agent:
+     # Retrieval service connection
+     rag_retrieval_service_host: "localhost"
+     rag_retrieval_service_port: 8766
+     rag_retrieval_service_timeout: 300
+     
+     # Retrieval settings
+     rag_num_retrievals: 3
+     rag_indexing_method: "tool_call_with_reasoning-3"
+   ```
+
+**Important Notes:**
+- The retrieval service must be running before using `rag_agent`
+- Model configuration (sentence encoder, caching) is handled server-side in the retrieval service
+- See the [retrieval service repository](https://github.com/xingdi-eric-yuan/retriever_service) for detailed documentation
+
+</details>
 
 ---
 

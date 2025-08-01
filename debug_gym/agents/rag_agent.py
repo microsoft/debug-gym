@@ -21,19 +21,56 @@ class RAGAgent(DebugAgent):
     """
     RAG (Retrieval-Augmented Generation) Agent that uses a retrieval service for efficiency.
 
-    Retrieval service configuration options:
+    This agent requires the standalone retrieval service to be running. The retrieval
+    service handles all model loading, caching, and index management.
+
+    ## Setup Instructions:
+
+    1. **Install and set up the retrieval service:**
+       See: https://github.com/xingdi-eric-yuan/retriever_service
+
+       Quick setup:
+       ```bash
+       git clone https://github.com/xingdi-eric-yuan/retriever_service
+       cd retriever_service
+       pip install -e .
+       python quick_start.py  # Starts service on localhost:8766
+       ```
+
+    2. **Configure the retrieval service:**
+       Edit `config.yaml` in the retriever service repository to set:
+       - `sentence_encoder_model`: The embedding model (e.g., "Qwen/Qwen3-Embedding-0.6B")
+       - `rag_cache_dir`: Cache directory for embeddings
+       - `rag_use_cache`: Whether to use caching (recommended: true)
+       - `rag_indexing_batch_size`: Batch size for indexing
+
+    3. **Configure this agent:**
+       Set the following in your debug-gym config:
+
+    ## Configuration Options:
 
     - rag_retrieval_service_host: Host for retrieval service (default: "localhost")
     - rag_retrieval_service_port: Port for retrieval service (default: 8766)
     - rag_retrieval_service_timeout: Timeout for retrieval service requests (default: 120)
+    - rag_num_retrievals: Number of examples to retrieve (default: 5)
+    - rag_indexing_method: Indexing method (e.g., "tool_call-1", "observation-2")
 
-    The agent will communicate with the retrieval service to:
+    ## How it works:
+
+    The agent communicates with the retrieval service to:
     - Build indexes from experience trajectory files
     - Retrieve relevant examples for the current query
 
     For parallel execution efficiency:
     - Uses retrieval service to avoid loading multiple copies of indexes
     - Shares retrieval logic across multiple agent instances
+
+    ## Important Notes:
+
+    - Model configuration (sentence_encoder_model, caching settings) is now handled
+      server-side in the retrieval service, not in this agent
+    - Make sure the retrieval service is running before using this agent
+    - The retrieval service repository contains detailed setup and configuration docs
     """
 
     name = "rag_agent"
