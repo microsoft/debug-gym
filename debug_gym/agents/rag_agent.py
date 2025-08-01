@@ -39,6 +39,10 @@ class RAGAgent(DebugAgent):
     name = "rag_agent"
     delimiter = " <STEP_DELIMITER> "
 
+    def _is_retrieval_service_available(self):
+        """Check if retrieval service is available. Can be mocked for testing."""
+        return RETRIEVAL_SERVICE_AVAILABLE
+
     def __init__(
         self,
         config: dict,
@@ -47,7 +51,7 @@ class RAGAgent(DebugAgent):
         logger=None,
     ):
         # Check if retrieval service is available before proceeding
-        if not RETRIEVAL_SERVICE_AVAILABLE:
+        if not self._is_retrieval_service_available():
             raise ImportError(
                 "The standalone retrieval service is required for RAG functionality. "
                 "Please install it by running: pip install retrieval-service"

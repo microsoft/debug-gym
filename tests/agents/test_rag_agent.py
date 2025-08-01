@@ -19,6 +19,63 @@ from debug_gym.gym.envs.env import EnvInfo
 from debug_gym.gym.tools.tool import ToolCall
 
 
+# Unit tests that always run - test RAG agent logic with mocks
+class TestRAGAgentUnitTests:
+    """Unit tests for RAGAgent that run with mocked dependencies."""
+
+    @pytest.mark.skipif(
+        not RETRIEVAL_SERVICE_AVAILABLE, reason="Retrieval service not available"
+    )
+    def test_parse_indexing_method_static(self):
+        """Test parsing indexing methods without full initialization."""
+        # Create an instance without calling __init__
+        agent = RAGAgent.__new__(RAGAgent)
+
+        # Test valid methods
+        assert agent.parse_indexing_method("tool_call-1") == ["tool_call", 1]
+        assert agent.parse_indexing_method("tool_call_with_reasoning-3") == [
+            "tool_call_with_reasoning",
+            3,
+        ]
+        assert agent.parse_indexing_method("observation-5") == ["observation", 5]
+        assert agent.parse_indexing_method("tool_name") == ["tool_name", 1]
+
+        # Test invalid methods
+        with pytest.raises(AssertionError, match="Invalid rag_indexing_method"):
+            agent.parse_indexing_method("invalid_method-1")
+
+    @pytest.mark.skipif(
+        not RETRIEVAL_SERVICE_AVAILABLE, reason="Retrieval service not available"
+    )
+    @patch("debug_gym.agents.rag_agent.RetrievalServiceClient")
+    def test_retrieve_relevant_examples_with_mock(self, mock_client_class):
+        """Test retrieving relevant examples with mocked service."""
+        mock_client_instance = MagicMock()
+        mock_client_class.return_value = mock_client_instance
+        mock_client_instance.retrieve.return_value = [
+            '{"tool_calls": {"name": "pdb", "arguments": {"command": "l"}}}',
+            '{"tool_calls": {"name": "view", "arguments": {"path": "test.py"}}}',
+        ]
+
+        # Create agent without full initialization
+        agent = RAGAgent.__new__(RAGAgent)
+        agent.retrieval_client = mock_client_instance
+        agent.index_key = "test_index"
+        agent.rag_num_retrievals = 2
+
+        results = agent._retrieve_relevant_examples("test query")
+
+        assert len(results) == 2
+        assert "pdb" in results[0]
+        assert "view" in results[1]
+        mock_client_instance.retrieve.assert_called_once_with(
+            index_key="test_index",
+            query_text="test query",
+            num_retrievals=2,
+        )
+
+
+# Integration tests that require actual service
 @pytest.mark.skipif(
     not RETRIEVAL_SERVICE_AVAILABLE, reason="Retrieval service not available"
 )
