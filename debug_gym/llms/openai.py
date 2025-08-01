@@ -238,16 +238,15 @@ class OpenAILLM(LLM):
         # In some models hosted on vllm, e.g., qwen-3, there could be content in both (when reasoning is enabled)
         # response.choices[0].message.content and response.choices[0].message.reasoning_content
         # https://qwen.readthedocs.io/en/latest/deployment/vllm.html#parsing-thinking-content
-        _content = response.choices[0].message.content or ""
+        _content = response.choices[0].message.content or None
+        _reasoning_content = None
         if hasattr(response.choices[0].message, "reasoning_content"):
-            reasoning_content = response.choices[0].message.reasoning_content
-            # Only add reasoning content if it's a string (not a MagicMock for tests)
-            if isinstance(reasoning_content, str) and reasoning_content:
-                _content = "\n".join([_content, reasoning_content]).strip()
+            _reasoning_content = response.choices[0].message.reasoning_content
 
         llm_response = LLMResponse(
             prompt=messages,
             response=_content,
+            reasoning_response=_reasoning_content,
             tool=self.parse_tool_call_response(tool_call),
             prompt_token_count=response.usage.prompt_tokens,
             response_token_count=response.usage.completion_tokens,

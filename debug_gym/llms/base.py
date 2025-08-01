@@ -157,7 +157,8 @@ class LLMResponse:
     def __init__(
         self,
         prompt: list[dict] | str,
-        response: str,
+        response: str = None,
+        reasoning_response: str = None,
         tool: ToolCall = None,
         prompt_token_count: int = None,
         response_token_count: int = None,
@@ -165,6 +166,7 @@ class LLMResponse:
     ):
         self.prompt = prompt
         self.response = response
+        self.reasoning_response = reasoning_response
         self.tool = tool
         if prompt_token_count is not None and response_token_count is not None:
             self.token_usage = TokenUsage(prompt_token_count, response_token_count)
