@@ -198,7 +198,7 @@ class RAGAgent(DebugAgent):
 
         success = self.retrieval_client.build_index(
             index_key=self.index_key,
-            experience_trajectory_path=self.experience_trajectory_path,
+            experience_trajectory_path=os.path.abspath(self.experience_trajectory_path),
             rag_indexing_method=indexing_method_str,
             sentence_encoder_model=self.sentence_encoder_model,
             rag_indexing_batch_size=self.rag_indexing_batch_size,
