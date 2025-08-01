@@ -53,7 +53,6 @@ rag_agent:
     rag_indexing_batch_size: 16
     sentence_encoder_model: "Qwen/Qwen3-Embedding-0.6B"
     experience_trajectory_path: "exps/sft_data/d1_full_truncated_30k_jul9.jsonl"
-    rag_cache_dir: ".rag_cache"
     rag_use_cache: true
     # Retrieval service configuration
     rag_retrieval_service_host: "localhost"

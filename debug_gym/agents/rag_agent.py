@@ -72,7 +72,6 @@ class RAGAgent(DebugAgent):
         )
 
         # Cache directory for storing computed representations
-        self.cache_dir = self.config.get("rag_cache_dir", ".rag_cache")
         self.use_cache = self.config.get("rag_use_cache", True)
 
         # Retrieval service configuration
