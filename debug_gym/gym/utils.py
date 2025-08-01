@@ -15,6 +15,8 @@ def clean_code(code):
 
 def filter_non_utf8(text):
     """Filter out non-UTF-8 characters from text."""
+    if not text:
+        return None
     if isinstance(text, str):
         return text.encode("utf-8", errors="ignore").decode("utf-8")
     return text

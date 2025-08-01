@@ -187,7 +187,7 @@ class OpenAILLM(LLM):
                 {
                     "role": "user",
                     "content": filter_non_utf8(
-                        f"{history_info.step_observation.observation}"
+                        history_info.step_observation.observation
                     ),
                 }
             )
@@ -199,7 +199,7 @@ class OpenAILLM(LLM):
                     "tool_call_id": history_info.action_tool_call.id,
                     "name": history_info.action_tool_call.name,
                     "content": filter_non_utf8(
-                        f"{history_info.step_observation.observation}"
+                        history_info.step_observation.observation
                     ),
                 }
             )

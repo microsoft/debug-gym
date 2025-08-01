@@ -3,28 +3,31 @@ from debug_gym.llms.utils import print_messages
 
 def test_print_messages(logger_mock):
     messages = [
-        {"role": "user", "content": "Hello"},
-        {"role": "assistant", "content": "Hi"},
         {"role": "system", "content": "System message"},
+        {"role": "user", "content": "Hello"},
+        {
+            "role": "assistant",
+            "content": "Hi",
+            "tool_calls": ["Tool call 1", "Tool call 2"],
+        },
         {"role": "tool", "content": "Tool message"},
         {
             "role": "user",
             "content": [{"type": "tool_result", "content": "Tool result"}],
         },
-        {"role": "assistant", "tool_calls": ["Tool call 1", "Tool call 2"]},
-        {"role": "assistant", "tool_calls": "Single tool call"},
+        {"role": "assistant", "tool_calls": [{"key": 3, "key2": "value"}]},
         {"role": "system", "content": 12345},
     ]
     print_messages(messages, logger_mock)
     assert logger_mock._log_history == [
-        "[cyan]Hello[/cyan]",
-        "[cyan]Hi[/cyan]",
         "[yellow]System message[/yellow]",
-        "[magenta]Tool message[/magenta]",
+        "[magenta]Hello[/magenta]",
+        "[cyan]Hi[/cyan]",
+        "[cyan]Tool call: Tool call 1[/cyan]",
+        "[cyan]Tool call: Tool call 2[/cyan]",
+        "[green]Tool message[/green]",
         "[magenta]Tool result[/magenta]",
-        "[cyan]Tool call 1[/cyan]",
-        "[cyan]Tool call 2[/cyan]",
-        "[cyan]Single tool call[/cyan]",
+        "[cyan]Tool call: {'key': 3, 'key2': 'value'}[/cyan]",
         "[yellow]12345[/yellow]",
     ]
 

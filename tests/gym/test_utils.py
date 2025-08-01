@@ -608,7 +608,7 @@ def test_filter_non_utf8():
     assert filter_non_utf8(mixed_text) == mixed_text
 
     # Test with empty string
-    assert filter_non_utf8("") == ""
+    assert filter_non_utf8("") == None
 
     # Test with non-string input (should return as-is)
     assert filter_non_utf8(None) is None
@@ -656,10 +656,10 @@ def test_filter_non_utf8_edge_cases():
         (42, 42),
         (3.14, 3.14),
         (True, True),
-        (False, False),
-        ([], []),
-        ({}, {}),
-        (set(), set()),
+        (False, None),
+        ([], None),
+        ({}, None),
+        (set(), None),
     ]
 
     for input_val, expected in test_cases:
