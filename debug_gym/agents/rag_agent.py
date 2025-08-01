@@ -66,13 +66,6 @@ class RAGAgent(DebugAgent):
         self.rag_indexing_method = self.parse_indexing_method(
             self.config.get("rag_indexing_method", None)
         )  # how to index the conversation history
-        self.rag_indexing_batch_size = self.config.get("rag_indexing_batch_size", 16)
-        self.sentence_encoder_model = self.config.get(
-            "sentence_encoder_model", "Qwen/Qwen3-Embedding-0.6B"
-        )
-
-        # Cache directory for storing computed representations
-        self.use_cache = self.config.get("rag_use_cache", True)
 
         # Retrieval service configuration
         self.retrieval_service_host = self.config.get(
@@ -150,7 +143,7 @@ class RAGAgent(DebugAgent):
         self._build_index_on_service()
 
     def _generate_index_key(self):
-        """Generate a unique index key based on trajectory path, indexing method, and encoder model."""
+        """Generate a unique index key based on trajectory path and indexing method."""
         # Extract filename from trajectory path
         trajectory_filename = os.path.basename(self.experience_trajectory_path)
         if trajectory_filename.endswith(".jsonl"):
@@ -160,13 +153,6 @@ class RAGAgent(DebugAgent):
         method, step = self.rag_indexing_method
         indexing_str = f"{method}-{step}"
 
-        # Extract model name (last part after /)
-        model_name = (
-            self.sentence_encoder_model.split("/")[-1]
-            if "/" in self.sentence_encoder_model
-            else self.sentence_encoder_model
-        )
-
         # Sanitize strings for key safety
         def sanitize_for_key(s):
             # Replace problematic characters with underscores
@@ -174,10 +160,9 @@ class RAGAgent(DebugAgent):
 
         trajectory_clean = sanitize_for_key(trajectory_filename)
         indexing_clean = sanitize_for_key(indexing_str)
-        model_clean = sanitize_for_key(model_name)
 
         # Create interpretable index key
-        index_key = f"{trajectory_clean}_{indexing_clean}_{model_clean}"
+        index_key = f"{trajectory_clean}_{indexing_clean}"
         return index_key
 
     def _build_index_on_service(self):
@@ -199,9 +184,6 @@ class RAGAgent(DebugAgent):
             index_key=self.index_key,
             experience_trajectory_path=os.path.abspath(self.experience_trajectory_path),
             rag_indexing_method=indexing_method_str,
-            sentence_encoder_model=self.sentence_encoder_model,
-            rag_indexing_batch_size=self.rag_indexing_batch_size,
-            use_cache=self.use_cache,
         )
 
         if not success:
