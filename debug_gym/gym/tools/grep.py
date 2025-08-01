@@ -137,9 +137,7 @@ class GrepTool(EnvironmentTool):
         # Format output
         if not results:
             search_scope = f"in {path}" if path else "in repository"
-            pattern_desc = (
-                f"pattern '{pattern}'"
-            )
+            pattern_desc = f"pattern '{pattern}'"
             return Observation(
                 self.name, f"No matches found for {pattern_desc} {search_scope}."
             )
