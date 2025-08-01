@@ -114,28 +114,39 @@ class AnthropicLLM(LLM):
     ) -> list[dict]:
         _messages = []
         if isinstance(response, list) and len(response) > 0:
+            _response = []
+            if response[0].response:
+                _response.append(response[0].response)
+            if response[0].reasoning_response:
+                _response.append(response[0].reasoning_response)
+            _response = None if len(_response) == 0 else "\n".join(_response)
+            content = []
+            if _response is not None:
+                content.append(
+                    {
+                        "type": "text",
+                        "text": filter_non_utf8(_response),
+                    }
+                )
+            content.append(
+                {
+                    "type": "tool_use",
+                    "id": response[0].tool.id,
+                    "name": response[0].tool.name,
+                    "input": response[0].tool.arguments,
+                }
+            )
             _messages.append(
                 {
                     "role": "assistant",
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": filter_non_utf8(response[0].response),
-                        },
-                        {
-                            "type": "tool_use",
-                            "id": response[
-                                0
-                            ].tool.id,  # 'toolu_01SdR84CsnTKRpdH4zwFjvGj'
-                            "name": response[0].tool.name,  # 'view'
-                            "input": response[
-                                0
-                            ].tool.arguments,  # {'path': 'hangman_test.py'}
-                        },
-                    ],
+                    "content": content,
                 }
             )
-        if history_info.action is None:
+        if (
+            history_info.action_tool_call is None
+            and history_info.action_content is None
+            and history_info.action_reasoning is None
+        ):
             # This is the initial state, no action taken yet
             _messages.append(
                 {
@@ -153,7 +164,7 @@ class AnthropicLLM(LLM):
                     "content": [
                         {
                             "type": "tool_result",
-                            "tool_use_id": history_info.action.id,  # 'toolu_01SdR84CsnTKRpdH4zwFjvGj'
+                            "tool_use_id": history_info.action_tool_call.id,  # 'toolu_01SdR84CsnTKRpdH4zwFjvGj'
                             "content": filter_non_utf8(
                                 f"{history_info.step_observation.observation}"
                             ),  # 'Viewing `hangman_test.py`. The file is read-only, it is not editable.'

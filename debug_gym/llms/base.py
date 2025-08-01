@@ -150,7 +150,8 @@ class TokenUsage:
 @dataclass
 class LLMResponse:
     prompt: list[dict] | str  # either a string or a list of messages.
-    response: str
+    response: str | None
+    reasoning_response: str | None
     tool: ToolCall
     token_usage: TokenUsage | None = None
 
@@ -417,7 +418,8 @@ class LLM(ABC):
 
         print_messages(messages, self.logger)
         self.logger.info(
-            f"LLM response - reasoning: {llm_response.response}\n"
+            f"LLM response - reasoning: {llm_response.reasoning_response}\n"
+            f"LLM response - content: {llm_response.response}\n"
             f"LLM response - tool call: {llm_response.tool}"
         )
         return llm_response

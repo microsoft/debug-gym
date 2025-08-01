@@ -259,7 +259,11 @@ class BaseAgent:
                 if debug:
                     breakpoint()
 
-                info = self.env.step(llm_response.tool, llm_response.response)
+                info = self.env.step(
+                    llm_response.tool,
+                    llm_response.response,
+                    llm_response.reasoning_response,
+                )
                 self.history.step(info, llm_response)
 
                 if (

@@ -158,23 +158,30 @@ class OpenAILLM(LLM):
     ) -> list[dict]:
         _messages = []
         if isinstance(response, list) and len(response) > 0:
-            _messages.append(
-                {
-                    "role": "assistant",
-                    "tool_calls": [
-                        {
-                            "type": "function",
-                            "id": response[0].tool.id,
-                            "function": {
-                                "name": response[0].tool.name,
-                                "arguments": json.dumps(response[0].tool.arguments),
-                            },
+            _response = {
+                "role": "assistant",
+                "tool_calls": [
+                    {
+                        "type": "function",
+                        "id": response[0].tool.id,
+                        "function": {
+                            "name": response[0].tool.name,
+                            "arguments": json.dumps(response[0].tool.arguments),
                         },
-                    ],
-                    "content": filter_non_utf8(f"{response[0].response}"),
-                }
-            )
-        if history_info.action is None:
+                    },
+                ],
+                "content": filter_non_utf8(f"{response[0].response}"),
+            }
+            if response[0].reasoning_response:
+                _response["reasoning_content"] = filter_non_utf8(
+                    f"{response[0].reasoning_response}"
+                )
+            _messages.append(_response)
+        if (
+            history_info.action_tool_call is None
+            and history_info.action_content is None
+            and history_info.action_reasoning is None
+        ):
             # This is the initial state, no action taken yet
             _messages.append(
                 {
@@ -189,8 +196,8 @@ class OpenAILLM(LLM):
             _messages.append(
                 {
                     "role": "tool",
-                    "tool_call_id": history_info.action.id,
-                    "name": history_info.action.name,
+                    "tool_call_id": history_info.action_tool_call.id,
+                    "name": history_info.action_tool_call.name,
                     "content": filter_non_utf8(
                         f"{history_info.step_observation.observation}"
                     ),
