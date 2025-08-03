@@ -36,11 +36,15 @@ class BashTool(EnvironmentTool):
             success, output = environment.terminal.run(command, timeout=30)
 
             if success:
-                result = output if output.strip() else "Command executed successfully (no output)"
+                result = (
+                    output
+                    if output.strip()
+                    else "Command executed successfully (no output)"
+                )
             else:
                 result = f"Command failed with output:\n{output}"
 
         except Exception as e:
             result = f"Error executing command: {str(e)}"
-            
+
         return Observation(self.name, result)
