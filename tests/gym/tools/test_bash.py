@@ -16,14 +16,14 @@ def env(tmp_path):
     tmp_path = Path(tmp_path)
     repo_path = tmp_path / "repo"
     repo_path.mkdir()
-    
+
     # Create some test files
     with open(repo_path / "test_file.txt", "w") as f:
         f.write("Hello World\nLine 2\nLine 3")
-    
+
     with open(repo_path / "script.py", "w") as f:
         f.write("print('Python script')")
-    
+
     # Create a subdirectory with files
     subdir = repo_path / "subdir"
     subdir.mkdir()
@@ -62,25 +62,19 @@ def test_bash_tool_metadata(bash_tool):
 def test_bash_successful_command(env):
     """Test executing a successful bash command."""
     bash_call = ToolCall(
-        id="bash_test",
-        name="bash",
-        arguments={"command": "echo 'Hello World'"}
+        id="bash_test", name="bash", arguments={"command": "echo 'Hello World'"}
     )
     env_info = env.step(bash_call)
-    
+
     assert env_info.step_observation.source == "bash"
     assert "Hello World" in env_info.step_observation.observation
 
 
 def test_bash_list_files(env):
     """Test listing files with bash command."""
-    bash_call = ToolCall(
-        id="bash_test",
-        name="bash",
-        arguments={"command": "ls -la"}
-    )
+    bash_call = ToolCall(id="bash_test", name="bash", arguments={"command": "ls -la"})
     env_info = env.step(bash_call)
-    
+
     assert env_info.step_observation.source == "bash"
     observation = env_info.step_observation.observation
     assert "test_file.txt" in observation
@@ -91,12 +85,10 @@ def test_bash_list_files(env):
 def test_bash_file_content(env):
     """Test reading file content with bash command."""
     bash_call = ToolCall(
-        id="bash_test",
-        name="bash",
-        arguments={"command": "cat test_file.txt"}
+        id="bash_test", name="bash", arguments={"command": "cat test_file.txt"}
     )
     env_info = env.step(bash_call)
-    
+
     assert env_info.step_observation.source == "bash"
     observation = env_info.step_observation.observation
     assert "Hello World" in observation
@@ -109,10 +101,10 @@ def test_bash_command_with_pipes(env):
     bash_call = ToolCall(
         id="bash_test",
         name="bash",
-        arguments={"command": "cat test_file.txt | head -1"}
+        arguments={"command": "cat test_file.txt | head -1"},
     )
     env_info = env.step(bash_call)
-    
+
     assert env_info.step_observation.source == "bash"
     observation = env_info.step_observation.observation
     assert "Hello World" in observation
@@ -122,12 +114,10 @@ def test_bash_command_with_pipes(env):
 def test_bash_failed_command(env):
     """Test executing a failed bash command."""
     bash_call = ToolCall(
-        id="bash_test",
-        name="bash",
-        arguments={"command": "ls non_existent_directory"}
+        id="bash_test", name="bash", arguments={"command": "ls non_existent_directory"}
     )
     env_info = env.step(bash_call)
-    
+
     assert env_info.step_observation.source == "bash"
     observation = env_info.step_observation.observation
     assert "Command failed with output:" in observation
@@ -137,12 +127,10 @@ def test_bash_failed_command(env):
 def test_bash_empty_output_command(env):
     """Test command that produces no output."""
     bash_call = ToolCall(
-        id="bash_test",
-        name="bash",
-        arguments={"command": "touch new_file.txt"}
+        id="bash_test", name="bash", arguments={"command": "touch new_file.txt"}
     )
     env_info = env.step(bash_call)
-    
+
     assert env_info.step_observation.source == "bash"
     observation = env_info.step_observation.observation
     assert "Command executed successfully (no output)" in observation
@@ -151,12 +139,10 @@ def test_bash_empty_output_command(env):
 def test_bash_python_execution(env):
     """Test executing Python script with bash."""
     bash_call = ToolCall(
-        id="bash_test",
-        name="bash",
-        arguments={"command": "python script.py"}
+        id="bash_test", name="bash", arguments={"command": "python script.py"}
     )
     env_info = env.step(bash_call)
-    
+
     assert env_info.step_observation.source == "bash"
     observation = env_info.step_observation.observation
     assert "Python script" in observation
@@ -167,10 +153,10 @@ def test_bash_complex_command(env):
     bash_call = ToolCall(
         id="bash_test",
         name="bash",
-        arguments={"command": "find . -name '*.txt' | wc -l"}
+        arguments={"command": "find . -name '*.txt' | wc -l"},
     )
     env_info = env.step(bash_call)
-    
+
     assert env_info.step_observation.source == "bash"
     observation = env_info.step_observation.observation
     # Should find test_file.txt and subdir/nested.txt = 2 files
@@ -179,13 +165,9 @@ def test_bash_complex_command(env):
 
 def test_bash_working_directory(env):
     """Test that bash commands run in the correct working directory."""
-    bash_call = ToolCall(
-        id="bash_test",
-        name="bash",
-        arguments={"command": "pwd"}
-    )
+    bash_call = ToolCall(id="bash_test", name="bash", arguments={"command": "pwd"})
     env_info = env.step(bash_call)
-    
+
     assert env_info.step_observation.source == "bash"
     observation = env_info.step_observation.observation
     assert str(env.working_dir) in observation
@@ -194,71 +176,69 @@ def test_bash_working_directory(env):
 def test_bash_environment_variables(env):
     """Test that environment variables are accessible."""
     bash_call = ToolCall(
-        id="bash_test",
-        name="bash",
-        arguments={"command": "echo $PATH"}
+        id="bash_test", name="bash", arguments={"command": "echo $PATH"}
     )
     env_info = env.step(bash_call)
-    
+
     assert env_info.step_observation.source == "bash"
     observation = env_info.step_observation.observation
     # PATH should be set in the environment
     assert len(observation.strip()) > 0
 
 
-@patch('debug_gym.gym.terminal.Terminal.run')
+@patch("debug_gym.gym.terminal.Terminal.run")
 def test_bash_terminal_failure(mock_run, bash_tool):
     """Test handling of terminal execution failure."""
     # Mock terminal.run to return failure
     mock_run.return_value = (False, "Command failed: permission denied")
-    
+
     # Create mock environment with terminal
     mock_env = MagicMock()
     mock_env.terminal = MagicMock()
     mock_env.terminal.run = mock_run
-    
+
     result = bash_tool.use(mock_env, "some_command")
-    
+
     assert isinstance(result, Observation)
     assert result.source == "bash"
     assert "Command failed with output:" in result.observation
     assert "permission denied" in result.observation
 
 
-@patch('debug_gym.gym.terminal.Terminal.run')
+@patch("debug_gym.gym.terminal.Terminal.run")
 def test_bash_terminal_success(mock_run, bash_tool):
     """Test successful terminal execution."""
     # Mock terminal.run to return success
     mock_run.return_value = (True, "Success output")
-    
+
     # Create mock environment with terminal
     mock_env = MagicMock()
     mock_env.terminal = MagicMock()
     mock_env.terminal.run = mock_run
-    
+
     result = bash_tool.use(mock_env, "echo hello")
-    
+
     assert isinstance(result, Observation)
     assert result.source == "bash"
     assert result.observation == "Success output"
-    
+
     # Verify terminal.run was called with correct parameters
     mock_run.assert_called_once_with("echo hello", timeout=30)
 
 
-@patch('debug_gym.gym.terminal.Terminal.run')
+@patch("debug_gym.gym.terminal.Terminal.run")
 def test_bash_empty_output_handling(mock_run, bash_tool):
     """Test handling of commands with empty output."""
     # Mock terminal.run to return success with empty output
     mock_run.return_value = (True, "")
-    
+
     # Create mock environment with terminal
     mock_env = MagicMock()
     mock_env.terminal = MagicMock()
     mock_env.terminal.run = mock_run
-    
+
     result = bash_tool.use(mock_env, "touch file")
-    
+
     assert isinstance(result, Observation)
     assert result.source == "bash"
     assert result.observation == "Command executed successfully (no output)"
@@ -269,9 +249,9 @@ def test_bash_direct_use_method(bash_tool):
     # Create mock environment
     mock_env = MagicMock()
     mock_env.terminal.run.return_value = (True, "direct test output")
-    
+
     result = bash_tool.use(mock_env, "echo direct")
-    
+
     assert isinstance(result, Observation)
     assert result.source == "bash"
     assert result.observation == "direct test output"
@@ -282,10 +262,10 @@ def test_bash_sed_command(env):
     bash_call = ToolCall(
         id="bash_test",
         name="bash",
-        arguments={"command": "sed -n '2,3p' test_file.txt"}
+        arguments={"command": "sed -n '2,3p' test_file.txt"},
     )
     env_info = env.step(bash_call)
-    
+
     assert env_info.step_observation.source == "bash"
     observation = env_info.step_observation.observation
     assert "Line 2" in observation
@@ -296,12 +276,10 @@ def test_bash_sed_command(env):
 def test_bash_grep_command(env):
     """Test grep command for searching."""
     bash_call = ToolCall(
-        id="bash_test",
-        name="bash",
-        arguments={"command": "grep -r 'Line' ."}
+        id="bash_test", name="bash", arguments={"command": "grep -r 'Line' ."}
     )
     env_info = env.step(bash_call)
-    
+
     assert env_info.step_observation.source == "bash"
     observation = env_info.step_observation.observation
     assert "Line 2" in observation or "Line 3" in observation
@@ -312,10 +290,10 @@ def test_bash_multiple_commands(env):
     bash_call = ToolCall(
         id="bash_test",
         name="bash",
-        arguments={"command": "echo 'test' > temp.txt && cat temp.txt"}
+        arguments={"command": "echo 'test' > temp.txt && cat temp.txt"},
     )
     env_info = env.step(bash_call)
-    
+
     assert env_info.step_observation.source == "bash"
     observation = env_info.step_observation.observation
     assert "test" in observation
