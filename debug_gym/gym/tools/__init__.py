@@ -6,3 +6,4 @@ from debug_gym.gym.tools.rewrite import RewriteTool
 from debug_gym.gym.tools.tool import EnvironmentTool
 from debug_gym.gym.tools.toolbox import Toolbox
 from debug_gym.gym.tools.view import ViewTool
+from debug_gym.gym.tools.bash import BashTool
