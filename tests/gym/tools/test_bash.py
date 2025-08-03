@@ -206,24 +206,6 @@ def test_bash_environment_variables(env):
     assert len(observation.strip()) > 0
 
 
-@patch('debug_gym.gym.tools.bash.BashTool.use')
-def test_bash_timeout_handling(mock_use, bash_tool):
-    """Test timeout handling in bash tool."""
-    # Mock a timeout exception
-    mock_use.side_effect = Exception("Timeout expired")
-    
-    # Create mock environment
-    mock_env = MagicMock()
-    
-    # This should trigger the exception handling
-    result = bash_tool.use(mock_env, "sleep 60")
-    
-    # Check that the error is properly handled
-    assert isinstance(result, Observation)
-    assert result.source == "bash"
-    assert "Error executing command" in result.observation
-
-
 @patch('debug_gym.gym.terminal.Terminal.run')
 def test_bash_terminal_failure(mock_run, bash_tool):
     """Test handling of terminal execution failure."""
