@@ -16,7 +16,7 @@ class BashTool(EnvironmentTool):
     ]
     description = (
         "Run commands in a bash shell. "
-        "You have access to common linux and python packages via apt and pip. "
+        "You have access to common linux and python packages via pip. "
         "State is persistent across command calls within the same session. "
         "\nExamples (for demonstration purposes only, you need to adjust the tool calling format according to your specific syntax):\n"
         + "\n".join(examples)
