@@ -1,5 +1,3 @@
-import os
-import re
 import shlex
 
 from debug_gym.gym.entities import Observation
@@ -49,132 +47,120 @@ class GrepTool(EnvironmentTool):
         line_numbers: bool = True,
         max_results: int = 100,
     ) -> Observation:
+        """Use grep functionality via bash tool as a special case."""
         if not pattern:
             return Observation(self.name, "Pattern cannot be empty.")
 
-        # Compile the search pattern
-        try:
-            flags = 0 if case_sensitive else re.IGNORECASE
-            compiled_pattern = re.compile(pattern, flags)
-        except re.error as e:
-            return Observation(self.name, f"Invalid pattern: {str(e)}")
+        # Build grep command arguments
+        grep_args = []
 
-        # Determine search scope
+        # Add options
+        grep_args.append("-n")  # line numbers
+        grep_args.append("-r")  # recursive
+        grep_args.append("-E")  # extended regex
+        grep_args.append("-H")  # print filename with output
+
+        if not case_sensitive:
+            grep_args.append("-i")  # ignore case
+
+        if not regex:
+            grep_args.append("-F")  # fixed strings (literal)
+
+        # Add pattern (safely quoted)
+        grep_args.append(shlex.quote(pattern))
+
+        # Add path or default to current directory
         if path:
-            search_path = environment.resolve_path(path)
-            if not os.path.exists(search_path):
-                return Observation(self.name, f"Path not found: {path}")
+            grep_args.append(shlex.quote(path))
         else:
-            search_path = environment.working_dir
+            grep_args.append(".")
 
-        results = []
-        files_searched = 0
-        max_files = 1000  # Reasonable limit to prevent overwhelming output
+        # Build the complete command
+        command = "grep " + " ".join(grep_args)
+
+        # Add exclusions for common non-text directories and limit results
+        command += (
+            " | grep -v '/.git/' | grep -v '__pycache__' | grep -v '/node_modules/'"
+        )
+
+        if max_results:
+            command += f" | head -{max_results}"
 
         try:
-            # If path is a single file
-            if os.path.isfile(search_path):
-                results.extend(
-                    self._search_file(
-                        search_path,
-                        compiled_pattern,
-                        line_numbers,
-                        max_results,
-                        environment,
+            # Use the environment's terminal to run the grep command
+            success, output = environment.terminal.run(command, timeout=30)
+
+            if success:
+                if output.strip():
+                    # Process the output to match expected format
+                    lines = output.strip().split("\n")
+
+                    if not lines or (len(lines) == 1 and not lines[0]):
+                        search_scope = f"in {path}" if path else "in repository"
+                        pattern_desc = f"pattern '{pattern}'"
+                        return Observation(
+                            self.name,
+                            f"No matches found for {pattern_desc} {search_scope}.",
+                        )
+
+                    if lines[0].startswith("grep: "):
+                        # Handle grep error messages
+                        return Observation(self.name, f"Grep error: {lines[0][6:]}")
+
+                    # Format output
+                    output_lines = []
+                    if len(lines) >= max_results:
+                        output_lines.append(
+                            f"Showing first {len(lines)} matches (search limit reached):"
+                        )
+                    else:
+                        output_lines.append(f"Found {len(lines)} matches:")
+
+                    output_lines.append("")
+
+                    current_file = None
+                    for line in lines:
+                        if ":" in line:
+                            # Parse grep output: filename:line_number:content
+                            parts = line.split(":", 2)
+                            if len(parts) >= 3:
+                                file_path = parts[0]
+                                line_num = parts[1]
+                                line_content = parts[2]
+
+                                if file_path != current_file:
+                                    if current_file is not None:
+                                        output_lines.append(
+                                            ""
+                                        )  # Empty line between files
+                                    output_lines.append(f"=== {file_path} ===")
+                                    current_file = file_path
+
+                                if len(line_content) >= 300:
+                                    line_content = line_content[:300] + "..."
+
+                                if line_numbers:
+                                    output_lines.append(
+                                        f"{line_num:>4}: {line_content}"
+                                    )
+                                else:
+                                    output_lines.append(line_content)
+                            else:
+                                # Fallback for unusual grep output
+                                output_lines.append(line)
+                        else:
+                            output_lines.append(line)
+
+                    return Observation(self.name, "\n".join(output_lines))
+                else:
+                    search_scope = f"in {path}" if path else "in repository"
+                    pattern_desc = f"pattern '{pattern}'"
+                    return Observation(
+                        self.name,
+                        f"No matches found for {pattern_desc} {search_scope}.",
                     )
-                )
-                files_searched = 1
             else:
-                # Search directory recursively using environment's file visibility rules
-                from debug_gym.gym.utils import _walk
-
-                for file_path in _walk(
-                    search_path, depth=None, skip=environment._is_ignored_func
-                ):
-                    if files_searched >= max_files:
-                        break
-
-                    # Only search files, not directories
-                    if file_path.is_file():
-                        try:
-                            file_results = self._search_file(
-                                str(file_path),
-                                compiled_pattern,
-                                line_numbers,
-                                max_results - len(results),
-                                environment,
-                            )
-                            results.extend(file_results)
-                            files_searched += 1
-
-                            if len(results) >= max_results:
-                                break
-                        except Exception as e:
-                            # Skip files that can't be read (binary files, permission errors, etc.)
-                            continue
-
-                    if len(results) >= max_results:
-                        break
+                return Observation(self.name, f"Grep command failed: {output}")
 
         except Exception as e:
-            return Observation(self.name, f"Search failed: {str(e)}")
-
-        # Format output
-        if not results:
-            search_scope = f"in {path}" if path else "in repository"
-            pattern_desc = f"pattern '{pattern}'"
-            return Observation(
-                self.name, f"No matches found for {pattern_desc} {search_scope}."
-            )
-
-        output_lines = []
-        if len(results) >= max_results:
-            output_lines.append(
-                f"Showing last {len(results)} matches (search limit reached):"
-            )
-        else:
-            output_lines.append(f"Found {len(results)} matches:")
-
-        output_lines.append("")
-
-        current_file = None
-        for file_path, line_num, line_content in results[-max_results:]:
-            # Show relative path from repository root
-            rel_path = os.path.relpath(file_path, environment.working_dir)
-
-            if rel_path != current_file:
-                if current_file is not None:
-                    output_lines.append("")  # Empty line between files
-                output_lines.append(f"=== {rel_path} ===")
-                current_file = rel_path
-
-            if line_numbers:
-                output_lines.append(f"{line_num:4d}: {line_content}")
-            else:
-                output_lines.append(line_content)
-
-        return Observation(self.name, "\n".join(output_lines))
-
-    def _search_file(
-        self, file_path, pattern, show_line_numbers, max_results, environment
-    ):
-        """Search for pattern in a single file."""
-        results = []
-        try:
-            with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
-                for line_num, line in enumerate(f, 1):
-                    if len(results) >= max_results:
-                        break
-
-                    if pattern.search(line):
-                        # Remove trailing newline and limit line length for display
-                        clean_line = line.rstrip("\n\r")
-                        if len(clean_line) > 200:
-                            clean_line = clean_line[:197] + "..."
-
-                        results.append((file_path, line_num, clean_line))
-        except (UnicodeDecodeError, PermissionError, IsADirectoryError, OSError):
-            # Skip files that can't be read as text (binary files, permission errors, etc.)
-            pass
-
-        return results
+            return Observation(self.name, f"Error executing grep: {str(e)}")

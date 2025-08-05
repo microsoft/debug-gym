@@ -326,7 +326,7 @@ class TestGrepTool:
 
         result = grep_tool.use(env, pattern="[invalid(regex")
         assert result.source == "grep"
-        assert "Invalid pattern" in result.observation
+        assert "Grep error:" in result.observation
 
     def test_grep_nonexistent_path(self, tmp_path, setup_grep_repo_env):
         """Test behavior when searching in non-existent path"""
@@ -334,7 +334,7 @@ class TestGrepTool:
 
         result = grep_tool.use(env, pattern="test", path="nonexistent/path")
         assert result.source == "grep"
-        assert "Path not found" in result.observation
+        assert "No such file or directory" in result.observation
 
     def test_grep_line_numbers(self, tmp_path, setup_grep_repo_env):
         """Test that line numbers are included in output"""
