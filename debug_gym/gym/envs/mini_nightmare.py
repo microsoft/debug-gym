@@ -24,21 +24,27 @@ class MiniNightmareEnv(RepoEnv):
 
     def __init__(
         self,
+        entrypoint: str = "python -m pytest -s test.py",
         terminal: Terminal | None = None,
         **kwargs,
     ):
-        terminal = terminal or DockerTerminal(logger=kwargs.get("logger"))
+        terminal = terminal or DockerTerminal(
+            base_image="python:3.12-slim",
+            setup_commands=[
+                "apt update",
+                "apt install -y git",
+                "pip install pytest pandas",
+            ],
+            logger=kwargs.get("logger"),
+        )
         if not isinstance(terminal, DockerTerminal):
             raise ValueError("MiniNightmareEnv only supports DockerTerminal.")
 
-        super().__init__(terminal=terminal, **kwargs)
+        super().__init__(entrypoint=entrypoint, terminal=terminal, **kwargs)
 
     @property
     def instructions(self) -> str:
         return self.current_sample["instructions"]
-
-    def __init__(self, entrypoint: str = "python -m pytest -s test.py", **kwargs):
-        super().__init__(entrypoint=entrypoint, **kwargs)
 
     def calculate_max_score(self, eval_output: EvalOutput) -> int:
         return utils.extract_max_score_from_pytest_output(eval_output.output)

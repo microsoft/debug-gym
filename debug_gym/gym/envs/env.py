@@ -1,9 +1,7 @@
 import atexit
-import os
 import shutil
 import tempfile
 from dataclasses import dataclass
-from glob import glob
 from pathlib import Path
 
 import numpy as np
