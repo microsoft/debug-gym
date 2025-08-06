@@ -103,6 +103,12 @@ class AnthropicLLM(LLM):
             type='tool_use',
         )
         """
+        if response is None:
+            return ToolCall(
+                id="empty_tool_response",
+                name="empty_tool_response",
+                arguments={},
+            )
         return ToolCall(
             id=response.id,
             name=response.name,
@@ -114,28 +120,30 @@ class AnthropicLLM(LLM):
     ) -> list[dict]:
         _messages = []
         if isinstance(response, list) and len(response) > 0:
-            _response = []
-            if response[0].response:
-                _response.append(response[0].response)
-            if response[0].reasoning_response:
-                _response.append(response[0].reasoning_response)
-            _response = None if len(_response) == 0 else "\n".join(_response)
             content = []
-            if _response is not None:
+            if response[0].reasoning_response:
+                content.append(
+                    {
+                        "type": "thinking",
+                        "text": filter_non_utf8(response[0].reasoning_response),
+                    }
+                )
+            if response[0].response:
                 content.append(
                     {
                         "type": "text",
-                        "text": filter_non_utf8(_response),
+                        "text": filter_non_utf8(response[0].response),
                     }
                 )
-            content.append(
-                {
-                    "type": "tool_use",
-                    "id": response[0].tool.id,
-                    "name": response[0].tool.name,
-                    "input": response[0].tool.arguments,
-                }
-            )
+            if response[0].tool:
+                content.append(
+                    {
+                        "type": "tool_use",
+                        "id": response[0].tool.id,
+                        "name": response[0].tool.name,
+                        "input": response[0].tool.arguments,
+                    }
+                )
             _messages.append(
                 {
                     "role": "assistant",
@@ -225,16 +233,22 @@ class AnthropicLLM(LLM):
         # messages are either of type `text` or `tool_use`
         # https://docs.anthropic.com/en/docs/build-with-claude/tool-use/implement-tool-use#handling-results-from-client-tools
 
+        # tool use block is a list of tool calls, we select the first one
         tool_use_block = [r for r in response.content if r.type == "tool_use"]
-        assert tool_use_block, "No tool use found in response."
-        tool_use_block = tool_use_block[0]  # Select first tool called
+        tool_use_block = (
+            tool_use_block[0] if tool_use_block else None
+        )  # Select first tool called
         # select the first text message if there's any
         text_messages = [r.text for r in response.content if r.type == "text"]
-        text_messages = text_messages[0] if text_messages else ""
+        text_messages = text_messages[0] if text_messages else None
+        # thinking
+        thinking_messages = [r.text for r in response.content if r.type == "thinking"]
+        thinking_messages = thinking_messages[0] if thinking_messages else None
 
         llm_response = LLMResponse(
             prompt=messages,
             response=text_messages,
+            reasoning_response=thinking_messages,
             tool=self.parse_tool_call_response(tool_use_block),
             prompt_token_count=response.usage.input_tokens,
             response_token_count=response.usage.output_tokens,
