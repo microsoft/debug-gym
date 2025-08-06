@@ -1,7 +1,6 @@
 import atexit
 import os
 import shutil
-import subprocess
 import tempfile
 from dataclasses import dataclass
 from glob import glob
@@ -298,20 +297,6 @@ class RepoEnv(TooledEnv):
         )
         msg += self.directory_tree()
         return msg
-
-    def restore(self, *filepaths):
-        filepaths = filepaths or glob(
-            f"{self.path}/**",
-            root_dir=self.path,
-            recursive=True,
-        )
-        relative_filepaths = [os.path.relpath(f, self.path) for f in filepaths]
-        for filepath in relative_filepaths:
-            if os.path.isdir(self.path / filepath):
-                os.makedirs(self.working_dir / filepath, exist_ok=True)
-                continue
-
-            shutil.copy2(self.path / filepath, self.working_dir / filepath)
 
     def reset(self, *, options: dict = None):
         """Resets the environment and returns eval as the initial observation."""
