@@ -31,7 +31,7 @@ def build_swe_env_once(tmp_path_factory, worker_id):
     """Build the SWEBench docker image only once.
     Do not run this fixture directly, use get_swe_env instead.
     """
-    _build_swe_env = lambda: SWEBenchEnv(instance_ids=["astropy__astropy-14096"])
+    _build_swe_env = lambda: SWEBenchEnv(problems=["astropy__astropy-14096"])
     if worker_id == "master":
         # Not running with pytest-xdist or we are in the master process
         _build_swe_env()
@@ -49,36 +49,14 @@ def get_swe_env(build_swe_env_once):
     """Instantiate a SWEBenchEnv instance after building the SWEBench docker image."""
 
     def _swe_env(working_dir=None, map_host_uid_gid=True, **kwargs):
-        instance_ids = ["astropy__astropy-14096"]
+        problems = ["astropy__astropy-14096"]
         terminal = DockerTerminal(
             path=working_dir, map_host_uid_gid=map_host_uid_gid, **kwargs
         )
-        env = SWEBenchEnv(instance_ids=instance_ids, terminal=terminal)
+        env = SWEBenchEnv(problems=problems, terminal=terminal)
         return env
 
     return _swe_env
-
-
-@if_docker_running
-def test_load_dataset(tmp_path, get_swe_env):
-    working_dir = str(tmp_path)
-    swe_env = get_swe_env(working_dir)
-    assert swe_env.dataset_id == "princeton-nlp/SWE-bench_Verified"
-    # check if the dataset contains features that SWEBenchEnv expects
-    assert list(swe_env.ds.features.keys()) == [
-        "repo",
-        "instance_id",
-        "base_commit",
-        "patch",  # not required
-        "test_patch",
-        "problem_statement",
-        "hints_text",  # not required
-        "created_at",  # not required
-        "version",  # not required
-        "FAIL_TO_PASS",
-        "PASS_TO_PASS",
-        "environment_setup_commit",  # not required
-    ]
 
 
 @if_docker_running
@@ -199,7 +177,7 @@ def test_load_dataset(tmp_path, get_swe_env):
     assert swe_env.dataset_id == "princeton-nlp/SWE-bench_Verified"
     task_name = "astropy__astropy-14096"
     assert task_name in swe_env.dataset.keys()
-    assert list(swe_env.dataset[task_name].keys()) == [
+    assert list(swe_env.ds.features.keys()) == [
         "repo",
         "instance_id",
         "base_commit",
@@ -322,30 +300,3 @@ def test_apply_gold_patch(tmp_path, get_swe_env):
     score = swe_env.calculate_score(eval_output)
 
     assert score == swe_env.max_score
-
-
-def test_get_problem_ids(get_swe_env):
-    swe_env = get_swe_env()
-
-    # Test retrieving all problem IDs
-    problem_ids = swe_env.get_problem_ids("all")
-    assert isinstance(problem_ids, list), "Expected a list of problem IDs"
-    assert len(problem_ids) > 0, "Expected at least one problem ID"
-    assert all(
-        isinstance(pid, str) for pid in problem_ids
-    ), "All problem IDs should be strings"
-    assert sorted(problem_ids) == problem_ids, "Problem IDs should be sorted"
-
-    # Test retrieving a single valid problem ID
-    task_name = "astropy__astropy-14096"
-    problem_ids = swe_env.get_problem_ids(task_name)
-    assert isinstance(problem_ids, list), "Expected a list of problem IDs"
-    assert len(problem_ids) == 1, "Expected exactly one problem ID"
-    assert problem_ids[0] == task_name, f"Expected problem ID to be {task_name}"
-
-    # Test retrieving an invalid problem ID
-    invalid_task_name = "non_existent_task"
-    with pytest.raises(
-        ValueError, match=f"Invalid split or problem id: '{invalid_task_name}'"
-    ):
-        swe_env.get_problem_ids(invalid_task_name)

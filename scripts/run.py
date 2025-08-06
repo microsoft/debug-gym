@@ -58,10 +58,14 @@ def run_agent(args, problem, config):
         mode="w" if args.force_all else "a",
     )
     try:
-        previous_run = load_previous_run_status(exp_path, problem)
-        if not args.force_all and previous_run is not None:
+        previous_run = load_previous_run_status(problem_path, problem)
+        if (
+            not args.force_all
+            and previous_run is not None
+            and previous_run.status in ["resolved", "unresolved"]
+        ):
             task_logger.debug(f"Previous run found: {problem_path}")
-            success = previous_run.status in ["resolved", "skip-resolved"]
+            success = previous_run.status == "resolved"
             task_logger.debug(f"Previous run status: {previous_run.status}")
             if not args.force_failed or success:
                 status = "skip-resolved" if success else "skip-unresolved"
@@ -72,7 +76,6 @@ def run_agent(args, problem, config):
                     score=previous_run.score,
                     max_score=previous_run.max_score,
                     status=status,
-                    logdir=previous_run.logdir,
                 )
                 task_logger.debug(f"Skipping {problem}, already done.")
                 return success
@@ -175,7 +178,12 @@ def run_agent(args, problem, config):
 def create_env(config: dict, logger: DebugGymLogger):
     terminal = select_terminal(config.get("terminal"), logger)
     env_class = select_env(config.get("benchmark"))
-    env = env_class(**config["env_kwargs"], terminal=terminal, logger=logger)
+    env = env_class(
+        **config["env_kwargs"],
+        problems=config.get("problems", ["custom"]),
+        terminal=terminal,
+        logger=logger,
+    )
     return env
 
 
@@ -233,11 +241,9 @@ def main():
     logger.info(f"Experiment log path: {exp_output_path}")
     dump_experiment_info(config, args)
 
-    # Figure out which problems to solve.
-    problems = config.get("problems", ["custom"])
-    if isinstance(problems, str) and "benchmark" in config:
-        env = create_env(config, logger=logger)
-        problems = env.get_problem_ids(split_or_problem_id=problems)
+    # Create the environment to get the list of problems to run.
+    env = create_env(config, logger=logger)
+    problems = sorted(env.dataset)
 
     if args.list:
         print(f"\n# Available problems in {config.get('benchmark', 'config')}:")

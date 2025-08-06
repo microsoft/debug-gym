@@ -171,7 +171,7 @@ class OpenAILLM(LLM):
                             },
                         },
                     ],
-                    "content": filter_non_utf8(f"{response[0].response}"),
+                    "content": filter_non_utf8(response[0].response),
                 }
             )
         if history_info.action is None:
@@ -180,7 +180,7 @@ class OpenAILLM(LLM):
                 {
                     "role": "user",
                     "content": filter_non_utf8(
-                        f"{history_info.step_observation.observation}"
+                        history_info.step_observation.observation
                     ),
                 }
             )
@@ -192,7 +192,7 @@ class OpenAILLM(LLM):
                     "tool_call_id": history_info.action.id,
                     "name": history_info.action.name,
                     "content": filter_non_utf8(
-                        f"{history_info.step_observation.observation}"
+                        history_info.step_observation.observation
                     ),
                 }
             )
@@ -214,10 +214,18 @@ class OpenAILLM(LLM):
             )
         except openai.BadRequestError as e:
             # Handle specific error for context length exceeded, otherwise just propagate the error
-            if e.code == "context_length_exceeded":
+            if e.code in [
+                "context_length_exceeded",
+                "model_max_prompt_tokens_exceeded",
+                "string_above_max_length",
+            ]:
+                raise ContextLengthExceededError
+            if (
+                e.code == "invalid_request_body"
+                and "maximum context length" in e.message
+            ):
                 raise ContextLengthExceededError
             raise
-
         # LLM may select multiple tool calls, we only care about the first action
         if not response.choices[0].message.tool_calls:
             # LLM failed to call a tool

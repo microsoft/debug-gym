@@ -3,7 +3,7 @@ import os
 import re
 from os.path import join as pjoin
 from pathlib import Path
-from typing import Callable
+from typing import Any, Callable
 
 
 def clean_code(code):
@@ -15,6 +15,8 @@ def clean_code(code):
 
 def filter_non_utf8(text):
     """Filter out non-UTF-8 characters from text."""
+    if not text:
+        return None
     if isinstance(text, str):
         return text.encode("utf-8", errors="ignore").decode("utf-8")
     return text
@@ -206,3 +208,39 @@ def extract_reward_from_pytest_output(output):
         return int(match.group(1))
 
     return 0
+
+
+def filter_problems(
+    dataset: dict[str, Any],
+    problems: str | list[str] | None = None,
+    custom_splits: dict[str, Any] | None = None,
+    excluded_ids: list[str] | None = None,
+) -> dict[str, Any]:
+    excluded_ids = excluded_ids or []
+    custom_splits = custom_splits or {}
+    problems = "all" if problems is None else problems
+
+    if not isinstance(problems, str):
+        # Check that all problems are valid task names.
+        for problem in problems:
+            if problem not in dataset:
+                raise ValueError(
+                    f"Invalid problem id: '{problem}'.\nChoose from: {sorted(dataset)}"
+                )
+
+        # Make sure all problems are unique.
+        if len(problems) != len(set(problems)):
+            raise ValueError("Duplicate problem IDs found in the list.")
+
+        return problems  # Assuming a list of problem IDs.
+
+    if problems == "all":
+        return [k for k in dataset if k not in excluded_ids]
+    elif problems in dataset:
+        return [problems]  # Single task
+    elif problems in custom_splits:
+        return custom_splits[problems]
+    else:
+        raise ValueError(
+            f"Invalid split or problem id: '{problems}'.\nChoose from: {sorted(dataset) + ['all'] + sorted(custom_splits)}"
+        )

@@ -253,7 +253,8 @@ class TaskProgressManager:
                     f" task {task.problem_id}.",
                     TaskProgress.color(task.status),
                 )
-                self.dump_task_status(task)
+                if task.status not in ["skip-resolved", "skip-unresolved"]:
+                    self.dump_task_status(task)
             # Update the Rich task
             pid = self._progress_task_ids.get(task.problem_id)
             if pid is not None:
@@ -427,12 +428,17 @@ class OverallProgressContext:
         """Refresh the progress display, updating overall and tasks progress."""
         # Update overall progress with new stats
         stats = self.tasks_progress.get_task_stats()
+        resolved = stats["resolved"] + stats["skip-resolved"]
+        unresolved = stats["unresolved"] + stats["skip-unresolved"] + stats["error"]
+        total_so_far = (resolved + unresolved) or 1  # Avoid division by zero
+        perf_so_far = f"{100. * float(resolved) / (total_so_far):.2f}%"
         stats_text = (
             f"running: [blue]{stats['running']}[/blue] | "
             f"pending: [yellow]{stats['pending']}[/yellow] | "
             f"resolved: [green]{stats['resolved'] + stats['skip-resolved']}[/green] | "
             f"unresolved: [red]{stats['unresolved'] + stats['skip-unresolved']}[/red] | "
-            f"error: [red]{stats['error']}[/red]"
+            f"error: [red]{stats['error']}[/red] | "
+            f"acc: [green]{perf_so_far}[/green]"
         )
         self.overall_progress.update(
             self._overall_task,

@@ -101,22 +101,3 @@ def test_steps(env):
 
 def test_instructions(env):
     assert env.instructions == "What time is it?"
-
-
-def test_get_problem_ids(env):
-    # Test retrieving all problem IDs
-    all_problem_ids = env.get_problem_ids("all")
-    assert isinstance(all_problem_ids, list)
-    assert len(all_problem_ids) > 0
-    assert all(isinstance(problem_id, str) for problem_id in all_problem_ids)
-
-    # Test retrieving a single valid problem ID
-    valid_problem_id = all_problem_ids[0]
-    single_problem_id = env.get_problem_ids(valid_problem_id)
-    assert isinstance(single_problem_id, list)
-    assert len(single_problem_id) == 1
-    assert single_problem_id[0] == valid_problem_id
-
-    # Test retrieving an invalid problem ID
-    with pytest.raises(ValueError, match="Invalid split or problem id: 'invalid_id'"):
-        env.get_problem_ids("invalid_id")

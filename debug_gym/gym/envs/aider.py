@@ -29,7 +29,6 @@ class AiderBenchmarkEnv(RepoEnv):
 
     def __init__(self, entrypoint: str = "python -m pytest -s .", **kwargs):
         super().__init__(entrypoint=entrypoint, **kwargs)
-        self.load_dataset()
 
     def calculate_max_score(self, eval_output: EvalOutput) -> int:
         return utils.extract_max_score_from_pytest_output(eval_output.output)
@@ -66,14 +65,14 @@ class AiderBenchmarkEnv(RepoEnv):
         infos = super().reset(options=options)
         return infos
 
-    def load_dataset(self):
+    def load_dataset(self, problems: str | list[str] | None = None):
         if not os.path.exists(self.REPO_PATH):
             subprocess.run(["git", "clone", self.REPO_URL, self.REPO_PATH], check=True)
 
         practice_path = self.REPO_PATH / "exercises" / "practice"
         directories = [d for d in practice_path.iterdir() if d.is_dir()]
 
-        self.dataset = {}
+        dataset = {}
         for directory in directories:
             task_name = directory.name.replace("-", "_")
 
@@ -103,18 +102,12 @@ class AiderBenchmarkEnv(RepoEnv):
                 directory / ".debugreadonly", patterns=["*test*.py"]
             )
 
-            self.dataset[task_name] = {
+            dataset[task_name] = {
                 "base_directory": directory,
                 "instructions": instructions,
                 "filename": task_name + ".py",
             }
 
-    def get_problem_ids(self, split_or_problem_id):
-        if split_or_problem_id == "all":
-            return sorted(self.dataset.keys())  # all tasks
-        elif split_or_problem_id in self.dataset:
-            return [split_or_problem_id]  # Single task
-        else:
-            raise ValueError(
-                f"Invalid split or problem id: '{split_or_problem_id}'.\nChoose from: {['all'] + sorted(self.dataset.keys())}"
-            )
+        problems = utils.filter_problems(dataset, problems)
+        dataset = {id: i for id, i in dataset.items() if id in problems}
+        return dataset

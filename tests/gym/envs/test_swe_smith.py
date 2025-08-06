@@ -31,7 +31,7 @@ def build_swe_env_once(tmp_path_factory, worker_id):
     Do not run this fixture directly, use get_swe_env instead.
     """
     _build_swe_env = lambda: SWESmithEnv(
-        instance_ids=["john-kurkowski__tldextract.3d1bf184.combine_file__1vnuqpt4"]
+        problems=["john-kurkowski__tldextract.3d1bf184.combine_file__1vnuqpt4"]
     )
     if worker_id == "master":
         # Not running with pytest-xdist or we are in the master process
@@ -50,11 +50,11 @@ def get_swe_env(build_swe_env_once):
     """Instantiate a SWESmithEnv instance after building the SWESmith docker image."""
 
     def _swe_env(working_dir=None, map_host_uid_gid=True, **kwargs):
-        instance_ids = ["john-kurkowski__tldextract.3d1bf184.combine_file__1vnuqpt4"]
+        problems = ["john-kurkowski__tldextract.3d1bf184.combine_file__1vnuqpt4"]
         terminal = DockerTerminal(
             path=working_dir, map_host_uid_gid=map_host_uid_gid, **kwargs
         )
-        env = SWESmithEnv(instance_ids=instance_ids, terminal=terminal)
+        env = SWESmithEnv(problems=problems, terminal=terminal)
         return env
 
     return _swe_env
@@ -227,34 +227,3 @@ def test_calculate_score_with_pytest_error(get_swe_env):
 
     score = swe_env.calculate_score(eval_output)
     assert score == 0
-
-
-def test_get_problem_ids_all(get_swe_env):
-    swe_env = get_swe_env()
-    swe_env.excluded_ids = ["excluded_task_1", "excluded_task_2"]
-    swe_env.dataset = {
-        "task_1": 0,
-        "task_2": 1,
-        "excluded_task_1": 2,
-        "excluded_task_2": 3,
-    }
-
-    # Test retrieving all problem IDs
-    problem_ids = swe_env.get_problem_ids("all")
-    assert problem_ids == ["task_1", "task_2"]
-
-    # Test retrieving a single valid problem ID
-    swe_env.dataset = {"task_1": 0, "task_2": 1}
-    problem_ids = swe_env.get_problem_ids("task_1")
-    assert problem_ids == ["task_1"]
-
-    # Test retrieving a valid split.
-    swe_env.dataset_splits = {"split_1": ["task_1", "task_2"]}
-    problem_ids = swe_env.get_problem_ids("split_1")
-    assert problem_ids == ["task_1", "task_2"]
-
-    # Test retrieving an invalid problem ID
-    swe_env.dataset = {"task_1": 0}
-    swe_env.dataset_splits = {"split_1": ["task_1"]}
-    with pytest.raises(ValueError, match="Invalid split or problem id: 'invalid_id'"):
-        swe_env.get_problem_ids("invalid_id")

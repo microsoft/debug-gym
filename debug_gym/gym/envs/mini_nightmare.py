@@ -39,7 +39,6 @@ class MiniNightmareEnv(RepoEnv):
 
     def __init__(self, entrypoint: str = "python -m pytest -s test.py", **kwargs):
         super().__init__(entrypoint=entrypoint, **kwargs)
-        self.load_dataset()
 
     def calculate_max_score(self, eval_output: EvalOutput) -> int:
         return utils.extract_max_score_from_pytest_output(eval_output.output)
@@ -76,7 +75,7 @@ class MiniNightmareEnv(RepoEnv):
         infos = super().reset(options=options)
         return infos
 
-    def load_dataset(self):
+    def load_dataset(self, problems: str | list[str] | None = None):
         assert os.path.exists(
             self.DATA_PATH
         ), f"Data path {self.DATA_PATH} does not exist."
@@ -94,12 +93,16 @@ class MiniNightmareEnv(RepoEnv):
                 pjoin(self.DATA_PATH, task_name, ".debugreadonly")
             ), f"Task {task_name} missing .debugreadonly file."
 
-        self.dataset = {}
+        dataset = {}
         for task_name in self.TASK_NAMES:
             task_path = pjoin(self.DATA_PATH, task_name)
 
-            self.dataset[task_name] = {
+            dataset[task_name] = {
                 "instructions": "The program doesn't behave as intended. Investigate the repository, figure out the root cause, then rewrite the code to fix the issue. Beaware that the bug may not be in the code you initially see.",
                 "base_directory": task_path,
                 "filename": task_name + "_code.py",
             }
+
+        problems = utils.filter_problems(dataset, problems)
+        dataset = {id: i for id, i in dataset.items() if id in problems}
+        return dataset
