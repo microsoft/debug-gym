@@ -33,6 +33,63 @@ class EnvInfo:
     rewrite_counter: int
     tools: list[EnvironmentTool]
 
+    def __str__(self) -> str:
+        """Pretty print the environment information."""
+        lines = []
+        lines.append("=" * 70)
+        lines.append("DEBUG GYM ENVIRONMENT INFO".center(70))
+        lines.append("=" * 70)
+
+        # Status section
+        lines.append(
+            f"📊 Status: {'✅ (DONE)' if self.done else '🔄 (IN PROGRESS)'}\t"
+            f"🎯 Score: {self.score}/{self.max_score}\t"
+            f"✏️ Rewrites: {self.rewrite_counter}"
+        )
+
+        # Action section
+        if self.action:
+            lines.append("🔧 Last Action:")
+            lines.append(f"   Tool: {self.action.name}")
+            if self.action_reasoning:
+                lines.append(f"   Reasoning: {self.action_reasoning}")
+            lines.append("")
+
+        # Observations section
+        lines.append(f"👁️ Observation:")
+        lines.append(f"```\n{self.step_observation}\n```")
+        lines.append("")
+
+        # Tools section
+        lines.append(f"🛠️  Available Tools ({len(self.tools)}):")
+        tool_names = [tool.name for tool in self.tools]
+        lines.append(f"   {', '.join(tool_names)}")
+        lines.append("")
+
+        # Breakpoints section
+        lines.append("🔴 Breakpoints:")
+        if self.current_breakpoints == "No breakpoints are set.":
+            lines.append("   None set")
+        else:
+            for bp in self.current_breakpoints.split("\n")[:5]:  # Show first 5
+                lines.append(f"   • {bp}")
+            if len(self.current_breakpoints.split("\n")) > 5:
+                lines.append(
+                    f"   ... and {len(self.current_breakpoints.split('\n')) - 5} more"
+                )
+        lines.append("")
+
+        # Directory tree section (truncated)
+        lines.append("📁 Directory Structure:")
+        tree_lines = self.dir_tree.split("\n")
+        for line in tree_lines[:10]:  # Show first 10 lines
+            lines.append(f"   {line}")
+        if len(tree_lines) > 10:
+            lines.append(f"   ... and {len(tree_lines) - 10} more files/directories")
+
+        lines.append("=" * 60)
+        return "\n".join(lines)
+
 
 class EventHooks:
     def __init__(self):
