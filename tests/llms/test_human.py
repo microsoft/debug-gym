@@ -524,7 +524,9 @@ def test_human_integration(build_env_info):
     human = Human()
     messages = [{"role": "user", "content": "Hello"}]
     env_info = build_env_info(
-        action=ToolCall(id="pdb-637469", name="pdb", arguments={"command": "b 10"}),
+        action_tool_call=ToolCall(
+            id="pdb-637469", name="pdb", arguments={"command": "b 10"}
+        ),
         tools=[Toolbox.get_tool("pdb"), Toolbox.get_tool("view")],
     )
     llm_response = human(messages, env_info.tools)
@@ -682,7 +684,9 @@ def test_human_format_tool_call_history(build_env_info):
 
     # Create mock history info
     history_info = build_env_info(
-        action=ToolCall(id="test-123", name="test_tool", arguments={"arg": "value"}),
+        action_tool_call=ToolCall(
+            id="test-123", name="test_tool", arguments={"arg": "value"}
+        ),
         step_observation=type("MockObs", (), {"observation": "Test observation"})(),
     )
 
