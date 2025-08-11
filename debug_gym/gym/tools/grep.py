@@ -87,6 +87,15 @@ class GrepTool(EnvironmentTool):
             command += f" | head -{max_results}"
 
         try:
+            # Assert that the terminal is a Docker terminal
+            from debug_gym.gym.terminal import DockerTerminal
+
+            if not isinstance(environment.terminal, DockerTerminal):
+                return Observation(
+                    self.name,
+                    "Error: grep tool requires a Docker terminal. Current terminal type is not supported.",
+                )
+
             # Use the environment's terminal to run the grep command
             success, output = environment.terminal.run(command, timeout=30)
 

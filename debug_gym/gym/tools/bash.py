@@ -31,6 +31,15 @@ class BashTool(EnvironmentTool):
     def use(self, environment, command: str) -> Observation:
         """Execute a bash command in the environment's terminal and return the result."""
         try:
+            # Assert that the terminal is a Docker terminal
+            from debug_gym.gym.terminal import DockerTerminal
+
+            if not isinstance(environment.terminal, DockerTerminal):
+                return Observation(
+                    self.name,
+                    "Error: bash tool requires a Docker terminal. Current terminal type is not supported.",
+                )
+
             # Use the environment's terminal to run the command
             # Set a reasonable timeout (30 seconds) to prevent hanging
             success, output = environment.terminal.run(command, timeout=30)
