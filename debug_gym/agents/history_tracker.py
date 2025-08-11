@@ -89,10 +89,9 @@ def build_history_prompt(
     history: HistoryTracker, llm: LLM, reset_prompt_history_after_rewrite: bool = False
 ):
     _history, _prompt_response_pairs = history.get()
-    # Find the latest rewrite step
-    if len(_history) == 0 or reset_prompt_history_after_rewrite is False:
-        latest_rewrite_step = 0
-    else:
+    latest_rewrite_step = 0
+    # Find the latest rewrite step if reset_prompt_history_after_rewrite
+    if reset_prompt_history_after_rewrite:
         for i in range(len(_history)):
             if _history[i].rewrite_counter == _history[-1].rewrite_counter:
                 latest_rewrite_step = i
