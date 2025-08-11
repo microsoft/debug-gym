@@ -59,6 +59,7 @@ class GrepTool(EnvironmentTool):
         grep_args.append("-r")  # recursive
         grep_args.append("-E")  # extended regex
         grep_args.append("-H")  # print filename with output
+        grep_args.append("-I")  # skip binary files
 
         if not case_sensitive:
             grep_args.append("-i")  # ignore case
