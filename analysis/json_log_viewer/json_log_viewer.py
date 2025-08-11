@@ -9,6 +9,9 @@ app = Flask(__name__)
 app.config["UPLOAD_FOLDER"] = "uploads"
 app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024  # 16MB max file size
 
+# Define a safe root directory for browsing
+SAFE_ROOT = os.getcwd()
+
 # Create uploads directory if it doesn't exist
 os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
 
@@ -123,11 +126,14 @@ def load_from_cwd(filename):
 @app.route("/browse_directory")
 def browse_directory():
     """Browse directory contents via AJAX"""
-    path = request.args.get("path", os.getcwd())
+    path = request.args.get("path", SAFE_ROOT)
 
     # Sanitize path to prevent directory traversal attacks
     try:
         path = os.path.abspath(path)
+        # Ensure path is within SAFE_ROOT
+        if not path.startswith(SAFE_ROOT):
+            return jsonify({"error": "Access denied: Path outside allowed directory"}), 403
         if not os.path.exists(path) or not os.path.isdir(path):
             return jsonify({"error": "Invalid directory"}), 400
     except (OSError, ValueError):
