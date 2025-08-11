@@ -65,7 +65,7 @@ class ViewTool(EnvironmentTool):
 
         # Convert 1-based line numbers to 0-based indices
         s = (start - 1) if start is not None else 0
-        e = end if end is not None else len(file_lines)
+        e = min(end, len(file_lines)) if end is not None else len(file_lines)
 
         # Validate indices
         if s < 0 or s >= len(file_lines):
