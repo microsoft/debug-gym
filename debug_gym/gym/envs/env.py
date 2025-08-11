@@ -25,7 +25,8 @@ class EnvInfo:
     dir_tree: str
     current_breakpoints: str
     action_reasoning: str | None
-    action: ToolCall | None
+    action_content: str | None
+    action_tool_call: ToolCall | None
     instructions: dict
     score: int
     max_score: int
@@ -343,7 +344,8 @@ class RepoEnv(TooledEnv):
             dir_tree=self.display_files(),
             current_breakpoints=self.current_breakpoints(),
             action_reasoning=None,
-            action=None,
+            action_content=None,
+            action_tool_call=None,
             done=self.done,
             score=self.score,
             max_score=self.max_score,
@@ -515,12 +517,17 @@ class RepoEnv(TooledEnv):
             f"apply_gold_patch is not implemented for {self.__class__.__name__}."
         )
 
-    def step(self, action: ToolCall, action_reasoning: str = "") -> EnvInfo:
+    def step(
+        self,
+        action_tool_call: ToolCall,
+        action_content: str | None = None,
+        action_reasoning: str | None = None,
+    ) -> EnvInfo:
         # given action, return new obs, and update infos
         # the action space is composed of a few smaller action spaces
         self.clear_all_observations()
         self.empty_event_queue()
-        message, tool_info = self.get_triggered_tools(action)
+        message, tool_info = self.get_triggered_tools(action_tool_call)
         if message:
             self.step_observation = Observation("env", message)
         else:
@@ -534,7 +541,7 @@ class RepoEnv(TooledEnv):
             except BaseException as e:
                 error_message = (
                     f"Error while using tool {triggered_tool.name} "
-                    f"with action: {action}.\n{e}"
+                    f"with action: {action_tool_call}.\n{e}"
                 )
                 self.step_observation = Observation("env", error_message)
                 self.logger.debug(error_message)
@@ -555,7 +562,8 @@ class RepoEnv(TooledEnv):
             dir_tree=self.display_files(),
             current_breakpoints=self.current_breakpoints(),
             action_reasoning=action_reasoning,
-            action=action,
+            action_content=action_content,
+            action_tool_call=action_tool_call,
             instructions=self.instructions,
             score=self.score,
             max_score=self.max_score,

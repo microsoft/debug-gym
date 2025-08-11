@@ -325,7 +325,8 @@ def test_format_tool_call_history_initial_state(mock_llm_config, logger_mock):
         dir_tree="",
         current_breakpoints="",
         action_reasoning=None,  # No reasoning yet
-        action=None,  # No action taken yet
+        action_content=None,  # No content yet
+        action_tool_call=None,  # No action taken yet
         instructions={},
         score=0,
         max_score=100,
@@ -368,7 +369,8 @@ def test_format_tool_call_history_with_action(mock_llm_config, logger_mock):
         dir_tree="",
         current_breakpoints="",
         action_reasoning="Edited the file to fix the bug",
-        action=action,  # Action was taken
+        action_content="Edited the file to fix the bug",
+        action_tool_call=action,  # Action was taken
         instructions={},
         score=0,
         max_score=100,

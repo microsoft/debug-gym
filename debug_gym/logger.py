@@ -253,7 +253,8 @@ class TaskProgressManager:
                     f" task {task.problem_id}.",
                     TaskProgress.color(task.status),
                 )
-                self.dump_task_status(task)
+                if task.status not in ["skip-resolved", "skip-unresolved"]:
+                    self.dump_task_status(task)
             # Update the Rich task
             pid = self._progress_task_ids.get(task.problem_id)
             if pid is not None:

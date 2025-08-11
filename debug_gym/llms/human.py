@@ -512,7 +512,11 @@ class Human(LLM):
                     ],
                 }
             )
-        if history_info.action is None:
+        if (
+            history_info.action_tool_call is None
+            and history_info.action_content is None
+            and history_info.action_reasoning is None
+        ):
             # This is the initial state, no action taken yet
             _messages.append(
                 {
@@ -529,7 +533,7 @@ class Human(LLM):
                     "content": [
                         {
                             "type": "tool_result",
-                            "tool_use_id": history_info.action.id,
+                            "tool_use_id": history_info.action_tool_call.id,
                             "content": filter_non_utf8(
                                 f"{history_info.step_observation.observation}"
                             ),
