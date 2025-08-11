@@ -326,6 +326,8 @@ def test_view_end_line_max(env):
         "     6 print('Line 6')\n"
         "     7 print('Line 7')\n"
         "     8 print('Line 8')\n"
+        "     9 print('Line 9')\n"
+        "    10 print('Line 10')\n"
         "```\n"
         "\n"
     )
