@@ -315,7 +315,7 @@ def test_view_end_line_max(env):
     )
     env_info = env.step(view_call)
     assert env_info.step_observation.observation == (
-        "Viewing `ten_lines.py`, lines 5-8 of 10 total lines.\n"
+        "Viewing `ten_lines.py`, lines 1-10 of 10 total lines.\n"
         "\n"
         "```\n"
         "     1 print('Line 1')\n"
