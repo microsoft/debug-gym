@@ -32,7 +32,8 @@ base:
     max_rewrite_steps: 10
     memory_size: 20
     save_patch: True
-    reset_prompt_history_after_rewrite: True
+    # If reset_prompt_history_after_rewrite is True, reset the prompt history after a rewrite; otherwise, keep the full history
+    # reset_prompt_history_after_rewrite: True
     # Optionally loads a custom system prompt template from a file.
     # system_prompt_template_file: "script/templates/system_prompt.jinja"
 
