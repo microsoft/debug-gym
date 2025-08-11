@@ -46,3 +46,7 @@ debug_agent:
 debug_5_agent:
     n_rewrites_before_pdb: 5
     tools: ["pdb", "view", "rewrite", "eval"]
+
+grep_agent:
+    agent_type: "rewrite_agent"
+    tools: ["grep", "view", "rewrite", "eval"]
