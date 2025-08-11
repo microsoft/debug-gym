@@ -47,6 +47,7 @@ class HistoryTracker:
             json_out = {
                 "step_id": game_step,
                 "reasoning": None,
+                "content": None,
                 "action": None,  # env reset
                 "obs": self.memory[0].step_observation.observation,
                 "rewrite_consumed": 0,
@@ -55,8 +56,9 @@ class HistoryTracker:
         else:
             json_out = {
                 "step_id": game_step,
+                "content": self.memory[game_step].action_content,
                 "reasoning": self.memory[game_step].action_reasoning,
-                "action": asdict(self.memory[game_step].action),
+                "action": asdict(self.memory[game_step].action_tool_call),
                 "obs": self.memory[game_step].step_observation.observation,
                 "rewrite_consumed": self.memory[game_step].rewrite_counter,
             }
@@ -87,10 +89,9 @@ def build_history_prompt(
     history: HistoryTracker, llm: LLM, reset_prompt_history_after_rewrite: bool = False
 ):
     _history, _prompt_response_pairs = history.get()
-    # Find the latest rewrite step
-    if len(_history) == 0 or reset_prompt_history_after_rewrite is False:
-        latest_rewrite_step = 0
-    else:
+    latest_rewrite_step = 0
+    # Find the latest rewrite step if reset_prompt_history_after_rewrite
+    if reset_prompt_history_after_rewrite:
         for i in range(len(_history)):
             if _history[i].rewrite_counter == _history[-1].rewrite_counter:
                 latest_rewrite_step = i

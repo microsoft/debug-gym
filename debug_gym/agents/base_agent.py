@@ -57,7 +57,7 @@ class BaseAgent:
         messages = build_history_prompt(
             self.history,
             self.llm,
-            self.config["reset_prompt_history_after_rewrite"],
+            self.config.get("reset_prompt_history_after_rewrite", False),
         )
         return messages
 
@@ -259,7 +259,11 @@ class BaseAgent:
                 if debug:
                     breakpoint()
 
-                info = self.env.step(llm_response.tool, llm_response.response)
+                info = self.env.step(
+                    llm_response.tool,
+                    llm_response.response,
+                    llm_response.reasoning_response,
+                )
                 self.history.step(info, llm_response)
 
                 if (
