@@ -204,21 +204,6 @@ def env(tmp_path):
     return env
 
 
-def test_restore(env):
-    # Change the content of a file
-    file1 = env.working_dir / "file1.txt"
-    with open(file1, "w") as f:
-        f.write("Hello, World!")
-
-    def hash_file(file):
-        with open(file, "rb") as f:
-            return hash(f.read())
-
-    assert hash_file(env.path / "file1.txt") != hash_file(file1)
-    env.restore()
-    assert hash_file(env.path / "file1.txt") == hash_file(file1)
-
-
 def test_display_files(env):
     result = env.display_files()
     assert result == (

@@ -1,10 +1,7 @@
 import atexit
-import os
 import shutil
-import subprocess
 import tempfile
 from dataclasses import dataclass
-from glob import glob
 from pathlib import Path
 
 import numpy as np
@@ -300,20 +297,6 @@ class RepoEnv(TooledEnv):
         msg += self.directory_tree()
         return msg
 
-    def restore(self, *filepaths):
-        filepaths = filepaths or glob(
-            f"{self.path}/**",
-            root_dir=self.path,
-            recursive=True,
-        )
-        relative_filepaths = [os.path.relpath(f, self.path) for f in filepaths]
-        for filepath in relative_filepaths:
-            if os.path.isdir(self.path / filepath):
-                os.makedirs(self.working_dir / filepath, exist_ok=True)
-                continue
-
-            shutil.copy2(self.path / filepath, self.working_dir / filepath)
-
     def reset(self, *, options: dict = None):
         """Resets the environment and returns eval as the initial observation."""
         self.logger.info("Resetting environment")
@@ -507,10 +490,12 @@ class RepoEnv(TooledEnv):
 
     @property
     def patch(self):
-        command = ["git", "diff", "--no-index", self.path, self.working_dir]
-        result = subprocess.run(command, text=True, capture_output=True)
-        patch = result.stdout.replace(str(self.working_dir), str(self.path))
-        return patch
+        success, output = self.terminal.run("git diff")
+        if not success:
+            self.logger.error("Failed to get git diff. {output}")
+            return None
+
+        return output
 
     def apply_gold_patch(self):
         raise NotImplementedError(

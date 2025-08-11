@@ -4,6 +4,7 @@ from os.path import join as pjoin
 import debug_gym.gym.utils as utils
 from debug_gym.gym.entities import EvalOutput
 from debug_gym.gym.envs.env import RepoEnv
+from debug_gym.gym.terminal import DockerTerminal, Terminal
 
 
 class MiniNightmareEnv(RepoEnv):
@@ -21,12 +22,29 @@ class MiniNightmareEnv(RepoEnv):
         "tomorrow_date",
     ]
 
+    def __init__(
+        self,
+        entrypoint: str = "python -m pytest -s test.py",
+        terminal: Terminal | None = None,
+        **kwargs,
+    ):
+        terminal = terminal or DockerTerminal(
+            base_image="python:3.12-slim",
+            setup_commands=[
+                "apt update",
+                "apt install -y git",
+                "pip install pytest pandas",
+            ],
+            logger=kwargs.get("logger"),
+        )
+        if not isinstance(terminal, DockerTerminal):
+            raise ValueError("MiniNightmareEnv only supports DockerTerminal.")
+
+        super().__init__(entrypoint=entrypoint, terminal=terminal, **kwargs)
+
     @property
     def instructions(self) -> str:
         return self.current_sample["instructions"]
-
-    def __init__(self, entrypoint: str = "python -m pytest -s test.py", **kwargs):
-        super().__init__(entrypoint=entrypoint, **kwargs)
 
     def calculate_max_score(self, eval_output: EvalOutput) -> int:
         return utils.extract_max_score_from_pytest_output(eval_output.output)
@@ -40,11 +58,26 @@ class MiniNightmareEnv(RepoEnv):
         self.last_eval = EvalOutput(success, output)
         return self.last_eval
 
+    def setup_terminal(self):
+        self.logger.info(f"Configuring docker container: {self.terminal.container}")
+
+        self.terminal.run("git init")
+        self.terminal.run("git config user.name 'debug-gym'")
+        self.terminal.run("git config user.email '<>'")
+
+        self.terminal.run("git add *.py")
+        self.terminal.run("git commit -am 'Init'")
+
+        self.terminal.run("git add .debugignore")
+        self.terminal.run("git add .debugreadonly")
+        self.terminal.run("git commit -am 'Add debug-gym ignore and read-only files'")
+
     def reset(self, *, options: dict = None):
         options = options or {}
         self.current_sample = self.dataset[options["task_name"]]
         directory = self.current_sample["base_directory"]
         self.setup_workspace(directory, entrypoint=self.entrypoint)
+        self.setup_terminal()
         infos = super().reset(options=options)
         return infos
 
