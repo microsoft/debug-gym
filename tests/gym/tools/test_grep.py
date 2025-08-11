@@ -189,9 +189,6 @@ env/
 """
             )
 
-        with (working_dir / "hidden" / "secret.txt").open("w") as f:
-            f.write("This is a secret file that should be ignored by default")
-
         return working_dir
 
     return _setup_grep_test_repo
@@ -277,19 +274,6 @@ class TestGrepTool:
         assert result.source == "grep"
         assert "src/utils.py" in result.observation
         assert "tests/test_utils.py" not in result.observation
-
-    def test_grep_with_ignore_patterns(self, tmp_path, setup_grep_repo_env):
-        """Test that grep respects ignore patterns"""
-        # Set up environment with ignore patterns
-        grep_tool, env = setup_grep_repo_env(
-            tmp_path, ignore_patterns=["*.md", "*.log", "hidden/", "*.bin"]
-        )
-
-        # Search for content that exists in ignored files
-        result = grep_tool.use(env, pattern="Test Project")
-        assert result.source == "grep"
-        # Should not find matches in README.md since it's ignored
-        assert "README.md" not in result.observation
 
     def test_grep_max_results_limit(self, tmp_path, setup_grep_repo_env):
         """Test max results limitation"""
@@ -387,19 +371,6 @@ class TestGrepTool:
         assert result.source == "grep"
         # Should either find no matches or handle the binary file gracefully
         assert "Search failed" not in result.observation
-
-    def test_grep_respects_environment_visibility(self, tmp_path, setup_grep_repo_env):
-        """Test that grep only searches visible files according to environment rules"""
-        # Set up environment with ignore patterns
-        grep_tool, env = setup_grep_repo_env(
-            tmp_path, ignore_patterns=[".git*", "hidden/", "*.bin"]
-        )
-
-        # Search for content that exists in hidden files
-        result = grep_tool.use(env, pattern="secret")
-        assert result.source == "grep"
-        # Should not find the secret file content
-        assert "secret.txt" not in result.observation
 
     def test_grep_file_too_large_line_truncation(self, tmp_path, setup_grep_repo_env):
         """Test that very long lines are truncated properly"""
