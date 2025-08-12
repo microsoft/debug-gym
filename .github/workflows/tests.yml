@@ -40,13 +40,19 @@ jobs:
             tests/gym/envs/test_swe_*.py
       - name: Test - PR - Fast
         if: github.event_name == 'pull_request' && steps.changed-files-specific.outputs.any_changed != 'true'
+        env:
+          FORCE_DOCKER_TERMINAL: false
         run: |
           DEBUG_GYM_DEBUG=1 pytest -vv -n 16 -k "not test_swe_bench and not test_swe_smith" --cov=debug_gym --cov-report=term-missing --cov-fail-under=80 --timeout=600
       - name: Test - PR - Slow
         if: github.event_name == 'pull_request' && steps.changed-files-specific.outputs.any_changed == 'true'
+        env:
+          FORCE_DOCKER_TERMINAL: false
         run: |
           DEBUG_GYM_DEBUG=1 pytest -vv -n 16 --cov=debug_gym --cov-report=term-missing --cov-fail-under=85 --timeout=600
       - name: Test - main
         if: github.event_name != 'pull_request'
+        env:
+          FORCE_DOCKER_TERMINAL: false
         run: |
           DEBUG_GYM_DEBUG=1 pytest -vv -n 16 --cov=debug_gym --cov-report=term-missing --cov-fail-under=85 --timeout=600

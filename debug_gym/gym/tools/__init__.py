@@ -1,4 +1,6 @@
+from debug_gym.gym.tools.bash import BashTool
 from debug_gym.gym.tools.eval import EvalTool
+from debug_gym.gym.tools.grep import GrepTool
 from debug_gym.gym.tools.listdir import ListdirTool
 from debug_gym.gym.tools.pdb import PDBTool
 from debug_gym.gym.tools.rewrite import RewriteTool
