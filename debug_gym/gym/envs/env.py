@@ -62,8 +62,8 @@ class EnvInfo:
 
         # Tools section
         lines.append(f"🛠️  Available Tools ({len(self.tools)}):")
-        tool_names = [tool.name for tool in self.tools]
-        lines.append(f"   {', '.join(tool_names)}")
+        # tool_names = [tool.name for tool in self.tools]
+        lines.append(f"   {'\n   '.join(map(str, self.tools))}")
         lines.append("")
 
         # Breakpoints section
