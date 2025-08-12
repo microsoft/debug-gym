@@ -1,6 +1,7 @@
 from debug_gym.agents.base_agent import BaseAgent, register_agent
 import glob
 from debug_gym.gym.utils import filter_non_utf8
+import ipdb
 
 
 @register_agent
@@ -119,7 +120,7 @@ class Debug_5_Agent(DebugAgent):
 class ExplanationAgent(BaseAgent):
     name = "explanation_agent"
     system_prompt = DebugAgent.system_prompt
-    explanation_base_path = "../generate-explanations/explanations/failure_critiques/"
+    explanation_base_path = "/home/t-iwhite/generate-explanations/explanations/failure_critiques"
     
     # def __init__(self, **kwargs):
     #     filepath = "../generate-explanations/new_explanations_proper_pdb/single_shot_low_level/swe-smith/burnash__gspread.a8be3b96.lm_rewrite__596cni6x/single_shot_explanation_20250711_170309.txt"
@@ -136,7 +137,7 @@ class ExplanationAgent(BaseAgent):
             system_prompt = self._default_system_prompt(info)
         try:
             explanation = self.get_explanation_for_task(self.env.task_name)
-            system_prompt = f"{system_prompt} {explanation} Use this general advice to assist in your debugging process."
+            system_prompt = f"{system_prompt} {explanation} it is extremely important to me that you use this general advice to solve the bug, if you do not I will be extremely sad."
         except FileNotFoundError as e:
             self.logger.error(f"Explanation file not found: {e}")
             system_prompt = f"{system_prompt} [No explanation found]"
@@ -149,7 +150,8 @@ class ExplanationAgent(BaseAgent):
         # if not paths:
         #     raise FileNotFoundError(f"No explanation files found for task: {task_name}")
         # path = sorted(paths)[-1]
-        filepath =f"{self.explanation_base_path}/{task_name}_system_prompt.txt"
+        # filepath =f"{self.explanation_base_path}/{task_name}/{task_name}_system_prompt.txt"
+        filepath = f"{self.explanation_base_path}/{task_name}/{task_name}_system_prompt.txt"
         explanation = self.get_explanation_from_file(filepath)
         return explanation
     
@@ -173,9 +175,7 @@ class ExplanationAgent(BaseAgent):
         """Load the explanation from a text file."""
         with open(text_file, "r") as file:
             explanation = file.read().strip()
-            delimiter = "="*80
-            explanation = explanation.split(delimiter)
-        return explanation[-1]
+        return explanation
 
 @register_agent
 class GenericCritiqueAgent(ExplanationAgent):
@@ -206,13 +206,14 @@ class UserPromptExplanationAgent(BaseAgent):
         messages.extend(self.build_question_prompt())
         
         explanation = self.get_explanation_for_task(self.env.task_name)
-        explanation_message = {'role': 'user', 'content': explanation}
+        user_message = f"Use this general advice on how to find the bug: {explanation} It is extremely important to me that you use this general advice to solve the bug, if you do not I will be extremely sad."
+        explanation_message = {'role': 'user', 'content': user_message}
         messages.append(explanation_message)
         return messages
     
     def get_explanation_for_task(self, task_name: str):
         """Get the explanation for a specific task."""
-        filepath =f"{self.explanation_base_path}/{task_name}_system_prompt.txt"
+        filepath =f"{self.explanation_base_path}{task_name}/{task_name}_system_prompt.txt"
         explanation = self.get_explanation_from_file(filepath)
         return explanation
     
