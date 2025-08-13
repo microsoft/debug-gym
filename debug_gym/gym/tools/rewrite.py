@@ -3,7 +3,6 @@ import difflib
 from debug_gym.gym.entities import Event, Observation
 from debug_gym.gym.tools.tool import EnvironmentTool
 from debug_gym.gym.tools.toolbox import Toolbox
-from debug_gym.gym.utils import clean_code
 
 
 @Toolbox.register()
@@ -45,7 +44,6 @@ class RewriteTool(EnvironmentTool):
 
     def _rewrite_file(self, environment, file_path, start, end, new_code):
         original_content = environment.read_file(file_path)
-        new_code = clean_code(new_code)  # str
         new_code_lines = new_code.split("\n")
         new_code_length = len(new_code_lines)
 
