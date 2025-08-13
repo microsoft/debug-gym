@@ -1,4 +1,8 @@
 from debug_gym.agents.base_agent import BaseAgent, register_agent
+from debug_gym.gym.envs.env import RepoEnv
+from debug_gym.llms.base import LLM
+from debug_gym.logger import DebugGymLogger
+import json
 
 
 @register_agent
@@ -116,3 +120,127 @@ class Debug_5_Agent(DebugAgent):
                 status="error",
             )
             raise
+
+class SampleAgent(BaseAgent):
+    name = "sample_agent"
+    system_prompt = "You are a sample agent that does nothing. Your goal is to return the observation as the action without any modifications. You can think step by step to help you make the decision at every step, but you must be concise and avoid overthinking. Output both your thinking process (if any) and the tool call in the response."
+
+    def __init__(
+        self,
+        config: dict,
+        env: RepoEnv,
+        llm: LLM | None = None,
+        logger: DebugGymLogger | None = None,
+    ):
+        super().__init__(config, env, llm, logger)
+        self.judge_llm = LLM(
+            model_name="o3"
+            )
+
+    def judge_to_rank_response(self, rubrics, responses):
+        """
+        Takes in a set of rubrics and a set of responses and gives each response a score based on the rubrics.
+        The responses are then returned in descending order of their scores.
+        """
+        response_scores = {}
+        for response in responses:
+            score = self.score_response(rubrics, response)
+            response_scores[response] = score
+
+        # sort indices of response_scores by
+        sorted_responses = sorted(response_scores.items(), key=lambda x: x[1], reverse=True)
+        return [resp for resp, _ in sorted_responses]
+
+    def score_response(self, rubrics, response):
+        """
+        Takes in a response and a set of rubrics and returns a score for the response based on the rubrics.
+        """
+        prompt = self.make_rubric_scoring_prompt(rubrics, response)
+        judge_scoring = self.judge_llm(prompt, self.env.tools)
+        
+        # parse the response to extract the scores
+        try:
+            fixed_scoring = judge_scoring.replace("'", '"').replace("True", "true").replace("False", "false")
+            scores = json.loads(fixed_scoring)
+        except json.JSONDecodeError:
+            self.logger.error(f"Failed to parse judge response: {judge_scoring}")
+            scores = []
+        
+        #TODO: check each piece of evidence against the ground truth??
+        score = sum(1 for item in scores if item.get("applies", False))
+        
+        return score
+    
+    def make_rubric_scoring_prompt(self, rubrics, response):
+        """
+        Takes in a set of rubrics and a response and returns a prompt that can be used to score the response based on the rubrics.
+        """
+        prompt = (
+            f"Please score the following response based on the following rubrics:\n"
+            f"Rubrics: {rubrics}\n"
+            f"Response: {self.history + response}\n"
+            f"For each rubric item, provide a response of true or false as well as evidence in terms of the steps, for example:\n"
+            "Return your answer in this format: [{'rubric': 'Use the pdb tool efficiently', 'applies': true, 'examples': [{'step': '7', 'tool_call': 'pdb'}, {'step': '8', 'tool_call': 'pdb'}]}, {'applies': false, 'evidence': []}, ...] "
+            "where applies is a boolean indicating whether the critique applies to the trajectory, step is the step number that the critique refers to, and tool_call is the name of the tool that was called at that step."
+        )
+        return prompt
+    
+    def agent_step(self, info, step, task_name=None, debug=False):
+        self.logger.info(f"\n{'='*20} STEP {step+1} {'='*20}\n")
+        highscore = max(highscore, info.score)
+        self.logger.info(
+            f"[{task_name[:10]:<10}] | Step: {step:<4} | Score: {info.score:>4}/{info.max_score:<4} ({info.score/info.max_score:.1%}) [Best: {highscore}]"
+        )
+
+        messages = self.build_prompt(info)
+        # Query k responses from the LLM
+        k = self.config.get("num_responses", 1)
+        llm_responses = []
+        for _ in range(k):
+            llm_response = self.llm(messages, info.tools)
+            llm_responses.append(llm_response)
+        
+        # For now, just use the first response
+        
+
+        if debug:
+            breakpoint()
+
+        info = self.env.step(
+            llm_response.tool,
+            llm_response.response,
+            llm_response.reasoning_response,
+        )
+        self.history.step(info, llm_response)
+
+        if (
+            info.done
+            or info.rewrite_counter >= self.config["max_rewrite_steps"]
+        ):
+            reason = "done" if info.done else "max_rewrite_steps reached"
+            self.logger.info(
+                f"Step: {step} | Score: {info.score}/{info.max_score} ({info.score/info.max_score:.1%}) | Reason: {reason}"
+            )
+            # early stop, set current step and total steps to be the same
+            self.logger.report_progress(
+                problem_id=task_name,
+                step=step + 1,
+                total_steps=step + 1,
+                score=info.score,
+                max_score=info.max_score,
+                status="resolved" if info.done else "unresolved",
+            )
+            return {"done": True, "score": info.score, "max_score": info.max_score}
+        # keep progress bar running until max_steps is reached
+        self.logger.report_progress(
+            problem_id=task_name,
+            step=step + 1,
+            total_steps=max_steps + 1,
+            score=info.score,
+            max_score=info.max_score,
+            status="running",
+        )
+        
+        
+    def run(self, task_name=None, debug=False):
+        pass
