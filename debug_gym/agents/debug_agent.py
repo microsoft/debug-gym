@@ -1,6 +1,7 @@
 from debug_gym.agents.base_agent import BaseAgent, register_agent
 from debug_gym.gym.envs.env import RepoEnv
 from debug_gym.llms.base import LLM
+from debug_gym.llms import OpenAILLM
 from debug_gym.logger import DebugGymLogger
 import json
 
@@ -120,10 +121,10 @@ class Debug_5_Agent(DebugAgent):
                 status="error",
             )
             raise
-
+@register_agent
 class SampleAgent(BaseAgent):
     name = "sample_agent"
-    system_prompt = "You are a sample agent that does nothing. Your goal is to return the observation as the action without any modifications. You can think step by step to help you make the decision at every step, but you must be concise and avoid overthinking. Output both your thinking process (if any) and the tool call in the response."
+    system_prompt = "You are a debugging agent specialized in fixing Python programs. Your goal is to debug a Python program to make sure it can pass a set of test functions. You have access to a set of tools including the pdb debugger to help you investigate the code before proposing a patch. While the code may seem familiar to you from your training, you should not assume you know the code. Instead, you must use the pdb debugger to investigate the code and understand the potential bugs. A common debugging workflow is to 1) find suspicious files and lines (from error messages or test failures); 2) set breakpoints at suspicious places; 3) continue execution so the frame is at the breakpoint you set; 4) then print necessary values to identify the bugs. Once you have gained enough information, propose a rewriting patch to fix the bugs. Avoid rewriting the entire code, focus on the bugs only. You can only call one tool at a time. Do not repeat your previous action, especially if it returned tool calling errors or it resulted in information that you already know. You can think step by step to help you make the decision at every step, but you must be concise and avoid overthinking. If you are confident that you have enough information, propose a patch to fix the bugs by calling the rewrite tool. If you are not sure, continue using the pdb tool to gather more information before proposing a patch. After every rewrite, it's always a good idea to call the eval tool to execute the new code and check if it passes the tests; if it does not, the tool will return the error messages, which you can use to continue debugging. Output both your thinking process (if any) and the tool call in the response."
 
     def __init__(
         self,
@@ -133,29 +134,35 @@ class SampleAgent(BaseAgent):
         logger: DebugGymLogger | None = None,
     ):
         super().__init__(config, env, llm, logger)
-        self.judge_llm = LLM(
-            model_name="o3"
-            )
+        self.judge_llm = LLM.instantiate(
+            llm_name="o3",
+            llm_config_file_path=config.get("llm_config_file_path"),
+            logger=logger,
+        )
+        with open("/home/t-iwhite/debug-gym/rubrics.txt", "r") as f:
+            self.rubrics = f.read().strip().split("\n")
+        
+        self.rubrics = [r for r in self.rubrics if r.strip()]
 
-    def judge_to_rank_response(self, rubrics, responses):
+    def judge_to_rank_response(self, responses):
         """
-        Takes in a set of rubrics and a set of responses and gives each response a score based on the rubrics.
+        Takes in a set of responses and gives each response a score based on the rubrics.
         The responses are then returned in descending order of their scores.
         """
         response_scores = {}
         for response in responses:
-            score = self.score_response(rubrics, response)
+            score = self.score_response(self.rubrics, response)
             response_scores[response] = score
 
         # sort indices of response_scores by
         sorted_responses = sorted(response_scores.items(), key=lambda x: x[1], reverse=True)
         return [resp for resp, _ in sorted_responses]
 
-    def score_response(self, rubrics, response):
+    def score_response(self, response):
         """
         Takes in a response and a set of rubrics and returns a score for the response based on the rubrics.
         """
-        prompt = self.make_rubric_scoring_prompt(rubrics, response)
+        prompt = self.make_rubric_scoring_prompt(self.rubrics, response)
         judge_scoring = self.judge_llm(prompt, self.env.tools)
         
         # parse the response to extract the scores
@@ -177,51 +184,99 @@ class SampleAgent(BaseAgent):
         """
         prompt = (
             f"Please score the following response based on the following rubrics:\n"
-            f"Rubrics: {rubrics}\n"
+            f"Rubrics: {self.rubrics}\n"
             f"Response: {self.history + response}\n"
             f"For each rubric item, provide a response of true or false as well as evidence in terms of the steps, for example:\n"
             "Return your answer in this format: [{'rubric': 'Use the pdb tool efficiently', 'applies': true, 'examples': [{'step': '7', 'tool_call': 'pdb'}, {'step': '8', 'tool_call': 'pdb'}]}, {'applies': false, 'evidence': []}, ...] "
             "where applies is a boolean indicating whether the critique applies to the trajectory, step is the step number that the critique refers to, and tool_call is the name of the tool that was called at that step."
         )
-        return prompt
-    
-    def agent_step(self, info, step, task_name=None, debug=False):
-        self.logger.info(f"\n{'='*20} STEP {step+1} {'='*20}\n")
-        highscore = max(highscore, info.score)
-        self.logger.info(
-            f"[{task_name[:10]:<10}] | Step: {step:<4} | Score: {info.score:>4}/{info.max_score:<4} ({info.score/info.max_score:.1%}) [Best: {highscore}]"
-        )
-
-        messages = self.build_prompt(info)
-        # Query k responses from the LLM
-        k = self.config.get("num_responses", 1)
-        llm_responses = []
-        for _ in range(k):
-            llm_response = self.llm(messages, info.tools)
-            llm_responses.append(llm_response)
+        return prompt 
         
-        # For now, just use the first response
-        
+    def run(self, task_name=None, debug=False):
+        step = 0
+        info = None
+        max_steps = self.config["max_steps"]
+        try:
+            self.history.reset()
+            info = self.env.reset(options={"task_name": task_name})
+            # initial state does not have prompt and response
+            self.history.step(info, None)
 
-        if debug:
-            breakpoint()
+            if info.done is True:
+                self.logger.report_progress(
+                    problem_id=task_name,
+                    step=1,
+                    total_steps=1,
+                    score=info.score,
+                    max_score=info.max_score,
+                    status="resolved",
+                )
+                return True
 
-        info = self.env.step(
-            llm_response.tool,
-            llm_response.response,
-            llm_response.reasoning_response,
-        )
-        self.history.step(info, llm_response)
-
-        if (
-            info.done
-            or info.rewrite_counter >= self.config["max_rewrite_steps"]
-        ):
-            reason = "done" if info.done else "max_rewrite_steps reached"
             self.logger.info(
-                f"Step: {step} | Score: {info.score}/{info.max_score} ({info.score/info.max_score:.1%}) | Reason: {reason}"
+                "Available tools (in LLM's tool calling format):\n"
+                f"{json.dumps(self.llm.define_tools(info.tools), indent=4)}\n"
             )
-            # early stop, set current step and total steps to be the same
+
+            highscore = info.score
+            for step in range(max_steps):
+                self.logger.info(f"\n{'='*20} STEP {step+1} {'='*20}\n")
+                highscore = max(highscore, info.score)
+                self.logger.info(
+                    f"[{task_name[:10]:<10}] | Step: {step:<4} | Score: {info.score:>4}/{info.max_score:<4} ({info.score/info.max_score:.1%}) [Best: {highscore}]"
+                )
+
+                messages = self.build_prompt(info)
+                # Sample 5 responses from the LLM
+                sampled_responses = []
+                for _ in range(5):
+                    response = self.llm(messages, info.tools)
+                    sampled_responses.append(response)
+                
+                # Rank the responses using the judge
+                ranked_responses = self.judge_to_rank_response(sampled_responses)
+                
+                # Use the top-ranked response
+                llm_response = ranked_responses[0]
+
+                if debug:
+                    breakpoint()
+
+                info = self.env.step(
+                    llm_response.tool,
+                    llm_response.response,
+                    llm_response.reasoning_response,
+                )
+                self.history.step(info, llm_response)
+
+                if (
+                    info.done
+                    or info.rewrite_counter >= self.config["max_rewrite_steps"]
+                ):
+                    reason = "done" if info.done else "max_rewrite_steps reached"
+                    self.logger.info(
+                        f"Step: {step} | Score: {info.score}/{info.max_score} ({info.score/info.max_score:.1%}) | Reason: {reason}"
+                    )
+                    # early stop, set current step and total steps to be the same
+                    self.logger.report_progress(
+                        problem_id=task_name,
+                        step=step + 1,
+                        total_steps=step + 1,
+                        score=info.score,
+                        max_score=info.max_score,
+                        status="resolved" if info.done else "unresolved",
+                    )
+                    break
+                # keep progress bar running until max_steps is reached
+                self.logger.report_progress(
+                    problem_id=task_name,
+                    step=step + 1,
+                    total_steps=max_steps + 1,
+                    score=info.score,
+                    max_score=info.max_score,
+                    status="running",
+                )
+            # max_steps was reached, task was either resolved or unresolved
             self.logger.report_progress(
                 problem_id=task_name,
                 step=step + 1,
@@ -230,17 +285,15 @@ class SampleAgent(BaseAgent):
                 max_score=info.max_score,
                 status="resolved" if info.done else "unresolved",
             )
-            return {"done": True, "score": info.score, "max_score": info.max_score}
-        # keep progress bar running until max_steps is reached
-        self.logger.report_progress(
-            problem_id=task_name,
-            step=step + 1,
-            total_steps=max_steps + 1,
-            score=info.score,
-            max_score=info.max_score,
-            status="running",
-        )
-        
-        
-    def run(self, task_name=None, debug=False):
-        pass
+            return info.done
+        except Exception:
+            # report any error that happens during the run
+            self.logger.report_progress(
+                problem_id=task_name,
+                step=step + 1,
+                total_steps=step + 1,
+                score=info.score if info else 0,
+                max_score=info.max_score if info else 1,
+                status="error",
+            )
+            raise

@@ -2,7 +2,7 @@ base:
     # Environment configs
     output_path: "exps/swesmith"
     benchmark: "swesmith"
-    problems: "all"  # list of problems, e.g., ["astropy__astropy-12907"], or strings like "test-125" (defined in gym/envs/configs), or "all",
+    problems: ["adrienverge__yamllint.8513d9b9.combine_file__05pv3u48", "adrienverge__yamllint.8513d9b9.combine_module__0ks1rma7", "adrienverge__yamllint.8513d9b9.func_pm_remove_assign__0dqjg9h7"]  # list of problems, e.g., ["astropy__astropy-12907"], or strings like "test-125" (defined in gym/envs/configs), or "all",
     env_kwargs: {
         "dir_tree_depth": 1,
         "run_timeout": 300,
@@ -49,3 +49,7 @@ solution_agent:
 grep_agent:
     agent_type: "rewrite_agent"
     tools: ["grep", "view", "rewrite", "listdir", "eval"]
+
+sample_agent:
+    agent_type: "sample_agent"
+    tools: ["pdb", "view", "rewrite", "listdir", "eval"]

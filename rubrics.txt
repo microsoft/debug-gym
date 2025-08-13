@@ -1,0 +1,16 @@
+Avoid excessive and repetitive use of the pdb tool; gather needed information in a few well-placed breakpoints instead of stepping/printing repeatedly.
+
+Understand the root cause before editing: inspect existing class structure with the view tool instead of immediate rewrites that break functionality.
+
+Do not try to rewrite the read-only test files; fixes must be applied in the project source code (yamllint) instead.
+
+Investigate one failing test with pdb and inspect the related library code before running the whole suite; avoid full `eval` runs when no code has changed.
+
+Use `view` and `pdb` more efficiently: load larger or targeted portions once and issue valid pdb commands against source, not tests, to reduce noise and errors.
+
+Limit changes to the minimal lines actually needed instead of rewriting large blocks (which kept adding syntax errors).
+
+Whenever an eval reports a SyntaxError, inspect the file immediately before doing another rewrite so you can see the exact offending text rather than guessing.
+
+Use the pdb tool to confirm runtime values (e.g., that `blank_lines` is undefined) before editing code; the session never invoked pdb even once.
+
