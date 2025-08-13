@@ -49,3 +49,9 @@ debug_5_agent:
 grep_agent:
     agent_type: "rewrite_agent"
     tools: ["grep", "view", "rewrite", "eval"]
+
+replay_agent:
+    llm_name: "gpt-4o"  # The LLM that will continue the trajectory
+    trajectory: "exps/mini_nightmare/test_replay/pandas_dataframe/debug_gym.jsonl"  # Trajectory to replay
+    cutoff_step: 5  # Replay to this step, then let the LLM continue.
+    tools: ["pdb", "grep", "eval"]
