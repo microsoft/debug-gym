@@ -10,8 +10,10 @@ from pathlib import Path
 from debug_gym.agents.base_agent import AGENT_REGISTRY, create_agent
 from debug_gym.agents.utils import load_config
 from debug_gym.experiment import add_tools, create_env, dump_experiment_info
-from debug_gym.llms.base import LLM
+from debug_gym.gym.tools.tool import ToolCall
+from debug_gym.llms.base import LLM, LLMResponse
 from debug_gym.llms.human import Human
+from debug_gym.llms.utils import print_messages
 from debug_gym.logger import DebugGymLogger, load_previous_run_status
 
 
@@ -67,14 +69,32 @@ def run_replay_agent(agent, task_name=None, debug=False):
             agent.logger.info(f"\n{'='*20} STEP {step+1} {'='*20}\n")
             highscore = max(highscore, info.score)
             agent.logger.info(
-                f"[{task_name[:10]:<10}] | Step: {step:<4} | Score: {info.score:>4}/{info.max_score:<4} ({info.score/info.max_score:.1%}) [Best: {highscore}]"
+                f"[{task_name[:10]:<10}] | Step: {step+1:<4} | Score: {info.score:>4}/{info.max_score:<4} ({info.score/info.max_score:.1%}) [Best: {highscore}]"
             )
 
+            messages = agent.build_prompt(info)
             if step < agent.config["replay_from"]:
-                messages = agent.build_prompt(info)
-                llm_response = agent.llm(messages, info.tools)
+                history_step = agent.config["trajectory"][step + 1]
+                assert len(history_step["prompt_response_pairs"]) == 1
+                prompt_response = history_step["prompt_response_pairs"][0]
+                llm_response = LLMResponse(
+                    prompt=prompt_response["prompt"],
+                    response=prompt_response.get("response"),
+                    reasoning_response=prompt_response.get(
+                        "reasoning_response"
+                    ),  # TODO: check if that's correct
+                    tool=ToolCall(**history_step["action"]),
+                    prompt_token_count=prompt_response["token_usage"]["prompt"],
+                    response_token_count=prompt_response["token_usage"]["response"],
+                )
+                print_messages(messages, agent.logger)
+                agent.logger.info(
+                    f"LLM response - reasoning: {llm_response.reasoning_response}\n"
+                    f"LLM response - content: {llm_response.response}\n"
+                    f"LLM response - tool call: {llm_response.tool}"
+                )
             else:
-                llm_response = None
+                llm_response = agent.llm(messages, info.tools)
 
             if debug:
                 breakpoint()
@@ -89,7 +109,7 @@ def run_replay_agent(agent, task_name=None, debug=False):
             if info.done or info.rewrite_counter >= agent.config["max_rewrite_steps"]:
                 reason = "done" if info.done else "max_rewrite_steps reached"
                 agent.logger.info(
-                    f"Step: {step} | Score: {info.score}/{info.max_score} ({info.score/info.max_score:.1%}) | Reason: {reason}"
+                    f"Step: {step+1} | Score: {info.score}/{info.max_score} ({info.score/info.max_score:.1%}) | Reason: {reason}"
                 )
                 # early stop, set current step and total steps to be the same
                 agent.logger.report_progress(
@@ -143,14 +163,13 @@ def run_task(args, problem, config):
     report_progress_error = True
 
     exp_path = Path(config["output_path"]) / config["uuid"]
-    problem_path = exp_path / problem
-
     task_logger = DebugGymLogger(
         problem,
-        log_dir=problem_path,
+        log_dir=exp_path,
         level=args.logging_level,
-        mode="w" if args.force_all else "a",
+        mode="a",
     )
+
     try:
         task_logger.report_progress(
             problem_id=problem,
@@ -305,6 +324,7 @@ def parse_args():
         choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
         help="Set logging level",
     )
+    parser.add_argument("--debug", action="store_true", help="Enable debug mode.")
 
     args = parser.parse_args()
     return args
@@ -313,21 +333,30 @@ def parse_args():
 def main():
     args = parse_args()
 
+    logger = DebugGymLogger("debug-gym", level=args.logging_level)
+    logger.info(f"Loading trajectory from {args.trajectory_file}")
+
     # Load trajectory file and validate it.
     with open(args.trajectory_file, "r") as f:
         trajectory = json.loads(f.read())
 
     config = trajectory["config"]
-    config["trajectory"] = trajectory["log"]
-    config["replay-from"] = args.replay_from
-    config["llm_name"] = args.llm or config.get("llm_name", "gpt-4o")
-    config["output_path"] = Path(args.trajectory_file).parent / config["replay-from"]
-    config["uuid"] = config["llm_name"]
 
-    exp_output_path = Path(args.trajectory_file).parent
-    logger = DebugGymLogger("debug-gym", level=args.logging_level)
-    logger.info(f"Experiment log path: {exp_output_path}")
-    # dump_experiment_info(config, args)
+    # Make sure we are replaying from an existing step.
+    if args.replay_from >= len(trajectory["log"]):
+        raise ValueError(
+            f"replay_from {args.replay_from} is greater than the number of steps in the trajectory {len(trajectory['log'])}."
+        )
+
+    config["terminal"]["type"] = "local"  # TODO: debug
+
+    config["trajectory"] = trajectory["log"]
+    config["replay_from"] = args.replay_from
+    config["llm_name"] = args.llm or config.get("llm_name", "gpt-4o")
+    config["output_path"] = str(
+        Path(args.trajectory_file).parent / str(config["replay_from"])
+    )
+    config["uuid"] = config["llm_name"]
 
     # Create the environment to get the list of problems to run.
     env = create_env(config, logger=logger)
@@ -343,7 +372,7 @@ def main():
     )
 
     # Stop live progress display if in Human mode (avoid conflicts with prompt_toolkit)
-    if isinstance(llm, Human):
+    if isinstance(llm, Human) or args.debug:
         logger.set_no_live()
 
     with logger.rich_progress(problems):
