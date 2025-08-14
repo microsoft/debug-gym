@@ -348,8 +348,6 @@ def main():
             f"replay_from {args.replay_from} is greater than the number of steps in the trajectory {len(trajectory['log'])}."
         )
 
-    config["terminal"]["type"] = "local"  # TODO: debug
-
     config["trajectory"] = trajectory["log"]
     config["replay_from"] = args.replay_from
     config["llm_name"] = args.llm or config.get("llm_name", "gpt-4o")
