@@ -143,6 +143,22 @@ class SampleAgent(BaseAgent):
             self.rubrics = f.read().strip().split("\n")
         
         self.rubrics = [r for r in self.rubrics if r.strip()]
+        
+    def prepare_history_tracker_for_analysis(self):
+        data = []
+        for step, info in enumerate(self.history.get_all()):
+            data.append({
+                "step": step, 
+                "role": "user" if step % 2 == 0 else "assistant", 
+                "tool_calls": {
+                    "name": info.action_tool_call.name,
+                    "arguments": info.action_tool_call.arguments,
+                },
+                "content": info.action_content,
+                "reasoning": info.action_reasoning,
+                "observation": info.step_observation.observation,
+            })
+        return data
 
     def judge_to_rank_response(self, responses):
         """
@@ -151,7 +167,7 @@ class SampleAgent(BaseAgent):
         """
         response_scores = {}
         for response in responses:
-            score = self.score_response(self.rubrics, response)
+            score = self.score_response(response)
             response_scores[response] = score
 
         # sort indices of response_scores by
@@ -162,7 +178,7 @@ class SampleAgent(BaseAgent):
         """
         Takes in a response and a set of rubrics and returns a score for the response based on the rubrics.
         """
-        prompt = self.make_rubric_scoring_prompt(self.rubrics, response)
+        prompt = self.make_rubric_scoring_prompt(response)
         judge_scoring = self.judge_llm(prompt, self.env.tools)
         
         # parse the response to extract the scores
@@ -178,14 +194,27 @@ class SampleAgent(BaseAgent):
         
         return score
     
-    def make_rubric_scoring_prompt(self, rubrics, response):
+    def make_rubric_scoring_prompt(self, response):
         """
         Takes in a set of rubrics and a response and returns a prompt that can be used to score the response based on the rubrics.
         """
+        
+        processed_history = self.prepare_history_tracker_for_analysis()
+        
+        decoded_response = {
+            "step": len(processed_history),
+            "tool_calls": {
+                "name": response.tool.name,
+                "arguments": response.tool.arguments,
+            },
+            "content": response.response,
+            "reasoning": response.reasoning_response,
+        }
+        processed_history.append(decoded_response)
         prompt = (
             f"Please score the following response based on the following rubrics:\n"
             f"Rubrics: {self.rubrics}\n"
-            f"Response: {self.history + response}\n"
+            f"Response: {json.dumps(processed_history, indent=2)}\n"
             f"For each rubric item, provide a response of true or false as well as evidence in terms of the steps, for example:\n"
             "Return your answer in this format: [{'rubric': 'Use the pdb tool efficiently', 'applies': true, 'examples': [{'step': '7', 'tool_call': 'pdb'}, {'step': '8', 'tool_call': 'pdb'}]}, {'applies': false, 'evidence': []}, ...] "
             "where applies is a boolean indicating whether the critique applies to the trajectory, step is the step number that the critique refers to, and tool_call is the name of the tool that was called at that step."
