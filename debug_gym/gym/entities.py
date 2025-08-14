@@ -13,6 +13,9 @@ class Observation:
     source: str
     observation: str
 
+    def __str__(self):
+        return self.observation
+
 
 class Event(Enum):
     ENV_START = "env_start"

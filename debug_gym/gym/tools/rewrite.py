@@ -33,7 +33,7 @@ class RewriteTool(EnvironmentTool):
             "description": "The ending line number to be rewritten. If None, end is the same as start.",
         },
         "new_code": {
-            "type": "string",
+            "type": ["string"],
             "description": "The new code to be inserted. The new code should be valid python code include proper indentation (can be determined from context).",
         },
     }
