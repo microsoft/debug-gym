@@ -6,13 +6,6 @@ from pathlib import Path
 from typing import Any, Callable
 
 
-def clean_code(code):
-    assert isinstance(code, str)
-    code_line = unescape(code).split("\n")
-    # Remove trailing white spaces with rstrip.
-    return "\n".join(line.rstrip() for line in code_line)
-
-
 def filter_non_utf8(text):
     """Filter out non-UTF-8 characters from text."""
     if not text:
@@ -20,20 +13,6 @@ def filter_non_utf8(text):
     if isinstance(text, str):
         return text.encode("utf-8", errors="ignore").decode("utf-8")
     return text
-
-
-def unescape(s):
-    try:
-        # First, try the normal unescape
-        result = codecs.decode(s, "unicode_escape")
-        # Test if it can be encoded to UTF-8 (which will happen during JSON encoding)
-        result.encode("utf-8")
-        return result
-    except UnicodeEncodeError:
-        # If it contains surrogate pairs that can't be encoded to UTF-8,
-        # replace them with the Unicode replacement character (U+FFFD)
-        result = codecs.decode(s, "unicode_escape")
-        return result.encode("utf-8", errors="replace").decode("utf-8")
 
 
 def show_line_number(code_string, code_path=None, environment=None, start_index=1):
