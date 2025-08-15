@@ -38,9 +38,10 @@ class OpenAILLM(LLM):
             and exception.code in self.context_length_error_code
         ):
             return True
-        for keyword in self.context_length_error_message_keywords:
-            if keyword in exception.message:
-                return True
+        if hasattr(exception, "message"):
+            for keyword in self.context_length_error_message_keywords:
+                if keyword in exception.message:
+                    return True
         return False
 
     @property
