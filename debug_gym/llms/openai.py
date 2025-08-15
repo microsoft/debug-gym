@@ -23,6 +23,23 @@ logging.getLogger("openai").setLevel(logging.WARNING)
 
 class OpenAILLM(LLM):
 
+    context_length_error_code = [
+        "context_length_exceeded",
+        "model_max_prompt_tokens_exceeded",
+        "string_above_max_length",
+    ]
+    context_length_error_message_keywords = [
+        "maximum context length",
+    ]
+
+    def is_context_length_error(self, exception: Exception) -> bool:
+        if exception.code in self.context_length_error_code:
+            return True
+        for keyword in self.context_length_error_message_keywords:
+            if keyword in exception.message:
+                return True
+        return False
+
     @property
     def client(self):
         if getattr(self, "_client", None) is None:
@@ -100,7 +117,8 @@ class OpenAILLM(LLM):
         ):
             # only retry when a such error occurs on a model hosting on vllm
             need_to_retry = False
-        if "maximum context length" in exception.message:
+
+        if self.is_context_length_error(exception):
             need_to_retry = False
 
         logger(
@@ -223,18 +241,7 @@ class OpenAILLM(LLM):
             )
         except openai.BadRequestError as e:
             # Handle specific error for context length exceeded, otherwise just propagate the error
-            if e.code in [
-                "context_length_exceeded",
-                "model_max_prompt_tokens_exceeded",
-                "string_above_max_length",
-            ]:
-                raise ContextLengthExceededError
-            if (
-                e.code == "invalid_request_body"
-                and "maximum context length" in e.message
-            ):
-                raise ContextLengthExceededError
-            if "maximum context length" in e.message:
+            if self.is_context_length_error(e):
                 raise ContextLengthExceededError
             raise e
         # LLM may select multiple tool calls, we only care about the first action
