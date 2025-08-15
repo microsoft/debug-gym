@@ -100,6 +100,8 @@ class OpenAILLM(LLM):
         ):
             # only retry when a such error occurs on a model hosting on vllm
             need_to_retry = False
+        if "maximum context length" in exception.message:
+            need_to_retry = False
 
         logger(
             f"Error calling {self.model_name}: {exception_full_name!r}\n"
@@ -234,6 +236,7 @@ class OpenAILLM(LLM):
                 raise ContextLengthExceededError
             if "maximum context length" in e.message:
                 raise ContextLengthExceededError
+            raise e
         # LLM may select multiple tool calls, we only care about the first action
         if not response.choices[0].message.tool_calls:
             # LLM failed to call a tool
