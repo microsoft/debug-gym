@@ -147,13 +147,18 @@ class SampleAgent(BaseAgent):
     def prepare_history_tracker_for_analysis(self):
         data = []
         for step, info in enumerate(self.history.get_all()):
+            if info.action_tool_call is not None:
+                tool_calls = {
+                    "name": info.action_tool_call.name,
+                    "arguments": info.action_tool_call.arguments,
+                }
+            else:
+                tool_calls = None
+            
             data.append({
                 "step": step, 
                 "role": "user" if step % 2 == 0 else "assistant", 
-                "tool_calls": {
-                    "name": info.action_tool_call.name,
-                    "arguments": info.action_tool_call.arguments,
-                },
+                "tool_calls": tool_calls,
                 "content": info.action_content,
                 "reasoning": info.action_reasoning,
                 "observation": info.step_observation.observation,
@@ -179,7 +184,8 @@ class SampleAgent(BaseAgent):
         Takes in a response and a set of rubrics and returns a score for the response based on the rubrics.
         """
         prompt = self.make_rubric_scoring_prompt(response)
-        judge_scoring = self.judge_llm(prompt, self.env.tools)
+        messages = [{"role": "user", "content": prompt}]
+        judge_scoring = self.judge_llm(messages, self.env.tools)
         
         # parse the response to extract the scores
         try:
