@@ -358,9 +358,17 @@ class LLM(ABC):
 
                     # If we had to trim messages, log the successful truncation
                     if retry_count > 0:
-                        self.logger.info(
-                            f"Prompt truncated to {llm_response.token_usage.prompt:,} tokens."
-                        )
+                        if (
+                            llm_response.token_usage
+                            and llm_response.token_usage.prompt is not None
+                        ):
+                            self.logger.info(
+                                f"Prompt truncated to {llm_response.token_usage.prompt:,} tokens."
+                            )
+                        else:
+                            self.logger.info(
+                                "Prompt truncated successfully (token count unavailable)."
+                            )
                     return llm_response
 
                 except ContextLengthExceededError:

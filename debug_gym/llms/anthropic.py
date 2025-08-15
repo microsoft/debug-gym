@@ -12,6 +12,23 @@ from debug_gym.llms.constants import LLM_API_KEY_PLACEHOLDER
 
 class AnthropicLLM(LLM):
 
+    context_length_error_code = []
+    context_length_error_message_keywords = [
+        "prompt is too long",
+    ]
+
+    def is_context_length_error(self, exception: Exception) -> bool:
+        if (
+            hasattr(exception, "code")
+            and exception.code in self.context_length_error_code
+        ):
+            return True
+        if hasattr(exception, "message"):
+            for keyword in self.context_length_error_message_keywords:
+                if keyword in exception.message:
+                    return True
+        return False
+
     @property
     def client(self):
         if getattr(self, "_client", None) is None:
@@ -64,12 +81,16 @@ class AnthropicLLM(LLM):
         exception_full_name = (
             f"{exception.__class__.__module__}.{exception.__class__.__name__}"
         )
+        need_to_retry = exception_full_name in _errors
+
+        if self.is_context_length_error(exception):
+            need_to_retry = False
 
         self.logger.debug(
             f"Error calling {self.model_name}: {exception_full_name!r} "
             f"{exception.message if hasattr(exception, 'message') else exception}"
         )
-        return exception_full_name in _errors
+        return need_to_retry
 
     def define_tools(self, tool_call_list: list[EnvironmentTool]) -> list[dict]:
         """Translates the list of tools into a format that is specifically defined by each LLM.
@@ -226,7 +247,7 @@ class AnthropicLLM(LLM):
             )
         except anthropic.BadRequestError as e:
             # Handle specific error for context length exceeded, otherwise just propagate the error
-            if "prompt is too long" in e.message:
+            if self.is_context_length_error(e):
                 raise ContextLengthExceededError
             raise
 

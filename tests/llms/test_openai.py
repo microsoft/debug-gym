@@ -25,10 +25,11 @@ class Tool1(EnvironmentTool):
 tools = [Tool1()]
 
 
-def create_fake_exception(module: str, classname: str, message: str):
+def create_fake_exception(module: str, classname: str, message: str, code: str):
     exc_type = type(classname, (Exception,), {})
     exc = exc_type(message)
     exc.message = message
+    exc.code = code
     exc.__class__.__module__ = module
     return exc
 
@@ -106,33 +107,61 @@ def test_need_to_be_retried(llm_config_registry_mock, logger_mock):
     openai_llm = OpenAILLM("openai", logger=logger_mock)
     qwen_llm = OpenAILLM("qwen", logger=logger_mock)
 
-    exception = create_fake_exception("openai", "RateLimitError", "Rate limit exceeded")
-    assert openai_llm.need_to_be_retried(exception) is True
-
     exception = create_fake_exception(
-        "openai", "APIStatusError", "Error occurred: 'status': 429 rate limit"
-    )
-    assert openai_llm.need_to_be_retried(exception) is True
-
-    exception = create_fake_exception(
-        "openai", "APIStatusError", "Encountered error: 'status': 504 gateway timeout"
+        "openai", "RateLimitError", "Rate limit exceeded", "fake code"
     )
     assert openai_llm.need_to_be_retried(exception) is True
 
     exception = create_fake_exception(
         "openai",
         "APIStatusError",
-        "Failure: 'status': 413 A previous prompt was too large. Please shorten input.",
+        "Error occurred: 'status': 429 rate limit",
+        "fake code",
     )
     assert openai_llm.need_to_be_retried(exception) is True
 
     exception = create_fake_exception(
-        "openai", "APIStatusError", "Error: 'status': 500 internal server error"
+        "openai",
+        "APIStatusError",
+        "Encountered error: 'status': 504 gateway timeout",
+        "fake code",
+    )
+    assert openai_llm.need_to_be_retried(exception) is True
+
+    exception = create_fake_exception(
+        "openai",
+        "APIStatusError",
+        "Encountered error: 'status': 504 gateway timeout",
+        "model_max_prompt_tokens_exceeded",
     )
     assert openai_llm.need_to_be_retried(exception) is False
 
     exception = create_fake_exception(
-        "openai", "PermissionDeniedError", "Permission denied error"
+        "openai",
+        "APIStatusError",
+        "Encountered error: maximum context length exceeded",
+        "fake code",
+    )
+    assert openai_llm.need_to_be_retried(exception) is False
+
+    exception = create_fake_exception(
+        "openai",
+        "APIStatusError",
+        "Failure: 'status': 413 A previous prompt was too large. Please shorten input.",
+        "fake code",
+    )
+    assert openai_llm.need_to_be_retried(exception) is True
+
+    exception = create_fake_exception(
+        "openai",
+        "APIStatusError",
+        "Error: 'status': 500 internal server error",
+        "fake code",
+    )
+    assert openai_llm.need_to_be_retried(exception) is False
+
+    exception = create_fake_exception(
+        "openai", "PermissionDeniedError", "Permission denied error", "fake code"
     )
     assert openai_llm.need_to_be_retried(exception) is True
 
@@ -140,11 +169,14 @@ def test_need_to_be_retried(llm_config_registry_mock, logger_mock):
         "openai",
         "BadRequestError",
         "Error code: 400 \n Invalid JSON: EOF while parsing a string",
+        "fake code",
     )
     assert openai_llm.need_to_be_retried(exception) is False
     assert qwen_llm.need_to_be_retried(exception) is True
 
-    exception = create_fake_exception("openai", "SomeOtherError", "Some other error")
+    exception = create_fake_exception(
+        "openai", "SomeOtherError", "Some other error", "fake code"
+    )
     assert openai_llm.need_to_be_retried(exception) is False
 
     exception = KeyboardInterrupt()  # KeyboardInterrupt should not be retried
