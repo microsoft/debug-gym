@@ -33,7 +33,10 @@ class OpenAILLM(LLM):
     ]
 
     def is_context_length_error(self, exception: Exception) -> bool:
-        if exception.code in self.context_length_error_code:
+        if (
+            hasattr(exception, "code")
+            and exception.code in self.context_length_error_code
+        ):
             return True
         for keyword in self.context_length_error_message_keywords:
             if keyword in exception.message:
