@@ -232,7 +232,8 @@ class OpenAILLM(LLM):
                 and "maximum context length" in e.message
             ):
                 raise ContextLengthExceededError
-            raise
+            if "maximum context length" in e.message:
+                raise ContextLengthExceededError
         # LLM may select multiple tool calls, we only care about the first action
         if not response.choices[0].message.tool_calls:
             # LLM failed to call a tool
