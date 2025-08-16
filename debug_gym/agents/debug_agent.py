@@ -2,6 +2,7 @@ from debug_gym.llms.base import LLM
 from debug_gym.agents.base_agent import BaseAgent, register_agent
 from debug_gym.agents.history_tracker import HistoryTracker
 from debug_gym.gym.envs.env import EnvInfo
+from debug_gym.gym.entities import Observation
 import json
 
 @register_agent
@@ -125,6 +126,7 @@ class ReplayAgent(DebugAgent):
     name: str = "replay_agent"
     
     def run(self, task_name=None, debug=False):
+        print("running!")
         step = 0
         info = None
         max_steps = self.config["max_steps"]
@@ -152,31 +154,20 @@ class ReplayAgent(DebugAgent):
 
             highscore = info.score
             for step in range(max_steps):
-                self.logger.info(f"\n{'='*20} STEP {step+1} {'='*20}\n")
-                highscore = max(highscore, info.score)
-                self.logger.info(
-                    f"[{task_name[:10]:<10}] | Step: {step:<4} | Score: {info.score:>4}/{info.max_score:<4} ({info.score/info.max_score:.1%}) [Best: {highscore}]"
-                )
-
-                messages = self.build_prompt(info)
-                llm_response = self.llm(messages, info.tools)
-
-                if debug:
-                    breakpoint()
-
-                info = self.env.step(
-                    llm_response.tool,
-                    llm_response.response,
-                    llm_response.reasoning_response,
-                )
-                self.history.step(info, llm_response)
-                
-                if step == critique_step: 
+                print(step)
+                critique_step = self.config.get("replay_from", None)
+                critique = self.config.get("critique", "")
+                if critique_step is not None and step == critique_step: 
+                    new_observation = Observation(
+                        source="user",
+                        observation=critique
+                    )
                     info = EnvInfo(
-                        step_observation=critique,
-                        action_tool_call= None,
-                        action_content= None,
-                        action_reasoning= None
+                        step_observation=new_observation,
+                        all_observations=info.all_observations + [new_observation],
+                        action_tool_call=None,
+                        action_content=None,
+                        action_reasoning=None,
                         rewrite_counter=info.rewrite_counter,
                         score=info.score,
                         max_score=info.max_score,
@@ -188,6 +179,27 @@ class ReplayAgent(DebugAgent):
                         eval_observation=info.eval_observation,
                     )
                     self.history.step(info, None)
+                
+                self.logger.info(f"\n{'='*20} STEP {step+1} {'='*20}\n")
+                highscore = max(highscore, info.score)
+                self.logger.info(
+                    f"[{task_name[:10]:<10}] | Step: {step:<4} | Score: {info.score:>4}/{info.max_score:<4} ({info.score/info.max_score:.1%}) [Best: {highscore}]"
+                )
+
+                messages = self.build_prompt(info)
+                llm_response = self.llm(messages, info.tools)
+                
+                if debug:
+                    breakpoint()
+
+                info = self.env.step(
+                    llm_response.tool,
+                    llm_response.response,
+                    llm_response.reasoning_response,
+                )
+                self.history.step(info, llm_response)
+                
+                
 
                 if (
                     info.done
