@@ -21,7 +21,6 @@ class AgentTimeoutException(BaseException):
     """Custom exception to handle timeouts in agent
     execution. Inherits from BaseException to ensure
     it is not caught by agent exception handling."""
-
     pass
 
 

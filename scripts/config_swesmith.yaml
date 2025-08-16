@@ -49,3 +49,8 @@ solution_agent:
 grep_agent:
     agent_type: "rewrite_agent"
     tools: ["grep", "view", "rewrite", "listdir", "eval"]
+
+replay_agent: 
+    tools: ["pdb", "view", "rewrite", "listdir", "eval"]
+    replay_from: 0
+    critique: "You are an awesome debugger"
