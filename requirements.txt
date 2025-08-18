@@ -1,5 +1,5 @@
 datasets
-openai
+openai==1.99.9
 azure-identity
 tenacity
 pyyaml
