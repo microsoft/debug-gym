@@ -12,6 +12,6 @@ docker==7.1.0
 swebench==4.0.3
 swesmith==0.0.4
 prompt_toolkit==3.0.51
-anthropic>=0.49.0
+anthropic==0.49.0
 jinja2==3.1.6
 rich==14.0.0
