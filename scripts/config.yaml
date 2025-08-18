@@ -38,15 +38,11 @@ base:
     # system_prompt_template_file: "script/templates/system_prompt.jinja"
 
 rewrite_agent:
-    tools: ["view", "rewrite", "eval"]
+    tools: ["grep", "view", "rewrite", "eval"]
 
 debug_agent:
-    tools: ["pdb", "view", "rewrite", "eval"]
+    tools: ["grep", "pdb", "view", "rewrite", "eval"]
 
 debug_5_agent:
     n_rewrites_before_pdb: 5
-    tools: ["pdb", "view", "rewrite", "eval"]
-
-grep_agent:
-    agent_type: "rewrite_agent"
-    tools: ["grep", "view", "rewrite", "eval"]
+    tools: ["grep", "pdb", "view", "rewrite", "eval"]

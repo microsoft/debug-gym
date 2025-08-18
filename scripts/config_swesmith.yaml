@@ -1,6 +1,6 @@
 base:
     # Environment configs
-    output_path: "exps/inference/swesmith"
+    output_path: "exps/swesmith"
     benchmark: "swesmith"
     problems: "all"  # list of problems, e.g., ["astropy__astropy-12907"], or strings like "test-125" (defined in gym/envs/configs), or "all",
     env_kwargs: {
@@ -40,12 +40,8 @@ debug_agent:
 
 debug_5_agent:
     n_rewrites_before_pdb: 5
-    tools: ["pdb", "view", "rewrite", "listdir", "eval"]
+    tools: ["grep", "pdb", "view", "rewrite", "listdir", "eval"]
 
 solution_agent:
     llm_name: "human"  # No need for an LLM.
     tools: ["eval", "pdb"]
-
-grep_agent:
-    agent_type: "rewrite_agent"
-    tools: ["grep", "view", "rewrite", "listdir", "eval"]
