@@ -209,29 +209,21 @@ class LLM(ABC):
         )
 
     @classmethod
-    def instantiate(
+    def instantiate_from_config(
         cls,
-        llm_name: str,
-        llm_config_file_path: str | None = None,
+        llm_config: LLMConfig,
         logger: DebugGymLogger | None = None,
     ) -> "LLM":
         """Creates an instance of the appropriate LLM class based on the configuration.
 
         Args:
-            llm_name: Name of the LLM model to instantiate.
-            llm_config_file_path: Optional path to the LLM configuration file.
+            llm_config: LLMConfig object containing the configuration.
             logger: Optional DebugGymLogger for logging.
 
         Returns:
             An instance of the appropriate LLM class.
         """
         logger = logger or DebugGymLogger("debug-gym")
-        if llm_name == "human":
-            from debug_gym.llms import Human
-
-            return Human(llm_name, logger=logger)
-
-        llm_config = LLMConfigRegistry.from_file(llm_config_file_path)[llm_name]
 
         tags = llm_config.tags
         if "copilot openai" in tags:
@@ -266,8 +258,39 @@ class LLM(ABC):
             from debug_gym.llms import OpenAILLM
 
             klass = OpenAILLM
-        llm = klass(llm_name, logger=logger, llm_config=llm_config)
+
+        llm = klass(llm_config.model, logger=logger, llm_config=llm_config)
         return llm
+
+    @classmethod
+    def instantiate(
+        cls,
+        llm_name: str | None = None,
+        llm_config: LLMConfig | None = None,
+        llm_config_file_path: str | None = None,
+        logger: DebugGymLogger | None = None,
+    ) -> "LLM":
+        """Creates an instance of the appropriate LLM class based on the configuration.
+
+        Args:
+            llm_name: Name of the LLM model to instantiate.
+            llm_config_file_path: Optional path to the LLM configuration file.
+            logger: Optional DebugGymLogger for logging.
+
+        Returns:
+            An instance of the appropriate LLM class.
+        """
+        logger = logger or DebugGymLogger("debug-gym")
+
+        if llm_name == "human":
+            from debug_gym.llms import Human
+
+            return Human(llm_name, logger=logger)
+
+        if llm_config is None:
+            llm_config = LLMConfigRegistry.from_file(llm_config_file_path)[llm_name]
+
+        return cls.instantiate_from_config(llm_config, logger)
 
     @abstractmethod
     def generate(self, messages, tools, **kwargs) -> LLMResponse:
