@@ -46,6 +46,7 @@ def test_show_line_number_no_code_path_no_breakpoints():
 
 def test_show_line_number_with_code_path(tmp_path):
     env = RepoEnv(path=tmp_path)
+    env.reset()
     code_path = f"{env.working_dir}/code.py"
     breakpoints_state = {f"{code_path}|||2": "b 2"}
     env.current_breakpoints_state = breakpoints_state
@@ -65,6 +66,7 @@ def test_show_line_number_with_code_path(tmp_path):
 
 def test_show_line_number_multiple_breakpoints(tmp_path):
     env = RepoEnv(path=tmp_path)
+    env.reset()
     code_path = f"{env.working_dir}/code.py"
     breakpoints_state = {
         f"{code_path}|||2": "b 2",
@@ -91,6 +93,7 @@ def test_show_line_number_multiple_breakpoints(tmp_path):
 
 def test_show_line_number_multiple_breakpoints_with_start_index(tmp_path):
     env = RepoEnv(path=tmp_path)
+    env.reset()
     code_path = f"{env.working_dir}/code.py"
     breakpoints_state = {
         f"{code_path}|||102": "b 102",

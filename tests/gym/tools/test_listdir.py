@@ -22,8 +22,8 @@ def test_listdir_default(tmp_path, setup_listdir_repo_env):
     obs = listdir.use(env)
     assert obs.source == "listdir"
     assert obs.observation == (
-        f"{str(env.working_dir)}/\n"
-        "|-- .pytest_cache/\n"
+        f"{env.working_dir}/\n"
+        # "|-- .pytest_cache/\n"
         "|-- __pycache__/\n"
         "|-- file1.py\n"
         "|-- file2.py\n"

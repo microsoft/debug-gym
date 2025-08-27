@@ -254,10 +254,10 @@ class PDBTool(EnvironmentTool):
         current_breakpoints_state_copy = copy.deepcopy(
             environment.current_breakpoints_state
         )
-        rewrite_file = environment.resolve_path(rewrite_file)
+        rewrite_file = environment.workspace.resolve_path(rewrite_file)
         for _key in environment.current_breakpoints_state.keys():
             _file_path, _line_number = _key.split("|||")
-            _file_path = environment.resolve_path(_file_path)
+            _file_path = environment.workspace.resolve_path(_file_path)
             if _file_path != rewrite_file:
                 # the breakpoints are not in the current file, no need to modify
                 continue

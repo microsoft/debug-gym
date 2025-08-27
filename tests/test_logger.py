@@ -356,10 +356,11 @@ def test_log_with_color_calls_logger_info_with_escaped_message():
 
     # The message should be escaped and wrapped in color tags
     expected_msg = f"[{color}]{escape(message)}[/{color}]"
-    mock_logger.info.assert_called_once()
-    args, kwargs = mock_logger.info.call_args
-    assert args[0] == expected_msg
-    assert kwargs["extra"] == {"already_escaped": True}
+    mock_logger.log.assert_called_once()
+    args, kwargs = mock_logger.log.call_args
+    assert args[0] == logging.INFO
+    assert args[1] == expected_msg
+    assert kwargs["extra"] == {"already_escaped": True, "markup": True}
 
 
 def test_log_with_color_handles_different_colors():
@@ -368,10 +369,22 @@ def test_log_with_color_handles_different_colors():
     for color in ["red", "green", "yellow"]:
         log_with_color(mock_logger, message, color)
         expected_msg = f"[{color}]{escape(message)}[/{color}]"
-        mock_logger.info.assert_called_with(
-            expected_msg, extra={"already_escaped": True}
+        mock_logger.log.assert_called_with(
+            logging.INFO, expected_msg, extra={"already_escaped": True, "markup": True}
         )
-        mock_logger.info.reset_mock()
+        mock_logger.log.reset_mock()
+
+
+def test_log_with_color_handles_different_levels():
+    mock_logger = MagicMock(spec=DebugGymLogger)
+    message = "Test message"
+    for level in [logging.INFO, logging.WARNING, logging.ERROR, logging.DEBUG]:
+        log_with_color(mock_logger, message, color="blue", level=level)
+        expected_msg = f"[blue]{escape(message)}[/blue]"
+        mock_logger.log.assert_called_with(
+            level, expected_msg, extra={"already_escaped": True, "markup": True}
+        )
+        mock_logger.log.reset_mock()
 
 
 def test_log_with_color_escapes_special_characters():
@@ -380,8 +393,8 @@ def test_log_with_color_escapes_special_characters():
     color = "magenta"
     log_with_color(mock_logger, message, color)
     expected_msg = f"[{color}]{escape(message)}[/{color}]"
-    mock_logger.info.assert_called_once_with(
-        expected_msg, extra={"already_escaped": True}
+    mock_logger.log.assert_called_once_with(
+        logging.INFO, expected_msg, extra={"already_escaped": True, "markup": True}
     )
 
 

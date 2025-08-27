@@ -1,6 +1,3 @@
-import atexit
-import shutil
-import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -9,8 +6,8 @@ import numpy as np
 from debug_gym.gym.entities import EvalOutput, Event, Observation
 from debug_gym.gym.terminal import Terminal
 from debug_gym.gym.tools.tool import EnvironmentTool, ToolCall
-from debug_gym.gym.utils import _walk, make_file_matcher
-from debug_gym.logger import DebugGymLogger
+from debug_gym.gym.workspace import RemoteWorkspace
+from debug_gym.logger import DebugGymLogger, log_with_color
 
 
 @dataclass
@@ -154,12 +151,12 @@ class RepoEnv(TooledEnv):
         entrypoint: str = "python -m pytest -sq .",
         debug_entrypoint: str | None = None,
         max_score: int | None = None,
-        readonly_patterns: list[str] | None = None,
+        readonly_patterns: list[str] | None = None,  # TODO: remove
         auto_eval_on_rewrite: bool = True,
         run_timeout: int | None = None,
         dir_tree_depth: int = 1,
-        persistent_breakpoints: bool = True,
-        auto_list: bool = True,
+        persistent_breakpoints: bool = True,  # TODO: remove
+        auto_list: bool = True,  # TODO: remove
         terminal: Terminal | None = None,
         logger: DebugGymLogger | None = None,
         problems: str | list[str] | None = None,
@@ -167,7 +164,7 @@ class RepoEnv(TooledEnv):
     ):
         super().__init__()
 
-        self.path = None
+        self.path = path
         self.max_score = max_score
         self.auto_eval_on_rewrite = auto_eval_on_rewrite
         self.run_timeout = run_timeout
@@ -180,17 +177,11 @@ class RepoEnv(TooledEnv):
         self.logger = logger or DebugGymLogger("debug-gym")
         self.infos: EnvInfo | None = None
         self.rng = None
-        self._tempdir = None
         self.additional_kwargs = kwargs
 
-        self.setup_workspace(
-            path=path,
-            entrypoint=entrypoint,
-            debug_entrypoint=debug_entrypoint,
-            readonly_patterns=readonly_patterns,
-        )
-        self._reset_env_state()
         self.dataset = self.load_dataset(problems)
+        self.workspace = RemoteWorkspace(self.terminal, logger=self.logger)
+        self.set_entrypoints(self.entrypoint, self.debug_entrypoint)
 
     def _reset_env_state(self):
         """Reset the environment state to the initial state."""
@@ -204,51 +195,7 @@ class RepoEnv(TooledEnv):
         self.clear_all_observations()
         self.empty_event_queue()
 
-    def setup_workspace(
-        self,
-        path: str,
-        entrypoint: str | None = None,
-        debug_entrypoint: str | None = None,
-        readonly_patterns: list[str] | None = None,
-        ignore_patterns: list[str] | None = None,
-    ):
-        readonly_patterns = readonly_patterns or []
-        ignore_patterns = ignore_patterns or []
-        if self.path:
-            self.cleanup_workspace()
-            self.path = None
-
-        if path is None:
-            return
-
-        self.path = Path(path)
-
-        # Create a random temporary folder for storing a backup of the repo.
-        self._tempdir = tempfile.TemporaryDirectory(prefix="RepoEnv-")
-        self.working_dir = Path(self._tempdir.name).resolve()
-
-        # Make sure to cleanup that folder once done.
-        atexit.register(self._tempdir.cleanup)
-
-        self.logger.debug(f"Working directory: {self.working_dir}")
-        shutil.copytree(
-            self.path,
-            self.working_dir,
-            dirs_exist_ok=True,
-            symlinks=True,
-            ignore=shutil.ignore_patterns("__pycache__", "*.pyc"),
-        )
-
-        self.setup_file_filters(readonly_patterns, ignore_patterns)
-
-        # override entrypoint as it might be task dependent
-        self.set_entrypoints(entrypoint, debug_entrypoint)
-
-        # Set up the terminal working dir
-        self.terminal.working_dir = str(self.working_dir)
-        self._reset_env_state()
-
-    def set_entrypoints(self, entrypoint, debug_entrypoint):
+    def set_entrypoints(self, entrypoint: str, debug_entrypoint: str | None = None):
         if entrypoint:
             self.entrypoint = self._prepare_entrypoint(entrypoint)
             debug_entrypoint = debug_entrypoint or entrypoint.replace(
@@ -280,28 +227,51 @@ class RepoEnv(TooledEnv):
         entrypoint = " ".join(entrypoint_list)
         return entrypoint
 
-    def cleanup_workspace(self):
-        if self._tempdir:
-            self._tempdir.cleanup()
+    @property
+    def working_dir(self) -> Path:
+        return self.workspace.working_dir
 
     @property
     def instructions(self) -> str:
+        """Instructions for the current task.
+        Override in subclasses for different behavior."""
         return ""
 
-    def display_files(self):
-        msg = (
-            "Listing files in the current working directory."
-            " (read-only) indicates read-only files."
-            f" Max depth: {str(self.dir_tree_depth)}.\n"
-        )
-        msg += self.directory_tree()
-        return msg
+    def setup_task(self, task_name: str, options: dict = None) -> None:
+        """Setup the task information.
+        Override in subclasses for different behavior. Called once at reset."""
+        pass
+
+    def setup_workspace(self) -> None:
+        """Setup the workspace.
+        Override in subclasses for different behavior. Called once at reset."""
+        self.workspace.reset()
+        self.workspace.copy_content(self.path)
+        self.workspace.setup_file_filters()
+
+    def setup_terminal(self) -> None:
+        """Setup the terminal.
+        Override in subclasses for different behavior. Called once at reset."""
+
+        log_with_color(self.logger, f"Configuring {self.terminal}...", "blue")
+
+        self.terminal.run("git init -b main")
+        self.terminal.run("git config user.name 'debug-gym'")
+        self.terminal.run("git config user.email '<>'")
+
+        self.terminal.run("git add *")
+        self.terminal.run("git commit -am 'Init'")
+
+        self.terminal.run("git add .debugignore .debugreadonly")
+        self.terminal.run("git commit -am 'Add debug-gym ignore and read-only files'")
 
     def reset(self, *, options: dict = None):
         """Resets the environment and returns eval as the initial observation."""
-        self.logger.info("Resetting environment")
         options = options or {}
-
+        self.logger.info("Resetting environment")
+        self.setup_task(task_name=options.get("task_name"), options=options)
+        self.setup_workspace()
+        self.setup_terminal()
         self._reset_env_state()
 
         # Notify all tools that the environment is reset and get their observations
@@ -324,7 +294,7 @@ class RepoEnv(TooledEnv):
             step_observation=self.step_observation,
             all_observations=self.all_observations,
             eval_observation=Observation("env", self.last_eval.output),
-            dir_tree=self.display_files(),
+            dir_tree=self.workspace.display_files(self.dir_tree_depth),
             current_breakpoints=self.current_breakpoints(),
             action_reasoning=None,
             action_content=None,
@@ -366,108 +336,9 @@ class RepoEnv(TooledEnv):
         self.last_eval = EvalOutput(success, output)
         return self.last_eval
 
-    def resolve_path(self, filepath: str | Path, raises=False) -> Path:
-        """Convert a relative filepath to absolute based on the working_dir.
-        If the path is already absolute, it is returned as is.
-        If raises is True, raises FileNotFoundError if the file does not exist,
-        is not in the working directory or is ignored by the ignore patterns.
-        If raises is False, returns the absolute path regardless of the file existence.
-        """
-        abs_filepath = Path(filepath)
-        if not abs_filepath.is_absolute():
-            abs_filepath = (Path(self.working_dir) / abs_filepath).resolve()
-        if (
-            raises
-            and abs_filepath != self.working_dir
-            and not (
-                abs_filepath.is_relative_to(self.working_dir)
-                and abs_filepath.exists()
-                and not self._is_ignored_func(abs_filepath)
-            )
-        ):
-            # raises error with original path
-            raise FileNotFoundError(
-                f"`{filepath}` does not exist or is not in "
-                f"the working directory `{self.working_dir}`."
-            )
-        return abs_filepath
-
-    def has_file(self, filepath: str) -> bool:
-        """Checks if a file exists in the working directory.
-        Shortcut for `resolve_path` with raises=True.
-        """
-        try:
-            self.resolve_path(filepath, raises=True)
-            return True
-        except FileNotFoundError:
-            return False
-
-    def read_file(self, filepath: str) -> str:
-        """Reads a file from the working directory.
-        Raises value error if the file does not exist"""
-        abs_filepath = self.resolve_path(filepath, raises=True)
-        return abs_filepath.read_text()
-
-    def is_editable(self, filepath):
-        return not self._is_readonly_func(self.resolve_path(filepath, raises=True))
-
-    def setup_file_filters(
-        self,
-        readonly_patterns: list[str] | None = None,
-        ignore_patterns: list[str] | None = None,
-    ):
-        """Indexes files and subdir in the working
-        directory, applying ignore and readonly patterns."""
-        readonly_patterns = readonly_patterns or []
-        ignore_patterns = ignore_patterns or []
-
-        # Ignore debug gym hidden files
-        ignore_patterns += [".debugignore", ".debugreadonly"]
-
-        # create a matcher function for ignored files, .debugignore has precedence over .gitignore
-        self._is_ignored_func = make_file_matcher(
-            base_dir=self.working_dir,
-            pattern_files=[
-                self.resolve_path(".gitignore"),
-                self.resolve_path(".debugignore"),
-            ],
-            patterns=ignore_patterns,
-        )
-
-        # create a matcher function for readonly files
-        self._is_readonly_func = make_file_matcher(
-            base_dir=self.working_dir,
-            pattern_files=self.resolve_path(".debugreadonly"),
-            patterns=readonly_patterns,
-        )
-
-    def directory_tree(self, root: str | Path = None, max_depth: int | None = None):
-        root = self.resolve_path(root or self.working_dir, raises=True)
-        max_depth = max_depth or self.dir_tree_depth
-
-        # initalize with root directory
-        result = [f"{root}/"]
-
-        # get all paths with correct depth
-        for path in _walk(root, max_depth, skip=self._is_ignored_func):
-            rel_path = path.relative_to(root)  # relative path from root
-            depth = len(rel_path.parts) - 1  # depth of current path
-            indent = "  " * depth  # 2 spaces per level for indent
-
-            # file vs direcrory formatting
-            result.append(f"{indent}|-- {path.name}")
-
-            if path.is_dir():
-                result[-1] += "/"
-
-            if not self.is_editable(path):
-                result[-1] += " (read-only)"
-
-        return "\n".join(result)
-
     def has_breakpoint(self, file_path: str, line_number: int) -> bool:
         """Check if a breakpoint is set at the given file and line number."""
-        key = f"{self.resolve_path(file_path)}|||{line_number}"
+        key = f"{self.workspace.resolve_path(file_path)}|||{line_number}"
         return key in self.current_breakpoints_state
 
     def current_breakpoints(self):
@@ -490,9 +361,9 @@ class RepoEnv(TooledEnv):
 
     @property
     def patch(self):
-        success, output = self.terminal.run("git diff")
+        success, output = self.terminal.run("git diff", strip_output=False)
         if not success:
-            self.logger.error("Failed to get git diff. {output}")
+            self.logger.error(f"Failed to get git diff:\n{output}")
             return None
 
         return output
@@ -544,7 +415,7 @@ class RepoEnv(TooledEnv):
             step_observation=self.step_observation,
             all_observations=self.all_observations,
             eval_observation=Observation("env", self.last_eval.output),
-            dir_tree=self.display_files(),
+            dir_tree=self.workspace.display_files(self.dir_tree_depth),
             current_breakpoints=self.current_breakpoints(),
             action_reasoning=action_reasoning,
             action_content=action_content,
@@ -565,9 +436,12 @@ class RepoEnv(TooledEnv):
             self.rewrite_counter += 1
 
     def close(self):
-        self.cleanup_workspace()
+        self.workspace.cleanup()
         if self.terminal:
             self.terminal.close()
+
+    def __del__(self):
+        self.close()
 
     def load_dataset(self, problems: str | list[str] | None = None):
         return {"custom": None}

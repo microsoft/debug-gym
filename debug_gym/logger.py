@@ -537,7 +537,7 @@ class DebugGymLogger(logging.Logger):
             console=self._live.console,
             show_time=False,
             rich_tracebacks=True,
-            markup=True,
+            markup=False,
         )
         rich_handler.setFormatter(logging.Formatter("🐸 [%(name)-12s]: %(message)s"))
         rich_handler.setLevel(level)
@@ -567,7 +567,8 @@ class DebugGymLogger(logging.Logger):
         logs through Rich."""
         if self.is_worker():
             self.LOG_QUEUE.put(record)
-        super().handle(record)
+        else:
+            super().handle(record)
 
     def _log_listener(self):
         if self.is_main():
@@ -661,10 +662,13 @@ class DebugGymLogger(logging.Logger):
         )
 
 
-def log_with_color(logger: DebugGymLogger, message: str, color: str):
-    """Log a message with a specific color, escape it for Rich, and mark it
+def log_with_color(
+    logger: DebugGymLogger, message: str, color: str, level=logging.INFO
+):
+    """Log a message with a specific color, escape it for Rich, and mark it667
     as already escaped for DebugGymLogger so it won't be escaped again."""
-    logger.info(
+    logger.log(
+        level,
         f"[{color}]{escape(message)}[/{color}]",
-        extra={"already_escaped": True},
+        extra={"already_escaped": True, "markup": True},
     )

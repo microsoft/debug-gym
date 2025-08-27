@@ -1,0 +1,284 @@
+import atexit
+import os
+import shutil
+import tempfile
+from pathlib import Path
+
+from debug_gym.gym.terminal import Terminal
+from debug_gym.gym.utils import _walk, make_file_matcher
+from debug_gym.logger import DebugGymLogger
+
+
+class LocalWorkspace:
+    def __init__(self, logger: DebugGymLogger | None = None):
+        self._tempdir = None
+        self.working_dir = None
+        self.logger = logger or DebugGymLogger("debug-gym")
+
+    def cleanup(self):
+        if self._tempdir:
+            self._tempdir.cleanup()
+
+    def reset(self):
+        self.cleanup()
+        self._tempdir = tempfile.TemporaryDirectory(prefix="DebugGym-")
+        atexit.register(self._tempdir.cleanup)
+        self.working_dir = Path(self._tempdir.name).resolve()
+        self.logger.debug(f"Working directory: {self.working_dir}")
+        self.terminal.working_dir = str(self.working_dir)
+
+    def copy(self, src: str | Path, target: str | Path | None = None):
+        """Copy files from src to target in the working directory."""
+        src = Path(src).resolve()
+        target = Path(target or self.working_dir).resolve()
+
+        shutil.copytree(
+            src,
+            target,
+            dirs_exist_ok=True,
+            symlinks=True,
+            ignore=shutil.ignore_patterns("__pycache__", "*.pyc"),
+        )
+
+    def resolve_path(self, filepath: str | Path, raises=False) -> Path:
+        """Convert a relative filepath to absolute based on the working_dir.
+        If the path is already absolute, it is returned as is.
+        If raises is True, raises FileNotFoundError if the file does not exist,
+        is not in the working directory or is ignored by the ignore patterns.
+        If raises is False, returns the absolute path regardless of the file existence.
+        """
+        abs_filepath = Path(filepath)
+        if not abs_filepath.is_absolute():
+            abs_filepath = (Path(self.working_dir) / abs_filepath).resolve()
+        if (
+            raises
+            and abs_filepath != self.working_dir
+            and not (
+                abs_filepath.is_relative_to(self.working_dir)
+                and abs_filepath.exists()
+                and not self._is_ignored_func(abs_filepath)
+            )
+        ):
+            # raises error with original path
+            raise FileNotFoundError(
+                f"`{filepath}` does not exist or is not in "
+                f"the working directory `{self.working_dir}`."
+            )
+        return abs_filepath
+
+    def read_file(self, filepath: str) -> str:
+        """Reads a file from the working directory.
+        Raises value error if the file does not exist"""
+        abs_filepath = self.resolve_path(filepath, raises=True)
+        return abs_filepath.read_text()
+
+    def write_file(self, filepath: str, content: str):
+        with open(self.resolve_path(filepath), "w") as f:
+            f.write(content)
+
+    def directory_tree(self, root: str | Path = None, max_depth: int = 1) -> str:
+        root = self.resolve_path(root or self.working_dir, raises=True)
+
+        # initalize with root directory
+        result = [f"{root}/"]
+
+        # get all paths with correct depth
+        for path in _walk(root, max_depth, skip=self._is_ignored_func):
+            rel_path = path.relative_to(root)  # relative path from root
+            depth = len(rel_path.parts) - 1  # depth of current path
+            indent = "  " * depth  # 2 spaces per level for indent
+
+            # file vs direcrory formatting
+            result.append(f"{indent}|-- {path.name}")
+
+            if path.is_dir():
+                result[-1] += "/"
+
+            if not self.is_editable(path):
+                result[-1] += " (read-only)"
+
+        return "\n".join(result)
+
+
+class RemoteWorkspace:
+
+    def __init__(self, terminal: Terminal, logger: DebugGymLogger | None = None):
+        self._tempdir = None
+        self.working_dir = None
+        self.logger = logger or DebugGymLogger("debug-gym")
+        self.terminal = terminal
+
+    def cleanup(self):
+        self.working_dir = None
+        if self._tempdir:
+            self._tempdir.cleanup()
+            self._tempdir = None
+
+    def reset(
+        self,
+        readonly_patterns: list[str] | None = None,
+        ignore_patterns: list[str] | None = None,
+    ):
+        self.cleanup()
+
+        self.working_dir = Path("/testbed")
+        if type(self.terminal) is Terminal:
+            self._tempdir = tempfile.TemporaryDirectory(prefix="DebugGym-")
+            atexit.register(self._tempdir.cleanup)
+            self.working_dir = Path(self._tempdir.name).resolve()
+
+        self.logger.debug(f"Working directory: {self.working_dir}")
+        self.terminal.working_dir = str(self.working_dir)
+        self.setup_file_filters(readonly_patterns, ignore_patterns)
+
+    def setup_file_filters(
+        self,
+        readonly_patterns: list[str] | None = None,
+        ignore_patterns: list[str] | None = None,
+    ):
+        """Indexes files and subdir in the working
+        directory, applying ignore and readonly patterns."""
+        self._is_readonly_func = lambda f: False
+        self._is_ignored_func = lambda f: False
+
+        readonly_patterns = readonly_patterns or []
+        ignore_patterns = ignore_patterns or []
+
+        # Ignore debug gym hidden files
+        ignore_patterns += [".debugignore", ".debugreadonly"]
+
+        ignore_patterns += (
+            self.read_file(".gitignore").splitlines()
+            if self.has_file(".gitignore")
+            else []
+        )
+        ignore_patterns += (
+            self.read_file(".debugignore").splitlines()
+            if self.has_file(".debugignore")
+            else []
+        )
+
+        readonly_patterns += (
+            self.read_file(".debugreadonly").splitlines()
+            if self.has_file(".debugreadonly")
+            else []
+        )
+
+        # create a matcher function for ignored files, .debugignore has precedence over .gitignore
+        self._is_ignored_func = make_file_matcher(
+            base_dir=self.working_dir,
+            pattern_files=[],
+            patterns=ignore_patterns,
+        )
+
+        # create a matcher function for readonly files
+        self._is_readonly_func = make_file_matcher(
+            base_dir=self.working_dir,
+            pattern_files=[],
+            patterns=readonly_patterns,
+        )
+
+    def copy_content(self, src: str | Path, target: str | Path | None = None):
+        """Copy files contained in src to a target directory."""
+        src = Path(src).resolve()
+        target = Path(target or self.working_dir).resolve()
+        self.terminal.copy_content(src, target)
+
+    def resolve_path(self, filepath: str | Path, raises=False) -> Path:
+        """Convert a relative filepath to absolute based on the working_dir.
+        If the path is already absolute, it is returned as is.
+        If raises is True, raises FileNotFoundError if the file does not exist,
+        is not in the working directory or is ignored by the ignore patterns.
+        If raises is False, returns the absolute path regardless of the file existence.
+        """
+        abs_filepath = Path(filepath)
+        if not abs_filepath.is_absolute():
+            abs_filepath = Path(self.working_dir) / abs_filepath
+        abs_filepath_str = str(abs_filepath)
+
+        if raises and abs_filepath != self.working_dir:
+            # Check if file exists, is within working_dir and is not ignored.
+            check_cmd = (
+                f'abs_path=$(realpath "{abs_filepath_str}"); '
+                f'test -e "$abs_path" && [[ "$abs_path" == {self.working_dir}* ]]'
+            )
+            success, result = self.terminal.run(
+                f"{check_cmd} && echo OK || echo MISSING"
+            )
+            if result.strip() != "OK" or self._is_ignored_func(abs_filepath):
+                raise FileNotFoundError(
+                    f"`{filepath}` does not exist or is not in "
+                    f"the working directory `{self.working_dir}`."
+                )
+
+        return Path(abs_filepath_str)
+
+    def read_file(self, filepath: str) -> str:
+        """Reads a file from the working directory.
+        Raises value error if the file does not exist"""
+        abs_filepath = self.resolve_path(filepath, raises=True)
+        success, output = self.terminal.run(
+            f"cat {abs_filepath}", raises=True, strip_output=False
+        )
+        return output
+
+    def write_file(self, filepath: str, content: str):
+        abs_filepath = self.resolve_path(filepath)
+        cmd = f"CONTENT=$(cat <<'EOF'\n{content}+\nEOF\n); echo -n \"${{CONTENT%+}}\" > {abs_filepath}"
+        self.terminal.run(cmd, raises=True)
+
+    def directory_tree(self, root: str | Path = None, max_depth: int = 1):
+        root = self.resolve_path(root or self.working_dir, raises=True)
+        # Use the terminal to run a bash command to list files
+        tree_cmd = f"tree --charset=ASCII --noreport -v -F -f -L {max_depth} {root} "
+        success, output = self.terminal.run(tree_cmd, raises=True)
+
+        lines = []
+        for line in output.splitlines():
+            prefix = ""
+            path = line
+            if "-- " in line:
+                prefix, path = line.split("-- ", 1)
+                prefix += "-- "
+
+            if self._is_ignored_func(path):
+                continue
+
+            if prefix:
+                lines.append(f"{prefix}{os.path.basename(path.rstrip('/'))}")
+            else:
+                lines.append(f"{prefix}{path.rstrip('/')}")
+
+            if path.endswith("/"):
+                lines[-1] += "/"
+
+            if self._is_readonly_func(path):
+                lines[-1] += " (read-only)"
+
+        output = "\n".join(lines)
+
+        # To maintain backward compatibility with previous version of debug-gym.
+        output = output.replace("`", "|").replace("    ", "  ")
+        return output
+
+    def is_editable(self, filepath):
+        return not self._is_readonly_func(self.resolve_path(filepath, raises=True))
+
+    def display_files(self, dir_tree_depth: int = 1) -> str:
+        msg = (
+            "Listing files in the current working directory."
+            " (read-only) indicates read-only files."
+            f" Max depth: {str(dir_tree_depth)}.\n"
+        )
+        msg += self.directory_tree(max_depth=dir_tree_depth)
+        return msg
+
+    def has_file(self, filepath: str) -> bool:
+        """Checks if a file exists in the working directory.
+        Shortcut for `resolve_path` with raises=True.
+        """
+        try:
+            self.resolve_path(filepath, raises=True)
+            return True
+        except FileNotFoundError:
+            return False
