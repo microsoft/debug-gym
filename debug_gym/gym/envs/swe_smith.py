@@ -21,7 +21,6 @@ from debug_gym.gym.utils import filter_problems
 
 class SWESmithEnv(SWEBenchEnv):
     CACHE = DEBUG_GYM_CACHE_DIR / "swe-smith"
-    DUMMY_DIR = DEBUG_GYM_CACHE_DIR / "swe-smith" / "empty"
     CONFIG = (
         importlib_files("debug_gym") / "gym" / "envs" / "configs" / "swe_smith.yaml"
     )
@@ -68,7 +67,7 @@ class SWESmithEnv(SWEBenchEnv):
 
         image_names = set(self.ds[dataset[id]]["image_name"] for id in dataset)
         self.logger.debug(
-            f"Loaded {len(self.ds)} tasks accross {len(image_names)} Docker images from {self.dataset_id}."
+            f"Loaded {len(dataset)} tasks accross {len(image_names)} Docker images from {self.dataset_id}."
         )
 
         # Download all images needed for SWE-Smith.
@@ -95,7 +94,7 @@ class SWESmithEnv(SWEBenchEnv):
     def setup_task(self, task_name: str, options: dict = None):
         if task_name not in self.dataset:
             raise ValueError(
-                f"Task `{task_name}` was not found in dataset. The available tasks are: {self.dataset}.\n"
+                f"Task `{task_name}` was not found in dataset. The available tasks are: {sorted(self.dataset)}.\n"
                 "Please provide a valid task or initialize the environment without problems to load all tasks."
             )
 

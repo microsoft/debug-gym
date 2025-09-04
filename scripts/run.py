@@ -265,7 +265,7 @@ def main():
 
     # Stop live progress display if --no-live-display is set
     # or in Human mode (avoid conflicts with prompt_toolkit)
-    if args.no_live_display or isinstance(llm, Human):
+    if args.no_live_display or isinstance(llm, Human) or args.debug:
         logger.set_no_live()
 
     num_workers = args.num_workers or int(os.environ.get("DEBUG_GYM_WORKERS", 1))

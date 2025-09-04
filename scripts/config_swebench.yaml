@@ -6,7 +6,8 @@ base:
     env_kwargs: {
         "dir_tree_depth": 1,
         "run_timeout": 300,
-        "dataset_id": "princeton-nlp/SWE-bench_Verified",
+        "dataset_id": "SWE-bench/SWE-bench_Verified",
+        "dataset_revision": "99450355ca8c611021187a57ffac304b66666738",
         # shortcut features
         "auto_eval_on_rewrite": False,  # If True, the environment will automatically call the Eval tool after a successful rewrite. If this is set to True, the agent does not need to call the Eval tool itself.
         "show_current_breakpoints": False,  # If True, the environment will automatically show the current breakpoints at every step in the system prompt.
@@ -42,5 +43,5 @@ debug_5_agent:
     tools: ["grep", "pdb", "view", "rewrite", "listdir", "eval"]
 
 solution_agent:
-    llm_name: "human"  # No need for an LLM.
+    llm_name: null  # No need for an LLM.
     tools: ["eval", "pdb"]

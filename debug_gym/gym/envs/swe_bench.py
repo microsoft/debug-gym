@@ -1,35 +1,26 @@
 import json
-import os
-import subprocess
 
 import datasets
 import docker
 from swebench.harness.constants import MAP_REPO_VERSION_TO_SPECS, TestStatus
-from swebench.harness.docker_build import (
-    build_env_images,
-    build_instance_image,
-    get_env_configs_to_build,
-)
 from swebench.harness.log_parsers import MAP_REPO_TO_PARSER
 from swebench.harness.test_spec.python import get_test_directives
 from swebench.harness.test_spec.test_spec import make_test_spec
-from swebench.harness.utils import load_swebench_dataset
 
 from debug_gym.constants import DEBUG_GYM_CACHE_DIR
 from debug_gym.gym.entities import EvalOutput
 from debug_gym.gym.envs.env import RepoEnv
 from debug_gym.gym.terminal import DockerTerminal, Terminal
-from debug_gym.gym.utils import create_ignore_file, filter_problems
+from debug_gym.gym.utils import filter_problems
 
 
 class SWEBenchEnv(RepoEnv):
     CACHE = DEBUG_GYM_CACHE_DIR / "swe-bench"
-    DUMMY_DIR = DEBUG_GYM_CACHE_DIR / "swe-bench" / "empty"
 
     def __init__(
         self,
-        dataset_id: str = "princeton-nlp/SWE-bench_Verified",
-        # dataset_id: str = "princeton-nlp/SWE-bench_lite",
+        dataset_id: str = "SWE-bench/SWE-bench_Verified",
+        dataset_revision: str = "99450355ca8c611021187a57ffac304b66666738",
         split: str = "test",
         terminal: Terminal | None = None,
         **kwargs,
@@ -38,10 +29,9 @@ class SWEBenchEnv(RepoEnv):
         if not isinstance(terminal, DockerTerminal):
             raise ValueError("SWEBenchEnv only supports DockerTerminal.")
 
-        self.DUMMY_DIR.mkdir(parents=True, exist_ok=True)
         self.dataset_id = dataset_id
+        self.dataset_revision = dataset_revision
         self.split = split
-        self.session_commands = []
         self.test_directives = []
 
         super().__init__(terminal=terminal, **kwargs)
@@ -51,39 +41,40 @@ class SWEBenchEnv(RepoEnv):
         return self.ds_row["problem_statement"]
 
     def load_dataset(self, problems: str | list[str] | None = None):
-        self.ds = datasets.load_dataset(self.dataset_id)[self.split]
+        self.ds = datasets.load_dataset(
+            self.dataset_id, revision=self.dataset_revision
+        )[self.split]
         dataset = {id: i for i, id in enumerate(self.ds["instance_id"])}
         problems = filter_problems(dataset, problems)
         dataset = {id: i for id, i in dataset.items() if id in problems}
 
-        swebench_instances = load_swebench_dataset(
-            name=self.dataset_id, instance_ids=list(dataset)
+        instance_ids = [self.ds[dataset[id]]["instance_id"] for id in dataset]
+        image_names = set(
+            f"sweb.eval.x86_64.{id.replace('__', '_1776_')}" for id in instance_ids
         )
-        docker_client = docker.from_env()
 
-        try:
-            env_configs_to_build = get_env_configs_to_build(
-                docker_client, swebench_instances
-            )
-        # swe-bench catches docker.errors.ImageNotFound and raises Exception
-        except BaseException:
-            env_configs_to_build = True
+        # Download all images needed for SWE-Bench.
+        client = docker.from_env()
+        tagged_image_names = set(f"swebench/{name}:latest" for name in image_names)
 
-        if env_configs_to_build:
-            self.logger.debug("Building Docker env-level images for SWE-Bench...")
-            build_env_images(
-                docker_client,
-                swebench_instances,
-                force_rebuild=False,
-                max_workers=24,
-            )
+        existing_images = set(
+            tag for image in client.images.list() for tag in image.tags
+        )
+        missing_images = tagged_image_names - existing_images
+        if missing_images:
+            self.logger.info(f"Found {len(missing_images)} missing Docker images.")
+            for i, image_name in enumerate(missing_images):
+                self.logger.info(
+                    f"Pulling Docker images {i + 1}/{len(missing_images)}: `{image_name}`."
+                )
+                client.images.pull(image_name)
 
         return dataset
 
     def setup_task(self, task_name: str, options: dict = None):
         if task_name not in self.dataset:
             raise ValueError(
-                f"Task `{task_name}` was not found in dataset. The available tasks are: {self.dataset}.\n"
+                f"Task `{task_name}` was not found in dataset. The available tasks are: {sorted(self.dataset)}.\n"
                 "Please provide a valid task or initialize the environment without problems to load all tasks."
             )
 
@@ -95,7 +86,9 @@ class SWEBenchEnv(RepoEnv):
         self.install_configs = MAP_REPO_VERSION_TO_SPECS[self.repo][self.version]
         self.gold_patch = self.ds_row["patch"]
         self.test_spec = make_test_spec(self.ds_row)
-        self.base_image = self.test_spec.instance_image_key
+        self.base_image = f"swebench/{self.test_spec.instance_image_key}".replace(
+            "__", "_1776_"
+        )
         self.base_commit = self.ds_row["base_commit"]
         self.test_patch = self.ds_row["test_patch"]
         self.fail_to_pass = json.loads(self.ds_row["FAIL_TO_PASS"])
@@ -109,14 +102,22 @@ class SWEBenchEnv(RepoEnv):
             # use pytest instead of `sympy bin/test` and `sphinx tox` so pdb breakpoints work
             expression = " ".join(self.test_directives)
             self.debug_entrypoint = f"python -m pytest {expression}"
-            # Install pytest if not already installed
-            self.install_configs["install"] += " && python -m pip install pytest"
 
             if self.entrypoint.startswith("PYTHONWARNINGS"):
                 # Move PYTHONWARNINGS from the entrypoint to the session commands
                 export, remaining = self.entrypoint.split(" ", 1)
-                self.session_commands.append(f"export {export}")
+                self.terminal.session_commands.append(f"export {export}")
                 self.entrypoint = remaining
+
+        if self.package_name == "django":
+            self.terminal.env_vars["LANG"] = "en_US.UTF-8"
+            self.terminal.env_vars["LANGUAGE"] = "en_US:en"
+            self.terminal.env_vars["LC_ALL"] = "en_US.UTF-8"
+            self.terminal.setup_commands += self.install_configs.get(
+                "eval_commands", []
+            )
+        elif self.package_name == "requests":
+            self.terminal.env_vars["CURL_CA_BUNDLE"] = ""
 
         # -s (capture=no) with pytest allows for debugging with pdb
         # -q (quiet) with pytest avoids long pytest output
@@ -126,11 +127,6 @@ class SWEBenchEnv(RepoEnv):
         self.entrypoint = self.entrypoint.replace("--tb=no", "--tb=short")
 
         self.git_apply_cmd = f"git apply -"
-
-        # Use SWE-Bench's test spec to build the instance image.
-        build_instance_image(
-            self.test_spec, docker.from_env(), logger=None, nocache=False
-        )
 
     def setup_workspace(self):
         self.terminal.base_image = self.base_image
@@ -145,6 +141,21 @@ class SWEBenchEnv(RepoEnv):
 
         self.terminal.session_commands.append("source /opt/miniconda3/bin/activate")
         self.terminal.session_commands.append("conda activate testbed")
+
+        if self.package_name == "astropy":
+            self.terminal.run("sed -i '/^addopts = -p no:warnings/s/^/# /' setup.cfg")
+        elif self.package_name == "requests":
+            # To avoid using httpbin.org which is unresponsive at time.
+            self.terminal.run(
+                "pip install httpbin[mainapp]==0.10.2 pytest-httpbin==2.1.0"
+            )
+            self.terminal.run("nohup gunicorn -b 127.0.0.1:80 -k gevent httpbin:app &")
+            self.terminal.run(
+                "nohup gunicorn -b 127.0.0.1:443 --certfile=/opt/miniconda3/envs/testbed/lib/python3.9/site-packages/pytest_httpbin/certs/server.pem --keyfile=/opt/miniconda3/envs/testbed/lib/python3.9/site-packages/pytest_httpbin/certs/server.key -k gevent httpbin:app &"
+            )
+            self.terminal.run('echo "127.0.0.1    httpbin.org" >> /etc/hosts')
+        elif self.task_name == "pylint-dev__pylint-4661":
+            self.terminal.run("pip install appdirs==1.4.4")
 
         # Apply the test patch directly.
         self.terminal.run(f"git apply - <<'EOF'\n{self.test_patch}\nEOF")

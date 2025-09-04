@@ -527,8 +527,7 @@ class DebugGymLogger(logging.Logger):
         self.log_dir = Path(log_dir) if log_dir else None
         if self.log_dir:  # Directory to store log files
             self.log_dir.mkdir(parents=True, exist_ok=True)
-            if self.is_worker():
-                self._initialize_file_handler(name, mode)
+            self._initialize_file_handler(name, mode)
             self.info(f"Logging to directory: {self.log_dir}")
 
     def _initialize_main_logger(self, level):
@@ -567,8 +566,7 @@ class DebugGymLogger(logging.Logger):
         logs through Rich."""
         if self.is_worker():
             self.LOG_QUEUE.put(record)
-        else:
-            super().handle(record)
+        super().handle(record)
 
     def _log_listener(self):
         if self.is_main():
