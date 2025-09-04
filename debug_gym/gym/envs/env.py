@@ -221,6 +221,10 @@ class RepoEnv(TooledEnv):
             entrypoint_list[2] = f"$(which {entrypoint_list[2]})"
             entrypoint_list = entrypoint_list[:2] + ["python"] + entrypoint_list[2:]
 
+        elif "xvfb" in entrypoint:
+            # parse "xvfb-run --auto-servernum .venv/bin/python -W ignore -m pytest -rA r2e_tests"
+            return entrypoint
+
         # For non-python commands, ensure we have the absolute path to the Python executable
         # and explicitly run it through Python for consistent execution behavior.
         elif entrypoint_list[0] != "python":
