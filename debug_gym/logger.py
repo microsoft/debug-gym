@@ -109,7 +109,7 @@ class TaskProgress:
             str(
                 log_file_path(
                     self.logdir,
-                    self.problem_id,
+                    "debug_gym",
                     relative=True,
                 )
             )
@@ -551,7 +551,7 @@ class DebugGymLogger(logging.Logger):
 
     def _initialize_file_handler(self, name: str, mode: str):
         self.setLevel(logging.DEBUG)  # Ensure logger operates at DEBUG level
-        self.log_file = log_file_path(self.log_dir, name)
+        self.log_file = log_file_path(self.log_dir, "debug_gym")
         fh = logging.FileHandler(self.log_file, mode=mode)
         formatter = StripAnsiFormatter("%(asctime)s %(levelname)-8s %(message)s")
         fh.setFormatter(formatter)
