@@ -98,6 +98,10 @@ class ShellSession:
         # Read the output until the sentinel or PS1
         output = self.read(read_until=read_until)
 
+        if not self.is_running:
+            self.close()
+            raise RuntimeError(f"{self} failed to start. Output:\n{output}")
+
         # Run session commands after starting the session if command was not provided
         if not command and self.session_commands:
             command = " && ".join(self.session_commands)
