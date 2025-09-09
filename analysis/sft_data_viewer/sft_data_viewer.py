@@ -45,37 +45,55 @@ def is_safe_path(filepath):
         if not filepath or not isinstance(filepath, str):
             return False
         
-        # Resolve the absolute path and normalize it
-        resolved_path = os.path.abspath(os.path.expanduser(filepath))
-        
-        # Check if file exists and is a file (not a directory or symlink)
-        if not os.path.isfile(resolved_path) or os.path.islink(resolved_path):
+        # First, normalize the path but don't do any file system operations yet
+        try:
+            resolved_path = os.path.abspath(os.path.expanduser(filepath))
+        except (OSError, ValueError):
             return False
         
-        # Check if file has .jsonl extension (case insensitive)
+        # Check if file has .jsonl extension (case insensitive) BEFORE any file operations
         if not resolved_path.lower().endswith('.jsonl'):
             return False
         
-        # Check if the path is within any of the allowed directories
+        # Check if the path is within any of the allowed directories FIRST
+        # This prevents any file system operations on unauthorized paths
+        is_within_allowed = False
         for allowed_dir in app.config["ALLOWED_DIRECTORIES"]:
             try:
                 # Use pathlib for robust path comparison
                 allowed_path = Path(allowed_dir).resolve()
-                file_path = Path(resolved_path).resolve()
+                candidate_path = Path(resolved_path)  # Don't resolve yet to avoid file system access
                 
-                # Check if the file is within the allowed directory (including subdirectories)
+                # Try to resolve only after checking it's theoretically within bounds
                 try:
-                    # This will raise ValueError if file_path is not relative to allowed_path
-                    file_path.relative_to(allowed_path)
-                    return True
+                    candidate_resolved = candidate_path.resolve()
+                    # Check if the file is within the allowed directory (including subdirectories)
+                    candidate_resolved.relative_to(allowed_path)
+                    is_within_allowed = True
+                    resolved_path = str(candidate_resolved)  # Use the safely resolved path
+                    break
                 except ValueError:
                     # File is not within this allowed directory, continue checking others
                     continue
+                except OSError:
+                    # Path resolution failed, continue to next directory
+                    continue
             except (OSError, ValueError):
-                # Handle cases where paths cannot be resolved
+                # Handle cases where allowed directory path cannot be resolved
                 continue
         
-        return False
+        if not is_within_allowed:
+            return False
+        
+        # Now that we've validated the path is within allowed directories,
+        # we can safely check if file exists and is a file (not a directory or symlink)
+        try:
+            if not os.path.isfile(resolved_path) or os.path.islink(resolved_path):
+                return False
+        except (OSError, ValueError):
+            return False
+        
+        return True
     except (OSError, ValueError, TypeError):
         return False
 
@@ -96,20 +114,31 @@ def safe_remove_file(filepath):
         if not filepath or not isinstance(filepath, str):
             return False
         
-        # Resolve the absolute path
-        resolved_path = os.path.abspath(filepath)
-        
-        # Check if the file is within the upload directory (for cleanup safety)
+        # Get the upload directory first
         upload_dir = os.path.abspath(app.config["UPLOAD_FOLDER"])
+        
+        # Resolve the absolute path but validate first
+        try:
+            resolved_path = os.path.abspath(filepath)
+        except (OSError, ValueError):
+            return False
+        
+        # Check if the file is within the upload directory BEFORE any file operations
         try:
             Path(resolved_path).relative_to(Path(upload_dir))
         except ValueError:
             # File is not within upload directory, don't remove
             return False
+        except (OSError, ValueError):
+            # Path validation failed
+            return False
         
-        # Remove the file if it exists
-        if os.path.isfile(resolved_path):
-            os.remove(resolved_path)
+        # Now that we've validated the path is safe, check if file exists and remove it
+        try:
+            if os.path.isfile(resolved_path):
+                os.remove(resolved_path)
+        except (OSError, ValueError):
+            return False
         
         return True
     except (OSError, ValueError, TypeError):
