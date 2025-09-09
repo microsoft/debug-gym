@@ -3,7 +3,8 @@ from unittest.mock import patch
 import pytest
 
 from debug_gym.gym.envs.mini_nightmare import MiniNightmareEnv
-from debug_gym.gym.terminal import DockerTerminal, Terminal
+from debug_gym.gym.terminals.docker import DockerTerminal
+from debug_gym.gym.terminals.terminal import Terminal
 
 
 @pytest.fixture

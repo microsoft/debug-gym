@@ -1,7 +1,7 @@
 import pytest
 
 from debug_gym.gym.envs import AiderBenchmarkEnv
-from debug_gym.gym.terminal import Terminal
+from debug_gym.gym.terminals.terminal import Terminal
 from debug_gym.gym.tools.tool import ToolCall
 from debug_gym.gym.tools.toolbox import Toolbox
 

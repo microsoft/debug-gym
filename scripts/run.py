@@ -11,7 +11,7 @@ from debug_gym import version as dg_version
 from debug_gym.agents.base_agent import AGENT_REGISTRY, create_agent
 from debug_gym.agents.utils import load_config
 from debug_gym.gym.envs import select_env
-from debug_gym.gym.terminal import select_terminal
+from debug_gym.gym.terminals import select_terminal
 from debug_gym.gym.tools.toolbox import Toolbox
 from debug_gym.llms.base import LLM
 from debug_gym.llms.human import Human

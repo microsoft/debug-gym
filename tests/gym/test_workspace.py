@@ -3,7 +3,8 @@ from pathlib import Path
 
 import pytest
 
-from debug_gym.gym.terminal import DockerTerminal, Terminal
+from debug_gym.gym.terminals.docker import DockerTerminal
+from debug_gym.gym.terminals.terminal import Terminal
 from debug_gym.gym.workspace import Workspace
 
 

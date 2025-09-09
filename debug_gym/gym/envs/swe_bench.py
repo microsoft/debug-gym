@@ -10,7 +10,9 @@ from swebench.harness.test_spec.test_spec import make_test_spec
 from debug_gym.constants import DEBUG_GYM_CACHE_DIR
 from debug_gym.gym.entities import EvalOutput
 from debug_gym.gym.envs.env import RepoEnv
-from debug_gym.gym.terminal import DockerTerminal, Terminal
+from debug_gym.gym.terminals.docker import DockerTerminal
+from debug_gym.gym.terminals.kubernetes import KubernetesTerminal
+from debug_gym.gym.terminals.terminal import Terminal
 from debug_gym.gym.utils import filter_problems
 
 
@@ -26,8 +28,10 @@ class SWEBenchEnv(RepoEnv):
         **kwargs,
     ):
         terminal = terminal or DockerTerminal(logger=kwargs.get("logger"))
-        if not isinstance(terminal, DockerTerminal):
-            raise ValueError("SWEBenchEnv only supports DockerTerminal.")
+        if not isinstance(terminal, (DockerTerminal, KubernetesTerminal)):
+            raise ValueError(
+                f"{self.__class__.__name__} only supports DockerTerminal and KubernetesTerminal."
+            )
 
         self.dataset_id = dataset_id
         self.dataset_revision = dataset_revision
@@ -129,6 +133,7 @@ class SWEBenchEnv(RepoEnv):
         self.git_apply_cmd = f"git apply -"
 
     def setup_workspace(self):
+        self.terminal.task_name = self.task_name
         self.terminal.base_image = self.base_image
         # Ignore hidden files (dotfiles) and any contents under hidden directories
         self.workspace.reset(ignore_patterns=["**/.*"])

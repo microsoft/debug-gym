@@ -15,7 +15,7 @@ from swesmith.utils import get_repo_commit_from_image_name
 from debug_gym.constants import DEBUG_GYM_CACHE_DIR
 from debug_gym.gym.entities import EvalOutput
 from debug_gym.gym.envs.swe_bench import SWEBenchEnv
-from debug_gym.gym.terminal import Terminal
+from debug_gym.gym.terminals.terminal import Terminal
 from debug_gym.gym.utils import filter_problems
 
 

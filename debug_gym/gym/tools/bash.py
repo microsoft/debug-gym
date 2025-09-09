@@ -34,7 +34,7 @@ class BashTool(EnvironmentTool):
             # Assert that the terminal is a Docker terminal (only in production)
             import os
 
-            from debug_gym.gym.terminal import DockerTerminal
+            from debug_gym.gym.terminals.docker import DockerTerminal
 
             # Skip Docker terminal check during testing or when explicitly disabled
             require_docker = (

@@ -11,7 +11,9 @@ from datasets import load_from_disk
 from debug_gym.constants import DEBUG_GYM_CACHE_DIR
 from debug_gym.gym.entities import EvalOutput
 from debug_gym.gym.envs.env import RepoEnv
-from debug_gym.gym.terminal import DockerTerminal, Terminal
+from debug_gym.gym.terminals.docker import DockerTerminal
+from debug_gym.gym.terminals.kubernetes import KubernetesTerminal
+from debug_gym.gym.terminals.terminal import Terminal
 from debug_gym.gym.utils import filter_problems
 
 
@@ -70,8 +72,10 @@ class R2EGymEnv(RepoEnv):
         **kwargs,
     ):
         terminal = terminal or DockerTerminal(logger=kwargs.get("logger"))
-        if not isinstance(terminal, DockerTerminal):
-            raise ValueError("R2EGymEnv only supports DockerTerminal.")
+        if not isinstance(terminal, (DockerTerminal, KubernetesTerminal)):
+            raise ValueError(
+                "R2EGymEnv only supports DockerTerminal and KubernetesTerminal."
+            )
 
         self.dataset_id = dataset_id
         self.dataset_revision = dataset_revision
