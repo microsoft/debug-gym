@@ -157,11 +157,15 @@ class SWEBenchEnv(RepoEnv):
         elif self.task_name == "pylint-dev__pylint-4661":
             self.terminal.run("pip install appdirs==1.4.4")
 
-        # Apply the test patch directly.
-        self.terminal.run(f"git apply - <<'EOF'\n{self.test_patch}\nEOF")
-
+        # Apply any changes needed to the install commands.
         self.terminal.run("git config user.name 'debug-gym'")
         self.terminal.run("git config user.email '<>'")
+        self.terminal.run(
+            f"git commit -am 'Changes needed for setting up {self.task_name}'"
+        )
+
+        # Apply the test patch directly.
+        self.terminal.run(f"git apply - <<'EOF'\n{self.test_patch}\nEOF")
         self.terminal.run(f"git commit -am 'Applying test patch for {self.task_name}'")
 
         # Remove the remote so the agent won't see newer commits.
