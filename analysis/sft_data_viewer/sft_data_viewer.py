@@ -29,68 +29,10 @@ total_records = 0
 records_per_page = 10
 
 
-def get_safe_path(filepath):
-    """
-    Validate and return a safe absolute path if the filepath is within allowed directories.
-    Returns None if the path is not safe.
-    
-    Args:
-        filepath (str): The file path to validate
-        
-    Returns:
-        str or None: The safe absolute path if valid, None otherwise
-    """
-    try:
-        # Basic input validation
-        if not filepath or not isinstance(filepath, str):
-            return None
-        
-        # Normalize the path string without file system access
-        try:
-            # Use string operations only to avoid file system access
-            normalized_input = os.path.normpath(os.path.expanduser(filepath))
-            if os.path.isabs(normalized_input):
-                candidate_abs = normalized_input
-            else:
-                candidate_abs = os.path.normpath(os.path.join(os.getcwd(), normalized_input))
-        except (OSError, ValueError):
-            return None
-        
-        # Check if file has .jsonl extension (case insensitive) - string operation only
-        if not candidate_abs.lower().endswith('.jsonl'):
-            return None
-        
-        # Check if the theoretical path would be within any allowed directory
-        # Use string/path manipulation without file system access
-        for allowed_dir in app.config["ALLOWED_DIRECTORIES"]:
-            try:
-                # Normalize both paths for comparison
-                allowed_abs = os.path.abspath(allowed_dir)
-                
-                # Check if candidate path starts with allowed directory path
-                # Add os.sep to ensure we're checking directory boundaries
-                if not allowed_abs.endswith(os.sep):
-                    allowed_abs += os.sep
-                
-                if candidate_abs.startswith(allowed_abs) or candidate_abs + os.sep == allowed_abs:
-                    # Path is theoretically within allowed directory
-                    # Now we can safely check if it actually exists as a file
-                    try:
-                        if os.path.isfile(candidate_abs) and not os.path.islink(candidate_abs):
-                            return candidate_abs
-                    except (OSError, ValueError):
-                        continue
-            except (OSError, ValueError):
-                continue
-        
-        return None
-    except (OSError, ValueError, TypeError):
-        return None
-
-
 def is_safe_path(filepath):
     """
-    Check if a file path is safe and accessible.
+    Validate that the file path is safe and within allowed directories.
+    Prevents path traversal attacks and restricts access to authorized directories.
     
     Args:
         filepath (str): The file path to validate
@@ -98,7 +40,62 @@ def is_safe_path(filepath):
     Returns:
         bool: True if the path is safe, False otherwise
     """
-    return get_safe_path(filepath) is not None
+    try:
+        # Basic input validation
+        if not filepath or not isinstance(filepath, str):
+            return False
+        
+        # First, normalize the path but don't do any file system operations yet
+        try:
+            resolved_path = os.path.abspath(os.path.expanduser(filepath))
+        except (OSError, ValueError):
+            return False
+        
+        # Check if file has .jsonl extension (case insensitive) BEFORE any file operations
+        if not resolved_path.lower().endswith('.jsonl'):
+            return False
+        
+        # Check if the path is within any of the allowed directories FIRST
+        # This prevents any file system operations on unauthorized paths
+        is_within_allowed = False
+        for allowed_dir in app.config["ALLOWED_DIRECTORIES"]:
+            try:
+                # Use pathlib for robust path comparison
+                allowed_path = Path(allowed_dir).resolve()
+                candidate_path = Path(resolved_path)  # Don't resolve yet to avoid file system access
+                
+                # Try to resolve only after checking it's theoretically within bounds
+                try:
+                    candidate_resolved = candidate_path.resolve()
+                    # Check if the file is within the allowed directory (including subdirectories)
+                    candidate_resolved.relative_to(allowed_path)
+                    is_within_allowed = True
+                    resolved_path = str(candidate_resolved)  # Use the safely resolved path
+                    break
+                except ValueError:
+                    # File is not within this allowed directory, continue checking others
+                    continue
+                except OSError:
+                    # Path resolution failed, continue to next directory
+                    continue
+            except (OSError, ValueError):
+                # Handle cases where allowed directory path cannot be resolved
+                continue
+        
+        if not is_within_allowed:
+            return False
+        
+        # Now that we've validated the path is within allowed directories,
+        # we can safely check if file exists and is a file (not a directory or symlink)
+        try:
+            if not os.path.isfile(resolved_path) or os.path.islink(resolved_path):
+                return False
+        except (OSError, ValueError):
+            return False
+        
+        return True
+    except (OSError, ValueError, TypeError):
+        return False
 
 
 def safe_remove_file(filepath):
@@ -160,14 +157,13 @@ app.jinja_env.globals.update(min=min, max=max)
 
 def count_jsonl_lines(filepath):
     """Count total lines in JSONL file efficiently"""
-    # Get validated safe path
-    safe_path = get_safe_path(filepath)
-    if safe_path is None:
+    # Validate file path for security
+    if not is_safe_path(filepath):
         print(f"Security error: Access denied to file path: {filepath}")
         return 0
     
     try:
-        with open(safe_path, 'r', encoding='utf-8') as f:
+        with open(filepath, 'r', encoding='utf-8') as f:
             count = sum(1 for _ in f)
         return count
     except Exception as e:
@@ -177,9 +173,8 @@ def count_jsonl_lines(filepath):
 
 def load_jsonl_page(filepath, page=0, per_page=10):
     """Load a specific page of records from JSONL file"""
-    # Get validated safe path
-    safe_path = get_safe_path(filepath)
-    if safe_path is None:
+    # Validate file path for security
+    if not is_safe_path(filepath):
         print(f"Security error: Access denied to file path: {filepath}")
         return []
     
@@ -188,7 +183,7 @@ def load_jsonl_page(filepath, page=0, per_page=10):
     end_idx = start_idx + per_page
     
     try:
-        with open(safe_path, 'r', encoding='utf-8') as f:
+        with open(filepath, 'r', encoding='utf-8') as f:
             for i, line in enumerate(f):
                 if i >= end_idx:
                     break
@@ -207,14 +202,13 @@ def load_jsonl_page(filepath, page=0, per_page=10):
 
 def load_single_record(filepath, record_idx):
     """Load a single record by index from JSONL file"""
-    # Get validated safe path
-    safe_path = get_safe_path(filepath)
-    if safe_path is None:
+    # Validate file path for security
+    if not is_safe_path(filepath):
         print(f"Security error: Access denied to file path: {filepath}")
         return None
     
     try:
-        with open(safe_path, 'r', encoding='utf-8') as f:
+        with open(filepath, 'r', encoding='utf-8') as f:
             for i, line in enumerate(f):
                 if i == record_idx:
                     try:
@@ -232,7 +226,7 @@ def load_single_record(filepath, record_idx):
 def index():
     global current_file_path, current_file_name, total_records
     
-    if current_file_path is None or get_safe_path(current_file_path) is None:
+    if current_file_path is None or not is_safe_path(current_file_path):
         # Reset invalid file path
         current_file_path = None
         current_file_name = None
@@ -319,21 +313,20 @@ def file_upload():
             
             try:
                 file.save(filepath)
-                # Validate the saved file path and get safe path
-                safe_path = get_safe_path(filepath)
-                if safe_path is None:
+                # Validate the saved file path
+                if not is_safe_path(filepath):
                     # Clean up the file if validation fails
                     safe_remove_file(filepath)
                     return render_template("upload.html", error="Security validation failed for uploaded file.")
                 
-                # Count total records using the original filepath (which gets validated internally)
+                # Count total records
                 total_records = count_jsonl_lines(filepath)
                 if total_records == 0:
                     # Clean up the file if it's empty or unreadable
                     safe_remove_file(filepath)
                     return render_template("upload.html", error="Uploaded file appears to be empty or could not be read.")
                 
-                current_file_path = safe_path  # Store the validated safe path
+                current_file_path = os.path.abspath(filepath)  # Store the absolute path
                 current_file_name = filename
                 return redirect(url_for("index"))
             except Exception as e:
@@ -359,21 +352,20 @@ def load_file():
     if not filepath:
         return render_template("upload.html", error="Please provide a file path")
     
-    # Get validated safe path
-    safe_path = get_safe_path(filepath)
-    if safe_path is None:
+    # Validate the file path for security
+    if not is_safe_path(filepath):
         allowed_dirs = ", ".join(app.config["ALLOWED_DIRECTORIES"])
         return render_template("upload.html", 
                              error=f"Access denied. File must be a .jsonl file within allowed directories: {allowed_dirs}")
     
     try:
-        # Count total records using the safe path
+        # Count total records
         total_records = count_jsonl_lines(filepath)
         if total_records == 0:
             return render_template("upload.html", error="File appears to be empty or could not be read")
         
-        current_file_path = safe_path  # Store the validated safe path
-        current_file_name = os.path.basename(safe_path)  # Extract filename from safe path
+        current_file_path = os.path.abspath(filepath)  # Store the absolute path
+        current_file_name = os.path.basename(os.path.abspath(filepath))  # Safe basename extraction
         return redirect(url_for("index"))
     except Exception as e:
         return render_template("upload.html", error=f"Error loading file: {str(e)}")
@@ -384,7 +376,7 @@ def view_record(record_idx):
     """View a single record in detail"""
     global current_file_path
     
-    if current_file_path is None or get_safe_path(current_file_path) is None:
+    if current_file_path is None or not is_safe_path(current_file_path):
         # Reset invalid file path
         current_file_path = None
         return redirect(url_for("file_upload"))
@@ -435,7 +427,7 @@ def get_record_api(record_idx):
     """API endpoint to get record data as JSON"""
     global current_file_path
     
-    if current_file_path is None or get_safe_path(current_file_path) is None:
+    if current_file_path is None or not is_safe_path(current_file_path):
         # Reset invalid file path
         current_file_path = None
         return jsonify({"error": "No file loaded"}), 400
@@ -456,7 +448,7 @@ def statistics():
     """Show statistics about the loaded dataset"""
     global current_file_path, total_records
     
-    if current_file_path is None or get_safe_path(current_file_path) is None:
+    if current_file_path is None or not is_safe_path(current_file_path):
         # Reset invalid file path
         current_file_path = None
         return redirect(url_for("file_upload"))
