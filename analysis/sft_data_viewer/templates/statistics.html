@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🐸 Statistics - Froggy SFT Data Viewer</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="container-fluid mt-4">
+        <div class="row">
+            <div class="col-12">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h1>🐸 Froggy Dataset Statistics</h1>
+                    <a href="{{ url_for('index') }}" class="btn btn-secondary">← Back to Records</a>
+                </div>
+
+                {% if current_file %}
+                <div class="alert alert-info">
+                    <strong>File:</strong> {{ current_file }} 
+                    <span class="badge bg-primary ms-2">{{ stats.total_records }} total records</span>
+                    <span class="badge bg-secondary ms-2">{{ stats.sample_size }} analyzed</span>
+                </div>
+                {% endif %}
+
+                <!-- Overview Cards -->
+                <div class="row mb-4">
+                    <div class="col-md-3">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h5 class="card-title">Total Records</h5>
+                                <h3 class="text-primary">{{ stats.total_records }}</h3>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h5 class="card-title">Avg Messages</h5>
+                                <h3 class="text-info">{{ "%.1f"|format(stats.avg_messages) if stats.avg_messages else 'N/A' }}</h3>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h5 class="card-title">Avg Tokens</h5>
+                                <h3 class="text-warning">{{ "%.0f"|format(stats.avg_tokens) if stats.avg_tokens else 'N/A' }}</h3>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h5 class="card-title">Success Rate</h5>
+                                <h3 class="text-success">{{ "%.1f"|format(stats.satisfied_criteria_percent) }}%</h3>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Criteria Analysis Row -->
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5>🎯 Criteria Analysis</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <h6>Individual Criteria Satisfaction</h6>
+                                        <div class="table-responsive">
+                                            <table class="table table-sm">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Criterion</th>
+                                                        <th>Count</th>
+                                                        <th>Percentage</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {% for criterion in stats.individual_criteria %}
+                                                    <tr>
+                                                        <td>{{ criterion.name }}</td>
+                                                        <td>{{ criterion.count }}</td>
+                                                        <td>{{ "%.1f"|format(criterion.percentage) }}%</td>
+                                                    </tr>
+                                                    {% endfor %}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <h6>Criteria Combinations</h6>
+                                        <div class="table-responsive">
+                                            <table class="table table-sm">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Criteria Combination</th>
+                                                        <th>Count</th>
+                                                        <th>Percentage</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {% for combo in stats.criteria_combinations %}
+                                                    <tr>
+                                                        <td>{{ combo.criteria_text }}</td>
+                                                        <td>{{ combo.count }}</td>
+                                                        <td>{{ "%.1f"|format(combo.percentage) }}%</td>
+                                                    </tr>
+                                                    {% endfor %}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Charts Row -->
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5>Message Role Distribution</h5>
+                            </div>
+                            <div class="card-body">
+                                <canvas id="roleChart" width="400" height="300"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5>Criteria Satisfaction Overview</h5>
+                            </div>
+                            <div class="card-body">
+                                <canvas id="successChart" width="400" height="300"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Detailed Statistics -->
+                <div class="row">
+                    <!-- Message Statistics -->
+                    <div class="col-md-6">
+                        <div class="card mb-4">
+                            <div class="card-header">
+                                <h5>Message Statistics</h5>
+                            </div>
+                            <div class="card-body">
+                                <table class="table table-sm">
+                                    <tbody>
+                                        {% if stats.avg_messages %}
+                                        <tr>
+                                            <td>Average Messages per Record:</td>
+                                            <td><strong>{{ "%.2f"|format(stats.avg_messages) }}</strong></td>
+                                        </tr>
+                                        <tr>
+                                            <td>Min Messages:</td>
+                                            <td>{{ stats.min_messages }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td>Max Messages:</td>
+                                            <td>{{ stats.max_messages }}</td>
+                                        </tr>
+                                        {% endif %}
+                                    </tbody>
+                                </table>
+
+                                <h6 class="mt-3">Role Distribution:</h6>
+                                <table class="table table-sm">
+                                    <tbody>
+                                        {% for role, count in stats.role_counts.items() %}
+                                        <tr>
+                                            <td>{{ role|title }}:</td>
+                                            <td><strong>{{ count }}</strong></td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Token Statistics -->
+                    <div class="col-md-6">
+                        <div class="card mb-4">
+                            <div class="card-header">
+                                <h5>Token Statistics</h5>
+                            </div>
+                            <div class="card-body">
+                                <table class="table table-sm">
+                                    <tbody>
+                                        {% if stats.avg_tokens %}
+                                        <tr>
+                                            <td>Average Tokens per Record:</td>
+                                            <td><strong>{{ "%.0f"|format(stats.avg_tokens) }}</strong></td>
+                                        </tr>
+                                        <tr>
+                                            <td>Min Tokens:</td>
+                                            <td>{{ stats.min_tokens }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td>Max Tokens:</td>
+                                            <td>{{ stats.max_tokens }}</td>
+                                        </tr>
+                                        {% endif %}
+                                    </tbody>
+                                </table>
+
+                                <h6 class="mt-3">Other Statistics:</h6>
+                                <table class="table table-sm">
+                                    <tbody>
+                                        <tr>
+                                            <td>Satisfied Criteria:</td>
+                                            <td>
+                                                <strong>{{ stats.satisfied_criteria_count }}</strong> 
+                                                ({{ "%.1f"|format(stats.satisfied_criteria_percent) }}%)
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td>Truncated Records:</td>
+                                            <td>
+                                                <strong>{{ stats.truncated_count }}</strong> 
+                                                ({{ "%.1f"|format(stats.truncated_percent) }}%)
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Problems Distribution -->
+                {% if stats.problems %}
+                <div class="row">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5>Problem Distribution (Top 10)</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="table-responsive">
+                                    <table class="table">
+                                        <thead>
+                                            <tr>
+                                                <th>Problem</th>
+                                                <th>Count</th>
+                                                <th>Percentage</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for problem, count in stats.top_problems %}
+                                            <tr>
+                                                <td>{{ problem[:100] }}{% if problem|length > 100 %}...{% endif %}</td>
+                                                <td>{{ count }}</td>
+                                                <td>{{ "%.1f"|format(count / stats.sample_size * 100) }}%</td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Role Distribution Chart
+        const roleCtx = document.getElementById('roleChart').getContext('2d');
+        const roleData = {
+            labels: [{% for role in stats.role_counts.keys() %}'{{ role|title }}'{% if not loop.last %},{% endif %}{% endfor %}],
+            datasets: [{
+                data: [{% for count in stats.role_counts.values() %}{{ count }}{% if not loop.last %},{% endif %}{% endfor %}],
+                backgroundColor: [
+                    '#6f42c1', '#0d6efd', '#198754', '#fd7e14', '#dc3545', '#ffc107'
+                ]
+            }]
+        };
+        new Chart(roleCtx, {
+            type: 'doughnut',
+            data: roleData,
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        position: 'bottom'
+                    }
+                }
+            }
+        });
+
+        // Success Chart
+        const successCtx = document.getElementById('successChart').getContext('2d');
+        const successData = {
+            labels: ['Satisfied', 'Not Satisfied'],
+            datasets: [{
+                data: [{{ stats.satisfied_criteria_count }}, {{ stats.sample_size - stats.satisfied_criteria_count }}],
+                backgroundColor: ['#198754', '#dc3545']
+            }]
+        };
+        new Chart(successCtx, {
+            type: 'doughnut',
+            data: successData,
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        position: 'bottom'
+                    }
+                }
+            }
+        });
+    </script>
+</body>
+</html>
