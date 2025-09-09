@@ -10,7 +10,7 @@ from debug_gym.gym.envs.env import EnvInfo, EventHooks, RepoEnv, TooledEnv
 from debug_gym.gym.terminal import Terminal
 from debug_gym.gym.tools.tool import ToolCall
 from debug_gym.gym.tools.toolbox import Toolbox
-from debug_gym.gym.workspace import RemoteWorkspace
+from debug_gym.gym.workspace import Workspace
 
 
 @pytest.fixture

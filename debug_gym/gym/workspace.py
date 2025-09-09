@@ -1,106 +1,14 @@
 import atexit
 import os
-import shutil
 import tempfile
 from pathlib import Path
 
 from debug_gym.gym.terminal import Terminal
-from debug_gym.gym.utils import _walk, make_file_matcher
+from debug_gym.gym.utils import make_file_matcher
 from debug_gym.logger import DebugGymLogger
 
 
-class LocalWorkspace:
-    def __init__(self, logger: DebugGymLogger | None = None):
-        self._tempdir = None
-        self.working_dir = None
-        self.logger = logger or DebugGymLogger("debug-gym")
-
-    def cleanup(self):
-        if self._tempdir:
-            self._tempdir.cleanup()
-
-    def reset(self):
-        self.cleanup()
-        self._tempdir = tempfile.TemporaryDirectory(prefix="DebugGym-")
-        atexit.register(self._tempdir.cleanup)
-        self.working_dir = Path(self._tempdir.name).resolve()
-        self.logger.debug(f"Working directory: {self.working_dir}")
-        self.terminal.working_dir = str(self.working_dir)
-
-    def copy(self, src: str | Path, target: str | Path | None = None):
-        """Copy files from src to target in the working directory."""
-        src = Path(src).resolve()
-        target = Path(target or self.working_dir).resolve()
-
-        shutil.copytree(
-            src,
-            target,
-            dirs_exist_ok=True,
-            symlinks=True,
-            ignore=shutil.ignore_patterns("__pycache__", "*.pyc"),
-        )
-
-    def resolve_path(self, filepath: str | Path, raises=False) -> Path:
-        """Convert a relative filepath to absolute based on the working_dir.
-        If the path is already absolute, it is returned as is.
-        If raises is True, raises FileNotFoundError if the file does not exist,
-        is not in the working directory or is ignored by the ignore patterns.
-        If raises is False, returns the absolute path regardless of the file existence.
-        """
-        abs_filepath = Path(filepath)
-        if not abs_filepath.is_absolute():
-            abs_filepath = (Path(self.working_dir) / abs_filepath).resolve()
-        if (
-            raises
-            and abs_filepath != self.working_dir
-            and not (
-                abs_filepath.is_relative_to(self.working_dir)
-                and abs_filepath.exists()
-                and not self._is_ignored_func(abs_filepath)
-            )
-        ):
-            # raises error with original path
-            raise FileNotFoundError(
-                f"`{filepath}` does not exist or is not in "
-                f"the working directory `{self.working_dir}`."
-            )
-        return abs_filepath
-
-    def read_file(self, filepath: str) -> str:
-        """Reads a file from the working directory.
-        Raises value error if the file does not exist"""
-        abs_filepath = self.resolve_path(filepath, raises=True)
-        return abs_filepath.read_text()
-
-    def write_file(self, filepath: str, content: str):
-        with open(self.resolve_path(filepath), "w") as f:
-            f.write(content)
-
-    def directory_tree(self, root: str | Path = None, max_depth: int = 1) -> str:
-        root = self.resolve_path(root or self.working_dir, raises=True)
-
-        # initalize with root directory
-        result = [f"{root}/"]
-
-        # get all paths with correct depth
-        for path in _walk(root, max_depth, skip=self._is_ignored_func):
-            rel_path = path.relative_to(root)  # relative path from root
-            depth = len(rel_path.parts) - 1  # depth of current path
-            indent = "  " * depth  # 2 spaces per level for indent
-
-            # file vs direcrory formatting
-            result.append(f"{indent}|-- {path.name}")
-
-            if path.is_dir():
-                result[-1] += "/"
-
-            if not self.is_editable(path):
-                result[-1] += " (read-only)"
-
-        return "\n".join(result)
-
-
-class RemoteWorkspace:
+class Workspace:
 
     def __init__(self, terminal: Terminal, logger: DebugGymLogger | None = None):
         self._tempdir = None

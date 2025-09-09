@@ -10,13 +10,13 @@ from debug_gym.gym.envs.env import EnvInfo, EventHooks, RepoEnv, TooledEnv
 from debug_gym.gym.terminal import DockerTerminal, Terminal
 from debug_gym.gym.tools.tool import ToolCall
 from debug_gym.gym.tools.toolbox import Toolbox
-from debug_gym.gym.workspace import RemoteWorkspace
+from debug_gym.gym.workspace import Workspace
 
 
 @pytest.fixture
 def workspace():
     terminal = Terminal()
-    workspace = RemoteWorkspace(terminal)
+    workspace = Workspace(terminal)
     workspace.reset()
 
     repo_path = workspace.working_dir
@@ -32,7 +32,7 @@ def workspace():
 def test_reset_and_cleanup_workspace():
     # Setup workspace with a native terminal.
     terminal = Terminal()
-    workspace = RemoteWorkspace(terminal)
+    workspace = Workspace(terminal)
 
     assert workspace._tempdir is None
     assert workspace.working_dir is None
@@ -52,7 +52,7 @@ def test_reset_and_cleanup_workspace():
 
     # Setup workspace with a remote terminal.
     terminal = DockerTerminal()
-    workspace = RemoteWorkspace(terminal)
+    workspace = Workspace(terminal)
 
     assert workspace._tempdir is None
     assert workspace.working_dir is None
@@ -306,6 +306,11 @@ def test_write_file(workspace):
 
     # Test with single line, no newline at the end.
     file_content_single_line = "Hello, DebugGym!"
+    workspace.write_file("test.txt", file_content_single_line)
+    assert file_path.read_text() == file_content_single_line
+
+    # Test with end delimiter
+    file_content_single_line = "Hello, DebugGym!+"
     workspace.write_file("test.txt", file_content_single_line)
     assert file_path.read_text() == file_content_single_line
 
