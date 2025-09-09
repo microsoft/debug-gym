@@ -164,7 +164,7 @@ def test_reset_and_step(get_swe_env):
 @if_docker_running
 def test_load_dataset(get_swe_env):
     swe_env = get_swe_env()
-    assert swe_env.dataset_id == "princeton-nlp/SWE-bench_Verified"
+    assert swe_env.dataset_id == "SWE-bench/SWE-bench_Verified"
     task_name = "astropy__astropy-14096"
     assert task_name in swe_env.dataset.keys()
     assert list(swe_env.ds.features.keys()) == [
