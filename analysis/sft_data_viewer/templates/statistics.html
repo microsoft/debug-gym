@@ -20,7 +20,11 @@
                 <div class="alert alert-info">
                     <strong>File:</strong> {{ current_file }} 
                     <span class="badge bg-primary ms-2">{{ stats.total_records }} total records</span>
-                    <span class="badge bg-secondary ms-2">{{ stats.sample_size }} analyzed</span>
+                    {% if stats.using_all_records %}
+                    <span class="badge bg-success ms-2">All records analyzed</span>
+                    {% else %}
+                    <span class="badge bg-warning ms-2">{{ stats.sample_size }} sampled (evenly distributed)</span>
+                    {% endif %}
                 </div>
                 {% endif %}
 
@@ -53,7 +57,7 @@
                     <div class="col-md-3">
                         <div class="card text-center">
                             <div class="card-body">
-                                <h5 class="card-title">Success Rate</h5>
+                                <h5 class="card-title">Has Any Criteria</h5>
                                 <h3 class="text-success">{{ "%.1f"|format(stats.satisfied_criteria_percent) }}%</h3>
                             </div>
                         </div>
@@ -65,7 +69,13 @@
                     <div class="col-12">
                         <div class="card">
                             <div class="card-header">
-                                <h5>🎯 Criteria Analysis</h5>
+                                <h5>🎯 Criteria Analysis 
+                                    {% if stats.using_all_records %}
+                                    <small class="text-muted">(computed using all {{ stats.sample_size }} trajectories)</small>
+                                    {% else %}
+                                    <small class="text-muted">(computed using a subsample of {{ stats.sample_size }} trajectories)</small>
+                                    {% endif %}
+                                </h5>
                             </div>
                             <div class="card-body">
                                 <div class="row">
@@ -136,10 +146,10 @@
                     <div class="col-md-6">
                         <div class="card">
                             <div class="card-header">
-                                <h5>Criteria Satisfaction Overview</h5>
+                                <h5>Criteria Combinations Distribution</h5>
                             </div>
                             <div class="card-body">
-                                <canvas id="successChart" width="400" height="300"></canvas>
+                                <canvas id="criteriaChart" width="400" height="300"></canvas>
                             </div>
                         </div>
                     </div>
@@ -238,40 +248,7 @@
                     </div>
                 </div>
 
-                <!-- Problems Distribution -->
-                {% if stats.problems %}
-                <div class="row">
-                    <div class="col-12">
-                        <div class="card">
-                            <div class="card-header">
-                                <h5>Problem Distribution (Top 10)</h5>
-                            </div>
-                            <div class="card-body">
-                                <div class="table-responsive">
-                                    <table class="table">
-                                        <thead>
-                                            <tr>
-                                                <th>Problem</th>
-                                                <th>Count</th>
-                                                <th>Percentage</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {% for problem, count in stats.top_problems %}
-                                            <tr>
-                                                <td>{{ problem[:100] }}{% if problem|length > 100 %}...{% endif %}</td>
-                                                <td>{{ count }}</td>
-                                                <td>{{ "%.1f"|format(count / stats.sample_size * 100) }}%</td>
-                                            </tr>
-                                            {% endfor %}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                {% endif %}
+
             </div>
         </div>
     </div>
@@ -302,23 +279,33 @@
             }
         });
 
-        // Success Chart
-        const successCtx = document.getElementById('successChart').getContext('2d');
-        const successData = {
-            labels: ['Satisfied', 'Not Satisfied'],
+        // Criteria Combinations Chart
+        const criteriaCtx = document.getElementById('criteriaChart').getContext('2d');
+        const criteriaData = {
+            labels: [{% for combo in stats.criteria_combinations %}'{{ combo.criteria_text }}'{% if not loop.last %},{% endif %}{% endfor %}],
             datasets: [{
-                data: [{{ stats.satisfied_criteria_count }}, {{ stats.sample_size - stats.satisfied_criteria_count }}],
-                backgroundColor: ['#198754', '#dc3545']
+                data: [{% for combo in stats.criteria_combinations %}{{ combo.count }}{% if not loop.last %},{% endif %}{% endfor %}],
+                backgroundColor: [
+                    '#198754', '#fd7e14', '#dc3545', '#6f42c1', '#0d6efd', '#ffc107', '#20c997', '#e83e8c'
+                ]
             }]
         };
-        new Chart(successCtx, {
+        new Chart(criteriaCtx, {
             type: 'doughnut',
-            data: successData,
+            data: criteriaData,
             options: {
                 responsive: true,
                 plugins: {
                     legend: {
                         position: 'bottom'
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const percentage = ((context.parsed / {{ stats.sample_size }}) * 100).toFixed(1);
+                                return context.label + ': ' + context.parsed + ' (' + percentage + '%)';
+                            }
+                        }
                     }
                 }
             }

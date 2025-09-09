@@ -279,15 +279,44 @@ def statistics():
     if current_file_path is None:
         return redirect(url_for("file_upload"))
     
-    # Sample some records to gather statistics
-    sample_size = min(100, total_records)
-    sample_records = load_jsonl_page(current_file_path, 0, sample_size)
+    # Decide whether to sample or use all records based on dataset size
+    use_all_records = total_records <= 2000  # Use all records for datasets under 2k
+    
+    if use_all_records:
+        # Load all records for accurate statistics
+        sample_records = []
+        with open(current_file_path, 'r') as f:
+            for line in f:
+                try:
+                    record = json.loads(line.strip())
+                    sample_records.append(record)
+                except json.JSONDecodeError:
+                    continue
+        sample_size = len(sample_records)
+    else:
+        # For larger datasets, sample evenly distributed records
+        sample_size = 2000  # Sample 2k records for better performance
+        
+        # Create evenly distributed sample indices
+        step = total_records / sample_size
+        sample_indices = [int(i * step) for i in range(sample_size)]
+        
+        sample_records = []
+        with open(current_file_path, 'r') as f:
+            for i, line in enumerate(f):
+                if i in sample_indices:
+                    try:
+                        record = json.loads(line.strip())
+                        sample_records.append(record)
+                    except json.JSONDecodeError:
+                        continue
+        sample_size = len(sample_records)
     
     # Collect statistics
     stats = {
         'total_records': total_records,
-        'sample_size': len(sample_records),
-        'problems': {},
+        'sample_size': sample_size,
+        'using_all_records': use_all_records,
         'message_counts': [],
         'token_counts': [],
         'satisfied_criteria_count': 0,
@@ -299,10 +328,6 @@ def statistics():
     }
     
     for record in sample_records:
-        # Problem statistics
-        problem = record.get('problem', 'N/A')
-        stats['problems'][problem] = stats['problems'].get(problem, 0) + 1
-        
         # Message and token counts
         messages = record.get('messages', [])
         stats['message_counts'].append(len(messages))
@@ -349,9 +374,6 @@ def statistics():
     
     stats['satisfied_criteria_percent'] = (stats['satisfied_criteria_count'] / sample_size * 100) if sample_size > 0 else 0
     stats['truncated_percent'] = (stats['truncated_count'] / sample_size * 100) if sample_size > 0 else 0
-    
-    # Sort problems by count for easier template rendering
-    stats['top_problems'] = sorted(stats['problems'].items(), key=lambda x: x[1], reverse=True)[:10]
     
     # Process criteria statistics for template
     stats['all_criteria_list'] = sorted(list(stats['all_criteria']))
