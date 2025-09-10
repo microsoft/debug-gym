@@ -22,32 +22,12 @@
                         <!-- File Upload Form -->
                         <div class="mb-4">
                             <h5>Upload JSONL File</h5>
-                            <div class="alert alert-warning">
-                                <small><strong>Note:</strong> For large files (>1GB), use the "Load from Server" option below instead.</small>
-                            </div>
                             <form method="POST" enctype="multipart/form-data">
                                 <div class="mb-3">
                                     <label for="file" class="form-label">Select JSONL file:</label>
                                     <input type="file" class="form-control" id="file" name="file" accept=".jsonl">
                                 </div>
                                 <button type="submit" class="btn btn-primary">Upload and View</button>
-                            </form>
-                        </div>
-
-                        <hr>
-
-                        <!-- Direct File Path Form -->
-                        <div class="mb-4">
-                            <h5>Load File from Server</h5>
-                            <form method="POST" action="{{ url_for('load_file') }}">
-                                <div class="mb-3">
-                                    <label for="filepath" class="form-label">File path:</label>
-                                    <input type="text" class="form-control" id="filepath" name="filepath" 
-                                           placeholder="/path/to/your/file.jsonl"
-                                           value="/Users/ericyuan/GitHub/debug-gym/analysis/d2_full_truncated_30k_sep1.jsonl">
-                                    <div class="form-text">Enter the full path to a JSONL file on the server</div>
-                                </div>
-                                <button type="submit" class="btn btn-success">Load File</button>
                             </form>
                         </div>
 
