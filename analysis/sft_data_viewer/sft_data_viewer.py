@@ -64,6 +64,50 @@ def load_jsonl_page(filepath, page=0, per_page=10):
         return []
 
 
+def get_shuffled_indices(total_records, page=0, per_page=10, seed=None):
+    """Generate shuffled indices for a specific page"""
+    import random
+    if seed is not None:
+        random.seed(seed)
+    
+    # Create a list of all indices and shuffle them
+    all_indices = list(range(total_records))
+    random.shuffle(all_indices)
+    
+    # Get the requested page of shuffled indices
+    start_idx = page * per_page
+    end_idx = start_idx + per_page
+    return all_indices[start_idx:end_idx]
+
+
+def load_records_by_indices(filepath, indices):
+    """Load specific records by their line indices"""
+    records = []
+    indices_set = set(indices)
+    
+    try:
+        with open(filepath, 'r') as f:
+            for i, line in enumerate(f):
+                if i in indices_set:
+                    try:
+                        record = json.loads(line.strip())
+                        records.append((i, record))  # Keep original index
+                    except json.JSONDecodeError as e:
+                        print(f"Error parsing line {i}: {e}")
+                        continue
+                        
+                # Early exit if we've found all records we need
+                if len(records) == len(indices):
+                    break
+    except Exception as e:
+        print(f"Error loading records by indices: {e}")
+        return []
+    
+    # Sort records to match the order of indices
+    index_to_record = {idx: record for idx, record in records}
+    return [(idx, index_to_record.get(idx)) for idx in indices if idx in index_to_record]
+
+
 def load_single_record(filepath, record_idx):
     """Load a single record by index from JSONL file"""
     try:
@@ -88,26 +132,41 @@ def index():
     if current_file_path is None:
         return redirect(url_for("file_upload"))
     
-    # Get pagination parameters
+    # Get pagination and shuffle parameters
     page = request.args.get('page', 0, type=int)
-    
-    # Load records for current page
-    records = load_jsonl_page(current_file_path, page, records_per_page)
+    shuffle = request.args.get('shuffle', 'false').lower() == 'true'
     
     # Calculate pagination info
     total_pages = math.ceil(total_records / records_per_page)
     
+    if shuffle:
+        # Generate shuffled indices for this page
+        shuffled_indices = get_shuffled_indices(total_records, page, records_per_page)
+        # Load records by their shuffled indices
+        indexed_records = load_records_by_indices(current_file_path, shuffled_indices)
+        records = [(idx, record) for idx, record in indexed_records]
+    else:
+        # Load records normally
+        normal_records = load_jsonl_page(current_file_path, page, records_per_page)
+        records = [(page * records_per_page + i, record) for i, record in enumerate(normal_records)]
+    
     # Process records for display (extract key info)
     processed_records = []
-    for i, record in enumerate(records):
-        record_idx = page * records_per_page + i
+    for original_idx, record in records:
+        record_idx = original_idx
         
         # Extract key metadata
+        satisfied_criteria = record.get('satisfied_criteria', False)
+        has_satisfied_criteria = len(satisfied_criteria) > 0 if isinstance(satisfied_criteria, list) else bool(satisfied_criteria)
+        criteria_count = len(satisfied_criteria) if isinstance(satisfied_criteria, list) else (1 if satisfied_criteria else 0)
+        
         metadata = {
             'index': record_idx,
             'problem': record.get('problem', 'N/A'),
             'run_id': record.get('run_id', 'N/A'),
-            'satisfied_criteria': record.get('satisfied_criteria', False),
+            'satisfied_criteria': satisfied_criteria,
+            'has_satisfied_criteria': has_satisfied_criteria,
+            'criteria_count': criteria_count,
             'truncated': record.get('truncated', False),
             'tokens': record.get('#tokens', 0),
             'messages_count': len(record.get('messages', [])),
@@ -138,7 +197,8 @@ def index():
         total_pages=total_pages,
         total_records=total_records,
         current_file=current_file_name,
-        records_per_page=records_per_page
+        records_per_page=records_per_page,
+        is_shuffled=shuffle
     )
 
 
