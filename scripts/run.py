@@ -139,12 +139,12 @@ def run_agent(args, problem, config):
             report_progress_error = False
             raise
 
+        # save log
+        agent.log(task_name=problem)
+
         # optionally apply patch
         if config["save_patch"]:
             agent.save_patch(task_name=problem)
-
-        # save log
-        agent.log(task_name=problem)
 
     except Exception as e:
         task_logger.error(
@@ -265,7 +265,7 @@ def main():
 
     # Stop live progress display if --no-live-display is set
     # or in Human mode (avoid conflicts with prompt_toolkit)
-    if args.no_live_display or isinstance(llm, Human):
+    if args.no_live_display or isinstance(llm, Human) or args.debug:
         logger.set_no_live()
 
     num_workers = args.num_workers or int(os.environ.get("DEBUG_GYM_WORKERS", 1))

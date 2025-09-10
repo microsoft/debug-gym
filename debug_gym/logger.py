@@ -527,8 +527,7 @@ class DebugGymLogger(logging.Logger):
         self.log_dir = Path(log_dir) if log_dir else None
         if self.log_dir:  # Directory to store log files
             self.log_dir.mkdir(parents=True, exist_ok=True)
-            if self.is_worker():
-                self._initialize_file_handler(name, mode)
+            self._initialize_file_handler(name, mode)
             self.info(f"Logging to directory: {self.log_dir}")
 
     def _initialize_main_logger(self, level):
@@ -537,7 +536,7 @@ class DebugGymLogger(logging.Logger):
             console=self._live.console,
             show_time=False,
             rich_tracebacks=True,
-            markup=True,
+            markup=False,
         )
         rich_handler.setFormatter(logging.Formatter("🐸 [%(name)-12s]: %(message)s"))
         rich_handler.setLevel(level)
@@ -661,10 +660,13 @@ class DebugGymLogger(logging.Logger):
         )
 
 
-def log_with_color(logger: DebugGymLogger, message: str, color: str):
-    """Log a message with a specific color, escape it for Rich, and mark it
+def log_with_color(
+    logger: DebugGymLogger, message: str, color: str, level=logging.INFO
+):
+    """Log a message with a specific color, escape it for Rich, and mark it667
     as already escaped for DebugGymLogger so it won't be escaped again."""
-    logger.info(
+    logger.log(
+        level,
         f"[{color}]{escape(message)}[/{color}]",
-        extra={"already_escaped": True},
+        extra={"already_escaped": True, "markup": True},
     )

@@ -5,11 +5,14 @@ import os
 import pty
 import shlex
 import subprocess
+import tarfile
 import tempfile
 import termios
 import time
 import uuid
+from io import BytesIO
 from pathlib import Path
+from sys import stdout
 
 import docker
 
@@ -234,7 +237,7 @@ class Terminal:
         if self.session_commands:
             entrypoint = self.session_commands + entrypoint
         entrypoint = " && ".join(entrypoint)
-        command = shlex.split(f'{self.default_shell_command} -c "{entrypoint}"')
+        command = shlex.split(self.default_shell_command) + ["-c", entrypoint]
         return command
 
     def run(
@@ -242,6 +245,7 @@ class Terminal:
         entrypoint: str | list[str],
         timeout: int = None,
         raises: bool = False,
+        strip_output: bool = True,
     ) -> tuple[bool, str]:
         """Run a list of commands in the terminal. Return command status and output."""
         command = self.prepare_command(entrypoint)
@@ -267,7 +271,10 @@ class Terminal:
             self.logger.debug(f"Failed to run command: {command}")
             raise ValueError(f"Failed to run command: {entrypoint}")
 
-        output = (stdout + stderr).strip("\r\n").strip("\n")
+        output = stdout + stderr
+        if strip_output:
+            output = output.strip("\r\n").strip("\n")
+
         self.logger.debug(
             f"Output from terminal with status {process.returncode}:\n{output}"
         )
@@ -299,6 +306,18 @@ class Terminal:
         for session in self.sessions:
             self.close_shell_session(session)
 
+    def __str__(self):
+        return f"Terminal[{self.working_dir}]"
+
+    def copy_content(self, src: str | Path, target: str | Path | None = None) -> None:
+        """Copy files contained in src on the host to target on the host."""
+        src = str(src)
+        target = str(target or self.working_dir)
+
+        self.logger.debug(f"[{self}] Copying {src} to {target}.")
+        # Use cp to copy files, including hidden files (dotfiles)
+        self.run(f"cp -r {src}/. {target}", raises=True)
+
 
 class DockerTerminal(Terminal):
 
@@ -312,10 +331,7 @@ class DockerTerminal(Terminal):
         # Docker-specific parameters
         base_image: str = "ubuntu:latest",
         setup_commands: list[str] | None = None,
-        volumes: dict[str, dict[str:str]] | None = None,
-        map_host_uid_gid: bool = True,
         **kwargs,
-        # TODO: dockerfile and/or docker-compose file?
     ):
         """
         volumes (dict or list): A dictionary to configure volumes mounted
@@ -336,34 +352,22 @@ class DockerTerminal(Terminal):
         )
         self.base_image = base_image
         self.setup_commands = setup_commands or []
-        self.volumes = volumes or {}
-        self.map_host_uid_gid = map_host_uid_gid
         self.docker_client = docker.from_env(timeout=600)
-        self.host_uid = os.getuid()
-        self.host_gid = os.getgid()
         self._container = None
-
-    def user_map(self):
-        _user = ""
-        if self.map_host_uid_gid:
-            _user = f"{self.host_uid}:{self.host_gid}"
-        return _user
 
     @property
     def working_dir(self):
-        """Lazy initialization of working_dir and volume."""
-        if self._working_dir is not None:
-            self.volumes.pop(self._working_dir, None)
-        working_dir = super().working_dir
-        self.volumes[working_dir] = {"bind": working_dir, "mode": "rw"}
-        return working_dir
+        """Lazy initialization of the working directory."""
+        return super().working_dir
 
     @working_dir.setter
     def working_dir(self, value):
-        if self._working_dir is not None:
-            self.volumes.pop(self._working_dir, None)
+        if self._container is not None:
+            raise ValueError(
+                "Cannot change working directory while container is running."
+            )
+
         self._working_dir = value
-        self.volumes[self._working_dir] = {"bind": self._working_dir, "mode": "rw"}
 
     @property
     def container(self):
@@ -375,17 +379,16 @@ class DockerTerminal(Terminal):
     @property
     def default_shell_command(self) -> list[str]:
         """Expects the container to have bash installed and python executable available."""
-        user_map = self.user_map()
-        if user_map:
-            user_map = f"--user {user_map}"
-        entrypoint = f"docker exec -t -i {user_map} {self.container.name} /bin/bash --noprofile --norc"
+        entrypoint = (
+            f"docker exec -t -i {self.container.name} /bin/bash --noprofile --norc"
+        )
         return entrypoint
 
     def new_shell_session(self):
         session = ShellSession(
             shell_command=self.default_shell_command,
             session_commands=[DISABLE_ECHO_COMMAND] + self.session_commands,
-            working_dir=self.working_dir,
+            working_dir=".",
             env_vars=self.env_vars,
             logger=self.logger,
         )
@@ -408,7 +411,7 @@ class DockerTerminal(Terminal):
         entrypoint: str | list[str],
         timeout: int = None,
         raises: bool = False,
-        user: str = None,
+        strip_output: bool = True,
     ) -> tuple[bool, str]:
         """Run a command in the terminal. Return command status and output."""
         command = self.prepare_command(entrypoint)
@@ -420,12 +423,14 @@ class DockerTerminal(Terminal):
             command,
             workdir=self.working_dir,
             environment=self.env_vars,
-            user=self.user_map() if user is None else user,
             stdout=True,
             stderr=True,
         )
         success = status == 0
-        output = output.decode().strip("\r\n").strip("\n")
+
+        output = output.decode()
+        if strip_output:
+            output = output.strip("\r\n").strip("\n")
 
         if raises and not success:
             # Command includes the entrypoint + session commands
@@ -442,9 +447,7 @@ class DockerTerminal(Terminal):
             image=self.base_image,
             command="sleep infinity",  # Keep the container running
             working_dir=self.working_dir,
-            volumes=self.volumes,
             environment=self.env_vars,
-            user=self.user_map(),
             detach=True,
             auto_remove=True,
             remove=True,
@@ -457,7 +460,7 @@ class DockerTerminal(Terminal):
         container.rename(container_name)
         container.reload()
         self._run_setup_commands(container)
-        self.logger.debug(f"Container {container_name} started successfully.")
+        self.logger.debug(f"{container} ({container_name}) started successfully.")
         atexit.register(self.clean_up)
         return container
 
@@ -465,10 +468,9 @@ class DockerTerminal(Terminal):
         """Run setup commands if any. If commands fail, stop the container."""
         if self.setup_commands:
             setup_commands = " && ".join(self.setup_commands)
-            self.logger.debug(f"Running setup commands: {setup_commands}")
+            self.logger.debug(f"{container} Running setup commands: {setup_commands}")
             status, output = container.exec_run(
                 ["/bin/bash", "-c", setup_commands],
-                user="root",  # Run as root to allow installations
                 workdir=self.working_dir,
                 environment=self.env_vars,
             )
@@ -496,14 +498,42 @@ class DockerTerminal(Terminal):
         super().close()
         self.clean_up()
 
+    def __str__(self):
+        return f"DockerTerminal[{self.container}, {self.working_dir}]"
+
+    def copy_content(self, src: str | Path, target: str | Path | None = None) -> None:
+        """Copy files contained in src on the host to target in the container."""
+        src = str(src)
+        target = str(target or self.working_dir)
+
+        self.logger.debug(f"[{self}] Copying {src} to {target}.")
+
+        # Create a tar archive of the file
+        tar_stream = BytesIO()
+        with tarfile.open(fileobj=tar_stream, mode="w") as tar:
+            if os.path.isdir(src):
+                for item in Path(src).iterdir():
+                    self.logger.debug(f"Adding {item} to tar")
+                    tar.add(str(item), arcname=os.path.basename(item))
+            else:
+                self.logger.debug(f"Adding {src} to tar")
+                tar.add(src, arcname=os.path.basename(src))
+
+        tar_stream.seek(0)
+
+        # Get the container object and copy the archive
+        self.container.put_archive(target, tar_stream)
+
 
 def select_terminal(
     terminal_config: dict | None = None, logger: DebugGymLogger | None = None
-) -> Terminal:
+) -> Terminal | None:
+    if terminal_config is None:
+        return None
+
     logger = logger or DebugGymLogger("debug-gym")
-    terminal_config = terminal_config or {"type": "local"}
     terminal_type = terminal_config["type"]
-    docker_only = ["base_image", "setup_commands", "volumes", "map_host_uid_gid"]
+    docker_only = ["base_image", "setup_commands"]
     match terminal_type:
         case "docker":
             terminal_class = DockerTerminal

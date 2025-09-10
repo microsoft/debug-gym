@@ -226,7 +226,10 @@ class LLM(ABC):
             An instance of the appropriate LLM class.
         """
         logger = logger or DebugGymLogger("debug-gym")
-        if llm_name == "human":
+        if not llm_name:
+            return None
+
+        elif llm_name == "human":
             from debug_gym.llms import Human
 
             return Human(llm_name, logger=logger)

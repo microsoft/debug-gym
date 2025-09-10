@@ -348,10 +348,12 @@ class BaseAgent:
         )
 
     def log(self, task_name="custom"):
+        # Simple tools list.
+        tools = [f"{tool.name}({tool.arguments})" for tool in self.env.tools]
         jsonl_output = {
             "problem": task_name,
             "config": self.config,
-            "tools": self.llm.define_tools(self.env.tools),
+            "tools": self.llm.define_tools(self.env.tools) if self.llm else tools,
             "uuid": self._uuid,
             "success": self.env.done,
             "log": [],
