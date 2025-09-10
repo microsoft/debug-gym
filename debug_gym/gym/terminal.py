@@ -471,7 +471,6 @@ class DockerTerminal(Terminal):
             self.logger.debug(f"{container} Running setup commands: {setup_commands}")
             status, output = container.exec_run(
                 ["/bin/bash", "-c", setup_commands],
-                # user="root",  # Run as root to allow installations
                 workdir=self.working_dir,
                 environment=self.env_vars,
             )

@@ -10,7 +10,7 @@ from debug_gym.gym.envs.env import EnvInfo, EventHooks, RepoEnv, TooledEnv
 from debug_gym.gym.terminal import Terminal
 from debug_gym.gym.tools.tool import ToolCall
 from debug_gym.gym.tools.toolbox import Toolbox
-from debug_gym.gym.workspace import RemoteWorkspace
+from debug_gym.gym.workspace import Workspace
 
 
 @pytest.fixture
@@ -210,7 +210,7 @@ def test_step(
 
 def test_reset(tmp_path):
     (tmp_path / "test.py").write_text("def test_1():\n  assert False\n")
-    (tmp_path / ".debugignore").write_text("__pycache__/\n")
+    (tmp_path / ".debugignore").write_text("__pycache__/\n.git/\n.pytest_cache/\n")
 
     env = RepoEnv(path=tmp_path, entrypoint="pytest test.py")
     infos = env.reset()

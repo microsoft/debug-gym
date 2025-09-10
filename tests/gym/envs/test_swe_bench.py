@@ -94,77 +94,25 @@ def test_reset_and_step(get_swe_env):
 |-- LICENSE.rst
 |-- MANIFEST.in
 |-- README.rst
-|-- astropy/"""
+|-- astropy/
+|-- cextern/
+|-- codecov.yml
+|-- conftest.py
+|-- docs/
+|-- examples/
+|-- licenses/
+|-- pip-requirements
+|-- pyproject.toml
+|-- setup.cfg
+|-- setup.py*
+|-- tox.ini"""
     assert env_info.step_observation.observation.startswith(listdir_start)
-
-
-# @if_docker_running
-# def test_run_command_with_raise(get_swe_env):
-#     swe_env = get_swe_env()
-#     swe_env.reset()
-#     # install sudo for testing, swe-bench images already have sudo
-#     success, output = swe_env.terminal.run(
-#         ["apt update", "apt install -y sudo", "echo 'Terminal ready'"]
-#     )
-#     assert success
-#     assert output.endswith("Terminal ready")
-
-#     status, output = swe_env.run_command_with_raise("echo 'Hello World'")
-#     assert output == "Hello World"
-#     with pytest.raises(
-#         ValueError,
-#         match=(
-#             "Failed to run command `cat /non_existent_file`:\n"
-#             "cat: /non_existent_file: No such file or directory"
-#         ),
-#     ):
-#         swe_env.run_command_with_raise("cat /non_existent_file")
-#     # add sudo if apt-get in command
-#     status, output = swe_env.run_command_with_raise("apt-get update")
-#     assert status
-#     # don't break if sudo is already there
-#     status, output = swe_env.run_command_with_raise("sudo apt-get update")
-#     assert status
-
-
-# @pytest.fixture
-# def install_configs_mock():
-#     install_configs = {
-#         "python": "3.12.8",
-#         "test_cmd": "pytest --help",
-#         "pre_install": ["apt-get help", "apt-get install -y vim"],
-#         "eval_commands": ["export TEST_VAR='Test Var'", "echo $TEST_VAR"],
-#         "install": "python3 -m pip install pytest==8.3.3",
-#         "post_install": ["echo 'Test file' > test.txt", "cat test.txt"],
-#         "packages": "pytest requests",
-#         "pip_packages": ["pytest"],
-#         "no_use_env": False,
-#     }
-#     return install_configs
-
-
-# @if_docker_running
-# def test_run_install(tmp_path, install_configs_mock, get_swe_env):
-#     swe_env = get_swe_env()
-#     swe_env.install_configs = install_configs_mock
-#     swe_env.run_install()
-#     _, output = swe_env.run_command_with_raise("python -m pytest --version")
-#     assert "pytest 8.3.3" in output
-
-
-# @if_docker_running
-# def test_run_post_install(install_configs_mock, get_swe_env):
-#     swe_env = get_swe_env()
-#     swe_env.install_configs = install_configs_mock
-#     swe_env.run_post_install()
-#     _, output = swe_env.run_command_with_raise("cat test.txt")
-#     assert output == "Test file"
 
 
 @if_docker_running
 def test_load_dataset(get_swe_env):
     swe_env = get_swe_env()
-    assert swe_env.dataset_id == "princeton-nlp/SWE-bench_Verified"
+    assert swe_env.dataset_id == "SWE-bench/SWE-bench_Verified"
     task_name = "astropy__astropy-14096"
     assert task_name in swe_env.dataset.keys()
     assert list(swe_env.ds.features.keys()) == [

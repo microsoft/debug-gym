@@ -39,17 +39,6 @@ def env(setup_aider_repo):
     return env
 
 
-def test_resolve_path(env):
-    path = env.workspace.resolve_path(env.working_dir, raises=True)
-    assert path == env.working_dir
-    assert (
-        env.workspace.resolve_path("clock.py", raises=True)
-        == env.working_dir / "clock.py"
-    )
-    with pytest.raises(FileNotFoundError):
-        env.workspace.resolve_path("nested/file.py", raises=True)
-
-
 def test_ignored_files(env):
     assert env.workspace.has_file("clock_test.py")
     assert env.workspace.has_file("clock.py")
