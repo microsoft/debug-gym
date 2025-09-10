@@ -7,16 +7,6 @@ import datasets
 import docker
 import yaml
 from datasets import load_from_disk
-from swebench.harness.constants import MAP_REPO_VERSION_TO_SPECS, TestStatus
-from swebench.harness.docker_build import (
-    build_env_images,
-    build_instance_image,
-    get_env_configs_to_build,
-)
-from swebench.harness.log_parsers import MAP_REPO_TO_PARSER
-from swebench.harness.test_spec.python import get_test_directives
-from swebench.harness.test_spec.test_spec import make_test_spec
-from swebench.harness.utils import load_swebench_dataset
 
 from debug_gym.constants import DEBUG_GYM_CACHE_DIR
 from debug_gym.gym.entities import EvalOutput
@@ -166,10 +156,6 @@ class R2EGymEnv(RepoEnv):
         }
 
         self.commit_hash = self.ds_row["commit_hash"]
-        # self.gold_patch = self.ds_row["patch"]  # TODO ???
-        # self.test_patch = self.ds_row["test_patch"]  # No need? Tests are in a separate folder.
-        # self.test_cmd = self.install_configs["test_cmd"]
-        # self.test_directives = get_test_directives(self.ds_row)
 
         self.entrypoint = "python -m pytest -W ignore -rA r2e_tests"
         if self.package_name == "pillow":
@@ -229,7 +215,6 @@ class R2EGymEnv(RepoEnv):
         self.terminal.run(
             f"find {self.repo_path}/.venv/bin -type f -executable -exec ln -sf {{}} {self.alt_path}/.local/bin/ \\;"
         )
-        # print(self.terminal.run(f"ls -l {self.alt_path}/.local/bin"))
 
         self.terminal.run("uv pip install chardet")
 
@@ -255,24 +240,20 @@ class R2EGymEnv(RepoEnv):
 
         # make a softlink for /root/r2e_tests (if present)
         self.terminal.run(f"ln -s {self.alt_path}/r2e_tests {self.repo_path}/r2e_tests")
-        # self.terminal.run(f"ln -s /r2e_tests {self.repo_path}/r2e_tests")
 
         self.terminal.session_commands.append("source .venv/bin/activate")
 
-        # Apply the test patch directly.
-        # self.terminal.run(f"git apply - <<'EOF'\n{self.test_patch}\nEOF")
-
         self.terminal.run("git config user.name 'debug-gym'")
         self.terminal.run("git config user.email '<>'")
-        # self.terminal.run(f"git commit -am 'Applying test patch for {self.task_name}'")
-
-        # Remove the remote so the agent won't see newer commits.
-        self.terminal.run("git remote remove origin")
 
         # Get the gold patch.
         _, self.gold_patch = self.terminal.run(
             f"git diff HEAD {self.commit_hash}", raises=True
         )
+
+        # Remove the remote so the agent won't see newer commits.
+        # TODO: remove .git/ entirely?
+        self.terminal.run("git remote remove origin")
 
     def apply_gold_patch(self):
         self.logger.info(f"Applying gold patch to {self.working_dir}.")
