@@ -130,7 +130,8 @@ class SWEBenchEnv(RepoEnv):
 
     def setup_workspace(self):
         self.terminal.base_image = self.base_image
-        self.workspace.reset()
+        # Ignore hidden files (dotfiles) and any contents under hidden directories
+        self.workspace.reset(ignore_patterns=["**/.*"])
         self.set_entrypoints(self.entrypoint, self.debug_entrypoint)
 
     def setup_terminal(self):

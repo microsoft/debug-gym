@@ -376,7 +376,7 @@ def test_pdb_crashing(tmp_path, setup_test_repo):
 
     initial_output = pdb.start_pdb(env)
     assert "The pytest entry point." in initial_output
-    output = pdb.interact_with_pdb("c", 5)
+    output = pdb.interact_with_pdb("c")
     assert "IndentationError" in output
 
 

@@ -1,15 +1,9 @@
 import os
 from pathlib import Path
-from unittest.mock import MagicMock, call, patch
 
-import numpy as np
 import pytest
 
-from debug_gym.gym.entities import EvalOutput, Event, Observation
-from debug_gym.gym.envs.env import EnvInfo, EventHooks, RepoEnv, TooledEnv
 from debug_gym.gym.terminal import DockerTerminal, Terminal
-from debug_gym.gym.tools.tool import ToolCall
-from debug_gym.gym.tools.toolbox import Toolbox
 from debug_gym.gym.workspace import Workspace
 
 
@@ -22,6 +16,7 @@ def workspace():
     repo_path = workspace.working_dir
     subdir_path = repo_path / "subdir"
     subdir_path.mkdir()
+    (repo_path / ".hidden").touch()
     (repo_path / "file1.txt").touch()
     (repo_path / "file2.txt").touch()
     (subdir_path / "subfile1.txt").touch()
@@ -73,6 +68,7 @@ def test_display_files(workspace):
     assert result == (
         "Listing files in the current working directory. (read-only) indicates read-only files. Max depth: 2.\n"
         f"{workspace.working_dir}/\n"
+        "|-- .hidden\n"
         "|-- file1.txt\n"
         "|-- file2.txt\n"
         "|-- subdir/\n"
@@ -94,6 +90,7 @@ def test_display_files_read_only(workspace):
     assert result == (
         "Listing files in the current working directory. (read-only) indicates read-only files. Max depth: 2.\n"
         f"{workspace.working_dir}/\n"
+        "|-- .hidden\n"
         "|-- file1.txt\n"
         "|-- file2.txt\n"
         "|-- read-only-file.txt (read-only)\n"
@@ -104,7 +101,7 @@ def test_display_files_read_only(workspace):
 
 def test_display_files_ignore(workspace):
     debugignore = workspace.working_dir / ".debugignore"
-    debugignore.write_text("file1.*\nsubdir/\n")
+    debugignore.write_text(".hidden\nfile1.*\nsubdir/\n")
 
     # Reset filters to take into account the .debugignore file.
     workspace.setup_file_filters()
@@ -119,11 +116,6 @@ def test_display_files_ignore(workspace):
 
 @pytest.mark.parametrize("debugignore", ["", ".?*"])
 def test_resolve_path(workspace, debugignore):
-
-    # terminal = Terminal()
-    # workspace = RemoteWorkspace(terminal)
-    # workspace.reset()
-
     (workspace.working_dir / ".debugignore").write_text(debugignore)
     workspace.setup_file_filters()  # Reset filters.
 
@@ -188,6 +180,7 @@ def test_setup_file_filters_basic(workspace):
     # Setup a fake repo structure
     subdir = workspace.working_dir / "subdir"
     files = [
+        workspace.working_dir / ".hidden",
         workspace.working_dir / "file1.txt",
         workspace.working_dir / "file2.txt",
         workspace.working_dir / "ignored.txt",

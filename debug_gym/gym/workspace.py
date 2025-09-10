@@ -146,26 +146,23 @@ class Workspace:
     def directory_tree(self, root: str | Path = None, max_depth: int = 1):
         root = self.resolve_path(root or self.working_dir, raises=True)
         # Use the terminal to run a bash command to list files
-        tree_cmd = f"tree --charset=ASCII --noreport -v -F -f -L {max_depth} {root} "
+        tree_cmd = f"tree --charset=ASCII --noreport -a -v -F -f -L {max_depth} {root} "
         success, output = self.terminal.run(tree_cmd, raises=True)
 
-        lines = []
-        for line in output.splitlines():
-            prefix = ""
-            path = line
-            if "-- " in line:
-                prefix, path = line.split("-- ", 1)
-                prefix += "-- "
+        first, *rest = output.splitlines()
+        lines = [first]
+        for line in rest:
+            assert "-- " in line
+            prefix, path = line.split("-- ", 1)
+            prefix += "-- "
 
             if self._is_ignored_func(path):
                 continue
 
-            if prefix:
-                lines.append(f"{prefix}{os.path.basename(path.rstrip('/'))}")
-            else:
-                lines.append(f"{prefix}{path.rstrip('/')}")
+            lines.append(f"{prefix}{os.path.basename(path.rstrip('/'))}")
 
             if path.endswith("/"):
+                # i.e. a directory
                 lines[-1] += "/"
 
             if self._is_readonly_func(path):

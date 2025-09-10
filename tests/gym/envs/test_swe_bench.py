@@ -94,7 +94,18 @@ def test_reset_and_step(get_swe_env):
 |-- LICENSE.rst
 |-- MANIFEST.in
 |-- README.rst
-|-- astropy/"""
+|-- astropy/
+|-- cextern/
+|-- codecov.yml
+|-- conftest.py
+|-- docs/
+|-- examples/
+|-- licenses/
+|-- pip-requirements
+|-- pyproject.toml
+|-- setup.cfg
+|-- setup.py*
+|-- tox.ini"""
     assert env_info.step_observation.observation.startswith(listdir_start)
 
 
