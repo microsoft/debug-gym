@@ -33,9 +33,9 @@ class SWESmithEnv(SWEBenchEnv):
         terminal: Terminal | None = None,
         **kwargs,
     ):
-        self.dataset_revision = dataset_revision
         super().__init__(
             dataset_id=dataset_id,
+            dataset_revision=dataset_revision,
             split=split,
             terminal=terminal,
             **kwargs,

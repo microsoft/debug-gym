@@ -6,7 +6,7 @@ import numpy as np
 from debug_gym.gym.entities import EvalOutput, Event, Observation
 from debug_gym.gym.terminal import Terminal
 from debug_gym.gym.tools.tool import EnvironmentTool, ToolCall
-from debug_gym.gym.workspace import RemoteWorkspace
+from debug_gym.gym.workspace import Workspace
 from debug_gym.logger import DebugGymLogger, log_with_color
 
 
@@ -182,7 +182,7 @@ class RepoEnv(TooledEnv):
         self.rng = None
         self.additional_kwargs = kwargs
 
-        self.workspace = RemoteWorkspace(self.terminal, logger=self.logger)
+        self.workspace = Workspace(self.terminal, logger=self.logger)
         self.dataset = self.load_dataset(problems)
         self.set_entrypoints(self.entrypoint, self.debug_entrypoint)
 
@@ -368,11 +368,7 @@ class RepoEnv(TooledEnv):
 
     @property
     def patch(self):
-        success, output = self.terminal.run("git diff", strip_output=False)
-        if not success:
-            self.logger.error(f"Failed to get git diff:\n{output}")
-            return None
-
+        success, output = self.terminal.run("git diff", strip_output=False, raises=True)
         return output
 
     def apply_gold_patch(self):

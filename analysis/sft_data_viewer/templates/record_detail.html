@@ -1,0 +1,843 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🐸 Trajectory #{{ record_idx }} - Froggy SFT Data Viewer</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #5A827E 0%, #84AE92 100%);
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+        }
+        
+        .container-fluid {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.1);
+            margin: 20px;
+            overflow: hidden;
+        }
+        
+        .trajectory-settings {
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .conversation-flow {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        
+        .step-container {
+            border: 1px solid #e9ecef;
+            border-radius: 6px;
+            margin-bottom: 12px;
+            overflow: hidden;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        
+        .step-header {
+            padding: 10px 15px;
+            cursor: pointer;
+            border-bottom: 1px solid #dee2e6;
+            transition: background-color 0.2s;
+            font-weight: 500;
+        }
+        
+        .step-header:hover {
+            background-color: #f8f9fa;
+        }
+        
+        .step-header.user {
+            background-color: #e8f5e8;
+            border-left: 4px solid #28a745;
+        }
+        
+        .step-header.assistant {
+            background-color: #f0fff0;
+            border-left: 4px solid #5A827E;
+        }
+        
+        .step-header.system {
+            background-color: #fff8e7;
+            border-left: 4px solid #ffc107;
+        }
+        
+        .step-header.tool {
+            background-color: #fff0f0;
+            border-left: 4px solid #fd7e14;
+        }
+        
+        .step-content {
+            padding: 15px;
+            background-color: #fefefe;
+            white-space: pre-wrap;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-size: 14px;
+            line-height: 1.5;
+            border-left: 4px solid transparent;
+        }
+        
+        .step-container.assistant .step-content {
+            border-left-color: #5A827E;
+        }
+        
+        .step-container.user .step-content {
+            border-left-color: #28a745;
+        }
+        
+        .step-container.system .step-content {
+            border-left-color: #ffc107;
+        }
+        
+        .step-container.tool .step-content {
+            border-left-color: #fd7e14;
+        }
+        
+
+        
+        .main-layout {
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+        
+        .navigation-panel {
+            width: 300px;
+            background: white;
+            border-right: 1px solid #dee2e6;
+            flex-shrink: 0;
+        }
+        
+        .step-navigation {
+            height: 100vh;
+            background: white;
+            border: none;
+            border-radius: 0;
+            padding: 20px;
+            overflow-y: auto;
+            box-shadow: none;
+        }
+        
+        .content-panel {
+            flex: 1;
+            overflow-y: auto;
+            background: white;
+        }
+        
+        .content-wrapper {
+            padding: 20px;
+        }
+        
+        /* Hide navigation on small screens */
+        @media (max-width: 992px) {
+            .navigation-panel {
+                display: none;
+            }
+        }
+        
+        .step-nav-item {
+            display: block;
+            padding: 5px 10px;
+            text-decoration: none;
+            border-radius: 4px;
+            margin-bottom: 2px;
+            font-size: 13px;
+            transition: all 0.2s;
+        }
+        
+        .step-nav-item:hover {
+            background-color: #f8f9fa;
+        }
+        
+        .step-nav-item.user {
+            border-left: 3px solid #28a745;
+            background-color: #e8f5e8;
+        }
+        
+        .step-nav-item.assistant {
+            border-left: 3px solid #5A827E;
+            background-color: #f0fff0;
+        }
+        
+        .step-nav-item.system {
+            border-left: 3px solid #ffc107;
+            background-color: #fff8e7;
+        }
+        
+        .step-nav-item.tool {
+            border-left: 3px solid #fd7e14;
+            background-color: #fff0f0;
+        }
+        
+        .step-nav-item.active {
+            background-color: #007bff !important;
+            color: white !important;
+            border-left-color: #0056b3 !important;
+            transform: translateX(2px);
+            box-shadow: 0 2px 8px rgba(0, 123, 255, 0.3);
+        }
+        
+        .step-nav-item.active .content-preview {
+            color: rgba(255, 255, 255, 0.8) !important;
+        }
+        
+        .step-nav-item.active .step-counter {
+            background-color: rgba(255, 255, 255, 0.2);
+        }
+        
+        .content-preview {
+            color: #6c757d;
+            font-size: 11px;
+            margin-top: 2px;
+        }
+        
+        .toggle-btn {
+            background: none;
+            border: none;
+            font-size: 12px;
+            color: #007bff;
+            cursor: pointer;
+            padding: 2px 8px;
+            border-radius: 3px;
+        }
+        
+        .toggle-btn:hover {
+            background-color: #e9ecef;
+        }
+        
+        .step-counter {
+            background-color: #495057;
+            color: white;
+            font-size: 11px;
+            padding: 2px 8px;
+            border-radius: 12px;
+            margin-right: 10px;
+            font-weight: 500;
+        }
+        
+
+        
+        .json-viewer {
+            padding: 0;
+            margin: 8px 0;
+            font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+            font-size: 13px;
+            line-height: 1.3;
+            white-space: pre;
+            background: transparent;
+            color: #495057;
+            border-left: 2px solid #dee2e6;
+            padding-left: 8px;
+        }
+        
+        .json-key {
+            color: #d73a49;
+            font-weight: 600;
+        }
+        
+        .json-string {
+            color: #032f62;
+        }
+        
+        .json-number {
+            color: #005cc5;
+        }
+        
+        .json-boolean {
+            color: #e36209;
+        }
+        
+        .json-null {
+            color: #6f42c1;
+        }
+        
+        .collapsible {
+            cursor: pointer;
+            user-select: none;
+        }
+        
+        .collapsible:before {
+            content: '▼ ';
+            color: #666;
+            font-size: 14px;
+            margin-right: 5px;
+        }
+        
+        .collapsed:before {
+            content: '▶ ';
+        }
+        
+        .collapsed + .json-content {
+            display: none;
+        }
+        
+        .expand-icon {
+            transition: transform 0.3s ease;
+        }
+        
+        .expanded .expand-icon {
+            transform: rotate(180deg);
+        }
+        
+        .conversation-stats {
+            background-color: #e7f3ff;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .navigation-buttons {
+            background: linear-gradient(45deg, #5A827E, #84AE92);
+            border-radius: 15px;
+        }
+        
+        .navigation-buttons .btn {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: white;
+            transition: all 0.3s ease;
+        }
+        
+        .navigation-buttons .btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+        }
+    </style>
+</head>
+<body>
+    <div class="main-layout">
+        <!-- Left Navigation Panel -->
+        <div class="navigation-panel">
+            <div class="step-navigation">
+                <h6 class="mb-2">📋 Message Steps</h6>
+                <div class="small text-muted mb-3">Click to jump to step</div>
+                {% for message in messages %}
+                    {% set step_num = loop.index %}
+                    <a href="#step-{{ step_num }}" class="step-nav-item {{ message.role }}">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <span class="step-counter">{{ step_num }}</span>
+                                {% if message.role == 'system' %}🔧 System
+                                {% elif message.role == 'user' %}👤 User
+                                {% elif message.role == 'assistant' %}🐸 Froggy
+                                {% elif message.role == 'tool' %}🛠️ Tool{% if message.get('name') %} ({{ message.name }}){% endif %}
+                                {% else %}❓ {{ message.role|title }}
+                                {% endif %}
+                            </div>
+                            {% if message.get('tool_calls') %}
+                                <small class="badge bg-info">{{ message.tool_calls|length }} calls</small>
+                            {% endif %}
+                        </div>
+                        {% if message.get('content') %}
+                            <div class="content-preview">{{ message.content[:60] }}{% if message.content|length > 60 %}...{% endif %}</div>
+                        {% endif %}
+                    </a>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Right Content Panel -->
+        <div class="content-panel">
+            <div class="content-wrapper">
+                <!-- Navigation -->
+                <div class="navigation-buttons bg-light p-3 rounded mb-4">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <a href="{{ url_for('index') }}" class="btn btn-secondary">← Back to List</a>
+                            {% if record_idx > 0 %}
+                            <a href="{{ url_for('view_record', record_idx=record_idx-1) }}" class="btn btn-outline-primary">← Previous Trajectory</a>
+                            {% endif %}
+                            {% if record_idx < total_records - 1 %}
+                            <a href="{{ url_for('view_record', record_idx=record_idx+1) }}" class="btn btn-outline-primary">Next Trajectory →</a>
+                            {% endif %}
+                            <button class="btn btn-outline-info" onclick="expandAllSteps()">📖 Expand All</button>
+                            <button class="btn btn-outline-warning" onclick="collapseAllSteps()">📄 Collapse All</button>
+                        </div>
+                        <div>
+                            <span class="badge bg-info">Trajectory {{ record_idx + 1 }} of {{ total_records }}</span>
+                        </div>
+                    </div>
+                </div>
+
+        <!-- Trajectory Header -->
+        <div class="row">
+            <div class="col-12">
+                <div class="trajectory-settings">
+                    <h2>🐸 Froggy Trajectory #{{ record_idx }}</h2>
+                    
+                    <!-- Trajectory Settings -->
+                    <div class="row mt-3">
+                        <div class="col-md-8">
+                            <h5>🎯 Problem Description</h5>
+                            <div class="alert alert-info">
+                                {{ metadata.problem }}
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <h5>� Trajectory Stats</h5>
+                            <table class="table table-sm table-borderless">
+                                <tr>
+                                    <td><strong>Run ID:</strong></td>
+                                    <td>{{ metadata.run_id }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Messages:</strong></td>
+                                    <td>{{ metadata.messages_count }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Tokens:</strong></td>
+                                    <td>{{ "{:,}".format(metadata.tokens) }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Status:</strong></td>
+                                    <td>
+                                        {% if metadata.has_satisfied_criteria %}
+                                        <span class="badge bg-success">✅ Success</span>
+                                        {% else %}
+                                        <span class="badge bg-danger">❌ Failed</span>
+                                        {% endif %}
+                                        {% if metadata.truncated %}
+                                        <span class="badge bg-warning">✂️ Truncated</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% if metadata.satisfied_criteria_list %}
+                                <tr>
+                                    <td><strong>Satisfied Criteria:</strong></td>
+                                    <td>
+                                        {% for criterion in metadata.satisfied_criteria_list %}
+                                        <span class="badge bg-info me-1">{{ criterion }}</span>
+                                        {% endfor %}
+                                    </td>
+                                </tr>
+                                {% endif %}
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Conversation Statistics -->
+        {% set user_msgs = messages | selectattr("role", "equalto", "user") | list %}
+        {% set assistant_msgs = messages | selectattr("role", "equalto", "assistant") | list %}
+        {% set system_msgs = messages | selectattr("role", "equalto", "system") | list %}
+        {% set tool_msgs = messages | selectattr("role", "equalto", "tool") | list %}
+        
+        <div class="row">
+            <div class="col-12">
+                <div class="conversation-stats">
+                    <h5>� Conversation Overview</h5>
+                    <div class="row text-center">
+                        <div class="col-3">
+                            <div class="h4 text-primary">{{ user_msgs | length }}</div>
+                            <small>User Messages</small>
+                        </div>
+                        <div class="col-3">
+                            <div class="h4 text-success">{{ assistant_msgs | length }}</div>
+                            <small>Assistant Messages</small>
+                        </div>
+                        <div class="col-3">
+                            <div class="h4 text-warning">{{ system_msgs | length }}</div>
+                            <small>System Messages</small>
+                        </div>
+                        <div class="col-3">
+                            <div class="h4 text-info">{{ tool_msgs | length }}</div>
+                            <small>Tool Messages</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+                <!-- Main Conversation Flow -->
+                <h4 class="mb-4">� Conversation Steps</h4>
+                
+                {% for message in messages %}
+                    {% set step_num = loop.index %}
+                    <div class="step-container {{ message.role }}" id="step-{{ step_num }}">
+                        <div class="step-header {{ message.role }}" onclick="toggleStep({{ step_num }})">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <span class="step-counter">{{ step_num }}</span>
+                                    <strong>
+                                        {% if message.role == 'system' %}🔧 System Instructions
+                                        {% elif message.role == 'user' %}👤 User Message
+                                        {% elif message.role == 'assistant' %}🐸 Froggy Response
+                                        {% elif message.role == 'tool' %}🛠️ Tool Response{% if message.get('name') %}: {{ message.name }}{% endif %}
+                                        {% else %}❓ {{ message.role|title }} Message
+                                        {% endif %}
+                                    </strong>
+                                    
+                                    {% if message.get('tool_call_id') %}
+                                        <span class="badge bg-warning ms-2">ID: {{ message.tool_call_id }}</span>
+                                    {% endif %}
+                                </div>
+                                <div>
+                                    {% if message.get('tool_calls') %}
+                                        <span class="badge bg-info me-2">{{ message.tool_calls|length }} tool calls</span>
+                                    {% endif %}
+                                    <span class="toggle-indicator" id="indicator-{{ step_num }}">▼</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="step-content" id="content-{{ step_num }}" style="display: block;">
+                            {%- if message.get('content') -%}
+                            <div id="text-content-{{ step_num }}">{{- message.content -}}</div>
+                            {%- endif -%}
+                            {%- if message.get('tool_calls') -%}
+                            <div class="json-viewer" id="tool-calls-json-{{ step_num }}">{{ message.tool_calls | tojson_pretty }}</div>
+                            {%- endif -%}
+                        </div>
+                    </div>
+                {% endfor %}
+
+                <!-- Available Tools Section (Collapsible) -->
+                {% if tools and tools|length > 0 %}
+                <div class="mt-4">
+                    <div class="card">
+                    <div class="card-header">
+                        <button class="btn btn-link text-decoration-none p-0" type="button" data-bs-toggle="collapse" data-bs-target="#toolsSection">
+                            🔧 Available Tools ({{ tools|length }}) - Click to expand
+                        </button>
+                    </div>
+                    <div class="collapse" id="toolsSection">
+                        <div class="card-body">
+                            <div class="row">
+                                {% for tool in tools %}
+                                {% set tool_num = loop.index %}
+                                <div class="col-md-6 col-lg-4 mb-3">
+                                    <div class="card h-100">
+                                        <div class="card-body">
+                                            <h6 class="card-title">{{ tool.function.name if tool.function else 'Unknown Tool' }}</h6>
+                                            {% if tool.function and tool.function.description %}
+                                                {% if tool.function.description|length > 200 %}
+                                                <div class="tool-description">
+                                                    <p class="card-text small" id="tool-desc-short-{{ tool_num }}">{{ tool.function.description[:200] }}...</p>
+                                                    <p class="card-text small" id="tool-desc-full-{{ tool_num }}" style="display: none;">{{ tool.function.description }}</p>
+                                                    <button class="btn btn-link btn-sm p-0" onclick="toggleToolDescription({{ tool_num }})">
+                                                        <small id="tool-toggle-{{ tool_num }}">Show more</small>
+                                                    </button>
+                                                </div>
+                                                {% else %}
+                                                <p class="card-text small">{{ tool.function.description }}</p>
+                                                {% endif %}
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+            </div> <!-- Close content-wrapper -->
+        </div> <!-- Close content-panel -->
+    </div> <!-- Close main-layout -->
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+
+
+        function toggleStep(stepNum) {
+            const content = document.getElementById(`content-${stepNum}`);
+            const indicator = document.getElementById(`indicator-${stepNum}`);
+            
+            if (content.style.display === 'none') {
+                content.style.display = 'block';
+                indicator.textContent = '▼';
+            } else {
+                content.style.display = 'none';
+                indicator.textContent = '▶';
+            }
+        }
+
+
+
+        function expandAllSteps() {
+            const allSteps = document.querySelectorAll('.step-container');
+            allSteps.forEach((step, index) => {
+                const stepNum = index + 1;
+                const content = document.getElementById(`content-${stepNum}`);
+                const indicator = document.getElementById(`indicator-${stepNum}`);
+                if (content && indicator) {
+                    content.style.display = 'block';
+                    indicator.textContent = '▼';
+                }
+            });
+        }
+
+        function collapseAllSteps() {
+            const allSteps = document.querySelectorAll('.step-container');
+            allSteps.forEach((step, index) => {
+                const stepNum = index + 1;
+                const content = document.getElementById(`content-${stepNum}`);
+                const indicator = document.getElementById(`indicator-${stepNum}`);
+                if (content && indicator) {
+                    content.style.display = 'none';
+                    indicator.textContent = '▶';
+                }
+            });
+        }
+
+        function toggleToolDescription(toolNum) {
+            const shortDesc = document.getElementById(`tool-desc-short-${toolNum}`);
+            const fullDesc = document.getElementById(`tool-desc-full-${toolNum}`);
+            const toggleText = document.getElementById(`tool-toggle-${toolNum}`);
+            
+            if (shortDesc.style.display === 'none') {
+                shortDesc.style.display = 'block';
+                fullDesc.style.display = 'none';
+                toggleText.textContent = 'Show more';
+            } else {
+                shortDesc.style.display = 'none';
+                fullDesc.style.display = 'block';
+                toggleText.textContent = 'Show less';
+            }
+        }
+        
+
+
+        // Toggle section visibility (like in json_log_viewer)
+        function toggleSection(sectionId) {
+            const content = document.getElementById(sectionId);
+            const header = content.previousElementSibling;
+            const icon = header.querySelector('.expand-icon');
+            
+            content.classList.toggle('expanded');
+            header.classList.toggle('expanded');
+        }
+
+        // Create collapsible JSON viewer (adapted from json_log_viewer)
+        function createCollapsibleJSON(obj, container, level = 0) {
+            if (typeof obj !== 'object' || obj === null) {
+                container.innerHTML = formatJSONValue(obj);
+                return;
+            }
+
+            const isArray = Array.isArray(obj);
+            const keys = Object.keys(obj);
+            
+            if (keys.length === 0) {
+                container.innerHTML = isArray ? '[]' : '{}';
+                return;
+            }
+
+            const wrapper = document.createElement('div');
+            
+            // Create header for collapsible section
+            const header = document.createElement('div');
+            header.className = 'collapsible';
+            header.innerHTML = `${isArray ? '[' : '{'} <span style="color: #666; font-size: 14px;">(${keys.length} items)</span>`;
+            
+            // Create content container
+            const content = document.createElement('div');
+            content.className = 'json-content';
+            content.style.marginLeft = '20px';
+            
+            keys.forEach((key, index) => {
+                const item = document.createElement('div');
+                item.style.marginBottom = '5px';
+                
+                const keySpan = document.createElement('span');
+                keySpan.className = 'json-key';
+                keySpan.textContent = isArray ? '' : `"${key}": `;
+                
+                const valueContainer = document.createElement('span');
+                
+                if (typeof obj[key] === 'object' && obj[key] !== null) {
+                    createCollapsibleJSON(obj[key], valueContainer, level + 1);
+                } else {
+                    valueContainer.innerHTML = formatJSONValue(obj[key]);
+                }
+                
+                item.appendChild(keySpan);
+                item.appendChild(valueContainer);
+                
+                if (index < keys.length - 1) {
+                    item.appendChild(document.createTextNode(','));
+                }
+                
+                content.appendChild(item);
+            });
+            
+            // Add closing bracket
+            const closing = document.createElement('div');
+            closing.textContent = isArray ? ']' : '}';
+            closing.style.marginLeft = '0px';
+            content.appendChild(closing);
+            
+            // Toggle functionality
+            header.addEventListener('click', function() {
+                header.classList.toggle('collapsed');
+            });
+            
+            wrapper.appendChild(header);
+            wrapper.appendChild(content);
+            container.appendChild(wrapper);
+        }
+
+        function formatJSONValue(value) {
+            if (typeof value === 'string') {
+                return `<span class="json-string">"${value}"</span>`;
+            } else if (typeof value === 'number') {
+                return `<span class="json-number">${value}</span>`;
+            } else if (typeof value === 'boolean') {
+                return `<span class="json-boolean">${value}</span>`;
+            } else if (value === null) {
+                return `<span class="json-null">null</span>`;
+            }
+            return value;
+        }
+
+        // Setup navigation functionality
+        document.addEventListener('DOMContentLoaded', function() {
+            
+            const navLinks = document.querySelectorAll('.step-nav-item');
+            const stepContainers = document.querySelectorAll('.step-container');
+            
+            // Smooth scrolling for navigation links
+            navLinks.forEach(link => {
+                link.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    const targetId = this.getAttribute('href').substring(1);
+                    const targetElement = document.getElementById(targetId);
+                    if (targetElement) {
+                        // Temporarily disable the intersection observer to prevent conflicts
+                        if (window.stepObserver) {
+                            window.stepObserver.disconnect();
+                        }
+                        
+                        // Store the clicked link reference
+                        window.lastClickedNavLink = this;
+                        
+                        // Remove active class from all nav links
+                        navLinks.forEach(navLink => navLink.classList.remove('active'));
+                        // Add active class to clicked link
+                        this.classList.add('active');
+                        
+                        // Use a simpler scrolling approach
+                        targetElement.scrollIntoView({ 
+                            behavior: 'smooth', 
+                            block: 'start',
+                            inline: 'nearest'
+                        });
+                        
+                        // Re-enable observer after a longer delay and ensure correct highlighting
+                        setTimeout(() => {
+                            if (window.stepObserver && window.lastClickedNavLink) {
+                                // Re-observe all containers
+                                stepContainers.forEach(container => {
+                                    window.stepObserver.observe(container);
+                                });
+                                
+                                // Force the correct highlighting after re-enabling observer
+                                setTimeout(() => {
+                                    navLinks.forEach(navLink => navLink.classList.remove('active'));
+                                    window.lastClickedNavLink.classList.add('active');
+                                    window.lastClickedNavLink = null;
+                                }, 100);
+                            }
+                        }, 1500); // Longer wait for smooth scroll to completely finish
+                        
+                        // Highlight the target step briefly
+                        targetElement.style.boxShadow = '0 0 15px rgba(0, 123, 255, 0.5)';
+                        setTimeout(() => {
+                            targetElement.style.boxShadow = '';
+                        }, 2000);
+                    }
+                });
+            });
+            
+            // Highlight active step as user scrolls
+            const observerOptions = {
+                root: null,
+                rootMargin: '-30% 0px -60% 0px', // More conservative margins
+                threshold: 0.2 // Require more visibility
+            };
+            
+            // Debounce function to prevent rapid observer updates
+            let observerTimeout;
+            window.stepObserver = new IntersectionObserver((entries) => {
+                // Don't update if we're in the middle of a manual navigation
+                if (window.lastClickedNavLink) {
+                    return;
+                }
+                
+                // Clear previous timeout
+                if (observerTimeout) {
+                    clearTimeout(observerTimeout);
+                }
+                
+                // Debounce the observer updates
+                observerTimeout = setTimeout(() => {
+                    entries.forEach(entry => {
+                        if (entry.isIntersecting) {
+                            const stepId = entry.target.id;
+                            const activeNavLink = document.querySelector(`a[href="#${stepId}"]`);
+                            
+                            // Remove active class from all nav links
+                            navLinks.forEach(navLink => navLink.classList.remove('active'));
+                            
+                            // Add active class to current nav link
+                            if (activeNavLink) {
+                                activeNavLink.classList.add('active');
+                            }
+                        }
+                    });
+                }, 100); // Small delay to debounce
+            }, observerOptions);
+            
+            // Observe all step containers
+            stepContainers.forEach(container => {
+                window.stepObserver.observe(container);
+            });
+            
+            // Reposition navigation on window resize
+
+
+            // Initialize collapsible JSON for tool calls
+            const toolCallsJsons = document.querySelectorAll('.json-viewer[id^="tool-calls-json-"]');
+            toolCallsJsons.forEach(jsonElement => {
+                if (jsonElement && jsonElement.textContent.trim()) {
+                    try {
+                        const jsonData = JSON.parse(jsonElement.textContent.trim());
+                        jsonElement.innerHTML = '';
+                        createCollapsibleJSON(jsonData, jsonElement);
+                    } catch (e) {
+                        // Keep original content if parsing fails, but clean up whitespace
+                        jsonElement.textContent = jsonElement.textContent.trim();
+                        console.log('Failed to parse JSON for tool calls:', e);
+                    }
+                }
+            });
+
+            // Collapse all steps initially except the first few
+            const allSteps = document.querySelectorAll('.step-container');
+            allSteps.forEach((step, index) => {
+                if (index > 2) { // Keep first 3 steps expanded
+                    const stepNum = index + 1;
+                    const content = document.getElementById(`content-${stepNum}`);
+                    const indicator = document.getElementById(`indicator-${stepNum}`);
+                    if (content && indicator) {
+                        content.style.display = 'none';
+                        indicator.textContent = '▶';
+                    }
+                }
+            });
+        });
+    </script>
+
+
+</body>
+</html>

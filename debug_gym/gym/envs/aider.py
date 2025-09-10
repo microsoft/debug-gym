@@ -114,12 +114,12 @@ class AiderBenchmarkEnv(RepoEnv):
 
         self.terminal.run(
             "git add *.py *.txt"
-        )  # Mini-nightmare tasks only have Python and text files.
+        )  # Aider tasks only have Python and text files.
         self.terminal.run("git commit -am 'Init'")
 
         self.terminal.run(
             "git add .debugignore .debugreadonly"
-        )  # Mini-nightmare tasks come with those.
+        )  # Aider tasks come with those.
         self.terminal.run("git commit -am 'Add debug-gym ignore and read-only files'")
 
     def load_dataset(self, problems: str | list[str] | None = None):

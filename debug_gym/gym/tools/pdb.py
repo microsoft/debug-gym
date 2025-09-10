@@ -68,7 +68,7 @@ class PDBTool(EnvironmentTool):
     def pdb_is_running(self):
         return self._session is not None and self._session.is_running
 
-    def interact_with_pdb(self, command: str, timeout: int):
+    def interact_with_pdb(self, command: str, timeout: int | None = None) -> str:
         try:
             output = self._session.run(command, read_until="(Pdb)", timeout=timeout)
         except TimeoutError as e:
