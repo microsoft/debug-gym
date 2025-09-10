@@ -300,7 +300,7 @@ def test_read_file_raises_for_nonexistent_file(workspace):
 
 def test_write_file(workspace):
     file_path = workspace.working_dir / "test.txt"
-    file_content = "Hello, DebugGym!\n"
+    file_content = "Hello, DebugGym!\n\n\n"
     workspace.write_file("test.txt", file_content)
     assert file_path.read_text() == file_content
 
@@ -309,8 +309,8 @@ def test_write_file(workspace):
     workspace.write_file("test.txt", file_content_single_line)
     assert file_path.read_text() == file_content_single_line
 
-    # Test with end delimiter
-    file_content_single_line = "Hello, DebugGym!+"
+    # Should still work if the content ends with the delimiter.
+    file_content_single_line = "Hello, DebugGym!nDEBUGGYM_DEL"
     workspace.write_file("test.txt", file_content_single_line)
     assert file_path.read_text() == file_content_single_line
 

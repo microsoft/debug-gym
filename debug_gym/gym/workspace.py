@@ -131,8 +131,16 @@ class Workspace:
         return output
 
     def write_file(self, filepath: str, content: str):
+        """Writes `content` to `filepath` exactly as-is, preserving any trailing newlines."""
         abs_filepath = self.resolve_path(filepath)
-        cmd = f"CONTENT=$(cat <<'EOF'\n{content}+\nEOF\n); echo -n \"${{CONTENT%+}}\" > {abs_filepath}"
+
+        # In the following command we:
+        # - use a single-quoted heredoc (cat <<'nDEBUGGYM_EOF' ... nDEBUGGYM_EOF) so the heredoc body is taken literally (no shell expansion)
+        # - append a sentinel character DEBUGGYM_DEL inside the heredoc so we can detect/restore trailing newlines later
+        # - capture the heredoc output into shell variable CONTENT since command substitution strips trailing newlines
+        # - "${CONTENT%DEBUGGYM_DEL}" removes the trailing sentinel DEBUGGYM_DEL (restoring the original trailing-newline state)
+        # - echo -n writes the result without adding an extra newline
+        cmd = f"CONTENT=$(cat <<'DEBUGGYM_EOF'\n{content}DEBUGGYM_DEL\nDEBUGGYM_EOF\n); echo -n \"${{CONTENT%DEBUGGYM_DEL}}\" > {abs_filepath}"
         self.terminal.run(cmd, raises=True)
 
     def directory_tree(self, root: str | Path = None, max_depth: int = 1):
