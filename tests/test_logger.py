@@ -157,7 +157,7 @@ def test_task_log_file_path(tmp_path):
         status="pending",
         logdir=str(log_dir),
     )
-    expected_path = str(log_dir / "test_task.log")
+    expected_path = str(log_dir / "debug_gym.log")
     assert task.log_file_path == expected_path
 
 
