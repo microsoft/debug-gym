@@ -37,6 +37,9 @@
                     <h1>🎯 SFT Trajectory Viewer</h1>
                     <div>
                         <a href="{{ url_for('statistics') }}" class="btn btn-info me-2">📊 Statistics</a>
+                        {% if not is_shuffled %}
+                        <a href="{{ url_for('index', shuffle='true') }}" class="btn btn-warning me-2" title="View trajectories in random order to see more diversity">🎲 Random Shuffle</a>
+                        {% endif %}
                         <a href="{{ url_for('change_file') }}" class="btn btn-secondary">📁 Change File</a>
                     </div>
                 </div>
@@ -45,6 +48,17 @@
                 <div class="alert alert-info">
                     <strong>📄 Dataset:</strong> {{ current_file }} 
                     <span class="badge bg-primary ms-2">{{ total_records }} trajectories</span>
+                    {% if is_shuffled %}
+                    <span class="badge bg-warning ms-2">🎲 Random Order</span>
+                    <a href="{{ url_for('index') }}" class="btn btn-outline-secondary btn-sm ms-2">📋 Normal Order</a>
+                    {% endif %}
+                </div>
+                {% endif %}
+                
+                {% if is_shuffled %}
+                <div class="alert alert-warning">
+                    <strong>🎲 Random Shuffle Mode:</strong> Trajectories are displayed in random order to help you discover diverse examples. Each page refresh will show different random trajectories.
+                    <a href="{{ url_for('index', shuffle='true', page=current_page) }}" class="btn btn-outline-warning btn-sm ms-2">🔄 Shuffle Again</a>
                 </div>
                 {% endif %}
 
@@ -54,20 +68,20 @@
                     <ul class="pagination justify-content-center">
                         {% if current_page > 0 %}
                         <li class="page-item">
-                            <a class="page-link" href="{{ url_for('index', page=current_page-1) }}">Previous</a>
+                            <a class="page-link" href="{{ url_for('index', page=current_page-1, shuffle=is_shuffled|string|lower) }}">Previous</a>
                         </li>
                         {% endif %}
                         
                         <!-- Show page numbers -->
                         {% for page_num in range(max(0, current_page-2), min(total_pages, current_page+3)) %}
                         <li class="page-item {% if page_num == current_page %}active{% endif %}">
-                            <a class="page-link" href="{{ url_for('index', page=page_num) }}">{{ page_num + 1 }}</a>
+                            <a class="page-link" href="{{ url_for('index', page=page_num, shuffle=is_shuffled|string|lower) }}">{{ page_num + 1 }}</a>
                         </li>
                         {% endfor %}
                         
                         {% if current_page < total_pages - 1 %}
                         <li class="page-item">
-                            <a class="page-link" href="{{ url_for('index', page=current_page+1) }}">Next</a>
+                            <a class="page-link" href="{{ url_for('index', page=current_page+1, shuffle=is_shuffled|string|lower) }}">Next</a>
                         </li>
                         {% endif %}
                     </ul>
@@ -87,11 +101,15 @@
                                 <div class="d-flex justify-content-between align-items-center">
                                     <h6 class="mb-0">🎯 Trajectory #{{ record_data.metadata.index }}</h6>
                                     <div>
-                                        {% if record_data.metadata.satisfied_criteria %}
-                                        <span class="badge bg-success">✓ Satisfied</span>
+                                        {% if record_data.metadata.has_satisfied_criteria %}
+                                        <span class="badge bg-success">✅ Success
+                                        {% if record_data.metadata.criteria_count > 1 %} ({{ record_data.metadata.criteria_count }}){% endif %}
+                                        </span>
+                                        {% else %}
+                                        <span class="badge bg-danger">❌ Failed</span>
                                         {% endif %}
                                         {% if record_data.metadata.truncated %}
-                                        <span class="badge bg-warning">Truncated</span>
+                                        <span class="badge bg-warning">✂️ Truncated</span>
                                         {% endif %}
                                     </div>
                                 </div>
@@ -119,6 +137,20 @@
                                         <tr>
                                             <td><strong>Tokens:</strong></td>
                                             <td>{{ record_data.metadata.tokens }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>Status:</strong></td>
+                                            <td>
+                                                {% if record_data.metadata.has_satisfied_criteria %}
+                                                <span class="text-success">✅ Success</span>
+                                                {% if record_data.metadata.criteria_count > 1 %} <small class="text-muted">({{ record_data.metadata.criteria_count }} criteria)</small>{% endif %}
+                                                {% else %}
+                                                <span class="text-danger">❌ Failed</span>
+                                                {% endif %}
+                                                {% if record_data.metadata.truncated %}
+                                                <span class="text-warning ms-2">✂️ Truncated</span>
+                                                {% endif %}
+                                            </td>
                                         </tr>
                                     </tbody>
                                 </table>
@@ -148,19 +180,19 @@
                     <ul class="pagination justify-content-center">
                         {% if current_page > 0 %}
                         <li class="page-item">
-                            <a class="page-link" href="{{ url_for('index', page=current_page-1) }}">Previous</a>
+                            <a class="page-link" href="{{ url_for('index', page=current_page-1, shuffle=is_shuffled|string|lower) }}">Previous</a>
                         </li>
                         {% endif %}
                         
                         {% for page_num in range(max(0, current_page-2), min(total_pages, current_page+3)) %}
                         <li class="page-item {% if page_num == current_page %}active{% endif %}">
-                            <a class="page-link" href="{{ url_for('index', page=page_num) }}">{{ page_num + 1 }}</a>
+                            <a class="page-link" href="{{ url_for('index', page=page_num, shuffle=is_shuffled|string|lower) }}">{{ page_num + 1 }}</a>
                         </li>
                         {% endfor %}
                         
                         {% if current_page < total_pages - 1 %}
                         <li class="page-item">
-                            <a class="page-link" href="{{ url_for('index', page=current_page+1) }}">Next</a>
+                            <a class="page-link" href="{{ url_for('index', page=current_page+1, shuffle=is_shuffled|string|lower) }}">Next</a>
                         </li>
                         {% endif %}
                     </ul>
