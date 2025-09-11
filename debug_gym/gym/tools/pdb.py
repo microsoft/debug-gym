@@ -89,7 +89,8 @@ class PDBTool(EnvironmentTool):
 
         if "The program finished and will be restarted" in initial_output:
             self.close_pdb()
-        else:
+
+        if self.pdb_is_running:
             if environment.persistent_breakpoints:
                 # restore persistent breakpoints
                 for _, _command in environment.current_breakpoints_state.items():
@@ -98,7 +99,9 @@ class PDBTool(EnvironmentTool):
                     initial_output = "\n".join(
                         [initial_output, "Breakpoints have been restored."]
                     )
+
             self.set_current_frame_file(environment)
+
         return initial_output
 
     def on_env_reset(self, environment, **kwargs) -> Observation:
