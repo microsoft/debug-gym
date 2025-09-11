@@ -449,7 +449,7 @@ class DockerTerminal(Terminal):
         self.logger.debug(f"Setting up container with base image: {self.base_image}")
 
         # Generate a unique container name
-        container_name = f"debug_gym_{uuid.uuid4().hex[:12]}"
+        container_name = f"debug_gym_{uuid.uuid4()}"
 
         container = self.docker_client.containers.run(
             image=self.base_image,
@@ -490,87 +490,16 @@ class DockerTerminal(Terminal):
             self.logger.debug("Setup commands ran successfully.")
 
     def clean_up(self):
-        """Clean up the Docker container with robust error handling."""
+        """Clean up the Docker container."""
         if self._container is not None:
-            container_name = self._container.name
-            self.logger.debug(f"Cleaning up container {container_name}")
-
             try:
-                # Try to stop the container gracefully first
-                self.logger.debug(f"Stopping container {container_name}")
-                self._container.stop(timeout=10)
-                self.logger.debug(f"Container {container_name} stopped successfully")
-
-            except docker.errors.APIError as e:
-                error_msg = str(e).lower()
-                if "is not running" in error_msg or "no such container" in error_msg:
-                    self.logger.debug(
-                        f"Container {container_name} is already stopped or removed"
-                    )
-                elif (
-                    "cannot stop container" in error_msg
-                    and "did not receive an exit event" in error_msg
-                ):
-                    # This is the specific error from your original message
-                    self.logger.warning(
-                        f"Container {container_name} failed to stop gracefully (exit event issue), attempting force kill"
-                    )
-                    try:
-                        self._container.kill()
-                        self.logger.debug(
-                            f"Container {container_name} force killed successfully"
-                        )
-                    except docker.errors.APIError as kill_e:
-                        if "no such container" in str(kill_e).lower():
-                            self.logger.debug(
-                                f"Container {container_name} was already removed during force kill"
-                            )
-                        else:
-                            self.logger.error(
-                                f"Failed to force kill container {container_name}: {kill_e}"
-                            )
-                    except Exception as kill_e:
-                        self.logger.error(
-                            f"Unexpected error during force kill of {container_name}: {kill_e}"
-                        )
-                else:
-                    # Other API errors, try to kill
-                    self.logger.warning(
-                        f"Container {container_name} stop failed ({e}), attempting force kill"
-                    )
-                    try:
-                        self._container.kill()
-                        self.logger.debug(
-                            f"Container {container_name} force killed successfully"
-                        )
-                    except Exception as kill_e:
-                        self.logger.error(
-                            f"Failed to force kill container {container_name}: {kill_e}"
-                        )
-
+                self.container.stop(timeout=1)
             except docker.errors.NotFound:
                 self.logger.debug(
-                    f"Container {container_name} not found, it may have already been removed"
+                    f"Container {self.container.name} not found. "
+                    "It might have already been removed."
                 )
-
-            except Exception as e:
-                self.logger.error(
-                    f"Unexpected error while cleaning up container {container_name}: {e}"
-                )
-                # Try force kill as last resort
-                try:
-                    self._container.kill()
-                    self.logger.debug(
-                        f"Container {container_name} force killed after unexpected error"
-                    )
-                except:
-                    self.logger.error(
-                        f"Final force kill attempt failed for {container_name}"
-                    )
-
-            finally:
-                self._container = None
-                self.logger.debug(f"Container cleanup completed for {container_name}")
+            self._container = None
 
     def close(self):
         super().close()

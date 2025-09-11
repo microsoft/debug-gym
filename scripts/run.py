@@ -293,27 +293,17 @@ def main():
                     executor.submit(run_agent, args, problem, config): problem
                     for problem in problems
                 }
-                try:
-                    for future in as_completed(futures):
-                        if future.cancelled():
-                            continue
-                        try:
-                            problem = futures[future]
-                            success = future.result()
-                        except AgentTimeoutException:
-                            pass  # Handled in run_agent, just continue
-                        except (KeyboardInterrupt, Exception) as e:
-                            # Give running tasks a chance to clean up containers
-                            logger.warning(
-                                "Exception occurred, shutting down executor gracefully..."
-                            )
-                            executor.shutdown(wait=True, cancel_futures=True)
-                            raise e
-                except (KeyboardInterrupt, Exception) as e:
-                    # Final fallback: give some time for cleanup before forcing shutdown
-                    logger.warning("Forcing executor shutdown due to exception...")
-                    executor.shutdown(wait=True, cancel_futures=True)
-                    raise e
+                for future in as_completed(futures):
+                    if future.cancelled():
+                        continue
+                    try:
+                        problem = futures[future]
+                        success = future.result()
+                    except AgentTimeoutException:
+                        pass  # Handled in run_agent, just continue
+                    except (KeyboardInterrupt, Exception) as e:
+                        executor.shutdown(wait=True, cancel_futures=True)
+                        raise e
 
 
 if __name__ == "__main__":
