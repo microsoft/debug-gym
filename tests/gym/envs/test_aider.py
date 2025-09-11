@@ -1,6 +1,7 @@
 import pytest
 
 from debug_gym.gym.envs import AiderBenchmarkEnv
+from debug_gym.gym.terminal import Terminal
 from debug_gym.gym.tools.tool import ToolCall
 from debug_gym.gym.tools.toolbox import Toolbox
 
@@ -32,35 +33,28 @@ def setup_aider_repo(tmp_path_factory):
 
 @pytest.fixture
 def env(setup_aider_repo):
-    env = AiderBenchmarkEnv()
+    terminal = Terminal()
+    env = AiderBenchmarkEnv(terminal=terminal)
     env.reset(options={"task_name": "clock"})
     return env
 
 
-def test_resolve_path(env):
-    path = env.resolve_path(env.working_dir, raises=True)
-    assert path == env.working_dir
-    assert env.resolve_path("clock.py", raises=True) == env.working_dir / "clock.py"
-    with pytest.raises(FileNotFoundError):
-        env.resolve_path("nested/file.py", raises=True)
-
-
 def test_ignored_files(env):
-    assert env.has_file("clock_test.py")
-    assert env.has_file("clock.py")
-    assert not env.has_file(".gitignore")
-    assert not env.has_file(".debugignore")
-    assert not env.has_file(".debugreadonly")
-    assert not env.has_file("nested/file.py")
+    assert env.workspace.has_file("clock_test.py")
+    assert env.workspace.has_file("clock.py")
+    assert not env.workspace.has_file(".gitignore")
+    assert not env.workspace.has_file(".debugignore")
+    assert not env.workspace.has_file(".debugreadonly")
+    assert not env.workspace.has_file("nested/file.py")
 
 
 def test_is_editable_files(env):
-    assert env.is_editable("clock.py")
-    assert not env.is_editable("clock_test.py")
+    assert env.workspace.is_editable("clock.py")
+    assert not env.workspace.is_editable("clock_test.py")
     with pytest.raises(FileNotFoundError):
-        assert not env.is_editable("nested/file.py")
+        assert not env.workspace.is_editable("nested/file.py")
     with pytest.raises(FileNotFoundError):
-        assert not env.is_editable(".debugignore")
+        assert not env.workspace.is_editable(".debugignore")
 
 
 def test_steps(env):

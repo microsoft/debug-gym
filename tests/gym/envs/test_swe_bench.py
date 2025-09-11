@@ -48,13 +48,8 @@ def build_swe_env_once(tmp_path_factory, worker_id):
 def get_swe_env(build_swe_env_once):
     """Instantiate a SWEBenchEnv instance after building the SWEBench docker image."""
 
-    def _swe_env(working_dir=None, map_host_uid_gid=True, **kwargs):
-        problems = ["astropy__astropy-14096"]
-        terminal = DockerTerminal(
-            path=working_dir, map_host_uid_gid=map_host_uid_gid, **kwargs
-        )
-        env = SWEBenchEnv(problems=problems, terminal=terminal)
-        return env
+    def _swe_env():
+        return SWEBenchEnv(problems=["astropy__astropy-14096"])
 
     return _swe_env
 
@@ -99,82 +94,25 @@ def test_reset_and_step(get_swe_env):
 |-- LICENSE.rst
 |-- MANIFEST.in
 |-- README.rst
-|-- astropy/"""
+|-- astropy/
+|-- cextern/
+|-- codecov.yml
+|-- conftest.py
+|-- docs/
+|-- examples/
+|-- licenses/
+|-- pip-requirements
+|-- pyproject.toml
+|-- setup.cfg
+|-- setup.py*
+|-- tox.ini"""
     assert env_info.step_observation.observation.startswith(listdir_start)
 
 
 @if_docker_running
-def test_run_command_with_raise(tmp_path, get_swe_env):
-    working_dir = str(tmp_path)
-    swe_env = get_swe_env(working_dir=working_dir, map_host_uid_gid=False)
-    # install sudo for testing, swe-bench images already have sudo
-    success, output = swe_env.terminal.run(
-        ["apt update", "apt install -y sudo", "echo 'Terminal ready'"]
-    )
-    assert success
-    assert output.endswith("Terminal ready")
-
-    status, output = swe_env.run_command_with_raise("echo 'Hello World'")
-    assert output == "Hello World"
-    with pytest.raises(
-        ValueError,
-        match=(
-            "Failed to run command `cat /non_existent_file`:\n"
-            "cat: /non_existent_file: No such file or directory"
-        ),
-    ):
-        swe_env.run_command_with_raise("cat /non_existent_file")
-    # add sudo if apt-get in command
-    status, output = swe_env.run_command_with_raise("apt-get update")
-    assert status
-    # don't break if sudo is already there
-    status, output = swe_env.run_command_with_raise("sudo apt-get update")
-    assert status
-
-
-@pytest.fixture
-def install_configs_mock():
-    install_configs = {
-        "python": "3.12.8",
-        "test_cmd": "pytest --help",
-        "pre_install": ["apt-get help", "apt-get install -y vim"],
-        "eval_commands": ["export TEST_VAR='Test Var'", "echo $TEST_VAR"],
-        "install": "python3 -m pip install pytest==8.3.3",
-        "post_install": ["echo 'Test file' > test.txt", "cat test.txt"],
-        "packages": "pytest requests",
-        "pip_packages": ["pytest"],
-        "no_use_env": False,
-    }
-    return install_configs
-
-
-@if_docker_running
-def test_run_install(tmp_path, install_configs_mock, get_swe_env):
-    working_dir = str(tmp_path)
-    swe_env = get_swe_env(
-        working_dir=working_dir, map_host_uid_gid=False, base_image="python:3.12-slim"
-    )
-    swe_env.install_configs = install_configs_mock
-    swe_env.run_install()
-    _, output = swe_env.run_command_with_raise("python -m pytest --version")
-    assert "pytest 8.3.3" in output
-
-
-@if_docker_running
-def test_run_post_install(tmp_path, install_configs_mock, get_swe_env):
-    working_dir = str(tmp_path)
-    swe_env = get_swe_env(working_dir)
-    swe_env.install_configs = install_configs_mock
-    swe_env.run_post_install()
-    _, output = swe_env.run_command_with_raise("cat test.txt")
-    assert output == "Test file"
-
-
-@if_docker_running
-def test_load_dataset(tmp_path, get_swe_env):
-    working_dir = str(tmp_path)
-    swe_env = get_swe_env(working_dir)
-    assert swe_env.dataset_id == "princeton-nlp/SWE-bench_Verified"
+def test_load_dataset(get_swe_env):
+    swe_env = get_swe_env()
+    assert swe_env.dataset_id == "SWE-bench/SWE-bench_Verified"
     task_name = "astropy__astropy-14096"
     assert task_name in swe_env.dataset.keys()
     assert list(swe_env.ds.features.keys()) == [
@@ -195,9 +133,8 @@ def test_load_dataset(tmp_path, get_swe_env):
 
 
 @if_docker_running
-def test_setup_task(tmp_path, get_swe_env):
-    working_dir = str(tmp_path)
-    swe_env = get_swe_env(working_dir)
+def test_setup_task(get_swe_env):
+    swe_env = get_swe_env()
     task_name = "astropy__astropy-14096"
     swe_env.setup_task(task_name)
     assert swe_env.task_name == task_name
@@ -208,38 +145,24 @@ def test_setup_task(tmp_path, get_swe_env):
 
 
 @if_docker_running
-def test_setup_terminal(tmp_path, get_swe_env):
-    working_dir = str(tmp_path)
-    swe_env = get_swe_env(working_dir)
+def test_setup_terminal(get_swe_env):
+    swe_env = get_swe_env()
     task_name = "astropy__astropy-14096"
-    swe_env.setup_task(task_name)
-    swe_env.setup_terminal()
-    git_logs = subprocess.run(
-        f"git -C {swe_env.working_dir} log -n 4".split(),
-        stdout=subprocess.PIPE,
-        text=True,
-    ).stdout
+    swe_env.reset(options={"task_name": task_name})
+    _, git_logs = swe_env.terminal.run("git log -n 4")
     assert swe_env.base_commit in git_logs
     assert f"Applying test patch for {task_name}" in git_logs
-    assert "Add debug-gym ignore and read-only files" in git_logs
 
-    git_diff = subprocess.run(
-        f"git -C {swe_env.working_dir} show HEAD^1".split(),
-        stdout=subprocess.PIPE,
-        text=True,
-    ).stdout
+    _, git_diff = swe_env.terminal.run("git show HEAD", strip_output=False)
     git_diff = git_diff[git_diff.index("diff --git") :]
     git_diff = [l for l in git_diff.split("\n") if not l.startswith("index ")]
     assert git_diff == swe_env.test_patch.split("\n")
-
-    assert ".debugignore" in os.listdir(swe_env.working_dir)
-    assert ".debugreadonly" in os.listdir(swe_env.working_dir)
 
 
 @if_docker_running
 def test_patch_property(tmp_path, get_swe_env):
     """Test the patch property that generates git diff output."""
-    swe_env = get_swe_env(working_dir=tmp_path)
+    swe_env = get_swe_env()
 
     # Reset with a task to set up the environment
     swe_env.reset(options={"task_name": "astropy__astropy-14096"})
@@ -249,15 +172,16 @@ def test_patch_property(tmp_path, get_swe_env):
     assert initial_patch == "", f"Expected empty patch initially, got: {initial_patch}"
 
     # Create a test file with some content
-    test_file = swe_env.working_dir / "test_patch_file.py"
+    test_file = tmp_path / "test_patch_file.py"
     test_content = """def hello_world():
     print("Hello, World!")
     return "success"
 """
     test_file.write_text(test_content)
+    swe_env.workspace.copy_content(test_file)
 
     # Add the file to git
-    swe_env.terminal.run(f"git add {test_file}")
+    swe_env.terminal.run(f"git add {test_file.name}")
     swe_env.terminal.run("git commit -m 'Add test file'")
 
     # Now modify the file
@@ -268,7 +192,7 @@ def test_patch_property(tmp_path, get_swe_env):
 def new_function():
     return "new"
 """
-    test_file.write_text(modified_content)
+    swe_env.workspace.write_file(test_file.name, modified_content)
 
     # Get the patch
     patch = swe_env.patch
@@ -288,7 +212,7 @@ def new_function():
 
 
 @if_docker_running
-def test_apply_gold_patch(tmp_path, get_swe_env):
+def test_apply_gold_patch(get_swe_env):
     swe_env = get_swe_env()
     env_info = swe_env.reset(options={"task_name": "astropy__astropy-14096"})
 

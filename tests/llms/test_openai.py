@@ -25,10 +25,11 @@ class Tool1(EnvironmentTool):
 tools = [Tool1()]
 
 
-def create_fake_exception(module: str, classname: str, message: str):
+def create_fake_exception(module: str, classname: str, message: str, code: str):
     exc_type = type(classname, (Exception,), {})
     exc = exc_type(message)
     exc.message = message
+    exc.code = code
     exc.__class__.__module__ = module
     return exc
 
@@ -55,6 +56,7 @@ def test_llm(mock_llm_config, mock_openai, logger_mock):
     mock_response = MagicMock()
     mock_response.choices = [MagicMock()]
     mock_response.choices[0].message.tool_calls = [MagicMock()]
+    mock_response.choices[0].message.content = "Test response content"
     mock_response.usage.prompt_tokens = 2
     mock_response.usage.completion_tokens = 4
 
@@ -105,33 +107,61 @@ def test_need_to_be_retried(llm_config_registry_mock, logger_mock):
     openai_llm = OpenAILLM("openai", logger=logger_mock)
     qwen_llm = OpenAILLM("qwen", logger=logger_mock)
 
-    exception = create_fake_exception("openai", "RateLimitError", "Rate limit exceeded")
-    assert openai_llm.need_to_be_retried(exception) is True
-
     exception = create_fake_exception(
-        "openai", "APIStatusError", "Error occurred: 'status': 429 rate limit"
-    )
-    assert openai_llm.need_to_be_retried(exception) is True
-
-    exception = create_fake_exception(
-        "openai", "APIStatusError", "Encountered error: 'status': 504 gateway timeout"
+        "openai", "RateLimitError", "Rate limit exceeded", "fake code"
     )
     assert openai_llm.need_to_be_retried(exception) is True
 
     exception = create_fake_exception(
         "openai",
         "APIStatusError",
-        "Failure: 'status': 413 A previous prompt was too large. Please shorten input.",
+        "Error occurred: 'status': 429 rate limit",
+        "fake code",
     )
     assert openai_llm.need_to_be_retried(exception) is True
 
     exception = create_fake_exception(
-        "openai", "APIStatusError", "Error: 'status': 500 internal server error"
+        "openai",
+        "APIStatusError",
+        "Encountered error: 'status': 504 gateway timeout",
+        "fake code",
+    )
+    assert openai_llm.need_to_be_retried(exception) is True
+
+    exception = create_fake_exception(
+        "openai",
+        "APIStatusError",
+        "Encountered error: 'status': 504 gateway timeout",
+        "model_max_prompt_tokens_exceeded",
     )
     assert openai_llm.need_to_be_retried(exception) is False
 
     exception = create_fake_exception(
-        "openai", "PermissionDeniedError", "Permission denied error"
+        "openai",
+        "APIStatusError",
+        "Encountered error: maximum context length exceeded",
+        "fake code",
+    )
+    assert openai_llm.need_to_be_retried(exception) is False
+
+    exception = create_fake_exception(
+        "openai",
+        "APIStatusError",
+        "Failure: 'status': 413 A previous prompt was too large. Please shorten input.",
+        "fake code",
+    )
+    assert openai_llm.need_to_be_retried(exception) is True
+
+    exception = create_fake_exception(
+        "openai",
+        "APIStatusError",
+        "Error: 'status': 500 internal server error",
+        "fake code",
+    )
+    assert openai_llm.need_to_be_retried(exception) is False
+
+    exception = create_fake_exception(
+        "openai", "PermissionDeniedError", "Permission denied error", "fake code"
     )
     assert openai_llm.need_to_be_retried(exception) is True
 
@@ -139,11 +169,14 @@ def test_need_to_be_retried(llm_config_registry_mock, logger_mock):
         "openai",
         "BadRequestError",
         "Error code: 400 \n Invalid JSON: EOF while parsing a string",
+        "fake code",
     )
     assert openai_llm.need_to_be_retried(exception) is False
     assert qwen_llm.need_to_be_retried(exception) is True
 
-    exception = create_fake_exception("openai", "SomeOtherError", "Some other error")
+    exception = create_fake_exception(
+        "openai", "SomeOtherError", "Some other error", "fake code"
+    )
     assert openai_llm.need_to_be_retried(exception) is False
 
     exception = KeyboardInterrupt()  # KeyboardInterrupt should not be retried
@@ -179,7 +212,8 @@ def test_format_tool_call_history_initial_state(mock_llm_config, logger_mock):
         dir_tree="",
         current_breakpoints="",
         action_reasoning=None,  # No reasoning yet
-        action=None,  # No action taken yet
+        action_content=None,  # No content yet
+        action_tool_call=None,  # No action taken yet
         instructions={},
         score=0,
         max_score=100,
@@ -233,7 +267,8 @@ def test_format_tool_call_history_with_action(mock_llm_config, logger_mock):
         dir_tree="",
         current_breakpoints="",
         action_reasoning="Edited the file to fix the bug",  # Reasoning for action
-        action=action,  # Action was taken
+        action_content="Edited the file to fix the bug",  # Content for action
+        action_tool_call=action,  # Action was taken
         instructions={},
         score=0,
         max_score=100,
@@ -311,7 +346,8 @@ def test_format_tool_call_history_complex_arguments(mock_llm_config, logger_mock
         dir_tree="",
         current_breakpoints="",
         action_reasoning="Configured the environment with complex settings",
-        action=action,
+        action_content="Configured the environment with complex settings",
+        action_tool_call=action,
         instructions={},
         score=0,
         max_score=100,
@@ -342,3 +378,151 @@ def test_format_tool_call_history_complex_arguments(mock_llm_config, logger_mock
     assert messages[1]["tool_call_id"] == "call_complex"
     assert messages[1]["name"] == "configure"
     assert messages[1]["content"] == "Complex operation completed"
+
+
+@patch("openai.resources.chat.completions.Completions.create")
+@patch.object(
+    LLMConfigRegistry,
+    "from_file",
+    return_value=LLMConfigRegistry.register_all(
+        {
+            "qwen": {
+                "model": "qwen-3",
+                "tokenizer": "qwen-3",
+                "context_limit": 4,
+                "api_key": "test-api-key",
+                "endpoint": "https://test-endpoint",
+                "api_version": "v1",
+                "tags": ["vllm"],
+            }
+        }
+    ),
+)
+def test_llm_with_reasoning_content(mock_llm_config, mock_openai, logger_mock):
+    """Test that reasoning content is properly combined with regular content"""
+    mock_response = MagicMock()
+    mock_response.choices = [MagicMock()]
+    mock_response.choices[0].message.tool_calls = [MagicMock()]
+    mock_response.choices[0].message.content = "Regular response"
+    mock_response.choices[0].message.reasoning_content = (
+        "Let me think about this step by step..."
+    )
+    mock_response.usage.prompt_tokens = 5
+    mock_response.usage.completion_tokens = 10
+
+    tmp_dict = {"arguments": '{"arg1": "test"}', "name": "test_tool"}
+    tmp_dataclass = make_dataclass("tmp", ((k, type(v)) for k, v in tmp_dict.items()))(
+        **tmp_dict
+    )
+    tmp_dict = dict(id="test_id", function=tmp_dataclass, type="function")
+    mock_response.choices[0].message.tool_calls[0] = make_dataclass(
+        "tmp", ((k, type(v)) for k, v in tmp_dict.items())
+    )(**tmp_dict)
+    mock_openai.return_value = mock_response
+
+    llm = OpenAILLM(model_name="qwen", logger=logger_mock)
+    messages = [{"role": "user", "content": "Test with reasoning"}]
+    llm_response = llm(messages, tools)
+
+    # The response should be the regular content, reasoning should be separate
+    assert llm_response.response == "Regular response"
+    assert llm_response.reasoning_response == "Let me think about this step by step..."
+    assert llm_response.prompt == messages
+    assert llm_response.tool == ToolCall(
+        id="test_id", name="test_tool", arguments={"arg1": "test"}
+    )
+
+
+@patch("openai.resources.chat.completions.Completions.create")
+@patch.object(
+    LLMConfigRegistry,
+    "from_file",
+    return_value=LLMConfigRegistry.register_all(
+        {
+            "qwen": {
+                "model": "qwen-3",
+                "tokenizer": "qwen-3",
+                "context_limit": 4,
+                "api_key": "test-api-key",
+                "endpoint": "https://test-endpoint",
+                "api_version": "v1",
+                "tags": ["vllm"],
+            }
+        }
+    ),
+)
+def test_llm_with_only_reasoning_content(mock_llm_config, mock_openai, logger_mock):
+    """Test that reasoning content works when regular content is empty"""
+    mock_response = MagicMock()
+    mock_response.choices = [MagicMock()]
+    mock_response.choices[0].message.tool_calls = [MagicMock()]
+    mock_response.choices[0].message.content = ""
+    mock_response.choices[0].message.reasoning_content = "Reasoning only response"
+    mock_response.usage.prompt_tokens = 3
+    mock_response.usage.completion_tokens = 7
+
+    tmp_dict = {"arguments": '{"arg1": "test"}', "name": "test_tool"}
+    tmp_dataclass = make_dataclass("tmp", ((k, type(v)) for k, v in tmp_dict.items()))(
+        **tmp_dict
+    )
+    tmp_dict = dict(id="test_id", function=tmp_dataclass, type="function")
+    mock_response.choices[0].message.tool_calls[0] = make_dataclass(
+        "tmp", ((k, type(v)) for k, v in tmp_dict.items())
+    )(**tmp_dict)
+    mock_openai.return_value = mock_response
+
+    llm = OpenAILLM(model_name="qwen", logger=logger_mock)
+    messages = [{"role": "user", "content": "Test reasoning only"}]
+    llm_response = llm(messages, tools)
+
+    # The response should be empty content, reasoning should be in reasoning_response
+    assert llm_response.response == ""
+    assert llm_response.reasoning_response == "Reasoning only response"
+
+
+@patch("openai.resources.chat.completions.Completions.create")
+@patch.object(
+    LLMConfigRegistry,
+    "from_file",
+    return_value=LLMConfigRegistry.register_all(
+        {
+            "openai": {
+                "model": "gpt-4",
+                "tokenizer": "gpt-4",
+                "context_limit": 4,
+                "api_key": "test-api-key",
+                "endpoint": "https://test-endpoint",
+                "api_version": "v1",
+                "tags": ["openai"],
+            }
+        }
+    ),
+)
+def test_llm_without_reasoning_content_attribute(
+    mock_llm_config, mock_openai, logger_mock
+):
+    """Test that models without reasoning_content attribute work normally"""
+    mock_response = MagicMock()
+    mock_response.choices = [MagicMock()]
+    mock_response.choices[0].message.tool_calls = [MagicMock()]
+    mock_response.choices[0].message.content = "Regular response only"
+    # Don't set reasoning_content attribute to simulate models that don't have it
+    mock_response.usage.prompt_tokens = 2
+    mock_response.usage.completion_tokens = 4
+
+    tmp_dict = {"arguments": '{"arg1": "test"}', "name": "test_tool"}
+    tmp_dataclass = make_dataclass("tmp", ((k, type(v)) for k, v in tmp_dict.items()))(
+        **tmp_dict
+    )
+    tmp_dict = dict(id="test_id", function=tmp_dataclass, type="function")
+    mock_response.choices[0].message.tool_calls[0] = make_dataclass(
+        "tmp", ((k, type(v)) for k, v in tmp_dict.items())
+    )(**tmp_dict)
+    mock_openai.return_value = mock_response
+
+    llm = OpenAILLM(model_name="openai", logger=logger_mock)
+    messages = [{"role": "user", "content": "Test without reasoning"}]
+    llm_response = llm(messages, tools)
+
+    # The response should be just the regular content
+    assert llm_response.response == "Regular response only"

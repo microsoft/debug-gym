@@ -68,7 +68,7 @@ class PDBTool(EnvironmentTool):
     def pdb_is_running(self):
         return self._session is not None and self._session.is_running
 
-    def interact_with_pdb(self, command: str, timeout: int):
+    def interact_with_pdb(self, command: str, timeout: int | None = None) -> str:
         try:
             output = self._session.run(command, read_until="(Pdb)", timeout=timeout)
         except TimeoutError as e:
@@ -89,7 +89,8 @@ class PDBTool(EnvironmentTool):
 
         if "The program finished and will be restarted" in initial_output:
             self.close_pdb()
-        else:
+
+        if self.pdb_is_running:
             if environment.persistent_breakpoints:
                 # restore persistent breakpoints
                 for _, _command in environment.current_breakpoints_state.items():
@@ -98,7 +99,9 @@ class PDBTool(EnvironmentTool):
                     initial_output = "\n".join(
                         [initial_output, "Breakpoints have been restored."]
                     )
+
             self.set_current_frame_file(environment)
+
         return initial_output
 
     def on_env_reset(self, environment, **kwargs) -> Observation:
@@ -254,10 +257,10 @@ class PDBTool(EnvironmentTool):
         current_breakpoints_state_copy = copy.deepcopy(
             environment.current_breakpoints_state
         )
-        rewrite_file = environment.resolve_path(rewrite_file)
+        rewrite_file = environment.workspace.resolve_path(rewrite_file)
         for _key in environment.current_breakpoints_state.keys():
             _file_path, _line_number = _key.split("|||")
-            _file_path = environment.resolve_path(_file_path)
+            _file_path = environment.workspace.resolve_path(_file_path)
             if _file_path != rewrite_file:
                 # the breakpoints are not in the current file, no need to modify
                 continue

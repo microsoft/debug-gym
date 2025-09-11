@@ -21,7 +21,6 @@ from debug_gym.gym.utils import filter_problems
 
 class SWESmithEnv(SWEBenchEnv):
     CACHE = DEBUG_GYM_CACHE_DIR / "swe-smith"
-    DUMMY_DIR = DEBUG_GYM_CACHE_DIR / "swe-smith" / "empty"
     CONFIG = (
         importlib_files("debug_gym") / "gym" / "envs" / "configs" / "swe_smith.yaml"
     )
@@ -34,9 +33,9 @@ class SWESmithEnv(SWEBenchEnv):
         terminal: Terminal | None = None,
         **kwargs,
     ):
-        self.dataset_revision = dataset_revision
         super().__init__(
             dataset_id=dataset_id,
+            dataset_revision=dataset_revision,
             split=split,
             terminal=terminal,
             **kwargs,
@@ -68,7 +67,7 @@ class SWESmithEnv(SWEBenchEnv):
 
         image_names = set(self.ds[dataset[id]]["image_name"] for id in dataset)
         self.logger.debug(
-            f"Loaded {len(self.ds)} tasks accross {len(image_names)} Docker images from {self.dataset_id}."
+            f"Loaded {len(dataset)} tasks accross {len(image_names)} Docker images from {self.dataset_id}."
         )
 
         # Download all images needed for SWE-Smith.
@@ -92,10 +91,10 @@ class SWESmithEnv(SWEBenchEnv):
 
         return dataset
 
-    def setup_task(self, task_name):
+    def setup_task(self, task_name: str, options: dict = None):
         if task_name not in self.dataset:
             raise ValueError(
-                f"Task `{task_name}` was not found in dataset. The available tasks are: {self.dataset}.\n"
+                f"Task `{task_name}` was not found in dataset. The available tasks are: {sorted(self.dataset)}.\n"
                 "Please provide a valid task or initialize the environment without problems to load all tasks."
             )
 
@@ -166,31 +165,14 @@ class SWESmithEnv(SWEBenchEnv):
             if "git remote add upstream" not in cmd
         ]
 
-        # The following will create the temporary working directory.
-        self.setup_workspace(
-            # Empty folder. The actual codebase will come from the docker image.
-            path=SWESmithEnv.DUMMY_DIR,
-            # allow traceback to be printed in the output.
-            entrypoint=self.test_cmd.replace("--tb=no", "--tb=short"),
-            # -s (capture=no) from pytest, allows for debugging with pdb
-            # -q (quiet) from pytest, to avoid long pytest output
-            debug_entrypoint=self.test_cmd.replace("pytest", "pytest -sq"),
-        )
-
-        # Those changes depend on the working directory created by setup_workspace.
-        if self.package_name == "gunicorn":
-            self.fail_to_pass = [
-                test.replace("/testbed/", f"{self.working_dir}/")
-                for test in self.fail_to_pass
-            ]
-            self.pass_to_pass = [
-                test.replace("/testbed/", f"{self.working_dir}/")
-                for test in self.pass_to_pass
-            ]
-
-        self.git_apply_cmd = f"git -C {self.working_dir} apply --reverse -"
+        # allow traceback to be printed in the output.
+        self.entrypoint = self.test_cmd.replace("--tb=no", "--tb=short")
+        # -s (capture=no) from pytest, allows for debugging with pdb
+        # -q (quiet) from pytest, to avoid long pytest output
+        self.debug_entrypoint = self.test_cmd.replace("pytest", "pytest -sq")
         # Note that the `gold_patch` is the same as the `test_patch` but will
         # be used in conjunction with --reverse.
+        self.git_apply_cmd = f"git apply --reverse -"
         self.gold_patch = self.test_patch
 
     def calculate_score(self, eval_output: EvalOutput) -> int:
@@ -218,6 +200,3 @@ class SWESmithEnv(SWEBenchEnv):
             f"Score: {score}/{self.max_score} ({score/self.max_score:.1%})"
         )
         return score
-
-    def run_post_install(self):
-        pass  # SWE-Smith does not have post-install commands.

@@ -28,20 +28,20 @@ base:
     max_rewrite_steps: 10
     memory_size: 20
     save_patch: True
-    reset_prompt_history_after_rewrite: True
+    reset_prompt_history_after_rewrite: False
     # Optionally loads a custom system prompt template from a file.
     # system_prompt_template_file: "script/templates/system_prompt.jinja"
 
 rewrite_agent:
-    tools: ["view", "rewrite", "listdir", "eval"]
+    tools: ["grep", "view", "rewrite", "listdir", "eval"]
 
 debug_agent:
-    tools: ["pdb", "view", "rewrite", "listdir", "eval"]
+    tools: ["grep", "pdb", "view", "rewrite", "listdir", "eval"]
 
 debug_5_agent:
     n_rewrites_before_pdb: 5
-    tools: ["pdb", "view", "rewrite", "listdir", "eval"]
+    tools: ["grep", "pdb", "view", "rewrite", "listdir", "eval"]
 
 solution_agent:
-    llm_name: "human"  # No need for an LLM.
+    llm_name: null  # No need for an LLM.
     tools: ["eval", "pdb"]

@@ -1,16 +1,15 @@
 import codecs
 import os
 import re
+import shutil
+import tempfile
+import zipfile
 from os.path import join as pjoin
 from pathlib import Path
 from typing import Any, Callable
 
-
-def clean_code(code):
-    assert isinstance(code, str)
-    code_line = unescape(code).split("\n")
-    # Remove trailing white spaces with rstrip.
-    return "\n".join(line.rstrip() for line in code_line)
+import requests
+from tqdm import tqdm
 
 
 def filter_non_utf8(text):
@@ -20,20 +19,6 @@ def filter_non_utf8(text):
     if isinstance(text, str):
         return text.encode("utf-8", errors="ignore").decode("utf-8")
     return text
-
-
-def unescape(s):
-    try:
-        # First, try the normal unescape
-        result = codecs.decode(s, "unicode_escape")
-        # Test if it can be encoded to UTF-8 (which will happen during JSON encoding)
-        result.encode("utf-8")
-        return result
-    except UnicodeEncodeError:
-        # If it contains surrogate pairs that can't be encoded to UTF-8,
-        # replace them with the Unicode replacement character (U+FFFD)
-        result = codecs.decode(s, "unicode_escape")
-        return result.encode("utf-8", errors="replace").decode("utf-8")
 
 
 def show_line_number(code_string, code_path=None, environment=None, start_index=1):
@@ -244,3 +229,102 @@ def filter_problems(
         raise ValueError(
             f"Invalid split or problem id: '{problems}'.\nChoose from: {sorted(dataset) + ['all'] + sorted(custom_splits)}"
         )
+
+
+def mkdirs(dirpath: str) -> str:
+    """Create a directory and all its parents.
+
+    If the folder already exists, its path is returned without raising any exceptions.
+
+    Arguments:
+        dirpath: Path where a folder need to be created.
+
+    Returns:
+        Path to the (created) folder.
+    """
+    try:
+        os.makedirs(dirpath)
+    except FileExistsError:
+        pass
+
+    return dirpath
+
+
+def download(url, dst, desc=None, force=False):
+    """Download a remote file using HTTP get request.
+
+    Args:
+        url (str): URL where to get the file.
+        dst (str): Destination folder where to save the file.
+        force (bool, optional):
+            Download again if it exists]. Defaults to False.
+
+    Returns:
+        str: Path to the downloaded file.
+
+    Notes:
+        This code is inspired by
+        https://github.com/huggingface/transformers/blob/v4.0.0/src/transformers/file_utils.py#L1069
+    """
+    filename = url.split("/")[-1]
+    path = pjoin(mkdirs(dst), filename)
+
+    if os.path.isfile(path) and not force:
+        return path
+
+    # Download to a temp folder first to avoid corrupting the cache
+    # with incomplete downloads.
+    temp_dir = mkdirs(pjoin(tempfile.gettempdir(), "tales"))
+    temp_path = pjoin(temp_dir, filename)
+    with open(temp_path, "ab") as temp_file:
+        headers = {}
+        resume_size = temp_file.tell()
+        if resume_size:
+            headers["Range"] = f"bytes={resume_size}-"
+            headers["x-ms-version"] = "2020-04-08"  # Needed for Range support.
+
+        r = requests.get(url, stream=True, headers=headers)
+        if r.headers.get("x-ms-error-code") == "InvalidRange" and r.headers[
+            "Content-Range"
+        ].rsplit("/", 1)[-1] == str(resume_size):
+            shutil.move(temp_path, path)
+            return path
+
+        r.raise_for_status()  # Bad request.
+        content_length = r.headers.get("Content-Length")
+        total = resume_size + int(content_length)
+        pbar = tqdm(
+            unit="B",
+            initial=resume_size,
+            unit_scale=True,
+            total=total,
+            desc=desc or "Downloading {}".format(filename),
+            leave=False,
+        )
+
+        for chunk in r.iter_content(chunk_size=1024):
+            if chunk:  # filter out keep-alive new chunks
+                pbar.update(len(chunk))
+                temp_file.write(chunk)
+
+    shutil.move(temp_path, path)
+
+    pbar.close()
+    return path
+
+
+def unzip(filename, dst=None, force=False):
+    zipped_file = zipfile.ZipFile(filename)
+    filenames_to_extract = list(zipped_file.namelist())
+    dst = dst or os.path.dirname(filename)
+
+    desc = f"Extracting {os.path.basename(filename)}"
+    skipped = 0
+    for f in tqdm(filenames_to_extract, desc=desc, leave=False, unit="file"):
+        if not os.path.isfile(pjoin(dst, f)) or force:
+            zipped_file.extract(f, dst)
+        else:
+            skipped += 1
+
+    if skipped:
+        print(f"{skipped} files skipped (use -f to overwrite).")

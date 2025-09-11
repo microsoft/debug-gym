@@ -192,6 +192,12 @@
             border-color: #118ab2;
         }
 
+        .step.action-grep {
+            background: #9b59b6;
+            color: white;
+            border-color: #9b59b6;
+        }
+
         .step.action-no_action,
         .step.action-unknown {
             background: #073b4c;
@@ -268,6 +274,10 @@
 
         .legend-color.action-eval {
             background: #118ab2;
+        }
+
+        .legend-color.action-grep {
+            background: #9b59b6;
         }
 
         .legend-color.action-no_action {
@@ -560,6 +570,10 @@
                             <span>eval</span>
                         </div>
                         <div class="legend-item">
+                            <div class="legend-color action-grep"></div>
+                            <span>grep</span>
+                        </div>
+                        <div class="legend-item">
                             <div class="legend-color action-no_action"></div>
                             <span>no action</span>
                         </div>
@@ -684,6 +698,14 @@
             return value;
         }
 
+        // Helper function to format empty/null values consistently
+        function formatEmptyValue(value) {
+            if (value === null || value === undefined || value === '' || value === 'None') {
+                return 'None';
+            }
+            return value;
+        }
+
         // Fetch step data from the server
         async function fetchStep(stepId) {
             // Save current scroll position
@@ -712,7 +734,17 @@
                                 <i class="fas fa-chevron-down expand-icon"></i>
                             </div>
                             <div class="detail-content expanded" id="reasoning-section">
-                                <div class="json-viewer" style="white-space: pre-wrap;">${data.reasoning || 'None'}</div>
+                                <div class="json-viewer" style="white-space: pre-wrap;">${formatEmptyValue(data.reasoning)}</div>
+                            </div>
+                        </div>
+
+                        <div class="detail-section">
+                            <div class="detail-header expanded" onclick="toggleSection('content-section')">
+                                <span><i class="fas fa-file-alt"></i> Content</span>
+                                <i class="fas fa-chevron-down expand-icon"></i>
+                            </div>
+                            <div class="detail-content expanded" id="content-section">
+                                <div class="json-viewer" style="white-space: pre-wrap;">${formatEmptyValue(data.content)}</div>
                             </div>
                         </div>
 
@@ -732,7 +764,7 @@
                                 <i class="fas fa-chevron-down expand-icon"></i>
                             </div>
                             <div class="detail-content expanded" id="observation-section">
-                                <div class="json-viewer" style="white-space: pre-wrap;">${data.obs || 'None'}</div>
+                                <div class="json-viewer" style="white-space: pre-wrap;">${formatEmptyValue(data.obs)}</div>
                             </div>
                         </div>
 
@@ -742,7 +774,7 @@
                                 <i class="fas fa-chevron-down expand-icon"></i>
                             </div>
                             <div class="detail-content" id="rewrite-section">
-                                <div class="json-viewer">${data.rewrite_consumed || 'None'}</div>
+                                <div class="json-viewer">${formatEmptyValue(data.rewrite_consumed)}</div>
                             </div>
                         </div>
 

@@ -306,6 +306,33 @@ def test_view_file_with_range_start_5_end_8(env):
     )
 
 
+def test_view_end_line_max(env):
+    # adjust end to max number of lines in the file (10 lines)
+    view_call = ToolCall(
+        id="view_id",
+        name="view",
+        arguments={"path": "ten_lines.py", "start": 1, "end": 11},
+    )
+    env_info = env.step(view_call)
+    assert env_info.step_observation.observation == (
+        "Viewing `ten_lines.py`, lines 1-10 of 10 total lines.\n"
+        "\n"
+        "```\n"
+        "     1 print('Line 1')\n"
+        "     2 print('Line 2')\n"
+        "     3 print('Line 3')\n"
+        "     4 print('Line 4')\n"
+        "     5 print('Line 5')\n"
+        "     6 print('Line 6')\n"
+        "     7 print('Line 7')\n"
+        "     8 print('Line 8')\n"
+        "     9 print('Line 9')\n"
+        "    10 print('Line 10')\n"
+        "```\n"
+        "\n"
+    )
+
+
 def test_view_file_with_invalid_range(env):
     view_call = ToolCall(
         id="view_id",
@@ -317,12 +344,7 @@ def test_view_file_with_invalid_range(env):
         env_info.step_observation.observation
         == "Invalid start index: `0`. It should be between 1 and 10."
     )
-    view_call.arguments = {"path": "ten_lines.py", "start": 1, "end": 11}
-    env_info = env.step(view_call)
-    assert (
-        env_info.step_observation.observation
-        == "Invalid end index: `11`. It should be between 1 and 10."
-    )
+
     view_call.arguments = {"path": "ten_lines.py", "start": 5, "end": 4}
     env_info = env.step(view_call)
     assert (

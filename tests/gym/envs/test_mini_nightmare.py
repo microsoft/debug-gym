@@ -1,85 +1,73 @@
-from unittest.mock import mock_open, patch
+import subprocess
+from unittest.mock import patch
 
 import pytest
 
-from debug_gym.gym.entities import Observation
-from debug_gym.gym.envs.env import EnvInfo
 from debug_gym.gym.envs.mini_nightmare import MiniNightmareEnv
-from debug_gym.gym.terminal import Terminal
+from debug_gym.gym.terminal import DockerTerminal, Terminal
 
 
-@pytest.fixture
-def env_info():
-    return EnvInfo(
-        step_observation=Observation(source="env", observation="obs"),
-        all_observations=[],
-        eval_observation=Observation(source="env", observation="eval_observation"),
-        dir_tree="dir_tree",
-        current_breakpoints="current_breakpoints",
-        action="action",
-        instructions={},
-        score=5,
-        max_score=10,
-        done=False,
-        rewrite_counter=0,
-        tools=[],
-    )
+def is_docker_running():
+    try:
+        subprocess.check_output(["docker", "ps"])
+        return True
+    except Exception:
+        return False
 
 
-@pytest.fixture
-@patch("os.path.exists", return_value=True)
-@patch("tempfile.TemporaryDirectory")
-@patch(
-    "builtins.open",
-    new_callable=mock_open,
-    read_data='{"data": [{"id": "test_task", "original_code_paths": ["path/to/file.py"], "buggy_code_list": ["print(\\"buggy code\\")"]}]}',
+if_docker_running = pytest.mark.skipif(
+    not is_docker_running(),
+    reason="Docker not running",
 )
-def mini_nightmare_env(mock_open, mock_tempdir, mock_exists, tmp_path):
-    # Mock the temporary directory
-    nightmare_dir = tmp_path / "tmp" / "MiniNightmareEnv-tempdir"
-    nightmare_dir.mkdir(parents=True, exist_ok=True)
-    mock_tempdir.return_value.name = nightmare_dir
 
-    # Initialize the MiniNightmareEnv
-    env = MiniNightmareEnv(path=nightmare_dir)
+
+@pytest.fixture
+def mini_nightmare_env():
+    # Initialize the MiniNightmareEnv with native Terminal
+    terminal = Terminal()
+    env = MiniNightmareEnv(terminal=terminal)
     return env
 
 
+def test_load_dataset(mini_nightmare_env):
+    dataset = mini_nightmare_env.load_dataset()
+    assert mini_nightmare_env.dataset == dataset
+
+    subproblems = list(dataset.keys())[::2]
+    subset = mini_nightmare_env.load_dataset(problems=subproblems)
+    assert list(subset.keys()) == subproblems
+
+
+@patch("debug_gym.gym.envs.mini_nightmare.build_docker_image")
+def test_build_docker_image(mock_build_docker_image):
+    MiniNightmareEnv()
+    mock_build_docker_image.assert_called_once()
+
+
 def test_instructions(mini_nightmare_env):
-    mini_nightmare_env.current_sample = {"instructions": "Test instructions"}
-    expected_instructions = "Test instructions"
+    expected_instructions = (
+        "The program doesn't behave as intended."
+        " Investigate the repository, figure out the root cause, then rewrite the code to fix the issue."
+        " Beaware that the bug may not be in the code you initially see."
+    )
     assert mini_nightmare_env.instructions == expected_instructions
 
 
-@patch("debug_gym.gym.envs.MiniNightmareEnv.setup_workspace")
-@patch.object(
-    Terminal,
-    "run",
-    return_value=(False, "collected 10 items, 5 failed, 5 passed ..."),
-)
-@patch("datasets.load_dataset")
-@patch("subprocess.run")
-def test_reset(
-    mock_run,
-    mock_load_dataset,
-    mock_terminal_run,
-    mock_setup_workspace,
-    mini_nightmare_env,
-):
-    mini_nightmare_env.dataset = {
-        "test_task": {
-            "base_directory": "test_directory",
-            "instructions": "Test instructions",
-            "filename": "test_task.py",
-        }
-    }
-    options = {"task_name": "test_task"}
-    infos = mini_nightmare_env.reset(options=options)
-    assert infos.instructions == "Test instructions"
-    assert infos.step_observation == Observation(
-        source="env",
-        observation="collected 10 items, 5 failed, 5 passed ...",
-    )
-    assert infos.max_score == 10
-    assert infos.score == 5
+def test_reset(mini_nightmare_env):
+    infos = mini_nightmare_env.reset(options={"task_name": "config"})
+    assert "2 failed" in infos.step_observation.observation
+    assert infos.max_score == 2
+    assert infos.score == 0
+    assert not infos.done
+
+
+@if_docker_running
+def test_reset_with_docker_terminal():
+    env = MiniNightmareEnv()
+    assert isinstance(env.terminal, DockerTerminal)
+
+    infos = env.reset(options={"task_name": "config"})
+    assert "2 failed" in infos.step_observation.observation
+    assert infos.max_score == 2
+    assert infos.score == 0
     assert not infos.done

@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 from unittest.mock import MagicMock, call, patch
 
@@ -9,6 +10,7 @@ from debug_gym.gym.envs.env import EnvInfo, EventHooks, RepoEnv, TooledEnv
 from debug_gym.gym.terminal import Terminal
 from debug_gym.gym.tools.tool import ToolCall
 from debug_gym.gym.tools.toolbox import Toolbox
+from debug_gym.gym.workspace import Workspace
 
 
 @pytest.fixture
@@ -110,58 +112,6 @@ def test_tool_names(env_mock):
     assert env_mock.tool_names == "tool1, tool2"
 
 
-@patch("tempfile.TemporaryDirectory")
-@patch("atexit.register")
-def test_setup_workspace(mock_atexit_register, mock_tempdir, tmp_path):
-    path_dir = tmp_path / "pathdir"
-    path_dir.mkdir()
-    file_content = 'print("Hello, World!")'
-    with open(path_dir / "file.py", "w") as f:
-        f.write(file_content)
-    working_dir = tmp_path / "tempdir"
-    working_dir.mkdir()
-    mock_tempdir.return_value.name = str(working_dir)
-    repo_env = RepoEnv(run_timeout=10, dir_tree_depth=2)
-    repo_env.setup_workspace(
-        path=str(path_dir),
-        entrypoint="python",
-        readonly_patterns=["readonly_pattern"],
-    )
-
-    assert repo_env.path == path_dir
-    assert repo_env.working_dir == working_dir
-    assert repo_env._tempdir.startswith("RepoEnv-")
-    with open(working_dir / "file.py", "r") as f:
-        assert f.read() == file_content
-    mock_atexit_register.assert_called_once_with(repo_env._tempdir.cleanup)
-
-
-@patch("tempfile.TemporaryDirectory")
-@patch("atexit.register")
-@patch("shutil.copytree")
-def test_setup_workspace_with_none_path(
-    mock_copytree, mock_atexit_register, mock_tempdir
-):
-    repo_env = RepoEnv(run_timeout=10, dir_tree_depth=2)
-    repo_env.setup_workspace(None, "/bin/bash")
-
-    assert repo_env.path is None
-    mock_tempdir.assert_not_called()
-    mock_copytree.assert_not_called()
-    mock_atexit_register.assert_not_called()
-
-
-@patch("tempfile.TemporaryDirectory")
-def test_cleanup_workspace(mock_tempdir):
-    mock_tempdir_instance = MagicMock()
-    mock_tempdir.return_value = mock_tempdir_instance
-    env = RepoEnv()
-    env._tempdir = mock_tempdir_instance
-    env.cleanup_workspace()
-
-    mock_tempdir_instance.cleanup.assert_called_once()
-
-
 def test_env_tools():
     tool1 = MagicMock()
     tool1.name = "tool1"
@@ -204,60 +154,33 @@ def env(tmp_path):
     return env
 
 
-def test_restore(env):
+def test_patch(env):
+    env.reset()
+
     # Change the content of a file
     file1 = env.working_dir / "file1.txt"
     with open(file1, "w") as f:
         f.write("Hello, World!")
 
-    def hash_file(file):
-        with open(file, "rb") as f:
-            return hash(f.read())
-
-    assert hash_file(env.path / "file1.txt") != hash_file(file1)
-    env.restore()
-    assert hash_file(env.path / "file1.txt") == hash_file(file1)
-
-
-def test_display_files(env):
-    result = env.display_files()
-    assert result == (
-        "Listing files in the current working directory. (read-only) indicates read-only files. Max depth: 2.\n"
-        f"{env.working_dir}/\n"
-        "|-- file1.txt\n"
-        "|-- file2.txt\n"
-        "|-- subdir/\n"
-        "  |-- subfile1.txt"
+    result = env.patch
+    expected = (
+        f"diff --git a/file1.txt b/file1.txt\n"
+        "index e69de29..b45ef6f 100644\n"
+        f"--- a/file1.txt\n"
+        f"+++ b/file1.txt\n"
+        "@@ -0,0 +1 @@\n"
+        "+Hello, World!\n"
+        "\\ No newline at end of file\n"
     )
-
-
-def test_display_files_read_only(env):
-    read_only_path = env.working_dir / "read-only-file.txt"
-    read_only_path.touch()
-    env.is_editable = lambda x: x != read_only_path
-    result = env.display_files()
-    assert result == (
-        "Listing files in the current working directory. (read-only) indicates read-only files. Max depth: 2.\n"
-        f"{env.working_dir}/\n"
-        "|-- file1.txt\n"
-        "|-- file2.txt\n"
-        "|-- read-only-file.txt (read-only)\n"
-        "|-- subdir/\n"
-        "  |-- subfile1.txt"
-    )
+    assert result == expected
 
 
 @patch.object(RepoEnv, "get_triggered_tools")
 @patch.object(RepoEnv, "get_tool")
 @patch.object(RepoEnv, "has_tool", return_value=False)
 @patch.object(RepoEnv, "eval")
-@patch.object(RepoEnv, "display_files")
 def test_step(
-    mock_display_files,
-    mock_eval,
-    mock_has_tool,
-    mock_get_tool,
-    mock_get_triggered_tools,
+    mock_eval, mock_has_tool, mock_get_tool, mock_get_triggered_tools, tmp_path
 ):
     mock_pdb_tool = MagicMock()
     observation = Observation("pdb", "PDB tool used")
@@ -265,19 +188,19 @@ def test_step(
     mock_pdb_tool.rewrite_success = True
     mock_pdb_tool.current_frame_file = "file.py"
     mock_get_tool.return_value = None
-    mock_display_files.return_value = "file list"
 
-    env = RepoEnv(path=".")
+    env = RepoEnv(path=tmp_path)
+    env.reset()
     env.last_eval = EvalOutput(success=False, output="1 failed, 0 passed")
+    tool_call = ToolCall(id="123", name="pdb", arguments={"command": "b 10"})
     mock_get_triggered_tools.return_value = None, [mock_pdb_tool, {"command": "b 10"}]
     infos = env.step(
-        {"id": "123", "name": "pdb", "arguments": {"command": "b 10"}},
+        tool_call,
         "let me set a breakpoint at line 10",
+        "some reasoning",
     )
 
-    mock_get_triggered_tools.assert_called_once_with(
-        {"id": "123", "name": "pdb", "arguments": {"command": "b 10"}}
-    )
+    mock_get_triggered_tools.assert_called_once_with(tool_call)
     mock_pdb_tool.assert_called_once_with(env, command="b 10")
     assert infos.step_observation == observation
     assert infos.score == 0
@@ -285,56 +208,29 @@ def test_step(
     assert isinstance(infos, EnvInfo)
 
 
-def test_directory_tree(tmp_path):
-    tmp_path = Path(tmp_path)
-    repo_path = tmp_path / "repo"
-    repo_path.mkdir()
-    subdir_path = repo_path / "subdir"
-    subdir_path.mkdir()
-    (repo_path / "file1.txt").touch()
-    (repo_path / "file2.txt").touch()
-    (subdir_path / "subfile1.txt").touch()
+def test_reset(tmp_path):
+    (tmp_path / "test.py").write_text("def test_1():\n  assert False\n")
+    (tmp_path / ".debugignore").write_text("__pycache__/\n.git/\n.pytest_cache/\n")
 
-    env = RepoEnv(path=repo_path, dir_tree_depth=3)
-    result = env.directory_tree()
-    expected_result = (
-        f"{env.working_dir}/\n"
-        "|-- file1.txt\n"
-        "|-- file2.txt\n"
-        "|-- subdir/\n"
-        "  |-- subfile1.txt"
-    )
-    assert result == expected_result
-
-
-@patch.object(Terminal, "run", return_value=(False, "1 failed, 0 passed"))
-@patch.object(RepoEnv, "get_tool")
-def test_reset(
-    mock_get_tool,
-    mock_eval,
-    env,
-):
-    mock_pdb_tool = MagicMock()
-    mock_pdb_tool.start_pseudo_terminal.return_value = None
-    mock_get_tool.return_value = mock_pdb_tool
+    env = RepoEnv(path=tmp_path, entrypoint="pytest test.py")
     infos = env.reset()
 
-    mock_eval.assert_called_once()
     assert env.current_breakpoints_state == {}
     assert env.rewrite_counter == 0
+    assert "FAILED test.py::test_1 - assert False" in env.last_eval.output
     assert infos == EnvInfo(
-        step_observation=Observation(source="env", observation="1 failed, 0 passed"),
-        all_observations=[Observation(source="env", observation="1 failed, 0 passed")],
-        eval_observation=Observation(source="env", observation="1 failed, 0 passed"),
-        dir_tree=f"""Listing files in the current working directory. (read-only) indicates read-only files. Max depth: 2.
-{env.working_dir}/
-|-- file1.txt
-|-- file2.txt
-|-- subdir/
-  |-- subfile1.txt""",
+        step_observation=Observation(source="env", observation=env.last_eval.output),
+        all_observations=[Observation(source="env", observation=env.last_eval.output)],
+        eval_observation=Observation(source="env", observation=env.last_eval.output),
+        dir_tree=(
+            "Listing files in the current working directory. (read-only) indicates read-only files. Max depth: 1.\n"
+            f"{env.working_dir}/\n"
+            "|-- test.py"
+        ),
         current_breakpoints="No breakpoints are set.",
         action_reasoning=None,
-        action=None,
+        action_content=None,
+        action_tool_call=None,
         instructions="",
         score=0,
         max_score=1,
@@ -345,7 +241,6 @@ def test_reset(
 
 
 def test_rewrite_counter(env):
-    # env.calculate_score = lambda x: 0
     env_info = env.reset()
     assert env.rewrite_counter == 0
     rewrite_tool = Toolbox.get_tool("rewrite")
@@ -383,31 +278,13 @@ def test_rewrite_counter(env):
         assert f.read() == "print('Hello')"
 
 
-def test_patch(env):
-    # Change the content of a file
-    file1 = env.working_dir / "file1.txt"
-    with open(file1, "w") as f:
-        f.write("Hello, World!")
-
-    result = env.patch
-    expected = (
-        f"diff --git a{env.path}/file1.txt b{env.path}/file1.txt\n"
-        "index e69de29..b45ef6f 100644\n"
-        f"--- a{env.path}/file1.txt\n"
-        f"+++ b{env.path}/file1.txt\n"
-        "@@ -0,0 +1 @@\n"
-        "+Hello, World!\n"
-        "\\ No newline at end of file\n"
-    )
-    assert result == expected
-
-
 def test_eval_success(tmp_path):
     working_dir = str(tmp_path)
     # create a dummy file
     with open(tmp_path / "file.py", "w") as f:
         f.write("print('Hello, World!')")
     env = RepoEnv(path=working_dir, entrypoint="python file.py")
+    env.reset()
     output = env.eval()
     assert output == EvalOutput(success=True, output="Hello, World!")
 
@@ -418,6 +295,7 @@ def test_eval_timeout(tmp_path):
     with open(tmp_path / "file.py", "w") as f:
         f.write("import time; time.sleep(5)")
     env = RepoEnv(path=working_dir, entrypoint="python file.py", run_timeout=1)
+    env.reset()
     output = env.eval()
     assert output == EvalOutput(success=False, output="Timeout expired.")
 
@@ -541,187 +419,9 @@ def test_queue_and_process_events():
     mock.assert_has_calls(expected_calls)
 
 
-@pytest.mark.parametrize("debugignore", ["", ".?*"])
-def test_resolve_path(tmp_path, debugignore):
-    (tmp_path / ".debugignore").write_text(debugignore)
-    env = RepoEnv(path=tmp_path)
-    abs_path = (env.working_dir / "file.txt").resolve()
-    (abs_path).touch()
-    # env.working_dir itself
-    path_from_env = env.resolve_path(str(env.working_dir), raises=True)
-    assert path_from_env == env.working_dir.resolve()
-    # relative path
-    path_from_env = env.resolve_path("file.txt")
-    assert path_from_env == abs_path
-    # relative path with ./
-    path_from_env = env.resolve_path("./file.txt")
-    assert path_from_env == abs_path
-    # absolute path
-    path_from_env = env.resolve_path(str(abs_path))
-    assert path_from_env == abs_path
-    # relative path with Path object
-    path_from_env = env.resolve_path(Path("file.txt"))
-    assert path_from_env == abs_path
-    # absolute path with Path object
-    path_from_env = env.resolve_path(abs_path)
-    assert path_from_env == abs_path
-    # return an absolute path regardless of existence
-    non_existent_path = env.resolve_path("non_existent_file.txt")
-    assert non_existent_path == (env.working_dir / "non_existent_file.txt").resolve()
-    # non-existent absolute path
-    non_existent_path = env.resolve_path("/tmp/non_existent_file.txt").resolve()
-    assert non_existent_path == Path("/tmp/non_existent_file.txt").resolve()
-
-
-def test_resolve_path_raises(tmp_path):
-    env = RepoEnv(path=tmp_path)
-    # Non-existent file with raises=True
-    with pytest.raises(FileNotFoundError):
-        env.resolve_path("non_existent_file.txt", raises=True)
-    # Non-existent absolute path with raises=True
-    with pytest.raises(FileNotFoundError):
-        env.resolve_path("/tmp/non_existent_file.txt", raises=True)
-    with pytest.raises(FileNotFoundError):
-        env.resolve_path("..", raises=True)
-    # Invalid path type
-    with pytest.raises(TypeError):
-        env.resolve_path(123, raises=True)
-    with pytest.raises(TypeError):
-        env.resolve_path(None, raises=True)
-
-
-def test_resolve_path_do_not_raise_working_dir(tmp_path):
-    # Do not raise for working directory even if the ignore patterns match
-    (tmp_path / ".debugignore").write_text(".*")
-    env = RepoEnv(path=tmp_path)
-    assert env.resolve_path(env.working_dir, raises=True) == env.working_dir
-
-
-def test_setup_file_filters_basic(tmp_path):
-    # Setup a fake repo structure
-    env = RepoEnv(path=tmp_path)
-    subdir = env.working_dir / "subdir"
-    subdir.mkdir()
-    files = [
-        env.working_dir / "file1.txt",
-        env.working_dir / "file2.txt",
-        env.working_dir / "ignored.txt",
-        env.working_dir / "readonly.txt",
-        env.working_dir / "subdir/file3.txt",
-    ]
-    [f.touch() for f in files]
-    files.append(subdir)
-    env.setup_file_filters()
-    # All files should be indexed
-    assert all(env.has_file(f) for f in files)
-    # All files should be editable if no readonly patterns
-    assert all(env.is_editable(f) for f in files)
-
-
-def test_setup_file_filters_with_ignore_patterns(tmp_path):
-    (tmp_path / "file1.txt").touch()
-    (tmp_path / "file2.txt").touch()
-    (tmp_path / "ignoreme.txt").touch()
-    (tmp_path / "subdir").mkdir()
-    (tmp_path / "subdir" / "file3.txt").touch()
-
-    env = RepoEnv(path=tmp_path)
-    # Ignore files matching "ignoreme.txt"
-    env.setup_file_filters(ignore_patterns=["ignoreme.txt"])
-    assert not env.has_file("ignoreme.txt")
-    assert env.has_file("file1.txt")
-    assert env.has_file("file2.txt")
-    assert env.has_file("subdir/file3.txt")
-
-
-def test_setup_file_filters_with_readonly_patterns(tmp_path):
-    (tmp_path / "file1.txt").touch()
-    (tmp_path / "readonly.txt").touch()
-
-    env = RepoEnv(path=tmp_path)
-    # Mark "readonly.txt" as read-only
-    env.setup_file_filters(readonly_patterns=["readonly.txt"])
-    assert env.is_editable("file1.txt")
-    assert not env.is_editable("readonly.txt")
-
-
-def test_setup_file_filters_with_debugignore_and_debugreadonly(tmp_path):
-    (tmp_path / "file1.txt").touch()
-    (tmp_path / "file2.txt").touch()
-    (tmp_path / "ignoreme.txt").touch()
-    (tmp_path / "readonly.txt").touch()
-    # Write .debugignore and .debugreadonly
-    (tmp_path / ".debugignore").write_text("ignoreme.txt\n")
-    (tmp_path / ".debugreadonly").write_text("readonly.txt\n")
-
-    env = RepoEnv(path=tmp_path)
-    env.setup_file_filters()
-    assert not env.has_file("ignoreme.txt")
-    assert env.has_file("file1.txt")
-    assert env.has_file("file2.txt")
-    assert env.has_file("readonly.txt")
-    # Check that readonly.txt is not editable
-    assert not env.is_editable("readonly.txt")
-    # Check that file1.txt and file2.txt are editable
-    assert env.is_editable("file1.txt")
-    assert env.is_editable("file2.txt")
-    with pytest.raises(FileNotFoundError):
-        env.is_editable("ignoreme.txt")
-
-
-def test_setup_file_filters_combined_patterns(tmp_path):
-    (tmp_path / "file1.txt").touch()
-    (tmp_path / "file2.txt").touch()
-    (tmp_path / "ignoreme.txt").touch()
-    (tmp_path / "readonly.txt").touch()
-    (tmp_path / ".debugignore").write_text("ignoreme.txt\n")
-    (tmp_path / ".debugreadonly").write_text("readonly.txt\n")
-
-    env = RepoEnv(path=tmp_path)
-    # Also ignore file2.txt and mark file1.txt as readonly via patterns
-    env.setup_file_filters(
-        ignore_patterns=["file2.txt"],
-        readonly_patterns=["file1.txt"],
-    )
-    assert not env.has_file("ignoreme.txt")
-    assert not env.has_file("file2.txt")
-    assert env.has_file("file1.txt")
-    assert env.has_file("readonly.txt")
-    # Both file1.txt and readonly.txt should be readonly
-    assert not env.is_editable("file1.txt")
-    assert not env.is_editable("readonly.txt")
-    with pytest.raises(FileNotFoundError):
-        assert not env.is_editable("ignoreme.txt")
-    with pytest.raises(FileNotFoundError):
-        assert not env.is_editable("file2.txt")
-
-
-def test_read_file_reads_existing_file(tmp_path):
-    env = RepoEnv(path=tmp_path)
-    file_path = env.working_dir / "test.txt"
-    file_content = "Hello, DebugGym!"
-    file_path.write_text(file_content)
-    # Read file using relative path
-    result = env.read_file(str(env.working_dir / "test.txt"))
-    assert result == file_content
-    # Read file using just the filename (should also work)
-    result = env.read_file("test.txt")
-    assert result == file_content
-
-
-def test_read_file_raises_for_nonexistent_file(tmp_path):
-    env = RepoEnv(path=tmp_path)
-    (env.working_dir / "test.txt").touch()
-    # relative path that does not exist
-    with pytest.raises(FileNotFoundError):
-        env.read_file("does_not_exist.txt")
-    # absolute path matching a file in the working_dir
-    with pytest.raises(FileNotFoundError):
-        env.read_file("/test.txt")
-
-
 def test_has_breakpoint_true_and_false(tmp_path):
     env = RepoEnv(path=tmp_path)
+    env.reset()
     file_path = env.working_dir / "test.py"
     file_path.write_text("print('hello')")
     line_number = 10
@@ -735,6 +435,7 @@ def test_has_breakpoint_true_and_false(tmp_path):
 
 def test_has_breakpoint_relative_path(tmp_path):
     env = RepoEnv(path=tmp_path)
+    env.reset()
     file_path = env.working_dir / "foo.py"
     file_path.write_text("print('foo')")
     line_number = 5

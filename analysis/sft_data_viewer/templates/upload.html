@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Upload SFT Data - SFT Data Viewer</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container mt-5">
+        <div class="row justify-content-center">
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="text-center mb-0">SFT Data Viewer</h2>
+                    </div>
+                    <div class="card-body">
+                        {% if error %}
+                        <div class="alert alert-danger">{{ error }}</div>
+                        {% endif %}
+
+                        <!-- File Upload Form -->
+                        <div class="mb-4">
+                            <h5>Upload JSONL File</h5>
+                            <form method="POST" enctype="multipart/form-data">
+                                <div class="mb-3">
+                                    <label for="file" class="form-label">Select JSONL file:</label>
+                                    <input type="file" class="form-control" id="file" name="file" accept=".jsonl">
+                                </div>
+                                <button type="submit" class="btn btn-primary">Upload and View</button>
+                            </form>
+                        </div>
+
+                        <div class="alert alert-info">
+                            <h6>Supported Format:</h6>
+                            <p class="mb-1"><strong>JSONL files</strong> - Each line should be a JSON object with the following structure:</p>
+                            <ul class="mb-0">
+                                <li><code>messages</code> - Array of conversation messages</li>
+                                <li><code>tools</code> - Array of available tools (optional)</li>
+                                <li><code>problem</code> - Problem description</li>
+                                <li><code>run_id</code> - Unique identifier for the run</li>
+                                <li><code>satisfied_criteria</code> - Boolean indicating success</li>
+                                <li><code>truncated</code> - Boolean indicating if truncated</li>
+                                <li><code>#tokens</code> - Token count</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

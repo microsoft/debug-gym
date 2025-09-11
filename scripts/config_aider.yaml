@@ -20,7 +20,7 @@ base:
         # session_commands define commands that are always executed before starting a shell session or running a single command in the terminal.
         # session_commands:["conda activate aider"],
         # setup_commands define commands that are executed only once when the terminal is created. This is only supported for Docker terminal.
-        setup_commands: ["pip install pytest"],
+        setup_commands: ["apt update", "apt install -y git", "pip install pytest"],
     }
 
     # LLM configs
@@ -32,16 +32,16 @@ base:
     max_rewrite_steps: 10
     memory_size: 20
     save_patch: True
-    reset_prompt_history_after_rewrite: True
+    reset_prompt_history_after_rewrite: False
     # Optionally loads a custom system prompt template from a file.
     # system_prompt_template_file: "script/templates/system_prompt.jinja"
 
 rewrite_agent:
-    tools: ["view", "rewrite", "eval"]
+    tools: ["grep", "view", "rewrite", "eval"]
 
 debug_agent:
-    tools: ["pdb", "view", "rewrite", "eval"]
+    tools: ["grep", "pdb", "view", "rewrite", "eval"]
 
 debug_5_agent:
     n_rewrites_before_pdb: 5
-    tools: ["pdb", "view", "rewrite", "eval"]
+    tools: ["grep", "pdb", "view", "rewrite", "eval"]

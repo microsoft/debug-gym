@@ -146,7 +146,7 @@ def test_full_rewrite(env):
 
 def test_rewrite_invalid_file(env):
     # overwrite the is_editable method to simulate a read-only file
-    env.is_editable = lambda x: x != "read_only.py"
+    env.workspace.is_editable = lambda x: x != "read_only.py"
     rewrite_tool = env.get_tool("rewrite")
     patch = {
         "path": "another_file.py",
@@ -202,3 +202,45 @@ def test_rewrite_invalid_line_number_2(env):
         "Invalid line number range, start should be less than or equal to end.\n"
     )
     assert not rewrite_tool.rewrite_success
+
+
+def test_rewrite_with_newlines(env):
+    rewrite_tool = env.get_tool("rewrite")
+    patch = {
+        "path": "test.py",
+        "start": 4,
+        "end": None,
+        "new_code": "    print(f'Hello, {name}!')\n    print(f'Hello #2!')",
+    }
+
+    obs = rewrite_tool.use(env, **patch)
+
+    assert rewrite_tool.rewrite_success
+    # using \n to prevent ide from removing trailing spaces
+    assert obs.observation == (
+        "The file `test.py` has been updated successfully.\n"
+        "\n"
+        "Diff:\n"
+        "\n"
+        "--- original\n"
+        "+++ current\n"
+        "@@ -1,5 +1,6 @@\n"
+        " import abc\n"
+        " \n"
+        " def greet():\n"
+        "-    print('Hello, world!')\n"
+        "+    print(f'Hello, {name}!')\n"
+        "+    print(f'Hello #2!')\n"
+        "     print('Goodbye, world!')\n"
+    )
+    with open(env.working_dir / "test.py", "r") as f:
+        new_content = f.read()
+
+    assert new_content == (
+        "import abc\n"
+        "\n"
+        "def greet():\n"
+        "    print(f'Hello, {name}!')\n"
+        "    print(f'Hello #2!')\n"
+        "    print('Goodbye, world!')\n"
+    )

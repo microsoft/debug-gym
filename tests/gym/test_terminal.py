@@ -205,10 +205,6 @@ def test_docker_terminal_init(tmp_dir_prefix):
     assert terminal.env_vars == {"NO_COLOR": "1", "PS1": DEFAULT_PS1}
     assert terminal.working_dir.startswith(tmp_dir_prefix)
     assert terminal.base_image == "ubuntu:latest"
-    assert terminal.volumes[terminal.working_dir] == {
-        "bind": terminal.working_dir,
-        "mode": "rw",
-    }
     assert terminal.container is not None
     assert terminal.container.status == "running"
 
@@ -219,19 +215,16 @@ def test_docker_terminal_init_with_params(tmp_path):
     session_commands = ["mkdir new_dir"]
     env_vars = {"ENV_VAR": "value"}
     base_image = "ubuntu:24.04"
-    volumes = {working_dir: {"bind": working_dir, "mode": "rw"}}
     terminal = DockerTerminal(
         working_dir=working_dir,
         session_commands=session_commands,
         env_vars=env_vars,
         base_image=base_image,
-        volumes=volumes,
     )
     assert terminal.working_dir == working_dir
     assert terminal.session_commands == session_commands
     assert terminal.env_vars == env_vars | {"NO_COLOR": "1", "PS1": DEFAULT_PS1}
     assert terminal.base_image == base_image
-    assert terminal.volumes == volumes
     assert terminal.container.status == "running"
 
     _, output = terminal.run("pwd", timeout=1)
@@ -251,8 +244,7 @@ def test_docker_terminal_init_with_params(tmp_path):
 )
 def test_docker_terminal_run(tmp_path, command):
     working_dir = str(tmp_path)
-    volumes = {working_dir: {"bind": working_dir, "mode": "rw"}}
-    docker_terminal = DockerTerminal(working_dir=working_dir, volumes=volumes)
+    docker_terminal = DockerTerminal(working_dir=working_dir)
     success, output = docker_terminal.run(command, timeout=1)
     assert output == "test"
     assert success is True
@@ -265,44 +257,13 @@ def test_docker_terminal_run(tmp_path, command):
     assert success is True
 
 
-@if_docker_running
-def test_docker_terminal_read_only_volume(tmp_path):
-    working_dir = str(tmp_path)
-    read_only_dir = tmp_path / "read_only"
-    read_only_dir.mkdir()
-    with open(read_only_dir / "test.txt", "w") as f:
-        f.write("test")
-    read_only_dir = str(read_only_dir)
-    volumes = {read_only_dir: {"bind": read_only_dir, "mode": "ro"}}
-    docker_terminal = DockerTerminal(working_dir=working_dir, volumes=volumes)
-    volumes = {
-        working_dir: {"bind": working_dir, "mode": "rw"},
-        read_only_dir: {"bind": read_only_dir, "mode": "ro"},
-    }
-    success, ls_output = docker_terminal.run(f"ls {read_only_dir}", timeout=1)
-    assert success is True
-    assert ls_output.startswith("test.txt")
-
-    success, output = docker_terminal.run(f"touch {read_only_dir}/test2.txt", timeout=1)
-    assert success is False
-    assert (
-        output
-        == f"touch: cannot touch '{read_only_dir}/test2.txt': Read-only file system"
-    )
-
-    success, output = docker_terminal.run(f"touch {working_dir}/test2.txt", timeout=1)
-    assert success is True
-    assert output == ""
-
-
 @if_is_linux
 @if_docker_running
 def test_docker_terminal_session(tmp_path):
     # same as test_terminal_session but with DockerTerminal
     working_dir = str(tmp_path)
-    volumes = {working_dir: {"bind": working_dir, "mode": "rw"}}
     command = "echo Hello World"
-    terminal = DockerTerminal(working_dir=working_dir, volumes=volumes)
+    terminal = DockerTerminal(working_dir=working_dir)
     assert not terminal.sessions
 
     session = terminal.new_shell_session()
@@ -320,18 +281,6 @@ def test_docker_terminal_session(tmp_path):
 
     terminal.close_shell_session(session)
     assert not terminal.sessions
-
-
-@if_docker_running
-def test_docker_terminal_update_volumes_with_working_dir(tmp_path):
-    working_dir_a = str(tmp_path / "dir_a")
-    terminal = DockerTerminal(working_dir=working_dir_a)
-    assert terminal.working_dir == working_dir_a
-    assert terminal.volumes[working_dir_a] == {"bind": working_dir_a, "mode": "rw"}
-
-    working_dir_b = str(tmp_path / "dir_b")
-    terminal.working_dir = working_dir_b
-    assert terminal.volumes[working_dir_b] == {"bind": working_dir_b, "mode": "rw"}
 
 
 @pytest.mark.parametrize(
@@ -353,7 +302,7 @@ def test_terminal_multiple_session_commands(tmp_path, terminal_cls):
 @if_docker_running
 def test_terminal_sudo_command(tmp_path):
     working_dir = str(tmp_path)
-    terminal = DockerTerminal(working_dir=working_dir, map_host_uid_gid=False)
+    terminal = DockerTerminal(working_dir=working_dir)
     success, output = terminal.run("vim --version", timeout=1)
     assert "vim: command not found" in output
     assert success is False
@@ -381,11 +330,9 @@ def test_terminal_cleanup(tmp_path):
 
 def test_select_terminal_default():
     terminal = select_terminal(None)
-    assert isinstance(terminal, Terminal)
-    config = {}
+    assert terminal is None
     terminal = select_terminal()
-    assert isinstance(terminal, Terminal)
-    assert config == {}  # config should not be modified
+    assert terminal is None
 
 
 def test_select_terminal_local():

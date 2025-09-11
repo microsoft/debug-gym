@@ -55,7 +55,7 @@ class ViewTool(EnvironmentTool):
         # RepoEnv.read_file raises FileNotFoundError if the file
         # does not exist or is not in the working directory
         try:
-            file_content = environment.read_file(new_file)
+            file_content = environment.workspace.read_file(new_file)
         except FileNotFoundError as e:
             return Observation(self.name, f"View failed. Error message:\n{str(e)}")
         file_lines = file_content.splitlines()
@@ -91,7 +91,7 @@ class ViewTool(EnvironmentTool):
         if include_line_numbers_and_breakpoints:
             display_content = show_line_number(
                 display_content,
-                code_path=environment.resolve_path(new_file),
+                code_path=environment.workspace.resolve_path(new_file),
                 environment=environment,
                 start_index=s + 1,
             )
@@ -106,7 +106,9 @@ class ViewTool(EnvironmentTool):
             else ""
         )
         read_only = (
-            " The file is read-only." if not environment.is_editable(new_file) else ""
+            " The file is read-only."
+            if not environment.workspace.is_editable(new_file)
+            else ""
         )
         obs = (
             f"Viewing `{new_file}`,{line_numbers}{read_only}{breakpoints_message}"

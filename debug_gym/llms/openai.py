@@ -23,6 +23,27 @@ logging.getLogger("openai").setLevel(logging.WARNING)
 
 class OpenAILLM(LLM):
 
+    context_length_error_code = [
+        "context_length_exceeded",
+        "model_max_prompt_tokens_exceeded",
+        "string_above_max_length",
+    ]
+    context_length_error_message_keywords = [
+        "maximum context length",
+    ]
+
+    def is_context_length_error(self, exception: Exception) -> bool:
+        if (
+            hasattr(exception, "code")
+            and exception.code in self.context_length_error_code
+        ):
+            return True
+        if hasattr(exception, "message"):
+            for keyword in self.context_length_error_message_keywords:
+                if keyword in exception.message:
+                    return True
+        return False
+
     @property
     def client(self):
         if getattr(self, "_client", None) is None:
@@ -101,6 +122,9 @@ class OpenAILLM(LLM):
             # only retry when a such error occurs on a model hosting on vllm
             need_to_retry = False
 
+        if self.is_context_length_error(exception):
+            need_to_retry = False
+
         logger(
             f"Error calling {self.model_name}: {exception_full_name!r}\n"
             f"{exception.message if hasattr(exception, 'message') else exception}"
@@ -158,23 +182,30 @@ class OpenAILLM(LLM):
     ) -> list[dict]:
         _messages = []
         if isinstance(response, list) and len(response) > 0:
-            _messages.append(
-                {
-                    "role": "assistant",
-                    "tool_calls": [
-                        {
-                            "type": "function",
-                            "id": response[0].tool.id,
-                            "function": {
-                                "name": response[0].tool.name,
-                                "arguments": json.dumps(response[0].tool.arguments),
-                            },
+            _response = {
+                "role": "assistant",
+                "tool_calls": [
+                    {
+                        "type": "function",
+                        "id": response[0].tool.id,
+                        "function": {
+                            "name": response[0].tool.name,
+                            "arguments": json.dumps(response[0].tool.arguments),
                         },
-                    ],
-                    "content": filter_non_utf8(response[0].response),
-                }
-            )
-        if history_info.action is None:
+                    },
+                ],
+                "content": filter_non_utf8(f"{response[0].response}"),
+            }
+            if response[0].reasoning_response:
+                _response["reasoning_content"] = filter_non_utf8(
+                    f"{response[0].reasoning_response}"
+                )
+            _messages.append(_response)
+        if (
+            history_info.action_tool_call is None
+            and history_info.action_content is None
+            and history_info.action_reasoning is None
+        ):
             # This is the initial state, no action taken yet
             _messages.append(
                 {
@@ -189,8 +220,8 @@ class OpenAILLM(LLM):
             _messages.append(
                 {
                     "role": "tool",
-                    "tool_call_id": history_info.action.id,
-                    "name": history_info.action.name,
+                    "tool_call_id": history_info.action_tool_call.id,
+                    "name": history_info.action_tool_call.name,
                     "content": filter_non_utf8(
                         history_info.step_observation.observation
                     ),
@@ -214,18 +245,9 @@ class OpenAILLM(LLM):
             )
         except openai.BadRequestError as e:
             # Handle specific error for context length exceeded, otherwise just propagate the error
-            if e.code in [
-                "context_length_exceeded",
-                "model_max_prompt_tokens_exceeded",
-                "string_above_max_length",
-            ]:
+            if self.is_context_length_error(e):
                 raise ContextLengthExceededError
-            if (
-                e.code == "invalid_request_body"
-                and "maximum context length" in e.message
-            ):
-                raise ContextLengthExceededError
-            raise
+            raise e
         # LLM may select multiple tool calls, we only care about the first action
         if not response.choices[0].message.tool_calls:
             # LLM failed to call a tool
@@ -234,9 +256,19 @@ class OpenAILLM(LLM):
             tool_call = response.choices[0].message.tool_calls[0]
             assert tool_call.type == "function"
 
+        # In openai call, the content is in response.choices[0].message.content
+        # In some models hosted on vllm, e.g., qwen-3, there could be content in both (when reasoning is enabled)
+        # response.choices[0].message.content and response.choices[0].message.reasoning_content
+        # https://qwen.readthedocs.io/en/latest/deployment/vllm.html#parsing-thinking-content
+        _content = response.choices[0].message.content
+        _reasoning_content = None
+        if hasattr(response.choices[0].message, "reasoning_content"):
+            _reasoning_content = response.choices[0].message.reasoning_content
+
         llm_response = LLMResponse(
             prompt=messages,
-            response=response.choices[0].message.content,
+            response=_content,
+            reasoning_response=_reasoning_content,
             tool=self.parse_tool_call_response(tool_call),
             prompt_token_count=response.usage.prompt_tokens,
             response_token_count=response.usage.completion_tokens,

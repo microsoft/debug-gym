@@ -36,7 +36,7 @@ def DebugGymLoggerTest():
 
 
 @pytest.fixture
-def debug_gym_loogger(tmp_path, DebugGymLoggerTest):
+def debug_gym_logger(tmp_path, DebugGymLoggerTest):
     logger = DebugGymLoggerTest("test_logger", log_dir=str(tmp_path))
     yield logger
 
@@ -157,7 +157,7 @@ def test_task_log_file_path(tmp_path):
         status="pending",
         logdir=str(log_dir),
     )
-    expected_path = str(log_dir / "test_task.log")
+    expected_path = str(log_dir / "debug_gym.log")
     assert task.log_file_path == expected_path
 
 
@@ -192,10 +192,10 @@ def test_strip_ansi_formatter():
     assert result == "Red text"
 
 
-def test_task_progress_manager_initialization(debug_gym_loogger):
+def test_task_progress_manager_initialization(debug_gym_logger):
     # Test that TaskProgressManager initializes correctly
     problems = ["problem1", "problem2"]
-    manager = TaskProgressManager(problems, logger=debug_gym_loogger)
+    manager = TaskProgressManager(problems, logger=debug_gym_logger)
 
     # Check that tasks were added for each problem
     assert len(manager._tasks) == 2
@@ -208,10 +208,10 @@ def test_task_progress_manager_initialization(debug_gym_loogger):
     assert "problem2" in manager._progress_task_ids
 
 
-def test_task_progress_manager_advance(debug_gym_loogger):
+def test_task_progress_manager_advance(debug_gym_logger):
     # Test that TaskProgressManager.advance updates task state correctly
     problems = ["problem1"]
-    manager = TaskProgressManager(problems, logger=debug_gym_loogger)
+    manager = TaskProgressManager(problems, logger=debug_gym_logger)
 
     # Initial state
     assert manager._tasks["problem1"].step == 0
@@ -243,10 +243,10 @@ def test_task_progress_manager_advance(debug_gym_loogger):
         assert kwargs["status"] == "running"
 
 
-def test_group_tasks_by_status_basic(debug_gym_loogger):
+def test_group_tasks_by_status_basic(debug_gym_logger):
     # Test that group_tasks_by_status groups tasks correctly by their status
     problems = ["p1", "p2", "p3", "p4"]
-    manager = TaskProgressManager(problems, logger=debug_gym_loogger)
+    manager = TaskProgressManager(problems, logger=debug_gym_logger)
     # Set up tasks with different statuses
     updates = [
         TaskProgress("p1", 1, 10, 10, 100, "resolved"),
@@ -267,10 +267,10 @@ def test_group_tasks_by_status_basic(debug_gym_loogger):
             assert grouped[status] == []
 
 
-def test_group_tasks_by_status_with_unknown_status(debug_gym_loogger):
+def test_group_tasks_by_status_with_unknown_status(debug_gym_logger):
     # Test that a task with an unknown status is grouped under "pending"
     problems = ["p1"]
-    manager = TaskProgressManager(problems, logger=debug_gym_loogger)
+    manager = TaskProgressManager(problems, logger=debug_gym_logger)
     # Manually set an unknown status
     manager._tasks["p1"].status = "not-a-status"
     grouped = manager.group_tasks_by_status()
@@ -302,10 +302,10 @@ def test_group_tasks_by_status_multiple_tasks_same_status():
             assert grouped[status] == []
 
 
-def test_task_progress_manager_get_task_stats(debug_gym_loogger):
+def test_task_progress_manager_get_task_stats(debug_gym_logger):
     # Test that TaskProgressManager.get_task_stats returns correct stats
     problems = ["p1", "p2", "p3", "p4", "p5", "p6", "p7", "p8"]
-    manager = TaskProgressManager(problems, max_display=5, logger=debug_gym_loogger)
+    manager = TaskProgressManager(problems, max_display=5, logger=debug_gym_logger)
 
     # Set up tasks with different statuses
     updates = [
@@ -356,10 +356,11 @@ def test_log_with_color_calls_logger_info_with_escaped_message():
 
     # The message should be escaped and wrapped in color tags
     expected_msg = f"[{color}]{escape(message)}[/{color}]"
-    mock_logger.info.assert_called_once()
-    args, kwargs = mock_logger.info.call_args
-    assert args[0] == expected_msg
-    assert kwargs["extra"] == {"already_escaped": True}
+    mock_logger.log.assert_called_once()
+    args, kwargs = mock_logger.log.call_args
+    assert args[0] == logging.INFO
+    assert args[1] == expected_msg
+    assert kwargs["extra"] == {"already_escaped": True, "markup": True}
 
 
 def test_log_with_color_handles_different_colors():
@@ -368,10 +369,22 @@ def test_log_with_color_handles_different_colors():
     for color in ["red", "green", "yellow"]:
         log_with_color(mock_logger, message, color)
         expected_msg = f"[{color}]{escape(message)}[/{color}]"
-        mock_logger.info.assert_called_with(
-            expected_msg, extra={"already_escaped": True}
+        mock_logger.log.assert_called_with(
+            logging.INFO, expected_msg, extra={"already_escaped": True, "markup": True}
         )
-        mock_logger.info.reset_mock()
+        mock_logger.log.reset_mock()
+
+
+def test_log_with_color_handles_different_levels():
+    mock_logger = MagicMock(spec=DebugGymLogger)
+    message = "Test message"
+    for level in [logging.INFO, logging.WARNING, logging.ERROR, logging.DEBUG]:
+        log_with_color(mock_logger, message, color="blue", level=level)
+        expected_msg = f"[blue]{escape(message)}[/blue]"
+        mock_logger.log.assert_called_with(
+            level, expected_msg, extra={"already_escaped": True, "markup": True}
+        )
+        mock_logger.log.reset_mock()
 
 
 def test_log_with_color_escapes_special_characters():
@@ -380,8 +393,8 @@ def test_log_with_color_escapes_special_characters():
     color = "magenta"
     log_with_color(mock_logger, message, color)
     expected_msg = f"[{color}]{escape(message)}[/{color}]"
-    mock_logger.info.assert_called_once_with(
-        expected_msg, extra={"already_escaped": True}
+    mock_logger.log.assert_called_once_with(
+        logging.INFO, expected_msg, extra={"already_escaped": True, "markup": True}
     )
 
 
@@ -462,11 +475,11 @@ def test_log_file_path_relative_outside_cwd(tmp_path):
     assert result == log_dir / "prob5.log"
 
 
-def test_dump_task_status_creates_json_file(tmp_path, debug_gym_loogger):
+def test_dump_task_status_creates_json_file(tmp_path, debug_gym_logger):
     logdir = tmp_path / "logdir"
     logdir.mkdir()
     problems = ["problem1", "problem2"]
-    manager = TaskProgressManager(problems, logger=debug_gym_loogger)
+    manager = TaskProgressManager(problems, logger=debug_gym_logger)
 
     task = TaskProgress(
         problem_id="problem1",
@@ -530,3 +543,45 @@ def test_load_previous_run_status_loads_taskprogress(tmp_path):
     assert result.max_score == 20
     assert result.status == "running"
     assert result.logdir == str(log_dir)
+
+
+def test_log_file_content(debug_gym_logger):
+    debug_gym_logger.info("Test log file content")
+    with open(debug_gym_logger.log_file, "r") as f:
+        content = f.read()
+    assert "Test log file content" in content
+
+
+def test_log_file_content_worker(tmp_path):
+    class TestDebugGymLoggerMain(DebugGymLogger):
+        LOG_QUEUE = mp.Queue(maxsize=10000)
+        PROGRESS_QUEUE = mp.Queue(maxsize=10000)
+        _is_worker = False
+
+    class TestDebugGymLoggerWorker(TestDebugGymLoggerMain):
+        _is_worker = True
+
+    main_logger = TestDebugGymLoggerMain("main", level=logging.ERROR)
+    worker_logger1 = TestDebugGymLoggerWorker("worker1", tmp_path)
+    worker_logger2 = TestDebugGymLoggerWorker("worker2", tmp_path)
+    worker_logger3 = TestDebugGymLoggerWorker("worker3", tmp_path)
+
+    main_logger.info("Main log message")
+    worker_logger1.info("Worker 1 log message")
+    worker_logger2.info("Worker 2 log message")
+    worker_logger3.info("Worker 3 log message")
+
+    assert main_logger.log_dir is None
+    assert main_logger.log_file is None
+
+    with open(worker_logger1.log_file, "r") as f:
+        content = f.read()
+    assert "Worker 1 log message" in content
+
+    with open(worker_logger2.log_file, "r") as f:
+        content = f.read()
+    assert "Worker 2 log message" in content
+
+    with open(worker_logger3.log_file, "r") as f:
+        content = f.read()
+    assert "Worker 3 log message" in content

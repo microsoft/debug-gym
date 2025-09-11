@@ -35,7 +35,7 @@ class ListdirTool(EnvironmentTool):
                 self.name, f"Depth must be 1 or greater, got `depth={depth}`"
             )
         try:
-            result = environment.directory_tree(root=path, max_depth=depth)
+            result = environment.workspace.directory_tree(root=path, max_depth=depth)
         except Exception as e:
             result = f"Error listing directory '{path}': {str(e)}"
         return Observation(self.name, result)
