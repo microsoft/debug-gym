@@ -133,7 +133,10 @@ def browse_directory():
         path = os.path.abspath(path)
         # Ensure path is within SAFE_ROOT
         if not path.startswith(SAFE_ROOT):
-            return jsonify({"error": "Access denied: Path outside allowed directory"}), 403
+            return (
+                jsonify({"error": "Access denied: Path outside allowed directory"}),
+                403,
+            )
         if not os.path.exists(path) or not os.path.isdir(path):
             return jsonify({"error": "Invalid directory"}), 400
     except (OSError, ValueError):
