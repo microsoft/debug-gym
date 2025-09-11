@@ -51,6 +51,9 @@ from debug_gym.llms.base import (
     ),
 )
 def test_instantiate_llm(mock_open, logger_mock):
+    llm = LLM.instantiate(None, logger=logger_mock)
+    assert llm is None
+
     # tags are used to filter models
     llm = LLM.instantiate("gpt-4o-mini", logger=logger_mock)
     assert isinstance(llm, OpenAILLM)

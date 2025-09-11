@@ -49,21 +49,17 @@ def build_swe_env_once(tmp_path_factory, worker_id):
 def get_swe_env(build_swe_env_once):
     """Instantiate a SWESmithEnv instance after building the SWESmith docker image."""
 
-    def _swe_env(working_dir=None, map_host_uid_gid=True, **kwargs):
+    def _swe_env():
         problems = ["john-kurkowski__tldextract.3d1bf184.combine_file__1vnuqpt4"]
-        terminal = DockerTerminal(
-            path=working_dir, map_host_uid_gid=map_host_uid_gid, **kwargs
-        )
-        env = SWESmithEnv(problems=problems, terminal=terminal)
+        env = SWESmithEnv(problems=problems)
         return env
 
     return _swe_env
 
 
 @if_docker_running
-def test_load_dataset(tmp_path, get_swe_env):
-    working_dir = str(tmp_path)
-    swe_env = get_swe_env(working_dir)
+def test_load_dataset(get_swe_env):
+    swe_env = get_swe_env()
     assert swe_env.dataset_id == "SWE-bench/SWE-smith"
     # check if the dataset contains features that SWESmithEnv expects
     assert sorted(swe_env.ds.features.keys()) == sorted(
@@ -90,13 +86,10 @@ def test_instructions(get_swe_env):
 
 
 @if_docker_running
-def test_setup_task(tmp_path, get_swe_env):
-    working_dir = str(tmp_path)
-    swe_env = get_swe_env(working_dir)
+def test_setup_task(get_swe_env):
+    swe_env = get_swe_env()
     task_name = "john-kurkowski__tldextract.3d1bf184.combine_file__1vnuqpt4"
-    swe_env.setup_task(
-        task_name
-    )  # SWE-smith uses setup_task instead of setup_task_info
+    swe_env.setup_task(task_name)
     assert swe_env.task_name == task_name
     assert swe_env.repo == "john-kurkowski/tldextract"
     assert swe_env.branch_name == task_name
@@ -104,33 +97,19 @@ def test_setup_task(tmp_path, get_swe_env):
 
 
 @if_docker_running
-def test_setup_terminal(tmp_path, get_swe_env):
-    working_dir = str(tmp_path)
-    swe_env = get_swe_env(working_dir)
+def test_setup_terminal(get_swe_env):
+    swe_env = get_swe_env()
     task_name = "john-kurkowski__tldextract.3d1bf184.combine_file__1vnuqpt4"
-    swe_env.setup_task(task_name)
-    swe_env.setup_terminal()
-    git_logs = subprocess.run(
-        f"git -C {swe_env.working_dir} log -n 4".split(),
-        stdout=subprocess.PIPE,
-        text=True,
-    ).stdout
+    swe_env.reset(options={"task_name": task_name})
+    _, git_logs = swe_env.terminal.run("git log -n 4")
     # For SWE-Smith the base commit is found in the branch associated to the
     # instance id and is different from the one in the main branch.
     # assert swe_env.base_commit in git_logs
     assert f"Applying test patch for {task_name}" in git_logs
-    assert "Add debug-gym ignore and read-only files" in git_logs
 
-    git_diff = subprocess.run(
-        f"git -C {swe_env.working_dir} show HEAD^1".split(),
-        stdout=subprocess.PIPE,
-        text=True,
-    ).stdout
+    _, git_diff = swe_env.terminal.run("git show HEAD", strip_output=False)
     git_diff = git_diff[git_diff.index("diff --git") :]
     assert git_diff == swe_env.test_patch
-
-    assert ".debugignore" in os.listdir(swe_env.working_dir)
-    assert ".debugreadonly" in os.listdir(swe_env.working_dir)
 
 
 @if_docker_running
@@ -201,14 +180,11 @@ def test_calculate_score_with_pytest_error(get_swe_env):
     swe_env.reset(options={"task_name": task_name})
 
     # Modify 'tldextract/tldextract.py' in the working_dir to introduce an indentation error.
-    file_path = os.path.join(swe_env.working_dir, "tldextract", "tldextract.py")
-    with open(file_path, "r") as file:
-        content = file.readlines()
+    content = swe_env.workspace.read_file("tldextract/tldextract.py").split("\n")
 
     # Introduce an indentation error by adding an extra space at the beginning of a line.
     content[10] = " 1/0   " + content[10]
-    with open(file_path, "w") as file:
-        file.writelines(content)
+    swe_env.workspace.write_file("tldextract/tldextract.py", "\n".join(content))
 
     # Now, when we run the tests, we should see an indentation error.
     eval_output = swe_env.eval()
