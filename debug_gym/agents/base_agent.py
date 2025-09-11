@@ -347,10 +347,10 @@ class BaseAgent:
             f"Patch saved in {pjoin(self._output_path, task_name, 'debug_gym.patch')}"
         )
 
-    def log(self, task_name="custom"):
+    def save_trajectory(self, task_name="custom"):
         # Simple tools list.
         tools = [f"{tool.name}({tool.arguments})" for tool in self.env.tools]
-        jsonl_output = {
+        json_output = {
             "problem": task_name,
             "config": self.config,
             "tools": self.llm.define_tools(self.env.tools) if self.llm else tools,
@@ -362,14 +362,13 @@ class BaseAgent:
         }
         for step_id in range(len(self.history)):
             step_json = self.history.json(step_id)
-            jsonl_output["log"].append(step_json)
+            json_output["log"].append(step_json)
         os.makedirs(pjoin(self._output_path, task_name), exist_ok=True)
-        with open(pjoin(self._output_path, task_name, "debug_gym.jsonl"), "w") as f:
-            json.dump(jsonl_output, f, indent=4)
+        json_file = pjoin(self._output_path, task_name, "trajectory.json")
+        with open(json_file, "w") as f:
+            json.dump(json_output, f, indent=4)
 
-        self.logger.debug(
-            f"Log saved in {pjoin(self._output_path, task_name, 'debug_gym.jsonl')}"
-        )
+        self.logger.debug(f"Trajectory saved in {json_file}")
 
 
 def create_agent(agent_type: str, **agent_kwargs):
