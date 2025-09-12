@@ -107,49 +107,26 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
-
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
           cache: 'pip'
-
       - name: Install dependencies
         run: pip install coverage
-
-      - name: Prepare coverage directory
-        run: mkdir -p .coverage
-
-      - name: Download main coverage
+      - name: Download coverage reports
         uses: actions/download-artifact@v4
-        with:
-          name: .coverage-main
-          path: .coverage
-
-      # Uncomment these only after adding corresponding upload steps in those jobs
-      - name: Download swebench coverage
-        if: always()
-        uses: actions/download-artifact@v4
-        with:
-          name: .coverage-swebench
-          path: .coverage
-
-      - name: Download swesmith coverage
-        if: always()
-        uses: actions/download-artifact@v4
-        with:
-          name: .coverage-swesmith
-          path: .coverage
-
-      - name: Download r2egym coverage
-        if: always()
-        uses: actions/download-artifact@v4
-        with:
-          name: .coverage-r2egym
-          path: .coverage
-
-      - name: Combine and report coverage
+      - name: Combine and report coverage.
         run: |
-          ls -la .coverage
-          coverage combine .coverage
-          coverage report --fail-under=85
+          ls -la
+          # The artifacts are downloaded as directories, but coverage combine expects files
+          # Move the .coverage files from directories to the current directory
+          for dir in .coverage-*; do
+            if [ -d "$dir" ] && [ -f "$dir/.coverage" ]; then
+              cp "$dir/.coverage" "${dir}.coverage"
+              echo "Moved coverage file from $dir to ${dir}.coverage"
+            fi
+          done
+          ls -la *.coverage
+          coverage combine --keep *.coverage
+          coverage report --cov-fail-under=85
