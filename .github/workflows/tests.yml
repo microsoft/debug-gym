@@ -129,4 +129,4 @@ jobs:
           done
           ls -la .*.coverage
           coverage combine --keep .*.coverage
-          coverage report --cov-fail-under=85
+          coverage report --fail-under=85
