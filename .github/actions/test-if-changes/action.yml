@@ -1,0 +1,39 @@
+
+name: Run env tests.
+inputs:
+  name:
+    description: 'Name for the coverage file.'
+    required: true
+  changed-files:
+    description: 'Files to look for changes.'
+    required: true
+  test-files:
+    description: 'Test files to run.'
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+        cache: 'pip'
+    - name: Install dependencies
+      shell: bash
+      run: |
+        pip install --upgrade pip
+        pip install -e '.[dev]'
+    - name: Run tests
+      env:
+        FORCE_DOCKER_TERMINAL: false
+      shell: bash
+      run: |
+        DEBUG_GYM_DEBUG=1 pytest ${{ inputs.test-files }} -vv -n 16 --timeout=600 --cov=debug_gym --cov-report=term-missing
+    - name: Store coverage report
+      uses: actions/upload-artifact@v4
+      with:
+        name: .coverage-${{ inputs.name }}
+        path: .coverage
+        if-no-files-found: error
+        include-hidden-files: true
