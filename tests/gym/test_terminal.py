@@ -1,6 +1,4 @@
-import platform
 import re
-import subprocess
 import tempfile
 import time
 from pathlib import Path
@@ -18,26 +16,6 @@ from debug_gym.gym.terminal import (
 )
 
 
-def is_docker_running():
-    try:
-        subprocess.check_output(["docker", "ps"])
-        return True
-    except Exception:
-        return False
-
-
-if_docker_running = pytest.mark.skipif(
-    not is_docker_running(),
-    reason="Docker not running",
-)
-
-
-if_is_linux = pytest.mark.skipif(
-    platform.system() != "Linux",
-    reason="Interactive ShellSession (pty) requires Linux.",
-)
-
-
 @pytest.fixture
 def tmp_dir_prefix(tmp_path):
     """Expected tmp_dir_prefix for a terminal session."""
@@ -46,7 +24,7 @@ def tmp_dir_prefix(tmp_path):
     return tmp_dir_prefix
 
 
-@if_is_linux
+@pytest.if_is_linux
 def test_shell_session_run(tmp_path):
     working_dir = str(tmp_path)
     shell_command = "/bin/bash --noprofile --norc"
@@ -198,7 +176,7 @@ def test_terminal_session(tmp_path):
     assert not terminal.sessions
 
 
-@if_docker_running
+@pytest.if_docker_running
 def test_docker_terminal_init(tmp_dir_prefix):
     terminal = DockerTerminal()
     assert terminal.session_commands == []
@@ -209,7 +187,7 @@ def test_docker_terminal_init(tmp_dir_prefix):
     assert terminal.container.status == "running"
 
 
-@if_docker_running
+@pytest.if_docker_running
 def test_docker_terminal_init_with_params(tmp_path):
     working_dir = str(tmp_path)
     session_commands = ["mkdir new_dir"]
@@ -234,7 +212,7 @@ def test_docker_terminal_init_with_params(tmp_path):
     assert "new_dir" in output
 
 
-@if_docker_running
+@pytest.if_docker_running
 @pytest.mark.parametrize(
     "command",
     [
@@ -257,8 +235,8 @@ def test_docker_terminal_run(tmp_path, command):
     assert success is True
 
 
-@if_is_linux
-@if_docker_running
+@pytest.if_is_linux
+@pytest.if_docker_running
 def test_docker_terminal_session(tmp_path):
     # same as test_terminal_session but with DockerTerminal
     working_dir = str(tmp_path)
@@ -287,7 +265,7 @@ def test_docker_terminal_session(tmp_path):
     "terminal_cls",
     [
         Terminal,
-        pytest.param(DockerTerminal, marks=if_docker_running),
+        pytest.param(DockerTerminal, marks=pytest.if_docker_running),
     ],
 )
 def test_terminal_multiple_session_commands(tmp_path, terminal_cls):
@@ -299,7 +277,7 @@ def test_terminal_multiple_session_commands(tmp_path, terminal_cls):
     assert output == f"Hello\nWorld\n{working_dir}"
 
 
-@if_docker_running
+@pytest.if_docker_running
 def test_terminal_sudo_command(tmp_path):
     working_dir = str(tmp_path)
     terminal = DockerTerminal(working_dir=working_dir)
@@ -315,7 +293,7 @@ def test_terminal_sudo_command(tmp_path):
     assert "VIM - Vi IMproved" in output
 
 
-@if_docker_running
+@pytest.if_docker_running
 def test_terminal_cleanup(tmp_path):
     working_dir = str(tmp_path)
     terminal = DockerTerminal(working_dir=working_dir)
@@ -342,7 +320,7 @@ def test_select_terminal_local():
     assert config == {"type": "local"}  # config should not be modified
 
 
-@if_docker_running
+@pytest.if_docker_running
 def test_select_terminal_docker():
     config = {"type": "docker"}
     terminal = select_terminal(config)
@@ -419,7 +397,7 @@ def test_shell_session_start_without_session_commands(tmp_path):
     session.close()
 
 
-@if_docker_running
+@pytest.if_docker_running
 def test_run_setup_commands_success(tmp_path):
     working_dir = str(tmp_path)
     setup_commands = ["touch test1.txt", "echo test > test2.txt"]
@@ -430,7 +408,7 @@ def test_run_setup_commands_success(tmp_path):
     assert output == "test1.txt\ntest2.txt"
 
 
-@if_docker_running
+@pytest.if_docker_running
 def test_run_setup_commands_failure(tmp_path):
     working_dir = str(tmp_path)
     setup_commands = ["echo install", "ls ./non_existent_dir"]

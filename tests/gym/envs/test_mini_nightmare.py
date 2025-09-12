@@ -1,24 +1,9 @@
-import subprocess
 from unittest.mock import patch
 
 import pytest
 
 from debug_gym.gym.envs.mini_nightmare import MiniNightmareEnv
 from debug_gym.gym.terminal import DockerTerminal, Terminal
-
-
-def is_docker_running():
-    try:
-        subprocess.check_output(["docker", "ps"])
-        return True
-    except Exception:
-        return False
-
-
-if_docker_running = pytest.mark.skipif(
-    not is_docker_running(),
-    reason="Docker not running",
-)
 
 
 @pytest.fixture
@@ -61,7 +46,7 @@ def test_reset(mini_nightmare_env):
     assert not infos.done
 
 
-@if_docker_running
+@pytest.if_docker_running
 def test_reset_with_docker_terminal():
     env = MiniNightmareEnv()
     assert isinstance(env.terminal, DockerTerminal)

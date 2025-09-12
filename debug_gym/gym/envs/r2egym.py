@@ -15,21 +15,23 @@ from debug_gym.gym.terminal import DockerTerminal, Terminal
 from debug_gym.gym.utils import filter_problems
 
 
-# Function to remove ANSI escape codes
 def decolor_dict_keys(key):
+    """Remove ANSI escape codes"""
+    # Ref: https://github.com/R2E-Gym/R2E-Gym/blob/main/src/r2egym/repo_analysis/execution_log_parser.py#L68
     decolor = lambda key: re.sub(r"\u001b\[\d+m", "", key)
     return {decolor(k): v for k, v in key.items()}
 
 
 def parse_log_pytest(log: str | None) -> dict[str, str]:
     """
-    Parser for test logs generated with Sympy framework
+    Parser for test logs generated with pytest framework
 
     Args:
         log (str): log content
     Returns:
         dict: test case to test status mapping
     """
+    # Ref: https://github.com/R2E-Gym/R2E-Gym/blob/main/src/r2egym/repo_analysis/execution_log_parser.py#L4
     if log is None:
         return {}
     test_status_map = {}
@@ -188,7 +190,8 @@ class R2EGymEnv(RepoEnv):
 
     def setup_workspace(self):
         self.terminal.base_image = self.base_image
-        self.workspace.reset()
+        # Ignore hidden files (dotfiles) and any contents under hidden directories
+        self.workspace.reset(ignore_patterns=["**/.*"])
         self.set_entrypoints(self.entrypoint, self.debug_entrypoint)
 
     def setup_terminal(self):
