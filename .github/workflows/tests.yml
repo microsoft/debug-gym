@@ -107,17 +107,49 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
           cache: 'pip'
+
       - name: Install dependencies
         run: pip install coverage
-      - name: Download coverage reports
+
+      - name: Prepare coverage directory
+        run: mkdir -p .coverage
+
+      - name: Download main coverage
         uses: actions/download-artifact@v4
-      - name: Combine and report coverage.
+        with:
+          name: .coverage-main
+          path: .coverage
+
+      # Uncomment these only after adding corresponding upload steps in those jobs
+      - name: Download swebench coverage
+        if: always()
+        uses: actions/download-artifact@v4
+        with:
+          name: .coverage-swebench
+          path: .coverage
+
+      - name: Download swesmith coverage
+        if: always()
+        uses: actions/download-artifact@v4
+        with:
+          name: .coverage-swesmith
+          path: .coverage
+
+      - name: Download r2egym coverage
+        if: always()
+        uses: actions/download-artifact@v4
+        with:
+          name: .coverage-r2egym
+          path: .coverage
+
+      - name: Combine and report coverage
         run: |
-          ls -la
-          coverage combine --keep .coverage-*
-          coverage report --cov-fail-under=85
+          ls -la .coverage
+          coverage combine .coverage
+          coverage report --fail-under=85
