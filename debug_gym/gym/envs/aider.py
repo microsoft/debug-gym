@@ -145,6 +145,20 @@ class AiderBenchmarkEnv(RepoEnv):
             instructions += instr_md.read_text() if instr_md.exists() else ""
             instructions += instr_more_md.read_text() if instr_more_md.exists() else ""
 
+            # Add .debugignore so all files are ignored except Python files.
+            utils.create_ignore_file(
+                directory / ".debugignore",
+                patterns=[
+                    ".?*",  # Ignore hidden files and directories but not current dir "."
+                    "__pycache__/",
+                    "*.pyc",
+                ],
+            )
+            # Add .debugreadonly so tests are readonly.
+            utils.create_ignore_file(
+                directory / ".debugreadonly", patterns=["*test*.py"]
+            )
+
             dataset[task_name] = {
                 "codebase": directory,
                 "instructions": instructions,
