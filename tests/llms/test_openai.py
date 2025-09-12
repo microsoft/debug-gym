@@ -398,7 +398,10 @@ def test_format_tool_call_history_complex_arguments(mock_llm_config, logger_mock
         }
     ),
 )
-def test_llm_with_reasoning_content(mock_llm_config, mock_openai, logger_mock):
+@patch.object(OpenAILLM, "tokenize", return_value=["test", "token"])
+def test_llm_with_reasoning_content(
+    mock_tokenize, mock_llm_config, mock_openai, logger_mock
+):
     """Test that reasoning content is properly combined with regular content"""
     mock_response = MagicMock()
     mock_response.choices = [MagicMock()]
@@ -451,7 +454,10 @@ def test_llm_with_reasoning_content(mock_llm_config, mock_openai, logger_mock):
         }
     ),
 )
-def test_llm_with_only_reasoning_content(mock_llm_config, mock_openai, logger_mock):
+@patch.object(OpenAILLM, "tokenize", return_value=["test", "token"])
+def test_llm_with_only_reasoning_content(
+    mock_tokenize, mock_llm_config, mock_openai, logger_mock
+):
     """Test that reasoning content works when regular content is empty"""
     mock_response = MagicMock()
     mock_response.choices = [MagicMock()]

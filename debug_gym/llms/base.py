@@ -238,25 +238,14 @@ class LLM(ABC):
 
         tags = llm_config.tags
         if "copilot openai" in tags:
-            try:
-                from debug_gym.llms.copilot import CopilotOpenAILLM
+            from debug_gym.llms.copilot import CopilotOpenAILLM
 
-                klass = CopilotOpenAILLM
-            except ImportError:
-                logger.warning(
-                    "Copilot OpenAI LLM is not available. Falling back to OpenAI LLM."
-                )
-                klass = None
+            klass = CopilotOpenAILLM
+
         elif "copilot claude" in tags:
-            try:
-                from debug_gym.llms.copilot import CopilotClaudeLLM
+            from debug_gym.llms.copilot import CopilotClaudeLLM
 
-                klass = CopilotClaudeLLM
-            except ImportError:
-                logger.warning(
-                    "Copilot Claude LLM is not available. Falling back to Claude LLM."
-                )
-                klass = None
+            klass = CopilotClaudeLLM
         elif "azure openai" in tags:
             from debug_gym.llms import AzureOpenAILLM
 
@@ -322,7 +311,7 @@ class LLM(ABC):
         should be implemented by subclasses. Returns an LLMResponse object
         with the prompt, response and token usage.
         """
-        from debug_gym.agents.utils import trim_prompt_messages
+        from debug_gym.agents.utils import get_message_tokens, trim_prompt_messages
 
         # Add custom generation parameters from config
         for key, value in self.config.generate_kwargs.items():
@@ -357,6 +346,16 @@ class LLM(ABC):
             max_retries = 1  # Prevent infinite recursion
             for retry_count in range(max_retries + 1):
                 try:
+                    # pre-truncate messages if they are too long, to avoid unnecessary retries
+                    message_tokens = sum(
+                        get_message_tokens(msg, self.count_tokens) for msg in messages
+                    )
+                    if message_tokens > self.context_length * 1.2:
+                        trimmed_messages = trim_prompt_messages(
+                            messages, self.context_length, self.count_tokens
+                        )
+                        messages = trimmed_messages
+
                     llm_response = self.generate(messages, tools, **kwargs)
 
                     # If we had to trim messages, log the successful truncation
