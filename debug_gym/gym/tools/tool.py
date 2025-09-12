@@ -38,7 +38,8 @@ class ToolCall:
 
 class EnvironmentTool(ABC):
     name: str = None
-    instructions: str = None
+    arguments: Dict[str, Any] = None
+    description: str = None
     history: list[Record] = None
 
     def __init__(self):
@@ -96,3 +97,7 @@ class EnvironmentTool(ABC):
         """
         self.history = []
         return None
+
+    def __str__(self):
+        args = ", ".join(f"{k}:{v['type'][0]}" for k, v in self.arguments.items())
+        return f"{self.name}({args}): {self.description.split('.')[0].strip()}."
