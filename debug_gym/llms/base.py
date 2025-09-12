@@ -346,6 +346,7 @@ class LLM(ABC):
             max_retries = 1  # Prevent infinite recursion
             for retry_count in range(max_retries + 1):
                 try:
+                    # pre-truncate messages if they are too long, to avoid unnecessary retries
                     message_tokens = sum(
                         get_message_tokens(msg, self.count_tokens) for msg in messages
                     )
