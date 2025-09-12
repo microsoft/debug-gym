@@ -447,6 +447,10 @@ class DockerTerminal(Terminal):
     def setup_container(self) -> docker.models.containers.Container:
         # Create and start a container mounting volumes and setting environment variables
         self.logger.debug(f"Setting up container with base image: {self.base_image}")
+
+        # Generate a unique container name
+        container_name = f"debug_gym_{uuid.uuid4()}"
+
         container = self.docker_client.containers.run(
             image=self.base_image,
             command="sleep infinity",  # Keep the container running
@@ -459,9 +463,8 @@ class DockerTerminal(Terminal):
             stdin_open=True,
             network_mode="host",
             mem_limit="16G",
+            name=container_name,
         )
-        container_name = f"debug_gym_{container.name}"
-        container.rename(container_name)
         container.reload()
         self._run_setup_commands(container)
         self.logger.debug(f"{container} ({container_name}) started successfully.")

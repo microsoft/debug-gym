@@ -302,7 +302,7 @@ def main():
                     except AgentTimeoutException:
                         pass  # Handled in run_agent, just continue
                     except (KeyboardInterrupt, Exception) as e:
-                        executor.shutdown(wait=False, cancel_futures=True)
+                        executor.shutdown(wait=True, cancel_futures=True)
                         raise e
 
 

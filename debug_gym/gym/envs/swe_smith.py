@@ -100,7 +100,9 @@ class SWESmithEnv(SWEBenchEnv):
 
         self.task_name = task_name
         self.ds_row = self.ds[self.dataset[self.task_name]]
-        self.base_commit = self.ds_row["base_commit"]
+        self.base_commit = (
+            self.ds_row["base_commit"] if "base_commit" in self.ds_row else "main"
+        )
         self.branch_name = self.ds_row["instance_id"]
         self.test_patch = self.ds_row["patch"]
         self.image_name = self.ds_row["image_name"]

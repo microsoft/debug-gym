@@ -461,12 +461,26 @@ class OverallProgressContext:
 
     def _status_listener(self):
         self.logger.debug("Starting status listener thread...")
+        last_refresh = time.time()
+        refresh_interval = 0.1  # Refresh UI every 100ms instead of after every update
+
         while not self._stop_event.is_set():
             try:
                 progress_update = self.progress_queue.get(timeout=0.1)
                 self.advance(progress_update)
-                self.refresh_progress()
+
+                # Only refresh UI periodically to avoid overwhelming the display
+                current_time = time.time()
+                if current_time - last_refresh >= refresh_interval:
+                    self.refresh_progress()
+                    last_refresh = current_time
+
             except queue.Empty:
+                # Refresh UI even when no updates to ensure latest state is shown
+                current_time = time.time()
+                if current_time - last_refresh >= refresh_interval:
+                    self.refresh_progress()
+                    last_refresh = current_time
                 continue
             except EOFError:  # queue closed
                 break
@@ -481,7 +495,7 @@ class DebugGymLogger(logging.Logger):
     shared queues, which the main process processes and displays in a Rich UI."""
 
     LOG_QUEUE = mp.Queue(maxsize=10000)
-    PROGRESS_QUEUE = mp.Queue(maxsize=10000)
+    PROGRESS_QUEUE = mp.Queue(maxsize=50000)  # Increased from 10000 to 50000
     _is_worker = False
 
     @classmethod

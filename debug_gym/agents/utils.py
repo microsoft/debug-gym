@@ -65,6 +65,12 @@ def trim(text: str, max_tokens: int, count_tokens: callable, where: str = "middl
         raise ValueError(f"Invalid value for `where`: {where!r}.")
 
 
+def get_message_tokens(message, count_tokens):
+    """Count tokens in a message."""
+    message_content = str(message.get("content", message.get("tool_calls", message)))
+    return count_tokens(message_content)
+
+
 def trim_prompt_messages(
     messages: list[dict], context_length: int, count_tokens: callable
 ):
@@ -91,16 +97,8 @@ def trim_prompt_messages(
     ], "the last message should be from the user or the tool"
     assert context_length >= 0, "context_length should be non-negative"
 
-    def get_message_content(message):
-        """Extract content from a message for token counting."""
-        return str(message.get("content", message.get("tool_calls", message)))
-
-    def get_message_tokens(message):
-        """Count tokens in a message."""
-        return count_tokens(get_message_content(message))
-
     # Calculate token count for all messages
-    message_tokens = [get_message_tokens(msg) for msg in messages]
+    message_tokens = [get_message_tokens(msg, count_tokens) for msg in messages]
     total_tokens = sum(message_tokens)
 
     # If we're already within limit, return as-is
@@ -177,7 +175,7 @@ def trim_prompt_messages(
     ), f"After trimming, no messages fit within context length: {context_length}!"
 
     # Verify final token count
-    final_tokens = sum(get_message_tokens(msg) for msg in result)
+    final_tokens = sum(get_message_tokens(msg, count_tokens) for msg in result)
     assert (
         final_tokens <= context_length
     ), f"After trimming, the message length still exceeds: {final_tokens} > {context_length}!"
