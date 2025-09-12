@@ -347,7 +347,7 @@ class BaseAgent:
             f"Patch saved in {pjoin(self._output_path, task_name, 'debug_gym.patch')}"
         )
 
-    def log(self, task_name="custom"):
+    def save_trajectory(self, task_name="custom"):
         # Simple tools list.
         tools = [f"{tool.name}({tool.arguments})" for tool in self.env.tools]
         json_output = {
@@ -368,7 +368,7 @@ class BaseAgent:
         with open(json_file, "w") as f:
             json.dump(json_output, f, indent=4)
 
-        self.logger.debug(f"Log saved in {json_file}")
+        self.logger.debug(f"Trajectory saved in {json_file}")
 
 
 def create_agent(agent_type: str, **agent_kwargs):

@@ -1,65 +1,13 @@
-import os
-import subprocess
-
 import pytest
-from filelock import FileLock
 
 from debug_gym.gym.entities import Observation
-from debug_gym.gym.envs import SWESmithEnv
-from debug_gym.gym.terminal import DockerTerminal
 from debug_gym.gym.tools.tool import ToolCall
 from debug_gym.gym.tools.toolbox import Toolbox
 
 
-def is_docker_running():
-    try:
-        subprocess.check_output(["docker", "ps"])
-        return True
-    except Exception:
-        return False
-
-
-if_docker_running = pytest.mark.skipif(
-    not is_docker_running(),
-    reason="Docker not running",
-)
-
-
-@pytest.fixture(scope="session")
-def build_swe_env_once(tmp_path_factory, worker_id):
-    """Build the SWESmith docker image only once.
-    Do not run this fixture directly, use get_swe_env instead.
-    """
-    _build_swe_env = lambda: SWESmithEnv(
-        problems=["john-kurkowski__tldextract.3d1bf184.combine_file__1vnuqpt4"]
-    )
-    if worker_id == "master":
-        # Not running with pytest-xdist or we are in the master process
-        _build_swe_env()
-    else:
-        # When running with pytest-xdist, synchronize between workers using a lock
-        root_tmp_dir = tmp_path_factory.getbasetemp().parent
-        lock_file = root_tmp_dir / "db_init.lock"
-        with FileLock(str(lock_file)):
-            # Only the first worker to acquire the lock will initialize the DB
-            _build_swe_env()
-
-
-@pytest.fixture
-def get_swe_env(build_swe_env_once):
-    """Instantiate a SWESmithEnv instance after building the SWESmith docker image."""
-
-    def _swe_env():
-        problems = ["john-kurkowski__tldextract.3d1bf184.combine_file__1vnuqpt4"]
-        env = SWESmithEnv(problems=problems)
-        return env
-
-    return _swe_env
-
-
-@if_docker_running
-def test_load_dataset(get_swe_env):
-    swe_env = get_swe_env()
+@pytest.if_docker_running
+def test_load_dataset(get_swe_smith_env):
+    swe_env = get_swe_smith_env()
     assert swe_env.dataset_id == "SWE-bench/SWE-smith"
     # check if the dataset contains features that SWESmithEnv expects
     assert sorted(swe_env.ds.features.keys()) == sorted(
@@ -77,17 +25,17 @@ def test_load_dataset(get_swe_env):
     )
 
 
-@if_docker_running
-def test_instructions(get_swe_env):
-    swe_env = get_swe_env()
+@pytest.if_docker_running
+def test_instructions(get_swe_smith_env):
+    swe_env = get_swe_smith_env()
     swe_env.ds_row = {"problem_statement": "Test problem statement"}
     expected_instructions = "Test problem statement"
     assert swe_env.instructions == expected_instructions
 
 
-@if_docker_running
-def test_setup_task(get_swe_env):
-    swe_env = get_swe_env()
+@pytest.if_docker_running
+def test_setup_task(get_swe_smith_env):
+    swe_env = get_swe_smith_env()
     task_name = "john-kurkowski__tldextract.3d1bf184.combine_file__1vnuqpt4"
     swe_env.setup_task(task_name)
     assert swe_env.task_name == task_name
@@ -96,15 +44,14 @@ def test_setup_task(get_swe_env):
     assert swe_env.package_name == "tldextract"
 
 
-@if_docker_running
-def test_setup_terminal(get_swe_env):
-    swe_env = get_swe_env()
+@pytest.if_docker_running
+def test_setup_terminal(get_swe_smith_env):
+    swe_env = get_swe_smith_env()
     task_name = "john-kurkowski__tldextract.3d1bf184.combine_file__1vnuqpt4"
     swe_env.reset(options={"task_name": task_name})
     _, git_logs = swe_env.terminal.run("git log -n 4")
     # For SWE-Smith the base commit is found in the branch associated to the
     # instance id and is different from the one in the main branch.
-    # assert swe_env.base_commit in git_logs
     assert f"Applying test patch for {task_name}" in git_logs
 
     _, git_diff = swe_env.terminal.run("git show HEAD", strip_output=False)
@@ -112,9 +59,9 @@ def test_setup_terminal(get_swe_env):
     assert git_diff == swe_env.test_patch
 
 
-@if_docker_running
-def test_reset_and_step(get_swe_env):
-    swe_env = get_swe_env()
+@pytest.if_docker_running
+def test_reset_and_step(get_swe_smith_env):
+    swe_env = get_swe_smith_env()
     env_info = swe_env.reset(
         options={
             "task_name": "john-kurkowski__tldextract.3d1bf184.combine_file__1vnuqpt4"
@@ -153,9 +100,9 @@ def test_reset_and_step(get_swe_env):
     assert env_info.step_observation.observation.startswith(listdir_start)
 
 
-@if_docker_running
-def test_apply_gold_patch(get_swe_env):
-    swe_env = get_swe_env()
+@pytest.if_docker_running
+def test_apply_gold_patch(get_swe_smith_env):
+    swe_env = get_swe_smith_env()
     env_info = swe_env.reset(
         options={
             "task_name": "john-kurkowski__tldextract.3d1bf184.combine_file__1vnuqpt4"
@@ -172,10 +119,10 @@ def test_apply_gold_patch(get_swe_env):
     assert score == swe_env.max_score
 
 
-@if_docker_running
-def test_calculate_score_with_pytest_error(get_swe_env):
+@pytest.if_docker_running
+def test_calculate_score_with_pytest_error(get_swe_smith_env):
     """Test that the indentation error in pytest is handled correctly."""
-    swe_env = get_swe_env()
+    swe_env = get_swe_smith_env()
     task_name = "john-kurkowski__tldextract.3d1bf184.combine_file__1vnuqpt4"
     swe_env.reset(options={"task_name": task_name})
 

@@ -139,8 +139,8 @@ def run_agent(args, problem, config):
             report_progress_error = False
             raise
 
-        # save log
-        agent.log(task_name=problem)
+        # save trajectory
+        agent.save_trajectory(task_name=problem)
 
         # optionally apply patch
         if config["save_patch"]:
