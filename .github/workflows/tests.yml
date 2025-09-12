@@ -127,6 +127,6 @@ jobs:
               echo "Moved coverage file from $dir to ${dir}.coverage"
             fi
           done
-          ls -la *.coverage
-          coverage combine --keep *.coverage
+          ls -la .*.coverage
+          coverage combine --keep .*.coverage
           coverage report --cov-fail-under=85
