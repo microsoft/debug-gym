@@ -3,7 +3,7 @@ import os
 import tempfile
 from pathlib import Path
 
-from debug_gym.gym.terminal import Terminal
+from debug_gym.gym.terminals.terminal import Terminal
 from debug_gym.gym.utils import make_file_matcher
 from debug_gym.logger import DebugGymLogger
 
