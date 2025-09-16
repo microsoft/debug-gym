@@ -3,6 +3,7 @@ import json
 import os
 import signal
 import subprocess
+import traceback
 import uuid
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
@@ -152,7 +153,7 @@ def run_agent(args, problem, config):
             f"or check {task_logger.log_file} for more information."
         )
         task_logger.debug(
-            f"Task {problem} generated an exception: {e!r}", exc_info=True
+            f"Task {problem} generated an exception: {e!r}. Traceback: {traceback.format_exc()}"
         )
         if report_progress_error:
             task_logger.report_progress(

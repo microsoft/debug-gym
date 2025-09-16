@@ -8,7 +8,7 @@ from termcolor import colored
 
 def main(args):
     # Collect all *.jsonl files in the output directory
-    for jsonl_name in ["froggy.jsonl", "debug_gym.jsonl"]:
+    for jsonl_name in ["froggy.jsonl", "debug_gym.jsonl", "trajectory.json"]:
         log_files = glob(f"{args.path}/**/{jsonl_name}", recursive=True)
         # Use pandas to read the logs
         results = []

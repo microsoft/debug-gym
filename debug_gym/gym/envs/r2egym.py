@@ -90,10 +90,10 @@ class R2EGymEnv(RepoEnv):
         # try getting the content inside of [ISSUE] [/ISSUE] using regex tags for ds['problem_statement'] else return ds['problem_statement']
         # ref: https://github.com/R2E-Gym/R2E-Gym/blob/main/src/r2egym/agenthub/runtime/docker.py#L592
         try:
-            content = self.ds["problem_statement"]
+            content = self.ds_row["problem_statement"]
             return re.search(r"\[ISSUE\](.*)\[/ISSUE\]", content, re.DOTALL).group(1)
         except Exception as e:
-            return self.ds["problem_statement"]
+            return self.ds_row["problem_statement"]
 
     def load_dataset(self, problems: str | list[str] | None = None):
         if Path(self.dataset_id).is_file() and self.dataset_id.endswith(".json"):
@@ -126,20 +126,23 @@ class R2EGymEnv(RepoEnv):
             f"Loaded {len(dataset)} tasks accross {len(image_names)} Docker images from {self.dataset_id}."
         )
 
-        # Download all images needed for R2E-Gym.
-        client = docker.from_env()
+        if not isinstance(self.terminal, KubernetesTerminal):
+            # Download all images needed for R2E-Gym.
+            client = docker.from_env()
 
-        existing_images = set(
-            tag for image in client.images.list() for tag in image.tags
-        )
-        missing_images = image_names - existing_images
-        if missing_images:
-            self.logger.warning(f"Found {len(missing_images)} missing Docker images.")
-            for i, image_name in enumerate(missing_images):
+            existing_images = set(
+                tag for image in client.images.list() for tag in image.tags
+            )
+            missing_images = image_names - existing_images
+            if missing_images:
                 self.logger.warning(
-                    f"Pulling Docker image {i + 1}/{len(missing_images)} `{image_name}`."
+                    f"Found {len(missing_images)} missing Docker images."
                 )
-                client.images.pull(image_name)
+                for i, image_name in enumerate(missing_images):
+                    self.logger.warning(
+                        f"Pulling Docker image {i + 1}/{len(missing_images)} `{image_name}`."
+                    )
+                    client.images.pull(image_name)
 
         return dataset
 
