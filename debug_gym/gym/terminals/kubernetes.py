@@ -308,6 +308,10 @@ class KubernetesTerminal(Terminal):
                 )
 
                 if pod.status.phase == "Running":
+                    # Log on which node the pod is running.
+                    self.logger.debug(
+                        f"Pod {self.pod_name} is running on node {pod.spec.node_name}."
+                    )
                     return
                 elif pod.status.phase in ["Failed", "Unknown"]:
                     raise ValueError(
