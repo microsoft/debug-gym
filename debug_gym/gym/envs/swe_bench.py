@@ -57,21 +57,22 @@ class SWEBenchEnv(RepoEnv):
             f"sweb.eval.x86_64.{id.replace('__', '_1776_')}" for id in instance_ids
         )
 
-        # Download all images needed for SWE-Bench.
-        client = docker.from_env()
-        tagged_image_names = set(f"swebench/{name}:latest" for name in image_names)
+        if not isinstance(self.terminal, KubernetesTerminal):
+            # Download all images needed for SWE-Bench.
+            client = docker.from_env()
+            tagged_image_names = set(f"swebench/{name}:latest" for name in image_names)
 
-        existing_images = set(
-            tag for image in client.images.list() for tag in image.tags
-        )
-        missing_images = tagged_image_names - existing_images
-        if missing_images:
-            self.logger.info(f"Found {len(missing_images)} missing Docker images.")
-            for i, image_name in enumerate(missing_images):
-                self.logger.info(
-                    f"Pulling Docker images {i + 1}/{len(missing_images)}: `{image_name}`."
-                )
-                client.images.pull(image_name)
+            existing_images = set(
+                tag for image in client.images.list() for tag in image.tags
+            )
+            missing_images = tagged_image_names - existing_images
+            if missing_images:
+                self.logger.info(f"Found {len(missing_images)} missing Docker images.")
+                for i, image_name in enumerate(missing_images):
+                    self.logger.info(
+                        f"Pulling Docker images {i + 1}/{len(missing_images)}: `{image_name}`."
+                    )
+                    client.images.pull(image_name)
 
         return dataset
 

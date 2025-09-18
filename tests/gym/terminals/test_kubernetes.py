@@ -39,19 +39,20 @@ def test_kubernetes_terminal_init():
     assert os.path.basename(terminal.working_dir).startswith("Terminal-")
     assert terminal.base_image == "ubuntu:latest"
     assert terminal.namespace == "default"
-    assert terminal.pod_name.startswith("debug-gym.")
-    # Pod should not be created until accessed
-    assert not terminal._pod_created
 
-    # Create pod.
-    pod = terminal.pod
-    assert pod is not None
-    assert terminal.is_running()
+    # Pod should not be created until accessed
+    assert terminal._pod is None
+    assert terminal.pod_name.startswith("dbg-gym.")
+
+    # Assessing the pod_name will create the pod.
+    assert terminal.pod.is_running()
+    assert terminal.pod.exists()
 
     # Close pod.
     terminal.close()
     time.sleep(5 + 1)  # wait for pod to terminate, i.e., grace_period_seconds
     assert not terminal.is_running()
+    assert not terminal.pod_exists()
 
 
 @if_kubernetes_available

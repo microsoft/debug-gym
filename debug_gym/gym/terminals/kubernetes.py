@@ -16,15 +16,91 @@ from kubernetes.stream.ws_client import ERROR_CHANNEL
 
 def _clean_pod_name(name: str) -> str:
     """Clean pod name to conform to Kubernetes naming conventions."""
-    # Replace any non-alphanumeric characters with hyphens and convert to lowercase.
-    # regex used for validation is
-    regex = r"[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*"
     # replace any characters not in the regex with hyphens
     cleaned = "".join(c if c.isalnum() or c in "-." else "-" for c in name).lower()
     # ensure it starts and ends with alphanumeric character
     cleaned = cleaned.strip("-").strip(".")
     # truncate to 253 characters
     return cleaned[:253]
+
+
+class Pod:
+    def __init__(self, k8s_client, pod_body: dict, logger: DebugGymLogger):
+        self.k8s_client = k8s_client
+        self.pod_body = pod_body
+        self.name = self.pod_body["metadata"]["name"]
+        self.namespace = self.pod_body["metadata"]["namespace"]
+        self.logger = logger
+
+        try:
+            self.k8s_client.create_namespaced_pod(
+                namespace=self.namespace, body=self.pod_body
+            )
+        except ApiException as e:
+            raise ValueError(f"Failed to create pod: {e}")
+
+    def exists(self) -> bool:
+        """Check if the pod exists in the namespace."""
+        try:
+            self.k8s_client.read_namespaced_pod(
+                name=self.name, namespace=self.namespace
+            )
+            return True
+        except ApiException as e:
+            if e.status == 404:
+                return False
+            self.logger.debug(f"Error checking pod existence: {e}")
+            return False
+
+    def is_running(self) -> bool:
+        """Check if the pod is currently running."""
+        try:
+            pod = self.k8s_client.read_namespaced_pod(
+                name=self.name, namespace=self.namespace
+            )
+            return pod.status.phase == "Running"
+        except ApiException as e:
+            if e.status == 404:
+                return False
+            self.logger.debug(f"Error checking pod status: {e}")
+            return False
+
+    def wait_for_pod_ready(self, timeout: int = 3600 * 2):
+        """Wait for the pod to be in Running state."""
+        start_time = time.time()
+        while time.time() - start_time < timeout:
+            try:
+                pod = self.k8s_client.read_namespaced_pod(
+                    name=self.name, namespace=self.namespace
+                )
+
+                if pod.status.phase == "Running":
+                    # Log on which node the pod is running.
+                    self.logger.debug(
+                        f"Pod {self.name} is running on node {pod.spec.node_name}."
+                    )
+                    return
+                elif pod.status.phase in ["Failed", "Unknown"]:
+                    raise ValueError(f"Pod {self.name} is in {pod.status.phase} state.")
+                elif pod.status.phase == "Pending":
+                    self.logger.debug(f"Pod {self.name} is still pending...")
+                    time.sleep(60)
+                elif pod.status.phase == "Succeeded":
+                    raise ValueError(
+                        f"Pod {self.name} has already succeeded unexpectedly."
+                    )
+                else:
+                    self.logger.debug(
+                        f"Pod {self.name} is in {pod.status.phase} state..."
+                    )
+                    time.sleep(5)
+
+            except ApiException as e:
+                self.logger.debug(f"Error checking pod status: {e}")
+
+        raise ValueError(
+            f"Pod {self.name} did not become ready within {timeout} seconds"
+        )
 
 
 class KubernetesTerminal(Terminal):
@@ -36,22 +112,17 @@ class KubernetesTerminal(Terminal):
         env_vars: dict[str, str] | None = None,
         include_os_env_vars: bool = False,
         logger: DebugGymLogger | None = None,
-        # Kubernetes-specific parameters
-        base_image: str = "ubuntu:latest",
         setup_commands: list[str] | None = None,
+        # Kubernetes-specific parameters
+        pod_name: str | None = None,
+        base_image: str = "ubuntu:latest",
+        registry: str = "docker.io/",
         namespace: str = "default",
         kube_config: str | None = None,
+        uuid: str | None = None,
+        pod_spec_kwargs: dict = None,
         **kwargs,
     ):
-        """
-        Kubernetes Terminal that manages a pod instead of a Docker container.
-
-        Args:
-            base_image: The container image to use for the pod
-            setup_commands: Commands to run after pod creation
-            namespace: Kubernetes namespace to create the pod in
-            pod_name: Custom pod name (auto-generated if None)
-        """
         super().__init__(
             working_dir=working_dir,
             session_commands=session_commands,
@@ -64,16 +135,24 @@ class KubernetesTerminal(Terminal):
         self._task_name = base_image
         self.setup_commands = setup_commands or []
         self.namespace = namespace
-        self._pod_name = None
+        self.kubernetes_kwargs = kwargs  # e.g., nodeSelector, tolerations
+        self.registry = registry.rstrip("/")
+        self.pod_name = pod_name or f"dbg-gym.{str(uuid.uuid4())[:8]}"
+        self.pod_spec_kwargs = pod_spec_kwargs or {}
+        self.labels = ({"app": "debug-gym", "component": "terminal", "uuid": uuid},)
+        self._pod = None
 
         # Initialize Kubernetes client
-        self.kube_config = kube_config or os.getenv(
-            "KUBECONFIG", str(Path.home() / ".kube" / "config")
-        )  # TODO: debugging
-        if self.kube_config:
-            config.load_kube_config(self.kube_config)
-        else:
+        self.kube_config = kube_config
+        if self.kube_config == "incluster":
+            self.kube_config = None
             config.load_incluster_config()
+        else:
+            self.kube_config = self.kube_config or os.environ.get(
+                "KUBECONFIG", "~/.kube/config"
+            )
+            self.kube_config = os.path.expanduser(self.kube_config)
+            config.load_kube_config(self.kube_config)
 
         self.k8s_client = client.CoreV1Api()
 
@@ -83,7 +162,8 @@ class KubernetesTerminal(Terminal):
 
     @task_name.setter
     def task_name(self, value):
-        if self._pod_name is not None:
+        # if self._pod_name is not None:
+        if self.is_running():
             raise ValueError("Cannot change task_name while pod is running.")
 
         self._task_name = value
@@ -95,45 +175,41 @@ class KubernetesTerminal(Terminal):
 
     @working_dir.setter
     def working_dir(self, value):
-        if self._pod_name:
+        if self.is_running():
+            # if self._pod_name is not None:
             raise ValueError("Cannot change working directory while pod is running.")
 
         self._working_dir = value
 
+    # @property
+    # def pod_name(self):
+    #     """Lazy initialization of the pod."""
+    #     if self._pod_name is None:
+    #         self.setup_pod()
+
+    #     return self._pod_name
+
     @property
-    def pod_name(self):
+    def pod(self):
         """Lazy initialization of the pod."""
-        if self._pod_name is None:
+        if self._pod is None:
             self.setup_pod()
 
-        return self._pod_name
+        return self._pod
 
     @property
     def default_shell_command(self) -> list[str]:
-        """Expects the pod to have bash installed and python executable available."""
-        # TODO: if self.kubeconfig is None, remove the --kubeconfig argument
-        entrypoint = [
-            "kubectl",
-            "--kubeconfig",
-            self.kube_config,
-            "exec",
-            "-it",
-            f"{self.pod_name}",
-            "-n",
-            self.namespace,
-            "--",
-            "/bin/bash",
-            "--noprofile",
-            "--norc",
-        ]
-        return entrypoint
+        """Expects the pod to have bash installed."""
+        kubeconfig = f"--kubeconfig {self.kube_config}" if self.kube_config else ""
+        bash_cmd = "/bin/bash --noprofile --norc"
+        return f"kubectl {kubeconfig} exec -it {self.pod.name} -n {self.pod.namespace} -- {bash_cmd}"
 
     def new_shell_session(self):
         if not self.is_running():
             raise ValueError("Pod is not running. Cannot create shell session.")
 
         session = ShellSession(
-            shell_command=" ".join(self.default_shell_command),
+            shell_command=self.default_shell_command,
             session_commands=[DISABLE_ECHO_COMMAND] + self.session_commands,
             working_dir=".",
             env_vars=self.env_vars,
@@ -141,6 +217,30 @@ class KubernetesTerminal(Terminal):
         )
         self.sessions.append(session)
         return session
+
+    def prepare_command(self, entrypoint: str | list[str]) -> list[str]:
+        """Prepares a shell command by combining session commands and entrypoint commands.
+        Then wraps the command in a shell call."""
+        if isinstance(entrypoint, str):
+            entrypoint = [entrypoint]
+        if self.session_commands:
+            entrypoint = self.session_commands + entrypoint
+        entrypoint_str = " && ".join(entrypoint)
+
+        # Set environment variables by prefixing the command
+        env_prefix = ""
+        if self.env_vars:
+            env_vars_str = " ".join([f'{k}="{v}"' for k, v in self.env_vars.items()])
+            env_prefix = f"export {env_vars_str} && "
+
+        # Build the full command with environment variables and working directory
+        command = entrypoint_str
+        if self.working_dir and self.working_dir != "/":
+            command = f"cd {self.working_dir} && {env_prefix}{command}"
+        elif env_prefix:
+            command = f"{env_prefix}{command}"
+
+        return command
 
     def run(
         self,
@@ -150,39 +250,20 @@ class KubernetesTerminal(Terminal):
         strip_output: bool = True,
     ) -> tuple[bool, str]:
         """Run a command in the pod. Return command status and output."""
-        if isinstance(entrypoint, str):
-            entrypoint = [entrypoint]
-        if self.session_commands:
-            entrypoint = self.session_commands + entrypoint
-        entrypoint_str = " && ".join(entrypoint)
-
-        if not self.is_running():
+        if not self.pod.is_running():
             raise ValueError("Pod is not running. Cannot run commands.")
 
-        self.logger.debug(f"[{self.pod_name}] Kubernetes exec run: {entrypoint_str}")
+        command = self.prepare_command(entrypoint)
+
+        self.logger.debug(f"[{self.pod.name}] Kubernetes exec run: {command}")
 
         try:
-            # Set environment variables by prefixing the command
-            env_prefix = ""
-            if self.env_vars:
-                env_vars_str = " ".join(
-                    [f'{k}="{v}"' for k, v in self.env_vars.items()]
-                )
-                env_prefix = f"export {env_vars_str} && "
-
-            # Build the full command with environment variables and working directory
-            full_command = entrypoint_str
-            if self.working_dir and self.working_dir != "/":
-                full_command = f"cd {self.working_dir} && {env_prefix}{full_command}"
-            elif env_prefix:
-                full_command = f"{env_prefix}{full_command}"
-
             # Execute command using Kubernetes stream API
             resp = stream.stream(
                 self.k8s_client.connect_get_namespaced_pod_exec,
-                name=self.pod_name,
-                namespace=self.namespace,
-                command=["/bin/bash", "-c", full_command],
+                name=self.pod.name,
+                namespace=self.pod.namespace,
+                command=["/bin/bash", "-c", command],
                 stderr=True,
                 stdin=False,
                 stdout=True,
@@ -200,7 +281,7 @@ class KubernetesTerminal(Terminal):
 
             # Get the exit code
             error_channel = resp.read_channel(ERROR_CHANNEL)  # Error channel
-            self.logger.debug(f"[{self.pod_name}] error channel: {error_channel}")
+            self.logger.debug(f"[{self.pod.name}] error channel: {error_channel}")
             status = json.loads(error_channel)
             success = status["status"] == "Success"
 
@@ -212,193 +293,183 @@ class KubernetesTerminal(Terminal):
             output = output.strip("\r\n").strip("\n")
 
         if raises and not success:
-            self.logger.debug(f"Failed to run command `{entrypoint_str}`:\n{output}")
-            raise ValueError(f"Failed to run command `{entrypoint}`:\n{output}")
+            self.logger.error(f"Failed to run command `{command}`:\n{output}")
+            raise ValueError(f"Failed to run command `{entrypoint}`")
 
-        self.logger.debug(f"Output from pod with success `{success}`:\n{output}")
+        self.logger.debug(f"[{self.pod.name}] Output success `{success}`:\n{output}")
         return success, output
 
     def setup_pod(self) -> None:
         """Create and start a Kubernetes pod."""
 
-        self._pod_name = _clean_pod_name(
-            f"debug-gym.{self.task_name}.{str(uuid.uuid4())[:8]}"
+        pod_name = _clean_pod_name(
+            self.pod_name or f"dbg-gym.{self.task_name}.{str(uuid.uuid4())[:8]}"
         )
         self.logger.debug(
-            f"Setting up pod {self.pod_name} with base image: {self.base_image}"
+            f"Setting up pod {pod_name} with base image: {self.base_image}"
         )
 
-        # Create pod specification using Kubernetes Python client objects
-        pod_spec = client.V1PodSpec(
-            containers=[
-                client.V1Container(
-                    name="main",
-                    # image=f"debuggymacr.azurecr.io/{self.base_image}",
-                    image=f"{self.base_image}",
-                    image_pull_policy="IfNotPresent",
-                    command=["/bin/bash"],
-                    args=["-c", "sleep infinity"],
-                    working_dir=self.working_dir or "/",
-                    env=[
-                        client.V1EnvVar(name=k, value=v)
-                        for k, v in self.env_vars.items()
-                    ],
-                    resources=client.V1ResourceRequirements(
-                        limits={"memory": "16Gi", "cpu": "2"},
-                        requests={"memory": "1Gi", "cpu": "0.5"},
-                    ),
-                    stdin=True,
-                    stdin_once=False,
-                    tty=True,
-                )
-            ],
-            restart_policy="Never",
-            image_pull_secrets=[{"name": "dockerhub-pro"}],
-            tolerations=[
-                client.V1Toleration(
-                    key="kubernetes.azure.com/scalesetpriority",
-                    operator="Equal",
-                    value="spot",
-                    effect="NoSchedule",
-                ),
-                client.V1Toleration(
-                    key="CriticalAddonsOnly",
-                    operator="Equal",
-                    value="true",
-                    effect="NoSchedule",
-                ),
-            ],
-        )
-
-        pod_metadata = client.V1ObjectMeta(
-            name=self.pod_name,
-            namespace=self.namespace,
-            labels={"app": "debug-gym", "component": "terminal"},
-        )
-
-        pod_body = client.V1Pod(
-            api_version="v1", kind="Pod", metadata=pod_metadata, spec=pod_spec
-        )
+        # Create pod specification for Kubernetes.
+        pod_body = {
+            "apiVersion": "v1",
+            "kind": "Pod",
+            "metadata": {
+                "name": pod_name,
+                "namespace": self.namespace,
+                "labels": self.labels,
+            },
+            "spec": {
+                "restartPolicy": "Never",
+                "containers": [
+                    {
+                        "name": "main",
+                        "image": f"{self.registry}/{self.base_image}",
+                        "image_pull_policy": "IfNotPresent",
+                        "command": ["/bin/bash"],
+                        "args": ["-c", "sleep infinity"],
+                        "working_dir": self.working_dir,
+                        "stdin": True,
+                        "stdin_once": False,
+                        "tty": True,
+                        "env": [
+                            {"name": k, "value": v} for k, v in self.env_vars.items()
+                        ],
+                        "resources": {
+                            "requests": {"cpu": "0.5", "memory": "1Gi"},
+                            "limits": {"cpu": "2", "memory": "8Gi"},
+                        },
+                    }
+                ],
+                **self.pod_spec_kwargs,  # e.g., nodeSelector, tolerations
+            },
+        }
 
         try:
-            # Create the pod
-            self.k8s_client.create_namespaced_pod(
-                namespace=self.namespace, body=pod_body
-            )
+            # # Create the pod
+            # self.k8s_client.create_namespaced_pod(
+            #     namespace=self.namespace, body=pod_body
+            # )
 
             # Wait for pod to be ready
-            self._wait_for_pod_ready()
+            # self._wait_for_pod_ready()
+
+            self._pod = Pod(self.k8s_client, pod_body, logger=self.logger)
+            # self._pod.create(pod_body)
+            # self._pod.wait_for_pod_ready()
 
             # Run setup commands
             self._run_setup_commands()
 
-            self.logger.debug(f"Pod {self.pod_name} started successfully.")
+            self.logger.debug(f"Pod {self.pod.name} started successfully.")
             atexit.register(self.clean_up)
 
         except ApiException as e:
             raise ValueError(f"Failed to create pod: {e}")
 
-    def _wait_for_pod_ready(self, timeout: int = 3600 * 2):
-        """Wait for the pod to be in Running state."""
-        start_time = time.time()
-        while time.time() - start_time < timeout:
-            try:
-                pod = self.k8s_client.read_namespaced_pod(
-                    name=self.pod_name, namespace=self.namespace
-                )
+    # def _wait_for_pod_ready(self, timeout: int = 3600 * 2):
+    #     """Wait for the pod to be in Running state."""
+    #     start_time = time.time()
+    #     while time.time() - start_time < timeout:
+    #         try:
+    #             pod = self.k8s_client.read_namespaced_pod(
+    #                 name=self.pod_name, namespace=self.namespace
+    #             )
 
-                if pod.status.phase == "Running":
-                    # Log on which node the pod is running.
-                    self.logger.debug(
-                        f"Pod {self.pod_name} is running on node {pod.spec.node_name}."
-                    )
-                    return
-                elif pod.status.phase in ["Failed", "Unknown"]:
-                    raise ValueError(
-                        f"Pod {self.pod_name} is in {pod.status.phase} state."
-                    )
-                elif pod.status.phase == "Pending":
-                    self.logger.debug(f"Pod {self.pod_name} is still pending...")
-                    time.sleep(60)
-                elif pod.status.phase == "Succeeded":
-                    raise ValueError(
-                        f"Pod {self.pod_name} has already succeeded unexpectedly."
-                    )
-                else:
-                    self.logger.debug(
-                        f"Pod {self.pod_name} is in {pod.status.phase} state..."
-                    )
-                    time.sleep(5)
+    #             if pod.status.phase == "Running":
+    #                 # Log on which node the pod is running.
+    #                 self.logger.debug(
+    #                     f"Pod {self.pod_name} is running on node {pod.spec.node_name}."
+    #                 )
+    #                 return
+    #             elif pod.status.phase in ["Failed", "Unknown"]:
+    #                 raise ValueError(
+    #                     f"Pod {self.pod_name} is in {pod.status.phase} state."
+    #                 )
+    #             elif pod.status.phase == "Pending":
+    #                 self.logger.debug(f"Pod {self.pod_name} is still pending...")
+    #                 time.sleep(60)
+    #             elif pod.status.phase == "Succeeded":
+    #                 raise ValueError(
+    #                     f"Pod {self.pod_name} has already succeeded unexpectedly."
+    #                 )
+    #             else:
+    #                 self.logger.debug(
+    #                     f"Pod {self.pod_name} is in {pod.status.phase} state..."
+    #                 )
+    #                 time.sleep(5)
 
-            except ApiException as e:
-                self.logger.debug(f"Error checking pod status: {e}")
+    #         except ApiException as e:
+    #             self.logger.debug(f"Error checking pod status: {e}")
 
-        raise ValueError(
-            f"Pod {self.pod_name} did not become ready within {timeout} seconds"
-        )
+    #     raise ValueError(
+    #         f"Pod {self.pod_name} did not become ready within {timeout} seconds"
+    #     )
 
     def _run_setup_commands(self):
         """Run setup commands if any. If commands fail, delete the pod."""
-        if self.setup_commands:
-            setup_commands = " && ".join(self.setup_commands)
-            self.logger.debug(
-                f"Pod {self.pod_name} Running setup commands: {setup_commands}"
-            )
+        if not self.setup_commands:
+            return
 
-            success, output = self.run(setup_commands)
-            if not success:
-                self.clean_up()
-                raise ValueError(
-                    f"Failed to run setup command: {setup_commands}\n"
-                    f"Output: {output}"
-                )
-            self.logger.debug("Setup commands ran successfully.")
+        setup_commands = " && ".join(self.setup_commands)
+        success, output = self.run(setup_commands, raises=True)
+        if not success:
+            self.clean_up()
+            raise ValueError(
+                f"Failed to run setup command: {setup_commands}\n" f"Output: {output}"
+            )
+        self.logger.debug("Setup commands ran successfully.")
 
     def clean_up(self):
         """Clean up the Kubernetes pod."""
-        if self.pod_exists():
-            try:
-                self.k8s_client.delete_namespaced_pod(
-                    name=self.pod_name, namespace=self.namespace, grace_period_seconds=5
-                )
-                self.logger.debug(f"Pod {self.pod_name} deleted successfully.")
-            except ApiException as e:
-                if e.status != 404:  # Ignore not found errors
-                    self.logger.debug(f"Failed to delete pod {self.pod_name}: {e}")
-            except Exception as e:
-                self.logger.debug(f"Error during pod cleanup: {e}")
-            finally:
-                self._pod_name = None
+        if not self.pod.exists():
+            return
+
+        try:
+            self.k8s_client.delete_namespaced_pod(
+                name=self.pod.name, namespace=self.pod.namespace, grace_period_seconds=5
+            )
+            self.logger.debug(f"Pod {self.pod.name} deleted successfully.")
+        except ApiException as e:
+            if e.status != 404:  # Ignore not found errors
+                self.logger.debug(f"Failed to delete pod {self.pod.name}: {e}")
+        except Exception as e:
+            self.logger.debug(f"Error during pod cleanup: {e}")
+        finally:
+            # self._pod_name = None
+            self._pod = None
 
     def close(self):
         super().close()
         self.clean_up()
 
-    def pod_exists(self) -> bool:
-        """Check if the pod exists in the namespace."""
-        try:
-            self.k8s_client.read_namespaced_pod(
-                name=self.pod_name, namespace=self.namespace
-            )
-            return True
-        except ApiException as e:
-            if e.status == 404:
-                return False
-            self.logger.debug(f"Error checking pod existence: {e}")
-            return False
+    # def pod_exists(self) -> bool:
+    #     """Check if the pod exists in the namespace."""
+    #     if self._pod_name is None:
+    #         return False
 
-    def is_running(self) -> bool:
-        """Check if the pod is currently running."""
-        try:
-            pod = self.k8s_client.read_namespaced_pod(
-                name=self.pod_name, namespace=self.namespace
-            )
-            return pod.status.phase == "Running"
-        except ApiException as e:
-            if e.status == 404:
-                return False
-            self.logger.debug(f"Error checking pod status: {e}")
-            return False
+    #     try:
+    #         self.k8s_client.read_namespaced_pod(
+    #             name=self._pod_name, namespace=self.namespace
+    #         )
+    #         return True
+    #     except ApiException as e:
+    #         if e.status == 404:
+    #             return False
+    #         self.logger.debug(f"Error checking pod existence: {e}")
+    #         return False
+
+    # def is_running(self) -> bool:
+    #     """Check if the pod is currently running."""
+    #     try:
+    #         pod = self.k8s_client.read_namespaced_pod(
+    #             name=self.pod_name, namespace=self.namespace
+    #         )
+    #         return pod.status.phase == "Running"
+    #     except ApiException as e:
+    #         if e.status == 404:
+    #             return False
+    #         self.logger.debug(f"Error checking pod status: {e}")
+    #         return False
 
     def __str__(self):
         return f"KubernetesTerminal[{self.pod_name}, {self.working_dir}]"
@@ -409,7 +480,7 @@ class KubernetesTerminal(Terminal):
         kubectl cp natively handles both files and directories, so we can
         simplify this to a single command rather than iterating through files.
         """
-        if not self.is_running():
+        if not self.pod.is_running():
             raise ValueError("Pod is not running. Cannot copy files.")
 
         src = str(src)
@@ -418,7 +489,7 @@ class KubernetesTerminal(Terminal):
         if not os.path.isdir(src):
             raise ValueError(f"Source {src} must be a directory.")
 
-        self.logger.debug(f"[{self.pod_name}] Copying {src} to {target}.")
+        self.logger.debug(f"[{self.pod.name}] Copying {src} to {target}.")
 
         try:
             # kubectl cp can handle both files and directories natively
@@ -433,7 +504,7 @@ class KubernetesTerminal(Terminal):
                     self.kube_config,
                     "cp",
                     f"{src}/.",
-                    f"{self.namespace}/{self.pod_name}:{target}",
+                    f"{self.pod.namespace}/{self.pod.name}:{target}",
                 ],
                 capture_output=True,
                 text=True,

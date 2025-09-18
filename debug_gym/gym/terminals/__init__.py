@@ -5,7 +5,9 @@ from debug_gym.logger import DebugGymLogger
 
 
 def select_terminal(
-    terminal_config: dict | None = None, logger: DebugGymLogger | None = None
+    terminal_config: dict | None = None,
+    logger: DebugGymLogger | None = None,
+    uuid: str | None = None,
 ) -> Terminal | None:
     if terminal_config is None:
         return None
@@ -25,4 +27,8 @@ def select_terminal(
         case _:
             raise ValueError(f"Unknown terminal {terminal_type}")
 
-    return terminal_class(**terminal_config, logger=logger)
+    return terminal_class(
+        **terminal_config,
+        logger=logger,
+        uuid=uuid,
+    )

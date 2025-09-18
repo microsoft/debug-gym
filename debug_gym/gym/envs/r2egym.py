@@ -196,6 +196,7 @@ class R2EGymEnv(RepoEnv):
         self.git_apply_cmd = f"git apply -"
 
     def setup_workspace(self):
+        self.terminal.task_name = self.task_name
         self.terminal.base_image = self.base_image
         # Ignore hidden files (dotfiles) and any contents under hidden directories
         self.workspace.reset(ignore_patterns=["**/.*"])

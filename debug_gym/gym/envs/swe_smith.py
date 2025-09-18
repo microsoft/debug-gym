@@ -15,6 +15,7 @@ from swesmith.utils import get_repo_commit_from_image_name
 from debug_gym.constants import DEBUG_GYM_CACHE_DIR
 from debug_gym.gym.entities import EvalOutput
 from debug_gym.gym.envs.swe_bench import SWEBenchEnv
+from debug_gym.gym.terminals.kubernetes import KubernetesTerminal
 from debug_gym.gym.terminals.terminal import Terminal
 from debug_gym.gym.utils import filter_problems
 
@@ -70,24 +71,27 @@ class SWESmithEnv(SWEBenchEnv):
             f"Loaded {len(dataset)} tasks accross {len(image_names)} Docker images from {self.dataset_id}."
         )
 
-        # Download all images needed for SWE-Smith.
-        client = docker.from_env()
-        tagged_image_names = set(f"{DOCKER_ORG}/{name}:{TAG}" for name in image_names)
+        if not isinstance(self.terminal, KubernetesTerminal):
+            # Download all images needed for SWE-Smith.
+            client = docker.from_env()
+            tagged_image_names = set(
+                f"{DOCKER_ORG}/{name}:{TAG}" for name in image_names
+            )
 
-        existing_images = set(
-            tag for image in client.images.list() for tag in image.tags
-        )
-        missing_images = tagged_image_names - existing_images
-        if missing_images:
-            self.logger.info(f"Found {len(missing_images)} missing Docker images.")
-            for image_name in missing_images:
-                docker_hub_image = image_name.replace("__", "_1776_")
-                self.logger.info(
-                    f"Pulling Docker image `{docker_hub_image}` to `{image_name}`."
-                )
-                client.images.pull(docker_hub_image)
-                # Rename images via tagging
-                client.images.get(docker_hub_image).tag(image_name)
+            existing_images = set(
+                tag for image in client.images.list() for tag in image.tags
+            )
+            missing_images = tagged_image_names - existing_images
+            if missing_images:
+                self.logger.info(f"Found {len(missing_images)} missing Docker images.")
+                for image_name in missing_images:
+                    docker_hub_image = image_name.replace("__", "_1776_")
+                    self.logger.info(
+                        f"Pulling Docker image `{docker_hub_image}` to `{image_name}`."
+                    )
+                    client.images.pull(docker_hub_image)
+                    # Rename images via tagging
+                    client.images.get(docker_hub_image).tag(image_name)
 
         return dataset
 
