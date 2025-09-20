@@ -161,52 +161,59 @@ class KubernetesTerminal(Terminal):
 
         self.logger.debug(f"[{self.pod_name}] Kubernetes exec run: {entrypoint_str}")
 
-        try:
-            # Set environment variables by prefixing the command
-            env_prefix = ""
-            if self.env_vars:
-                env_vars_str = " ".join(
-                    [f'{k}="{v}"' for k, v in self.env_vars.items()]
+        for _ in range(3):
+            try:
+                # Set environment variables by prefixing the command
+                env_prefix = ""
+                if self.env_vars:
+                    env_vars_str = " ".join(
+                        [f'{k}="{v}"' for k, v in self.env_vars.items()]
+                    )
+                    env_prefix = f"export {env_vars_str} && "
+
+                # Build the full command with environment variables and working directory
+                full_command = entrypoint_str
+                if self.working_dir and self.working_dir != "/":
+                    full_command = (
+                        f"cd {self.working_dir} && {env_prefix}{full_command}"
+                    )
+                elif env_prefix:
+                    full_command = f"{env_prefix}{full_command}"
+
+                # Execute command using Kubernetes stream API
+                resp = stream.stream(
+                    self.k8s_client.connect_get_namespaced_pod_exec,
+                    name=self.pod_name,
+                    namespace=self.namespace,
+                    command=["/bin/bash", "-c", full_command],
+                    stderr=True,
+                    stdin=False,
+                    stdout=True,
+                    tty=False,
+                    _preload_content=False,
                 )
-                env_prefix = f"export {env_vars_str} && "
 
-            # Build the full command with environment variables and working directory
-            full_command = entrypoint_str
-            if self.working_dir and self.working_dir != "/":
-                full_command = f"cd {self.working_dir} && {env_prefix}{full_command}"
-            elif env_prefix:
-                full_command = f"{env_prefix}{full_command}"
+                output = ""
+                while resp.is_open():
+                    resp.update(timeout=1)
+                    if resp.peek_stdout():
+                        output += resp.read_stdout()
+                    if resp.peek_stderr():
+                        output += resp.read_stderr()
 
-            # Execute command using Kubernetes stream API
-            resp = stream.stream(
-                self.k8s_client.connect_get_namespaced_pod_exec,
-                name=self.pod_name,
-                namespace=self.namespace,
-                command=["/bin/bash", "-c", full_command],
-                stderr=True,
-                stdin=False,
-                stdout=True,
-                tty=False,
-                _preload_content=False,
-            )
+                # Get the exit code
+                error_channel = resp.read_channel(ERROR_CHANNEL)  # Error channel
+                self.logger.debug(f"[{self.pod_name}] error channel: {error_channel}")
+                status = json.loads(error_channel)
+                success = status["status"] == "Success"
+                break  # Command executed successfully, exit the retry loop
 
-            output = ""
-            while resp.is_open():
-                resp.update(timeout=1)
-                if resp.peek_stdout():
-                    output += resp.read_stdout()
-                if resp.peek_stderr():
-                    output += resp.read_stderr()
-
-            # Get the exit code
-            error_channel = resp.read_channel(ERROR_CHANNEL)  # Error channel
-            self.logger.debug(f"[{self.pod_name}] error channel: {error_channel}")
-            status = json.loads(error_channel)
-            success = status["status"] == "Success"
-
-        except Exception as e:
-            success = False
-            output = f"Command execution failed: {str(e)}"
+            except Exception as e:
+                success = False
+                self.logger.debug(
+                    f"[{self.pod_name}] Exception during command execution: {e}"
+                )
+                output = f"Command execution failed: {str(e)}"
 
         if strip_output:
             output = output.strip("\r\n").strip("\n")
@@ -252,6 +259,7 @@ class KubernetesTerminal(Terminal):
                     tty=True,
                 )
             ],
+            active_deadline_seconds=3600 * 12,  # half a day
             restart_policy="Never",
             image_pull_secrets=[{"name": "dockerhub-pro"}],
             tolerations=[
