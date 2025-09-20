@@ -13,6 +13,8 @@ from kubernetes import client, config, stream
 from kubernetes.client.rest import ApiException
 from kubernetes.stream.ws_client import ERROR_CHANNEL
 
+NB_RETRIES_RUN = 3  # Number of retries for running a command
+
 
 def _clean_pod_name(name: str) -> str:
     """Clean pod name to conform to Kubernetes naming conventions."""
@@ -257,37 +259,42 @@ class KubernetesTerminal(Terminal):
 
         self.logger.debug(f"[{self.pod.name}] Kubernetes exec run: {command}")
 
-        try:
-            # Execute command using Kubernetes stream API
-            resp = stream.stream(
-                self.k8s_client.connect_get_namespaced_pod_exec,
-                name=self.pod.name,
-                namespace=self.pod.namespace,
-                command=["/bin/bash", "-c", command],
-                stderr=True,
-                stdin=False,
-                stdout=True,
-                tty=False,
-                _preload_content=False,
-            )
+        for _ in range(NB_RETRIES_RUN):
+            try:
+                # Execute command using Kubernetes stream API
+                resp = stream.stream(
+                    self.k8s_client.connect_get_namespaced_pod_exec,
+                    name=self.pod.name,
+                    namespace=self.pod.namespace,
+                    command=["/bin/bash", "-c", command],
+                    stderr=True,
+                    stdin=False,
+                    stdout=True,
+                    tty=False,
+                    _preload_content=False,
+                )
 
-            output = ""
-            while resp.is_open():
-                resp.update(timeout=1)
-                if resp.peek_stdout():
-                    output += resp.read_stdout()
-                if resp.peek_stderr():
-                    output += resp.read_stderr()
+                output = ""
+                while resp.is_open():
+                    resp.update(timeout=1)
+                    if resp.peek_stdout():
+                        output += resp.read_stdout()
+                    if resp.peek_stderr():
+                        output += resp.read_stderr()
 
-            # Get the exit code
-            error_channel = resp.read_channel(ERROR_CHANNEL)  # Error channel
-            self.logger.debug(f"[{self.pod.name}] error channel: {error_channel}")
-            status = json.loads(error_channel)
-            success = status["status"] == "Success"
+                # Get the exit code
+                error_channel = resp.read_channel(ERROR_CHANNEL)  # Error channel
+                self.logger.debug(f"[{self.pod.name}] error channel: {error_channel}")
+                status = json.loads(error_channel)
+                success = status["status"] == "Success"
+                break  # Command executed successfully, exit the retry loop
 
-        except Exception as e:
-            success = False
-            output = f"Command execution failed: {str(e)}"
+            except Exception as e:
+                success = False
+                self.logger.debug(
+                    f"[{self.pod.name}] Exception during command execution: {e}"
+                )
+                output = f"Command execution failed: {str(e)}"
 
         if strip_output:
             output = output.strip("\r\n").strip("\n")
@@ -319,6 +326,7 @@ class KubernetesTerminal(Terminal):
                 "labels": self.labels,
             },
             "spec": {
+                "activeDeadlineSeconds": 3600 * 12,  # half a day
                 "restartPolicy": "Never",
                 "containers": [
                     {
