@@ -11,7 +11,9 @@ from datasets import load_from_disk
 from debug_gym.constants import DEBUG_GYM_CACHE_DIR
 from debug_gym.gym.entities import EvalOutput
 from debug_gym.gym.envs.env import RepoEnv
-from debug_gym.gym.terminal import DockerTerminal, Terminal
+from debug_gym.gym.terminals.docker import DockerTerminal
+from debug_gym.gym.terminals.kubernetes import KubernetesTerminal
+from debug_gym.gym.terminals.terminal import Terminal
 from debug_gym.gym.utils import filter_problems
 
 
@@ -70,14 +72,15 @@ class R2EGymEnv(RepoEnv):
         **kwargs,
     ):
         terminal = terminal or DockerTerminal(logger=kwargs.get("logger"))
-        if not isinstance(terminal, DockerTerminal):
-            raise ValueError("R2EGymEnv only supports DockerTerminal.")
+        if not isinstance(terminal, (DockerTerminal, KubernetesTerminal)):
+            raise ValueError(
+                "R2EGymEnv only supports DockerTerminal and KubernetesTerminal."
+            )
 
         self.dataset_id = dataset_id
         self.dataset_revision = dataset_revision
         self.split = split
         self.session_commands = []
-        self.test_directives = []
 
         super().__init__(terminal=terminal, **kwargs)
 
@@ -86,10 +89,10 @@ class R2EGymEnv(RepoEnv):
         # try getting the content inside of [ISSUE] [/ISSUE] using regex tags for ds['problem_statement'] else return ds['problem_statement']
         # ref: https://github.com/R2E-Gym/R2E-Gym/blob/main/src/r2egym/agenthub/runtime/docker.py#L592
         try:
-            content = self.ds["problem_statement"]
+            content = self.ds_row["problem_statement"]
             return re.search(r"\[ISSUE\](.*)\[/ISSUE\]", content, re.DOTALL).group(1)
         except Exception as e:
-            return self.ds["problem_statement"]
+            return self.ds_row["problem_statement"]
 
     def load_dataset(self, problems: str | list[str] | None = None):
         if Path(self.dataset_id).is_file() and self.dataset_id.endswith(".json"):
@@ -122,20 +125,23 @@ class R2EGymEnv(RepoEnv):
             f"Loaded {len(dataset)} tasks accross {len(image_names)} Docker images from {self.dataset_id}."
         )
 
-        # Download all images needed for R2E-Gym.
-        client = docker.from_env()
+        if not isinstance(self.terminal, KubernetesTerminal):
+            # Download all images needed for R2E-Gym.
+            client = docker.from_env()
 
-        existing_images = set(
-            tag for image in client.images.list() for tag in image.tags
-        )
-        missing_images = image_names - existing_images
-        if missing_images:
-            self.logger.warning(f"Found {len(missing_images)} missing Docker images.")
-            for i, image_name in enumerate(missing_images):
+            existing_images = set(
+                tag for image in client.images.list() for tag in image.tags
+            )
+            missing_images = image_names - existing_images
+            if missing_images:
                 self.logger.warning(
-                    f"Pulling Docker image {i + 1}/{len(missing_images)} `{image_name}`."
+                    f"Found {len(missing_images)} missing Docker images."
                 )
-                client.images.pull(image_name)
+                for i, image_name in enumerate(missing_images):
+                    self.logger.warning(
+                        f"Pulling Docker image {i + 1}/{len(missing_images)} `{image_name}`."
+                    )
+                    client.images.pull(image_name)
 
         return dataset
 
@@ -189,9 +195,12 @@ class R2EGymEnv(RepoEnv):
         self.git_apply_cmd = f"git apply -"
 
     def setup_workspace(self):
+        self.terminal.task_name = self.task_name
         self.terminal.base_image = self.base_image
         # Ignore hidden files (dotfiles) and any contents under hidden directories
-        self.workspace.reset(ignore_patterns=["**/.*"])
+        self.workspace.reset(
+            ignore_patterns=["**/.*"], readonly_patterns=["r2e_tests/**"]
+        )
         self.set_entrypoints(self.entrypoint, self.debug_entrypoint)
 
     def setup_terminal(self):

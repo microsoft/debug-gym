@@ -16,12 +16,7 @@ base:
     }
     tools: ["pdb", "view", "rewrite"]
     terminal: {
-        type: "docker",  # "docker" or "local"
-        base_image: "python:3.12-slim",
-        # session_commands define commands that are always executed before starting a shell session or running a single command in the terminal.
-        # session_commands:["conda activate aider"],
-        # setup_commands define commands that are executed only once when the terminal is created. This is only supported for Docker terminal.
-        setup_commands: ["pip install pytest"],
+        type: "docker",  # "local", "docker", or "kubernetes"
     }
 
     # LLM configs

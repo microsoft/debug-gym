@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pytest
 
 from debug_gym.gym.entities import Observation
@@ -115,6 +117,37 @@ def test_reset_and_step(get_r2egym_env):
 |-- tools/
 |-- vendor/"""
     assert env_info.step_observation.observation.startswith(listdir_start)
+
+
+@pytest.if_docker_running
+def test_readonly_file(get_r2egym_env):
+    env = get_r2egym_env()
+    env_info = env.reset(
+        options={"task_name": "aiohttp_final:d7cd0613472fd4d9940e37f1c55921f6a1515324"}
+    )
+    assert env.workspace._is_readonly_func("/testbed/r2e_tests/test_1.py")
+
+    env.add_tool(Toolbox.get_tool("view"))
+    env.add_tool(Toolbox.get_tool("listdir"))
+
+    tool_call = ToolCall(
+        id="listdir_id", name="listdir", arguments={"path": "r2e_tests"}
+    )
+    env_info = env.step(tool_call)
+    assert f"|-- test_1.py (read-only)" in env_info.step_observation.observation
+
+    tool_call = ToolCall(
+        id="view_id", name="view", arguments={"path": "r2e_tests/test_1.py"}
+    )
+    env_info = env.step(tool_call)
+    assert (
+        f"Viewing `r2e_tests/test_1.py`"
+        in env_info.step_observation.observation.splitlines()[0]
+    )
+    assert (
+        "The file is read-only."
+        in env_info.step_observation.observation.splitlines()[0]
+    )
 
 
 @pytest.if_docker_running

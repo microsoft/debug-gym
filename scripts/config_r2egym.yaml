@@ -18,6 +18,25 @@ base:
     }
     terminal: {
         type: "docker",
+        container_registry: debuggymacr.azurecr.io,  # docker.io,
+        kube_config: "~/.kube/config",
+        namespace: "mtl-rl",
+        pod_spec_kwargs: {
+            tolerations: [
+                {
+                    key: "kubernetes.azure.com/scalesetpriority",
+                    operator: "Equal",
+                    value: "spot",
+                    effect: "NoSchedule",
+                },
+                {
+                    key: "CriticalAddonsOnly",
+                    operator: "Equal",
+                    value: "true",
+                    effect: "NoSchedule",
+                },
+            ]
+        }
     }
 
     # LLM configs

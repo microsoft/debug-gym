@@ -5,7 +5,8 @@ import debug_gym.gym.utils as utils
 from debug_gym.constants import DEBUG_GYM_CACHE_DIR
 from debug_gym.gym.entities import EvalOutput
 from debug_gym.gym.envs.env import RepoEnv
-from debug_gym.gym.terminal import DockerTerminal, Terminal
+from debug_gym.gym.terminals.docker import DockerTerminal
+from debug_gym.gym.terminals.terminal import Terminal
 
 DOCKER_MINI_NIGHTMARE_IMAGE_NAME = "debug-gym:mini-nightmare"
 
