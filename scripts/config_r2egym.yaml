@@ -18,7 +18,7 @@ base:
     }
     terminal: {
         type: "kubernetes",
-        container_registry: debuggymacr.azurecr.io,  # docker.io,
+        registry: debuggymacr.azurecr.io,  # docker.io,
         kube_config: "~/.kube/config",
         namespace: "mtl-rl",
         pod_spec_kwargs: {
