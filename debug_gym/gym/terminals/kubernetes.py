@@ -340,7 +340,7 @@ class KubernetesTerminal(Terminal):
                 "labels": self.labels,
             },
             "spec": {
-                "activeDeadlineSeconds": 3600 * 12,  # half a day
+                "activeDeadlineSeconds": 3600 * 24,  # a day
                 "restartPolicy": "Never",
                 "containers": [
                     {
