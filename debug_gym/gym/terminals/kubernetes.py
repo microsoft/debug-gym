@@ -393,7 +393,7 @@ class KubernetesTerminal(Terminal):
     def close(self):
         super().close()
         if self._pod is not None:
-            self.clean_up()
+            self._pod.clean_up()
             self._pod = None
 
     def __str__(self):
