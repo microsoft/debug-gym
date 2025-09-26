@@ -41,6 +41,9 @@ class Pod:
         except ApiException as e:
             raise ValueError(f"Failed to create pod: {e}")
 
+        atexit.register(self.clean_up)
+        self.wait_for_pod_ready()
+
     def exists(self) -> bool:
         """Check if the pod exists in the namespace."""
         try:
@@ -86,7 +89,7 @@ class Pod:
                     raise ValueError(f"Pod {self.name} is in {pod.status.phase} state.")
                 elif pod.status.phase == "Pending":
                     self.logger.debug(f"Pod {self.name} is still pending...")
-                    time.sleep(60)
+                    time.sleep(10)
                 elif pod.status.phase == "Succeeded":
                     raise ValueError(
                         f"Pod {self.name} has already succeeded unexpectedly."
@@ -103,6 +106,22 @@ class Pod:
         raise ValueError(
             f"Pod {self.name} did not become ready within {timeout} seconds"
         )
+
+    def clean_up(self):
+        """Clean up the Kubernetes pod."""
+        if self.exists():
+            return
+
+        try:
+            self.k8s_client.delete_namespaced_pod(
+                name=self.name, namespace=self.namespace, grace_period_seconds=5
+            )
+            self.logger.debug(f"Pod {self.name} deleted successfully.")
+        except ApiException as e:
+            if e.status != 404:  # Ignore not found errors
+                self.logger.debug(f"Failed to delete pod {self.name}: {e}")
+        except Exception as e:
+            self.logger.debug(f"Error during pod cleanup: {e}")
 
 
 class KubernetesTerminal(Terminal):
@@ -121,7 +140,7 @@ class KubernetesTerminal(Terminal):
         registry: str = "docker.io/",
         namespace: str = "default",
         kube_config: str | None = None,
-        uuid: str | None = None,
+        extra_labels: dict | None = None,
         pod_spec_kwargs: dict = None,
         **kwargs,
     ):
@@ -139,9 +158,11 @@ class KubernetesTerminal(Terminal):
         self.namespace = namespace
         self.kubernetes_kwargs = kwargs  # e.g., nodeSelector, tolerations
         self.registry = registry.rstrip("/")
-        self.pod_name = pod_name or f"dbg-gym.{str(uuid.uuid4())[:8]}"
+        self.pod_name = pod_name
         self.pod_spec_kwargs = pod_spec_kwargs or {}
-        self.labels = ({"app": "debug-gym", "component": "terminal", "uuid": uuid},)
+        self.labels = {"app": "debug-gym", "component": "terminal"} | (
+            extra_labels or {}
+        )
         self._pod = None
 
         # Initialize Kubernetes client
@@ -164,9 +185,8 @@ class KubernetesTerminal(Terminal):
 
     @task_name.setter
     def task_name(self, value):
-        # if self._pod_name is not None:
-        if self.is_running():
-            raise ValueError("Cannot change task_name while pod is running.")
+        if self._pod is not None:
+            raise ValueError("Cannot change task_name once the pod has been created.")
 
         self._task_name = value
 
@@ -177,19 +197,13 @@ class KubernetesTerminal(Terminal):
 
     @working_dir.setter
     def working_dir(self, value):
-        if self.is_running():
+        if self._pod is not None:
             # if self._pod_name is not None:
-            raise ValueError("Cannot change working directory while pod is running.")
+            raise ValueError(
+                "Cannot change working directory once the pod has been created."
+            )
 
         self._working_dir = value
-
-    # @property
-    # def pod_name(self):
-    #     """Lazy initialization of the pod."""
-    #     if self._pod_name is None:
-    #         self.setup_pod()
-
-    #     return self._pod_name
 
     @property
     def pod(self):
@@ -207,7 +221,7 @@ class KubernetesTerminal(Terminal):
         return f"kubectl {kubeconfig} exec -it {self.pod.name} -n {self.pod.namespace} -- {bash_cmd}"
 
     def new_shell_session(self):
-        if not self.is_running():
+        if not self.pod.is_running():
             raise ValueError("Pod is not running. Cannot create shell session.")
 
         session = ShellSession(
@@ -353,65 +367,14 @@ class KubernetesTerminal(Terminal):
         }
 
         try:
-            # # Create the pod
-            # self.k8s_client.create_namespaced_pod(
-            #     namespace=self.namespace, body=pod_body
-            # )
-
-            # Wait for pod to be ready
-            # self._wait_for_pod_ready()
-
             self._pod = Pod(self.k8s_client, pod_body, logger=self.logger)
-            # self._pod.create(pod_body)
-            # self._pod.wait_for_pod_ready()
 
             # Run setup commands
             self._run_setup_commands()
-
             self.logger.debug(f"Pod {self.pod.name} started successfully.")
-            atexit.register(self.clean_up)
 
         except ApiException as e:
             raise ValueError(f"Failed to create pod: {e}")
-
-    # def _wait_for_pod_ready(self, timeout: int = 3600 * 2):
-    #     """Wait for the pod to be in Running state."""
-    #     start_time = time.time()
-    #     while time.time() - start_time < timeout:
-    #         try:
-    #             pod = self.k8s_client.read_namespaced_pod(
-    #                 name=self.pod_name, namespace=self.namespace
-    #             )
-
-    #             if pod.status.phase == "Running":
-    #                 # Log on which node the pod is running.
-    #                 self.logger.debug(
-    #                     f"Pod {self.pod_name} is running on node {pod.spec.node_name}."
-    #                 )
-    #                 return
-    #             elif pod.status.phase in ["Failed", "Unknown"]:
-    #                 raise ValueError(
-    #                     f"Pod {self.pod_name} is in {pod.status.phase} state."
-    #                 )
-    #             elif pod.status.phase == "Pending":
-    #                 self.logger.debug(f"Pod {self.pod_name} is still pending...")
-    #                 time.sleep(60)
-    #             elif pod.status.phase == "Succeeded":
-    #                 raise ValueError(
-    #                     f"Pod {self.pod_name} has already succeeded unexpectedly."
-    #                 )
-    #             else:
-    #                 self.logger.debug(
-    #                     f"Pod {self.pod_name} is in {pod.status.phase} state..."
-    #                 )
-    #                 time.sleep(5)
-
-    #         except ApiException as e:
-    #             self.logger.debug(f"Error checking pod status: {e}")
-
-    #     raise ValueError(
-    #         f"Pod {self.pod_name} did not become ready within {timeout} seconds"
-    #     )
 
     def _run_setup_commands(self):
         """Run setup commands if any. If commands fail, delete the pod."""
@@ -421,63 +384,17 @@ class KubernetesTerminal(Terminal):
         setup_commands = " && ".join(self.setup_commands)
         success, output = self.run(setup_commands, raises=True)
         if not success:
-            self.clean_up()
+            self.close()
             raise ValueError(
                 f"Failed to run setup command: {setup_commands}\n" f"Output: {output}"
             )
         self.logger.debug("Setup commands ran successfully.")
 
-    def clean_up(self):
-        """Clean up the Kubernetes pod."""
-        if not self.pod.exists():
-            return
-
-        try:
-            self.k8s_client.delete_namespaced_pod(
-                name=self.pod.name, namespace=self.pod.namespace, grace_period_seconds=5
-            )
-            self.logger.debug(f"Pod {self.pod.name} deleted successfully.")
-        except ApiException as e:
-            if e.status != 404:  # Ignore not found errors
-                self.logger.debug(f"Failed to delete pod {self.pod.name}: {e}")
-        except Exception as e:
-            self.logger.debug(f"Error during pod cleanup: {e}")
-        finally:
-            # self._pod_name = None
-            self._pod = None
-
     def close(self):
         super().close()
-        self.clean_up()
-
-    # def pod_exists(self) -> bool:
-    #     """Check if the pod exists in the namespace."""
-    #     if self._pod_name is None:
-    #         return False
-
-    #     try:
-    #         self.k8s_client.read_namespaced_pod(
-    #             name=self._pod_name, namespace=self.namespace
-    #         )
-    #         return True
-    #     except ApiException as e:
-    #         if e.status == 404:
-    #             return False
-    #         self.logger.debug(f"Error checking pod existence: {e}")
-    #         return False
-
-    # def is_running(self) -> bool:
-    #     """Check if the pod is currently running."""
-    #     try:
-    #         pod = self.k8s_client.read_namespaced_pod(
-    #             name=self.pod_name, namespace=self.namespace
-    #         )
-    #         return pod.status.phase == "Running"
-    #     except ApiException as e:
-    #         if e.status == 404:
-    #             return False
-    #         self.logger.debug(f"Error checking pod status: {e}")
-    #         return False
+        if self._pod is not None:
+            self.clean_up()
+            self._pod = None
 
     def __str__(self):
         return f"KubernetesTerminal[{self.pod_name}, {self.working_dir}]"

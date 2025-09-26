@@ -30,5 +30,5 @@ def select_terminal(
     return terminal_class(
         **terminal_config,
         logger=logger,
-        uuid=uuid,
+        extra_labels={"uuid": uuid},
     )

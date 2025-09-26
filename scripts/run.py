@@ -177,7 +177,7 @@ def run_agent(args, problem, config):
 
 
 def create_env(config: dict, logger: DebugGymLogger):
-    terminal = select_terminal(config.get("terminal"), logger, config["uuid"])
+    terminal = select_terminal(config.get("terminal"), logger, uuid=config["uuid"])
     env_class = select_env(config.get("benchmark"))
     env = env_class(
         **config["env_kwargs"],
