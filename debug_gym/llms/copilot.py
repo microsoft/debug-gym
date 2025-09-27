@@ -33,6 +33,7 @@ class CopilotLLM(OpenAILLM):
         """Create HMAC for request authentication"""
         if not hmac_secret:
             return None
+        # Use current time rounded to prevent minor timing issues
         current = str(int(time.time()))
         signature = hmac.new(
             hmac_secret.encode("utf-8"), current.encode("utf-8"), hashlib.sha256
@@ -121,12 +122,19 @@ class CopilotLLM(OpenAILLM):
                 )
 
             bearer_token = self.fetch_token()
+            # Generate fresh HMAC timestamp for each client creation
             hmac_value = self.create_request_hmac(hmac_secret)
 
             if not hmac_value or not bearer_token:
                 raise ValueError(
                     "Missing HMAC or Bearer token for GitHub Copilot Claude API"
                 )
+
+            # Log the HMAC timestamp for debugging (without revealing the secret)
+            timestamp = hmac_value.split(".")[0]
+            self.logger.debug(
+                f"Creating client with HMAC timestamp: {timestamp} (current time: {int(time.time())})"
+            )
 
             # Create OpenAI client with GitHub Copilot endpoint and custom headers
             self._client = OpenAI(
@@ -168,18 +176,36 @@ class CopilotLLM(OpenAILLM):
         )
         logger = self.logger.debug
         if exception_full_name == "openai.AuthenticationError":
-            if "HMAC timestamp out of range" in exception.message:
+            error_message = getattr(exception, "message", str(exception))
+            if "HMAC timestamp out of range" in error_message:
                 # This error indicates that the HMAC timestamp is out of range,
-                # which can happen if the system clock is not synchronized.
-                # We should retry after a short delay to allow for clock synchronization.
+                # which can happen if the system clock is not synchronized or
+                # the HMAC timestamp has expired. We need to regenerate the client
+                # with a fresh HMAC timestamp.
+                self.logger.info(
+                    "HMAC timestamp out of range, regenerating client with fresh timestamp"
+                )
+                self._invalidate_client_cache()
                 need_to_retry = True
-                time.sleep(5)
+                time.sleep(2)  # Short delay before retry
+            elif "unauthorized" in error_message.lower():
+                # General authentication failure - refresh both token and client
+                self.logger.info("Authentication failure, refreshing token and client")
+                self._invalidate_client_cache()
+                need_to_retry = True
+                time.sleep(2)
         logger(
             f"Error calling {self.model_name}: {exception_full_name!r} {
-                exception.message if hasattr(exception, 'message') else exception
+                getattr(exception, 'message', str(exception))
             }"
         )
         return need_to_retry
+
+    def _invalidate_client_cache(self):
+        """Invalidate both token and client cache to force regeneration"""
+        self._client = None
+        self._token_cache = None
+        self._token_expires_at = 0
 
 
 class CopilotOpenAILLM(CopilotLLM):
