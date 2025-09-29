@@ -1,6 +1,7 @@
 import atexit
 import json
 import os
+import random
 import subprocess
 import time
 import uuid
@@ -9,11 +10,11 @@ from pathlib import Path
 from debug_gym.gym.terminals.shell_session import ShellSession
 from debug_gym.gym.terminals.terminal import DISABLE_ECHO_COMMAND, Terminal
 from debug_gym.logger import DebugGymLogger
-from kubernetes import client, config, stream
+from kubernetes import client, config, stream, watch
 from kubernetes.client.rest import ApiException
 from kubernetes.stream.ws_client import ERROR_CHANNEL
 
-NB_RETRIES_RUN = 3  # Number of retries for running a command
+NB_RETRIES_RUN = 50  # Number of retries for running a command
 
 
 def _clean_pod_name(name: str) -> str:
@@ -34,12 +35,59 @@ class Pod:
         self.namespace = self.pod_body["metadata"]["namespace"]
         self.logger = logger
 
-        try:
-            self.k8s_client.create_namespaced_pod(
-                namespace=self.namespace, body=self.pod_body
+        # Give creation a generous retry window before failing hard.
+        max_retries = 30
+        # Start each pod with a slightly different backoff so that a burst of
+        # workers doesn't hammer the API in lock-step.
+        base_backoff = random.uniform(1, 3)
+        backoff = base_backoff
+        last_error = None
+
+        for attempt in range(1, max_retries + 1):
+            try:
+                self.k8s_client.create_namespaced_pod(
+                    namespace=self.namespace, body=self.pod_body
+                )
+                break
+            except ApiException as e:
+                last_error = e
+                # Kubernetes surfaces throttling/outages/conflicts via these
+                # HTTP codes; retry them with exponential backoff.
+                if e.status in (409, 429, 500, 503):
+                    if e.status == 409:
+                        try:
+                            existing = self.k8s_client.read_namespaced_pod(
+                                name=self.name,
+                                namespace=self.namespace,
+                            )
+                            if existing:
+                                # Another controller already created the pod;
+                                # treat that as success so we can attach.
+                                self.logger.debug(
+                                    f"Pod {self.name} already exists; reusing existing pod."
+                                )
+                                break
+                        except ApiException as read_err:
+                            self.logger.debug(
+                                f"Failed to read existing pod {self.name} after 409: {read_err}"
+                            )
+
+                    self.logger.warning(
+                        f"Transient error {e.status} while creating pod {self.name}"
+                        f" (attempt {attempt}/{max_retries}); retrying in {backoff:.1f}s"
+                    )
+                    time.sleep(backoff)
+                    backoff = min(backoff * 2, 240)
+                    continue
+
+                raise ValueError(f"Failed to create pod: {e}")
+            except Exception as e:
+                raise ValueError(f"Failed to create pod: {e}")
+        else:
+            # All retries exhausted; bubble up the last Kubernetes error.
+            raise ValueError(
+                f"Exceeded retry limit while creating pod {self.name}: {last_error}"
             )
-        except ApiException as e:
-            raise ValueError(f"Failed to create pod: {e}")
 
         atexit.register(self.clean_up)
         self.wait_for_pod_ready()
@@ -109,14 +157,46 @@ class Pod:
 
     def clean_up(self):
         """Clean up the Kubernetes pod."""
-        if self.exists():
+        # Exit quickly if the pod has already vanished; nothing left to do.
+        if not self.exists():
             return
 
         try:
+            # Issue a graceful delete so the node can free resources promptly.
             self.k8s_client.delete_namespaced_pod(
                 name=self.name, namespace=self.namespace, grace_period_seconds=5
             )
             self.logger.debug(f"Pod {self.name} deleted successfully.")
+
+            w = watch.Watch()
+            try:
+                # Watch ensures we see the actual DELETED event instead of
+                # racing on eventual consistency from the API.
+                for event in w.stream(
+                    self.k8s_client.list_namespaced_pod,
+                    namespace=self.namespace,
+                    field_selector=f"metadata.name={self.name}",
+                    timeout_seconds=60,
+                ):
+                    if event.get("type") == "DELETED":
+                        self.logger.debug(
+                            f"Confirmed pod {self.name} deletion via watch event."
+                        )
+                        break
+                else:
+                    # We never saw a deletion event; log it so operators know to
+                    # investigate lingering pods.
+                    self.logger.debug(
+                        f"Watch timeout while waiting for pod {self.name} deletion."
+                    )
+            finally:
+                w.stop()
+
+            if self.exists():
+                # Final check to surface stubborn pods that may need manual cleanup.
+                self.logger.debug(
+                    f"Pod {self.name} still exists after delete request; manual cleanup may be required."
+                )
         except ApiException as e:
             if e.status != 404:  # Ignore not found errors
                 self.logger.debug(f"Failed to delete pod {self.name}: {e}")
@@ -272,7 +352,6 @@ class KubernetesTerminal(Terminal):
         command = self.prepare_command(entrypoint)
 
         self.logger.debug(f"[{self.pod.name}] Kubernetes exec run: {command}")
-
         for _ in range(NB_RETRIES_RUN):
             try:
                 # Execute command using Kubernetes stream API
@@ -309,6 +388,8 @@ class KubernetesTerminal(Terminal):
                     f"[{self.pod.name}] Exception during command execution: {e}"
                 )
                 output = f"Command execution failed: {str(e)}"
+                backoff = random.uniform(5, 10)  # seconds
+                time.sleep(backoff)
 
         if strip_output:
             output = output.strip("\r\n").strip("\n")
