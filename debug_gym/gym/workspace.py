@@ -92,11 +92,12 @@ class Workspace:
         target = Path(target or self.working_dir).resolve()
         self.terminal.copy_content(src, target)
 
-    def resolve_path(self, filepath: str | Path, raises=False) -> Path:
+    def resolve_path(self, filepath: str | Path, raises: str | bool = False) -> Path:
         """Convert a relative filepath to absolute based on the working_dir.
         If the path is already absolute, it is returned as is.
         If raises is True, raises FileNotFoundError if the file does not exist,
-        is not in the working directory or is ignored by the ignore patterns.
+        or is not in the working directory or is ignored by the ignore patterns.
+        If raises is "ignore", then raises FileNotFoundError only if the file is ignored.
         If raises is False, returns the absolute path regardless of the file existence.
         """
         abs_filepath = Path(filepath)
@@ -104,7 +105,7 @@ class Workspace:
             abs_filepath = Path(self.working_dir) / abs_filepath
         abs_filepath_str = str(abs_filepath)
 
-        if raises and abs_filepath != self.working_dir:
+        if raises in [True, "ignore"] and abs_filepath != self.working_dir:
             # Check if file exists, is within working_dir and is not ignored.
             check_cmd = (
                 f'abs_path=$(realpath "{abs_filepath_str}"); '
@@ -113,7 +114,9 @@ class Workspace:
             success, result = self.terminal.run(
                 f"{check_cmd} && echo OK || echo MISSING"
             )
-            if result.strip() != "OK" or self._is_ignored_func(abs_filepath):
+            if (result.strip() != "OK" and raises == True) or self._is_ignored_func(
+                abs_filepath
+            ):
                 raise FileNotFoundError(
                     f"`{filepath}` does not exist or is not in "
                     f"the working directory `{self.working_dir}`."
@@ -121,18 +124,21 @@ class Workspace:
 
         return Path(abs_filepath_str)
 
-    def read_file(self, filepath: str) -> str:
+    def read_file(self, filepath: str, raises: bool = True) -> str:
         """Reads a file from the working directory.
-        Raises value error if the file does not exist"""
-        abs_filepath = self.resolve_path(filepath, raises=True)
+        By default, raises value error if the file does not exist"""
+        abs_filepath = self.resolve_path(filepath, raises=raises)
         success, output = self.terminal.run(
-            f"cat {abs_filepath}", raises=True, strip_output=False
+            f"cat {abs_filepath}", raises=raises, strip_output=False
         )
         return output
 
     def write_file(self, filepath: str, content: str):
         """Writes `content` to `filepath` exactly as-is, preserving any trailing newlines."""
-        abs_filepath = self.resolve_path(filepath)
+        abs_filepath = self.resolve_path(filepath, raises="ignore")
+
+        # create parent directories via the terminal if needed
+        self.terminal.run(f'mkdir -p "{str(abs_filepath.parent)}"', raises=True)
 
         # In the following command we:
         # - use a single-quoted heredoc (cat <<'nDEBUGGYM_EOF' ... nDEBUGGYM_EOF) so the heredoc body is taken literally (no shell expansion)

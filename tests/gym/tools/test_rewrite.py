@@ -244,3 +244,28 @@ def test_rewrite_with_newlines(env):
         "    print(f'Hello #2!')\n"
         "    print('Goodbye, world!')\n"
     )
+
+
+def test_rewrite_new_file(env):
+    """Ensure the rewrite tool can create a brand new file when it does not already exist."""
+    rewrite_tool = env.get_tool("rewrite")
+    filename = "new_dir/nested/new_module.py"
+    assert not (env.working_dir / filename).exists()
+
+    patch = {
+        "path": filename,
+        "start": None,  # full file write
+        "end": None,
+        "is_new_file": True,
+        "new_code": "def added():\n    return 'created'\n",
+    }
+    obs = rewrite_tool.use(env, **patch)
+
+    assert rewrite_tool.rewrite_success, f"Rewrite failed: {obs.observation}"
+    # We don't assert the entire diff (more brittle); just key substrings.
+    assert f"The file `{filename}` has been updated successfully." in obs.observation
+    assert "def added():" in obs.observation
+
+    with open(env.working_dir / filename, "r") as f:
+        content = f.read()
+    assert content == "def added():\n    return 'created'\n"

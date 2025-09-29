@@ -13,9 +13,10 @@ class RewriteTool(EnvironmentTool):
         """rewrite(path="code/utils.py", start=10, end=None, new_code="    print('bonjour')") will rewite line number 10 of the specified file 'code/utils.py' to be print('bonjour'), with the indents ahead (in this case, 4 spaces).""",
         """rewrite(path="code/utils.py", start=10, end=20, new_code="    print('hello')\\n    print('hi again')") will replace the chunk of code between line number 10 and 20 in the specified file 'code/utils.py' by the two lines provided, both with indents ahead (in this case, 4 spaces).""",
         """rewrite(path='code/utils.py', start=4, end=6, new_code="        print('buongiorno')") will replace the chunk of code between line number 4 and 6 in the specified file 'code/utils.py' by the single line provided, with the indent ahead (in this case, 8 spaces).""",
+        """rewrite(path='code/utils.py', is_new_file=True, new_code="print('greetings')") will generate a new file at the specified path 'code/utils.py' with the content print('greetings').""",
     ]
     description = (
-        "Rewrite the content of the specified file path, between lines [start, end], with the new code. Line numbers are 1-based. When start is provided and end is None, it's assumed to rewrite a single line (start). When both start and end are None, it's assumed to rewrite the whole file, this is not recommended because most of the time the expected edit is local. The new code should be valid python code include proper indentation (can be determined from context)."
+        "Rewrite the content of the specified file path, between lines [start, end], with the new code. Line numbers are 1-based. When start is provided and end is None, it's assumed to rewrite a single line (start). When both start and end are None, it's assumed to rewrite the whole file, this is not recommended because most of the time the expected edit is local. When is_new_file is True, a new file will be created at the specified path with the new code. The new code should be valid python code include proper indentation (can be determined from context)."
         + "\nExamples (for demonstration purposes only, you need to adjust the tool calling format according to your specific syntax):"
         + "\n".join(examples)
     )
@@ -32,6 +33,10 @@ class RewriteTool(EnvironmentTool):
             "type": ["number", "null"],
             "description": "The ending line number to be rewritten. If None, end is the same as start.",
         },
+        "is_new_file": {
+            "type": ["boolean", "null"],
+            "description": "Whether the file to be modified is a new file. Default is False.",
+        },
         "new_code": {
             "type": ["string"],
             "description": "The new code to be inserted. The new code should be valid python code include proper indentation (can be determined from context).",
@@ -41,12 +46,17 @@ class RewriteTool(EnvironmentTool):
     def _overwrite_file(self, environment, filepath: str, content: str):
         environment.workspace.write_file(filepath, content)
 
-    def _rewrite_file(self, environment, file_path, start, end, new_code):
-        original_content = environment.workspace.read_file(file_path)
+    def _rewrite_file(
+        self, environment, file_path, start, end, new_code, is_new_file=False
+    ):
+        raise_on_nonexistent_file = not is_new_file
+        original_content = environment.workspace.read_file(
+            file_path, raises=raise_on_nonexistent_file
+        )
         new_code_lines = new_code.split("\n")
         new_code_length = len(new_code_lines)
 
-        if start is None:
+        if start is None or is_new_file:
             # no line number is provided, rewrite the whole code
             self._overwrite_file(environment, filepath=file_path, content=new_code)
         else:
@@ -91,13 +101,24 @@ class RewriteTool(EnvironmentTool):
         path: str = None,
         start: int = None,
         end: int = None,
+        is_new_file: bool = False,
         new_code: str = "",
     ) -> Observation:
         self.rewrite_success = False
         if path is None:
             return self.fail(environment, "File path is None.")
-        if not environment.workspace.is_editable(path):
-            return self.fail(environment, f"`{path}` is not editable.")
+
+        # If creating a new file, just ensure the target directory is inside workspace and not ignored
+        if is_new_file:
+            # Resolve without requiring existence
+            try:
+                environment.workspace.resolve_path(path, raises="ignore")
+            except Exception as e:
+                return self.fail(environment, f"Invalid path `{path}`: {e}")
+        else:
+            if not environment.workspace.is_editable(path):
+                return self.fail(environment, f"`{path}` is not editable.")
+
         if start is not None:
             end = end or start  # only start is provided (rewrite that line)
             if start > end:
@@ -112,7 +133,7 @@ class RewriteTool(EnvironmentTool):
             start, end = start - 1, end - 1  # 1-based to 0-based
         try:
             diff, new_code_length = self._rewrite_file(
-                environment, path, start, end, new_code
+                environment, path, start, end, new_code, is_new_file=is_new_file
             )
         except Exception as e:
             return self.fail(environment, str(e))
