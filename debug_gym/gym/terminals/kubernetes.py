@@ -7,6 +7,13 @@ import time
 import uuid
 from pathlib import Path
 
+from tenacity import (
+    retry,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_random_exponential,
+)
+
 from debug_gym.gym.terminals.shell_session import ShellSession
 from debug_gym.gym.terminals.terminal import DISABLE_ECHO_COMMAND, Terminal
 from debug_gym.logger import DebugGymLogger
@@ -17,7 +24,7 @@ from kubernetes.stream.ws_client import ERROR_CHANNEL
 NB_RETRIES_RUN = 50  # Number of retries for running a command
 
 
-def _clean_pod_name(name: str) -> str:
+def _clean_for_kubernetes(name: str) -> str:
     """Clean pod name to conform to Kubernetes naming conventions."""
     # replace any characters not in the regex with hyphens
     cleaned = "".join(c if c.isalnum() or c in "-." else "-" for c in name).lower()
@@ -28,69 +35,113 @@ def _clean_pod_name(name: str) -> str:
 
 
 class Pod:
-    def __init__(self, k8s_client, pod_body: dict, logger: DebugGymLogger):
+    def __init__(
+        self, k8s_client: client.CoreV1Api, pod_body: dict, logger: DebugGymLogger
+    ):
         self.k8s_client = k8s_client
         self.pod_body = pod_body
         self.name = self.pod_body["metadata"]["name"]
         self.namespace = self.pod_body["metadata"]["namespace"]
         self.logger = logger
+        self._last_pending_reason = None  # Track to avoid duplicate pending logs
 
-        # Give creation a generous retry window before failing hard.
-        max_retries = 30
-        # Start each pod with a slightly different backoff so that a burst of
-        # workers doesn't hammer the API in lock-step.
-        base_backoff = random.uniform(1, 3)
-        backoff = base_backoff
-        last_error = None
-
-        for attempt in range(1, max_retries + 1):
-            try:
-                self.k8s_client.create_namespaced_pod(
-                    namespace=self.namespace, body=self.pod_body
-                )
-                break
-            except ApiException as e:
-                last_error = e
-                # Kubernetes surfaces throttling/outages/conflicts via these
-                # HTTP codes; retry them with exponential backoff.
-                if e.status in (409, 429, 500, 503):
-                    if e.status == 409:
-                        try:
-                            existing = self.k8s_client.read_namespaced_pod(
-                                name=self.name,
-                                namespace=self.namespace,
-                            )
-                            if existing:
-                                # Another controller already created the pod;
-                                # treat that as success so we can attach.
-                                self.logger.debug(
-                                    f"Pod {self.name} already exists; reusing existing pod."
-                                )
-                                break
-                        except ApiException as read_err:
-                            self.logger.debug(
-                                f"Failed to read existing pod {self.name} after 409: {read_err}"
-                            )
-
-                    self.logger.warning(
-                        f"Transient error {e.status} while creating pod {self.name}"
-                        f" (attempt {attempt}/{max_retries}); retrying in {backoff:.1f}s"
-                    )
-                    time.sleep(backoff)
-                    backoff = min(backoff * 2, 240)
-                    continue
-
-                raise ValueError(f"Failed to create pod: {e}")
-            except Exception as e:
-                raise ValueError(f"Failed to create pod: {e}")
-        else:
-            # All retries exhausted; bubble up the last Kubernetes error.
-            raise ValueError(
-                f"Exceeded retry limit while creating pod {self.name}: {last_error}"
-            )
-
+        self.create_pod()
         atexit.register(self.clean_up)
         self.wait_for_pod_ready()
+
+    @retry(
+        retry=retry_if_exception_type(ApiException),
+        wait=wait_random_exponential(multiplier=1, min=1, max=240),
+        stop=stop_after_attempt(30),
+        reraise=True,
+    )
+    def create_pod(self):
+        """Create a Kubernetes pod with tenacity retry and exponential backoff."""
+        try:
+            pod = self.k8s_client.create_namespaced_pod(
+                namespace=self.namespace, body=self.pod_body, field_validation="Strict"
+            )
+            self.logger.debug(f"Created {self}.")
+            return pod
+        except ApiException as e:
+            # Handle 409 conflicts specially - check if pod already exists
+            if e.status == 409:
+                try:
+                    existing = self.k8s_client.read_namespaced_pod(
+                        name=self.name, namespace=self.namespace
+                    )
+                    if existing:
+                        self.logger.debug(f"{self} Reusing existing pod.")
+                        return
+                except ApiException:
+                    pass  # Fall through to retry logic
+
+            # Only retry on specific HTTP status codes
+            if e.status in (409, 429, 500, 503):
+                self.logger.warning(f"{self} Retrying pod creation (HTTP {e.status}).")
+                raise  # Let tenacity handle the retry
+            else:
+                # Non-retriable error, fail immediately
+                raise ValueError(f"Failed to create pod: {e}")
+        except Exception as e:
+            # Non-ApiException errors are not retriable
+            raise ValueError(f"Failed to create pod: {e}")
+
+    def wait_for_pod_ready(self, timeout: int = 3600 * 2):
+        """Wait for the pod to be in Running state using Kubernetes watch."""
+        self.logger.debug(f"{self} Waiting to be ready...")
+
+        w = watch.Watch()
+        try:
+            for event in w.stream(
+                self.k8s_client.list_namespaced_pod,
+                namespace=self.namespace,
+                field_selector=f"metadata.name={self.name}",
+                timeout_seconds=timeout,
+            ):
+                event_type = event.get("type")
+                pod = event.get("object")
+
+                if not pod:
+                    continue
+
+                phase = pod.status.phase
+
+                if phase == "Running":
+                    self.logger.debug(f"{self} is ready on node {pod.spec.node_name}")
+                    return
+                elif phase in ["Failed", "Unknown", "Succeeded"]:
+                    raise ValueError(f"{self} is in {phase} state instead of running.")
+                elif phase == "Pending" and event_type == "ADDED":
+                    # Only log pending status on initial ADDED event or when reason changes
+                    self._log_pending_status(pod)
+
+        except Exception as e:
+            self.logger.debug(f"{self} Error during pod watch: {e}")
+            raise ValueError(f"Error watching pod {self.name}: {e}")
+        finally:
+            w.stop()
+
+        # If we get here, we've timed out
+        raise ValueError(
+            f"Pod {self.name} did not become ready within {timeout} seconds"
+        )
+
+    def _log_pending_status(self, pod):
+        """Log pending status only if it's different from the last one."""
+        if pod.status.conditions:
+            for condition in pod.status.conditions:
+                if condition.status == "False":
+                    reason = f"{condition.reason}: {condition.message}"
+                    if reason != self._last_pending_reason:
+                        self.logger.debug(f"{self} Pending - {reason}")
+                        self._last_pending_reason = reason
+                    return
+
+        # No specific conditions found
+        if self._last_pending_reason != "scheduling":
+            self.logger.debug(f"{self} Pending - scheduling...")
+            self._last_pending_reason = "scheduling"
 
     def exists(self) -> bool:
         """Check if the pod exists in the namespace."""
@@ -102,8 +153,8 @@ class Pod:
         except ApiException as e:
             if e.status == 404:
                 return False
-            self.logger.debug(f"Error checking pod existence: {e}")
-            return False
+            self.logger.debug(f"{self} Error checking pod existence: {e}")
+            raise
 
     def is_running(self) -> bool:
         """Check if the pod is currently running."""
@@ -115,63 +166,21 @@ class Pod:
         except ApiException as e:
             if e.status == 404:
                 return False
-            self.logger.debug(f"Error checking pod status: {e}")
-            return False
-
-    def wait_for_pod_ready(self, timeout: int = 3600 * 2):
-        """Wait for the pod to be in Running state."""
-        start_time = time.time()
-        while time.time() - start_time < timeout:
-            try:
-                pod = self.k8s_client.read_namespaced_pod(
-                    name=self.name, namespace=self.namespace
-                )
-
-                if pod.status.phase == "Running":
-                    # Log on which node the pod is running.
-                    self.logger.debug(
-                        f"Pod {self.name} is running on node {pod.spec.node_name}."
-                    )
-                    return
-                elif pod.status.phase in ["Failed", "Unknown"]:
-                    raise ValueError(f"Pod {self.name} is in {pod.status.phase} state.")
-                elif pod.status.phase == "Pending":
-                    self.logger.debug(f"Pod {self.name} is still pending...")
-                    time.sleep(10)
-                elif pod.status.phase == "Succeeded":
-                    raise ValueError(
-                        f"Pod {self.name} has already succeeded unexpectedly."
-                    )
-                else:
-                    self.logger.debug(
-                        f"Pod {self.name} is in {pod.status.phase} state..."
-                    )
-                    time.sleep(5)
-
-            except ApiException as e:
-                self.logger.debug(f"Error checking pod status: {e}")
-
-        raise ValueError(
-            f"Pod {self.name} did not become ready within {timeout} seconds"
-        )
+            self.logger.debug(f"{self} Error checking pod status: {e}")
+            raise
 
     def clean_up(self):
         """Clean up the Kubernetes pod."""
-        # Exit quickly if the pod has already vanished; nothing left to do.
         if not self.exists():
             return
 
         try:
-            # Issue a graceful delete so the node can free resources promptly.
             self.k8s_client.delete_namespaced_pod(
                 name=self.name, namespace=self.namespace, grace_period_seconds=5
             )
-            self.logger.debug(f"Pod {self.name} deleted successfully.")
 
             w = watch.Watch()
             try:
-                # Watch ensures we see the actual DELETED event instead of
-                # racing on eventual consistency from the API.
                 for event in w.stream(
                     self.k8s_client.list_namespaced_pod,
                     namespace=self.namespace,
@@ -179,29 +188,26 @@ class Pod:
                     timeout_seconds=60,
                 ):
                     if event.get("type") == "DELETED":
-                        self.logger.debug(
-                            f"Confirmed pod {self.name} deletion via watch event."
-                        )
-                        break
+                        self.logger.debug(f"{self} deleted.")
+                        return
                 else:
-                    # We never saw a deletion event; log it so operators know to
-                    # investigate lingering pods.
-                    self.logger.debug(
-                        f"Watch timeout while waiting for pod {self.name} deletion."
-                    )
+                    self.logger.debug(f"{self} deletion timed out.")
             finally:
                 w.stop()
 
             if self.exists():
-                # Final check to surface stubborn pods that may need manual cleanup.
                 self.logger.debug(
-                    f"Pod {self.name} still exists after delete request; manual cleanup may be required."
+                    f"{self} still exists after delete - manual cleanup may be required"
                 )
+
         except ApiException as e:
             if e.status != 404:  # Ignore not found errors
                 self.logger.debug(f"Failed to delete pod {self.name}: {e}")
         except Exception as e:
             self.logger.debug(f"Error during pod cleanup: {e}")
+
+    def __str__(self):
+        return f"Pod[{self.name}]"
 
 
 class KubernetesTerminal(Terminal):
@@ -238,9 +244,10 @@ class KubernetesTerminal(Terminal):
         self.namespace = namespace
         self.kubernetes_kwargs = kwargs  # e.g., nodeSelector, tolerations
         self.registry = registry.rstrip("/")
-        self.pod_name = pod_name
+        self._pod_name = pod_name
         self.pod_spec_kwargs = pod_spec_kwargs or {}
-        self.labels = {"app": "debug-gym", "component": "terminal"} | (
+        user = _clean_for_kubernetes(os.environ.get("USER", "unknown"))
+        self.labels = {"app": "debug-gym", "component": "terminal", "user": user} | (
             extra_labels or {}
         )
         self._pod = None
@@ -261,13 +268,27 @@ class KubernetesTerminal(Terminal):
         atexit.register(self.close)
 
     @property
+    def pod_name(self):
+        if self._pod is None:
+            raise ValueError("Pod not created yet; pod_name is not available.")
+
+        return self._pod.name
+
+    @pod_name.setter
+    def pod_name(self, value):
+        if self._pod is not None:
+            raise ValueError("Cannot change the pod's name after its creation.")
+
+        self._pod_name = value
+
+    @property
     def task_name(self):
         return self._task_name
 
     @task_name.setter
     def task_name(self, value):
         if self._pod is not None:
-            raise ValueError("Cannot change task_name once the pod has been created.")
+            raise ValueError("Cannot change task_name after pod creation.")
 
         self._task_name = value
 
@@ -279,10 +300,7 @@ class KubernetesTerminal(Terminal):
     @working_dir.setter
     def working_dir(self, value):
         if self._pod is not None:
-            # if self._pod_name is not None:
-            raise ValueError(
-                "Cannot change working directory once the pod has been created."
-            )
+            raise ValueError("Cannot change working directory after pod creation.")
 
         self._working_dir = value
 
@@ -405,8 +423,8 @@ class KubernetesTerminal(Terminal):
     def setup_pod(self) -> None:
         """Create and start a Kubernetes pod."""
 
-        pod_name = _clean_pod_name(
-            self.pod_name or f"dbg-gym.{self.task_name}.{str(uuid.uuid4())[:8]}"
+        pod_name = _clean_for_kubernetes(
+            self._pod_name or f"dbg-gym.{self.task_name}.{str(uuid.uuid4())[:8]}"
         )
         self.logger.debug(
             f"Setting up pod {pod_name} with base image: {self.base_image}"
@@ -428,12 +446,12 @@ class KubernetesTerminal(Terminal):
                     {
                         "name": "main",
                         "image": f"{self.registry}/{self.base_image}",
-                        "image_pull_policy": "IfNotPresent",
+                        "imagePullPolicy": "IfNotPresent",
                         "command": ["/bin/bash"],
                         "args": ["-c", "sleep infinity"],
-                        "working_dir": self.working_dir,
+                        "workingDir": self.working_dir,
                         "stdin": True,
-                        "stdin_once": False,
+                        "stdinOnce": False,
                         "tty": True,
                         "env": [
                             {"name": k, "value": v} for k, v in self.env_vars.items()
@@ -453,7 +471,7 @@ class KubernetesTerminal(Terminal):
 
             # Run setup commands
             self._run_setup_commands()
-            self.logger.debug(f"Pod {self.pod.name} started successfully.")
+            self.logger.debug(f"{self.pod} started successfully.")
 
         except ApiException as e:
             raise ValueError(f"Failed to create pod: {e}")

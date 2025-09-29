@@ -9,11 +9,24 @@ import termios
 import time
 import uuid
 
+from tenacity import (
+    retry,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_random_exponential,
+)
+
 from debug_gym.logger import DebugGymLogger
 from debug_gym.utils import strip_ansi
 
 DEFAULT_TIMEOUT = 300
 DEFAULT_PS1 = "DEBUG_GYM_PS1"
+
+
+class ProcessNotRunningError(Exception):
+    """Raised when the shell process is not running after initialization."""
+
+    pass
 
 
 class ShellSession:
@@ -47,6 +60,12 @@ class ShellSession:
     def is_running(self):
         return self.process is not None and self.process.poll() is None
 
+    @retry(
+        stop=stop_after_attempt(30),
+        wait=wait_random_exponential(multiplier=0.1, min=0.1, max=2.0),
+        retry=retry_if_exception_type(ProcessNotRunningError),
+        reraise=True,
+    )
     def start(self, command=None, read_until=None):
         self.close()  # Close any existing session
 
@@ -92,7 +111,7 @@ class ShellSession:
 
         if not self.is_running:
             self.close()
-            raise RuntimeError(f"{self} failed to start. Output:\n{output}")
+            raise ProcessNotRunningError(f"{self} failed to start. Output:\n{output}")
 
         # Run session commands after starting the session if command was not provided
         if not command and self.session_commands:

@@ -42,17 +42,23 @@ def test_kubernetes_terminal_init():
 
     # Pod should not be created until accessed
     assert terminal._pod is None
-    assert terminal.pod_name.startswith("dbg-gym.")
+    with pytest.raises(
+        ValueError, match="Pod not created yet; pod_name is not available."
+    ):
+        terminal.pod_name  # Accessing pod_name before pod creation should raise an error.
 
-    # Assessing the pod_name will create the pod.
+    # Assessing the `pod` property will create it.
+    assert terminal.pod
+    assert terminal._pod is not None
+
+    # Pod name should be automatically generated when not provided at initialization.
+    assert terminal.pod_name.startswith("dbg-gym.")
     assert terminal.pod.is_running()
     assert terminal.pod.exists()
 
     # Close pod.
     terminal.close()
-    time.sleep(5 + 1)  # wait for pod to terminate, i.e., grace_period_seconds
-    assert not terminal.is_running()
-    assert not terminal.pod_exists()
+    assert terminal._pod is None
 
 
 @if_kubernetes_available
@@ -61,7 +67,7 @@ def test_kubernetes_terminal_init_with_params(tmp_path):
     session_commands = ["mkdir new_dir"]
     env_vars = {"ENV_VAR": "value"}
     base_image = "ubuntu:24.04"
-    namespace = "test-namespace"
+    namespace = "default"  # Need to exists.
     pod_name = "test-pod-123"
 
     terminal = KubernetesTerminal(
@@ -76,18 +82,16 @@ def test_kubernetes_terminal_init_with_params(tmp_path):
     assert terminal.session_commands == session_commands
     assert terminal.env_vars == env_vars | {"NO_COLOR": "1", "PS1": DEFAULT_PS1}
     assert terminal.base_image == base_image
-    assert terminal.namespace == namespace
-    assert terminal.pod_name == pod_name
 
     # Create pod.
-    pod = terminal.pod
-    assert pod is not None
-    assert terminal.is_running()
+    assert terminal.pod is not None
+    assert terminal.pod.is_running()
+    assert terminal.pod.name == pod_name
+    assert terminal.pod.namespace == namespace
 
     # Close pod.
     terminal.close()
-    time.sleep(5 + 1)  # wait for pod to terminate, i.e., grace_period_seconds
-    assert not terminal.is_running()
+    assert terminal._pod is None
 
 
 @if_kubernetes_available
@@ -115,7 +119,7 @@ def test_kubernetes_terminal_run(tmp_path, command):
 
 
 @if_kubernetes_available
-def test_kubernetes_terminal_multiple_session_commands(tmp_path):
+def test_kubernetes_terminal_with_session_commands(tmp_path):
     working_dir = str(tmp_path)
     session_commands = ["echo 'Hello'", "echo 'World'"]
     terminal = KubernetesTerminal(working_dir, session_commands=session_commands)
@@ -180,19 +184,17 @@ def test_kubernetes_terminal_cleanup(tmp_path):
     """Test cleanup functionality."""
     working_dir = str(tmp_path)
     terminal = KubernetesTerminal(working_dir=working_dir)
-    pod_name = terminal.pod
-    assert terminal.is_running()
 
     # Test cleanup without creating pod
-    terminal.clean_up()
-    time.sleep(5 + 1)  # wait for pod to terminate, i.e., grace_period_seconds
-    assert not terminal._pod_created
-    assert not terminal.is_running()
+    terminal.close()
+
+    assert terminal.pod.is_running()
+    assert terminal._pod is not None
+    terminal.close()
+    assert terminal._pod is None
 
     # Test that cleanup can be called multiple times safely
-    terminal.clean_up()
-    assert not terminal._pod_created
-    assert not terminal.is_running()
+    terminal.close()
 
 
 @if_kubernetes_available
@@ -204,40 +206,20 @@ def test_select_terminal_kubernetes():
     assert config == {"type": "kubernetes"}  # config should not be modified
 
 
-# @if_kubernetes_available
-# def test_kubernetes_terminal_pod_naming():
-#     """Test pod naming functionality."""
-#     # Test default pod name generation
-#     terminal1 = KubernetesTerminal()
-#     assert terminal1.pod_name.startswith("debug-gym-")
-#     assert len(terminal1.pod_name.split("-")) == 3  # debug-gym-<uuid>
-
-#     # Test custom pod name
-#     custom_name = "my-custom-pod"
-#     terminal2 = KubernetesTerminal(pod_name=custom_name)
-#     assert terminal2.pod_name == custom_name
-
-
-# @if_kubernetes_available
-# def test_kubernetes_terminal_namespace_handling():
-#     """Test namespace configuration."""
-#     # Test default namespace
-#     terminal1 = KubernetesTerminal()
-#     assert terminal1.namespace == "default"
-
-#     # Test custom namespace
-#     custom_namespace = "test-namespace"
-#     terminal2 = KubernetesTerminal(namespace=custom_namespace)
-#     assert terminal2.namespace == custom_namespace
-
-
-def test_kubernetes_terminal_working_dir_readonly_after_pod_creation():
+def test_kubernetes_terminal_readonly_properties_after_pod_creation():
     """Test that working directory cannot be changed after pod creation."""
     terminal = KubernetesTerminal()
-    # Simulate pod creation
-    terminal.pod = True
+    terminal.pod  # Create pod.
 
     with pytest.raises(
-        ValueError, match="Cannot change working directory while pod is running"
+        ValueError, match="Cannot change the pod's name after its creation."
+    ):
+        terminal.pod_name = "New-Podname"
+
+    with pytest.raises(ValueError, match="Cannot change task_name after pod creation."):
+        terminal.task_name = "New-Task"
+
+    with pytest.raises(
+        ValueError, match="Cannot change working directory after pod creation."
     ):
         terminal.working_dir = "/new/path"
