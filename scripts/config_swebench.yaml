@@ -19,7 +19,7 @@ base:
         type: "kubernetes",
         registry: debuggymacr.azurecr.io,  # docker.io,
         kube_config: "~/.kube/config",
-        namespace: "mtl-rl",
+        namespace: "mtl-cpu-jobs",
         pod_spec_kwargs: {
             tolerations: [
                 {

@@ -258,6 +258,7 @@ class KubernetesTerminal(Terminal):
             config.load_kube_config(self.kube_config)
 
         self.k8s_client = client.CoreV1Api()
+        atexit.register(self.close)
 
     @property
     def task_name(self):
@@ -382,7 +383,7 @@ class KubernetesTerminal(Terminal):
                 success = status["status"] == "Success"
                 break  # Command executed successfully, exit the retry loop
 
-            except Exception as e:
+            except ApiException as e:
                 success = False
                 self.logger.debug(
                     f"[{self.pod.name}] Exception during command execution: {e}"
