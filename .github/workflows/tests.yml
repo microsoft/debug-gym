@@ -102,7 +102,7 @@ jobs:
           include-hidden-files: true
 
   test-kubernetes:
-    name: "Testing Kubernetes Terminal"
+    name: "Testing Kubernetes"
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -120,10 +120,10 @@ jobs:
       - uses: ./.github/actions/test-if-changes
         with:
           name: kubernetes
-          test-files: "tests/gym/envs/test_kubernetes.py"
+          test-files: "tests/gym/terminals/test_kubernetes.py"
           changed-files: |
-            debug_gym/gym/envs/kubernetes.py
-            tests/gym/envs/test_kubernetes.py
+            debug_gym/gym/terminals/kubernetes.py
+            tests/gym/terminals/test_kubernetes.py
 
   report-coverage:
     runs-on: ubuntu-latest
