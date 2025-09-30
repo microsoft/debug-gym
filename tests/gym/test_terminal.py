@@ -6,14 +6,14 @@ from pathlib import Path
 import docker
 import pytest
 
-from debug_gym.gym.terminal import (
-    DEFAULT_PS1,
-    DISABLE_ECHO_COMMAND,
+from debug_gym.gym.terminals import (
     DockerTerminal,
     LocalTerminal,
     ShellSession,
     select_terminal,
 )
+from debug_gym.gym.terminals.shell_session import DEFAULT_PS1
+from debug_gym.gym.terminals.terminal import DISABLE_ECHO_COMMAND
 
 
 @pytest.fixture

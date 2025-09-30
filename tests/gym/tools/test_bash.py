@@ -186,7 +186,7 @@ def test_bash_environment_variables(env):
     assert len(observation.strip()) > 0
 
 
-@patch("debug_gym.gym.terminal.LocalTerminal.run")
+@patch("debug_gym.gym.terminals.LocalTerminal.run")
 def test_bash_terminal_failure(mock_run, bash_tool):
     """Test handling of terminal execution failure."""
     # Mock terminal.run to return failure
@@ -205,7 +205,7 @@ def test_bash_terminal_failure(mock_run, bash_tool):
     assert "permission denied" in result.observation
 
 
-@patch("debug_gym.gym.terminal.LocalTerminal.run")
+@patch("debug_gym.gym.terminals.LocalTerminal.run")
 def test_bash_terminal_success(mock_run, bash_tool):
     """Test successful terminal execution."""
     # Mock terminal.run to return success
@@ -226,7 +226,7 @@ def test_bash_terminal_success(mock_run, bash_tool):
     mock_run.assert_called_once_with("echo hello", timeout=30)
 
 
-@patch("debug_gym.gym.terminal.LocalTerminal.run")
+@patch("debug_gym.gym.terminals.LocalTerminal.run")
 def test_bash_empty_output_handling(mock_run, bash_tool):
     """Test handling of commands with empty output."""
     # Mock terminal.run to return success with empty output
