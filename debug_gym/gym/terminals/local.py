@@ -3,34 +3,11 @@ import shlex
 import subprocess
 from pathlib import Path
 
-from debug_gym.gym.terminals.shell_session import DEFAULT_PS1, ShellSession
+from debug_gym.gym.terminals.shell_session import ShellSession
 from debug_gym.gym.terminals.terminal import Terminal
-from debug_gym.logger import DebugGymLogger
 
 
 class LocalTerminal(Terminal):
-
-    def __init__(
-        self,
-        working_dir: str = None,
-        session_commands: list[str] = None,
-        env_vars: dict[str, str] = None,
-        include_os_env_vars: bool = True,
-        logger: DebugGymLogger | None = None,
-        **kwargs,
-    ):
-        self.logger = logger or DebugGymLogger("debug-gym")
-        self.session_commands = session_commands or []
-        self.env_vars = env_vars or {}
-        if include_os_env_vars:
-            self.env_vars = self.env_vars | dict(os.environ)
-        # Clean up output by disabling terminal prompt and colors
-        self.env_vars["NO_COLOR"] = "1"  # disable colors
-        self.env_vars["PS1"] = (
-            DEFAULT_PS1  # use a sentinel to know when to stop reading
-        )
-        self._working_dir = working_dir
-        self.sessions = []
 
     @property
     def working_dir(self):
