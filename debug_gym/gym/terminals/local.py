@@ -1,8 +1,6 @@
-import atexit
 import os
 import shlex
 import subprocess
-import tempfile
 from pathlib import Path
 
 from debug_gym.gym.terminals.shell_session import DEFAULT_PS1, ShellSession
@@ -37,12 +35,7 @@ class LocalTerminal(Terminal):
     @property
     def working_dir(self):
         """Lazy initialization of the working directory."""
-        if self._working_dir is None:
-            _tempdir = tempfile.TemporaryDirectory(prefix="Terminal-")
-            atexit.register(_tempdir.cleanup)
-            self._working_dir = str(Path(_tempdir.name).resolve())
-            self.logger.debug(f"Using temporary working directory: {self._working_dir}")
-        return self._working_dir
+        return super().working_dir
 
     @working_dir.setter
     def working_dir(self, value):
