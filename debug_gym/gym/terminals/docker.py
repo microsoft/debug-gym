@@ -153,6 +153,7 @@ class DockerTerminal(Terminal):
             network_mode="host",
             mem_limit="16G",
         )
+        container.reload()  # Refresh container attributes (e.g., status="running")
         self._run_setup_commands(container)
         self.logger.debug(f"{container} ({container_name}) started successfully.")
         atexit.register(self.clean_up)
