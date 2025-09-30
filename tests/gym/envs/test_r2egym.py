@@ -36,7 +36,8 @@ def test_load_dataset(get_r2egym_env):
 def test_instructions(get_r2egym_env):
     env = get_r2egym_env()
     env.setup_task("aiohttp_final:d7cd0613472fd4d9940e37f1c55921f6a1515324")
-    assert env.ds_row["problem_statement"] in env.instructions
+    # Instructions might be wrapped by [ISSUE] [/ISSUE]
+    assert env.instructions in env.ds_row["problem_statement"]
 
 
 @pytest.if_docker_running
