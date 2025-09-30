@@ -12,7 +12,6 @@ import time
 import uuid
 from io import BytesIO
 from pathlib import Path
-from sys import stdout
 
 import docker
 
