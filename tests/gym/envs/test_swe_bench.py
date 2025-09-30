@@ -157,13 +157,14 @@ def test_patch_property(tmp_path, get_swe_bench_env):
     assert initial_patch == "", f"Expected empty patch initially, got: {initial_patch}"
 
     # Create a test file with some content
+    test_dir = str(tmp_path)
     test_file = tmp_path / "test_patch_file.py"
     test_content = """def hello_world():
     print("Hello, World!")
     return "success"
 """
     test_file.write_text(test_content)
-    env.workspace.copy_content(test_file)
+    env.workspace.copy_content(test_dir)
 
     # Add the file to git
     env.terminal.run(f"git add {test_file.name}")
