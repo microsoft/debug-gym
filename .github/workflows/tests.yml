@@ -92,7 +92,7 @@ jobs:
         env:
           ALLOW_LOCAL_TERMINAL: true
         run: |
-          DEBUG_GYM_DEBUG=1 pytest -vv -n 16 -k "not test_swe_bench and not test_swe_smith and not test_r2egym" --cov=debug_gym --cov-report=term-missing --timeout=600
+          DEBUG_GYM_DEBUG=1 pytest -vv -n 16 -k "not test_swe_bench and not test_swe_smith and not test_r2egym and not test_kubernetes" --cov=debug_gym --cov-report=term-missing --timeout=600
       - name: Store coverage report
         uses: actions/upload-artifact@v4
         with:
@@ -101,9 +101,33 @@ jobs:
           if-no-files-found: error
           include-hidden-files: true
 
+  test-kubernetes:
+    name: "Testing Kubernetes Terminal"
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [ "python" ]
+        os: [ubuntu-latest]
+
+    steps:
+      - uses: actions/checkout@v5
+      - name: start minikube
+        id: minikube
+        uses: medyagh/setup-minikube@latest
+      - name: kubectl
+        run: kubectl get pods -A
+      - uses: ./.github/actions/test-if-changes
+        with:
+          name: kubernetes
+          test-files: "tests/gym/envs/test_kubernetes.py"
+          changed-files: |
+            debug_gym/gym/envs/kubernetes.py
+            tests/gym/envs/test_kubernetes.py
+
   report-coverage:
     runs-on: ubuntu-latest
-    needs: [tests, test-swebench, test-swesmith, test-r2egym]
+    needs: [tests, test-swebench, test-swesmith, test-r2egym, test-kubernetes]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
