@@ -7,6 +7,9 @@ import time
 import uuid
 from pathlib import Path
 
+from kubernetes import client, config, stream, watch
+from kubernetes.client.rest import ApiException
+from kubernetes.stream.ws_client import ERROR_CHANNEL
 from tenacity import (
     retry,
     retry_if_exception_type,
@@ -17,9 +20,6 @@ from tenacity import (
 from debug_gym.gym.terminals.shell_session import ShellSession
 from debug_gym.gym.terminals.terminal import DISABLE_ECHO_COMMAND, Terminal
 from debug_gym.logger import DebugGymLogger
-from kubernetes import client, config, stream, watch
-from kubernetes.client.rest import ApiException
-from kubernetes.stream.ws_client import ERROR_CHANNEL
 
 NB_RETRIES_RUN = 50  # Number of retries for running a command
 
