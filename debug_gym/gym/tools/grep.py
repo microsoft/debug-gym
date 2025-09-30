@@ -95,7 +95,7 @@ class GrepTool(EnvironmentTool):
 
             # Require remote terminal unless local is explicitly allowed
             require_remote = (
-                os.getenv("ALLOW_LOCAL_TERMINAL", "false").lower() == "false"
+                os.environ.get("ALLOW_LOCAL_TERMINAL", "false").lower() == "false"
             )
             if require_remote and type(environment.terminal) is Terminal:
                 return Observation(
