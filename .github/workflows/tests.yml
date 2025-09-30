@@ -90,7 +90,7 @@ jobs:
           pip install -e '.[dev]'
       - name: Test - PR - Fast
         env:
-          FORCE_DOCKER_TERMINAL: false
+          ALLOW_LOCAL_TERMINAL: true
         run: |
           DEBUG_GYM_DEBUG=1 pytest -vv -n 16 -k "not test_swe_bench and not test_swe_smith and not test_r2egym" --cov=debug_gym --cov-report=term-missing --timeout=600
       - name: Store coverage report

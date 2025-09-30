@@ -31,19 +31,17 @@ class BashTool(EnvironmentTool):
     def use(self, environment, command: str) -> Observation:
         """Execute a bash command in the environment's terminal and return the result."""
         try:
-            # Assert that the terminal is a Docker terminal (only in production)
+            # Assert that the terminal is not a local terminal (only in production)
             import os
 
-            from debug_gym.gym.terminals.docker import DockerTerminal
+            from debug_gym.gym.terminals.terminal import Terminal
 
-            # Skip Docker terminal check during testing or when explicitly disabled
-            require_docker = (
-                os.getenv("FORCE_DOCKER_TERMINAL", "true").lower() == "true"
-            )
-            if require_docker and not isinstance(environment.terminal, DockerTerminal):
+            # Allow local terminal when explicitly enabled
+            allow_local = os.getenv("ALLOW_LOCAL_TERMINAL", "false").lower() == "true"
+            if not allow_local and type(environment.terminal) is Terminal:
                 return Observation(
                     self.name,
-                    "Error: bash tool requires a Docker terminal. Current terminal type is not supported.",
+                    "Error: bash tool requires a non-local terminal. Current terminal type is not supported.",
                 )
 
             # Use the environment's terminal to run the command
