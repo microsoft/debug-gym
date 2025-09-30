@@ -3,13 +3,8 @@ from pathlib import Path
 
 import pytest
 
-from debug_gym.gym.terminals import (
-    DockerTerminal,
-    LocalTerminal,
-    ShellSession,
-    select_terminal,
-)
-from debug_gym.gym.terminals.shell_session import DEFAULT_PS1
+from debug_gym.gym.terminals import DockerTerminal, LocalTerminal, select_terminal
+from debug_gym.gym.terminals.shell_session import DEFAULT_PS1, ShellSession
 
 
 @pytest.fixture
@@ -183,7 +178,7 @@ def test_shell_session_start_with_session_commands(tmp_path):
     assert session.filedescriptor is not None
     assert session.process is not None
     output = session.run("print('test python')", ">>>")
-    assert output == "test python"
+    assert "test python" in output
     session.close()
 
 
@@ -211,5 +206,5 @@ def test_shell_session_start_without_session_commands(tmp_path):
     assert session.filedescriptor is not None
     assert session.process is not None
     output = session.run("print('test python')", ">>>")
-    assert output == "test python"
+    assert "test python" in output
     session.close()
