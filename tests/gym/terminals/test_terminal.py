@@ -1,17 +1,15 @@
 import os
 import re
-import tempfile
-from pathlib import Path
 
 import pytest
 
 from debug_gym.gym.terminals import select_terminal
+from debug_gym.gym.terminals.local import LocalTerminal
 from debug_gym.gym.terminals.shell_session import DEFAULT_PS1
-from debug_gym.gym.terminals.terminal import Terminal
 
 
 def test_terminal_init():
-    terminal = Terminal()
+    terminal = LocalTerminal()
     assert terminal.session_commands == []
     assert terminal.env_vars["NO_COLOR"] == "1"
     assert terminal.env_vars["PS1"] == DEFAULT_PS1
@@ -20,7 +18,7 @@ def test_terminal_init():
 
 
 def test_terminal_init_no_os_env_vars():
-    terminal = Terminal(include_os_env_vars=False)
+    terminal = LocalTerminal(include_os_env_vars=False)
     assert terminal.env_vars == {"NO_COLOR": "1", "PS1": DEFAULT_PS1}
 
 
@@ -28,7 +26,7 @@ def test_terminal_init_with_params(tmp_path):
     working_dir = str(tmp_path)
     session_commands = ["echo 'Hello World'"]
     env_vars = {"ENV_VAR": "value"}
-    terminal = Terminal(working_dir, session_commands, env_vars)
+    terminal = LocalTerminal(working_dir, session_commands, env_vars)
     assert terminal.working_dir == working_dir
     assert terminal.session_commands == session_commands
     assert terminal.env_vars["NO_COLOR"] == "1"
@@ -43,7 +41,7 @@ def test_terminal_init_with_params(tmp_path):
 
 def test_terminal_run(tmp_path):
     working_dir = str(tmp_path)
-    terminal = Terminal(working_dir=working_dir)
+    terminal = LocalTerminal(working_dir=working_dir)
     entrypoint = "echo 'Hello World'"
     success, output = terminal.run(entrypoint, timeout=1)
     assert success is True
@@ -52,7 +50,7 @@ def test_terminal_run(tmp_path):
 
 
 def test_terminal_run_tmp_working_dir():
-    terminal = Terminal()
+    terminal = LocalTerminal()
     entrypoint = "pwd -P"
     success, output = terminal.run(entrypoint, timeout=1)
     assert success is True
@@ -68,7 +66,7 @@ def test_terminal_run_tmp_working_dir():
 )
 def test_terminal_run_multiple_commands(tmp_path, command):
     working_dir = str(tmp_path)
-    terminal = Terminal(working_dir=working_dir)
+    terminal = LocalTerminal(working_dir=working_dir)
     success, output = terminal.run(command, timeout=1)
     assert success is True
     assert output == "Hello\nWorld"
@@ -76,7 +74,7 @@ def test_terminal_run_multiple_commands(tmp_path, command):
 
 def test_terminal_run_failure(tmp_path):
     working_dir = str(tmp_path)
-    terminal = Terminal(working_dir=working_dir)
+    terminal = LocalTerminal(working_dir=working_dir)
     entrypoint = "ls non_existent_dir"
     success, output = terminal.run(entrypoint, timeout=1)
     assert success is False
@@ -89,7 +87,7 @@ def test_terminal_run_failure(tmp_path):
 def test_terminal_session(tmp_path):
     working_dir = str(tmp_path)
     command = "echo Hello World"
-    terminal = Terminal(working_dir=working_dir)
+    terminal = LocalTerminal(working_dir=working_dir)
     assert not terminal.sessions
 
     session = terminal.new_shell_session()
@@ -110,7 +108,7 @@ def test_terminal_session(tmp_path):
 def test_terminal_multiple_session_commands(tmp_path):
     working_dir = str(tmp_path)
     session_commands = ["echo 'Hello'", "echo 'World'"]
-    terminal = Terminal(working_dir, session_commands)
+    terminal = LocalTerminal(working_dir, session_commands)
     status, output = terminal.run("pwd", timeout=1)
     assert status
     assert output == f"Hello\nWorld\n{working_dir}"
@@ -126,7 +124,7 @@ def test_select_terminal_default():
 def test_select_terminal_local():
     config = {"type": "local"}
     terminal = select_terminal(config)
-    assert isinstance(terminal, Terminal)
+    assert isinstance(terminal, LocalTerminal)
     assert config == {"type": "local"}  # config should not be modified
 
 
@@ -141,7 +139,7 @@ def test_select_terminal_invalid_config():
 
 
 def test_shell_session_start_with_session_commands(tmp_path):
-    terminal = Terminal(
+    terminal = LocalTerminal(
         working_dir=str(tmp_path),
         session_commands=["echo setup"],
     )
@@ -172,7 +170,7 @@ def test_shell_session_start_with_session_commands(tmp_path):
 
 
 def test_shell_session_start_without_session_commands(tmp_path):
-    terminal = Terminal(working_dir=str(tmp_path))
+    terminal = LocalTerminal(working_dir=str(tmp_path))
     session = terminal.new_shell_session()
 
     # Test starting without command
@@ -210,7 +208,7 @@ def test_copy_content(tmp_path):
     working_dir = tmp_path / "working_dir"
     working_dir.mkdir()
 
-    terminal = Terminal(working_dir=working_dir)
+    terminal = LocalTerminal(working_dir=working_dir)
     # Source must be a folder.
     with pytest.raises(ValueError, match="Source .* must be a directory."):
         terminal.copy_content(source_file)

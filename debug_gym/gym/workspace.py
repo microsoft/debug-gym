@@ -3,6 +3,7 @@ import os
 import tempfile
 from pathlib import Path
 
+from debug_gym.gym.terminals.local import LocalTerminal
 from debug_gym.gym.terminals.terminal import Terminal
 from debug_gym.gym.utils import make_file_matcher
 from debug_gym.logger import DebugGymLogger
@@ -30,7 +31,8 @@ class Workspace:
         self.cleanup()
 
         self.working_dir = Path("/testbed")
-        if type(self.terminal) is Terminal:
+        # only create temp dir for local terminal
+        if type(self.terminal) is LocalTerminal:
             self._tempdir = tempfile.TemporaryDirectory(prefix="DebugGym-")
             atexit.register(self._tempdir.cleanup)
             self.working_dir = Path(self._tempdir.name).resolve()

@@ -4,13 +4,13 @@ from pathlib import Path
 import pytest
 
 from debug_gym.gym.terminals.docker import DockerTerminal
-from debug_gym.gym.terminals.terminal import Terminal
+from debug_gym.gym.terminals.local import LocalTerminal
 from debug_gym.gym.workspace import Workspace
 
 
 @pytest.fixture
 def workspace():
-    terminal = Terminal()
+    terminal = LocalTerminal()
     workspace = Workspace(terminal)
     workspace.reset()
 
@@ -27,7 +27,7 @@ def workspace():
 
 def test_reset_and_cleanup_workspace():
     # Setup workspace with a native terminal.
-    terminal = Terminal()
+    terminal = LocalTerminal()
     workspace = Workspace(terminal)
 
     assert workspace._tempdir is None

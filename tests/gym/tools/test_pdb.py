@@ -9,7 +9,7 @@ import pytest
 from debug_gym.gym.entities import Event
 from debug_gym.gym.envs.env import RepoEnv
 from debug_gym.gym.terminals.docker import DockerTerminal
-from debug_gym.gym.terminals.terminal import Terminal
+from debug_gym.gym.terminals.local import LocalTerminal
 from debug_gym.gym.tools.pdb import PDBTool
 
 
@@ -74,9 +74,9 @@ def setup_pdb_repo_env(setup_test_repo, setup_breakpoints_state):
 
 
 def test_pdb_use(tmp_path, setup_test_repo):
-    # Test PDBTool with Terminal, verbose pytest
+    # Test PDBTool with LocalTerminal, verbose pytest
     tests_path = str(setup_test_repo(tmp_path))
-    terminal = Terminal()
+    terminal = LocalTerminal()
     env = RepoEnv(
         path=tests_path,
         terminal=terminal,
@@ -102,9 +102,9 @@ def test_pdb_use(tmp_path, setup_test_repo):
 
 
 def test_pdb_use_empty_command(tmp_path, setup_test_repo):
-    # Test PDBTool with Terminal, verbose pytest
+    # Test PDBTool with LocalTerminal, verbose pytest
     tests_path = str(setup_test_repo(tmp_path))
-    terminal = Terminal()
+    terminal = LocalTerminal()
     env = RepoEnv(
         path=tests_path,
         terminal=terminal,
@@ -119,9 +119,9 @@ def test_pdb_use_empty_command(tmp_path, setup_test_repo):
 
 
 def test_pdb_b_fail_blank_or_comment(tmp_path, setup_test_repo):
-    # Test PDBTool with Terminal, verbose pytest
+    # Test PDBTool with LocalTerminal, verbose pytest
     tests_path = str(setup_test_repo(tmp_path))
-    terminal = Terminal()
+    terminal = LocalTerminal()
     env = RepoEnv(
         path=tests_path,
         terminal=terminal,
@@ -140,9 +140,9 @@ def test_pdb_b_fail_blank_or_comment(tmp_path, setup_test_repo):
 
 
 def test_pdb_pass_empty_path_if_in_session(tmp_path, setup_test_repo):
-    # Test PDBTool with Terminal, verbose pytest
+    # Test PDBTool with LocalTerminal, verbose pytest
     tests_path = str(setup_test_repo(tmp_path))
-    terminal = Terminal()
+    terminal = LocalTerminal()
     env = RepoEnv(
         path=tests_path,
         terminal=terminal,
@@ -165,7 +165,7 @@ def test_pdb_pass_empty_path_if_in_session(tmp_path, setup_test_repo):
 def test_pdb_use_default_env_entrypoint(tmp_path, setup_test_repo):
     # Test PDBTool with default env entrypoint, quiet pytest
     tests_path = str(setup_test_repo(tmp_path))
-    terminal = Terminal()
+    terminal = LocalTerminal()
     env = RepoEnv(path=tests_path, terminal=terminal)
     env.reset()
     pdb = PDBTool()
