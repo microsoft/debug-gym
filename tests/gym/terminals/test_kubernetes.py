@@ -117,6 +117,8 @@ def test_kubernetes_terminal_run(tmp_path, command):
     assert "test" in output
     assert success is True
 
+    terminal.close()
+
 
 @if_kubernetes_available
 def test_kubernetes_terminal_with_session_commands(tmp_path):
@@ -126,6 +128,7 @@ def test_kubernetes_terminal_with_session_commands(tmp_path):
     status, output = terminal.run("pwd", timeout=1)
     assert status
     assert output == f"Hello\nWorld\n{working_dir}"
+    terminal.close()
 
 
 @if_is_linux
@@ -152,6 +155,7 @@ def test_kubernetes_terminal_session(tmp_path):
 
     terminal.close_shell_session(session)
     assert not terminal.sessions
+    terminal.close()
 
 
 @if_kubernetes_available
@@ -177,6 +181,7 @@ def test_copy_content(tmp_path):
     # Verify the content was copied correctly
     _, output = terminal.run(f"cat {terminal.working_dir}/tmp.txt", timeout=1)
     assert output == "Hello World"
+    terminal.close()
 
 
 @if_kubernetes_available
@@ -204,6 +209,7 @@ def test_select_terminal_kubernetes():
     terminal = select_terminal(config)
     assert isinstance(terminal, KubernetesTerminal)
     assert config == {"type": "kubernetes"}  # config should not be modified
+    terminal.close()
 
 
 def test_kubernetes_terminal_readonly_properties_after_pod_creation():
@@ -223,3 +229,5 @@ def test_kubernetes_terminal_readonly_properties_after_pod_creation():
         ValueError, match="Cannot change working directory after pod creation."
     ):
         terminal.working_dir = "/new/path"
+
+    terminal.close()

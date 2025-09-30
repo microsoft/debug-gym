@@ -496,6 +496,9 @@ class KubernetesTerminal(Terminal):
             self._pod.clean_up()
             self._pod = None
 
+    def __del__(self):
+        self.close()
+
     def __str__(self):
         return f"KubernetesTerminal[{self.pod_name}, {self.working_dir}]"
 

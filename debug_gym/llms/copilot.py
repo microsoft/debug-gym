@@ -160,8 +160,7 @@ class CopilotLLM(OpenAILLM):
 
         return OpenAI(
             api_key=bearer_token,
-            base_url=self.config.endpoint
-            or "https://api.enterprise.githubcopilot.com",
+            base_url=self.config.endpoint or "https://api.enterprise.githubcopilot.com",
             default_headers={
                 "X-Interaction-Type": "conversation-agent",
                 "OpenAI-Intent": "conversation-agent",
@@ -205,9 +204,7 @@ class CopilotLLM(OpenAILLM):
                 need_to_retry = True
                 time.sleep(self.AUTH_RETRY_DELAY_SECONDS)
             elif "unauthorized" in error_message.lower():
-                self.logger.info(
-                    "Authentication failure, refreshing token and client"
-                )
+                self.logger.info("Authentication failure, refreshing token and client")
                 self._invalidate_client_cache()
                 need_to_retry = True
                 time.sleep(self.AUTH_RETRY_DELAY_SECONDS)

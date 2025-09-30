@@ -1,9 +1,9 @@
 import atexit
 import os
 import tarfile
+import uuid
 from io import BytesIO
 from pathlib import Path
-import uuid
 
 import docker
 
