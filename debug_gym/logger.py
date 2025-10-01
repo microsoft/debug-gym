@@ -3,6 +3,7 @@ import logging
 import multiprocessing as mp
 import os
 import queue
+import re
 import threading
 import time
 from contextlib import contextmanager
@@ -19,14 +20,12 @@ from rich.progress import BarColumn, Progress, SpinnerColumn, Task, TextColumn
 from rich.table import Table
 from rich.text import Text
 
-from debug_gym.utils import strip_ansi
-
 
 class StripAnsiFormatter(logging.Formatter):
 
     def format(self, record):
         msg = super().format(record)
-        return strip_ansi(msg)
+        return re.sub(r"\x1B[@-_][0-?]*[ -/]*[@-~]", "", msg)
 
 
 @dataclass(slots=True)  # Slitly faster / memory efficient when using slots
@@ -294,7 +293,6 @@ class TaskProgressManager:
             if pid is not None:
                 is_visible = task_id in visible_tasks
                 self.progress.update(pid, visible=is_visible)
-        self.progress.refresh()
 
     def _visible_tasks(self) -> Dict[str, Dict[str, Any]]:
         """Get visible tasks limited to the maximum display count,
@@ -445,7 +443,6 @@ class OverallProgressContext:
             description=stats_text,
             completed=self.completed,
         )
-        self.overall_progress.refresh()
         # Update panel content
         self.tasks_progress.refresh_progress(all_tasks=all_tasks)
 

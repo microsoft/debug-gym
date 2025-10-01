@@ -1,4 +1,5 @@
 import pytest
+from anyio import Path
 
 from debug_gym.gym.entities import Observation
 from debug_gym.gym.tools.tool import ToolCall
@@ -58,6 +59,39 @@ def test_reset_and_step(get_swe_bench_env):
 |-- setup.py*
 |-- tox.ini"""
     assert env_info.step_observation.observation.startswith(listdir_start)
+
+
+@pytest.if_docker_running
+def test_readonly_file(get_swe_bench_env):
+    env = get_swe_bench_env()
+    env_info = env.reset(options={"task_name": "astropy__astropy-14096"})
+    test_filename = Path("/testbed/astropy/coordinates/tests/test_sky_coord.py")
+    assert str(test_filename).replace("/testbed/", "") in env.test_directives
+    assert env.workspace._is_readonly_func(test_filename)
+    assert not env.workspace._is_readonly_func(test_filename.parent)
+
+    env.add_tool(Toolbox.get_tool("view"))
+    tool_call = ToolCall(
+        id="view_id", name="view", arguments={"path": str(test_filename)}
+    )
+    env_info = env.step(tool_call)
+    assert env_info.step_observation.source == "view"
+    assert (
+        f"Viewing `{test_filename}`"
+        in env_info.step_observation.observation.splitlines()[0]
+    )
+    assert (
+        "The file is read-only."
+        in env_info.step_observation.observation.splitlines()[0]
+    )
+
+    env.add_tool(Toolbox.get_tool("listdir"))
+    tool_call = ToolCall(
+        id="listdir_id", name="listdir", arguments={"path": str(test_filename.parent)}
+    )
+    env_info = env.step(tool_call)
+    assert env_info.step_observation.source == "listdir"
+    assert "|-- test_sky_coord.py (read-only)" in env_info.step_observation.observation
 
 
 @pytest.if_docker_running
@@ -123,13 +157,14 @@ def test_patch_property(tmp_path, get_swe_bench_env):
     assert initial_patch == "", f"Expected empty patch initially, got: {initial_patch}"
 
     # Create a test file with some content
+    test_dir = str(tmp_path)
     test_file = tmp_path / "test_patch_file.py"
     test_content = """def hello_world():
     print("Hello, World!")
     return "success"
 """
     test_file.write_text(test_content)
-    env.workspace.copy_content(test_file)
+    env.workspace.copy_content(test_dir)
 
     # Add the file to git
     env.terminal.run(f"git add {test_file.name}")

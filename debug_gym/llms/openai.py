@@ -132,6 +132,16 @@ class OpenAILLM(LLM):
 
         return need_to_retry
 
+    def _perform_chat_completion(self, **kwargs):
+        """Invoke the OpenAI chat completion endpoint.
+
+        Kept as a separate method so subclasses can customize how the client is
+        retrieved per attempt (for example, to refresh authentication headers
+        such as GitHub Copilot HMAC tokens).
+        """
+
+        return self.client.chat.completions.create(**kwargs)
+
     def define_tools(self, tool_call_list: list[EnvironmentTool]) -> list[dict]:
         """Translates the list of tools into a format that is specifically defined by each LLM.
         OpenAI function calling format: https://platform.openai.com/docs/guides/function-calling
@@ -235,7 +245,7 @@ class OpenAILLM(LLM):
         kwargs["max_tokens"] = kwargs.get("max_tokens", NOT_GIVEN)
         try:
             response = retry_on_exception(
-                self.client.chat.completions.create, self.need_to_be_retried
+                self._perform_chat_completion, self.need_to_be_retried
             )(
                 model=self.config.model,
                 messages=messages,

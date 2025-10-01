@@ -4,7 +4,8 @@ from pathlib import Path
 import numpy as np
 
 from debug_gym.gym.entities import EvalOutput, Event, Observation
-from debug_gym.gym.terminal import Terminal
+from debug_gym.gym.terminals.local import LocalTerminal
+from debug_gym.gym.terminals.terminal import Terminal
 from debug_gym.gym.tools.tool import EnvironmentTool, ToolCall
 from debug_gym.gym.workspace import Workspace
 from debug_gym.logger import DebugGymLogger, log_with_color
@@ -229,7 +230,7 @@ class RepoEnv(TooledEnv):
         self.auto_eval_on_rewrite = auto_eval_on_rewrite
         self.run_timeout = run_timeout
         self.dir_tree_depth = dir_tree_depth
-        self.terminal = terminal or Terminal()
+        self.terminal = terminal or LocalTerminal()  # TODO: default to DockerTerminal
         self.entrypoint = entrypoint
         self.debug_entrypoint = debug_entrypoint or entrypoint
         self.persistent_breakpoints = persistent_breakpoints

@@ -3,6 +3,7 @@ import json
 import os
 import signal
 import subprocess
+import traceback
 import uuid
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
@@ -11,7 +12,7 @@ from debug_gym import version as dg_version
 from debug_gym.agents.base_agent import AGENT_REGISTRY, create_agent
 from debug_gym.agents.utils import load_config
 from debug_gym.gym.envs import select_env
-from debug_gym.gym.terminal import select_terminal
+from debug_gym.gym.terminals import select_terminal
 from debug_gym.gym.tools.toolbox import Toolbox
 from debug_gym.llms.base import LLM
 from debug_gym.llms.human import Human
@@ -152,7 +153,7 @@ def run_agent(args, problem, config):
             f"or check {task_logger.log_file} for more information."
         )
         task_logger.debug(
-            f"Task {problem} generated an exception: {e!r}", exc_info=True
+            f"Task {problem} generated an exception: {e!r}. Traceback: {traceback.format_exc()}"
         )
         if report_progress_error:
             task_logger.report_progress(
@@ -176,7 +177,7 @@ def run_agent(args, problem, config):
 
 
 def create_env(config: dict, logger: DebugGymLogger):
-    terminal = select_terminal(config.get("terminal"), logger)
+    terminal = select_terminal(config.get("terminal"), logger, uuid=config["uuid"])
     env_class = select_env(config.get("benchmark"))
     env = env_class(
         **config["env_kwargs"],

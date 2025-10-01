@@ -88,19 +88,19 @@ class GrepTool(EnvironmentTool):
             command += f" | head -{max_results}"
 
         try:
-            # Assert that the terminal is a Docker terminal (only in production)
+            # Assert that the terminal is not a local terminal (only in production)
             import os
 
-            from debug_gym.gym.terminal import DockerTerminal
+            from debug_gym.gym.terminals.local import LocalTerminal
 
-            # Skip Docker terminal check during testing or when explicitly disabled
-            require_docker = (
-                os.getenv("FORCE_DOCKER_TERMINAL", "true").lower() == "true"
+            # Require remote terminal unless local is explicitly allowed
+            require_remote = (
+                os.environ.get("ALLOW_LOCAL_TERMINAL", "false").lower() == "false"
             )
-            if require_docker and not isinstance(environment.terminal, DockerTerminal):
+            if require_remote and type(environment.terminal) is LocalTerminal:
                 return Observation(
                     self.name,
-                    "Error: grep tool requires a Docker terminal. Current terminal type is not supported.",
+                    "Error: grep tool requires a non-local terminal. Current terminal type is not supported.",
                 )
 
             # Use the environment's terminal to run the grep command

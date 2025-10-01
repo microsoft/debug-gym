@@ -2,7 +2,7 @@ import copy
 import re
 
 from debug_gym.gym.entities import Observation
-from debug_gym.gym.terminal import ShellSession
+from debug_gym.gym.terminals.shell_session import ShellSession
 from debug_gym.gym.tools.tool import EnvironmentTool
 from debug_gym.gym.tools.toolbox import Toolbox
 

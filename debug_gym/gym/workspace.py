@@ -3,7 +3,8 @@ import os
 import tempfile
 from pathlib import Path
 
-from debug_gym.gym.terminal import Terminal
+from debug_gym.gym.terminals.local import LocalTerminal
+from debug_gym.gym.terminals.terminal import Terminal
 from debug_gym.gym.utils import make_file_matcher
 from debug_gym.logger import DebugGymLogger
 
@@ -30,7 +31,8 @@ class Workspace:
         self.cleanup()
 
         self.working_dir = Path("/testbed")
-        if type(self.terminal) is Terminal:
+        # only create temp dir for local terminal
+        if type(self.terminal) is LocalTerminal:
             self._tempdir = tempfile.TemporaryDirectory(prefix="DebugGym-")
             atexit.register(self._tempdir.cleanup)
             self.working_dir = Path(self._tempdir.name).resolve()
@@ -107,7 +109,7 @@ class Workspace:
         if raises and abs_filepath != self.working_dir:
             # Check if file exists, is within working_dir and is not ignored.
             check_cmd = (
-                f'abs_path=$(realpath "{abs_filepath_str}"); '
+                f'abs_path=$(realpath -s "{abs_filepath_str}"); '
                 f'test -e "$abs_path" && [[ "$abs_path" == {self.working_dir}* ]]'
             )
             success, result = self.terminal.run(
@@ -146,7 +148,9 @@ class Workspace:
     def directory_tree(self, root: str | Path = None, max_depth: int = 1):
         root = self.resolve_path(root or self.working_dir, raises=True)
         # Use the terminal to run a bash command to list files
-        tree_cmd = f"tree --charset=ASCII --noreport -a -v -F -f -L {max_depth} {root} "
+        tree_cmd = (
+            f"tree --charset=ASCII --noreport -a -v -F -f -l -L {max_depth} {root} "
+        )
         success, output = self.terminal.run(tree_cmd, raises=True)
 
         first, *rest = output.splitlines()
@@ -159,7 +163,9 @@ class Workspace:
             if self._is_ignored_func(path):
                 continue
 
-            lines.append(f"{prefix}{os.path.basename(path.rstrip('/'))}")
+            # Remove trailing / and symbolic link details.
+            clean_path = path.split(" -> ")[0].rstrip("/")
+            lines.append(f"{prefix}{os.path.basename(clean_path)}")
 
             if path.endswith("/"):
                 # i.e. a directory

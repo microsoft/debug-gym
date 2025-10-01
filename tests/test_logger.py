@@ -173,7 +173,18 @@ def test_task_log_file_path_empty_dir():
     assert task.log_file_path == ""
 
 
-def test_strip_ansi_formatter():
+@pytest.mark.parametrize(
+    "message,expected",
+    [
+        ("\033[31mRed text\033[0m", "Red text"),
+        ("\x1b[31mThis is a test message.\x1b[0m", "This is a test message."),
+        ("\x1b[32mAnother test message.\x1b[0m", "Another test message."),
+        ("No ANSI codes here.", "No ANSI codes here."),
+        ("\x1b[1;34mBold blue text\x1b[0m", "Bold blue text"),
+        ("\x1b[0mReset code only\x1b[0m", "Reset code only"),
+    ],
+)
+def test_strip_ansi_formatter(message, expected):
     # Test that the StripAnsiFormatter removes ANSI color codes
     formatter = StripAnsiFormatter("%(message)s")
 
@@ -183,13 +194,13 @@ def test_strip_ansi_formatter():
         level=logging.INFO,
         pathname="",
         lineno=0,
-        msg="\033[31mRed text\033[0m",
+        msg=message,
         args=(),
         exc_info=None,
     )
 
     result = formatter.format(record)
-    assert result == "Red text"
+    assert result == expected
 
 
 def test_task_progress_manager_initialization(debug_gym_logger):

@@ -1,7 +1,7 @@
 import pytest
 
 from debug_gym.gym.envs import AiderBenchmarkEnv
-from debug_gym.gym.terminal import Terminal
+from debug_gym.gym.terminals.local import LocalTerminal
 from debug_gym.gym.tools.tool import ToolCall
 from debug_gym.gym.tools.toolbox import Toolbox
 
@@ -33,7 +33,7 @@ def setup_aider_repo(tmp_path_factory):
 
 @pytest.fixture
 def env(setup_aider_repo):
-    terminal = Terminal()
+    terminal = LocalTerminal()
     env = AiderBenchmarkEnv(terminal=terminal)
     env.reset(options={"task_name": "clock"})
     return env
