@@ -80,7 +80,11 @@ def test_terminal_init(tmp_dir_prefix):
 
 def test_terminal_init_no_os_env_vars():
     terminal = LocalTerminal(include_os_env_vars=False)
-    assert terminal.env_vars == {"NO_COLOR": "1", "PS1": DEFAULT_PS1}
+    assert terminal.env_vars == {
+        "NO_COLOR": "1",
+        "PS1": DEFAULT_PS1,
+        "PYTHONSTARTUP": "",
+    }
 
 
 def test_terminal_init_with_params(tmp_path):

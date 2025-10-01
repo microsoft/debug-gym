@@ -35,7 +35,11 @@ if_is_linux = pytest.mark.skipif(
 def test_kubernetes_terminal_init():
     terminal = KubernetesTerminal()
     assert terminal.session_commands == []
-    assert terminal.env_vars == {"NO_COLOR": "1", "PS1": DEFAULT_PS1}
+    assert terminal.env_vars == {
+        "NO_COLOR": "1",
+        "PS1": DEFAULT_PS1,
+        "PYTHONSTARTUP": "",
+    }
     assert os.path.basename(terminal.working_dir).startswith("Terminal-")
     assert terminal.base_image == "ubuntu:latest"
     assert terminal.namespace == "default"
