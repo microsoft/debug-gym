@@ -134,6 +134,9 @@ class Workspace:
         """Writes `content` to `filepath` exactly as-is, preserving any trailing newlines."""
         abs_filepath = self.resolve_path(filepath)
 
+        # create parent directories via the terminal if needed
+        self.terminal.run(f'mkdir -p "{str(abs_filepath.parent)}"', raises=True)
+
         # In the following command we:
         # - use a single-quoted heredoc (cat <<'nDEBUGGYM_EOF' ... nDEBUGGYM_EOF) so the heredoc body is taken literally (no shell expansion)
         # - append a sentinel character DEBUGGYM_DEL inside the heredoc so we can detect/restore trailing newlines later
