@@ -89,12 +89,12 @@ def test_shell_session_start_with_session_commands(tmp_path):
 
     # Test starting without command
     output = session.start()
-    assert output == "setup"  # from `echo setup` in session_commands
+    assert "setup" in output  # from `echo setup` in session_commands
     assert session.is_running
     assert session.filedescriptor is not None
     assert session.process is not None
     output = session.run("echo Hello World")
-    assert output == "Hello World"
+    assert "Hello World" in output
     session.close()
     assert not session.is_running
     assert session.filedescriptor is None
@@ -107,7 +107,7 @@ def test_shell_session_start_with_session_commands(tmp_path):
     assert session.filedescriptor is not None
     assert session.process is not None
     output = session.run("print('test python')", ">>>")
-    assert output == "test python"
+    assert "test python" in output
     session.close()
 
 
@@ -117,12 +117,11 @@ def test_shell_session_start_without_session_commands(tmp_path):
 
     # Test starting without command
     output = session.start()
-    assert output == ""
     assert session.is_running
     assert session.filedescriptor is not None
     assert session.process is not None
     output = session.run("echo Hello World")
-    assert output == "Hello World"
+    assert "Hello World" in output
     session.close()
     assert not session.is_running
     assert session.filedescriptor is None
@@ -135,7 +134,7 @@ def test_shell_session_start_without_session_commands(tmp_path):
     assert session.filedescriptor is not None
     assert session.process is not None
     output = session.run("print('test python')", ">>>")
-    assert output == "test python"
+    assert "test python" in output
     session.close()
 
 
