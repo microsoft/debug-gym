@@ -24,6 +24,8 @@ class Event(Enum):
     FILE_CHANGE = "file_change"
     REWRITE_SUCCESS = "rewrite_success"
     REWRITE_FAIL = "rewrite_fail"
+    CREATE_SUCCESS = "create_success"
+    CREATE_FAIL = "create_fail"
     SWITCH_CONTEXT = "switch_context"
 
     @property

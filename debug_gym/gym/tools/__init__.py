@@ -1,4 +1,5 @@
 from debug_gym.gym.tools.bash import BashTool
+from debug_gym.gym.tools.create import CreateTool
 from debug_gym.gym.tools.eval import EvalTool
 from debug_gym.gym.tools.grep import GrepTool
 from debug_gym.gym.tools.listdir import ListdirTool
