@@ -73,8 +73,10 @@ class LocalTerminal(Terminal):
     def default_shell_command(self) -> str:
         """Starts a new bash session exporting the current python executable as 'python'.
         Flags --noprofile and --norc are used to avoid loading any bash profile or rc file,
-        which could interfere with the terminal setup (clean outputs)"""
-        return "/bin/bash --noprofile --norc"
+        which could interfere with the terminal setup (clean outputs).
+        Flag --noediting disables readline editing features including bracketed paste mode.
+        """
+        return "/bin/bash --noprofile --norc --noediting"
 
     def new_shell_session(self):
         session = ShellSession(

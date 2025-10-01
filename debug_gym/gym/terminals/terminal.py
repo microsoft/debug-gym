@@ -28,9 +28,10 @@ class Terminal(ABC):
             self.env_vars = self.env_vars | dict(os.environ)
         # Clean up output by disabling terminal prompt and colors
         self.env_vars["NO_COLOR"] = "1"  # disable colors
-        self.env_vars["PS1"] = (
-            DEFAULT_PS1  # use a sentinel to know when to stop reading
-        )
+        self.env_vars["PYTHONSTARTUP"] = ""  # prevent Python from loading startup files
+        # use a sentinel to know when to stop reading
+        self.env_vars["PS1"] = DEFAULT_PS1
+
         self._working_dir = working_dir
         self.sessions = []
 
@@ -66,11 +67,9 @@ class Terminal(ABC):
         pass
 
     @property
+    @abstractmethod
     def default_shell_command(self) -> str:
-        """Starts a new bash session exporting the current python executable as 'python'.
-        Flags --noprofile and --norc are used to avoid loading any bash profile or rc file,
-        which could interfere with the terminal setup (clean outputs)"""
-        return "/bin/bash --noprofile --norc"
+        pass
 
     @abstractmethod
     def new_shell_session(self):

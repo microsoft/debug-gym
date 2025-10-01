@@ -316,7 +316,7 @@ class KubernetesTerminal(Terminal):
     def default_shell_command(self) -> list[str]:
         """Expects the pod to have bash installed."""
         kubeconfig = f"--kubeconfig {self.kube_config}" if self.kube_config else ""
-        bash_cmd = "/bin/bash --noprofile --norc"
+        bash_cmd = "/bin/bash --noprofile --norc --noediting"
         return f"kubectl {kubeconfig} exec -it {self.pod.name} -n {self.pod.namespace} -- {bash_cmd}"
 
     def new_shell_session(self):

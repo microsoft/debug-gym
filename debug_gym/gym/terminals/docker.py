@@ -72,9 +72,7 @@ class DockerTerminal(Terminal):
     @property
     def default_shell_command(self) -> list[str]:
         """Expects the container to have bash installed and python executable available."""
-        entrypoint = (
-            f"docker exec -t -i {self.container.name} /bin/bash --noprofile --norc"
-        )
+        entrypoint = f"docker exec -t -i {self.container.name} /bin/bash --noprofile --norc --noediting"
         return entrypoint
 
     def new_shell_session(self):
