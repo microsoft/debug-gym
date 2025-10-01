@@ -107,7 +107,7 @@ def test_kubernetes_terminal_run(tmp_path, command):
     working_dir = str(tmp_path)
     terminal = KubernetesTerminal(working_dir=working_dir)
     success, output = terminal.run(command, timeout=1)
-    assert "test" in output
+    assert output == "test"
     assert success is True
 
     success, output = terminal.run("echo $ENV_VAR", timeout=1)
@@ -143,17 +143,15 @@ def test_kubernetes_terminal_session(tmp_path):
     session = terminal.new_shell_session()
     assert len(terminal.sessions) == 1
     output = session.run(command, timeout=1)
-    assert DISABLE_ECHO_COMMAND in output
-    assert "Hello World" in output
+    assert output == f"{DISABLE_ECHO_COMMAND}Hello World"
 
     output = session.start()
     session.run("export TEST_VAR='FooBar'", timeout=1)
-    assert DISABLE_ECHO_COMMAND in output
-    assert "FooBar" not in output
+    assert output == f"{DISABLE_ECHO_COMMAND}"
     output = session.run("pwd", timeout=1)
-    assert working_dir in output
+    assert output == working_dir
     output = session.run("echo $TEST_VAR", timeout=1)
-    assert "FooBar" in output
+    assert output == "FooBar"
 
     terminal.close_shell_session(session)
     assert not terminal.sessions

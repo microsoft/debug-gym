@@ -91,18 +91,16 @@ def test_docker_terminal_session(tmp_path):
     session = terminal.new_shell_session()
     assert len(terminal.sessions) == 1
     output = session.run(command, timeout=1)
-    assert DISABLE_ECHO_COMMAND in output
-    assert "Hello World" in output
+    assert output == f"{DISABLE_ECHO_COMMAND}Hello World"
 
     output = session.start()
     session.run("export TEST_VAR='FooBar'", timeout=1)
-    assert DISABLE_ECHO_COMMAND in output
-    assert "FooBar" not in output
+    assert output == f"{DISABLE_ECHO_COMMAND}"
 
     output = session.run("pwd", timeout=1)
-    assert working_dir in output
+    assert output == working_dir
     output = session.run("echo $TEST_VAR", timeout=1)
-    assert "FooBar" in output
+    assert output == "FooBar"
 
     terminal.close_shell_session(session)
     assert not terminal.sessions
