@@ -17,7 +17,6 @@ from tenacity import (
 )
 
 from debug_gym.logger import DebugGymLogger
-from debug_gym.utils import strip_ansi
 
 DEFAULT_TIMEOUT = 300
 DEFAULT_PS1 = "DEBUG_GYM_PS1"
@@ -135,6 +134,7 @@ class ShellSession:
         read_until: str | None = None,
         timeout: int | None = None,
         read_length: int = 1024,
+        strip_output: bool = True,
     ) -> str:
         """Read from this Shell session until read_until is found, timeout is reached"""
         read_until = read_until or self.default_read_until
@@ -169,9 +169,9 @@ class ShellSession:
                 if e.errno != errno.EAGAIN:
                     raise
 
-        # Strip out ANSI escape codes.
-        output = strip_ansi(output)
-        output = output.replace(read_until, "").strip().strip("\r\n")
+        output = output.replace(read_until, "").strip()
+        if strip_output:
+            output = output.strip("\r\n").strip("\n")
         return output
 
     def run(

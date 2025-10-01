@@ -3,6 +3,7 @@ import logging
 import multiprocessing as mp
 import os
 import queue
+import re
 import threading
 import time
 from contextlib import contextmanager
@@ -19,14 +20,12 @@ from rich.progress import BarColumn, Progress, SpinnerColumn, Task, TextColumn
 from rich.table import Table
 from rich.text import Text
 
-from debug_gym.utils import strip_ansi
-
 
 class StripAnsiFormatter(logging.Formatter):
 
     def format(self, record):
         msg = super().format(record)
-        return strip_ansi(msg)
+        return re.sub(r"\x1B[@-_][0-?]*[ -/]*[@-~]", "", msg)
 
 
 @dataclass(slots=True)  # Slitly faster / memory efficient when using slots
