@@ -292,33 +292,43 @@ def test_read_file_raises_for_nonexistent_file(workspace):
         workspace.read_file("/test.txt")
 
 
-def test_write_file(workspace):
+def test_write_file_basic(workspace):
     file_path = workspace.working_dir / "test.txt"
     file_content = "Hello, DebugGym!\n\n\n"
     workspace.write_file("test.txt", file_content)
     assert file_path.read_text() == file_content
 
-    # Test with single line, no newline at the end.
+
+def test_write_file_single_line_no_newline(workspace):
+    file_path = workspace.working_dir / "test.txt"
     file_content_single_line = "Hello, DebugGym!"
     workspace.write_file("test.txt", file_content_single_line)
     assert file_path.read_text() == file_content_single_line
 
-    # Should still work if the content ends with the delimiter.
+
+def test_write_file_with_delimiter(workspace):
+    file_path = workspace.working_dir / "test.txt"
     file_content_single_line = "Hello, DebugGym!nDEBUGGYM_DEL"
     workspace.write_file("test.txt", file_content_single_line)
     assert file_path.read_text() == file_content_single_line
 
-    # Test with newlines
+
+def test_write_file_with_newlines(workspace):
+    file_path = workspace.working_dir / "test.txt"
     file_content_with_newlines = "Hello, DebugGym!\nThis is a test.\n"
     workspace.write_file("test.txt", file_content_with_newlines)
     assert file_path.read_text() == file_content_with_newlines
 
-    # Test with empty content
+
+def test_write_file_empty_content(workspace):
+    file_path = workspace.working_dir / "test.txt"
     file_content_empty = ""
     workspace.write_file("test.txt", file_content_empty)
     assert file_path.read_text() == file_content_empty
 
-    # Test with content exceeding max command length.
+
+def test_write_file_exceeding_max_command_length(workspace):
+    file_path = workspace.working_dir / "test.txt"
     file_content_exceeding_max_command_length = "A" * (2 * 1024**2)  # 2MB of 'A's
     workspace.write_file("test.txt", file_content_exceeding_max_command_length)
     assert file_path.read_text() == file_content_exceeding_max_command_length
