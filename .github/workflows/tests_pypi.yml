@@ -2,7 +2,7 @@ name: "Tests from Pypi"
 
 on:
   workflow_run:
-    workflows: ["Release"]
+    workflows: ["PyPI Release"]
     types:
       - completed
   schedule:
