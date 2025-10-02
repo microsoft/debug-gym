@@ -55,7 +55,7 @@ The structure of `debug-gym` is as below:
 debug_gym
 ├── gym
 │   ├── envs
-│   ├── terminal
+│   ├── terminals
 │   └── tools
 ├── agents
 └── llms
@@ -116,7 +116,34 @@ To demonstrate how to integrate `debug-gym` with coding tasks and repositories, 
 | `aider` | [https://github.com/Aider-AI/aider](https://github.com/Aider-AI/aider) |
 | `swebench`| [https://github.com/princeton-nlp/SWE-bench](https://github.com/princeton-nlp/SWE-bench) |
 | `swesmith`| [https://github.com/SWE-bench/SWE-smith](https://github.com/SWE-bench/SWE-smith) |
+| `r2egym`| [https://github.com/R2E-Gym/R2E-Gym](https://github.com/R2E-Gym/R2E-Gym) |
 | `mini_nightmare` | A set of 10 hand-crafted minimal buggy code snippet where rewrite only agents have harder time to tackle. Read details [here](https://github.com/microsoft/debug-gym/blob/main/data/mini_nightmare/mini_nightmare.md). |
+
+
+---
+
+#### 2.4. Terminals
+
+`debug-gym` supports multiple terminal backends to accommodate different execution environments and deployment scenarios. Each terminal type provides a consistent interface while handling the underlying infrastructure differently.
+
+| Terminal Type | Description |
+| :-: | :----- |
+| `LocalTerminal` | Executes commands directly on the local machine using bash. Ideal for development and testing on local systems. |
+| `DockerTerminal` | Executes commands inside Docker containers running on your machine. Provides isolated execution environments. (Recommended) |
+| `KubernetesTerminal` | Executes commands in Kubernetes pods for scalable deployments. Provides isolated execution environments. Suitable when dealing with large benchmarks like `swebench`, `swesmith`, and `r2egym`. |
+
+All terminals support:
+- Specify custom working directories and session commands
+- Environment variable configuration
+- Command execution with timeout handling
+- Output capturing and error reporting
+- Automatic cleanup and resource management
+- Retry mechanisms for transient errors
+- Provide a way to create persistent interactive shell sessions using pseudo-terminals (PTY). Used internally by interactive debugging tools such as `pdb`.
+> [!WARNING]
+> Interactive shell sessions are not fully compatible with macOS due to their reliance on pty.
+
+Terminal selection is configured through the `terminal_config` in your script configuration file. The framework automatically handles terminal initialization, command execution, and cleanup based on the specified type.
 
 ---
 
