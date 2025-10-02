@@ -312,3 +312,13 @@ def test_write_file(workspace):
     file_content_with_newlines = "Hello, DebugGym!\nThis is a test.\n"
     workspace.write_file("test.txt", file_content_with_newlines)
     assert file_path.read_text() == file_content_with_newlines
+
+    # Test with empty content
+    file_content_empty = ""
+    workspace.write_file("test.txt", file_content_empty)
+    assert file_path.read_text() == file_content_empty
+
+    # Test with content exceeding max command length.
+    file_content_exceeding_max_command_length = "A" * (2 * 1024**2)  # 2MB of 'A's
+    workspace.write_file("test.txt", file_content_exceeding_max_command_length)
+    assert file_path.read_text() == file_content_exceeding_max_command_length

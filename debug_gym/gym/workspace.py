@@ -136,14 +136,24 @@ class Workspace:
         """Writes `content` to `filepath` exactly as-is, preserving any trailing newlines."""
         abs_filepath = self.resolve_path(filepath)
 
+        # We will split content in chunks of 32kB to avoid hitting command length limits.
+        chunk_size = 32 * 1024  # 32kB
+        first_chunk = content[:chunk_size]
+        rest = content[chunk_size:]
+
         # In the following command we:
         # - use a single-quoted heredoc (cat <<'nDEBUGGYM_EOF' ... nDEBUGGYM_EOF) so the heredoc body is taken literally (no shell expansion)
         # - append a sentinel character DEBUGGYM_DEL inside the heredoc so we can detect/restore trailing newlines later
         # - capture the heredoc output into shell variable CONTENT since command substitution strips trailing newlines
         # - "${CONTENT%DEBUGGYM_DEL}" removes the trailing sentinel DEBUGGYM_DEL (restoring the original trailing-newline state)
         # - echo -n writes the result without adding an extra newline
-        cmd = f"CONTENT=$(cat <<'DEBUGGYM_EOF'\n{content}DEBUGGYM_DEL\nDEBUGGYM_EOF\n); echo -n \"${{CONTENT%DEBUGGYM_DEL}}\" > {abs_filepath}"
+        cmd = f"CONTENT=$(cat <<'DEBUGGYM_EOF'\n{first_chunk}DEBUGGYM_DEL\nDEBUGGYM_EOF\n); echo -n \"${{CONTENT%DEBUGGYM_DEL}}\" > {abs_filepath}"
         self.terminal.run(cmd, raises=True)
+
+        for i in range(0, len(rest), chunk_size):
+            chunk = rest[i : i + chunk_size]
+            cmd = f"CONTENT=$(cat <<'DEBUGGYM_EOF'\n{chunk}DEBUGGYM_DEL\nDEBUGGYM_EOF\n); echo -n \"${{CONTENT%DEBUGGYM_DEL}}\" >> {abs_filepath}"
+            self.terminal.run(cmd, raises=True)
 
     def directory_tree(self, root: str | Path = None, max_depth: int = 1):
         root = self.resolve_path(root or self.working_dir, raises=True)
