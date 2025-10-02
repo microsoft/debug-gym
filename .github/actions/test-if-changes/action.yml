@@ -10,6 +10,9 @@ inputs:
   test-files:
     description: 'Test files to run.'
     required: true
+  version:
+    description: 'Specific version to install from PyPI (e.g., "1.0.0"). If not provided, builds from source.'
+    required: false
 
 runs:
   using: "composite"
@@ -23,7 +26,11 @@ runs:
       shell: bash
       run: |
         pip install --upgrade pip
-        pip install -e '.[dev]'
+        if [[ -z "${{ inputs.version }}" ]]; then
+          pip install -e '.[dev]'
+        else
+          pip install "debug-gym[dev]==${{ inputs.version }}"
+        fi
     - name: Run tests
       env:
         DEBUG_GYM_DEBUG: 1
