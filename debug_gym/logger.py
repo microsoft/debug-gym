@@ -518,7 +518,12 @@ class DebugGymLogger(logging.Logger):
     ):
         super().__init__(name)
         # If var env "DEBUG_GYM_DEBUG" is set, turn on debug mode
-        if os.environ.get("DEBUG_GYM_DEBUG"):
+        if os.environ.get("DEBUG_GYM_DEBUG", "").strip().lower() in (
+            "1",
+            "true",
+            "yes",
+            "on",
+        ):
             level = logging.DEBUG
 
         # Prevent the log messages from being propagated to the root logger
