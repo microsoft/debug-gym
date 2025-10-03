@@ -7,6 +7,7 @@ import time
 import uuid
 from pathlib import Path
 
+from jinja2 import Template
 from kubernetes import client, config, stream, watch
 from kubernetes.client.rest import ApiException
 from kubernetes.stream.ws_client import ERROR_CHANNEL
@@ -16,6 +17,7 @@ from tenacity import (
     stop_after_attempt,
     wait_random_exponential,
 )
+from yaml import dump, safe_load
 
 from debug_gym.gym.terminals.shell_session import ShellSession
 from debug_gym.gym.terminals.terminal import DISABLE_ECHO_COMMAND, Terminal
@@ -226,6 +228,7 @@ class KubernetesTerminal(Terminal):
         registry: str = "docker.io/",
         namespace: str = "default",
         kube_config: str | None = None,
+        kube_context: str | None = None,
         extra_labels: dict | None = None,
         pod_spec_kwargs: dict = None,
         **kwargs,
@@ -247,13 +250,12 @@ class KubernetesTerminal(Terminal):
         self._pod_name = pod_name
         self.pod_spec_kwargs = pod_spec_kwargs or {}
         user = _clean_for_kubernetes(os.environ.get("USER", "unknown"))
-        self.labels = {"app": "debug-gym", "component": "terminal", "user": user} | (
-            extra_labels or {}
-        )
+        self.labels = {"app": "dbg-gym", "user": user} | (extra_labels or {})
         self._pod = None
 
         # Initialize Kubernetes client
         self.kube_config = kube_config
+        self.kube_context = kube_context
         if self.kube_config == "incluster":
             self.kube_config = None
             config.load_incluster_config()
@@ -262,7 +264,7 @@ class KubernetesTerminal(Terminal):
                 "KUBECONFIG", "~/.kube/config"
             )
             self.kube_config = os.path.expanduser(self.kube_config)
-            config.load_kube_config(self.kube_config)
+            config.load_kube_config(self.kube_config, self.kube_context)
 
         self.k8s_client = client.CoreV1Api()
         atexit.register(self.close)
@@ -430,6 +432,12 @@ class KubernetesTerminal(Terminal):
             f"Setting up pod {pod_name} with base image: {self.base_image}"
         )
 
+        # Render pod_spec_kwargs as a Jinja2 template, replace variables, then load as dict.
+        pod_spec_yaml = dump(self.pod_spec_kwargs)
+        pod_spec_template = Template(pod_spec_yaml)
+        rendered_yaml = pod_spec_template.render(os.environ)
+        pod_spec_kwargs = safe_load(rendered_yaml)
+
         # Create pod specification for Kubernetes.
         pod_body = {
             "apiVersion": "v1",
@@ -462,7 +470,7 @@ class KubernetesTerminal(Terminal):
                         },
                     }
                 ],
-                **self.pod_spec_kwargs,  # e.g., nodeSelector, tolerations
+                **pod_spec_kwargs,  # e.g., nodeSelector, tolerations
             },
         }
 
