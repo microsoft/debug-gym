@@ -99,6 +99,68 @@ def test_kubernetes_terminal_init_with_params(tmp_path):
 
 
 @if_kubernetes_available
+def test_kubernetes_terminal_init_with_pod_specs(tmp_path):
+    working_dir = str(tmp_path)
+    # set an environment variable to use in the pod spec
+    os.environ["HOSTNAME"] = "minikube"
+    pod_spec_kwargs = {
+        "affinity": {
+            "nodeAffinity": {
+                "requiredDuringSchedulingIgnoredDuringExecution": {
+                    "nodeSelectorTerms": [
+                        {
+                            "matchExpressions": [
+                                {
+                                    "key": "kubernetes.io/hostname",
+                                    "operator": "In",
+                                    "values": ["{{HOSTNAME}}"],
+                                }
+                            ]
+                        }
+                    ]
+                }
+            }
+        },
+        "tolerations": [
+            {
+                "key": "kubernetes.azure.com/scalesetpriority",
+                "operator": "Equal",
+                "value": "spot",
+                "effect": "NoSchedule",
+            },
+            {
+                "key": "CriticalAddonsOnly",
+                "operator": "Equal",
+                "value": "true",
+                "effect": "NoSchedule",
+            },
+        ],
+    }
+
+    terminal = KubernetesTerminal(
+        working_dir=working_dir,
+        pod_spec_kwargs=pod_spec_kwargs,
+        kube_context="minikube",
+    )
+
+    terminal.pod  # Create pod.
+    assert (
+        terminal.pod.pod_body["spec"]["tolerations"] == pod_spec_kwargs["tolerations"]
+    )
+    # Make sure environment variable was replaced in the pod spec.
+    spec = terminal.pod.pod_body["spec"]
+    node_affinity = spec["affinity"]["nodeAffinity"]
+    required = node_affinity["requiredDuringSchedulingIgnoredDuringExecution"]
+    term = required["nodeSelectorTerms"][0]
+    match_expression = term["matchExpressions"][0]
+    assert match_expression["values"] == [os.environ["HOSTNAME"]]
+
+    # Close pod.
+    terminal.close()
+    assert terminal._pod is None
+
+
+@if_kubernetes_available
 @pytest.mark.parametrize(
     "command",
     [
