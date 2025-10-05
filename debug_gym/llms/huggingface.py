@@ -103,9 +103,7 @@ class HuggingFaceLLM(OpenAILLM):
         normalized = []
         for message in messages:
             role = message.get("role", "user")
-            if role == "tool":
-                role = "user"
-            elif role not in {"system", "user", "assistant"}:
+            if role not in {"system", "user", "assistant"}:
                 role = "user"
 
             content = message.get("content")
