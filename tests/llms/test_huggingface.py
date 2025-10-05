@@ -1,9 +1,16 @@
 import json
 from unittest.mock import MagicMock, patch
 
+import pytest
+from transformers import AutoTokenizer
+
 from debug_gym.llms import HuggingFaceLLM
-from debug_gym.llms.base import LLMConfigRegistry
+from debug_gym.llms.base import LLMConfig, LLMConfigRegistry
 from debug_gym.llms.openai import OpenAILLM
+
+# Run these tests with `pytest tests/llms/test_huggingface.py -m hf_tokenizer`
+# to include the integration case that downloads the real Qwen tokenizer.
+
 
 MODEL_REGISTRY = {
     "qwen-3": {
@@ -16,6 +23,20 @@ MODEL_REGISTRY = {
         "tokenizer_kwargs": {"trust_remote_code": True},
     }
 }
+
+REAL_TOKENIZER_ID = "Qwen/Qwen3-0.6B"
+
+
+@pytest.fixture(scope="session")
+def real_qwen3_tokenizer():
+    try:
+        return AutoTokenizer.from_pretrained(REAL_TOKENIZER_ID, trust_remote_code=True)
+    except (
+        OSError,
+        ValueError,
+        ImportError,
+    ) as exc:  # pragma: no cover - network-dependent
+        pytest.skip(f"Unable to load tokenizer {REAL_TOKENIZER_ID}: {exc}")
 
 
 @patch.object(
@@ -153,3 +174,52 @@ def test_message_token_counts_fallbacks_to_openai_when_template_fails(
 
     assert counts == [5, 6]
     mock_super_counts.assert_called_once_with(messages)
+
+
+@pytest.mark.hf_tokenizer
+def test_chat_template_counts_with_real_tokenizer(real_qwen3_tokenizer, logger_mock):
+    config = LLMConfig(
+        model="qwen-3",
+        tokenizer=REAL_TOKENIZER_ID,
+        context_limit=4,
+        api_key="placeholder",
+        endpoint="http://localhost",
+        tags=["vllm"],
+        tokenizer_kwargs={"trust_remote_code": True},
+    )
+
+    llm = HuggingFaceLLM(model_name="qwen-3", logger=logger_mock, llm_config=config)
+    llm._hf_tokenizer = real_qwen3_tokenizer
+
+    messages = [
+        {"role": "system", "content": "Instructions"},
+        {"role": "user", "content": "Hello"},
+        {"role": "tool", "content": "Result"},
+    ]
+
+    counts = llm._get_message_token_counts(messages)
+
+    normalized = llm._normalize_messages_for_template(messages)
+    expected_counts = []
+    prev_len = 0
+    for idx in range(1, len(normalized) + 1):
+        try:
+            tokenized = real_qwen3_tokenizer.apply_chat_template(
+                normalized[:idx], tokenize=True, add_generation_prompt=False
+            )
+        except TypeError:  # pragma: no cover - version-specific
+            tokenized = real_qwen3_tokenizer.apply_chat_template(
+                normalized[:idx], tokenize=True
+            )
+        token_ids = (
+            tokenized.get("input_ids") if isinstance(tokenized, dict) else tokenized
+        )
+        if token_ids and isinstance(token_ids[0], list):
+            token_ids = token_ids[0]
+        if token_ids is None:
+            pytest.skip("Tokenizer did not return token ids")
+        expected_counts.append(len(token_ids) - prev_len)
+        prev_len = len(token_ids)
+
+    assert counts == expected_counts
+    assert counts[-1] > 0
