@@ -1,3 +1,4 @@
+import json
 from unittest.mock import MagicMock, patch
 
 from debug_gym.gym.tools.tool import ToolCall
@@ -44,6 +45,168 @@ def test_huggingface_tokenizer_usage(mock_auto_tokenizer, mock_llm_config, logge
     assert tokenizer_mock.pad_token == "</s>"
 
 
+@patch.object(
+    LLMConfigRegistry,
+    "from_file",
+    return_value=LLMConfigRegistry.register_all(
+        {
+            "qwen-3": {
+                "model": "qwen-3",
+                "tokenizer": "Qwen/Qwen3",
+                "context_limit": 4,
+                "api_key": "test-api-key",
+                "endpoint": "https://test-endpoint",
+                "tags": ["vllm"],
+            }
+        }
+    ),
+)
+@patch("debug_gym.llms.huggingface.AutoTokenizer.from_pretrained")
+def test_huggingface_normalizes_messages_for_template(
+    mock_auto_tokenizer, mock_llm_config, logger_mock
+):
+    tokenizer_mock = MagicMock()
+    tokenizer_mock.pad_token = None
+    tokenizer_mock.eos_token = "</s>"
+    mock_auto_tokenizer.return_value = tokenizer_mock
+
+    llm = HuggingFaceLLM(model_name="qwen-3", logger=logger_mock)
+
+    raw_messages = [
+        {"role": "tool", "content": "partial output"},
+        {
+            "role": "developer",
+            "content": [{"text": "line1"}, {"text": "line2"}],
+        },
+        {
+            "role": "assistant",
+            "content": None,
+            "tool_calls": [{"type": "function", "name": "noop", "arguments": {}}],
+        },
+        {"role": "user", "content": None},
+    ]
+
+    normalized = llm._normalize_messages_for_template(raw_messages)
+
+    assert normalized == [
+        {"role": "user", "content": "partial output"},
+        {"role": "user", "content": "line1\nline2"},
+        {
+            "role": "assistant",
+            "content": json.dumps(
+                [{"type": "function", "name": "noop", "arguments": {}}]
+            ),
+        },
+        {"role": "user", "content": ""},
+    ]
+
+
+@patch.object(
+    LLMConfigRegistry,
+    "from_file",
+    return_value=LLMConfigRegistry.register_all(
+        {
+            "qwen-3": {
+                "model": "qwen-3",
+                "tokenizer": "Qwen/Qwen3",
+                "context_limit": 4,
+                "api_key": "test-api-key",
+                "endpoint": "https://test-endpoint",
+                "tags": ["vllm"],
+            }
+        }
+    ),
+)
+@patch("debug_gym.llms.huggingface.AutoTokenizer.from_pretrained")
+def test_huggingface_chat_template_token_counts(
+    mock_auto_tokenizer, mock_llm_config, logger_mock
+):
+    tokenizer_mock = MagicMock()
+    tokenizer_mock.pad_token = None
+    tokenizer_mock.eos_token = "</s>"
+
+    def fake_apply_chat_template(messages, tokenize=True, add_generation_prompt=False):
+        length = len(messages)
+        return list(range(length * 2))
+
+    tokenizer_mock.apply_chat_template.side_effect = fake_apply_chat_template
+    tokenizer_mock.encode.return_value = []
+    mock_auto_tokenizer.return_value = tokenizer_mock
+
+    llm = HuggingFaceLLM(model_name="qwen-3", logger=logger_mock)
+
+    messages = [
+        {"role": "system", "content": "Instructions"},
+        {"role": "user", "content": "Hello"},
+        {"role": "assistant", "content": "Hi there"},
+        {"role": "tool", "content": "Result"},
+    ]
+
+    counts = llm._get_message_token_counts(messages)
+
+    assert counts == [2, 2, 2, 2]
+    assert tokenizer_mock.apply_chat_template.call_count == len(messages)
+    normalized_final = tokenizer_mock.apply_chat_template.call_args_list[-1][0][0]
+    assert normalized_final[-1]["role"] == "user"
+    assert normalized_final[-1]["content"] == "Result"
+
+
+@patch.object(
+    LLMConfigRegistry,
+    "from_file",
+    return_value=LLMConfigRegistry.register_all(
+        {
+            "qwen-3": {
+                "model": "qwen-3",
+                "tokenizer": "Qwen/Qwen3",
+                "context_limit": 4,
+                "api_key": "test-api-key",
+                "endpoint": "https://test-endpoint",
+                "tags": ["vllm"],
+            }
+        }
+    ),
+)
+@patch("debug_gym.llms.huggingface.AutoTokenizer.from_pretrained")
+def test_huggingface_chat_template_zero_token_fallback(
+    mock_auto_tokenizer, mock_llm_config, logger_mock
+):
+    tokenizer_mock = MagicMock()
+    tokenizer_mock.pad_token = None
+    tokenizer_mock.eos_token = "</s>"
+    tokenizer_mock.apply_chat_template.return_value = []
+    tokenizer_mock.encode.side_effect = [[1, 2], [3, 4, 5]]
+    mock_auto_tokenizer.return_value = tokenizer_mock
+
+    llm = HuggingFaceLLM(model_name="qwen-3", logger=logger_mock)
+
+    messages = [
+        {"role": "system", "content": "Instructions"},
+        {"role": "user", "content": "Hello"},
+    ]
+
+    counts = llm._get_message_token_counts(messages)
+
+    assert counts == [2, 3]
+    assert tokenizer_mock.encode.call_count == len(messages)
+
+
+@patch.object(
+    LLMConfigRegistry,
+    "from_file",
+    return_value=LLMConfigRegistry.register_all(
+        {
+            "qwen-3": {
+                "model": "qwen-3",
+                "tokenizer": "Qwen/Qwen3",
+                "context_limit": 4,
+                "api_key": "test-api-key",
+                "endpoint": "https://test-endpoint",
+                "tags": ["vllm"],
+            }
+        }
+    ),
+)
 @patch.object(HuggingFaceLLM, "generate")
 @patch.object(
     LLMConfigRegistry,
