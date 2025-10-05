@@ -223,3 +223,29 @@ def test_chat_template_counts_with_real_tokenizer(real_qwen3_tokenizer, logger_m
 
     assert counts == expected_counts
     assert counts[-1] > 0
+
+
+@pytest.mark.hf_tokenizer
+def test_tokenize_and_count_tokens_with_real_tokenizer(
+    real_qwen3_tokenizer, logger_mock
+):
+    config = LLMConfig(
+        model="qwen-3",
+        tokenizer=REAL_TOKENIZER_ID,
+        context_limit=4,
+        api_key="placeholder",
+        endpoint="http://localhost",
+        tags=["vllm"],
+        tokenizer_kwargs={"trust_remote_code": True},
+    )
+
+    llm = HuggingFaceLLM(model_name="qwen-3", logger=logger_mock, llm_config=config)
+    llm._hf_tokenizer = real_qwen3_tokenizer
+
+    text = "Hello world!"
+    hf_ids = real_qwen3_tokenizer.encode(text, add_special_tokens=False)
+    hf_tokens = real_qwen3_tokenizer.convert_ids_to_tokens(hf_ids)
+
+    tokens = llm.tokenize(text)
+    assert tokens == hf_tokens
+    assert llm.count_tokens(text) == len(hf_ids)
