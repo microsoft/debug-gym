@@ -103,6 +103,13 @@ class SWEBenchEnv(RepoEnv):
 
         self.entrypoint = " ".join([self.test_cmd, *self.test_directives])
 
+        # Store the "official" entrypoints (with benchmark-provided tests) separately so we can
+        # hide them from the agent during development. The agent will instead use a generic
+        # pytest command to execute ONLY the tests it authors. At final submission time we
+        # switch to these official entrypoints and apply the hidden test patch for scoring.
+        self.official_entrypoint = self.entrypoint
+        self.official_debug_entrypoint = self.entrypoint.replace("pytest", "pytest -sq")
+
         if self.package_name == "sphinx" or self.package_name == "sympy":
             # use pytest instead of `sympy bin/test` and `sphinx tox` so pdb breakpoints work
             expression = " ".join(self.test_directives)
@@ -124,14 +131,27 @@ class SWEBenchEnv(RepoEnv):
         elif self.package_name == "requests":
             self.terminal.env_vars["CURL_CA_BUNDLE"] = ""
 
-        # -s (capture=no) with pytest allows for debugging with pdb
-        # -q (quiet) with pytest avoids long pytest output
-        self.debug_entrypoint = self.entrypoint.replace("pytest", "pytest -sq")
+        # Prepare agent-facing (development) entrypoints.
+        # Agent should not see benchmark tests; it must write its own tests.
+        # We therefore default to running all tests the agent creates (e.g. in tests/ or any pattern) via pytest.
+        # Keep output concise and pdb-friendly.
+        self.agent_entrypoint = "python -m pytest -sq"
+        self.entrypoint = self.agent_entrypoint
+        self.debug_entrypoint = (
+            self.agent_entrypoint
+        )  # pdb variant added later by set_entrypoints
 
-        # --tb=short with pytest keeps the output concise
-        self.entrypoint = self.entrypoint.replace("--tb=no", "--tb=short")
+        # Short tracebacks in official mode; agent mode already concise.
+        self.official_entrypoint = self.official_entrypoint.replace(
+            "--tb=no", "--tb=short"
+        )
+        self.official_debug_entrypoint = self.official_debug_entrypoint.replace(
+            "--tb=no", "--tb=short"
+        )
 
         self.git_apply_cmd = f"git apply -"
+        # Flag to ensure final submission only happens once.
+        self._final_submitted = False
 
     def setup_workspace(self):
         self.terminal.task_name = self.task_name
@@ -173,9 +193,9 @@ class SWEBenchEnv(RepoEnv):
             f"git commit -am 'Changes needed for setting up {self.task_name}'"
         )
 
-        # Apply the test patch directly.
-        self.terminal.run(f"git apply - <<'EOF'\n{self.test_patch}\nEOF")
-        self.terminal.run(f"git commit -am 'Applying test patch for {self.task_name}'")
+        # NOTE: We intentionally DO NOT apply the benchmark test patch here.
+        # The agent must write its own tests. The official test patch is only
+        # applied when the agent invokes the 'submit' tool.
 
         # Remove the remote so the agent won't see newer commits.
         self.terminal.run("git remote remove origin")
@@ -185,6 +205,49 @@ class SWEBenchEnv(RepoEnv):
         command = self.git_apply_cmd + f" <<'EOF'\n{self.gold_patch}\nEOF"
         self.terminal.run(command, raises=True)
         self.logger.info("Patch applied successfully.")
+
+    # ---------------- Final submission / hidden test evaluation ---------------- #
+    def final_submit(self):
+        """Apply hidden benchmark test patch, switch to official entrypoint, run eval.
+
+        After calling this, the environment score reflects the official benchmark
+        tests. Further rewrites should generally be disallowed by the controller.
+        """
+        if self._final_submitted:
+            # Re-run eval only (in case caller wants refreshed output)
+            eval_output = self.eval()
+            self.score = self.calculate_score(eval_output)
+            self.done = self.calculate_done(eval_output)
+            return EvalOutput(eval_output.success, eval_output.output)
+
+        # Stash current working state as a commit (so patch context is stable)
+        self.terminal.run("git add -A")
+        self.terminal.run("git commit -am 'Checkpoint before final submission' || true")
+
+        # Apply official test patch (hidden until now)
+        success, output = self.terminal.run(
+            f"git apply - <<'EOF'\n{self.test_patch}\nEOF", timeout=30
+        )
+        if not success:
+            # Do not mark as submitted; allow retry after user adjustments.
+            self.logger.error("Failed to apply official test patch during submission.")
+            self.last_eval = EvalOutput(
+                False, f"Failed to apply official test patch:\n{output}"
+            )
+            return self.last_eval
+
+        self.terminal.run(
+            f"git commit -am 'Apply official benchmark test patch for {self.task_name}' || true"
+        )
+
+        # Switch to official entrypoints and evaluate
+        self.set_entrypoints(self.official_entrypoint, self.official_debug_entrypoint)
+        eval_output = self.eval()
+        self.score = self.calculate_score(eval_output)
+        self.done = self.calculate_done(eval_output)
+        self._final_submitted = True
+        self.last_eval = eval_output
+        return eval_output
 
     def calculate_max_score(self, eval_output: EvalOutput) -> int:
         return len(self.fail_to_pass)

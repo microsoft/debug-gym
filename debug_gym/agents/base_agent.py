@@ -246,10 +246,10 @@ class BaseAgent:
             highscore = info.score
             for step in range(max_steps):
                 self.logger.info(f"\n{'='*20} STEP {step+1} {'='*20}\n")
-                highscore = max(highscore, info.score)
-                self.logger.info(
-                    f"[{task_name[:10]:<10}] | Step: {step:<4} | Score: {info.score:>4}/{info.max_score:<4} ({info.score/info.max_score:.1%}) [Best: {highscore}]"
-                )
+                # highscore = max(highscore, info.score)
+                # self.logger.info(
+                #     f"[{task_name[:10]:<10}] | Step: {step:<4} | Score: {info.score:>4}/{info.max_score:<4} ({info.score/info.max_score:.1%}) [Best: {highscore}]"
+                # )
 
                 messages = self.build_prompt(info)
                 llm_response = self.llm(messages, info.tools)
@@ -263,6 +263,24 @@ class BaseAgent:
                     llm_response.reasoning_response,
                 )
                 self.history.step(info, llm_response)
+
+                if info.step_observation.source == "submit":
+                    print(
+                        """
+                          ATTENTION ATTENTION ATTENTION ATTENTION ATTENTION ATTENTION
+                          ================================================================
+                          ================================================================
+                          ================================================================
+                          ================================================================
+                            ================================================================
+                            ================================================================
+                            ================================================================
+                            ================================================================
+                          ATTENTION ATTENTION ATTENTION ATTENTION ATTENTION ATTENTION
+                          submit cool called
+                    """
+                    )
+                    break
 
                 if (
                     info.done

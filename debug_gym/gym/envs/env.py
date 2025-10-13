@@ -338,29 +338,30 @@ class RepoEnv(TooledEnv):
         self.queue_event(Event.ENV_RESET, source="env")
         self.all_observations = self.process_events()
 
-        # Gets eval (initial observation) from cache or by running env.eval
-        if self.last_eval:  # if eval tool was triggered by Event.ENV_RESET
-            self.step_observation = Observation("env", self.last_eval.output)
-        else:  # if eval tool was not triggered by Event.ENV_RESET
-            self.last_eval = self.eval()
-            self.step_observation = Observation("env", self.last_eval.output)
-            self.all_observations.insert(0, self.step_observation)
+        # REMOVE EVAL LOGIC
+        # # Gets eval (initial observation) from cache or by running env.eval
+        # if self.last_eval:  # if eval tool was triggered by Event.ENV_RESET
+        #     self.step_observation = Observation("env", self.last_eval.output)
+        # else:  # if eval tool was not triggered by Event.ENV_RESET
+        #     self.last_eval = self.eval()
+        #     self.step_observation = Observation("env", self.last_eval.output)
+        #     self.all_observations.insert(0, self.step_observation)
 
-        self.max_score = self.calculate_max_score(self.last_eval)
-        self.score = self.calculate_score(self.last_eval)
-        self.done = self.calculate_done(self.last_eval)
+        # self.max_score = self.calculate_max_score(self.last_eval)
+        # self.score = self.calculate_score(self.last_eval)
+        # self.done = self.calculate_done(self.last_eval)
 
         self.infos = EnvInfo(
-            step_observation=self.step_observation,
-            all_observations=self.all_observations,
-            eval_observation=Observation("env", self.last_eval.output),
+            step_observation=None,
+            all_observations=None,
+            eval_observation=Observation("env", None),
             dir_tree=self.workspace.display_files(self.dir_tree_depth),
             current_breakpoints=self.current_breakpoints(),
             action_reasoning=None,
             action_content=None,
             action_tool_call=None,
-            done=self.done,
-            score=self.score,
+            done=None,
+            score=None,
             max_score=self.max_score,
             instructions=self.instructions,
             rewrite_counter=self.rewrite_counter,
@@ -464,22 +465,23 @@ class RepoEnv(TooledEnv):
         self.all_observations.insert(0, self.step_observation)
 
         # Calculate score and done based on the last eval output
-        self.score = self.calculate_score(self.last_eval)
-        self.done = self.calculate_done(self.last_eval)
+        # self.score = self.calculate_score(self.last_eval)
+        # self.done = self.calculate_done(self.last_eval)
 
         self.infos = EnvInfo(
             step_observation=self.step_observation,
             all_observations=self.all_observations,
-            eval_observation=Observation("env", self.last_eval.output),
+            # eval_observation=Observation("env", self.last_eval.output),
+            eval_observation=None,
             dir_tree=self.workspace.display_files(self.dir_tree_depth),
             current_breakpoints=self.current_breakpoints(),
             action_reasoning=action_reasoning,
             action_content=action_content,
             action_tool_call=action_tool_call,
             instructions=self.instructions,
-            score=self.score,
-            max_score=self.max_score,
-            done=self.done,
+            score=None,
+            max_score=None,
+            done=None,
             rewrite_counter=self.rewrite_counter,
             tools=self.tools,
         )
