@@ -100,5 +100,7 @@ def build_history_prompt(
     for history_info, response in zip(
         _history[latest_rewrite_step:], _prompt_response_pairs[latest_rewrite_step:]
     ):
+        if history_info.step_observation is None:
+            continue
         _messages.extend(llm.format_tool_call_history(history_info, response))
     return _messages
