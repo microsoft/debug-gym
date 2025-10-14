@@ -264,9 +264,11 @@ class RepoEnv(TooledEnv):
             )
             self.debug_entrypoint = self._prepare_entrypoint(debug_entrypoint)
         if self.debug_entrypoint is not None and "-m pdb" not in self.debug_entrypoint:
+            # second replace fixes issue previously with shell session failing to start
+            # because of entrypoints with substring python -m pdb -m pytest
             self.debug_entrypoint = self.debug_entrypoint.replace(
                 "python ", "python -m pdb "
-            )
+            ).replace("-m pytest", "$(which pytest)")
         self.entrypoint = "PYTHONPATH=$PYTHONPATH:$PWD " + self.entrypoint
         self.debug_entrypoint = "PYTHONPATH=$PYTHONPATH:$PWD " + self.debug_entrypoint
 
