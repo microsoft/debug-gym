@@ -68,9 +68,22 @@ class OpenAILLM(LLM):
                 self._tk_func = tiktoken.encoding_for_model(self.tokenizer_name).encode
             except KeyError:
                 try:  # Try to load from transformers.
-                    self._tk_func = AutoTokenizer.from_pretrained(
-                        self.tokenizer_name
-                    ).tokenize
+                    tokenizer = AutoTokenizer.from_pretrained(self.tokenizer_name)
+                    if self.apply_chat_template:
+
+                        def _tokenize(txt):
+                            return tokenizer.tokenize(
+                                tokenizer.apply_chat_template(
+                                    txt,
+                                    tokenize=False,
+                                    add_generation_prompt=True,
+                                    enable_thinking=self.enable_thinking,
+                                )
+                            )
+
+                        self._tk_func = _tokenize
+                    else:
+                        self._tk_func = tokenizer.tokenize
                 except OSError:
                     raise ValueError(
                         f"Tokenizer `{self.tokenizer_name}` not found for model "
