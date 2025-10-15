@@ -57,6 +57,8 @@ class LLMConfig:
     api_key: Optional[str] = None
     endpoint: Optional[str] = None
     tokenizer: Optional[str] = None
+    apply_chat_template: Optional[bool] = False
+    enable_thinking: Optional[bool] = False
     reasoning_end_token: Optional[str] = None
     system_prompt_support: bool = True
     ignore_kwargs: List[str] = None
@@ -201,6 +203,8 @@ class LLM(ABC):
         )
         self.tokenizer_name = self.config.tokenizer
         self.context_length = self.config.context_limit * 1000
+        self.apply_chat_template = self.config.apply_chat_template
+        self.enable_thinking = self.config.enable_thinking
         self.reasoning_end_token = self.config.reasoning_end_token
 
         self.logger.debug(
