@@ -2,239 +2,482 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <!-- Meta tags for social media banners, these should be filled in appropriatly as they are your "business card" -->
-  <!-- Replace the content tag with appropriate information -->
-  <meta name="description" content="debug-gym">
-  <meta property="og:title" content="debug-gym"/>
-  <meta property="og:description" content="debug-gym: A Text-Based Environment for Interactive Debugging"/>
+  <meta name="description" content="MSR Montreal - Froggy Team Research Projects">
+  <meta property="og:title" content="MSR Montreal - Froggy Team"/>
+  <meta property="og:description" content="Research projects from the MSR Montreal Froggy Team"/>
   <meta property="og:url" content="https://microsoft.github.io/debug-gym/"/>
-  <!-- Path to banner image, should be in the path listed below. Optimal dimenssions are 1200X630-->
-  <meta property="og:image" content="static/image/your_banner_image.png" />
-  <meta property="og:image:width" content="1200"/>
-  <meta property="og:image:height" content="630"/>
-
-
-  <meta name="twitter:title" content="debug-gym">
-  <meta name="twitter:description" content="debug-gym: A Text-Based Environment for Interactive Debugging">
-  <!-- Path to banner image, should be in the path listed below. Optimal dimenssions are 1200X600-->
-  <meta name="twitter:image" content="static/images/your_twitter_banner_image.png">
+  <meta name="twitter:title" content="MSR Montreal - Froggy Team">
+  <meta name="twitter:description" content="Research projects from the MSR Montreal Froggy Team">
   <meta name="twitter:card" content="summary_large_image">
-  <!-- Keywords for your paper to be indexed by-->
-  <meta name="keywords" content="debug-gym, interactive debugging, large language models, coding tasks, python debugger, pdb, text-based environment, code generation">
+  <meta name="keywords" content="MSR Montreal, Froggy Team, research, AI, machine learning, debugging, code generation">
   <meta name="viewport" content="width=device-width, initial-scale=1">
 
-
-  <title>debug-gym</title>
+  <title>MSR Montreal - Froggy Team</title>
   <link rel="icon" type="image/x-icon" href="static/images/favicon.ico">
-  <link href="https://fonts.googleapis.com/css?family=Google+Sans|Noto+Sans|Castoro"
-  rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css?family=Google+Sans|Noto+Sans|Castoro" rel="stylesheet">
 
   <link rel="stylesheet" href="static/css/bulma.min.css">
-  <link rel="stylesheet" href="static/css/bulma-carousel.min.css">
-  <link rel="stylesheet" href="static/css/bulma-slider.min.css">
   <link rel="stylesheet" href="static/css/fontawesome.all.min.css">
-  <link rel="stylesheet"
-  href="https://cdn.jsdelivr.net/gh/jpswalsh/academicons@1/css/academicons.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/jpswalsh/academicons@1/css/academicons.min.css">
   <link rel="stylesheet" href="static/css/index.css">
 
   <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
-  <script src="https://documentcloud.adobe.com/view-sdk/main.js"></script>
   <script defer src="static/js/fontawesome.all.min.js"></script>
-  <script src="static/js/bulma-carousel.min.js"></script>
-  <script src="static/js/bulma-slider.min.js"></script>
-  <script src="static/js/index.js"></script>
+
+  <style>
+    body {
+      background: #f8f9fa;
+      min-height: 100vh;
+      padding-top: 70px;
+    }
+
+    /* Navigation Bar */
+    .navbar-custom {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 70px;
+      background: white;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      padding: 0 2rem;
+    }
+
+    .navbar-brand {
+      display: flex;
+      align-items: center;
+      gap: 1.5rem;
+      flex: 1;
+    }
+
+    .navbar-logo {
+      height: 45px;
+      transition: transform 0.2s;
+    }
+
+    .navbar-logo:hover {
+      transform: scale(1.05);
+    }
+
+    .navbar-divider {
+      height: 35px;
+      width: 1px;
+      background: #e0e0e0;
+    }
+
+    .navbar-title {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: #2c3e50;
+    }
+
+    .froggy-inline-logo {
+      height: 35px;
+    }
+
+    /* Hero Section */
+    .hero.is-primary {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      position: relative;
+      overflow: hidden;
+      margin-top: 0;
+    }
+
+    .hero.is-primary::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      right: -50%;
+      width: 200%;
+      height: 200%;
+      background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+      animation: pulse 15s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { transform: translate(0, 0) scale(1); }
+      50% { transform: translate(-10%, -10%) scale(1.1); }
+    }
+
+    .hero-body {
+      padding: 3rem 1.5rem;
+      position: relative;
+      z-index: 1;
+    }
+
+    .hero .title {
+      text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      font-size: 2.5rem;
+    }
+
+    .hero .subtitle {
+      text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      font-size: 1.5rem;
+    }
+
+    /* Intro Section */
+    .section-intro {
+      padding: 2.5rem 1.5rem;
+      background: white;
+      border-bottom: 1px solid #e8e8e8;
+    }
+
+    .section-intro .content p {
+      font-size: 1.1rem;
+      line-height: 1.7;
+      color: #555;
+    }
+
+    /* Projects Section */
+    .section {
+      padding: 3rem 1.5rem;
+    }
+
+    .projects-title {
+      text-align: center;
+      margin-bottom: 3rem;
+      color: #2c3e50;
+      position: relative;
+    }
+
+    .projects-title::after {
+      content: '';
+      display: block;
+      width: 60px;
+      height: 4px;
+      background: linear-gradient(to right, #667eea, #764ba2);
+      margin: 1rem auto 0;
+      border-radius: 2px;
+    }
+
+    /* Project Cards */
+    .project-card {
+      background: white;
+      border-radius: 12px;
+      padding: 2.5rem;
+      margin-bottom: 2rem;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      border-top: 4px solid #667eea;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .project-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(135deg, rgba(102, 126, 234, 0.03) 0%, rgba(255, 255, 255, 0) 100%);
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+
+    .project-card:hover {
+      transform: translateY(-8px);
+      box-shadow: 0 12px 28px rgba(0,0,0,0.12);
+      border-top-color: #764ba2;
+    }
+
+    .project-card:hover::before {
+      opacity: 1;
+    }
+
+    .project-card h3 {
+      margin-bottom: 1rem;
+      color: #2c3e50;
+      position: relative;
+      z-index: 1;
+      font-size: 1.75rem;
+    }
+
+    .project-card p {
+      color: #555;
+      margin-bottom: 1rem;
+      line-height: 1.7;
+      position: relative;
+      z-index: 1;
+    }
+
+    .project-status {
+      display: inline-block;
+      padding: 0.4rem 1rem;
+      border-radius: 20px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      margin-bottom: 1.25rem;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+      position: relative;
+      z-index: 1;
+    }
+
+    .status-published {
+      background: linear-gradient(135deg, #48c774 0%, #3db761 100%);
+      color: white;
+    }
+
+    .status-coming-soon {
+      background: linear-gradient(135deg, #ffdd57 0%, #ffc837 100%);
+      color: #363636;
+    }
+
+    .project-links {
+      margin-top: 1.5rem;
+      position: relative;
+      z-index: 1;
+    }
+
+    .project-links a {
+      margin-right: 0.5rem;
+      margin-bottom: 0.5rem;
+      transition: all 0.2s;
+      border-radius: 6px;
+    }
+
+    .project-links a:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    }
+
+    /* Contact Section */
+    .section.hero.is-light {
+      background: white;
+      border-top: 1px solid #e8e8e8;
+    }
+
+    code {
+      white-space: nowrap;
+      background-color: #f5f5f5;
+      padding: 0.2em 0.4em;
+      border-radius: 4px;
+    }
+
+    /* Mobile Responsive */
+    @media screen and (max-width: 768px) {
+      body {
+        padding-top: 110px;
+      }
+
+      .navbar-custom {
+        height: auto;
+        min-height: 70px;
+        flex-direction: column;
+        padding: 1rem;
+        gap: 0.75rem;
+      }
+
+      .navbar-brand {
+        flex-direction: column;
+        gap: 0.75rem;
+        width: 100%;
+        justify-content: center;
+      }
+
+      .navbar-divider {
+        display: none;
+      }
+
+      .navbar-logo {
+        height: 35px;
+      }
+
+      .froggy-inline-logo {
+        height: 28px;
+      }
+
+      .navbar-title {
+        font-size: 1.1rem;
+        text-align: center;
+      }
+
+      .hero .title {
+        font-size: 2rem;
+      }
+
+      .hero .subtitle {
+        font-size: 1.25rem;
+      }
+
+      .hero-body {
+        padding: 2.5rem 1.5rem;
+      }
+
+      .project-card {
+        padding: 1.5rem;
+      }
+
+      .project-card h3 {
+        font-size: 1.5rem;
+      }
+    }
+  </style>
 </head>
 <body>
 
   <div id='cookie-banner'></div>
 
-  <section class="hero">
+  <!-- Navigation Bar -->
+  <nav class="navbar-custom">
+    <div class="navbar-brand">
+      <img src="static/images/Microsoft_logo.svg" alt="Microsoft Research" class="navbar-logo">
+      <div class="navbar-divider"></div>
+      <div class="navbar-title">
+        <span>MSR Montreal</span>
+        <img src="static/images/froggy_new_logo.png" alt="Froggy Team" class="froggy-inline-logo">
+      </div>
+    </div>
+  </nav>
+
+  <section class="hero is-primary">
     <div class="hero-body">
       <div class="container is-max-desktop">
         <div class="columns is-centered">
           <div class="column has-text-centered">
-            <h1 class="title is-1 publication-title"><code>debug-gym</code>: A Text-Based Environment for Interactive Debugging</h1>
-            <div class="is-size-5 publication-authors">
-              <!-- Paper authors -->
-              <span class="author-block">
-                The <code class="lightly-bold">debug-gym</code> Team <img src="static/images/froggy_logo_no_bg_no_border.png" alt="froggy logo" style="height: 26px; vertical-align: -4px;">
-                  </span>
-                  </div>
-
-                  <div class="is-size-5 has-text-centered">
-                    <code class="lightly-bold">debug-gym@microsoft.com</code>
-                  </div>
-
-                  <div class="is-size-5 publication-authors">
-                    <span class="author-block">Microsoft Research</span>
-                  </div>
-
-                  <div class="column has-text-centered">
-                    <div class="publication-links">
-
-                  <!-- Github link -->
-                  <span class="link-block">
-                    <a href="https://github.com/microsoft/debug-gym" target="_blank"
-                    class="external-link button is-normal is-rounded is-dark">
-                    <span class="icon">
-                      <i class="fab fa-github"></i>
-                    </span>
-                    <span>Code</span>
-                  </a>
-                </span>
-
-                <!-- ArXiv abstract Link -->
-                <span class="link-block">
-                  <a href="https://arxiv.org/abs/2503.21557" target="_blank"
-                  class="external-link button is-normal is-rounded is-dark">
-                  <span class="icon">
-                    <i class="ai ai-arxiv"></i>
-                  </span>
-                  <span>arXiv</span>
-                </a>
-              </span>
-            </div>
+            <h1 class="title is-1">
+              Froggy Team Research Projects
+            </h1>
+            <h2 class="subtitle is-3">
+              Building the future of AI-assisted software engineering
+            </h2>
           </div>
         </div>
       </div>
     </div>
-  </div>
-</section>
-
-<section class="section">
-  <div class="container is-max-desktop">
-    <div class="columns is-centered">
-      <div class="column is-three-quarters has-text-centered">
-        <figure class="image">
-          <img class="custom-image" src="static/images/intro_diagram-2.png" alt="Descriptive Alt Text">
-        </figure>
-      </div>
-    </div>
-    <div class="columns is-centered">
-      <div class="column is-three-quarters has-text-centered">
-        <p class="long-caption">
-          In most existing approaches (shown in <span style="color: black; font-weight: bold;">black</span>), an agent rewrites its code conditioned on error messages obtained from executing its code.  <code class="lightly-bold">pond</code> equips the agent with additional tools such as <code class="lightly-bold">pdb</code> (shown in <span style="color: rgb(219, 1, 1); font-weight: bold;">red</span>), so it can interactively seek necessary information from the semantic space hidden behind the code, and therefore have better code repairing performance.
-        </p>
-      </div>
-    </div>
-  </div>
-</section>
-
-
-
-
-<!-- Paper abstract -->
-<section class="section hero is-light">
-  <div class="container is-max-desktop">
-    <div class="columns is-centered has-text-centered">
-      <div class="column is-four-fifths">
-        <h2 class="title is-3">Abstract</h2>
-        <div class="content has-text-justified">
-          <p>
-            Large Language Models (LLMs) are increasingly relied upon for coding tasks, yet in most scenarios it is assumed that all relevant information can be either accessed in context or matches their training data. We posit that LLMs may benefit from the ability to interactively explore a codebase to gather the information relevant to their task. To achieve this, we present a textual environment, namely <code class="lightly-bold">debug-gym</code>, that can be used to develop LLM agents in an interactive coding setting, bridging the gap between current LLM capabilities and large-scale real-world code generation and debugging requirements. Our environment is lightweight and provides a preset of useful tools, such as a python debugger (<code class="lightly-bold">pdb</code>), designed to facilitate a LLM-based agent's interactive debugging. Beyond coding and debugging tasks, this approach can be generalized to other tasks that would benefit from information-seeking behavior by an LLM agent.
-          </p>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
-<!-- End paper abstract -->
-
-<!--Video demo section -->
-<section class="section" id="Video Demo">
-    <div class="container is-max-desktop content">
-      <h2 class="title">Video Demo</h2>
-      <figure>
-        <img src="static/images/debug-bench-demo.gif" alt="Video Demo GIF">
-      </figure>
-    </div>
   </section>
-<!--End BibTex section -->
 
-<!--Mini Nightmare section -->
-<section class="section" id="Experiments">
-    <div class="container is-max-desktop content">
-      <h2 class="title">Mini Nightmare</h2>
-      <div class="content has-text-justified">
-        <p>
-          Mini-nightmare is a collection of ten minimal buggy Python scripts that human developers would find easier to debug if provided with interactive debugging tools. For instance, the <code>shopping_cart</code> problem, which consists of a simple code snippet that aims to implement a shopping cart class. This specific task was created in Python 2, where the round() function adopts an “away from zero” style. However, in Python 3, where we run the debug-gym experiments in, the behavior has been changed to a “ties to even” style. We observe smart debugging traces in trajectories from the agent using Claude 3.7 Sonnet below, showing its use of the pdb tool to test its hypothesis and then import an external library to make sure the rounding is working properly.
-        </p>
-      </div>
+  <section class="section-intro">
+    <div class="container is-max-desktop">
       <div class="columns is-centered">
-        <div class="column is-three-quarters has-text-centered">
-          <figure>
-            <img src="static/images/shopping_cart_mini_nightmare.png" alt="Descriptive Alt Text">
-          </figure>
+        <div class="column is-four-fifths has-text-centered">
+          <div class="content">
+            <p class="is-size-5">
+              Welcome to the MSR Montreal Froggy Team's research hub. We develop cutting-edge AI tools and frameworks to advance software engineering, code understanding, and interactive debugging. Explore our projects below.
+            </p>
+          </div>
         </div>
       </div>
     </div>
   </section>
-  
-<!--Mini Nightmare section -->
 
+  <section class="section">
+    <div class="container is-max-desktop">
+      <h2 class="title is-2 projects-title">Our Projects</h2>
 
+      <!-- debug-gym Project -->
+      <div class="project-card">
+        <span class="project-status status-published">March 2025</span>
+        <h3 class="title is-3"><code>debug-gym</code></h3>
+        <p>
+          A text-based environment for interactive debugging that enables Large Language Models (LLMs) to interactively explore codebases and gather relevant information for debugging tasks. The environment provides preset tools like Python debugger (pdb) to facilitate LLM-based agents' interactive debugging capabilities.
+        </p>
+        <div class="project-links">
+          <a href="debug-gym.html" class="button is-primary">
+            <span class="icon"><i class="fas fa-info-circle"></i></span>
+            <span>Project Page</span>
+          </a>
+          <a href="https://github.com/microsoft/debug-gym" target="_blank" class="button is-dark">
+            <span class="icon"><i class="fab fa-github"></i></span>
+            <span>Code</span>
+          </a>
+          <a href="https://arxiv.org/abs/2503.21557" target="_blank" class="button is-link">
+            <span class="icon"><i class="ai ai-arxiv"></i></span>
+            <span>Paper</span>
+          </a>
+        </div>
+      </div>
 
-<!--BibTex citation -->
-  <section class="section" id="BibTeX">
-    <div class="container is-max-desktop content">
-      <h2 class="title">BibTeX</h2>
-      <pre><code>@article{yuan2025debuggym,
-        title={debug-gym: A Text-Based Environment for Interactive Debugging},
-        author={Xingdi Yuan, Morgane M Moss, Charbel El Feghali, Chinmay Singh, Darya Moldavskaya, Drew MacPhee, Lucas Caccia, Matheus Pereira, Minseon Kim, Alessandro Sordoni, Marc-Alexandre C\^ot\'e},
-        journal={arXiv preprint arXiv:2503.21557},
-        year={2025},
-        url={https://arxiv.org/abs/2503.21557}
-      }</code></pre>
+      <!-- BugPilot Project -->
+      <div class="project-card">
+        <span class="project-status status-coming-soon">Coming Soon</span>
+        <h3 class="title is-3"><code>BugPilot</code></h3>
+        <p>
+          An intelligent debugging assistant that leverages AI to help developers identify, understand, and fix bugs more efficiently. BugPilot combines static analysis, dynamic execution, and LLM-powered insights to provide comprehensive debugging support.
+        </p>
+        <div class="project-links">
+          <a href="bugpilot.html" class="button is-primary">
+            <span class="icon"><i class="fas fa-info-circle"></i></span>
+            <span>Learn More</span>
+          </a>
+        </div>
+      </div>
+
+      <!-- Gistify Project -->
+      <div class="project-card">
+        <span class="project-status status-coming-soon">Coming Soon</span>
+        <h3 class="title is-3"><code>Gistify</code></h3>
+        <p>
+          A tool for automatically generating concise, meaningful summaries of code repositories and pull requests. Gistify helps developers quickly understand codebases, review changes, and maintain comprehensive documentation with AI-powered analysis.
+        </p>
+        <div class="project-links">
+          <a href="gistify.html" class="button is-primary">
+            <span class="icon"><i class="fas fa-info-circle"></i></span>
+            <span>Learn More</span>
+          </a>
+        </div>
+      </div>
+
     </div>
-</section>
-<!--End BibTex citation -->
+  </section>
 
+  <section class="section hero is-light">
+    <div class="container is-max-desktop">
+      <div class="columns is-centered has-text-centered">
+        <div class="column is-four-fifths">
+          <h2 class="title is-3">Contact</h2>
+          <div class="content">
+            <p class="is-size-5">
+              For inquiries about our research, please contact us at <code style="font-size: 1rem;">debug-gym@microsoft.com</code>
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
 
   <footer class="footer">
-  <script>
+    <script>
       function manageConsent() {
-          if (WcpConsent.siteConsent.isConsentRequired) {
-              WcpConsent.siteConsent.manageConsent();
-          }
+        if (WcpConsent.siteConsent.isConsentRequired) {
+          WcpConsent.siteConsent.manageConsent();
+        }
       }
-  </script>
-  <div class="container">
-    <div class="columns is-centered">
-      <div class="column is-8">
-        <div class="content">
-
-          <p>
-            This page was built using the <a href="https://github.com/eliahuhorwitz/Academic-project-page-template" target="_blank">Academic Project Page Template</a> which was adopted from the <a href="https://nerfies.github.io" target="_blank">Nerfies</a> project page.
-            <br> This website is licensed under a <a rel="license"  href="http://creativecommons.org/licenses/by-sa/4.0/" target="_blank">Creative
-            Commons Attribution-ShareAlike 4.0 International License</a>.
-          </p>
-
-        </div>
-        <div class="col-sm-4">
+    </script>
+    <div class="container">
+      <div class="columns is-centered">
+        <div class="column is-8">
+          <div class="content">
+            <p>
+              This page was built using the <a href="https://github.com/eliahuhorwitz/Academic-project-page-template" target="_blank">Academic Project Page Template</a>.
+              <br> This website is licensed under a <a rel="license" href="http://creativecommons.org/licenses/by-sa/4.0/" target="_blank">Creative Commons Attribution-ShareAlike 4.0 International License</a>.
+            </p>
+          </div>
+          <div class="col-sm-4">
             <ul class="links">
-                <li style="visibility: hidden;">
-                    <a id="footer-cookie-link" style="cursor: pointer; padding-right:20px" onclick="manageConsent()" aria-label="Manage cookies">Manage cookies</a>
-                </li>
-                <li>
-                    <div class="copyright">
-                        <span>© 2024 Microsoft</span> | <a href="https://go.microsoft.com/fwlink/?LinkId=521839">Privacy & Cookies</a> | <a href="https://go.microsoft.com/fwlink/?linkid=2259814">Consumer Health Privacy</a> 
-                    </div>
-                </li>
+              <li style="visibility: hidden;">
+                <a id="footer-cookie-link" style="cursor: pointer; padding-right:20px" onclick="manageConsent()" aria-label="Manage cookies">Manage cookies</a>
+              </li>
+              <li>
+                <div class="copyright">
+                  <span>© 2025 Microsoft</span> | <a href="https://go.microsoft.com/fwlink/?LinkId=521839">Privacy & Cookies</a> | <a href="https://go.microsoft.com/fwlink/?linkid=2259814">Consumer Health Privacy</a>
+                </div>
+              </li>
             </ul>
+          </div>
         </div>
       </div>
     </div>
-  </div>
-</footer>
+  </footer>
 
-<!-- Statcounter tracking code -->
-  
-<!-- You can add a tracker to track page visits by creating an account at statcounter.com -->
+  <!-- Microsoft EU cookie compliance library -->
+  <script src="https://wcpstatic.microsoft.com/mscc/lib/v2/wcp-consent.js"></script>
 
-    <!-- End of Statcounter Code -->
-
-    <!-- Microsoft EU cookie compliance library -->
-<script src="https://wcpstatic.microsoft.com/mscc/lib/v2/wcp-consent.js"></script>
-
-  </body>
-  </html>
+</body>
+</html>
