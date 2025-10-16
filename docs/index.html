@@ -229,6 +229,31 @@
       color: #363636;
     }
 
+    .content-type-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.3rem 0.8rem;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 0.75rem;
+      position: relative;
+      z-index: 1;
+    }
+
+    .content-type-project {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+
+    .content-type-blog {
+      background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+      color: white;
+    }
+
     .project-links {
       margin-top: 1.5rem;
       position: relative;
@@ -369,10 +394,19 @@
 
   <section class="section">
     <div class="container is-max-desktop">
-      <h2 class="title is-2 projects-title">Our Projects</h2>
+      <h2 class="title is-2 projects-title">Projects & Insights</h2>
+
+      <!-- Research Projects Section -->
+      <h3 class="title is-4" style="margin-top: 2rem; margin-bottom: 1.5rem; color: #667eea;">
+        <span class="icon"><i class="fas fa-flask"></i></span>
+        Research Projects
+      </h3>
 
       <!-- debug-gym Project -->
       <div class="project-card">
+        <span class="content-type-badge content-type-project">
+          <i class="fas fa-cube"></i> Project
+        </span>
         <span class="project-status status-published">March 2025</span>
         <h3 class="title is-3"><code>debug-gym</code></h3>
         <p>
@@ -396,6 +430,9 @@
 
       <!-- BugPilot Project -->
       <div class="project-card">
+        <span class="content-type-badge content-type-project">
+          <i class="fas fa-cube"></i> Project
+        </span>
         <span class="project-status status-coming-soon">Coming Soon</span>
         <h3 class="title is-3"><code>BugPilot</code></h3>
         <p>
@@ -411,6 +448,9 @@
 
       <!-- Gistify Project -->
       <div class="project-card">
+        <span class="content-type-badge content-type-project">
+          <i class="fas fa-cube"></i> Project
+        </span>
         <span class="project-status status-coming-soon">Coming Soon</span>
         <h3 class="title is-3"><code>Gistify</code></h3>
         <p>
@@ -420,6 +460,30 @@
           <a href="gistify.html" class="button is-primary">
             <span class="icon"><i class="fas fa-info-circle"></i></span>
             <span>Learn More</span>
+          </a>
+        </div>
+      </div>
+
+      <!-- Blog Posts Section -->
+      <h3 class="title is-4" style="margin-top: 3rem; margin-bottom: 1.5rem; color: #f5576c;">
+        <span class="icon"><i class="fas fa-pen"></i></span>
+        Blog Posts & Technical Insights
+      </h3>
+
+      <!-- Sample Blog Post -->
+      <div class="project-card">
+        <span class="content-type-badge content-type-blog">
+          <i class="fas fa-newspaper"></i> Blog Post
+        </span>
+        <span class="project-status status-published">January 2025</span>
+        <h3 class="title is-3">Building AI Agents That Actually Debug Code</h3>
+        <p>
+          A deep dive into the technical challenges and breakthroughs in creating effective AI debugging agents. We explore how to build agents that understand code context, navigate complex execution traces, and validate fixes through execution-based testing.
+        </p>
+        <div class="project-links">
+          <a href="blog-post-template.html" class="button is-primary">
+            <span class="icon"><i class="fas fa-book-open"></i></span>
+            <span>Read Article</span>
           </a>
         </div>
       </div>
