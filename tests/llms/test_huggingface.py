@@ -12,10 +12,12 @@ from debug_gym.llms.openai import OpenAILLM
 # to include the integration case that downloads the real Qwen tokenizer.
 
 
+HF_MODEL_ID = "Qwen/Qwen3-0.6B"
+
 MODEL_REGISTRY = {
     "qwen-3": {
-        "model": "qwen-3",
-        "tokenizer": "Qwen/Qwen3",
+        "model": HF_MODEL_ID,
+        "tokenizer": HF_MODEL_ID,
         "context_limit": 4,
         "api_key": "test-api-key",
         "endpoint": "https://test-endpoint",
@@ -24,19 +26,17 @@ MODEL_REGISTRY = {
     }
 }
 
-REAL_TOKENIZER_ID = "Qwen/Qwen3-0.6B"
-
 
 @pytest.fixture(scope="session")
 def real_qwen3_tokenizer():
     try:
-        return AutoTokenizer.from_pretrained(REAL_TOKENIZER_ID, trust_remote_code=True)
+        return AutoTokenizer.from_pretrained(HF_MODEL_ID)
     except (
         OSError,
         ValueError,
         ImportError,
     ) as exc:  # pragma: no cover - network-dependent
-        pytest.skip(f"Unable to load tokenizer {REAL_TOKENIZER_ID}: {exc}")
+        pytest.skip(f"Unable to load tokenizer {HF_MODEL_ID}: {exc}")
 
 
 @patch.object(
@@ -44,26 +44,19 @@ def real_qwen3_tokenizer():
     "from_file",
     return_value=LLMConfigRegistry.register_all(MODEL_REGISTRY),
 )
-@patch("debug_gym.llms.huggingface.AutoTokenizer.from_pretrained")
-def test_tokenize_uses_hf_tokenizer_with_pad_fallback(
-    mock_auto_tokenizer, mock_llm_config, logger_mock
-):
-    tokenizer_mock = MagicMock()
-    tokenizer_mock.encode.return_value = [10, 20, 30]
-    tokenizer_mock.convert_ids_to_tokens.return_value = ["<a>", "<b>", "<c>"]
-    tokenizer_mock.pad_token = None
-    tokenizer_mock.eos_token = "</s>"
-    mock_auto_tokenizer.return_value = tokenizer_mock
-
-    llm = HuggingFaceLLM(model_name="qwen-3", logger=logger_mock)
-
-    tokens = llm.tokenize("hello world")
-    assert tokens == ["<a>", "<b>", "<c>"]
-    assert llm.count_tokens("hello world") == 3
-
-    mock_auto_tokenizer.assert_called_once_with("Qwen/Qwen3", trust_remote_code=True)
-    tokenizer_mock.encode.assert_called_with("hello world", add_special_tokens=False)
-    assert tokenizer_mock.pad_token == "</s>"
+def test_tokenize_uses_hf_tokenizer_with_pad_fallback(mock_llm_config, logger_mock):
+    tokenizer = AutoTokenizer.from_pretrained(HF_MODEL_ID)
+    tokenizer.pad_token = None
+    tokenizer.eos_token = "</s>"
+    with patch(
+        "debug_gym.llms.huggingface.AutoTokenizer.from_pretrained"
+    ) as mock_auto_tokenizer:
+        mock_auto_tokenizer.return_value = tokenizer
+        llm = HuggingFaceLLM(model_name="qwen-3", logger=logger_mock)
+        assert llm.tokenize("hello world") == ["hello", "Ġworld"]
+        assert llm.count_tokens("hello world") == 2
+        assert tokenizer.eos_token == "</s>"
+        assert tokenizer.pad_token == "</s>"
 
 
 @patch.object(
@@ -179,8 +172,8 @@ def test_message_token_counts_fallbacks_to_openai_when_template_fails(
 @pytest.mark.hf_tokenizer
 def test_chat_template_counts_with_real_tokenizer(real_qwen3_tokenizer, logger_mock):
     config = LLMConfig(
-        model="qwen-3",
-        tokenizer=REAL_TOKENIZER_ID,
+        model=HF_MODEL_ID,
+        tokenizer=HF_MODEL_ID,
         context_limit=4,
         api_key="placeholder",
         endpoint="http://localhost",
@@ -230,8 +223,8 @@ def test_tokenize_and_count_tokens_with_real_tokenizer(
     real_qwen3_tokenizer, logger_mock
 ):
     config = LLMConfig(
-        model="qwen-3",
-        tokenizer=REAL_TOKENIZER_ID,
+        model=HF_MODEL_ID,
+        tokenizer=HF_MODEL_ID,
         context_limit=4,
         api_key="placeholder",
         endpoint="http://localhost",
@@ -249,3 +242,92 @@ def test_tokenize_and_count_tokens_with_real_tokenizer(
     tokens = llm.tokenize(text)
     assert tokens == hf_tokens
     assert llm.count_tokens(text) == len(hf_ids)
+
+
+@patch.object(
+    LLMConfigRegistry,
+    "from_file",
+    return_value=LLMConfigRegistry.register_all(
+        {
+            "qwen": {
+                "model": HF_MODEL_ID,
+                "tokenizer": HF_MODEL_ID,
+                "apply_chat_template": False,
+                "context_limit": 4096,
+                "api_key": "fake",
+                "endpoint": "fake",
+                "api_version": "1",
+                "tags": ["vllm"],
+            }
+        }
+    ),
+)
+def test_hf_tokenize_no_chat_template(mock_llm_config, logger_mock):
+    llm = HuggingFaceLLM(model_name="qwen", logger=logger_mock)
+    tokens = llm.tokenize("hello world")
+    assert tokens == ["hello", "Ġworld"]
+
+
+@patch.object(
+    LLMConfigRegistry,
+    "from_file",
+    return_value=LLMConfigRegistry.register_all(
+        {
+            "qwen": {
+                "model": HF_MODEL_ID,
+                "tokenizer": HF_MODEL_ID,
+                "apply_chat_template": True,
+                "context_limit": 4096,
+                "api_key": "fake",
+                "endpoint": "fake",
+                "api_version": "1",
+                "tags": ["vllm"],
+            }
+        }
+    ),
+)
+def test_hf_tokenize_apply_chat_template(mock_llm_config, logger_mock):
+    llm = HuggingFaceLLM(model_name="qwen", logger=logger_mock)
+
+    tokens = llm.tokenize("hello world")
+
+    assert tokens == [
+        "<|im_start|>",
+        "assistant",
+        "Ċ",
+        "<think>",
+        "ĊĊ",
+        "</think>",
+        "ĊĊ",
+    ]
+
+
+@patch.object(
+    LLMConfigRegistry,
+    "from_file",
+    return_value=LLMConfigRegistry.register_all(
+        {
+            "qwen": {
+                "model": HF_MODEL_ID,
+                "tokenizer": HF_MODEL_ID,
+                "apply_chat_template": True,
+                "enable_thinking": True,
+                "context_limit": 4096,
+                "api_key": "fake",
+                "endpoint": "fake",
+                "api_version": "1",
+                "tags": ["vllm"],
+            }
+        }
+    ),
+)
+def test_hf_tokenize_apply_chat_template_thinking(mock_llm_config, logger_mock):
+    llm = HuggingFaceLLM(model_name="qwen", logger=logger_mock)
+
+    tokens = llm.tokenize("hello world")
+
+    assert tokens == [
+        "<|im_start|>",
+        "assistant",
+        "Ċ",
+    ]

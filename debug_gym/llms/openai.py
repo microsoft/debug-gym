@@ -67,7 +67,8 @@ class OpenAILLM(LLM):
             try:
                 self._tk_func = tiktoken.encoding_for_model(self.tokenizer_name).encode
             except KeyError:
-                try:  # Try to load from transformers.
+                # Try to load from transformers, mostly deprecated. Use HuggingFaceLLM for transformers models.
+                try:
                     tokenizer = AutoTokenizer.from_pretrained(self.tokenizer_name)
                     if self.apply_chat_template:
 

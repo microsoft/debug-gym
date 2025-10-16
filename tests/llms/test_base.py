@@ -54,8 +54,8 @@ from debug_gym.llms.base import (
                 "tags": ["anthropic", "claude", "claude-3.7"],
             },
             "qwen-3": {
-                "model": "qwen-3",
-                "tokenizer": "Qwen/Qwen3",
+                "model": "Qwen/Qwen3-0.6B",
+                "tokenizer": "Qwen/Qwen3-0.6B",
                 "context_limit": 4,
                 "api_key": "test-api-key",
                 "endpoint": "https://test-endpoint",
