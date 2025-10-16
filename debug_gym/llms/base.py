@@ -13,6 +13,7 @@ from tenacity import (
     wait_random_exponential,
 )
 
+from debug_gym.agents.utils import get_message_tokens, trim_prompt_messages
 from debug_gym.gym.envs.env import EnvInfo
 from debug_gym.gym.tools.tool import EnvironmentTool, ToolCall
 from debug_gym.llms.constants import DEFAULT_LLM_CONFIG
@@ -57,6 +58,8 @@ class LLMConfig:
     api_key: Optional[str] = None
     endpoint: Optional[str] = None
     tokenizer: Optional[str] = None
+    apply_chat_template: Optional[bool] = False
+    enable_thinking: Optional[bool] = False
     reasoning_end_token: Optional[str] = None
     system_prompt_support: bool = True
     ignore_kwargs: List[str] = None
@@ -66,6 +69,8 @@ class LLMConfig:
     scope: Optional[str] = None
     # Custom parameters to pass to generate
     generate_kwargs: dict = None
+    # Additional kwargs for tokenizer construction (e.g., trust_remote_code)
+    tokenizer_kwargs: dict | None = None
 
     def __post_init__(self):
         # Set tokenizer to model if not specified
@@ -78,6 +83,8 @@ class LLMConfig:
             self.tags = []
         if self.generate_kwargs is None:
             self.generate_kwargs = {}
+        if self.tokenizer_kwargs is None:
+            self.tokenizer_kwargs = {}
 
 
 @dataclass
@@ -201,6 +208,8 @@ class LLM(ABC):
         )
         self.tokenizer_name = self.config.tokenizer
         self.context_length = self.config.context_limit * 1000
+        self.apply_chat_template = self.config.apply_chat_template
+        self.enable_thinking = self.config.enable_thinking
         self.reasoning_end_token = self.config.reasoning_end_token
 
         self.logger.debug(
@@ -237,6 +246,7 @@ class LLM(ABC):
         llm_config = LLMConfigRegistry.from_file(llm_config_file_path)[llm_name]
 
         tags = llm_config.tags
+
         if "copilot openai" in tags:
             from debug_gym.llms.copilot import CopilotOpenAILLM
 
@@ -246,18 +256,27 @@ class LLM(ABC):
             from debug_gym.llms.copilot import CopilotClaudeLLM
 
             klass = CopilotClaudeLLM
+
         elif "azure openai" in tags:
             from debug_gym.llms import AzureOpenAILLM
 
             klass = AzureOpenAILLM
+
+        elif "vllm" in tags:
+            from debug_gym.llms import HuggingFaceLLM
+
+            klass = HuggingFaceLLM
+
         elif "anthropic" in tags:
             from debug_gym.llms import AnthropicLLM
 
             klass = AnthropicLLM
+
         else:
             from debug_gym.llms import OpenAILLM
 
             klass = OpenAILLM
+
         llm = klass(llm_name, logger=logger, llm_config=llm_config)
         return llm
 
@@ -276,6 +295,28 @@ class LLM(ABC):
     def count_tokens(self, text: str) -> int:
         """Count the number of tokens in a text."""
         return len(self.tokenize(text))
+
+    def _get_message_token_counts(self, messages: list[dict]) -> list[int]:
+        """Return per-message token counts used for context management.
+
+        Subclasses can override this to plug in custom counting strategies
+        (for example, chat-template aware tokenizers).
+        """
+        return [get_message_tokens(msg, self.count_tokens) for msg in messages]
+
+    def _trim_messages_to_context(
+        self, messages: list[dict], message_token_counts: list[int] | None = None
+    ) -> list[dict]:
+        """Trim messages so they fit within the model context budget.
+
+        Args:
+            messages: Original message list.
+            message_token_counts: Optional precomputed counts aligned with messages.
+
+        Returns:
+            A trimmed list of messages.
+        """
+        return trim_prompt_messages(messages, self.context_length, self.count_tokens)
 
     @abstractmethod
     def define_tools(self, tool_call_list: list[EnvironmentTool]) -> list[dict]:
@@ -311,8 +352,6 @@ class LLM(ABC):
         should be implemented by subclasses. Returns an LLMResponse object
         with the prompt, response and token usage.
         """
-        from debug_gym.agents.utils import get_message_tokens, trim_prompt_messages
-
         # Add custom generation parameters from config
         for key, value in self.config.generate_kwargs.items():
             # Only set if not already specified in the call
@@ -347,12 +386,11 @@ class LLM(ABC):
             for retry_count in range(max_retries + 1):
                 try:
                     # pre-truncate messages if they are too long, to avoid unnecessary retries
-                    message_tokens = sum(
-                        get_message_tokens(msg, self.count_tokens) for msg in messages
-                    )
+                    message_token_counts = self._get_message_token_counts(messages)
+                    message_tokens = sum(message_token_counts)
                     if message_tokens > self.context_length * 1.2:
-                        trimmed_messages = trim_prompt_messages(
-                            messages, self.context_length, self.count_tokens
+                        trimmed_messages = self._trim_messages_to_context(
+                            messages, message_token_counts
                         )
                         messages = trimmed_messages
 
@@ -390,8 +428,8 @@ class LLM(ABC):
                     )
 
                     # Trim messages and try again
-                    trimmed_messages = trim_prompt_messages(
-                        messages, self.context_length, self.count_tokens
+                    trimmed_messages = self._trim_messages_to_context(
+                        messages, self._get_message_token_counts(messages)
                     )
 
                     if not trimmed_messages:
