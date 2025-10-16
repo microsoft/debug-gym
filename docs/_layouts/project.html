@@ -1,0 +1,123 @@
+---
+layout: default
+---
+<!-- Back Button -->
+<a href="{{ '/' | relative_url }}" class="button is-light project-back-button">
+  <span class="icon"><i class="fas fa-arrow-left"></i></span>
+  <span>Back to Projects</span>
+</a>
+
+<section class="hero project-hero is-light">
+  <div class="hero-body">
+    <div class="container is-max-desktop">
+      <div class="columns is-centered">
+        <div class="column has-text-centered">
+          <div class="project-hero__eyebrow">{{ page.hero_label | default: 'Featured Research Project' }}</div>
+          <h1 class="title is-1 publication-title">
+            {% if page.title_html %}
+              {{ page.title_html }}
+            {% else %}
+              {{ page.title }}
+            {% endif %}
+          </h1>
+          
+          <div class="project-meta">
+            {% if page.team_logo %}
+            <div class="project-meta__logo">
+              <img src="{{ page.team_logo | relative_url }}" alt="{{ page.authors | default: page.title }} logo">
+            </div>
+            {% endif %}
+
+            <div class="project-meta__details">
+              {% if page.authors %}
+              <div class="is-size-5 publication-authors project-meta__item">
+                <span class="author-block">{{ page.authors }}</span>
+              </div>
+              {% endif %}
+
+              {% if page.affiliation %}
+              <div class="is-size-6 project-meta__item project-meta__affiliation">
+                {{ page.affiliation }}
+              </div>
+              {% endif %}
+
+              {% if page.email %}
+              <div class="project-meta__item">
+                <code class="lightly-bold">{{ page.email }}</code>
+              </div>
+              {% endif %}
+            </div>
+          </div>
+
+          <div class="project-links project-links--hero">
+            {% if page.github_url %}
+            <a href="{{ page.github_url }}" target="_blank" class="external-link button is-normal is-rounded is-dark">
+              <span class="icon"><i class="fab fa-github"></i></span>
+              <span>Code</span>
+            </a>
+            {% endif %}
+
+            {% if page.arxiv_url %}
+            <a href="{{ page.arxiv_url }}" target="_blank" class="external-link button is-normal is-rounded is-dark">
+              <span class="icon"><i class="ai ai-arxiv"></i></span>
+              <span>arXiv</span>
+            </a>
+            {% endif %}
+
+            {% if page.paper_url %}
+            <a href="{{ page.paper_url }}" target="_blank" class="external-link button is-normal is-rounded is-dark">
+              <span class="icon"><i class="fas fa-file-pdf"></i></span>
+              <span>Paper</span>
+            </a>
+            {% endif %}
+
+            {% if page.demo_url %}
+            <a href="{{ page.demo_url }}" target="_blank" class="external-link button is-normal is-rounded is-dark">
+              <span class="icon"><i class="fas fa-play"></i></span>
+              <span>Demo</span>
+            </a>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Main Content -->
+<section class="section project-body">
+  <div class="container is-max-desktop">
+    <div class="content project-content">
+      {{ content }}
+    </div>
+  </div>
+</section>
+
+{% if page.bibtex %}
+<section class="section project-bibtex">
+  <div class="container is-max-desktop">
+    <div class="project-bibtex__header">
+      <h2 class="title is-3">BibTeX</h2>
+      <button class="button is-small is-info copy-btn" onclick="copyBibtex(this)">
+        <span class="icon"><i class="fas fa-copy"></i></span>
+        <span>Copy</span>
+      </button>
+    </div>
+    <pre id="bibtex-content" class="project-bibtex__code">{{ page.bibtex }}</pre>
+  </div>
+</section>
+
+<script>
+function copyBibtex(btn) {
+  const bibtexText = document.getElementById('bibtex-content').textContent;
+  navigator.clipboard.writeText(bibtexText).then(() => {
+    btn.classList.add('copied');
+    btn.innerHTML = '<span class="icon"><i class="fas fa-check"></i></span><span>Copied!</span>';
+    setTimeout(() => {
+      btn.classList.remove('copied');
+      btn.innerHTML = '<span class="icon"><i class="fas fa-copy"></i></span><span>Copy</span>';
+    }, 2000);
+  });
+}
+</script>
+{% endif %}

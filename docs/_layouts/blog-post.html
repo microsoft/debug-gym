@@ -1,0 +1,78 @@
+---
+layout: default
+---
+<!-- Back Button -->
+<a href="{{ '/' | relative_url }}" class="button is-light blog-back-button">
+  <span class="icon"><i class="fas fa-arrow-left"></i></span>
+  <span>Back to Home</span>
+</a>
+
+<!-- Blog Hero -->
+<section class="blog-hero">
+  <div class="container is-max-desktop has-text-centered">
+    <div class="blog-hero__label">{{ page.hero_label | default: 'Team Insight' }}</div>
+    <h1 class="blog-hero__title">{{ page.title }}</h1>
+
+    <div class="blog-meta">
+      {% if page.date %}
+      <div class="blog-meta__item">
+        <span class="blog-meta__icon"><i class="fas fa-calendar"></i></span>
+        <span>{{ page.date | date: "%B %-d, %Y" }}</span>
+      </div>
+      {% endif %}
+
+      {% if page.reading_time %}
+      <div class="blog-meta__item">
+        <span class="blog-meta__icon"><i class="fas fa-clock"></i></span>
+        <span>{{ page.reading_time }} min read</span>
+      </div>
+      {% endif %}
+
+      {% if page.author %}
+      <div class="blog-meta__item">
+        <span class="blog-meta__icon"><i class="fas fa-user"></i></span>
+        <span>{{ page.author }}</span>
+      </div>
+      {% endif %}
+    </div>
+
+    {% if page.tags %}
+    <div class="blog-tags">
+      {% for tag in page.tags %}
+      <span class="blog-tag">{{ tag }}</span>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+</section>
+
+<!-- Blog Content -->
+<section class="blog-wrapper">
+  <article class="blog-content">
+    {{ content }}
+  </article>
+</section>
+
+<!-- Blog Footer -->
+{% if page.authors %}
+<section class="blog-authors">
+  <div class="container is-max-desktop">
+    <div class="blog-authors__card">
+      <h3>About the Authors</h3>
+      <div class="author-list">
+        {% for author in page.authors %}
+        <div class="author-card">
+          <div class="author-avatar">{{ author.name | slice: 0 }}</div>
+          <div class="author-card__details">
+            <div class="author-card__name">{{ author.name }}</div>
+            {% if author.role %}
+            <div class="author-card__role">{{ author.role }}</div>
+            {% endif %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</section>
+{% endif %}
