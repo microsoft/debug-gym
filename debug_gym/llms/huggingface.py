@@ -20,11 +20,12 @@ class HuggingFaceLLM(OpenAILLM):
                 self._hf_tokenizer = AutoTokenizer.from_pretrained(
                     self.tokenizer_name, **tokenizer_kwargs
                 )
-            except OSError as exc:
+            except OSError:
                 raise ValueError(
-                    "Failed to load Hugging Face tokenizer "
-                    f"`{self.tokenizer_name}` for model {self.model_name}."
-                ) from exc
+                    f"Tokenizer `{self.tokenizer_name}` not found for model "
+                    f"{self.model_name}, make sure you have access to "
+                    "the model (e.g., HuggingFace API key is correctly set)."
+                )
 
             # Ensure we have a pad token to avoid downstream warnings when invoking
             # the tokenizer in encode mode.
@@ -36,16 +37,24 @@ class HuggingFaceLLM(OpenAILLM):
         return self._hf_tokenizer
 
     def tokenize(self, text: str) -> list[str]:
-        tokenizer = self._load_tokenizer()
-        token_ids = tokenizer.encode(str(text), add_special_tokens=False)
+        if getattr(self, "_tk_func", None) is None:
+            tokenizer = self._load_tokenizer()
+            if self.apply_chat_template:
 
-        if hasattr(tokenizer, "convert_ids_to_tokens"):
-            try:
-                return tokenizer.convert_ids_to_tokens(token_ids)
-            except Exception:  # pragma: no cover
-                pass
+                def _tokenize(txt):
+                    return tokenizer.tokenize(
+                        tokenizer.apply_chat_template(
+                            txt,
+                            tokenize=False,
+                            add_generation_prompt=True,
+                            enable_thinking=self.enable_thinking,
+                        )
+                    )
 
-        return [str(t) for t in token_ids]
+                self._tk_func = _tokenize
+            else:
+                self._tk_func = tokenizer.tokenize
+        return self._tk_func(text)
 
     def count_tokens(self, text) -> int:
         tokenizer = self._load_tokenizer()
