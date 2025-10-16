@@ -47,14 +47,16 @@ description: "Building the future of AI-assisted software engineering"
 
     {% for project in site.projects %}
     <div class="project-card">
-      <span class="content-type-badge content-type-project">
-        <i class="fas fa-cube"></i> Project
-      </span>
-      {% if project.status == 'coming-soon' %}
-      <span class="project-status status-coming-soon">Coming Soon</span>
-      {% else %}
-      <span class="project-status status-published">March 2025</span>
-      {% endif %}
+      <div class="project-card__meta-row">
+        <span class="content-type-badge content-type-project">
+          <i class="fas fa-cube"></i> Project
+        </span>
+        {% if project.status == 'coming-soon' %}
+        <span class="project-status status-coming-soon">Coming Soon</span>
+        {% else %}
+        <span class="project-status status-published">March 2025</span>
+        {% endif %}
+      </div>
       <h3 class="title is-3">
         {% if project.title_html %}
           {{ project.title_html }}
@@ -92,10 +94,12 @@ description: "Building the future of AI-assisted software engineering"
 
     {% for post in site.posts %}
     <div class="project-card">
-      <span class="content-type-badge content-type-blog">
-        <i class="fas fa-newspaper"></i> Blog Post
-      </span>
-      <span class="project-status status-published">{{ post.date | date: "%B %Y" }}</span>
+      <div class="project-card__meta-row">
+        <span class="content-type-badge content-type-blog">
+          <i class="fas fa-newspaper"></i> Blog Post
+        </span>
+        <span class="project-status status-published">{{ post.date | date: "%B %Y" }}</span>
+      </div>
       <h3 class="title is-3">{{ post.title }}</h3>
       <p>{{ post.description }}</p>
       <div class="project-links">

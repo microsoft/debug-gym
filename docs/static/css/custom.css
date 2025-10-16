@@ -281,6 +281,14 @@ a:hover {
   overflow: hidden;
 }
 
+.project-card__meta-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 1.2rem;
+  flex-wrap: wrap;
+}
+
 .project-card::before {
   content: '';
   position: absolute;
@@ -318,21 +326,33 @@ a:hover {
   z-index: 1;
 }
 
+.content-type-badge,
 .project-status {
-  display: inline-block;
-  padding: 0.4rem 1rem;
-  border-radius: 20px;
-  font-size: 0.85rem;
-  font-weight: 600;
-  margin-bottom: 1.25rem;
-  box-shadow: var(--shadow-xs);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.42rem;
+  padding: 0.44rem 1.05rem;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  margin-bottom: 0;
   position: relative;
   z-index: 1;
+  line-height: 1;
+  box-shadow: var(--shadow-xs);
+  backdrop-filter: blur(2px);
+}
+
+.project-status {
+  text-transform: none;
+  letter-spacing: 0.06em;
+  align-self: center;
 }
 
 .status-published {
   background: linear-gradient(135deg, var(--color-success) 0%, #2fa67a 100%);
-  color: white;
+  color: #fff;
 }
 
 .status-coming-soon {
@@ -341,20 +361,10 @@ a:hover {
 }
 
 .content-type-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  padding: 0.3rem 0.8rem;
-  border-radius: 6px;
-  font-size: 0.75rem;
-  font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
-  margin-bottom: 0.75rem;
-  position: relative;
-  z-index: 1;
-  background: rgba(92, 107, 255, 0.08);
-  color: var(--color-primary);
+  letter-spacing: 0.15em;
+  font-size: 0.74rem;
+  margin-bottom: 0;
 }
 
 .content-type-project {
@@ -380,6 +390,22 @@ a:hover {
   margin-bottom: 0.5rem;
   transition: all 0.25s ease;
   border-radius: var(--radius-sm);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding-inline: 1.05rem;
+  padding-block: 0.65rem;
+}
+
+.project-links a .icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.18);
+  font-size: 0.9rem;
 }
 
 .project-links a:hover {
@@ -957,6 +983,10 @@ code {
     font-size: 1.3rem;
   }
 
+  .hero.is-primary {
+    margin-bottom: 2.75rem;
+  }
+
   .hero-body {
     padding: 2.75rem 1.5rem;
   }
@@ -1015,6 +1045,11 @@ code {
   .blog-hero {
     margin: 0 1rem 2.5rem;
     padding: 3.5rem 1.75rem 3rem;
+  }
+
+  .section-intro {
+    margin: 1.5rem 1rem 2.5rem;
+    padding: 2.25rem 1.5rem;
   }
 
   .blog-content {
