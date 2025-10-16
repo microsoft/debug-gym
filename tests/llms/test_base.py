@@ -582,7 +582,7 @@ def test_context_length_exceeded_with_successful_truncation(
     messages = [{"role": "user", "content": "Long message"}]
 
     # Mock trim_prompt_messages to return shorter messages
-    with patch("debug_gym.agents.utils.trim_prompt_messages") as mock_trim:
+    with patch("debug_gym.llms.base.trim_prompt_messages") as mock_trim:
         shorter_messages = [{"role": "user", "content": "Short"}]
         mock_trim.return_value = shorter_messages
 

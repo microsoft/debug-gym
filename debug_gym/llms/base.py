@@ -13,6 +13,7 @@ from tenacity import (
     wait_random_exponential,
 )
 
+from debug_gym.agents.utils import get_message_tokens, trim_prompt_messages
 from debug_gym.gym.envs.env import EnvInfo
 from debug_gym.gym.tools.tool import EnvironmentTool, ToolCall
 from debug_gym.llms.constants import DEFAULT_LLM_CONFIG
@@ -301,9 +302,6 @@ class LLM(ABC):
         Subclasses can override this to plug in custom counting strategies
         (for example, chat-template aware tokenizers).
         """
-
-        from debug_gym.agents.utils import get_message_tokens
-
         return [get_message_tokens(msg, self.count_tokens) for msg in messages]
 
     def _trim_messages_to_context(
@@ -318,9 +316,6 @@ class LLM(ABC):
         Returns:
             A trimmed list of messages.
         """
-
-        from debug_gym.agents.utils import trim_prompt_messages
-
         return trim_prompt_messages(messages, self.context_length, self.count_tokens)
 
     @abstractmethod
