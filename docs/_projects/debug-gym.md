@@ -3,7 +3,7 @@ layout: project
 title: "debug-gym: A Text-Based Environment for Interactive Debugging"
 title_html: '<code>debug-gym</code>: A Text-Based Environment for Interactive Debugging'
 description: "A text-based environment for interactive debugging that enables Large Language Models to interactively explore codebases"
-authors: "The debug-gym Team"
+authors: "The Debug-Gym Team"
 team_logo: "/static/images/froggy_logo_no_bg_no_border.png"
 email: "debug-gym@microsoft.com"
 affiliation: "Microsoft Research"
@@ -36,7 +36,7 @@ Large Language Models (LLMs) are increasingly relied upon for coding tasks, yet 
 ## Video Demo
 
 <div style="text-align: center; margin: 2rem 0;">
-  <img src="{{ '/static/images/debug-bench-demo.gif' | relative_url }}" alt="Video Demo">
+  <img src="{{ '/static/images/debug-bench-demo.gif' | relative_url }}" alt="Debug-Gym Video Demo">
 </div>
 
 ## Experiments: Mini Nightmare

@@ -165,9 +165,11 @@ a:hover {
   color: var(--color-text);
 }
 
-.froggy-inline-logo {
-  height: 35px;
-  filter: drop-shadow(0 6px 12px rgba(92, 107, 255, 0.18));
+.debug-gym-inline-logo {
+  height: 45px;
+  max-height: 45px;
+  width: auto;
+  filter: drop-shadow(0 6px 18px rgba(92, 107, 255, 0.2));
 }
 
 /* Hero Section */
@@ -966,8 +968,10 @@ code {
     height: 35px;
   }
 
-  .froggy-inline-logo {
-    height: 28px;
+  .debug-gym-inline-logo {
+    height: 35px;
+    max-height: 35px;
+    filter: drop-shadow(0 5px 14px rgba(92, 107, 255, 0.18));
   }
 
   .navbar-title {

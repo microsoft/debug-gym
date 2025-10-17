@@ -2,7 +2,7 @@
 layout: blog-post
 title: "Building AI Agents That Actually Debug Code"
 date: 2025-01-15
-author: "The Froggy Team"
+author: "The Debug-Gym Team"
 reading_time: 8
 tags: ["AI", "Debugging", "LLMs", "Software Engineering"]
 description: "A deep dive into the technical challenges and breakthroughs in creating effective AI debugging agents"
