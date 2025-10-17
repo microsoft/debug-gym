@@ -347,9 +347,9 @@ class RepoEnv(TooledEnv):
         #     self.step_observation = Observation("env", self.last_eval.output)
         #     self.all_observations.insert(0, self.step_observation)
 
-        # self.max_score = self.calculate_max_score(self.last_eval)
-        # self.score = self.calculate_score(self.last_eval)
-        # self.done = self.calculate_done(self.last_eval)
+        self.max_score = self.calculate_max_score(self.last_eval)
+        self.score = self.calculate_score(self.last_eval)
+        self.done = self.calculate_done(self.last_eval)
 
         self.infos = EnvInfo(
             step_observation=None,
@@ -360,8 +360,8 @@ class RepoEnv(TooledEnv):
             action_reasoning=None,
             action_content=None,
             action_tool_call=None,
-            done=None,
-            score=None,
+            done=self.done,
+            score=self.score,
             max_score=self.max_score,
             instructions=self.instructions,
             rewrite_counter=self.rewrite_counter,
@@ -382,7 +382,11 @@ class RepoEnv(TooledEnv):
     def calculate_score(self, eval_output: EvalOutput) -> int:
         """Calculate the score from the eval output.
         Override in subclasses for different behavior."""
-        return eval_output.success
+        if eval_output is not None:
+            return eval_output.success
+        else:
+            return 0
+        # return eval_output.success
 
     def calculate_done(self, eval_output: EvalOutput) -> bool:
         """Determine if the task is done.
@@ -465,8 +469,8 @@ class RepoEnv(TooledEnv):
         self.all_observations.insert(0, self.step_observation)
 
         # Calculate score and done based on the last eval output
-        # self.score = self.calculate_score(self.last_eval)
-        # self.done = self.calculate_done(self.last_eval)
+        self.score = self.calculate_score(self.last_eval)
+        self.done = self.calculate_done(self.last_eval)
 
         self.infos = EnvInfo(
             step_observation=self.step_observation,
@@ -479,9 +483,9 @@ class RepoEnv(TooledEnv):
             action_content=action_content,
             action_tool_call=action_tool_call,
             instructions=self.instructions,
-            score=None,
-            max_score=None,
-            done=None,
+            score=self.score,
+            max_score=self.max_score,
+            done=self.done,
             rewrite_counter=self.rewrite_counter,
             tools=self.tools,
         )
