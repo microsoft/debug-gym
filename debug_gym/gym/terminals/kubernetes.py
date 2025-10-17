@@ -266,6 +266,15 @@ class KubernetesTerminal(Terminal):
             self.kube_config = os.path.expanduser(self.kube_config)
             config.load_kube_config(self.kube_config, self.kube_context)
 
+        # Ensure helper binaries such as kubectl can be discovered even when
+        # host environment variables are not inherited.
+        if not include_os_env_vars:
+            path = os.environ.get("PATH")
+            if path:
+                self.env_vars.setdefault("PATH", path)
+        if self.kube_config:
+            self.env_vars.setdefault("KUBECONFIG", self.kube_config)
+
         self.k8s_client = client.CoreV1Api()
         atexit.register(self.close)
 
@@ -533,15 +542,19 @@ class KubernetesTerminal(Terminal):
             # The official Kubernetes Python client does not provide a direct method for file copy.
             # The recommended approach is still to use 'kubectl cp' via subprocess.
             # Alternatives (using tar + exec) are complex and less reliable for directories.
-            result = subprocess.run(
+            command = ["kubectl"]
+            if self.kube_config:
+                command.extend(["--kubeconfig", self.kube_config])
+            command.extend(
                 [
-                    "kubectl",
-                    "--kubeconfig",
-                    self.kube_config,
                     "cp",
                     f"{src}/.",
                     f"{self.pod.namespace}/{self.pod.name}:{target}",
-                ],
+                ]
+            )
+
+            result = subprocess.run(
+                command,
                 capture_output=True,
                 text=True,
                 timeout=120,  # Increased timeout for directory operations
