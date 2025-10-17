@@ -10,10 +10,10 @@ This site is built with Jekyll, allowing you to write content in Markdown while 
 
 ### Installation
 
-1. Install dependencies:
+1. Install dependencies (installs gems locally to avoid sudo prompts on macOS):
 ```bash
 cd docs
-bundle install
+bundle install --path vendor/bundle
 ```
 
 2. Start the Jekyll development server:
@@ -188,7 +188,7 @@ Output will be in `_site/` directory.
 
 ### Jekyll not found
 ```bash
-bundle install
+bundle install --path vendor/bundle
 ```
 
 ### Port already in use
@@ -204,6 +204,7 @@ bundle exec jekyll serve --port 4001
 - Hard refresh browser (Cmd+Shift+R on Mac)
 - Restart Jekyll server
 - Check `_site/` is being regenerated
+- Remove cached build artifacts if needed: delete `docs/_site/`, `docs/.jekyll-cache/`, and `docs/vendor/` before re-running the build
 
 ## File Organization Tips
 
