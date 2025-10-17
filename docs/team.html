@@ -1,0 +1,62 @@
+---
+layout: default
+title: "Meet the Debug-Gym Team"
+description: "Photos, names, and affiliations of the Debug-Gym research team"
+permalink: /team/
+---
+
+<section class="section team-intro">
+  <div class="container is-max-desktop">
+    <div class="columns is-centered">
+      <div class="column is-two-thirds has-text-centered">
+        <h1 class="title is-1">Meet the Debug-Gym Team</h1>
+        <p class="subtitle is-4">Add or edit teammates by updating <code>_data/team.yml</code>. Each entry can include a name, role, affiliation, headshot, and helpful links.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+{% assign team_members = site.data.team %}
+
+<section class="section team-directory">
+  <div class="container is-max-desktop">
+    {% if team_members and team_members.size > 0 %}
+      <div class="team-grid">
+        {% for member in team_members %}
+          <article class="team-card">
+            {% if member.photo and member.photo != '' %}
+              <div class="team-card__photo">
+                <img src="{{ member.photo | relative_url }}" alt="Portrait of {{ member.name }}">
+              </div>
+            {% else %}
+              <div class="team-card__photo team-card__photo--placeholder" aria-hidden="true">
+                <span>{{ member.name | slice: 0, 1 }}</span>
+              </div>
+            {% endif %}
+            <div class="team-card__body">
+              <h2 class="team-card__name">{{ member.name }}</h2>
+              {% if member.role %}
+                <p class="team-card__role">{{ member.role }}</p>
+              {% endif %}
+              {% if member.affiliation %}
+                <p class="team-card__affiliation">{{ member.affiliation }}</p>
+              {% endif %}
+
+              {% if member.links and member.links.size > 0 %}
+                <div class="team-card__links">
+                  {% for link in member.links %}
+                    <a href="{{ link.url }}" class="team-card__link" target="_blank" rel="noopener">{{ link.label }}</a>
+                  {% endfor %}
+                </div>
+              {% endif %}
+            </div>
+          </article>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="notification is-warning is-light has-text-centered">
+        <p><strong>No team members yet.</strong> Edit <code>_data/team.yml</code> to add your first teammate.</p>
+      </div>
+    {% endif %}
+  </div>
+</section>

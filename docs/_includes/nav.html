@@ -1,14 +1,17 @@
 <!-- Navigation Bar -->
-<nav class="navbar-custom">
+<nav class="navbar-custom" role="navigation" aria-label="Main navigation">
   <div class="navbar-brand">
-    <a href="{{ '/' | relative_url }}">
+    <a href="{{ '/' | relative_url }}" class="navbar-logo-link" aria-label="Microsoft Research homepage">
       <img src="{{ '/static/images/Microsoft_logo.svg' | relative_url }}" alt="Microsoft Research" class="navbar-logo">
     </a>
-    <div class="navbar-divider"></div>
+    <div class="navbar-divider" aria-hidden="true"></div>
     <div class="navbar-title">
-      <a href="{{ '/' | relative_url }}" style="text-decoration: none; color: inherit; display: flex; align-items: center; gap: 0.75rem;">
-  <img src="{{ '/static/images/froggy_new_logo.png' | relative_url }}" alt="Debug-Gym Team" class="debug-gym-inline-logo">
+      <a href="{{ '/' | relative_url }}" class="navbar-home-link" aria-label="Debug-Gym homepage">
+        <img src="{{ '/static/images/froggy_new_logo.png' | relative_url }}" alt="Debug-Gym Team" class="debug-gym-inline-logo">
       </a>
     </div>
+  </div>
+  <div class="navbar-links">
+    <a href="{{ '/team/' | relative_url }}" class="navbar-link">Team</a>
   </div>
 </nav>

@@ -1,0 +1,16 @@
+# Update this list to manage the Team page.
+# Each entry supports: name (required), role (optional), affiliation (optional), photo (optional), and links (optional).
+- name: "Sample Teammate"
+  role: "Researcher"
+  affiliation: "Microsoft Research Montréal"
+  photo: "/static/images/team/sample-headshot.png"
+  links:
+    - label: "GitHub"
+      url: "https://github.com/microsoft"
+    - label: "LinkedIn"
+      url: "https://www.linkedin.com/company/microsoft/"
+- name: "Add Your Next Teammate"
+  role: "Engineer"
+  affiliation: "Microsoft Research Montréal"
+  photo: ""
+  links: []
