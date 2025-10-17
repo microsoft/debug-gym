@@ -264,9 +264,11 @@ class RepoEnv(TooledEnv):
             )
             self.debug_entrypoint = self._prepare_entrypoint(debug_entrypoint)
         if self.debug_entrypoint is not None and "-m pdb" not in self.debug_entrypoint:
+            # second replace fixes issue previously with shell session failing to start
+            # because of entrypoints with substring python -m pdb -m pytest
             self.debug_entrypoint = self.debug_entrypoint.replace(
                 "python ", "python -m pdb "
-            )
+            ).replace("-m pytest", "$(which pytest)")
         self.entrypoint = "PYTHONPATH=$PYTHONPATH:$PWD " + self.entrypoint
         self.debug_entrypoint = "PYTHONPATH=$PYTHONPATH:$PWD " + self.debug_entrypoint
 
@@ -343,22 +345,23 @@ class RepoEnv(TooledEnv):
         self.queue_event(Event.ENV_RESET, source="env")
         self.all_observations = self.process_events()
 
-        # Gets eval (initial observation) from cache or by running env.eval
-        if self.last_eval:  # if eval tool was triggered by Event.ENV_RESET
-            self.step_observation = Observation("env", self.last_eval.output)
-        else:  # if eval tool was not triggered by Event.ENV_RESET
-            self.last_eval = self.eval()
-            self.step_observation = Observation("env", self.last_eval.output)
-            self.all_observations.insert(0, self.step_observation)
+        # REMOVE EVAL LOGIC
+        # # Gets eval (initial observation) from cache or by running env.eval
+        # if self.last_eval:  # if eval tool was triggered by Event.ENV_RESET
+        #     self.step_observation = Observation("env", self.last_eval.output)
+        # else:  # if eval tool was not triggered by Event.ENV_RESET
+        #     self.last_eval = self.eval()
+        #     self.step_observation = Observation("env", self.last_eval.output)
+        #     self.all_observations.insert(0, self.step_observation)
 
         self.max_score = self.calculate_max_score(self.last_eval)
         self.score = self.calculate_score(self.last_eval)
         self.done = self.calculate_done(self.last_eval)
 
         self.infos = EnvInfo(
-            step_observation=self.step_observation,
-            all_observations=self.all_observations,
-            eval_observation=Observation("env", self.last_eval.output),
+            step_observation=None,
+            all_observations=None,
+            eval_observation=Observation("env", None),
             dir_tree=self.workspace.display_files(self.dir_tree_depth),
             current_breakpoints=self.current_breakpoints(),
             action_reasoning=None,
@@ -386,7 +389,11 @@ class RepoEnv(TooledEnv):
     def calculate_score(self, eval_output: EvalOutput) -> int:
         """Calculate the score from the eval output.
         Override in subclasses for different behavior."""
-        return eval_output.success
+        if eval_output is not None:
+            return eval_output.success
+        else:
+            return 0
+        # return eval_output.success
 
     def calculate_done(self, eval_output: EvalOutput) -> bool:
         """Determine if the task is done.
@@ -475,7 +482,8 @@ class RepoEnv(TooledEnv):
         self.infos = EnvInfo(
             step_observation=self.step_observation,
             all_observations=self.all_observations,
-            eval_observation=Observation("env", self.last_eval.output),
+            # eval_observation=Observation("env", self.last_eval.output),
+            eval_observation=None,
             dir_tree=self.workspace.display_files(self.dir_tree_depth),
             current_breakpoints=self.current_breakpoints(),
             action_reasoning=action_reasoning,

@@ -49,7 +49,12 @@ class HistoryTracker:
                 "reasoning": None,
                 "content": None,
                 "action": None,  # env reset
-                "obs": self.memory[0].step_observation.observation,
+                # bash agent will not have an initial eval observation
+                "obs": (
+                    self.memory[0].step_observation.observation
+                    if self.memory[0].step_observation
+                    else None
+                ),
                 "rewrite_consumed": 0,
                 "prompt_response_pairs": None,
             }
@@ -100,5 +105,7 @@ def build_history_prompt(
     for history_info, response in zip(
         _history[latest_rewrite_step:], _prompt_response_pairs[latest_rewrite_step:]
     ):
+        if history_info.step_observation is None:
+            continue
         _messages.extend(llm.format_tool_call_history(history_info, response))
     return _messages
