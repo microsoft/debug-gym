@@ -9,6 +9,7 @@ email: "debug-gym@microsoft.com"
 affiliation: "Microsoft Research"
 github_url: "https://github.com/microsoft/debug-gym"
 arxiv_url: "https://arxiv.org/abs/2503.21557"
+release_date: 2025-03-27
 bibtex: |
   @article{yuan2025debuggym,
     title={debug-gym: A Text-Based Environment for Interactive Debugging},

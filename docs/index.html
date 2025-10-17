@@ -1,6 +1,6 @@
 ---
 layout: default
-title: "MSR Montreal - Froggy Team"
+title: "MSR Montréal - Froggy Team"
 description: "Building the future of AI-assisted software engineering"
 ---
 
@@ -10,10 +10,10 @@ description: "Building the future of AI-assisted software engineering"
       <div class="columns is-centered">
         <div class="column has-text-centered">
           <h1 class="title is-1">
-            Froggy Team Research Projects
+            The Froggy Team
           </h1>
           <h2 class="subtitle is-3">
-            Building the future of AI-assisted software engineering
+            Microsoft Research Montréal
           </h2>
         </div>
       </div>
@@ -26,9 +26,22 @@ description: "Building the future of AI-assisted software engineering"
     <div class="columns is-centered">
       <div class="column is-four-fifths has-text-centered">
         <div class="content">
-          <p class="is-size-5">
-            Welcome to the MSR Montreal Froggy Team's research hub. We develop cutting-edge AI tools and frameworks to advance software engineering, code understanding, and interactive debugging. Explore our projects below.
-          </p>
+          <div class="is-size-5 content" style="text-align: left;">
+            <p>
+              We aim to advance research on Large Language Models (LLMs), with a particular focus on agentic coding LLMs. Our interests include:
+            </p>
+            <ol>
+              <li>
+                <strong>Reasoning</strong> — decomposing hard problems into smaller steps, efficiently searching for solutions, and managing memory.
+              </li>
+              <li>
+                <strong>Interaction</strong> — reinforcement learning and training models that can interact with textual environments and learn from feedback.
+              </li>
+              <li>
+                <strong>Modularity</strong> — building plug-and-play language architectures for efficient customization and deployment.
+              </li>
+            </ol>
+          </div>
         </div>
       </div>
     </div>
@@ -45,7 +58,12 @@ description: "Building the future of AI-assisted software engineering"
       Research Projects
     </h3>
 
-    {% for project in site.projects %}
+  {% assign coming_soon_projects = site.projects | where: "status", "coming-soon" %}
+  {% assign released_projects = site.projects | where_exp: "project", "project.status != 'coming-soon'" %}
+    {% assign released_sorted = released_projects | sort: "release_date" | reverse %}
+    {% assign ordered_projects = coming_soon_projects | concat: released_sorted %}
+
+    {% for project in ordered_projects %}
     <div class="project-card">
       <div class="project-card__meta-row">
         <span class="content-type-badge content-type-project">
@@ -54,7 +72,10 @@ description: "Building the future of AI-assisted software engineering"
         {% if project.status == 'coming-soon' %}
         <span class="project-status status-coming-soon">Coming Soon</span>
         {% else %}
-        <span class="project-status status-published">March 2025</span>
+        {% assign release_display = project.release_date | default: project.date %}
+        {% if release_display %}
+        <span class="project-status status-published">{{ release_display | date: "%B %Y" }}</span>
+        {% endif %}
         {% endif %}
       </div>
       <h3 class="title is-3">

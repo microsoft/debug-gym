@@ -1,4 +1,4 @@
-# MSR Montreal Froggy Team - Jekyll Site
+# MSR Montréal Froggy Team - Jekyll Site
 
 This site is built with Jekyll, allowing you to write content in Markdown while maintaining the same beautiful design.
 
