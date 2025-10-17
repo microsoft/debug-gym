@@ -3,6 +3,7 @@ import json
 import os
 import random
 import subprocess
+import tempfile
 import time
 import uuid
 from pathlib import Path
@@ -252,6 +253,7 @@ class KubernetesTerminal(Terminal):
         user = _clean_for_kubernetes(os.environ.get("USER", "unknown"))
         self.labels = {"app": "dbg-gym", "user": user} | (extra_labels or {})
         self._pod = None
+        self._temp_kubeconfig_file: str | None = None
 
         # Initialize Kubernetes client
         self.kube_config = kube_config
@@ -259,6 +261,7 @@ class KubernetesTerminal(Terminal):
         if self.kube_config == "incluster":
             self.kube_config = None
             config.load_incluster_config()
+            self._prepare_incluster_kubeconfig()
         else:
             self.kube_config = self.kube_config or os.environ.get(
                 "KUBECONFIG", "~/.kube/config"
@@ -343,6 +346,76 @@ class KubernetesTerminal(Terminal):
         )
         self.sessions.append(session)
         return session
+
+    def _prepare_incluster_kubeconfig(self) -> None:
+        service_host = os.environ.get("KUBERNETES_SERVICE_HOST")
+        service_port = os.environ.get("KUBERNETES_SERVICE_PORT", "443")
+        server = None
+        if service_host:
+            server = f"https://{service_host}:{service_port}"
+        else:
+            server = "https://kubernetes.default.svc"
+
+        token_path = "/var/run/secrets/kubernetes.io/serviceaccount/token"
+        ca_path = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
+        namespace_path = "/var/run/secrets/kubernetes.io/serviceaccount/namespace"
+
+        if os.path.exists(namespace_path):
+            with open(namespace_path, "r", encoding="utf-8") as ns_file:
+                sa_namespace = ns_file.read().strip()
+                if sa_namespace:
+                    self.namespace = self.namespace or sa_namespace
+
+        if not os.path.exists(token_path):
+            raise ValueError(
+                "In-cluster configuration detected but service account token not found."
+            )
+
+        with open(token_path, "r", encoding="utf-8") as token_file:
+            token = token_file.read().strip()
+
+        cluster_entry = {"name": "incluster", "cluster": {"server": server}}
+        if os.path.exists(ca_path):
+            cluster_entry["cluster"]["certificate-authority"] = ca_path
+
+        kubeconfig_data = {
+            "apiVersion": "v1",
+            "kind": "Config",
+            "clusters": [cluster_entry],
+            "contexts": [
+                {
+                    "name": "incluster",
+                    "context": {
+                        "cluster": "incluster",
+                        "user": "incluster",
+                        "namespace": self.namespace,
+                    },
+                }
+            ],
+            "current-context": "incluster",
+            "users": [{"name": "incluster", "user": {"token": token}}],
+        }
+
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            prefix="dbg-gym-kubeconfig-",
+            suffix=".yaml",
+            delete=False,
+        ) as tmp_file:
+            dump(kubeconfig_data, tmp_file)
+            self._temp_kubeconfig_file = tmp_file.name
+
+        self.kube_config = self._temp_kubeconfig_file
+
+    def _cleanup_temp_kubeconfig(self) -> None:
+        if self._temp_kubeconfig_file and os.path.exists(self._temp_kubeconfig_file):
+            try:
+                os.remove(self._temp_kubeconfig_file)
+            except OSError as exc:
+                self.logger.debug(
+                    f"Failed to delete temporary kubeconfig {self._temp_kubeconfig_file}: {exc}"
+                )
+        self._temp_kubeconfig_file = None
 
     def prepare_command(self, entrypoint: str | list[str]) -> list[str]:
         """Prepares a shell command by combining session commands and entrypoint commands.
@@ -512,6 +585,7 @@ class KubernetesTerminal(Terminal):
         if self._pod is not None:
             self._pod.clean_up()
             self._pod = None
+        self._cleanup_temp_kubeconfig()
 
     def __del__(self):
         self.close()
