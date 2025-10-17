@@ -21,6 +21,9 @@
 - name: "Eric Yuan"
   affiliation: "Microsoft Research Montréal"
   photo: "/static/images/team/xingdi.png"
+  links:
+    - label: "Website"
+      url: "https://xingdi-eric-yuan.github.io/"
 - name: "Fabio Vera"
   affiliation: "Microsoft Research New England"
   photo: "/static/images/team/fabio.jpg"
