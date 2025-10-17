@@ -19,10 +19,4 @@ class SubmitTool(EnvironmentTool):
                 self.name, "Environment does not support final submission."
             )
         eval_output = environment.final_submit()
-        summary = [
-            "=== FINAL SUBMISSION RESULTS ===",
-            f"Success: {eval_output.success}",
-            "--- Raw Output (truncated to 2000 chars) ---",
-            eval_output.output,
-        ]
-        return Observation(self.name, "\n".join(summary))
+        return Observation(self.name, eval_output.output)

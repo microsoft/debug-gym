@@ -253,6 +253,8 @@ class SWEBenchEnv(RepoEnv):
         return len(self.fail_to_pass)
 
     def calculate_score(self, eval_output: EvalOutput) -> int:
+        if eval_output is None:
+            return 0
         test_status_map = MAP_REPO_TO_PARSER[self.repo](
             eval_output.output, self.test_spec
         )
