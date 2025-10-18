@@ -266,6 +266,15 @@ class KubernetesTerminal(Terminal):
             self.kube_config = os.path.expanduser(self.kube_config)
             config.load_kube_config(self.kube_config, self.kube_context)
 
+        # Ensure helper binaries such as kubectl can be discovered even when
+        # host environment variables are not inherited.
+        if not include_os_env_vars:
+            path = os.environ.get("PATH")
+            if path:
+                self.env_vars.setdefault("PATH", path)
+        if self.kube_config:
+            self.env_vars.setdefault("KUBECONFIG", self.kube_config)
+        
         self.k8s_client = client.CoreV1Api()
         atexit.register(self.close)
 
