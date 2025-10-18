@@ -6,6 +6,9 @@
 - name: "Atharv Sonwane"
   affiliation: "Cornell University"
   photo: "/static/images/team/atharv.jpg"
+  links:
+    - label: "Website"
+      url: "https://threewisemonkeys-as.github.io/"
 - name: "Charbel El Feghali"
   affiliation: "Mila, McGill University"
   photo: "/static/images/team/charbel.png"
@@ -30,12 +33,21 @@
 - name: "Hyunji Amy Lee"
   affiliation: "University of North Carolina at Chapel Hill"
   photo: "/static/images/team/hyunji.jpg"
+  links:
+    - label: "Website"
+      url: "https://amy-hyunji.github.io/"
 - name: "Isadora White"
   affiliation: "University of California San Diego"
   photo: "/static/images/team/isadora.jpg"
+  links:
+    - label: "Website"
+      url: "https://icwhite.github.io/website/"
 - name: "Lucas Pagé-Caccia"
   affiliation: "Microsoft Research Montréal"
   photo: "/static/images/team/lucas.png"
+  links:
+    - label: "Website"
+      url: "https://www.cs.mcgill.ca/~lpagec/"
 - name: "Marc-Alexandre Côté"
   affiliation: "Microsoft Research Montréal"
   photo: "/static/images/team/marc.png"
@@ -45,9 +57,15 @@
 - name: "Minseon Kim"
   affiliation: "Microsoft Research Montréal"
   photo: "/static/images/team/minseon.png"
+  links:
+    - label: "Website"
+      url: "https://kim-minseon.github.io/"
 - name: "Morgane Moss"
   affiliation: "Mila, Université de Montréal"
   photo: "/static/images/team/morgane.png"
 - name: "Zhengyan Shi"
   affiliation: "Microsoft Research Montréal"
   photo: "/static/images/team/zhengyan.jpg"
+  links:
+    - label: "Website"
+      url: "https://shizhengyan.github.io/"
