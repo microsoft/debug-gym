@@ -268,10 +268,17 @@ class KubernetesTerminal(Terminal):
 
         # Ensure helper binaries such as kubectl can be discovered even when
         # host environment variables are not inherited.
-        if not include_os_env_vars:
+        if not include_os_env_vars:  # TODO: remove include_os_env_vars from here and docker
             path = os.environ.get("PATH")
             if path:
                 self.env_vars.setdefault("PATH", path)
+            # For in-cluster kubectl access, pass Kubernetes service environment variables
+            # This enables kubectl to auto-discover the service account credentials
+            if kube_config == "incluster":
+                for key in ["KUBERNETES_SERVICE_HOST", "KUBERNETES_SERVICE_PORT"]:
+                    value = os.environ.get(key)
+                    if value:
+                        self.env_vars.setdefault(key, value)
         if self.kube_config:
             self.env_vars.setdefault("KUBECONFIG", self.kube_config)
 
@@ -326,9 +333,9 @@ class KubernetesTerminal(Terminal):
     @property
     def default_shell_command(self) -> list[str]:
         """Expects the pod to have bash installed."""
-        kubeconfig = f"--kubeconfig {self.kube_config}" if self.kube_config else ""
+        kubeconfig = f"--kubeconfig {self.kube_config} " if self.kube_config else ""
         bash_cmd = "/bin/bash --noprofile --norc --noediting"
-        return f"kubectl {kubeconfig} exec -it {self.pod.name} -n {self.pod.namespace} -- {bash_cmd}"
+        return f"kubectl {kubeconfig}exec -it {self.pod.name} -c main -n {self.pod.namespace} -- {bash_cmd}"
 
     def new_shell_session(self):
         if not self.pod.is_running():
