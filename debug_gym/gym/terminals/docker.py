@@ -22,7 +22,7 @@ class DockerTerminal(Terminal):
         include_os_env_vars: bool = False,
         logger: DebugGymLogger | None = None,
         # Docker-specific parameters
-        base_image: str = "ubuntu:latest",
+        base_image: str = None,
         setup_commands: list[str] | None = None,
         **kwargs,
     ):
