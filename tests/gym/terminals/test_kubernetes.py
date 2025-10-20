@@ -35,11 +35,24 @@ if_is_linux = pytest.mark.skipif(
 def test_kubernetes_terminal_init():
     terminal = KubernetesTerminal(base_image="ubuntu:latest")
     assert terminal.session_commands == []
-    assert terminal.env_vars == {
+    expected_base_env = {
         "NO_COLOR": "1",
         "PS1": DEFAULT_PS1,
         "PYTHONSTARTUP": "",
     }
+    for key, value in expected_base_env.items():
+        assert terminal.env_vars[key] == value
+
+    assert terminal.env_vars["PATH"] == os.environ.get("PATH")
+    if terminal.kube_config:
+        assert terminal.env_vars["KUBECONFIG"] == terminal.kube_config
+    else:
+        assert "KUBECONFIG" not in terminal.env_vars
+
+    extra_env_keys = set(terminal.env_vars) - (
+        set(expected_base_env) | {"PATH", "KUBECONFIG"}
+    )
+    assert not extra_env_keys
     assert os.path.basename(terminal.working_dir).startswith("Terminal-")
     assert terminal.base_image == "ubuntu:latest"
     assert terminal.namespace == "default"
@@ -84,7 +97,15 @@ def test_kubernetes_terminal_init_with_params(tmp_path):
     )
     assert terminal.working_dir == working_dir
     assert terminal.session_commands == session_commands
-    assert terminal.env_vars == env_vars | {"NO_COLOR": "1", "PS1": DEFAULT_PS1}
+    assert terminal.env_vars["ENV_VAR"] == "value"
+    assert terminal.env_vars["NO_COLOR"] == "1"
+    assert terminal.env_vars["PS1"] == DEFAULT_PS1
+    assert terminal.env_vars["PYTHONSTARTUP"] == ""
+    assert terminal.env_vars["PATH"] == os.environ.get("PATH")
+    if terminal.kube_config:
+        assert terminal.env_vars["KUBECONFIG"] == terminal.kube_config
+    else:
+        assert "KUBECONFIG" not in terminal.env_vars
     assert terminal.base_image == base_image
 
     # Create pod.

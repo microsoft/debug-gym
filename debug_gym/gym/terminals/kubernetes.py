@@ -274,7 +274,7 @@ class KubernetesTerminal(Terminal):
                 self.env_vars.setdefault("PATH", path)
         if self.kube_config:
             self.env_vars.setdefault("KUBECONFIG", self.kube_config)
-        
+
         self.k8s_client = client.CoreV1Api()
         atexit.register(self.close)
 
