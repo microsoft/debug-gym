@@ -60,7 +60,9 @@ def test_docker_terminal_init_with_params(tmp_path):
 )
 def test_docker_terminal_run(tmp_path, command):
     working_dir = str(tmp_path)
-    docker_terminal = DockerTerminal(working_dir=working_dir, base_image="ubuntu:latest")
+    docker_terminal = DockerTerminal(
+        working_dir=working_dir, base_image="ubuntu:latest"
+    )
     success, output = docker_terminal.run(command, timeout=1)
     assert output == "test"
     assert success is True
@@ -151,7 +153,9 @@ def test_select_terminal_docker():
 def test_run_setup_commands_success(tmp_path):
     working_dir = str(tmp_path)
     setup_commands = ["touch test1.txt", "echo test > test2.txt"]
-    terminal = DockerTerminal(working_dir, setup_commands=setup_commands, base_image="ubuntu:latest")
+    terminal = DockerTerminal(
+        working_dir, setup_commands=setup_commands, base_image="ubuntu:latest"
+    )
     assert terminal.container is not None
     assert terminal.container.status == "running"
     _, output = terminal.run("ls", timeout=1)
@@ -163,7 +167,9 @@ def test_run_setup_commands_failure(tmp_path):
     working_dir = str(tmp_path)
     setup_commands = ["echo install", "ls ./non_existent_dir"]
     with pytest.raises(ValueError, match="Failed to run setup command:*"):
-        terminal = DockerTerminal(working_dir, setup_commands=setup_commands, base_image="ubuntu:latest")
+        terminal = DockerTerminal(
+            working_dir, setup_commands=setup_commands, base_image="ubuntu:latest"
+        )
         terminal.container  # start the container
 
 
