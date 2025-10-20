@@ -12,7 +12,7 @@ from debug_gym.gym.terminals.terminal import DISABLE_ECHO_COMMAND
 
 @pytest.if_docker_running
 def test_docker_terminal_init():
-    terminal = DockerTerminal()
+    terminal = DockerTerminal(base_image="ubuntu:latest")
     assert terminal.session_commands == []
     assert terminal.env_vars == {
         "NO_COLOR": "1",
@@ -60,7 +60,7 @@ def test_docker_terminal_init_with_params(tmp_path):
 )
 def test_docker_terminal_run(tmp_path, command):
     working_dir = str(tmp_path)
-    docker_terminal = DockerTerminal(working_dir=working_dir)
+    docker_terminal = DockerTerminal(working_dir=working_dir, base_image="ubuntu:latest")
     success, output = docker_terminal.run(command, timeout=1)
     assert output == "test"
     assert success is True
@@ -77,7 +77,7 @@ def test_docker_terminal_run(tmp_path, command):
 def test_terminal_multiple_session_commands(tmp_path):
     working_dir = str(tmp_path)
     session_commands = ["echo 'Hello'", "echo 'World'"]
-    terminal = DockerTerminal(working_dir, session_commands)
+    terminal = DockerTerminal(working_dir, session_commands, base_image="ubuntu:latest")
     status, output = terminal.run("pwd", timeout=1)
     assert status
     assert output == f"Hello\nWorld\n{working_dir}"
@@ -89,7 +89,7 @@ def test_docker_terminal_session(tmp_path):
     # same as test_terminal_session but with DockerTerminal
     working_dir = str(tmp_path)
     command = "echo Hello World"
-    terminal = DockerTerminal(working_dir=working_dir)
+    terminal = DockerTerminal(working_dir=working_dir, base_image="ubuntu:latest")
     assert not terminal.sessions
 
     session = terminal.new_shell_session()
@@ -113,7 +113,7 @@ def test_docker_terminal_session(tmp_path):
 @pytest.if_docker_running
 def test_terminal_sudo_command(tmp_path):
     working_dir = str(tmp_path)
-    terminal = DockerTerminal(working_dir=working_dir)
+    terminal = DockerTerminal(working_dir=working_dir, base_image="ubuntu:latest")
     success, output = terminal.run("vim --version", timeout=1)
     assert "vim: command not found" in output
     assert success is False
@@ -129,7 +129,7 @@ def test_terminal_sudo_command(tmp_path):
 @pytest.if_docker_running
 def test_terminal_cleanup(tmp_path):
     working_dir = str(tmp_path)
-    terminal = DockerTerminal(working_dir=working_dir)
+    terminal = DockerTerminal(working_dir=working_dir, base_image="ubuntu:latest")
     container_name = terminal.container.name
     terminal.clean_up()
     assert terminal._container is None
@@ -151,7 +151,7 @@ def test_select_terminal_docker():
 def test_run_setup_commands_success(tmp_path):
     working_dir = str(tmp_path)
     setup_commands = ["touch test1.txt", "echo test > test2.txt"]
-    terminal = DockerTerminal(working_dir, setup_commands=setup_commands)
+    terminal = DockerTerminal(working_dir, setup_commands=setup_commands, base_image="ubuntu:latest")
     assert terminal.container is not None
     assert terminal.container.status == "running"
     _, output = terminal.run("ls", timeout=1)
@@ -163,7 +163,7 @@ def test_run_setup_commands_failure(tmp_path):
     working_dir = str(tmp_path)
     setup_commands = ["echo install", "ls ./non_existent_dir"]
     with pytest.raises(ValueError, match="Failed to run setup command:*"):
-        terminal = DockerTerminal(working_dir, setup_commands=setup_commands)
+        terminal = DockerTerminal(working_dir, setup_commands=setup_commands, base_image="ubuntu:latest")
         terminal.container  # start the container
 
 
@@ -176,7 +176,7 @@ def test_copy_content(tmp_path):
     with open(source_file, "w") as src_file:
         src_file.write("Hello World")
 
-    terminal = DockerTerminal()
+    terminal = DockerTerminal(base_image="ubuntu:latest")
     # Source must be a folder.
     with pytest.raises(ValueError, match="Source .* must be a directory."):
         terminal.copy_content(source_file)
