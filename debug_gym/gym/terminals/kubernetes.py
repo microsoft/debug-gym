@@ -268,7 +268,8 @@ class KubernetesTerminal(Terminal):
 
         # Ensure helper binaries such as kubectl can be discovered even when
         # host environment variables are not inherited.
-        if not include_os_env_vars:  # TODO: remove include_os_env_vars from here and docker
+        # TODO: remove include_os_env_vars from here and docker
+        if not include_os_env_vars:
             path = os.environ.get("PATH")
             if path:
                 self.env_vars.setdefault("PATH", path)
