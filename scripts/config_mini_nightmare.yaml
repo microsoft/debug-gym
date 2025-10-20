@@ -17,6 +17,7 @@ base:
 
     terminal: {
         type: "docker",  # "local", "docker", or "kubernetes"
+        base_image: "debug-gym:mini-nightmare",
     }
 
     # LLM configs
