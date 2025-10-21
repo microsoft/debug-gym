@@ -19,7 +19,6 @@ class DockerTerminal(Terminal):
         working_dir: str | None = None,
         session_commands: list[str] | None = None,
         env_vars: dict[str, str] | None = None,
-        include_os_env_vars: bool = False,
         logger: DebugGymLogger | None = None,
         # Docker-specific parameters
         base_image: str = "ubuntu:latest",
@@ -39,7 +38,6 @@ class DockerTerminal(Terminal):
             working_dir=working_dir,
             session_commands=session_commands,
             env_vars=env_vars,
-            include_os_env_vars=include_os_env_vars,
             logger=logger,
             **kwargs,
         )

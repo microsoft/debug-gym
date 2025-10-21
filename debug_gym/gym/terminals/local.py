@@ -5,9 +5,31 @@ from pathlib import Path
 
 from debug_gym.gym.terminals.shell_session import ShellSession
 from debug_gym.gym.terminals.terminal import Terminal
+from debug_gym.logger import DebugGymLogger
 
 
 class LocalTerminal(Terminal):
+
+    def __init__(
+        self,
+        working_dir: str | None = None,
+        session_commands: list[str] | None = None,
+        env_vars: dict[str, str] | None = None,
+        logger: DebugGymLogger | None = None,
+        # Local-specific parameters
+        include_os_env_vars: bool = False,
+        **kwargs,
+    ):
+        if include_os_env_vars:
+            env_vars = env_vars | dict(os.environ)
+
+        super().__init__(
+            working_dir=working_dir,
+            session_commands=session_commands,
+            env_vars=env_vars,
+            logger=logger,
+            **kwargs,
+        )
 
     @property
     def working_dir(self):

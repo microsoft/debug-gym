@@ -15,7 +15,6 @@ def select_terminal(
 
     logger = logger or DebugGymLogger("debug-gym")
     terminal_type = terminal_config["type"]
-    docker_only = ["base_image", "setup_commands"]
     match terminal_type:
         case "docker":
             terminal_class = DockerTerminal
@@ -23,8 +22,6 @@ def select_terminal(
             terminal_class = KubernetesTerminal
         case "local":
             terminal_class = LocalTerminal
-            if any(cfg in terminal_config for cfg in docker_only):
-                logger.warning("Ignoring Docker-only parameters for local terminal.")
         case _:
             raise ValueError(f"Unknown terminal {terminal_type}")
 

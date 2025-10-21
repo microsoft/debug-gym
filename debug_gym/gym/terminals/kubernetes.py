@@ -219,10 +219,9 @@ class KubernetesTerminal(Terminal):
         working_dir: str | None = None,
         session_commands: list[str] | None = None,
         env_vars: dict[str, str] | None = None,
-        include_os_env_vars: bool = False,
         logger: DebugGymLogger | None = None,
-        setup_commands: list[str] | None = None,
         # Kubernetes-specific parameters
+        setup_commands: list[str] | None = None,
         pod_name: str | None = None,
         base_image: str = "ubuntu:latest",
         registry: str = "docker.io/",
@@ -237,7 +236,6 @@ class KubernetesTerminal(Terminal):
             working_dir=working_dir,
             session_commands=session_commands,
             env_vars=env_vars,
-            include_os_env_vars=include_os_env_vars,
             logger=logger,
             **kwargs,
         )
