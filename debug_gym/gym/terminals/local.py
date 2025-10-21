@@ -17,7 +17,7 @@ class LocalTerminal(Terminal):
         env_vars: dict[str, str] | None = None,
         logger: DebugGymLogger | None = None,
         # Local-specific parameters
-        include_os_env_vars: bool = False,
+        include_os_env_vars: bool = True,
         **kwargs,
     ):
         if include_os_env_vars:
