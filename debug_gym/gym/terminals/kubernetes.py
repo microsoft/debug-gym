@@ -257,27 +257,25 @@ class KubernetesTerminal(Terminal):
         if self.kube_config == "incluster":
             self.kube_config = None
             config.load_incluster_config()
+            # For in-cluster kubectl access, pass Kubernetes service environment variables
+            # This enables kubectl to auto-discover the service account credentials
+            for key in ["KUBERNETES_SERVICE_HOST", "KUBERNETES_SERVICE_PORT"]:
+                value = os.environ.get(key)
+                if value:
+                    self.env_vars.setdefault(key, value)
         else:
             self.kube_config = self.kube_config or os.environ.get(
                 "KUBECONFIG", "~/.kube/config"
             )
             self.kube_config = os.path.expanduser(self.kube_config)
             config.load_kube_config(self.kube_config, self.kube_context)
+            self.env_vars.setdefault("KUBECONFIG", self.kube_config)
 
         # Ensure helper binaries such as kubectl can be discovered even when
         # host environment variables are not inherited.
         path = os.environ.get("PATH")
         if path:
             self.env_vars.setdefault("PATH", path)
-        # For in-cluster kubectl access, pass Kubernetes service environment variables
-        # This enables kubectl to auto-discover the service account credentials
-        if kube_config == "incluster":
-            for key in ["KUBERNETES_SERVICE_HOST", "KUBERNETES_SERVICE_PORT"]:
-                value = os.environ.get(key)
-                if value:
-                    self.env_vars.setdefault(key, value)
-        if self.kube_config:
-            self.env_vars.setdefault("KUBECONFIG", self.kube_config)
 
         self.k8s_client = client.CoreV1Api()
         atexit.register(self.close)
