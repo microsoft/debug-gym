@@ -3,6 +3,7 @@ layout: project
 title: "BugPilot"
 description: "An intelligent debugging companion for developers"
 status: "coming-soon"
+draft: true
 ---
 
 ## Coming Soon
