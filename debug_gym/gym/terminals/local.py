@@ -20,6 +20,7 @@ class LocalTerminal(Terminal):
         include_os_env_vars: bool = True,
         **kwargs,
     ):
+        env_vars = env_vars or {}
         if include_os_env_vars:
             env_vars = env_vars | dict(os.environ)
 
