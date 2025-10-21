@@ -162,6 +162,7 @@ def test_kubernetes_terminal_init_with_pod_specs(tmp_path):
         working_dir=working_dir,
         pod_spec_kwargs=pod_spec_kwargs,
         kube_context="minikube",
+        base_image="ubuntu:latest",
     )
 
     terminal.pod  # Create pod.
