@@ -360,6 +360,75 @@ a:hover {
   font-size: 1.55rem;
 }
 
+/* Froggy Team Footnote Tooltip */
+.froggy-footnote {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  cursor: help;
+  text-decoration: none;
+}
+
+.froggy-footnote:focus {
+  outline: none;
+  text-decoration: underline;
+  text-decoration-thickness: 0.08em;
+}
+
+.froggy-footnote__tooltip {
+  position: absolute;
+  top: calc(100% + 0.75rem);
+  left: 50%;
+  transform: translate(-50%, -6px);
+  background: var(--color-text);
+  color: #fff;
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  max-width: 280px;
+  font-size: 0.95rem;
+  line-height: 1.4;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.18s ease, transform 0.18s ease;
+  z-index: 5;
+}
+
+.froggy-footnote__tooltip::before {
+  content: '';
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-width: 10px;
+  border-style: solid;
+  border-color: transparent transparent var(--color-text) transparent;
+}
+
+.froggy-footnote:hover .froggy-footnote__tooltip,
+.froggy-footnote:focus .froggy-footnote__tooltip,
+.froggy-footnote:focus-within .froggy-footnote__tooltip {
+  opacity: 1;
+  visibility: visible;
+  transform: translate(-50%, 0);
+}
+
+@media (max-width: 600px) {
+  .froggy-footnote__tooltip {
+    left: 0;
+    transform: translate(0, -6px);
+    max-width: 240px;
+  }
+
+  .froggy-footnote:hover .froggy-footnote__tooltip,
+  .froggy-footnote:focus .froggy-footnote__tooltip,
+  .froggy-footnote:focus-within .froggy-footnote__tooltip {
+    transform: translate(0, 0);
+  }
+}
+
 /* Intro Section */
 
 .section-intro {
