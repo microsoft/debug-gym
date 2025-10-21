@@ -369,7 +369,7 @@ a:hover {
   box-shadow: var(--shadow-xs);
   border-radius: var(--radius-lg);
   max-width: 940px;
-  margin: 2rem auto 3.5rem;
+  margin: 2rem auto 1.5rem;
   position: relative;
 }
 
@@ -520,9 +520,18 @@ a:hover {
   color: var(--color-primary-dark);
 }
 
+.content-type-news {
+  background: linear-gradient(135deg, rgba(255, 214, 102, 0.3) 0%, rgba(255, 168, 76, 0.35) 100%);
+  color: #b86e1b;
+}
+
 .content-type-blog {
   background: linear-gradient(135deg, rgba(255, 171, 191, 0.3) 0%, rgba(255, 101, 132, 0.35) 100%);
   color: #d9486e;
+}
+
+.section-projects {
+  padding-top: 0.5rem;
 }
 
 .project-links {
