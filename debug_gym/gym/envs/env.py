@@ -231,8 +231,8 @@ class RepoEnv(TooledEnv):
         self.run_timeout = run_timeout
         self.dir_tree_depth = dir_tree_depth
         self.terminal = terminal or LocalTerminal()  # TODO: default to DockerTerminal
-        self.entrypoint = entrypoint
-        self.debug_entrypoint = debug_entrypoint or entrypoint
+        self._entrypoint = entrypoint
+        self._debug_entrypoint = debug_entrypoint
         self.persistent_breakpoints = persistent_breakpoints
         self.auto_list = auto_list
         self.logger = logger or DebugGymLogger("debug-gym")
@@ -242,7 +242,7 @@ class RepoEnv(TooledEnv):
 
         self.workspace = Workspace(self.terminal, logger=self.logger)
         self.dataset = self.load_dataset(problems)
-        self.set_entrypoints(self.entrypoint, self.debug_entrypoint)
+        self.set_entrypoints(self._entrypoint, self._debug_entrypoint)
 
     def _reset_env_state(self):
         """Reset the environment state to the initial state."""
@@ -257,18 +257,13 @@ class RepoEnv(TooledEnv):
         self.empty_event_queue()
 
     def set_entrypoints(self, entrypoint: str, debug_entrypoint: str | None = None):
-        if entrypoint:
-            self.entrypoint = self._prepare_entrypoint(entrypoint)
-            debug_entrypoint = debug_entrypoint or entrypoint.replace(
-                "python ", "python -m pdb "
-            )
-            self.debug_entrypoint = self._prepare_entrypoint(debug_entrypoint)
-        if self.debug_entrypoint is not None and "-m pdb" not in self.debug_entrypoint:
-            self.debug_entrypoint = self.debug_entrypoint.replace(
-                "python ", "python -m pdb "
-            )
-        self.entrypoint = "PYTHONPATH=$PYTHONPATH:$PWD " + self.entrypoint
-        self.debug_entrypoint = "PYTHONPATH=$PYTHONPATH:$PWD " + self.debug_entrypoint
+        debug_entrypoint = debug_entrypoint or entrypoint.replace(
+            "python ", "python -m pdb "
+        )
+        self.entrypoint = self._prepare_entrypoint(entrypoint)
+        self.debug_entrypoint = self._prepare_entrypoint(debug_entrypoint)
+        # self.entrypoint = "PYTHONPATH=$PYTHONPATH:$PWD " + self.entrypoint
+        # self.debug_entrypoint = "PYTHONPATH=$PYTHONPATH:$PWD " + self.debug_entrypoint
 
     @staticmethod
     def _prepare_entrypoint(entrypoint):
