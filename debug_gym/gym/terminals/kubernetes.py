@@ -222,8 +222,8 @@ class KubernetesTerminal(Terminal):
         setup_commands: list[str] | None = None,
         # Kubernetes-specific parameters
         pod_name: str | None = None,
-        base_image: str = "ubuntu:latest",
-        registry: str = "docker.io/",
+        base_image: str | None = None,
+        registry: str = "",
         namespace: str = "default",
         kube_config: str | None = None,
         extra_labels: dict | None = None,
@@ -243,7 +243,7 @@ class KubernetesTerminal(Terminal):
         self.setup_commands = setup_commands or []
         self.namespace = namespace
         self.kubernetes_kwargs = kwargs  # e.g., nodeSelector, tolerations
-        self.registry = registry.rstrip("/")
+        self.registry = registry.rstrip("/") + "/" if registry else ""
         self._pod_name = pod_name
         self.pod_spec_kwargs = pod_spec_kwargs or {}
         user = _clean_for_kubernetes(os.environ.get("USER", "unknown"))
@@ -427,7 +427,7 @@ class KubernetesTerminal(Terminal):
             self._pod_name or f"dbg-gym.{self.task_name}.{str(uuid.uuid4())[:8]}"
         )
         self.logger.debug(
-            f"Setting up pod {pod_name} with base image: {self.base_image}"
+            f"Setting up pod {pod_name} with image: {self.registry}{self.base_image}"
         )
 
         # Create pod specification for Kubernetes.
@@ -445,7 +445,7 @@ class KubernetesTerminal(Terminal):
                 "containers": [
                     {
                         "name": "main",
-                        "image": f"{self.registry}/{self.base_image}",
+                        "image": f"{self.registry}{self.base_image}",
                         "imagePullPolicy": "IfNotPresent",
                         "command": ["/bin/bash"],
                         "args": ["-c", "sleep infinity"],
