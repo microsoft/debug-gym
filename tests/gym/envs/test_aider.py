@@ -1,6 +1,9 @@
+from unittest.mock import patch
+
 import pytest
 
 from debug_gym.gym.envs import AiderBenchmarkEnv
+from debug_gym.gym.terminals.docker import DockerTerminal
 from debug_gym.gym.terminals.local import LocalTerminal
 from debug_gym.gym.tools.tool import ToolCall
 from debug_gym.gym.tools.toolbox import Toolbox
@@ -95,3 +98,21 @@ def test_steps(env):
 
 def test_instructions(env):
     assert env.instructions == "What time is it?"
+
+
+@patch("debug_gym.gym.envs.aider.build_docker_image")
+def test_build_docker_image(mock_build_docker_image):
+    AiderBenchmarkEnv()
+    mock_build_docker_image.assert_called_once()
+
+
+@pytest.if_docker_running
+def test_reset_with_docker_terminal():
+    env = AiderBenchmarkEnv()
+    assert isinstance(env.terminal, DockerTerminal)
+
+    infos = env.reset(options={"task_name": "clock"})
+    assert "1 failed" in infos.step_observation.observation
+    assert infos.max_score == 1
+    assert infos.score == 0
+    assert not infos.done

@@ -82,6 +82,8 @@ class MiniNightmareEnv(RepoEnv):
             base_image=DOCKER_MINI_NIGHTMARE_IMAGE_NAME,
             logger=kwargs.get("logger"),
         )
+        if hasattr(terminal, "base_image") and terminal.base_image is None:
+            terminal.base_image = DOCKER_MINI_NIGHTMARE_IMAGE_NAME
 
         super().__init__(entrypoint=entrypoint, terminal=terminal, **kwargs)
 
@@ -118,8 +120,6 @@ class MiniNightmareEnv(RepoEnv):
             src=self.current_task["codebase"], target=self.workspace.working_dir
         )
         self.workspace.setup_file_filters()  # Use codebase's .debugignore and .debugreadonly.
-
-        self.set_entrypoints("python -m pytest --tb=no -s test.py")
 
     def setup_terminal(self):
         self.logger.info(f"Configuring {self.terminal}...")

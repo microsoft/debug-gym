@@ -4,7 +4,6 @@ base:
     benchmark: "mini_nightmare"
     problems: "all"  # list of problems, e.g., ["config"], or "all"
     env_kwargs: {
-        "entrypoint": "python -m pytest --tb=no -s test.py",
         "dir_tree_depth": 1,
         "run_timeout": 30,
         # shortcut features
@@ -16,7 +15,7 @@ base:
     }
 
     terminal: {
-        type: "docker",  # "local", "docker", or "kubernetes"
+        type: "docker",  # "docker", "kubernetes", or "local"
     }
 
     # LLM configs
