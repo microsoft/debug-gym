@@ -14,9 +14,9 @@ class SubmitTool(EnvironmentTool):
     arguments = {}
 
     def use(self, environment, **kwargs) -> Observation:
-        if not hasattr(environment, "final_submit"):
-            return Observation(
-                self.name, "Environment does not support final submission."
-            )
-        eval_output = environment.final_submit()
+        # if not hasattr(environment, "final_submit"):
+        #     return Observation(
+        #         self.name, "Environment does not support final submission."
+        #     )
+        eval_output = environment.eval()
         return Observation(self.name, eval_output.output)

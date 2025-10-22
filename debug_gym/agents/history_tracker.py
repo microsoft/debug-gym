@@ -49,12 +49,7 @@ class HistoryTracker:
                 "reasoning": None,
                 "content": None,
                 "action": None,  # env reset
-                # bash agent will not have an initial eval observation
-                "obs": (
-                    self.memory[0].step_observation.observation
-                    if self.memory[0].step_observation
-                    else None
-                ),
+                "obs": self.memory[0].step_observation.observation,
                 "rewrite_consumed": 0,
                 "prompt_response_pairs": None,
             }

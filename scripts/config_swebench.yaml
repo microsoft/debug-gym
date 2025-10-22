@@ -24,8 +24,8 @@ base:
 
     # Agent configs
     random_seed: 42
-    max_steps: 100
-    max_rewrite_steps: 20
+    max_steps: 50
+    max_rewrite_steps: 10
     memory_size: 20
     save_patch: True
     reset_prompt_history_after_rewrite: False
@@ -35,11 +35,8 @@ base:
 rewrite_agent:
     tools: ["grep", "view", "rewrite", "listdir", "eval"]
 
-# debug_agent:
-#     tools: ["grep", "pdb", "view", "rewrite", "listdir", "eval"]
-
 debug_agent:
-    tools: ["bash", "pdb", "rewrite", "submit"]
+    tools: ["grep", "pdb", "view", "rewrite", "listdir", "eval"]
 
 debug_5_agent:
     n_rewrites_before_pdb: 5
@@ -48,3 +45,12 @@ debug_5_agent:
 solution_agent:
     llm_name: null  # No need for an LLM.
     tools: ["eval", "pdb"]
+
+swe_agent:
+    env_kwargs:
+        debug_mode: false
+    
+    max_steps: 100
+    max_rewrite_steps: 20
+    tools: ["bash", "rewrite", "submit"]
+    #tools: ["bash", "pdb", "rewrite", "submit"]

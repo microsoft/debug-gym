@@ -218,6 +218,7 @@ class RepoEnv(TooledEnv):
         dir_tree_depth: int = 1,
         persistent_breakpoints: bool = True,  # TODO: remove
         auto_list: bool = True,  # TODO: remove
+        debug_mode: bool = True,
         terminal: Terminal | None = None,
         logger: DebugGymLogger | None = None,
         problems: str | list[str] | None = None,
@@ -226,7 +227,7 @@ class RepoEnv(TooledEnv):
         super().__init__()
 
         self.path = path
-        self.max_score = max_score
+        self.max_score = max_score or 1
         self.auto_eval_on_rewrite = auto_eval_on_rewrite
         self.run_timeout = run_timeout
         self.dir_tree_depth = dir_tree_depth
@@ -235,6 +236,7 @@ class RepoEnv(TooledEnv):
         self._debug_entrypoint = debug_entrypoint
         self.persistent_breakpoints = persistent_breakpoints
         self.auto_list = auto_list
+        self.debug_mode = debug_mode
         self.logger = logger or DebugGymLogger("debug-gym")
         self.infos: EnvInfo | None = None
         self.rng = None
@@ -338,23 +340,25 @@ class RepoEnv(TooledEnv):
         self.queue_event(Event.ENV_RESET, source="env")
         self.all_observations = self.process_events()
 
-        # REMOVE EVAL LOGIC
-        # # Gets eval (initial observation) from cache or by running env.eval
-        # if self.last_eval:  # if eval tool was triggered by Event.ENV_RESET
-        #     self.step_observation = Observation("env", self.last_eval.output)
-        # else:  # if eval tool was not triggered by Event.ENV_RESET
-        #     self.last_eval = self.eval()
-        #     self.step_observation = Observation("env", self.last_eval.output)
-        #     self.all_observations.insert(0, self.step_observation)
+        # Gets eval (initial observation) by running env.eval if debug_mode is on.
+        eval_observation = None
+        self.step_observation = Observation("env", self.instructions)
+        if self.debug_mode:
+            self.last_eval = self.eval()
+            eval_observation = Observation("env", self.last_eval.output)
+            self.step_observation = eval_observation
 
-        self.max_score = self.calculate_max_score(self.last_eval)
-        self.score = self.calculate_score(self.last_eval)
-        self.done = self.calculate_done(self.last_eval)
+        self.all_observations.insert(0, self.step_observation)
+
+        if self.debug_mode:
+            self.max_score = self.calculate_max_score(self.last_eval)
+            self.score = self.calculate_score(self.last_eval)
+            self.done = self.calculate_done(self.last_eval)
 
         self.infos = EnvInfo(
-            step_observation=None,
-            all_observations=None,
-            eval_observation=Observation("env", None),
+            step_observation=self.step_observation,
+            all_observations=self.all_observations,
+            eval_observation=eval_observation,
             dir_tree=self.workspace.display_files(self.dir_tree_depth),
             current_breakpoints=self.current_breakpoints(),
             action_reasoning=None,
@@ -382,11 +386,7 @@ class RepoEnv(TooledEnv):
     def calculate_score(self, eval_output: EvalOutput) -> int:
         """Calculate the score from the eval output.
         Override in subclasses for different behavior."""
-        if eval_output is not None:
-            return eval_output.success
-        else:
-            return 0
-        # return eval_output.success
+        return eval_output.success
 
     def calculate_done(self, eval_output: EvalOutput) -> bool:
         """Determine if the task is done.
@@ -469,14 +469,16 @@ class RepoEnv(TooledEnv):
         self.all_observations.insert(0, self.step_observation)
 
         # Calculate score and done based on the last eval output
-        self.score = self.calculate_score(self.last_eval)
-        self.done = self.calculate_done(self.last_eval)
+        eval_observation = None
+        if self.debug_mode:
+            self.score = self.calculate_score(self.last_eval)
+            self.done = self.calculate_done(self.last_eval)
+            eval_observation = Observation("env", self.last_eval.output)
 
         self.infos = EnvInfo(
             step_observation=self.step_observation,
             all_observations=self.all_observations,
-            # eval_observation=Observation("env", self.last_eval.output),
-            eval_observation=None,
+            eval_observation=eval_observation,
             dir_tree=self.workspace.display_files(self.dir_tree_depth),
             current_breakpoints=self.current_breakpoints(),
             action_reasoning=action_reasoning,
