@@ -32,8 +32,7 @@ docs/
 │   ├── default.html      # Base layout with nav
 │   ├── project.html      # Research project pages
 │   └── blog-post.html    # Blog post pages
-├── _data/                # Structured data used across pages
-│   └── team.yml          # Team roster for the team page
+├── _data/                # Structured data used across pages (add your own files as needed)
 ├── _includes/            # Reusable components
 │   └── nav.html          # Navigation bar
 ├── _projects/            # Research project pages (Markdown)
@@ -42,7 +41,6 @@ docs/
 │   └── gistify.md
 ├── _posts/               # Blog posts (Markdown)
 │   └── 2025-01-15-building-ai-debugging-agents.md
-├── team.html             # Team roster page (auto-generates from _data/team.yml)
 ├── index.html            # Landing page (auto-generates from collections)
 └── static/               # CSS, JS, images
 
@@ -137,27 +135,20 @@ More content...
 - To host a PDF locally, drop it in `docs/static/papers/` and reference it with `paper_local: "/static/papers/<file>.pdf"`.
 - Leave both fields blank (or set `paper_url: "#"`) to surface a disabled “Paper link coming soon” button.
 
-### Updating the Team Page
+### Team data (optional)
 
-The Team page (`team.html`) renders directly from the structured data in `_data/team.yml`:
-
-1. Open `_data/team.yml` and add a new object with `name` (required) plus any optional fields you need:
+The legacy Team page has been retired, and `_data/team.yml` has been removed. If you’d like blog posts (or other templates) to look up author metadata, you can recreate the file with entries like:
 
 ```yaml
 - name: "Ada Lovelace"
   role: "Research Scientist"
   affiliation: "Microsoft Research Montréal"
-  photo: "/static/images/team/ada-lovelace.jpg"   # Optional headshot
   links:
     - label: "Scholar"
       url: "https://scholar.google.com/..."
-    - label: "GitHub"
-      url: "https://github.com/..."
 ```
 
-2. Store headshots in `static/images/team/` (a folder already checked into the repo with an example `sample-headshot.png`). Reference them with `{{ '/static/images/team/<file>' | relative_url }}` if hand-editing HTML.
-
-3. Rebuild the site and your updates will appear automatically on `/team/`.
+Layouts are resilient if the file is missing, so only add it back when you need the extra data.
 
 ## Markdown Features
 
