@@ -72,7 +72,7 @@ class OpenAILLM(LLM):
                 raise ValueError(
                     f"Tokenizer `{self.tokenizer_name}` not found for model "
                     f"{self.model_name}. If using Hugging Face models, please "
-                    f"set tag `vllm`  to load the HuggingFaceLLM class instead."
+                    f"set tag `vllm` to load the HuggingFaceLLM class instead."
                 )
         # Tokenize each message individually
         result = []
