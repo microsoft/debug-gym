@@ -70,10 +70,15 @@ class ShellSession:
 
         # Prepare entrypoint, combining session commands and command if provided
         # For example: `bin/bash -c "session_command1 && session_command2 && pdb"`
-        entrypoint = self.shell_command
         if command:
             command = " && ".join(self.session_commands + [command])
-            entrypoint = f'{self.shell_command} -c "{command}"'
+            # Build command list: split shell_command, then add ["-c", command]
+            # Keep the command string intact so constructs like $(which ...) reach the target shell
+            cmd_list = shlex.split(self.shell_command) + ["-c", command]
+            entrypoint = f"{self.shell_command} -c {command!r}"
+        else:
+            cmd_list = shlex.split(self.shell_command)
+            entrypoint = self.shell_command
 
         self.logger.debug(f"Starting {self} with entrypoint: {entrypoint}")
 
@@ -91,7 +96,7 @@ class ShellSession:
         termios.tcsetattr(_client, termios.TCSANOW, attrs)
 
         self.process = subprocess.Popen(
-            shlex.split(entrypoint),
+            cmd_list,
             env=self.env_vars,
             cwd=self.working_dir,
             stdin=_client,

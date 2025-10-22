@@ -1,5 +1,4 @@
 import atexit
-import os
 import tempfile
 from abc import ABC, abstractmethod
 from pathlib import Path
@@ -14,18 +13,15 @@ class Terminal(ABC):
 
     def __init__(
         self,
-        working_dir: str = None,
-        session_commands: list[str] = None,
-        env_vars: dict[str, str] = None,
-        include_os_env_vars: bool = True,
+        working_dir: str | None = None,
+        session_commands: list[str] | None = None,
+        env_vars: dict[str, str] | None = None,
         logger: DebugGymLogger | None = None,
         **kwargs,
     ):
         self.logger = logger or DebugGymLogger("debug-gym")
         self.session_commands = session_commands or []
         self.env_vars = env_vars or {}
-        if include_os_env_vars:
-            self.env_vars = self.env_vars | dict(os.environ)
         # Clean up output by disabling terminal prompt and colors
         self.env_vars["NO_COLOR"] = "1"  # disable colors
         self.env_vars["PYTHONSTARTUP"] = ""  # prevent Python from loading startup files
@@ -34,6 +30,9 @@ class Terminal(ABC):
 
         self._working_dir = working_dir
         self.sessions = []
+
+        if kwargs:
+            self.logger.warning(f"Ignoring unknown parameters: {kwargs}")
 
     @property
     def working_dir(self):
