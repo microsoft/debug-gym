@@ -3,6 +3,7 @@ layout: project
 title: "Gistify"
 description: "AI-powered code understanding and summarization"
 status: "coming-soon"
+draft: true
 ---
 
 ## Coming Soon

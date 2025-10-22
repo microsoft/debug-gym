@@ -3,7 +3,7 @@ layout: project
 title: "debug-gym: A Text-Based Environment for Interactive Debugging"
 title_html: '<code>debug-gym</code>: A Text-Based Environment for Interactive Debugging'
 description: "A text-based environment for interactive debugging that enables Large Language Models to interactively explore codebases"
-authors: "The Debug-Gym Team"
+authors: "The Froggy Team"
 team_logo: "/static/images/froggy_logo_no_bg_no_border.png"
 email: "debug-gym@microsoft.com"
 affiliation: "Microsoft Research"

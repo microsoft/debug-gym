@@ -1,7 +1,6 @@
 ---
 layout: default
-title: "MSR Montréal - Debug-Gym Team"
-description: "Building the future of AI-assisted software engineering"
+title: "MSR Montréal - Froggy Team"
 ---
 
 <section class="hero is-primary">
@@ -10,7 +9,12 @@ description: "Building the future of AI-assisted software engineering"
       <div class="columns is-centered">
         <div class="column has-text-centered">
           <h1 class="title is-1">
-            The Debug-Gym Team
+            <span class="froggy-footnote" tabindex="0">
+              The Froggy Team
+              <span class="froggy-footnote__tooltip" role="tooltip">
+                Frogs love to eat bugs
+              </span>
+            </span>
           </h1>
           <h2 class="subtitle is-3">
             Microsoft Research Montréal
@@ -28,19 +32,8 @@ description: "Building the future of AI-assisted software engineering"
         <div class="content">
           <div class="is-size-5 content" style="text-align: left;">
             <p>
-              We aim to advance research on Large Language Models (LLMs), with a particular focus on agentic coding LLMs. Our interests include:
+              We aim to advance research on Large Language Models (LLMs), with a particular focus on agentic coding LLMs. We build interactive SWE environments and synthetic tasks that facilitate designing, training, and evaluating agentic coding AI systems. We distil teacher LLMs' reasoning and coding capabilities into smaller, more efficient (plug-and-play) student models that can be deployed in real-world settings. We also explore new learning paradigms that leverage interaction and feedback to improve LLM-based coding agents.
             </p>
-            <ol>
-              <li>
-                <strong>Reasoning</strong> — decomposing hard problems into smaller steps, efficiently searching for solutions, and managing memory.
-              </li>
-              <li>
-                <strong>Interaction</strong> — reinforcement learning and training models that can interact with textual environments and learn from feedback.
-              </li>
-              <li>
-                <strong>Modularity</strong> — building plug-and-play language architectures for efficient customization and deployment.
-              </li>
-            </ol>
           </div>
         </div>
       </div>
@@ -48,90 +41,179 @@ description: "Building the future of AI-assisted software engineering"
   </div>
 </section>
 
-<section class="section">
+<section class="section section-feed">
   <div class="container is-max-desktop">
-    <h2 class="title is-2 projects-title">Projects & Insights</h2>
+    {% assign feed_featured = '' | split: '' %}
+    {% assign feed_regular = '' | split: '' %}
 
-    <!-- Research Projects Section -->
-    <h3 class="title is-4" style="margin-top: 2rem; margin-bottom: 1.5rem; color: #667eea;">
-      <span class="icon"><i class="fas fa-flask"></i></span>
-      Research Projects
-    </h3>
-
-  {% assign coming_soon_projects = site.projects | where: "status", "coming-soon" %}
-  {% assign released_projects = site.projects | where_exp: "project", "project.status != 'coming-soon'" %}
-    {% assign released_sorted = released_projects | sort: "release_date" | reverse %}
-    {% assign ordered_projects = coming_soon_projects | concat: released_sorted %}
-
-    {% for project in ordered_projects %}
-    <div class="project-card">
-      <div class="project-card__meta-row">
-        <span class="content-type-badge content-type-project">
-          <i class="fas fa-cube"></i> Project
-        </span>
-        {% if project.status == 'coming-soon' %}
-        <span class="project-status status-coming-soon">Coming Soon</span>
+    {% assign news_items = site.data.news %}
+    {% if news_items and news_items.size > 0 %}
+      {% for item in news_items %}
+        {% if item.draft %}
+          {% continue %}
+        {% endif %}
+        {% assign sort_source = item.date %}
+        {% if sort_source %}
+          {% assign sort_key = sort_source | date: "%Y%m%d%H%M%S" %}
         {% else %}
-        {% assign release_display = project.release_date | default: project.date %}
-        {% if release_display %}
-        <span class="project-status status-published">{{ release_display | date: "%B %Y" }}</span>
+          {% assign sort_key = '00000000000000' %}
         {% endif %}
-        {% endif %}
-      </div>
-      <h3 class="title is-3">
-        {% if project.title_html %}
-          {{ project.title_html }}
+        {% capture entry_markup %}
+          <div class="project-card">
+            <div class="project-card__meta-row">
+              <span class="content-type-badge content-type-news">
+                <i class="fas fa-bullhorn"></i> News
+              </span>
+              {% if item.date %}
+              <span class="project-status status-published">{{ item.date | date: "%B %Y" }}</span>
+              {% endif %}
+            </div>
+            <h3 class="title is-3">
+              {% if item.title_html %}
+                {{ item.title_html }}
+              {% else %}
+                {{ item.title }}
+              {% endif %}
+            </h3>
+            {% if item.description %}
+            <p>{{ item.description }}</p>
+            {% endif %}
+            {% if item.link %}
+            <div class="project-links">
+              <a href="{{ item.link }}" class="button is-primary">
+                <span class="icon"><i class="fas fa-arrow-right"></i></span>
+                <span>{{ item.cta_text | default: "Learn More" }}</span>
+              </a>
+            </div>
+            {% endif %}
+          </div>
+        {% endcapture %}
+        {% capture entry %}{{ sort_key }}::{{ entry_markup | strip }}{% endcapture %}
+        {% if item.always_top %}
+          {% assign feed_featured = feed_featured | push: entry %}
         {% else %}
-          <code>{{ project.title }}</code>
+          {% assign feed_regular = feed_regular | push: entry %}
         {% endif %}
-      </h3>
-      <p>{{ project.description }}</p>
-      <div class="project-links">
-        <a href="{{ project.url | relative_url }}" class="button is-primary">
-          <span class="icon"><i class="fas fa-info-circle"></i></span>
-          <span>{% if project.status == 'coming-soon' %}Learn More{% else %}Project Page{% endif %}</span>
-        </a>
-        {% if project.github_url %}
-        <a href="{{ project.github_url }}" target="_blank" class="button is-dark">
-          <span class="icon"><i class="fab fa-github"></i></span>
-          <span>Code</span>
-        </a>
+      {% endfor %}
+    {% endif %}
+
+    {% if site.posts and site.posts.size > 0 %}
+      {% for post in site.posts %}
+        {% if post.draft %}
+          {% continue %}
         {% endif %}
-        {% if project.arxiv_url %}
-        <a href="{{ project.arxiv_url }}" target="_blank" class="button is-link">
-          <span class="icon"><i class="ai ai-arxiv"></i></span>
-          <span>Paper</span>
-        </a>
+        {% assign sort_key = post.date | date: "%Y%m%d%H%M%S" %}
+        {% capture entry_markup %}
+          <div class="project-card">
+            <div class="project-card__meta-row">
+              <span class="content-type-badge content-type-blog">
+                <i class="fas fa-newspaper"></i> Blog Post
+              </span>
+              <span class="project-status status-published">{{ post.date | date: "%B %Y" }}</span>
+            </div>
+            <h3 class="title is-3">{{ post.title }}</h3>
+            {% if post.description %}
+            <p>{{ post.description }}</p>
+            {% endif %}
+            <div class="project-links">
+              <a href="{{ post.url | relative_url }}" class="button is-primary">
+                <span class="icon"><i class="fas fa-book-open"></i></span>
+                <span>Read Article</span>
+              </a>
+            </div>
+          </div>
+        {% endcapture %}
+        {% capture entry %}{{ sort_key }}::{{ entry_markup | strip }}{% endcapture %}
+        {% if post.always_top %}
+          {% assign feed_featured = feed_featured | push: entry %}
+        {% else %}
+          {% assign feed_regular = feed_regular | push: entry %}
         {% endif %}
-      </div>
-    </div>
-    {% endfor %}
+      {% endfor %}
+    {% endif %}
 
-    <!-- Blog Posts Section -->
-    <h3 class="title is-4" style="margin-top: 3rem; margin-bottom: 1.5rem; color: #f5576c;">
-      <span class="icon"><i class="fas fa-pen"></i></span>
-      Blog Posts & Technical Insights
-    </h3>
+    {% assign project_documents = site.projects %}
+    {% if project_documents and project_documents.size > 0 %}
+      {% for project in project_documents %}
+        {% if project.draft %}
+          {% continue %}
+        {% endif %}
+        {% assign release_source = project.release_date | default: project.date %}
+        {% if release_source %}
+          {% assign sort_key = release_source | date: "%Y%m%d%H%M%S" %}
+        {% else %}
+          {% assign sort_key = '00000000000000' %}
+        {% endif %}
+        {% capture entry_markup %}
+          <div class="project-card">
+            <div class="project-card__meta-row">
+              <span class="content-type-badge content-type-project">
+                <i class="fas fa-cube"></i> Project
+              </span>
+              {% if project.status == 'coming-soon' %}
+              <span class="project-status status-coming-soon">Coming Soon</span>
+              {% elsif release_source %}
+              <span class="project-status status-published">{{ release_source | date: "%B %Y" }}</span>
+              {% endif %}
+            </div>
+            <h3 class="title is-3">
+              {% if project.title_html %}
+                {{ project.title_html }}
+              {% else %}
+                <code>{{ project.title }}</code>
+              {% endif %}
+            </h3>
+            <p>{{ project.description }}</p>
+            <div class="project-links">
+              <a href="{{ project.url | relative_url }}" class="button is-primary">
+                <span class="icon"><i class="fas fa-info-circle"></i></span>
+                <span>{% if project.status == 'coming-soon' %}Learn More{% else %}Project Page{% endif %}</span>
+              </a>
+              {% if project.github_url %}
+              <a href="{{ project.github_url }}" target="_blank" class="button is-dark">
+                <span class="icon"><i class="fab fa-github"></i></span>
+                <span>Code</span>
+              </a>
+              {% endif %}
+              {% if project.arxiv_url %}
+              <a href="{{ project.arxiv_url }}" target="_blank" class="button is-link">
+                <span class="icon"><i class="ai ai-arxiv"></i></span>
+                <span>Paper</span>
+              </a>
+              {% endif %}
+            </div>
+          </div>
+        {% endcapture %}
+        {% capture entry %}{{ sort_key }}::{{ entry_markup | strip }}{% endcapture %}
+        {% if project.always_top %}
+          {% assign feed_featured = feed_featured | push: entry %}
+        {% else %}
+          {% assign feed_regular = feed_regular | push: entry %}
+        {% endif %}
+      {% endfor %}
+    {% endif %}
 
-    {% for post in site.posts %}
-    <div class="project-card">
-      <div class="project-card__meta-row">
-        <span class="content-type-badge content-type-blog">
-          <i class="fas fa-newspaper"></i> Blog Post
-        </span>
-        <span class="project-status status-published">{{ post.date | date: "%B %Y" }}</span>
-      </div>
-      <h3 class="title is-3">{{ post.title }}</h3>
-      <p>{{ post.description }}</p>
-      <div class="project-links">
-        <a href="{{ post.url | relative_url }}" class="button is-primary">
-          <span class="icon"><i class="fas fa-book-open"></i></span>
-          <span>Read Article</span>
-        </a>
-      </div>
-    </div>
-    {% endfor %}
+    {% assign feed_featured = feed_featured | sort | reverse %}
+    {% assign feed_regular = feed_regular | sort | reverse %}
+    {% assign feed_items = feed_featured | concat: feed_regular %}
 
+    {% if feed_items.size > 0 %}
+      {% for entry in feed_items %}
+        {% assign parts = entry | split: "::" %}
+        {% assign card_markup = parts[1] %}
+        {{ card_markup | strip }}
+      {% endfor %}
+    {% else %}
+      <div class="project-card">
+        <div class="project-card__meta-row">
+          <span class="content-type-badge">
+            <i class="fas fa-info-circle"></i> Update
+          </span>
+        </div>
+        <h3 class="title is-3">No updates yet</h3>
+  <p>Stay tuned for the latest from the Froggy team.</p>
+      </div>
+    {% endif %}
   </div>
 </section>
 
@@ -142,7 +224,7 @@ description: "Building the future of AI-assisted software engineering"
         <h2 class="title is-3">Contact Us</h2>
         <div class="content">
           <p>
-            Interested in collaborating or learning more about our research?<br>
+            Interested in collaborating or learning more about&nbsp;our research?<br>
             Reach out to us at <code>debug-gym@microsoft.com</code>
           </p>
         </div>

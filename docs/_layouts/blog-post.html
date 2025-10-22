@@ -13,6 +13,16 @@ layout: default
     <div class="blog-hero__label">{{ page.hero_label | default: 'Team Insight' }}</div>
     <h1 class="blog-hero__title">{{ page.title }}</h1>
 
+    {% assign author_display = page.author %}
+    {% if author_display == nil or author_display == '' %}
+      {% if page.authors %}
+        {% assign author_names = page.authors | map: 'name' | compact %}
+        {% if author_names and author_names.size > 0 %}
+          {% assign author_display = author_names | join: ', ' %}
+        {% endif %}
+      {% endif %}
+    {% endif %}
+
     <div class="blog-meta">
       {% if page.date %}
       <div class="blog-meta__item">
@@ -28,10 +38,10 @@ layout: default
       </div>
       {% endif %}
 
-      {% if page.author %}
+      {% if author_display %}
       <div class="blog-meta__item">
         <span class="blog-meta__icon"><i class="fas fa-user"></i></span>
-        <span>{{ page.author }}</span>
+        <span>{{ author_display }}</span>
       </div>
       {% endif %}
     </div>
@@ -41,6 +51,30 @@ layout: default
       {% for tag in page.tags %}
       <span class="blog-tag">{{ tag }}</span>
       {% endfor %}
+    </div>
+    {% endif %}
+
+    {% assign paper_external_url = page.paper_url | default: page.arxiv_url %}
+    {% assign paper_local_path = page.paper_local %}
+
+    {% assign has_external = paper_external_url and paper_external_url != '' %}
+    {% assign has_local = paper_local_path and paper_local_path != '' %}
+
+    {% if has_external or has_local %}
+    <div class="blog-hero__links">
+      {% if has_external %}
+      <a href="{{ paper_external_url }}" class="blog-hero__link{% if paper_external_url == '#' %} is-placeholder{% endif %}" {% if paper_external_url != '#' %}target="_blank"{% endif %} {% if paper_external_url contains '://' %}rel="noopener noreferrer"{% endif %} {% if paper_external_url == '#' %}aria-disabled="true"{% endif %}>
+        <span class="blog-hero__link-icon"><i class="ai ai-arxiv"></i></span>
+        <span>{% if paper_external_url == '#' %}Paper link coming soon{% else %}View paper{% endif %}</span>
+      </a>
+      {% endif %}
+
+      {% if has_local %}
+      <a href="{{ paper_local_path | relative_url }}" class="blog-hero__link" target="_blank" rel="noopener noreferrer">
+        <span class="blog-hero__link-icon"><i class="fas fa-file-pdf"></i></span>
+        <span>View paper</span>
+      </a>
+      {% endif %}
     </div>
     {% endif %}
   </div>
@@ -59,14 +93,60 @@ layout: default
   <div class="container is-max-desktop">
     <div class="blog-authors__card">
       <h3>About the Authors</h3>
+      {% assign team_members = site.data.team %}
+      {% if team_members == nil %}
+        {% assign team_members = '' | split: '' %}
+      {% endif %}
       <div class="author-list">
         {% for author in page.authors %}
+        {% assign lookup_name = author.team_member | default: author.name %}
+        {% assign team_member = team_members | where: 'name', lookup_name | first %}
+        {% assign avatar_photo = nil %}
+        {% if team_member and team_member.photo %}
+          {% assign avatar_photo = team_member.photo %}
+        {% elsif author.photo %}
+          {% assign avatar_photo = author.photo %}
+        {% endif %}
+
+        {% assign author_details = '' | split: '' %}
+        {% if author.role %}
+          {% assign author_details = author_details | push: author.role %}
+        {% endif %}
+        {% if team_member and team_member.affiliation %}
+          {% unless author_details contains team_member.affiliation %}
+            {% assign author_details = author_details | push: team_member.affiliation %}
+          {% endunless %}
+        {% endif %}
+
+        {% assign author_links = '' | split: '' %}
+        {% if team_member and team_member.links %}
+          {% assign author_links = author_links | concat: team_member.links %}
+        {% endif %}
+        {% if author.links %}
+          {% assign author_links = author_links | concat: author.links %}
+        {% endif %}
+
         <div class="author-card">
-          <div class="author-avatar">{{ author.name | slice: 0 }}</div>
+          {% if avatar_photo %}
+          <div class="author-avatar author-avatar--image">
+            <img src="{{ avatar_photo | relative_url }}" alt="{{ author.name }} headshot">
+          </div>
+          {% else %}
+          <div class="author-avatar" aria-hidden="true">{{ author.name | slice: 0, 1 }}</div>
+          {% endif %}
           <div class="author-card__details">
             <div class="author-card__name">{{ author.name }}</div>
-            {% if author.role %}
-            <div class="author-card__role">{{ author.role }}</div>
+            {% for detail in author_details %}
+            <div class="author-card__role">{{ detail }}</div>
+            {% endfor %}
+            {% if author_links and author_links.size > 0 %}
+            <div class="author-card__links">
+              {% for link in author_links %}
+                {% if link.url %}
+                <a href="{{ link.url }}" class="author-card__link" target="_blank" rel="noopener noreferrer">{{ link.label | default: 'Link' }}</a>
+                {% endif %}
+              {% endfor %}
+            </div>
             {% endif %}
           </div>
         </div>
