@@ -1,99 +1,39 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <!-- Meta tags for social media banners, these should be filled in appropriatly as they are your "business card" -->
-  <!-- Replace the content tag with appropriate information -->
-  <meta name="description" content="debug-gym">
-  <meta property="og:title" content="debug-gym"/>
-  <meta property="og:description" content="debug-gym: A Text-Based Environment for Interactive Debugging"/>
-  <meta property="og:url" content="https://microsoft.github.io/debug-gym/"/>
-  <!-- Path to banner image, should be in the path listed below. Optimal dimenssions are 1200X630-->
-  <meta property="og:image" content="static/image/your_banner_image.png" />
-  <meta property="og:image:width" content="1200"/>
-  <meta property="og:image:height" content="630"/>
+---
+layout: default
+title: "MSR Montréal - Froggy Team"
+---
 
-
-  <meta name="twitter:title" content="debug-gym">
-  <meta name="twitter:description" content="debug-gym: A Text-Based Environment for Interactive Debugging">
-  <!-- Path to banner image, should be in the path listed below. Optimal dimenssions are 1200X600-->
-  <meta name="twitter:image" content="static/images/your_twitter_banner_image.png">
-  <meta name="twitter:card" content="summary_large_image">
-  <!-- Keywords for your paper to be indexed by-->
-  <meta name="keywords" content="debug-gym, interactive debugging, large language models, coding tasks, python debugger, pdb, text-based environment, code generation">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-
-
-  <title>debug-gym</title>
-  <link rel="icon" type="image/x-icon" href="static/images/favicon.ico">
-  <link href="https://fonts.googleapis.com/css?family=Google+Sans|Noto+Sans|Castoro"
-  rel="stylesheet">
-
-  <link rel="stylesheet" href="static/css/bulma.min.css">
-  <link rel="stylesheet" href="static/css/bulma-carousel.min.css">
-  <link rel="stylesheet" href="static/css/bulma-slider.min.css">
-  <link rel="stylesheet" href="static/css/fontawesome.all.min.css">
-  <link rel="stylesheet"
-  href="https://cdn.jsdelivr.net/gh/jpswalsh/academicons@1/css/academicons.min.css">
-  <link rel="stylesheet" href="static/css/index.css">
-
-  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
-  <script src="https://documentcloud.adobe.com/view-sdk/main.js"></script>
-  <script defer src="static/js/fontawesome.all.min.js"></script>
-  <script src="static/js/bulma-carousel.min.js"></script>
-  <script src="static/js/bulma-slider.min.js"></script>
-  <script src="static/js/index.js"></script>
-</head>
-<body>
-
-  <div id='cookie-banner'></div>
-
-  <section class="hero">
-    <div class="hero-body">
-      <div class="container is-max-desktop">
-        <div class="columns is-centered">
-          <div class="column has-text-centered">
-            <h1 class="title is-1 publication-title"><code>debug-gym</code>: A Text-Based Environment for Interactive Debugging</h1>
-            <div class="is-size-5 publication-authors">
-              <!-- Paper authors -->
-              <span class="author-block">
-                The <code class="lightly-bold">debug-gym</code> Team <img src="static/images/froggy_logo_no_bg_no_border.png" alt="froggy logo" style="height: 26px; vertical-align: -4px;">
-                  </span>
-                  </div>
-
-                  <div class="is-size-5 has-text-centered">
-                    <code class="lightly-bold">debug-gym@microsoft.com</code>
-                  </div>
-
-                  <div class="is-size-5 publication-authors">
-                    <span class="author-block">Microsoft Research</span>
-                  </div>
-
-                  <div class="column has-text-centered">
-                    <div class="publication-links">
-
-                  <!-- Github link -->
-                  <span class="link-block">
-                    <a href="https://github.com/microsoft/debug-gym" target="_blank"
-                    class="external-link button is-normal is-rounded is-dark">
-                    <span class="icon">
-                      <i class="fab fa-github"></i>
-                    </span>
-                    <span>Code</span>
-                  </a>
-                </span>
-
-                <!-- ArXiv abstract Link -->
-                <span class="link-block">
-                  <a href="https://arxiv.org/abs/2503.21557" target="_blank"
-                  class="external-link button is-normal is-rounded is-dark">
-                  <span class="icon">
-                    <i class="ai ai-arxiv"></i>
-                  </span>
-                  <span>arXiv</span>
-                </a>
+<section class="hero is-primary">
+  <div class="hero-body">
+    <div class="container is-max-desktop">
+      <div class="columns is-centered">
+        <div class="column has-text-centered">
+          <h1 class="title is-1">
+            <span class="froggy-footnote" tabindex="0">
+              The Froggy Team
+              <span class="froggy-footnote__tooltip" role="tooltip">
+                Frogs love to eat bugs
               </span>
-            </div>
+            </span>
+          </h1>
+          <h2 class="subtitle is-3">
+            Microsoft Research Montréal
+          </h2>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section-intro">
+  <div class="container is-max-desktop">
+    <div class="columns is-centered">
+      <div class="column is-four-fifths has-text-centered">
+        <div class="content">
+          <div class="is-size-5 content" style="text-align: left;">
+            <p>
+              We aim to advance research on Large Language Models (LLMs), with a particular focus on agentic coding LLMs. We build interactive SWE environments and synthetic tasks that facilitate designing, training, and evaluating agentic coding AI systems. We distil teacher LLMs' reasoning and coding capabilities into smaller, more efficient (plug-and-play) student models that can be deployed in real-world settings. We also explore new learning paradigms that leverage interaction and feedback to improve LLM-based coding agents.
+            </p>
           </div>
         </div>
       </div>
@@ -101,140 +41,194 @@
   </div>
 </section>
 
-<section class="section">
+<section class="section section-feed">
   <div class="container is-max-desktop">
-    <div class="columns is-centered">
-      <div class="column is-three-quarters has-text-centered">
-        <figure class="image">
-          <img class="custom-image" src="static/images/intro_diagram-2.png" alt="Descriptive Alt Text">
-        </figure>
+    {% assign feed_featured = '' | split: '' %}
+    {% assign feed_regular = '' | split: '' %}
+
+    {% assign news_items = site.data.news %}
+    {% if news_items and news_items.size > 0 %}
+      {% for item in news_items %}
+        {% if item.draft %}
+          {% continue %}
+        {% endif %}
+        {% assign sort_source = item.date %}
+        {% if sort_source %}
+          {% assign sort_key = sort_source | date: "%Y%m%d%H%M%S" %}
+        {% else %}
+          {% assign sort_key = '00000000000000' %}
+        {% endif %}
+        {% capture entry_markup %}
+          <div class="project-card">
+            <div class="project-card__meta-row">
+              <span class="content-type-badge content-type-news">
+                <i class="fas fa-bullhorn"></i> News
+              </span>
+              {% if item.date %}
+              <span class="project-status status-published">{{ item.date | date: "%B %Y" }}</span>
+              {% endif %}
+            </div>
+            <h3 class="title is-3">
+              {% if item.title_html %}
+                {{ item.title_html }}
+              {% else %}
+                {{ item.title }}
+              {% endif %}
+            </h3>
+            {% if item.description %}
+            <p>{{ item.description }}</p>
+            {% endif %}
+            {% if item.link %}
+            <div class="project-links">
+              <a href="{{ item.link }}" class="button is-primary">
+                <span class="icon"><i class="fas fa-arrow-right"></i></span>
+                <span>{{ item.cta_text | default: "Learn More" }}</span>
+              </a>
+            </div>
+            {% endif %}
+          </div>
+        {% endcapture %}
+        {% capture entry %}{{ sort_key }}::{{ entry_markup | strip }}{% endcapture %}
+        {% if item.always_top %}
+          {% assign feed_featured = feed_featured | push: entry %}
+        {% else %}
+          {% assign feed_regular = feed_regular | push: entry %}
+        {% endif %}
+      {% endfor %}
+    {% endif %}
+
+    {% if site.posts and site.posts.size > 0 %}
+      {% for post in site.posts %}
+        {% if post.draft %}
+          {% continue %}
+        {% endif %}
+        {% assign sort_key = post.date | date: "%Y%m%d%H%M%S" %}
+        {% capture entry_markup %}
+          <div class="project-card">
+            <div class="project-card__meta-row">
+              <span class="content-type-badge content-type-blog">
+                <i class="fas fa-newspaper"></i> Blog Post
+              </span>
+              <span class="project-status status-published">{{ post.date | date: "%B %Y" }}</span>
+            </div>
+            <h3 class="title is-3">{{ post.title }}</h3>
+            {% if post.description %}
+            <p>{{ post.description }}</p>
+            {% endif %}
+            <div class="project-links">
+              <a href="{{ post.url | relative_url }}" class="button is-primary">
+                <span class="icon"><i class="fas fa-book-open"></i></span>
+                <span>Read Article</span>
+              </a>
+            </div>
+          </div>
+        {% endcapture %}
+        {% capture entry %}{{ sort_key }}::{{ entry_markup | strip }}{% endcapture %}
+        {% if post.always_top %}
+          {% assign feed_featured = feed_featured | push: entry %}
+        {% else %}
+          {% assign feed_regular = feed_regular | push: entry %}
+        {% endif %}
+      {% endfor %}
+    {% endif %}
+
+    {% assign project_documents = site.projects %}
+    {% if project_documents and project_documents.size > 0 %}
+      {% for project in project_documents %}
+        {% if project.draft %}
+          {% continue %}
+        {% endif %}
+        {% assign release_source = project.release_date | default: project.date %}
+        {% if release_source %}
+          {% assign sort_key = release_source | date: "%Y%m%d%H%M%S" %}
+        {% else %}
+          {% assign sort_key = '00000000000000' %}
+        {% endif %}
+        {% capture entry_markup %}
+          <div class="project-card">
+            <div class="project-card__meta-row">
+              <span class="content-type-badge content-type-project">
+                <i class="fas fa-cube"></i> Project
+              </span>
+              {% if project.status == 'coming-soon' %}
+              <span class="project-status status-coming-soon">Coming Soon</span>
+              {% elsif release_source %}
+              <span class="project-status status-published">{{ release_source | date: "%B %Y" }}</span>
+              {% endif %}
+            </div>
+            <h3 class="title is-3">
+              {% if project.title_html %}
+                {{ project.title_html }}
+              {% else %}
+                <code>{{ project.title }}</code>
+              {% endif %}
+            </h3>
+            <p>{{ project.description }}</p>
+            <div class="project-links">
+              <a href="{{ project.url | relative_url }}" class="button is-primary">
+                <span class="icon"><i class="fas fa-info-circle"></i></span>
+                <span>{% if project.status == 'coming-soon' %}Learn More{% else %}Project Page{% endif %}</span>
+              </a>
+              {% if project.github_url %}
+              <a href="{{ project.github_url }}" target="_blank" class="button is-dark">
+                <span class="icon"><i class="fab fa-github"></i></span>
+                <span>Code</span>
+              </a>
+              {% endif %}
+              {% if project.arxiv_url %}
+              <a href="{{ project.arxiv_url }}" target="_blank" class="button is-link">
+                <span class="icon"><i class="ai ai-arxiv"></i></span>
+                <span>Paper</span>
+              </a>
+              {% endif %}
+            </div>
+          </div>
+        {% endcapture %}
+        {% capture entry %}{{ sort_key }}::{{ entry_markup | strip }}{% endcapture %}
+        {% if project.always_top %}
+          {% assign feed_featured = feed_featured | push: entry %}
+        {% else %}
+          {% assign feed_regular = feed_regular | push: entry %}
+        {% endif %}
+      {% endfor %}
+    {% endif %}
+
+    {% assign feed_featured = feed_featured | sort | reverse %}
+    {% assign feed_regular = feed_regular | sort | reverse %}
+    {% assign feed_items = feed_featured | concat: feed_regular %}
+
+    {% if feed_items.size > 0 %}
+      {% for entry in feed_items %}
+        {% assign parts = entry | split: "::" %}
+        {% assign card_markup = parts[1] %}
+        {{ card_markup | strip }}
+      {% endfor %}
+    {% else %}
+  <div class="project-card">
+        <div class="project-card__meta-row">
+          <span class="content-type-badge">
+            <i class="fas fa-info-circle"></i> Update
+          </span>
+        </div>
+        <h3 class="title is-3">No updates yet</h3>
+  <p>Stay tuned for the latest from the Froggy team.</p>
       </div>
-    </div>
-    <div class="columns is-centered">
-      <div class="column is-three-quarters has-text-centered">
-        <p class="long-caption">
-          In most existing approaches (shown in <span style="color: black; font-weight: bold;">black</span>), an agent rewrites its code conditioned on error messages obtained from executing its code.  <code class="lightly-bold">pond</code> equips the agent with additional tools such as <code class="lightly-bold">pdb</code> (shown in <span style="color: rgb(219, 1, 1); font-weight: bold;">red</span>), so it can interactively seek necessary information from the semantic space hidden behind the code, and therefore have better code repairing performance.
-        </p>
-      </div>
-    </div>
+    {% endif %}
   </div>
 </section>
 
-
-
-
-<!-- Paper abstract -->
 <section class="section hero is-light">
   <div class="container is-max-desktop">
     <div class="columns is-centered has-text-centered">
       <div class="column is-four-fifths">
-        <h2 class="title is-3">Abstract</h2>
-        <div class="content has-text-justified">
-          <p>
-            Large Language Models (LLMs) are increasingly relied upon for coding tasks, yet in most scenarios it is assumed that all relevant information can be either accessed in context or matches their training data. We posit that LLMs may benefit from the ability to interactively explore a codebase to gather the information relevant to their task. To achieve this, we present a textual environment, namely <code class="lightly-bold">debug-gym</code>, that can be used to develop LLM agents in an interactive coding setting, bridging the gap between current LLM capabilities and large-scale real-world code generation and debugging requirements. Our environment is lightweight and provides a preset of useful tools, such as a python debugger (<code class="lightly-bold">pdb</code>), designed to facilitate a LLM-based agent's interactive debugging. Beyond coding and debugging tasks, this approach can be generalized to other tasks that would benefit from information-seeking behavior by an LLM agent.
-          </p>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
-<!-- End paper abstract -->
-
-<!--Video demo section -->
-<section class="section" id="Video Demo">
-    <div class="container is-max-desktop content">
-      <h2 class="title">Video Demo</h2>
-      <figure>
-        <img src="static/images/debug-bench-demo.gif" alt="Video Demo GIF">
-      </figure>
-    </div>
-  </section>
-<!--End BibTex section -->
-
-<!--Mini Nightmare section -->
-<section class="section" id="Experiments">
-    <div class="container is-max-desktop content">
-      <h2 class="title">Mini Nightmare</h2>
-      <div class="content has-text-justified">
-        <p>
-          Mini-nightmare is a collection of ten minimal buggy Python scripts that human developers would find easier to debug if provided with interactive debugging tools. For instance, the <code>shopping_cart</code> problem, which consists of a simple code snippet that aims to implement a shopping cart class. This specific task was created in Python 2, where the round() function adopts an “away from zero” style. However, in Python 3, where we run the debug-gym experiments in, the behavior has been changed to a “ties to even” style. We observe smart debugging traces in trajectories from the agent using Claude 3.7 Sonnet below, showing its use of the pdb tool to test its hypothesis and then import an external library to make sure the rounding is working properly.
-        </p>
-      </div>
-      <div class="columns is-centered">
-        <div class="column is-three-quarters has-text-centered">
-          <figure>
-            <img src="static/images/shopping_cart_mini_nightmare.png" alt="Descriptive Alt Text">
-          </figure>
-        </div>
-      </div>
-    </div>
-  </section>
-  
-<!--Mini Nightmare section -->
-
-
-
-<!--BibTex citation -->
-  <section class="section" id="BibTeX">
-    <div class="container is-max-desktop content">
-      <h2 class="title">BibTeX</h2>
-      <pre><code>@article{yuan2025debuggym,
-        title={debug-gym: A Text-Based Environment for Interactive Debugging},
-        author={Xingdi Yuan, Morgane M Moss, Charbel El Feghali, Chinmay Singh, Darya Moldavskaya, Drew MacPhee, Lucas Caccia, Matheus Pereira, Minseon Kim, Alessandro Sordoni, Marc-Alexandre C\^ot\'e},
-        journal={arXiv preprint arXiv:2503.21557},
-        year={2025},
-        url={https://arxiv.org/abs/2503.21557}
-      }</code></pre>
-    </div>
-</section>
-<!--End BibTex citation -->
-
-
-  <footer class="footer">
-  <script>
-      function manageConsent() {
-          if (WcpConsent.siteConsent.isConsentRequired) {
-              WcpConsent.siteConsent.manageConsent();
-          }
-      }
-  </script>
-  <div class="container">
-    <div class="columns is-centered">
-      <div class="column is-8">
+        <h2 class="title is-3">Contact Us</h2>
         <div class="content">
-
           <p>
-            This page was built using the <a href="https://github.com/eliahuhorwitz/Academic-project-page-template" target="_blank">Academic Project Page Template</a> which was adopted from the <a href="https://nerfies.github.io" target="_blank">Nerfies</a> project page.
-            <br> This website is licensed under a <a rel="license"  href="http://creativecommons.org/licenses/by-sa/4.0/" target="_blank">Creative
-            Commons Attribution-ShareAlike 4.0 International License</a>.
+            Interested in collaborating or learning more about&nbsp;our research?<br>
+            Reach out to us at <code>debug-gym@microsoft.com</code>
           </p>
-
-        </div>
-        <div class="col-sm-4">
-            <ul class="links">
-                <li style="visibility: hidden;">
-                    <a id="footer-cookie-link" style="cursor: pointer; padding-right:20px" onclick="manageConsent()" aria-label="Manage cookies">Manage cookies</a>
-                </li>
-                <li>
-                    <div class="copyright">
-                        <span>© 2024 Microsoft</span> | <a href="https://go.microsoft.com/fwlink/?LinkId=521839">Privacy & Cookies</a> | <a href="https://go.microsoft.com/fwlink/?linkid=2259814">Consumer Health Privacy</a> 
-                    </div>
-                </li>
-            </ul>
         </div>
       </div>
     </div>
   </div>
-</footer>
-
-<!-- Statcounter tracking code -->
-  
-<!-- You can add a tracker to track page visits by creating an account at statcounter.com -->
-
-    <!-- End of Statcounter Code -->
-
-    <!-- Microsoft EU cookie compliance library -->
-<script src="https://wcpstatic.microsoft.com/mscc/lib/v2/wcp-consent.js"></script>
-
-  </body>
-  </html>
+</section>
