@@ -1,7 +1,7 @@
 ---
 layout: default
 title: "Meet the Froggy Team"
-description: "Photos, names, and affiliations of the Froggy research team"
+description: "Profiles, roles, and affiliations of the Froggy research team"
 permalink: /team/
 ---
 
@@ -17,20 +17,18 @@ permalink: /team/
 </section> -->
 
 {% assign team_members = site.data.team %}
+{% assign avatar_palette = 'variant-1|variant-2|variant-3|variant-4|variant-5|variant-6' | split: '|' %}
+{% assign palette_size = avatar_palette | size %}
 
 <section class="section team-directory">
   <div class="container is-max-desktop">
     {% if team_members and team_members.size > 0 %}
       <div class="team-grid">
         {% for member in team_members %}
-          <article class="team-card">
-            {% assign photo_path = member.photo | default: '' | strip %}
-            {% assign photo_file = nil %}
-            {% if photo_path != '' %}
-              {% assign matching_files = site.static_files | where: 'path', photo_path %}
-              {% assign photo_file = matching_files | first %}
-            {% endif %}
+          {% assign palette_index = forloop.index0 | modulo: palette_size %}
+          {% assign avatar_variant = avatar_palette[palette_index] %}
 
+          <article class="team-card">
             {% assign name_parts = member.name | strip | split: ' ' %}
             {% assign first_initial = '' %}
             {% assign last_initial = '' %}
@@ -54,36 +52,34 @@ permalink: /team/
               {% assign initials = member.name | slice: 0, 1 | upcase %}
             {% elsif last_initial == '' %}
               {% assign initials = first_initial %}
+            {% elsif last_initial == first_initial %}
+              {% assign initials = first_initial | append: last_initial %}
             {% else %}
               {% assign initials = first_initial | append: last_initial %}
             {% endif %}
 
-            {% if photo_file %}
-            <div class="team-card__photo">
-              <img src="{{ member.photo | relative_url }}" alt="Portrait of {{ member.name }}">
+            <div class="team-card__header">
+              <div class="team-card__avatar initial-avatar initial-avatar--lg initial-avatar--{{ avatar_variant }}" aria-hidden="true">
+                <span>{{ initials }}</span>
+              </div>
+              <div class="team-card__summary">
+                <h2 class="team-card__name">{{ member.name }}</h2>
+                {% if member.role %}
+                  <p class="team-card__role">{{ member.role }}</p>
+                {% endif %}
+                {% if member.affiliation %}
+                  <p class="team-card__affiliation">{{ member.affiliation }}</p>
+                {% endif %}
+              </div>
             </div>
-            {% else %}
-            <div class="team-card__photo team-card__photo--placeholder" aria-hidden="true">
-              <span>{{ initials }}</span>
-            </div>
-            {% endif %}
-            <div class="team-card__body">
-              <h2 class="team-card__name">{{ member.name }}</h2>
-              {% if member.role %}
-                <p class="team-card__role">{{ member.role }}</p>
-              {% endif %}
-              {% if member.affiliation %}
-                <p class="team-card__affiliation">{{ member.affiliation }}</p>
-              {% endif %}
 
-              {% if member.links and member.links.size > 0 %}
-                <div class="team-card__links">
-                  {% for link in member.links %}
-                    <a href="{{ link.url }}" class="team-card__link" target="_blank" rel="noopener">{{ link.label }}</a>
-                  {% endfor %}
-                </div>
-              {% endif %}
-            </div>
+            {% if member.links and member.links.size > 0 %}
+              <div class="team-card__links">
+                {% for link in member.links %}
+                  <a href="{{ link.url }}" class="team-card__link" target="_blank" rel="noopener">{{ link.label }}</a>
+                {% endfor %}
+              </div>
+            {% endif %}
           </article>
         {% endfor %}
       </div>

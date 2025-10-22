@@ -96,23 +96,12 @@ layout: default
       {% if team_members == nil %}
         {% assign team_members = '' | split: '' %}
       {% endif %}
+  {% assign avatar_palette = 'variant-1|variant-2|variant-3|variant-4|variant-5|variant-6' | split: '|' %}
+  {% assign palette_size = avatar_palette | size %}
       <div class="author-list">
         {% for author in page.authors %}
         {% assign lookup_name = author.team_member | default: author.name %}
         {% assign team_member = team_members | where: 'name', lookup_name | first %}
-        {% assign avatar_photo = nil %}
-        {% if team_member and team_member.photo %}
-          {% assign avatar_photo = team_member.photo %}
-        {% elsif author.photo %}
-          {% assign avatar_photo = author.photo %}
-        {% endif %}
-
-        {% assign avatar_photo_path = avatar_photo | default: '' | strip %}
-        {% assign avatar_photo_file = nil %}
-        {% if avatar_photo_path != '' %}
-          {% assign matching_files = site.static_files | where: 'path', avatar_photo_path %}
-          {% assign avatar_photo_file = matching_files | first %}
-        {% endif %}
 
         {% assign author_details = '' | split: '' %}
         {% if author.role %}
@@ -156,14 +145,13 @@ layout: default
           {% assign author_initials = author.name | slice: 0, 1 | upcase %}
         {% endif %}
 
+  {% assign palette_index = forloop.index0 | modulo: palette_size %}
+        {% assign avatar_variant = avatar_palette[palette_index] %}
+
         <div class="author-card">
-          {% if avatar_photo_file %}
-          <div class="author-avatar author-avatar--image">
-            <img src="{{ avatar_photo_path | relative_url }}" alt="{{ author.name }} headshot">
+          <div class="author-avatar initial-avatar initial-avatar--sm initial-avatar--{{ avatar_variant }}" aria-hidden="true">
+            <span>{{ author_initials }}</span>
           </div>
-          {% else %}
-          <div class="author-avatar" aria-hidden="true">{{ author_initials }}</div>
-          {% endif %}
           <div class="author-card__details">
             <div class="author-card__name">{{ author.name }}</div>
             {% for detail in author_details %}
