@@ -10,7 +10,7 @@ permalink: /team/
     <div class="columns is-centered">
       <div class="column is-two-thirds has-text-centered">
   <h1 class="title is-1">Meet the Froggy Team</h1>
-        <p class="subtitle is-4">Add or edit teammates by updating <code>_data/team.yml</code>. Each entry can include a name, role, affiliation, headshot, and helpful links.</p>
+    <p class="subtitle is-4">Add or edit teammates by updating <code>_data/team.yml</code>. Each entry can include a name, role, affiliation, headshot, and helpful links.</p>
       </div>
     </div>
   </div>
@@ -24,14 +24,48 @@ permalink: /team/
       <div class="team-grid">
         {% for member in team_members %}
           <article class="team-card">
-            {% if member.photo and member.photo != '' %}
-              <div class="team-card__photo">
-                <img src="{{ member.photo | relative_url }}" alt="Portrait of {{ member.name }}">
-              </div>
+            {% assign photo_path = member.photo | default: '' | strip %}
+            {% assign photo_file = nil %}
+            {% if photo_path != '' %}
+              {% assign matching_files = site.static_files | where: 'path', photo_path %}
+              {% assign photo_file = matching_files | first %}
+            {% endif %}
+
+            {% assign name_parts = member.name | strip | split: ' ' %}
+            {% assign first_initial = '' %}
+            {% assign last_initial = '' %}
+            {% assign last_part_clean = '' %}
+
+            {% for part in name_parts %}
+              {% assign part_clean = part | strip %}
+              {% if part_clean != '' %}
+                {% if first_initial == '' %}
+                  {% assign first_initial = part_clean | slice: 0, 1 | upcase %}
+                {% endif %}
+                {% assign last_part_clean = part_clean %}
+              {% endif %}
+            {% endfor %}
+
+            {% if last_part_clean != '' %}
+              {% assign last_initial = last_part_clean | slice: 0, 1 | upcase %}
+            {% endif %}
+
+            {% if first_initial == '' %}
+              {% assign initials = member.name | slice: 0, 1 | upcase %}
+            {% elsif last_initial == '' %}
+              {% assign initials = first_initial %}
             {% else %}
-              <div class="team-card__photo team-card__photo--placeholder" aria-hidden="true">
-                <span>{{ member.name | slice: 0, 1 }}</span>
-              </div>
+              {% assign initials = first_initial | append: last_initial %}
+            {% endif %}
+
+            {% if photo_file %}
+            <div class="team-card__photo">
+              <img src="{{ member.photo | relative_url }}" alt="Portrait of {{ member.name }}">
+            </div>
+            {% else %}
+            <div class="team-card__photo team-card__photo--placeholder" aria-hidden="true">
+              <span>{{ initials }}</span>
+            </div>
             {% endif %}
             <div class="team-card__body">
               <h2 class="team-card__name">{{ member.name }}</h2>

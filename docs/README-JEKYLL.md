@@ -33,7 +33,7 @@ docs/
 │   ├── project.html      # Research project pages
 │   └── blog-post.html    # Blog post pages
 ├── _data/                # Structured data used across pages
-│   └── team.yml          # Team member roster for the Team page
+│   └── team.yml          # Team roster for the team page
 ├── _includes/            # Reusable components
 │   └── nav.html          # Navigation bar
 ├── _projects/            # Research project pages (Markdown)

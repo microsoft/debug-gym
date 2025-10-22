@@ -1,4 +1,4 @@
-# Update this list to manage the Team page.
+# Update this list to manage the team page.
 # Each entry supports: name (required), role (optional), affiliation (optional), photo (optional), and links (optional).
 - name: "Alessandro Sordoni"
   affiliation: "Microsoft Research Montréal"

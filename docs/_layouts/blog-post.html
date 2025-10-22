@@ -107,6 +107,13 @@ layout: default
           {% assign avatar_photo = author.photo %}
         {% endif %}
 
+        {% assign avatar_photo_path = avatar_photo | default: '' | strip %}
+        {% assign avatar_photo_file = nil %}
+        {% if avatar_photo_path != '' %}
+          {% assign matching_files = site.static_files | where: 'path', avatar_photo_path %}
+          {% assign avatar_photo_file = matching_files | first %}
+        {% endif %}
+
         {% assign author_details = '' | split: '' %}
         {% if author.role %}
           {% assign author_details = author_details | push: author.role %}
@@ -125,13 +132,37 @@ layout: default
           {% assign author_links = author_links | concat: author.links %}
         {% endif %}
 
+        {% assign author_initials = '' %}
+        {% assign raw_parts = author.name | default: '' | strip | split: ' ' %}
+        {% assign name_parts_clean = '' | split: '' %}
+        {% for raw in raw_parts %}
+          {% assign part_clean = raw | strip %}
+          {% if part_clean != '' %}
+            {% assign name_parts_clean = name_parts_clean | push: part_clean %}
+          {% endif %}
+        {% endfor %}
+
+        {% if name_parts_clean.size > 0 %}
+          {% assign first_initial = name_parts_clean[0] | slice: 0, 1 | upcase %}
+          {% assign author_initials = author_initials | append: first_initial %}
+          {% if name_parts_clean.size > 1 %}
+            {% assign last_index = name_parts_clean.size | minus: 1 %}
+            {% assign last_initial = name_parts_clean[last_index] | slice: 0, 1 | upcase %}
+            {% assign author_initials = author_initials | append: last_initial %}
+          {% endif %}
+        {% endif %}
+
+        {% if author_initials == '' %}
+          {% assign author_initials = author.name | slice: 0, 1 | upcase %}
+        {% endif %}
+
         <div class="author-card">
-          {% if avatar_photo %}
+          {% if avatar_photo_file %}
           <div class="author-avatar author-avatar--image">
-            <img src="{{ avatar_photo | relative_url }}" alt="{{ author.name }} headshot">
+            <img src="{{ avatar_photo_path | relative_url }}" alt="{{ author.name }} headshot">
           </div>
           {% else %}
-          <div class="author-avatar" aria-hidden="true">{{ author.name | slice: 0, 1 }}</div>
+          <div class="author-avatar" aria-hidden="true">{{ author_initials }}</div>
           {% endif %}
           <div class="author-card__details">
             <div class="author-card__name">{{ author.name }}</div>
