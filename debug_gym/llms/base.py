@@ -13,11 +13,10 @@ from tenacity import (
     wait_random_exponential,
 )
 
-from debug_gym.agents.utils import trim_prompt_messages
 from debug_gym.gym.envs.env import EnvInfo
 from debug_gym.gym.tools.tool import EnvironmentTool, ToolCall
 from debug_gym.llms.constants import DEFAULT_LLM_CONFIG
-from debug_gym.llms.utils import print_messages
+from debug_gym.llms.utils import print_messages, trim_prompt_messages
 from debug_gym.logger import DebugGymLogger
 
 # Set logging level down to WARNING for endpoint queries.

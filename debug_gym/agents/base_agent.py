@@ -8,10 +8,10 @@ import numpy as np
 from jinja2 import Environment, Template
 
 from debug_gym.agents.history_tracker import HistoryTracker, build_history_prompt
-from debug_gym.agents.utils import trim
 from debug_gym.gym.envs.env import RepoEnv
 from debug_gym.gym.utils import filter_non_utf8
 from debug_gym.llms.base import LLM
+from debug_gym.llms.utils import trim
 from debug_gym.logger import DebugGymLogger
 
 AGENT_REGISTRY = {}
