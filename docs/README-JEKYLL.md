@@ -103,6 +103,8 @@ author: "Author Name"
 reading_time: 8
 tags: ["AI", "Debugging", "Research"]
 description: "A brief description"
+paper_url: "https://arxiv.org/abs/your-paper"
+# paper_local: "/static/papers/your-paper.pdf"
 authors:
   - name: "First Author"
     role: "Researcher"
@@ -128,6 +130,12 @@ More content...
 ```
 
 3. The blog post will automatically appear on the index page!
+
+**Paper links:**
+
+- Use `paper_url` for any external link (arXiv, conference page, etc.).
+- To host a PDF locally, drop it in `docs/static/papers/` and reference it with `paper_local: "/static/papers/<file>.pdf"`.
+- Leave both fields blank (or set `paper_url: "#"`) to surface a disabled “Paper link coming soon” button.
 
 ### Updating the Team Page
 
