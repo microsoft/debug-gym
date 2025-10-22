@@ -56,20 +56,19 @@ layout: default
 
     {% assign paper_external_url = page.paper_url | default: page.arxiv_url %}
     {% assign paper_local_path = page.paper_local %}
+    {% assign has_external = paper_external_url | default: '' | strip %}
+    {% assign has_local = paper_local_path | default: '' | strip %}
 
-    {% assign has_external = paper_external_url and paper_external_url != '' %}
-    {% assign has_local = paper_local_path and paper_local_path != '' %}
-
-    {% if has_external or has_local %}
+    {% if has_external != '' or has_local != '' %}
     <div class="blog-hero__links">
-      {% if has_external %}
+      {% if has_external != '' %}
       <a href="{{ paper_external_url }}" class="blog-hero__link{% if paper_external_url == '#' %} is-placeholder{% endif %}" {% if paper_external_url != '#' %}target="_blank"{% endif %} {% if paper_external_url contains '://' %}rel="noopener noreferrer"{% endif %} {% if paper_external_url == '#' %}aria-disabled="true"{% endif %}>
         <span class="blog-hero__link-icon"><i class="ai ai-arxiv"></i></span>
         <span>{% if paper_external_url == '#' %}Paper link coming soon{% else %}View paper{% endif %}</span>
       </a>
       {% endif %}
 
-      {% if has_local %}
+      {% if has_local != '' %}
       <a href="{{ paper_local_path | relative_url }}" class="blog-hero__link" target="_blank" rel="noopener noreferrer">
         <span class="blog-hero__link-icon"><i class="fas fa-file-pdf"></i></span>
         <span>View paper</span>
