@@ -7,8 +7,8 @@ from debug_gym.agents.utils import load_config, trim, trim_prompt_messages
 
 
 def test_trim_prompt_messages():
-    def count_tokens(text):
-        return len(text)
+    def count_tokens(messages):
+        return sum(len(msg.get("content", msg.get("tool_calls"))) for msg in messages)
 
     # Test basic validation
     with pytest.raises(AssertionError, match="messages should not be empty"):

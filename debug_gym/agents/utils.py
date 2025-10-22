@@ -66,9 +66,16 @@ def trim(text: str, max_tokens: int, count_tokens: callable, where: str = "middl
 
 
 def get_message_tokens(message, count_tokens):
-    """Count tokens in a message."""
-    message_content = str(message.get("content", message.get("tool_calls", message)))
-    return count_tokens(message_content)
+    """Count tokens in a single message.
+
+    Args:
+        message: A single message dict
+        count_tokens: Function that takes a list of messages and returns total token count
+
+    Returns:
+        Token count for this message
+    """
+    return count_tokens([message])
 
 
 def trim_prompt_messages(

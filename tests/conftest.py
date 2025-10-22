@@ -45,8 +45,13 @@ def llm_class_mock():
                 response_token_count=20,
             )
 
-        def tokenize(self, text):
-            return [c for c in text]
+        def tokenize(self, messages):
+            # Return list of token lists, one per message
+            result = []
+            for msg in messages:
+                content = str(msg.get("content", msg.get("tool_calls", msg)))
+                result.append([c for c in content])
+            return result
 
         def define_tools(self, tool_call_list):
             return tool_call_list

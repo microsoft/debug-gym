@@ -177,15 +177,23 @@ class CopilotLLM(OpenAILLM):
             timeout=None,
         )
 
-    def tokenize(self, text: str) -> list[str]:
+    def tokenize(self, messages: list[dict]) -> list[list[str]]:
         if getattr(self, "_tk_func", None) is None:
             try:
-                self._tk_func = tiktoken.encoding_for_model("gpt-4o").encode
+                encoder = tiktoken.encoding_for_model("gpt-4o")
+                # For tiktoken, encode returns list of ints, convert to strings
+                self._tk_func = lambda text: [str(t) for t in encoder.encode(text)]
             except KeyError:
                 # Simple word-based tokenization as fallback
-                # For Claude, you might want to use tiktoken or another tokenizer
                 self._tk_func = lambda x: x.split()
-        return self._tk_func(text)
+
+        # Tokenize each message individually
+        result = []
+        for msg in messages:
+            content = str(msg.get("content", msg.get("tool_calls", msg)))
+            tokens = self._tk_func(content)
+            result.append(tokens)
+        return result
 
     def need_to_be_retried(self, exception) -> bool:
         # re-use the need_to_be_retried function from the parent class

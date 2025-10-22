@@ -13,7 +13,7 @@ from tenacity import (
     wait_random_exponential,
 )
 
-from debug_gym.agents.utils import get_message_tokens, trim_prompt_messages
+from debug_gym.agents.utils import trim_prompt_messages
 from debug_gym.gym.envs.env import EnvInfo
 from debug_gym.gym.tools.tool import EnvironmentTool, ToolCall
 from debug_gym.llms.constants import DEFAULT_LLM_CONFIG
@@ -288,35 +288,30 @@ class LLM(ABC):
         pass
 
     @abstractmethod
-    def tokenize(self, text: str) -> list[str]:
-        """Abstract method to tokenize a text."""
-        pass
-
-    def count_tokens(self, text: str) -> int:
-        """Count the number of tokens in a text."""
-        return len(self.tokenize(text))
-
-    def _get_message_token_counts(self, messages: list[dict]) -> list[int]:
-        """Return per-message token counts used for context management.
-
-        Subclasses can override this to plug in custom counting strategies
-        (for example, chat-template aware tokenizers).
-        """
-        return [get_message_tokens(msg, self.count_tokens) for msg in messages]
-
-    def _trim_messages_to_context(
-        self, messages: list[dict], message_token_counts: list[int] | None = None
-    ) -> list[dict]:
-        """Trim messages so they fit within the model context budget.
+    def tokenize(self, messages: list[dict]) -> list[list[str]]:
+        """Abstract method to tokenize messages.
 
         Args:
-            messages: Original message list.
-            message_token_counts: Optional precomputed counts aligned with messages.
+            messages: List of message dicts
 
         Returns:
-            A trimmed list of messages.
+            List of token lists, one per message
         """
-        return trim_prompt_messages(messages, self.context_length, self.count_tokens)
+        pass
+
+    def count_tokens(self, messages: list[dict] | str) -> int:
+        """Count the total number of tokens across all messages.
+
+        Args:
+            messages: List of message dicts
+
+        Returns:
+            Total token count across all messages
+        """
+        if isinstance(messages, str):
+            messages = [{"role": "user", "content": messages}]
+        tokenized = self.tokenize(messages)
+        return sum(len(tokens) for tokens in tokenized)
 
     @abstractmethod
     def define_tools(self, tool_call_list: list[EnvironmentTool]) -> list[dict]:
@@ -386,11 +381,10 @@ class LLM(ABC):
             for retry_count in range(max_retries + 1):
                 try:
                     # pre-truncate messages if they are too long, to avoid unnecessary retries
-                    message_token_counts = self._get_message_token_counts(messages)
-                    message_tokens = sum(message_token_counts)
+                    message_tokens = self.count_tokens(messages)
                     if message_tokens > self.context_length * 1.2:
-                        trimmed_messages = self._trim_messages_to_context(
-                            messages, message_token_counts
+                        trimmed_messages = trim_prompt_messages(
+                            messages, self.context_length, self.count_tokens
                         )
                         messages = trimmed_messages
 
@@ -428,8 +422,8 @@ class LLM(ABC):
                     )
 
                     # Trim messages and try again
-                    trimmed_messages = self._trim_messages_to_context(
-                        messages, self._get_message_token_counts(messages)
+                    trimmed_messages = trim_prompt_messages(
+                        messages, self.context_length, self.count_tokens
                     )
 
                     if not trimmed_messages:

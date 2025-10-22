@@ -119,7 +119,7 @@ class BaseAgent:
 
     def trim_message(
         self,
-        message,
+        message: str,
         count_tokens=None,
         max_length=None,
         max_length_percentage=0,
@@ -140,10 +140,8 @@ class BaseAgent:
 
         if count_tokens is None or max_length is None or max_length <= 0:
             return message
-        tokens = count_tokens(message)
-        if tokens > max_length:
-            return trim(message, max_length, count_tokens=count_tokens, where=where)
-        return message
+
+        return trim(message, max_length, count_tokens=count_tokens, where=where)
 
     def _load_system_prompt_template(self) -> Template | None:
         """Load system prompt template from config if specified and register custom filters.
