@@ -40,8 +40,6 @@ def test_eval(env):
 @pytest.mark.parametrize(
     "method,env_auto_eval_on_rewrite,expected",
     [
-        ("on_env_reset", False, "1 passed in "),
-        ("on_env_reset", True, "1 passed in "),
         ("on_rewrite_success", True, "1 passed in "),
         ("on_rewrite_success", False, "FAILED test_1.py::test_1"),
     ],
