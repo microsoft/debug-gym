@@ -132,8 +132,6 @@ class SWEBenchEnv(RepoEnv):
         self.entrypoint = self.entrypoint.replace("--tb=no", "--tb=short")
 
         self.git_apply_cmd = f"git apply -"
-        # Flag to ensure final submission only happens once.
-        self._final_submitted = False
 
     def setup_workspace(self):
         self.terminal.task_name = self.task_name

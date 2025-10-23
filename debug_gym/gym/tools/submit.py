@@ -7,16 +7,12 @@ from debug_gym.gym.tools.toolbox import Toolbox
 class SubmitTool(EnvironmentTool):
     name = "submit"
     description = (
-        "Finalize the task: applies the hidden official benchmark test patch, switches to the "
-        "official test entrypoint, runs the benchmark evaluation, and returns the final results. "
-        "After this call the environment is marked as submitted and further development should stop."
+        "Finalize the task: applies the hidden official benchmark test patch,"
+        "runs the benchmark evaluation, and returns the final results. "
+        "After this call the environment is marked as submitted and further development will stop."
     )
     arguments = {}
 
     def use(self, environment, **kwargs) -> Observation:
-        # if not hasattr(environment, "final_submit"):
-        #     return Observation(
-        #         self.name, "Environment does not support final submission."
-        #     )
         eval_output = environment.eval()
         return Observation(self.name, eval_output.output)
