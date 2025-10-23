@@ -107,7 +107,7 @@ def test_build_docker_image(mock_build_docker_image):
 
 
 @pytest.if_docker_running
-def test_reset_with_docker_terminal():
+def test_reset_with_docker_terminal(setup_aider_repo):
     env = AiderBenchmarkEnv()
     assert isinstance(env.terminal, DockerTerminal)
 
