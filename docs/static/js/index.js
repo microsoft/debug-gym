@@ -48,7 +48,7 @@ $(document).ready(function() {
   
 	const cookieManager = document.querySelector('#footer-cookie-link');
 	if (consentRequired() && cookieManager && cookieManager.parentElement) {
-	  cookieManager.parentElement.style.visibility = 'visible';
+	  cookieManager.parentElement.style.display = 'flex';
 	}
   
 	// initialize consent
