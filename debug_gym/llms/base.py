@@ -381,7 +381,7 @@ class LLM(ABC):
                 try:
                     # pre-truncate messages if they are too long, to avoid unnecessary retries
                     message_tokens = self.count_tokens(messages)
-                    if message_tokens > self.context_length * 1.2:
+                    if message_tokens > self.context_length:
                         trimmed_messages = trim_prompt_messages(
                             messages, self.context_length, self.count_tokens
                         )

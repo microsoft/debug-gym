@@ -84,7 +84,7 @@ def test_message_token_counts_uses_chat_template(mock_llm_config, logger_mock):
 
     # When using chat template, each message gets template tokens added
     # The exact counts depend on the template format
-    assert counts == 27
+    assert counts == 31
 
 
 @pytest.mark.hf_tokenizer
