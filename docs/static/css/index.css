@@ -102,6 +102,22 @@ body {
   padding: 4rem 1.5rem 3rem;
 }
 
+.footer .links {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 1rem;
+}
+
+.footer .links li {
+  display: flex;
+  align-items: center;
+}
+
 .footer .icon-link {
   font-size: 1.6rem;
   color: var(--color-text-muted);
