@@ -33,13 +33,26 @@ if_is_linux = pytest.mark.skipif(
 
 @if_kubernetes_available
 def test_kubernetes_terminal_init():
-    terminal = KubernetesTerminal()
+    terminal = KubernetesTerminal(base_image="ubuntu:latest")
     assert terminal.session_commands == []
-    assert terminal.env_vars == {
+    expected_base_env = {
         "NO_COLOR": "1",
         "PS1": DEFAULT_PS1,
         "PYTHONSTARTUP": "",
     }
+    for key, value in expected_base_env.items():
+        assert terminal.env_vars[key] == value
+
+    assert terminal.env_vars["PATH"] == os.environ.get("PATH")
+    if terminal.kube_config:
+        assert terminal.env_vars["KUBECONFIG"] == terminal.kube_config
+    else:
+        assert "KUBECONFIG" not in terminal.env_vars
+
+    extra_env_keys = set(terminal.env_vars) - (
+        set(expected_base_env) | {"PATH", "KUBECONFIG"}
+    )
+    assert not extra_env_keys
     assert os.path.basename(terminal.working_dir).startswith("Terminal-")
     assert terminal.base_image == "ubuntu:latest"
     assert terminal.namespace == "default"
@@ -84,7 +97,15 @@ def test_kubernetes_terminal_init_with_params(tmp_path):
     )
     assert terminal.working_dir == working_dir
     assert terminal.session_commands == session_commands
-    assert terminal.env_vars == env_vars | {"NO_COLOR": "1", "PS1": DEFAULT_PS1}
+    assert terminal.env_vars["ENV_VAR"] == "value"
+    assert terminal.env_vars["NO_COLOR"] == "1"
+    assert terminal.env_vars["PS1"] == DEFAULT_PS1
+    assert terminal.env_vars["PYTHONSTARTUP"] == ""
+    assert terminal.env_vars["PATH"] == os.environ.get("PATH")
+    if terminal.kube_config:
+        assert terminal.env_vars["KUBECONFIG"] == terminal.kube_config
+    else:
+        assert "KUBECONFIG" not in terminal.env_vars
     assert terminal.base_image == base_image
 
     # Create pod.
@@ -92,6 +113,69 @@ def test_kubernetes_terminal_init_with_params(tmp_path):
     assert terminal.pod.is_running()
     assert terminal.pod.name == pod_name
     assert terminal.pod.namespace == namespace
+
+    # Close pod.
+    terminal.close()
+    assert terminal._pod is None
+
+
+@if_kubernetes_available
+def test_kubernetes_terminal_init_with_pod_specs(tmp_path):
+    working_dir = str(tmp_path)
+    # set an environment variable to use in the pod spec
+    os.environ["HOSTNAME"] = "minikube"
+    pod_spec_kwargs = {
+        "affinity": {
+            "nodeAffinity": {
+                "requiredDuringSchedulingIgnoredDuringExecution": {
+                    "nodeSelectorTerms": [
+                        {
+                            "matchExpressions": [
+                                {
+                                    "key": "kubernetes.io/hostname",
+                                    "operator": "In",
+                                    "values": ["{{HOSTNAME}}"],
+                                }
+                            ]
+                        }
+                    ]
+                }
+            }
+        },
+        "tolerations": [
+            {
+                "key": "kubernetes.azure.com/scalesetpriority",
+                "operator": "Equal",
+                "value": "spot",
+                "effect": "NoSchedule",
+            },
+            {
+                "key": "CriticalAddonsOnly",
+                "operator": "Equal",
+                "value": "true",
+                "effect": "NoSchedule",
+            },
+        ],
+    }
+
+    terminal = KubernetesTerminal(
+        working_dir=working_dir,
+        pod_spec_kwargs=pod_spec_kwargs,
+        kube_context="minikube",
+        base_image="ubuntu:latest",
+    )
+
+    terminal.pod  # Create pod.
+    assert (
+        terminal.pod.pod_body["spec"]["tolerations"] == pod_spec_kwargs["tolerations"]
+    )
+    # Make sure environment variable was replaced in the pod spec.
+    spec = terminal.pod.pod_body["spec"]
+    node_affinity = spec["affinity"]["nodeAffinity"]
+    required = node_affinity["requiredDuringSchedulingIgnoredDuringExecution"]
+    term = required["nodeSelectorTerms"][0]
+    match_expression = term["matchExpressions"][0]
+    assert match_expression["values"] == [os.environ["HOSTNAME"]]
 
     # Close pod.
     terminal.close()
@@ -109,7 +193,7 @@ def test_kubernetes_terminal_init_with_params(tmp_path):
 def test_kubernetes_terminal_run(tmp_path, command):
     """Test running commands in the Kubernetes terminal."""
     working_dir = str(tmp_path)
-    terminal = KubernetesTerminal(working_dir=working_dir)
+    terminal = KubernetesTerminal(working_dir=working_dir, base_image="ubuntu:latest")
     success, output = terminal.run(command, timeout=1)
     assert output == "test"
     assert success is True
@@ -128,7 +212,9 @@ def test_kubernetes_terminal_run(tmp_path, command):
 def test_kubernetes_terminal_with_session_commands(tmp_path):
     working_dir = str(tmp_path)
     session_commands = ["echo 'Hello'", "echo 'World'"]
-    terminal = KubernetesTerminal(working_dir, session_commands=session_commands)
+    terminal = KubernetesTerminal(
+        working_dir, session_commands=session_commands, base_image="ubuntu:latest"
+    )
     status, output = terminal.run("pwd", timeout=1)
     assert status
     assert output == f"Hello\nWorld\n{working_dir}"
@@ -141,7 +227,7 @@ def test_kubernetes_terminal_session(tmp_path):
     # same as test_terminal_session but with DockerTerminal
     working_dir = str(tmp_path)
     command = "echo Hello World"
-    terminal = KubernetesTerminal(working_dir=working_dir)
+    terminal = KubernetesTerminal(working_dir=working_dir, base_image="ubuntu:latest")
     assert not terminal.sessions
 
     session = terminal.new_shell_session()
@@ -171,7 +257,7 @@ def test_copy_content(tmp_path):
     with open(source_file, "w") as src_file:
         src_file.write("Hello World")
 
-    terminal = KubernetesTerminal()
+    terminal = KubernetesTerminal(base_image="ubuntu:latest")
     # Source must be a folder.
     with pytest.raises(ValueError, match="Source .* must be a directory."):
         terminal.copy_content(source_file)
@@ -192,7 +278,7 @@ def test_copy_content(tmp_path):
 def test_kubernetes_terminal_cleanup(tmp_path):
     """Test cleanup functionality."""
     working_dir = str(tmp_path)
-    terminal = KubernetesTerminal(working_dir=working_dir)
+    terminal = KubernetesTerminal(working_dir=working_dir, base_image="ubuntu:latest")
 
     # Test cleanup without creating pod
     terminal.close()
@@ -218,7 +304,7 @@ def test_select_terminal_kubernetes():
 
 def test_kubernetes_terminal_readonly_properties_after_pod_creation():
     """Test that working directory cannot be changed after pod creation."""
-    terminal = KubernetesTerminal()
+    terminal = KubernetesTerminal(base_image="ubuntu:latest")
     terminal.pod  # Create pod.
 
     with pytest.raises(

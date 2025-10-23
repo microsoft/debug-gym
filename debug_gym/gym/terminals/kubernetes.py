@@ -7,6 +7,7 @@ import time
 import uuid
 from pathlib import Path
 
+from jinja2 import Template
 from kubernetes import client, config, stream, watch
 from kubernetes.client.rest import ApiException
 from kubernetes.stream.ws_client import ERROR_CHANNEL
@@ -16,6 +17,7 @@ from tenacity import (
     stop_after_attempt,
     wait_random_exponential,
 )
+from yaml import dump, safe_load
 
 from debug_gym.gym.terminals.shell_session import ShellSession
 from debug_gym.gym.terminals.terminal import DISABLE_ECHO_COMMAND, Terminal
@@ -217,15 +219,15 @@ class KubernetesTerminal(Terminal):
         working_dir: str | None = None,
         session_commands: list[str] | None = None,
         env_vars: dict[str, str] | None = None,
-        include_os_env_vars: bool = False,
         logger: DebugGymLogger | None = None,
-        setup_commands: list[str] | None = None,
         # Kubernetes-specific parameters
+        setup_commands: list[str] | None = None,
         pod_name: str | None = None,
-        base_image: str = "ubuntu:latest",
-        registry: str = "docker.io/",
+        base_image: str | None = None,
+        registry: str = "",
         namespace: str = "default",
         kube_config: str | None = None,
+        kube_context: str | None = None,
         extra_labels: dict | None = None,
         pod_spec_kwargs: dict = None,
         **kwargs,
@@ -234,7 +236,6 @@ class KubernetesTerminal(Terminal):
             working_dir=working_dir,
             session_commands=session_commands,
             env_vars=env_vars,
-            include_os_env_vars=include_os_env_vars,
             logger=logger,
             **kwargs,
         )
@@ -243,26 +244,36 @@ class KubernetesTerminal(Terminal):
         self.setup_commands = setup_commands or []
         self.namespace = namespace
         self.kubernetes_kwargs = kwargs  # e.g., nodeSelector, tolerations
-        self.registry = registry.rstrip("/")
+        self.registry = registry.rstrip("/") + "/" if registry else ""
         self._pod_name = pod_name
         self.pod_spec_kwargs = pod_spec_kwargs or {}
         user = _clean_for_kubernetes(os.environ.get("USER", "unknown"))
-        self.labels = {"app": "debug-gym", "component": "terminal", "user": user} | (
-            extra_labels or {}
-        )
+        self.labels = {"app": "dbg-gym", "user": user} | (extra_labels or {})
         self._pod = None
 
         # Initialize Kubernetes client
         self.kube_config = kube_config
+        self.kube_context = kube_context
         if self.kube_config == "incluster":
             self.kube_config = None
             config.load_incluster_config()
+            # For in-cluster kubectl access, pass Kubernetes service environment variables
+            # This enables kubectl to auto-discover the service account credentials
+            for key in ("KUBERNETES_SERVICE_HOST", "KUBERNETES_SERVICE_PORT"):
+                if key in os.environ:
+                    self.env_vars.setdefault(key, os.environ[key])
         else:
             self.kube_config = self.kube_config or os.environ.get(
                 "KUBECONFIG", "~/.kube/config"
             )
             self.kube_config = os.path.expanduser(self.kube_config)
-            config.load_kube_config(self.kube_config)
+            config.load_kube_config(self.kube_config, self.kube_context)
+            self.env_vars.setdefault("KUBECONFIG", self.kube_config)
+
+        # Ensure helper binaries such as kubectl can be discovered even when
+        # host environment variables are not inherited.
+        if "PATH" in os.environ:
+            self.env_vars.setdefault("PATH", os.environ["PATH"])
 
         self.k8s_client = client.CoreV1Api()
         atexit.register(self.close)
@@ -315,9 +326,9 @@ class KubernetesTerminal(Terminal):
     @property
     def default_shell_command(self) -> list[str]:
         """Expects the pod to have bash installed."""
-        kubeconfig = f"--kubeconfig {self.kube_config}" if self.kube_config else ""
+        kubeconfig = f"--kubeconfig {self.kube_config} " if self.kube_config else ""
         bash_cmd = "/bin/bash --noprofile --norc --noediting"
-        return f"kubectl {kubeconfig} exec -it {self.pod.name} -n {self.pod.namespace} -- {bash_cmd}"
+        return f"kubectl {kubeconfig}exec -it {self.pod.name} -c main -n {self.pod.namespace} -- {bash_cmd}"
 
     def new_shell_session(self):
         if not self.pod.is_running():
@@ -427,8 +438,14 @@ class KubernetesTerminal(Terminal):
             self._pod_name or f"dbg-gym.{self.task_name}.{str(uuid.uuid4())[:8]}"
         )
         self.logger.debug(
-            f"Setting up pod {pod_name} with base image: {self.base_image}"
+            f"Setting up pod {pod_name} with image: {self.registry}{self.base_image}"
         )
+
+        # Render pod_spec_kwargs as a Jinja2 template, replace variables, then load as dict.
+        pod_spec_yaml = dump(self.pod_spec_kwargs)
+        pod_spec_template = Template(pod_spec_yaml)
+        rendered_yaml = pod_spec_template.render(os.environ)
+        pod_spec_kwargs = safe_load(rendered_yaml)
 
         # Create pod specification for Kubernetes.
         pod_body = {
@@ -445,7 +462,7 @@ class KubernetesTerminal(Terminal):
                 "containers": [
                     {
                         "name": "main",
-                        "image": f"{self.registry}/{self.base_image}",
+                        "image": f"{self.registry}{self.base_image}",
                         "imagePullPolicy": "IfNotPresent",
                         "command": ["/bin/bash"],
                         "args": ["-c", "sleep infinity"],
@@ -462,7 +479,7 @@ class KubernetesTerminal(Terminal):
                         },
                     }
                 ],
-                **self.pod_spec_kwargs,  # e.g., nodeSelector, tolerations
+                **pod_spec_kwargs,  # e.g., nodeSelector, tolerations
             },
         }
 

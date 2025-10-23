@@ -47,7 +47,7 @@ def test_reset_and_cleanup_workspace():
     assert not os.path.isdir(working_dir)
 
     # Setup workspace with a remote terminal.
-    terminal = DockerTerminal()
+    terminal = DockerTerminal(base_image="ubuntu:latest")
     workspace = Workspace(terminal)
 
     assert workspace._tempdir is None

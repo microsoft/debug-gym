@@ -527,7 +527,7 @@ def test_context_length_exceeded_prevents_infinite_recursion(
     messages = [{"role": "user", "content": "Long message"}]
 
     # Mock trim_prompt_messages to return the same messages (no reduction)
-    with patch("debug_gym.agents.utils.trim_prompt_messages") as mock_trim:
+    with patch("debug_gym.llms.utils.trim_prompt_messages") as mock_trim:
         mock_trim.return_value = messages
 
         # Should raise ContextLengthExceededError, not RecursionError

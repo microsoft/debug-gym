@@ -19,10 +19,10 @@ class DockerTerminal(Terminal):
         working_dir: str | None = None,
         session_commands: list[str] | None = None,
         env_vars: dict[str, str] | None = None,
-        include_os_env_vars: bool = False,
         logger: DebugGymLogger | None = None,
         # Docker-specific parameters
-        base_image: str = "ubuntu:latest",
+        base_image: str | None = None,
+        registry: str = "",
         setup_commands: list[str] | None = None,
         **kwargs,
     ):
@@ -39,11 +39,11 @@ class DockerTerminal(Terminal):
             working_dir=working_dir,
             session_commands=session_commands,
             env_vars=env_vars,
-            include_os_env_vars=include_os_env_vars,
             logger=logger,
             **kwargs,
         )
         self.base_image = base_image
+        self.registry = registry.rstrip("/") + "/" if registry else ""
         self.setup_commands = setup_commands or []
         self.docker_client = docker.from_env(timeout=600)
         self._container = None
@@ -133,13 +133,15 @@ class DockerTerminal(Terminal):
 
     def setup_container(self) -> docker.models.containers.Container:
         # Create and start a container mounting volumes and setting environment variables
-        self.logger.debug(f"Setting up container with base image: {self.base_image}")
+        self.logger.debug(
+            f"Setting up container with image: {self.registry}{self.base_image}"
+        )
 
         # Generate a unique container name
         container_name = f"debug_gym_{uuid.uuid4()}"
         container = self.docker_client.containers.run(
             name=container_name,
-            image=self.base_image,
+            image=f"{self.registry}{self.base_image}",
             command="sleep infinity",  # Keep the container running
             working_dir=self.working_dir,
             environment=self.env_vars,

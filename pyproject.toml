@@ -35,4 +35,6 @@ dev = [
     "pytest-xdist",
     "pytest-timeout",
     "pytest-env",
+    "isort",
+    "black",
 ]

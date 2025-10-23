@@ -36,98 +36,26 @@ class HuggingFaceLLM(OpenAILLM):
                 self._hf_tokenizer.pad_token = self._hf_tokenizer.eos_token
         return self._hf_tokenizer
 
-    def tokenize(self, text: str) -> list[str]:
-        if getattr(self, "_tk_func", None) is None:
-            tokenizer = self._load_tokenizer()
-            if self.apply_chat_template:
-
-                def _tokenize(txt):
-                    return tokenizer.tokenize(
-                        tokenizer.apply_chat_template(
-                            txt,
-                            tokenize=False,
-                            add_generation_prompt=True,
-                            enable_thinking=self.enable_thinking,
-                        )
-                    )
-
-                self._tk_func = _tokenize
-            else:
-                self._tk_func = tokenizer.tokenize
-        return self._tk_func(text)
-
-    def count_tokens(self, text) -> int:
+    def tokenize(self, messages: list[dict]) -> list[list[str]]:
         tokenizer = self._load_tokenizer()
-        token_ids = tokenizer.encode(str(text), add_special_tokens=False)
-        return len(token_ids)
 
-    # --- chat template helpers -------------------------------------------------
-
-    def _get_message_token_counts(self, messages: list[dict]) -> list[int]:
-        if not self._supports_chat_template():
-            return super()._get_message_token_counts(messages)
-
-        tokenizer = self._load_tokenizer()
-        normalized = self._normalize_messages_for_template(messages)
-        counts: list[int] = []
-        prev_len = 0
-
-        for idx in range(1, len(normalized) + 1):
-            try:
-                tokenized = tokenizer.apply_chat_template(
-                    normalized[:idx],
-                    tokenize=True,
-                    add_generation_prompt=False,
-                )
-            except TypeError:
-                tokenized = tokenizer.apply_chat_template(
-                    normalized[:idx], tokenize=True
-                )
-            except ValueError:
-                return super()._get_message_token_counts(messages)
-
-            token_ids = (
-                tokenized.get("input_ids") if isinstance(tokenized, dict) else tokenized
+        if self.apply_chat_template:
+            # When applying chat template, tokenize all messages together
+            # then return as a single list
+            text = tokenizer.apply_chat_template(
+                messages,
+                tokenize=False,
+                add_generation_prompt=True,
+                enable_thinking=self.enable_thinking,
             )
-            if token_ids and isinstance(token_ids[0], list):
-                token_ids = token_ids[0]
-
-            if token_ids is None:
-                return super()._get_message_token_counts(messages)
-
-            current_len = len(token_ids)
-            if current_len == 0 and idx == len(normalized):
-                return super()._get_message_token_counts(messages)
-
-            counts.append(max(current_len - prev_len, 0))
-            prev_len = current_len
-
-        return counts
-
-    def _supports_chat_template(self) -> bool:
-        tokenizer = self._load_tokenizer()
-        return hasattr(tokenizer, "apply_chat_template")
-
-    def _normalize_messages_for_template(self, messages: Iterable[dict]) -> list[dict]:
-        normalized = []
-        for message in messages:
-            role = message.get("role", "user")
-            if role not in {"system", "user", "assistant"}:
-                role = "user"
-
-            content = message.get("content")
-            if isinstance(content, list):
-                parts = []
-                for item in content:
-                    if isinstance(item, dict) and "text" in item:
-                        parts.append(item["text"])
-                    else:
-                        parts.append(str(item))
-                content = "\n".join(parts)
-            elif content is None and message.get("tool_calls"):
-                content = json.dumps(message.get("tool_calls"))
-            else:
-                content = "" if content is None else str(content)
-
-            normalized.append({"role": role, "content": content})
-        return normalized
+            tokens = tokenizer.tokenize(text)
+            # Return as list with single element (all tokens together)
+            return [tokens]
+        else:
+            # Tokenize each message individually
+            result = []
+            for msg in messages:
+                content = str(msg["content"])
+                tokens = tokenizer.tokenize(content)
+                result.append(tokens)
+            return result

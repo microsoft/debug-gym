@@ -532,3 +532,35 @@ def test_llm_without_reasoning_content_attribute(
 
     # The response should be just the regular content
     assert llm_response.response == "Regular response only"
+
+
+@patch.object(
+    LLMConfigRegistry,
+    "from_file",
+    return_value=LLMConfigRegistry.register_all(
+        {
+            "qwen": {
+                "model": "Qwen/Qwen3-0.6B",
+                "tokenizer": "Qwen/Qwen3-0.6B",
+                "context_limit": 4,
+                "api_key": "test-api-key",
+                "endpoint": "https://test-endpoint",
+                "api_version": "v1",
+                "tags": ["openai"],  # Using openai tag to force OpenAILLM class
+            }
+        }
+    ),
+)
+def test_openai_llm_raises_error_for_non_gpt_tokenizer(mock_llm_config, logger_mock):
+    """Test that OpenAILLM raises ValueError when tokenizer is not a GPT model"""
+    import pytest
+
+    llm = OpenAILLM(model_name="qwen", logger=logger_mock)
+    messages = [{"role": "user", "content": "test"}]
+
+    # Should raise ValueError when trying to tokenize with a non-GPT tokenizer
+    with pytest.raises(ValueError) as exc_info:
+        llm.tokenize(messages)
+
+    assert "Tokenizer `Qwen/Qwen3-0.6B` not found" in str(exc_info.value)
+    assert "set tag `vllm`" in str(exc_info.value)
