@@ -45,5 +45,36 @@
   </footer>
   {% endif %}
 
+  <footer class="footer">
+    <script>
+        function manageConsent() {
+            if (WcpConsent.siteConsent.isConsentRequired) {
+                WcpConsent.siteConsent.manageConsent();
+            }
+        }
+    </script>
+    <div class="container">
+      <div class="columns is-centered">
+        <div class="column is-8">
+          <div class="col-sm-4">
+              <ul class="links">
+                  <li style="visibility: hidden;">
+                      <a id="footer-cookie-link" style="cursor: pointer; padding-right:20px" onclick="manageConsent()" aria-label="Manage cookies">Manage cookies</a>
+                  </li>
+                  <li>
+                      <div class="copyright">
+                          <span>© 2025 Microsoft</span> | <a href="https://go.microsoft.com/fwlink/?LinkId=521839">Privacy & Cookies</a> | <a href="https://go.microsoft.com/fwlink/?linkid=2259814">Consumer Health Privacy</a> 
+                      </div>
+                  </li>
+              </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </footer>
+  
+  <!-- Microsoft EU cookie compliance library -->
+  <script src="https://wcpstatic.microsoft.com/mscc/lib/v2/wcp-consent.js"></script>
+
 </body>
 </html>
