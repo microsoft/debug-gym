@@ -264,24 +264,6 @@ class BaseAgent:
                 )
                 self.history.step(info, llm_response)
 
-                if info.step_observation.source == "submit":
-                    print(
-                        """
-                          ATTENTION ATTENTION ATTENTION ATTENTION ATTENTION ATTENTION
-                          ================================================================
-                          ================================================================
-                          ================================================================
-                          ================================================================
-                            ================================================================
-                            ================================================================
-                            ================================================================
-                            ================================================================
-                          ATTENTION ATTENTION ATTENTION ATTENTION ATTENTION ATTENTION
-                          submit cool called
-                    """
-                    )
-                    # break
-
                 if (
                     info.done
                     or info.rewrite_counter >= self.config["max_rewrite_steps"]
