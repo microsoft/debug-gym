@@ -69,51 +69,6 @@ def test_tokenize_uses_hf_tokenizer_with_pad_fallback(mock_llm_config, logger_mo
 @patch.object(
     LLMConfigRegistry,
     "from_file",
-    return_value=LLMConfigRegistry.register_all(MODEL_REGISTRY),
-)
-@patch("debug_gym.llms.huggingface.AutoTokenizer.from_pretrained")
-def test_normalize_messages_for_chat_template(
-    mock_auto_tokenizer, mock_llm_config, logger_mock
-):
-    tokenizer_mock = MagicMock()
-    tokenizer_mock.pad_token = None
-    tokenizer_mock.eos_token = "</s>"
-    mock_auto_tokenizer.return_value = tokenizer_mock
-
-    llm = HuggingFaceLLM(model_name="qwen-3", logger=logger_mock)
-
-    raw_messages = [
-        {"role": "tool", "content": "partial output"},
-        {
-            "role": "developer",
-            "content": [{"text": "line1"}, {"text": "line2"}],
-        },
-        {
-            "role": "assistant",
-            "content": None,
-            "tool_calls": [{"type": "function", "name": "noop", "arguments": {}}],
-        },
-        {"role": "user", "content": None},
-    ]
-
-    normalized = llm._normalize_messages_for_template(raw_messages)
-
-    assert normalized == [
-        {"role": "user", "content": "partial output"},
-        {"role": "user", "content": "line1\nline2"},
-        {
-            "role": "assistant",
-            "content": json.dumps(
-                [{"type": "function", "name": "noop", "arguments": {}}]
-            ),
-        },
-        {"role": "user", "content": ""},
-    ]
-
-
-@patch.object(
-    LLMConfigRegistry,
-    "from_file",
     return_value=LLMConfigRegistry.register_all(MODEL_REGISTRY_WITH_CHAT_TEMPLATE),
 )
 def test_message_token_counts_uses_chat_template(mock_llm_config, logger_mock):
@@ -130,13 +85,6 @@ def test_message_token_counts_uses_chat_template(mock_llm_config, logger_mock):
     # When using chat template, each message gets template tokens added
     # The exact counts depend on the template format
     assert counts == 27
-
-    normalized = llm._normalize_messages_for_template(messages)
-    assert normalized == [
-        {"role": "system", "content": "Instructions"},
-        {"role": "user", "content": "Hello world!"},
-        {"role": "user", "content": "Result"},
-    ]
 
 
 @pytest.mark.hf_tokenizer
@@ -162,13 +110,6 @@ def test_chat_template_counts_with_real_tokenizer(real_qwen3_tokenizer, logger_m
 
     counts = llm.count_tokens(messages)
     assert counts == 5
-
-    normalized = llm._normalize_messages_for_template(messages)
-    assert normalized == [
-        {"role": "system", "content": "Instructions"},
-        {"role": "user", "content": "Hello world!"},
-        {"role": "user", "content": "Result"},
-    ]
 
 
 @pytest.mark.hf_tokenizer

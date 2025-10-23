@@ -39,13 +39,11 @@ class HuggingFaceLLM(OpenAILLM):
     def tokenize(self, messages: list[dict]) -> list[list[str]]:
         tokenizer = self._load_tokenizer()
 
-        normalized = self._normalize_messages_for_template(messages)
-
         if self.apply_chat_template:
             # When applying chat template, tokenize all messages together
             # then return as a single list
             text = tokenizer.apply_chat_template(
-                normalized,
+                messages,
                 tokenize=False,
                 add_generation_prompt=True,
                 enable_thinking=self.enable_thinking,
@@ -56,37 +54,8 @@ class HuggingFaceLLM(OpenAILLM):
         else:
             # Tokenize each message individually
             result = []
-            for msg in normalized:
+            for msg in messages:
                 content = str(msg["content"])
                 tokens = tokenizer.tokenize(content)
                 result.append(tokens)
             return result
-
-    # --- chat template helpers -------------------------------------------------
-
-    def _normalize_messages_for_template(self, messages: Iterable[dict]) -> list[dict]:
-        """Normalize messages to be a list of dicts with 'role' and 'content' keys.
-        Roles are mapped to 'system', 'user', 'assistant'. Content is converted to string.
-        """
-        normalized = []
-        for message in messages:
-            role = message.get("role", "user")
-            if role not in {"system", "user", "assistant"}:
-                role = "user"
-
-            content = message.get("content")
-            if isinstance(content, list):
-                parts = []
-                for item in content:
-                    if isinstance(item, dict) and "text" in item:
-                        parts.append(item["text"])
-                    else:
-                        parts.append(str(item))
-                content = "\n".join(parts)
-            elif content is None and message.get("tool_calls"):
-                content = json.dumps(message.get("tool_calls"))
-            else:
-                content = "" if content is None else str(content)
-
-            normalized.append({"role": role, "content": content})
-        return normalized
