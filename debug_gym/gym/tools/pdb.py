@@ -37,9 +37,19 @@ class PDBTool(EnvironmentTool):
         super().__init__()
         self.current_frame_file = None
         self._session: ShellSession = None
-        if not set_default_entrypoint:
+        self.set_default_entrypoint = set_default_entrypoint
+        self.entrypoint = None
+        if not self.set_default_entrypoint:
             # Force the agent to provide an entrypoint when using the tool.
             self.arguments["entrypoint"]["type"].remove("null")
+            self.arguments["entrypoint"][
+                "description"
+            ] = "The entrypoint command to start the pdb session. Must be provided when using the pdb tool."
+            self.description += (
+                "\nNote: When using the pdb tool, an entrypoint must be provided."
+            )
+        else:
+            self.description += "\nNote: You can optionally specify an 'entrypoint' argument to control how the PDB session is started. If not provided, the environment's default debug entrypoint will be used."
 
     def __getstate__(self):
         """Handles serialisation of the PDBTool instance (for pickle) without un-picklable attributes"""
@@ -83,19 +93,18 @@ class PDBTool(EnvironmentTool):
 
         return output.replace("(Pdb)", "").strip()  # remove the prompt
 
-    def close_pdb(self):
+    def stop_pdb(self):
         self._session.close()
         self.current_frame_file = None
 
     def start_pdb(self, environment) -> str:
         self._session = environment.terminal.new_shell_session()
         # init pdb and wait for the prompt
-        initial_output = self._session.start(
-            environment.debug_entrypoint, read_until="(Pdb)"
-        )
+        self.entrypoint = self.entrypoint or environment.debug_entrypoint
+        initial_output = self._session.start(self.entrypoint, read_until="(Pdb)")
 
         if "The program finished and will be restarted" in initial_output:
-            self.close_pdb()
+            self.stop_pdb()
 
         if self.pdb_is_running:
             if environment.persistent_breakpoints:
@@ -126,14 +135,29 @@ class PDBTool(EnvironmentTool):
 
     def restart_pdb(self, environment) -> str:
         """Restart the pdb session and restore the breakpoints."""
-        self.close_pdb()
+        self.stop_pdb()
         return self.start_pdb(environment)
 
-    def use(self, environment, command: str) -> Observation:
+    def use(
+        self, environment, command: str, entrypoint: str | None = None
+    ) -> Observation:
         if command == "":
             return Observation(
                 self.name, "Failure calling pdb:\nEmpty commands are not allowed."
             )
+
+        if entrypoint is None and not self.set_default_entrypoint:
+            return Observation(
+                self.name,
+                "Failure calling pdb:\nAn entrypoint must be provided when using the pdb tool.",
+            )
+
+        # Check if we need to restart pdb due to a different entrypoint.
+        if entrypoint is not None and entrypoint != self.entrypoint:
+            self.stop_pdb()
+
+        # Set the entrypoint. Priority: tool argument > last entrypoint > default entrypoint.
+        self.entrypoint = entrypoint or self.entrypoint or environment.debug_entrypoint
 
         _warning = ""
         # if print, it's OK to have ";" or "\n" in the command

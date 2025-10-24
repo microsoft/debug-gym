@@ -181,18 +181,15 @@ class SWEBenchEnv(RepoEnv):
         self.logger.info("Patch applied successfully.")
 
     def eval(self, **kwargs) -> EvalOutput:
-        # We need to apply the test patch before final evaluation.
+        # We need to apply the test patch before running any evaluation.
         # Reset any changes made to test_directives files.
         self.terminal.run(f"git checkout -- {' '.join(self.test_directives)}")
 
         # Apply official test patch (hidden until now)
-        success, output = self.terminal.run(
-            f"git apply - <<'EOF'\n{self.test_patch}\nEOF", timeout=30
-        )
+        self.terminal.run(f"git apply - <<'EOF'\n{self.test_patch}\nEOF")
 
         success, output = self.terminal.run(self.entrypoint, timeout=self.run_timeout)
         self.last_eval = EvalOutput(success, output)
-        self.score = self.calculate_score(self.last_eval)
 
         return self.last_eval
 

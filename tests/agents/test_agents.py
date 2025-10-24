@@ -587,6 +587,7 @@ def test_save_trajectory(agent_setup, tmp_path):
     agent, env, llm = next(agent_setup(DebugAgent))
     agent._output_path = str(tmp_path)
     env.terminated = True
+    env.resolved = True
 
     # Make all fields JSON serializable
     agent.config = {"output_path": str(tmp_path), "random_seed": 42}

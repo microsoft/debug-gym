@@ -69,11 +69,13 @@ def test_setup_terminal(get_r2egym_env):
 @pytest.if_docker_running
 def test_reset_and_step(get_r2egym_env):
     env = get_r2egym_env()
+    env.add_tool(Toolbox.get_tool("eval"))
     env_info = env.reset(
         options={"task_name": "aiohttp_final:d7cd0613472fd4d9940e37f1c55921f6a1515324"}
     )
 
-    assert "short test summary info" in env_info.step_observation.observation
+    assert env.instructions == env_info.step_observation.observation
+    assert "short test summary info" in env_info.eval_observation.observation
     assert env_info.score == env.score == 0
     assert env_info.max_score == 1
     assert not env_info.terminated

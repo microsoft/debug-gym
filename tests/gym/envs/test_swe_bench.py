@@ -17,9 +17,11 @@ def test_instructions(get_swe_bench_env):
 @pytest.if_docker_running
 def test_reset_and_step(get_swe_bench_env):
     env = get_swe_bench_env()
+    env.add_tool(Toolbox.get_tool("eval"))
     env_info = env.reset(options={"task_name": "astropy__astropy-14096"})
 
-    assert "short test summary info" in env_info.step_observation.observation
+    assert env.instructions == env_info.step_observation.observation
+    assert "short test summary info" in env_info.eval_observation.observation
     assert env_info.score == env.score == 0
     assert env_info.max_score == env.max_score == len(env.fail_to_pass) == 1
     assert not env_info.terminated
@@ -138,10 +140,17 @@ def test_setup_terminal(get_swe_bench_env):
     env.reset(options={"task_name": task_name})
     _, git_logs = env.terminal.run("git log -n 4")
     assert env.base_commit in git_logs
-    assert f"Applying test patch for {task_name}" in git_logs
+    assert f"Applying test patch for {task_name}" not in git_logs
 
-    _, git_diff = env.terminal.run("git show HEAD", strip_output=False)
-    git_diff = git_diff[git_diff.index("diff --git") :]
+    # Check that the gold test patch has not been applied.
+    _, code_diff = env.terminal.run("git diff")
+    for test_directive in env.test_directives:
+        assert test_directive not in code_diff
+
+    # After calling eval, the test patch should be applied.
+    env.eval()
+
+    _, git_diff = env.terminal.run("git diff", strip_output=False)
     git_diff = [l for l in git_diff.split("\n") if not l.startswith("index ")]
     assert git_diff == env.test_patch.split("\n")
 
@@ -202,6 +211,7 @@ def new_function():
 @pytest.if_docker_running
 def test_apply_gold_patch(get_swe_bench_env):
     env = get_swe_bench_env()
+    env.add_tool(Toolbox.get_tool("eval"))
     env_info = env.reset(options={"task_name": "astropy__astropy-14096"})
 
     assert not env_info.terminated
@@ -209,7 +219,6 @@ def test_apply_gold_patch(get_swe_bench_env):
     assert env_info.score == env.score == 0
 
     env.apply_gold_patch()
-    eval_output = env.eval()
-    score = env.calculate_score(eval_output)
-
-    assert score == env.max_score
+    env_info = env.step(ToolCall(id="eval_id", name="eval", arguments={}))
+    assert env_info.step_observation.source == "eval"
+    assert env_info.score == env_info.max_score

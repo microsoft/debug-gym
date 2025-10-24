@@ -227,7 +227,7 @@ class RepoEnv(TooledEnv):
         super().__init__()
 
         self.path = path
-        self.max_score = max_score or 1
+        self.max_score = max_score
         self.auto_eval_on_rewrite = auto_eval_on_rewrite
         self.run_timeout = run_timeout
         self.dir_tree_depth = dir_tree_depth
@@ -364,7 +364,7 @@ class RepoEnv(TooledEnv):
             terminated=self.terminated,
             resolved=self.resolved,
             score=self.score,
-            max_score=self.max_score,
+            max_score=self.max_score or 1,
             instructions=self.instructions,
             rewrite_counter=self.rewrite_counter,
             tools=self.tools,
@@ -473,6 +473,7 @@ class RepoEnv(TooledEnv):
 
         # Calculate score and done based on the last eval output
         if self.last_eval:
+            self.max_score = self.max_score or self.calculate_max_score(self.last_eval)
             self.score = self.calculate_score(self.last_eval)
             self.terminated = self.calculate_terminated(self.last_eval)
             self.resolved = self.calculate_resolved(self.last_eval)
@@ -490,7 +491,7 @@ class RepoEnv(TooledEnv):
             action_tool_call=action_tool_call,
             instructions=self.instructions,
             score=self.score,
-            max_score=self.max_score,
+            max_score=self.max_score or 1,
             terminated=self.terminated,
             resolved=self.resolved,
             rewrite_counter=self.rewrite_counter,

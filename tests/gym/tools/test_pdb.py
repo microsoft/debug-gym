@@ -403,11 +403,11 @@ def test_pdb_timeout(tmp_path, setup_test_repo):
     assert not pdb.pdb_is_running
 
 
-def test_close_pdb_start_and_close_session(tmp_path, setup_pdb_repo_env):
+def test_stop_pdb_start_and_close_session(tmp_path, setup_pdb_repo_env):
     pdb_tool, env = setup_pdb_repo_env(tmp_path)
     # setup_pdb_repo_env starts the pdb session
     assert pdb_tool.pdb_is_running
-    pdb_tool.close_pdb()
+    pdb_tool.stop_pdb()
     assert not pdb_tool.pdb_is_running
     pdb_tool.start_pdb(env)
     assert pdb_tool.pdb_is_running
@@ -457,7 +457,7 @@ def test_on_rewrite_success_calls_breakpoint_modify_and_restart_pdb(
 
 def test_restart_pdb_calls_close_and_start(tmp_path, setup_pdb_repo_env):
     pdb_tool, env = setup_pdb_repo_env(tmp_path)
-    pdb_tool.close_pdb = lambda: setattr(pdb_tool, "closed", True)
+    pdb_tool.stop_pdb = lambda: setattr(pdb_tool, "closed", True)
     pdb_tool.start_pdb = lambda e: "started"
     out = pdb_tool.restart_pdb(env)
     assert pdb_tool.closed

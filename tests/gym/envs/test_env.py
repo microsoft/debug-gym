@@ -214,8 +214,6 @@ def test_reset(tmp_path):
     infos = env.reset()
 
     assert env.last_eval is None
-    assert env.eval_observation is None
-
     assert env.current_breakpoints_state == {}
     assert env.rewrite_counter == 0
     assert infos == EnvInfo(

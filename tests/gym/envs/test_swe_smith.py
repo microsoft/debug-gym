@@ -54,28 +54,30 @@ def test_setup_terminal(get_swe_smith_env):
     _, git_logs = env.terminal.run("git log -n 4")
     # For SWE-Smith the base commit is found in the branch associated to the
     # instance id and is different from the one in the main branch.
-    assert f"Applying test patch for {task_name}" in git_logs
+    assert f"Applying bug patch for {task_name}" in git_logs
 
     _, git_diff = env.terminal.run("git show HEAD", strip_output=False)
     git_diff = git_diff[git_diff.index("diff --git") :]
-    assert git_diff == env.test_patch
+    assert git_diff == env.bug_patch
 
 
 @pytest.if_docker_running
 def test_reset_and_step(get_swe_smith_env):
     env = get_swe_smith_env()
+    env.add_tool(Toolbox.get_tool("eval"))
     env_info = env.reset(
         options={
             "task_name": "john-kurkowski__tldextract.3d1bf184.combine_file__1vnuqpt4"
         }
     )
 
-    assert "short test summary info" in env_info.step_observation.observation
+    assert env.instructions == env_info.step_observation.observation
+    assert "short test summary info" in env_info.eval_observation.observation
     assert env_info.score == env.score == 0
     assert env_info.max_score == env.max_score == len(env.fail_to_pass) == 39
     assert not env_info.terminated
     assert not env_info.resolved
-    assert not env.termianted
+    assert not env.terminated
     assert not env.resolved
 
     tool_call = ToolCall(id="listdir_id", name="listdir", arguments={})
@@ -149,6 +151,7 @@ def test_readonly_file(get_swe_smith_env):
 @pytest.if_docker_running
 def test_apply_gold_patch(get_swe_smith_env):
     env = get_swe_smith_env()
+    env.add_tool(Toolbox.get_tool("eval"))
     env_info = env.reset(
         options={
             "task_name": "john-kurkowski__tldextract.3d1bf184.combine_file__1vnuqpt4"
@@ -160,10 +163,9 @@ def test_apply_gold_patch(get_swe_smith_env):
     assert env_info.score == env.score == 0
 
     env.apply_gold_patch()
-    eval_output = env.eval()
-    score = env.calculate_score(eval_output)
-
-    assert score == env.max_score
+    env_info = env.step(ToolCall(id="eval_id", name="eval", arguments={}))
+    assert env_info.step_observation.source == "eval"
+    assert env_info.score == env_info.max_score
 
 
 @pytest.if_docker_running

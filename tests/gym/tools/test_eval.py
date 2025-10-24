@@ -60,5 +60,3 @@ def test_eval_on_event(env, method, env_auto_eval_on_rewrite, expected):
 
     getattr(eval_tool, method)(env, random_arg="random_arg")
     assert expected in env.last_eval.output
-    assert env.terminated == True
-    assert env.resolved == True

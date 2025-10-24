@@ -6,11 +6,7 @@ from debug_gym.gym.tools.toolbox import Toolbox
 @Toolbox.register()
 class SubmitTool(EnvironmentTool):
     name = "submit"
-    description = (
-        "Finalize the task: applies the hidden official benchmark test patch,"
-        "runs the benchmark evaluation, and returns the final results. "
-        "After this call the environment is marked as submitted and further development will stop."
-    )
+    description = "Submit your changes once the task is complete."
     arguments = {}
 
     def use(self, environment, **kwargs) -> Observation:

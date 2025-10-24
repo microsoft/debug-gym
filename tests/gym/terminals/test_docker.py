@@ -18,6 +18,7 @@ def test_docker_terminal_init():
         "NO_COLOR": "1",
         "PS1": DEFAULT_PS1,
         "PYTHONSTARTUP": "",
+        "PYTHONDONTWRITEBYTECODE": "1",
     }
     assert os.path.basename(terminal.working_dir).startswith("Terminal-")
     assert terminal.base_image == "ubuntu:latest"
