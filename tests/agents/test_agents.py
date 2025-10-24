@@ -168,7 +168,8 @@ def test_build_prompt(agent_setup, build_env_info):
 def test_run(agent_setup, build_env_info):
     agent, env, llm = next(agent_setup(DebugAgent))
     env.reset.return_value = build_env_info(
-        done=False,
+        terminated=False,
+        resolved=False,
         score=0,
         max_score=10,
         instructions="Test instructions",
@@ -177,7 +178,8 @@ def test_run(agent_setup, build_env_info):
         step_observation="Test last run obs",
     )
     env.step.return_value = build_env_info(
-        done=True,
+        terminated=True,
+        resolved=True,
         score=10,
         max_score=10,
         instructions="Test instructions",
@@ -206,7 +208,8 @@ def test_build_system_prompt_rewrite_agent(agent_setup, build_env_info):
 def test_run_debug_5_agent(agent_setup, build_env_info):
     agent, env, llm = next(agent_setup(Debug_5_Agent))
     env.reset.return_value = build_env_info(
-        done=False,
+        terminated=False,
+        resolved=False,
         score=0,
         max_score=10,
         rewrite_counter=0,
@@ -216,7 +219,8 @@ def test_run_debug_5_agent(agent_setup, build_env_info):
         step_observation="Test last run obs",
     )
     env.step.return_value = build_env_info(
-        done=True,
+        terminated=True,
+        resolved=True,
         score=10,
         max_score=10,
         rewrite_counter=0,
@@ -460,7 +464,8 @@ def test_run_early_completion(agent_setup, build_env_info):
 
     # Mock environment to return completed task immediately
     env.reset.return_value = build_env_info(
-        done=True,
+        terminated=True,
+        resolved=True,
         score=10,
         max_score=10,
         instructions="Test instructions",
@@ -480,7 +485,8 @@ def test_run_max_rewrite_steps(agent_setup, build_env_info):
     agent.config["max_rewrite_steps"] = 2
 
     env.reset.return_value = build_env_info(
-        done=False,
+        terminated=False,
+        resolved=False,
         score=0,
         max_score=10,
         rewrite_counter=0,
@@ -492,7 +498,8 @@ def test_run_max_rewrite_steps(agent_setup, build_env_info):
 
     # First step - increase rewrite counter to max
     env.step.return_value = build_env_info(
-        done=False,
+        terminated=False,
+        resolved=False,
         score=5,
         max_score=10,
         rewrite_counter=2,  # Reaches max_rewrite_steps
@@ -513,7 +520,8 @@ def test_run_exception_handling(agent_setup, build_env_info):
     agent, env, llm = next(agent_setup(DebugAgent))
 
     env.reset.return_value = build_env_info(
-        done=False,
+        terminated=False,
+        resolved=False,
         score=0,
         max_score=10,
         instructions="Test instructions",
@@ -578,7 +586,7 @@ def test_save_trajectory(agent_setup, tmp_path):
     """Test trajectory saving functionality"""
     agent, env, llm = next(agent_setup(DebugAgent))
     agent._output_path = str(tmp_path)
-    env.done = True
+    env.terminated = True
 
     # Make all fields JSON serializable
     agent.config = {"output_path": str(tmp_path), "random_seed": 42}
@@ -614,7 +622,7 @@ def test_save_trajectory(agent_setup, tmp_path):
             "config": agent.config,
             "tools": [{"name": "test_tool", "args": "test_args"}],
             "uuid": agent._uuid,
-            "success": env.done,
+            "success": env.resolved,
             "log": [
                 {"step": 0, "action": "test_action_0"},
                 {"step": 1, "action": "test_action_1"},
@@ -646,7 +654,7 @@ def test_save_trajectory(agent_setup, tmp_path):
         "config": agent.config,
         "tools": ["test_tool(test_args)"],  # String format when no LLM
         "uuid": agent._uuid,
-        "success": env.done,
+        "success": env.resolved,
         "log": [
             {"step": 0, "action": "test_action_0"},
             {"step": 1, "action": "test_action_1"},

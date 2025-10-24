@@ -27,12 +27,19 @@ class PDBTool(EnvironmentTool):
             "type": ["string"],
             "description": "The command to be sent to the PDB terminal. The command should be a valid PDB command. See https://docs.python.org/3/library/pdb.html for more information.",
         },
+        "entrypoint": {
+            "type": ["string", "null"],
+            "description": "The entrypoint command to start the pdb session. If null, the environment's debug_entrypoint will be used.",
+        },
     }
 
-    def __init__(self):
+    def __init__(self, set_default_entrypoint: bool = True):
         super().__init__()
         self.current_frame_file = None
         self._session: ShellSession = None
+        if not set_default_entrypoint:
+            # Force the agent to provide an entrypoint when using the tool.
+            self.arguments["entrypoint"]["type"].remove("null")
 
     def __getstate__(self):
         """Handles serialisation of the PDBTool instance (for pickle) without un-picklable attributes"""

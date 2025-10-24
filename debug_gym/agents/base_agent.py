@@ -227,7 +227,7 @@ class BaseAgent:
             # initial state does not have prompt and response
             self.history.step(info, None)
 
-            if info.done is True:
+            if info.resolved is True:
                 self.logger.report_progress(
                     problem_id=task_name,
                     step=1,
@@ -265,10 +265,12 @@ class BaseAgent:
                 self.history.step(info, llm_response)
 
                 if (
-                    info.done
+                    info.terminated
                     or info.rewrite_counter >= self.config["max_rewrite_steps"]
                 ):
-                    reason = "done" if info.done else "max_rewrite_steps reached"
+                    reason = (
+                        "terminated" if info.resolved else "max_rewrite_steps reached"
+                    )
                     self.logger.info(
                         f"Step: {step} | Score: {info.score}/{info.max_score} ({info.score/info.max_score:.1%}) | Reason: {reason}"
                     )
@@ -279,7 +281,7 @@ class BaseAgent:
                         total_steps=step + 1,
                         score=info.score,
                         max_score=info.max_score,
-                        status="resolved" if info.done else "unresolved",
+                        status="resolved" if info.resolved else "unresolved",
                     )
                     break
                 # keep progress bar running until max_steps is reached
@@ -298,9 +300,9 @@ class BaseAgent:
                 total_steps=step + 1,
                 score=info.score,
                 max_score=info.max_score,
-                status="resolved" if info.done else "unresolved",
+                status="resolved" if info.resolved else "unresolved",
             )
-            return info.done
+            return info.resolved
         except Exception:
             # report any error that happens during the run
             self.logger.report_progress(
@@ -353,7 +355,7 @@ class BaseAgent:
             "config": self.config,
             "tools": self.llm.define_tools(self.env.tools) if self.llm else tools,
             "uuid": self._uuid,
-            "success": self.env.done,
+            "success": self.env.resolved,
             "log": [],
             "agent_type": self.__class__.__name__,
             "logger": str(self.logger.log_file),

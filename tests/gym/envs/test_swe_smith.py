@@ -73,8 +73,10 @@ def test_reset_and_step(get_swe_smith_env):
     assert "short test summary info" in env_info.step_observation.observation
     assert env_info.score == env.score == 0
     assert env_info.max_score == env.max_score == len(env.fail_to_pass) == 39
-    assert not env_info.done
-    assert not env.done
+    assert not env_info.terminated
+    assert not env_info.resolved
+    assert not env.termianted
+    assert not env.resolved
 
     tool_call = ToolCall(id="listdir_id", name="listdir", arguments={})
     env_info = env.step(tool_call)
@@ -153,7 +155,8 @@ def test_apply_gold_patch(get_swe_smith_env):
         }
     )
 
-    assert not env_info.done
+    assert not env_info.terminated
+    assert not env_info.resolved
     assert env_info.score == env.score == 0
 
     env.apply_gold_patch()

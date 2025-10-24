@@ -23,7 +23,7 @@ class Debug_5_Agent(DebugAgent):
             # initial state does not have prompt and response
             self.history.step(info, None)
 
-            if info.done is True:
+            if info.resolved is True:
                 # msg = "Environment started with entrypoint passing without errors."
                 self.logger.report_progress(
                     problem_id=task_name,
@@ -69,10 +69,10 @@ class Debug_5_Agent(DebugAgent):
                 self.history.step(info, llm_response)
 
                 if (
-                    info.done
+                    info.terminated
                     or info.rewrite_counter >= self.config["max_rewrite_steps"]
                 ):
-                    reason = "done" if info.done else "max_rewrite_steps reached"
+                    reason = "done" if info.resolved else "max_rewrite_steps reached"
                     self.logger.info(
                         f"Step: {step} | Score: {info.score}/{info.max_score} ({info.score/info.max_score:.1%}) | Reason: {reason}"
                     )
@@ -83,7 +83,7 @@ class Debug_5_Agent(DebugAgent):
                         total_steps=step + 1,
                         score=info.score,
                         max_score=info.max_score,
-                        status="resolved" if info.done else "unresolved",
+                        status="resolved" if info.resolved else "unresolved",
                     )
                     break
                 # keep progress bar running until max_steps is reached
@@ -102,9 +102,9 @@ class Debug_5_Agent(DebugAgent):
                 total_steps=step + 1,
                 score=info.score,
                 max_score=info.max_score,
-                status="resolved" if info.done else "unresolved",
+                status="resolved" if info.resolved else "unresolved",
             )
-            return info.done
+            return info.resolved
         except Exception:
             # report any error that happens during the run
             self.logger.report_progress(

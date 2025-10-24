@@ -1,3 +1,5 @@
+import time
+
 from debug_gym.gym.entities import Observation
 from debug_gym.gym.tools.tool import EnvironmentTool
 from debug_gym.gym.tools.toolbox import Toolbox
@@ -13,7 +15,12 @@ class EvalTool(EnvironmentTool):
         eval_output = environment.eval()
         return Observation(self.name, eval_output.output)
 
+    def on_env_reset(self, environment, **kwargs):
+        super().on_env_reset(environment, **kwargs)
+        return self(environment)
+
     def on_rewrite_success(self, environment, **kwargs):
+        # TODO: Make this behavior configurable via tool arguments
         if environment.auto_eval_on_rewrite:
             return self(environment)
         return None

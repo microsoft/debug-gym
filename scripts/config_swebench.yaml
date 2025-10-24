@@ -46,11 +46,14 @@ solution_agent:
     llm_name: null  # No need for an LLM.
     tools: ["eval", "pdb"]
 
-swe_agent:
-    env_kwargs:
-        debug_mode: false
-    
+swe_agent:    
     max_steps: 100
     max_rewrite_steps: 20
-    tools: ["bash", "rewrite", "submit"]
+    tools:
+        - bash
+        - rewrite
+        - submit
+        - pdb:
+            set_default_entrypoint: false
+
     #tools: ["bash", "pdb", "rewrite", "submit"]

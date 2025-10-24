@@ -15,4 +15,5 @@ class SubmitTool(EnvironmentTool):
 
     def use(self, environment, **kwargs) -> Observation:
         eval_output = environment.eval()
+        environment.terminated = True
         return Observation(self.name, eval_output.output)

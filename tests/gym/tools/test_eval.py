@@ -54,9 +54,11 @@ def test_eval_on_event(env, method, env_auto_eval_on_rewrite, expected):
     assert env_info.step_observation.source == "eval"
     assert "FAILED test_1.py::test_1" in env_info.step_observation.observation
 
-    # Edit test file to pass. If eval is called, env.done is set to True
+    # Edit test file to pass. If eval is called, env.terminated is set to True
     with open(env.working_dir / "test_1.py", "w") as f:
         f.write("def test_1():\n  assert True\n")
 
     getattr(eval_tool, method)(env, random_arg="random_arg")
     assert expected in env.last_eval.output
+    assert env.terminated == True
+    assert env.resolved == True

@@ -33,7 +33,7 @@ class AgentSolution(BaseAgent):
             info = self.env.reset(options={"task_name": task_name})
             self.history.step(info)
 
-            if info.done is True:
+            if info.resolved is True:
                 self._report_progress(task_name, info, "resolved")
                 return True
 
@@ -76,13 +76,12 @@ class AgentSolution(BaseAgent):
             self.logger.info(
                 f"Score: {info.score}/{info.max_score} ({info.score/info.max_score:.1%})"
             )
-            assert info.done, (
+            assert info.resolved, (
                 "The task is not done after applying the gold patch.\n"
                 f"{info.step_observation.observation}"
             )
-            status = "resolved" if info.done else "unresolved"
-            self._report_progress(task_name, info, status)
+            self._report_progress(task_name, info, "resolved")
         except Exception:
             self._report_progress(task_name, info, "error")
             raise
-        return info.done
+        return info.resolved

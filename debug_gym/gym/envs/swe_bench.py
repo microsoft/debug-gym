@@ -171,13 +171,6 @@ class SWEBenchEnv(RepoEnv):
         self.terminal.run("git config user.email '<>'")
         self.terminal.run(f"git commit -am 'Setting up {self.task_name}'")
 
-        # Apply the test patch directly.
-        if self.debug_mode:
-            self.terminal.run(f"git apply - <<'EOF'\n{self.test_patch}\nEOF")
-            self.terminal.run(
-                f"git commit -am 'Applying test patch for {self.task_name}'"
-            )
-
         # Remove the remote so the agent won't see newer commits.
         self.terminal.run("git remote remove origin")
 
@@ -188,43 +181,18 @@ class SWEBenchEnv(RepoEnv):
         self.logger.info("Patch applied successfully.")
 
     def eval(self, **kwargs) -> EvalOutput:
-        if self.debug_mode is False:
-            # We need to apply the test patch before final evaluation.
+        # We need to apply the test patch before final evaluation.
+        # Reset any changes made to test_directives files.
+        self.terminal.run(f"git checkout -- {' '.join(self.test_directives)}")
 
-            # Reset any changes made to test_directives files.
-            self.terminal.run(f"git checkout -- {' '.join(self.test_directives)}")
-
-            # Stash current working state as a commit (so patch context is stable)
-            self.terminal.run("git add -A")
-            self.terminal.run(
-                "git commit -am 'Checkpoint before final submission' || true"
-            )
-
-            # Apply official test patch (hidden until now)
-            success, output = self.terminal.run(
-                f"git apply - <<'EOF'\n{self.test_patch}\nEOF", timeout=30
-            )
-            if not success:
-                # Do not mark as submitted; allow retry after user adjustments.
-                self.logger.error(
-                    "Failed to apply official test patch during submission."
-                )
-                assert False, "Failed to apply official test patch during eval."
-                self.last_eval = EvalOutput(
-                    False, f"Failed to apply official test patch:\n{output}"
-                )
-                return self.last_eval
-
-            # self.terminal.run(
-            #     f"git commit -am 'Apply official benchmark test patch for {self.task_name}' || true"
-            # )
+        # Apply official test patch (hidden until now)
+        success, output = self.terminal.run(
+            f"git apply - <<'EOF'\n{self.test_patch}\nEOF", timeout=30
+        )
 
         success, output = self.terminal.run(self.entrypoint, timeout=self.run_timeout)
         self.last_eval = EvalOutput(success, output)
-
-        if self.debug_mode is False:
-            self.score = self.calculate_score(self.last_eval)
-            self.done = True  # Only one eval in non-debug mode.
+        self.score = self.calculate_score(self.last_eval)
 
         return self.last_eval
 
