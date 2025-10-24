@@ -589,14 +589,16 @@ def test_human_max_retries_exceeded(build_env_info):
 def test_human_tokenize():
     """Test Human tokenization"""
     human = Human()
-    tokens = human.tokenize("hello world test")
-    assert tokens == ["hello", "world", "test"]
+    messages = [{"role": "user", "content": "hello world test"}]
+    tokens = human.tokenize(messages)
+    assert tokens == [["hello", "world", "test"]]
 
 
 def test_human_count_tokens():
     """Test Human token counting"""
     human = Human()
-    count = human.count_tokens("hello world test")
+    messages = [{"role": "user", "content": "hello world test"}]
+    count = human.count_tokens(messages)
     assert count == 3
 
 

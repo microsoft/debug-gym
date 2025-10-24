@@ -111,9 +111,11 @@ class TestCopilotLLM:
         mock_encode = MagicMock(return_value=[1, 2, 3, 4])
         with patch("tiktoken.encoding_for_model") as mock_tiktoken:
             mock_tiktoken.return_value.encode = mock_encode
-            tokens = llm.tokenize("test text")
+            messages = [{"role": "user", "content": "test text"}]
+            tokens = llm.tokenize(messages)
 
-        assert tokens == [1, 2, 3, 4]
+        # Should return list of token lists (one per message)
+        assert tokens == [["1", "2", "3", "4"]]
         mock_tiktoken.assert_called_once_with("gpt-4o")
         mock_encode.assert_called_once_with("test text")
 
@@ -125,9 +127,11 @@ class TestCopilotLLM:
         with patch(
             "tiktoken.encoding_for_model", side_effect=KeyError("model not found")
         ):
-            tokens = llm.tokenize("hello world test")
+            messages = [{"role": "user", "content": "hello world test"}]
+            tokens = llm.tokenize(messages)
 
-        assert tokens == ["hello", "world", "test"]
+        # Should return list of token lists (one per message)
+        assert tokens == [["hello", "world", "test"]]
 
     def test_need_to_be_retried_hmac_timestamp_error(self, mock_config, logger_mock):
         """Test retry logic for HMAC timestamp errors"""

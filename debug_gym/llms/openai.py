@@ -62,22 +62,25 @@ class OpenAILLM(LLM):
             )
         return self._client
 
-    def tokenize(self, text: str) -> list[str]:
+    def tokenize(self, messages: list[dict]) -> list[list[str]]:
         if getattr(self, "_tk_func", None) is None:
             try:
-                self._tk_func = tiktoken.encoding_for_model(self.tokenizer_name).encode
+                encoder = tiktoken.encoding_for_model(self.tokenizer_name)
+                # For tiktoken, encode returns list of ints, we need to convert to list of "tokens"
+                self._tk_func = lambda text: [str(t) for t in encoder.encode(text)]
             except KeyError:
-                try:  # Try to load from transformers.
-                    self._tk_func = AutoTokenizer.from_pretrained(
-                        self.tokenizer_name
-                    ).tokenize
-                except OSError:
-                    raise ValueError(
-                        f"Tokenizer `{self.tokenizer_name}` not found for model "
-                        f"{self.model_name}, make sure you have access to "
-                        "the model (e.g., HuggingFace API key is correctly set)."
-                    )
-        return self._tk_func(text)
+                raise ValueError(
+                    f"Tokenizer `{self.tokenizer_name}` not found for model "
+                    f"{self.model_name}. If using Hugging Face models, please "
+                    f"set tag `vllm` to load the HuggingFaceLLM class instead."
+                )
+        # Tokenize each message individually
+        result = []
+        for msg in messages:
+            content = str(msg.get("content", msg.get("tool_calls", msg)))
+            tokens = self._tk_func(content)
+            result.append(tokens)
+        return result
 
     def need_to_be_retried(self, exception) -> bool:
         # List of fully qualified names of RateLimitError exceptions from various libraries

@@ -471,12 +471,21 @@ class Human(LLM):
         if prompt_toolkit_available:
             self._history = InMemoryHistory()
 
-    def tokenize(self, text: str) -> list[str]:
-        """Tokenizes a text by splitting it by spaces."""
-        return text.split()
+    def tokenize(self, messages: list[dict]) -> list[list[str]]:
+        """Tokenizes messages by splitting content by spaces."""
+        result = []
+        for msg in messages:
+            content = str(msg.get("content", msg.get("tool_calls", msg)))
+            tokens = content.split()
+            result.append(tokens)
+        return result
 
-    def count_tokens(self, text: str) -> int:
-        return len(self.tokenize(text))
+    def count_tokens(self, messages: list[dict] | str) -> int:
+        """Count tokens across all messages."""
+        if isinstance(messages, str):
+            messages = [{"role": "user", "content": messages}]
+        tokenized = self.tokenize(messages)
+        return sum(len(tokens) for tokens in tokenized)
 
     def define_tools(self, tool_call_list: list[EnvironmentTool]) -> list[dict]:
         available_commands = []
@@ -615,6 +624,6 @@ class Human(LLM):
             prompt=messages,
             response=action,
             tool=tool_call,
-            prompt_token_count=self.count_tokens(json.dumps(messages)),
-            response_token_count=self.count_tokens(action),
+            prompt_token_count=self.count_tokens(messages),
+            response_token_count=self.count_tokens([{"tool_calls": action}]),
         )

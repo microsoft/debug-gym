@@ -41,24 +41,18 @@ class AnthropicLLM(LLM):
             self._client = Anthropic(api_key=self.config.api_key)
         return self._client
 
-    def tokenize(self, text: str) -> list[str]:
-        raise NotImplementedError("Tokenization is not supported by Anthropic.")
+    def tokenize(self, messages: list[dict]) -> list[list[str]]:
+        """Tokenization is not directly supported by Anthropic.
+        This method returns empty token lists as a placeholder."""
+        raise NotImplementedError("Direct tokenization is not supported by Anthropic.")
 
-    def count_tokens(self, text: str) -> int:
-        """Count the number of tokens in a text using the Anthropic API.
-        Dump content to JSON for cases such as:
-            {
-                "role": "user",
-                "content": [
-                    {
-                        "type": "tool_result",
-                        "tool_use_id": "id123",
-                        "content": "results",
-                    }
-                ],
-            }
-        """
-        messages = [{"role": "user", "content": [{"type": "text", "text": text}]}]
+    def count_tokens(self, messages: list[dict] | str) -> int:
+        """Count the number of tokens in a text using the Anthropic API."""
+        if isinstance(messages, str):
+            messages = [
+                {"role": "user", "content": [{"type": "text", "text": messages}]}
+            ]
+
         try:
             response = self.client.messages.count_tokens(
                 model=self.tokenizer_name, messages=messages
@@ -67,7 +61,7 @@ class AnthropicLLM(LLM):
         except Exception as e:
             self.logger.warning(
                 f"Error calling Claude token count API: {e!r}. "
-                f"The message was: {messages}. Will return 0 tokens."
+                f"The messages were: {messages}. Will return 0 tokens."
             )
         return 0
 
