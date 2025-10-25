@@ -8,7 +8,7 @@ from debug_gym.gym.terminals.local import LocalTerminal
 from debug_gym.gym.terminals.terminal import Terminal
 from debug_gym.gym.tools.tool import EnvironmentTool, ToolCall
 from debug_gym.gym.workspace import Workspace
-from debug_gym.logger import DebugGymLogger, log_with_color
+from debug_gym.logger import DebugGymLogger
 
 
 @dataclass
@@ -315,7 +315,7 @@ class RepoEnv(TooledEnv):
         """Setup the terminal.
         Override in subclasses for different behavior. Called once at reset."""
 
-        log_with_color(self.logger, f"Configuring {self.terminal}...", "blue")
+        self.logger.debug(f"Configuring {self.terminal}...")
 
         self.terminal.run("git init -b main")
         self.terminal.run("git config user.name 'debug-gym'")
@@ -330,7 +330,7 @@ class RepoEnv(TooledEnv):
     def reset(self, *, options: dict = None):
         """Resets the environment and returns eval as the initial observation."""
         options = options or {}
-        self.logger.info("Resetting environment")
+        self.logger.debug("Resetting environment")
         self.setup_task(task_name=options.get("task_name"), options=options)
         self.setup_workspace()
         self.setup_terminal()

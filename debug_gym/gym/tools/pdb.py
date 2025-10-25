@@ -2,7 +2,7 @@ import copy
 import re
 
 from debug_gym.gym.entities import Observation
-from debug_gym.gym.terminals.shell_session import ShellSession
+from debug_gym.gym.terminals.shell_session import ProcessNotRunningError, ShellSession
 from debug_gym.gym.tools.tool import EnvironmentTool
 from debug_gym.gym.tools.toolbox import Toolbox
 
@@ -10,6 +10,7 @@ from debug_gym.gym.tools.toolbox import Toolbox
 @Toolbox.register()
 class PDBTool(EnvironmentTool):
     name: str = "pdb"
+    # TODO: add example of providing an entrypoint
     examples = [
         """pdb(command="b mttl/models/modifiers/mlp.py:42") to set a breakpoint at line 42 in the file with the path 'mttl/models/modifiers/mlp.py'.""",
         """pdb(command="c") to continue the execution until the next breakpoint.""",
@@ -41,6 +42,9 @@ class PDBTool(EnvironmentTool):
         self.entrypoint = None
         if not self.set_default_entrypoint:
             # Force the agent to provide an entrypoint when using the tool.
+            self.arguments = copy.deepcopy(
+                self.arguments
+            )  # Avoid modifying the class variable.
             self.arguments["entrypoint"]["type"].remove("null")
             self.arguments["entrypoint"][
                 "description"
@@ -94,8 +98,9 @@ class PDBTool(EnvironmentTool):
         return output.replace("(Pdb)", "").strip()  # remove the prompt
 
     def stop_pdb(self):
-        self._session.close()
         self.current_frame_file = None
+        if self._session is not None:
+            self._session.close()
 
     def start_pdb(self, environment) -> str:
         self._session = environment.terminal.new_shell_session()
@@ -152,12 +157,20 @@ class PDBTool(EnvironmentTool):
                 "Failure calling pdb:\nAn entrypoint must be provided when using the pdb tool.",
             )
 
-        # Check if we need to restart pdb due to a different entrypoint.
-        if entrypoint is not None and entrypoint != self.entrypoint:
-            self.stop_pdb()
-
         # Set the entrypoint. Priority: tool argument > last entrypoint > default entrypoint.
-        self.entrypoint = entrypoint or self.entrypoint or environment.debug_entrypoint
+        entrypoint = entrypoint or self.entrypoint or environment.debug_entrypoint
+
+        # Check if we need to restart pdb due to a different entrypoint.
+        if entrypoint != self.entrypoint:
+            try:
+                # TODO: allow entrypoint to simply be a file to call with 'python -m pdb <file>'
+                self.entrypoint = entrypoint
+                self.restart_pdb(environment)
+            except ProcessNotRunningError as e:
+                return Observation(
+                    self.name,
+                    f"Provided entrypoint failed to start a pdb session:\n{e.output}",
+                )
 
         _warning = ""
         # if print, it's OK to have ";" or "\n" in the command

@@ -10,6 +10,7 @@ from debug_gym.gym.entities import Event
 from debug_gym.gym.envs.env import RepoEnv
 from debug_gym.gym.terminals.docker import DockerTerminal
 from debug_gym.gym.terminals.local import LocalTerminal
+from debug_gym.gym.terminals.shell_session import ProcessNotRunningError
 from debug_gym.gym.tools.pdb import PDBTool
 
 
@@ -693,9 +694,10 @@ def test_pdb_list_output_indentation(tmp_path, setup_pdb_repo_env):
         f.write("\n".join(f"    'Line {i+1}'" for i in range(1, 2000)))
         f.write("\n\nif __name__ == '__main__':\n")
         f.write("    dummy_function()\n")
-    env.set_entrypoints("python large_file.py", "python -m pdb large_file.py")
-    pdb_tool.start_pdb(env)
-    pdb_obs = pdb_tool.use(env, "b large_file.py:100")
+    # env.set_entrypoints("python large_file.py", "python -m pdb large_file.py")
+    debug_entrypoint = "python -m pdb large_file.py"
+    # pdb_tool.start_pdb(env)
+    pdb_obs = pdb_tool.use(env, "b large_file.py:100", debug_entrypoint)
     assert (
         f"Pdb command output:\nBreakpoint 5 at {wd}/large_file.py:100"
     ) in pdb_obs.observation
@@ -809,3 +811,114 @@ def test_pdbtool_pickle_roundtrip(tmp_path, setup_pdb_repo_env):
 
     assert rehydrated.name == pdb_tool.name
     assert rehydrated.examples == pdb_tool.examples
+
+
+def test_pdb_entrypoint_priority_order(tmp_path, setup_pdb_repo_env):
+    pdb, env = setup_pdb_repo_env(tmp_path)
+
+    # 1. First use with custom entrypoint - should use provided entrypoint
+    custom1 = "python -m pdb -m pytest -sq ."
+    pdb.use(env, command="l", entrypoint=custom1)
+    assert pdb.entrypoint == custom1
+
+    # 2. Second use without entrypoint - should use last entrypoint (custom1)
+    pdb.stop_pdb()  # Stop to test entrypoint selection on restart
+    pdb.use(env, command="l")
+    assert pdb.entrypoint == custom1
+
+    # 3. Third use with different entrypoint - should use new entrypoint
+    custom2 = "python -m pdb -m pytest -v ."
+    pdb.use(env, command="l", entrypoint=custom2)
+    assert pdb.entrypoint == custom2
+
+
+def test_pdb_set_default_entrypoint_false_requires_entrypoint(
+    tmp_path, setup_pdb_repo_env
+):
+    _, env = setup_pdb_repo_env(tmp_path)
+    pdb = PDBTool(set_default_entrypoint=False)
+
+    # Should fail when no entrypoint is provided
+    output = pdb.use(env, command="l")
+    assert "Failure calling pdb:" in output.observation
+    assert (
+        "An entrypoint must be provided when using the pdb tool." in output.observation
+    )
+
+    # Should work when entrypoint is provided
+    output = pdb.use(env, command="l", entrypoint="python -m pdb -m pytest -sv .")
+    assert """The pytest entry point.""" in output.observation
+
+
+def test_pdb_set_default_entrypoint_false_arguments_validation():
+    """Test that when set_default_entrypoint=False, arguments schema is updated."""
+    pdb_no_default = PDBTool(set_default_entrypoint=False)
+    pdb_with_default = PDBTool(set_default_entrypoint=True)
+
+    # When set_default_entrypoint=False, "null" should be removed from entrypoint type
+    assert "null" not in pdb_no_default.arguments["entrypoint"]["type"]
+    assert "string" in pdb_no_default.arguments["entrypoint"]["type"]
+    assert "an entrypoint must be provided" in pdb_no_default.description
+
+    # When set_default_entrypoint=True, "null" should be present in entrypoint type
+    assert "null" in pdb_with_default.arguments["entrypoint"]["type"]
+    assert "string" in pdb_with_default.arguments["entrypoint"]["type"]
+    assert "optionally specify an 'entrypoint'" in pdb_with_default.description
+
+
+def test_pdb_invalid_entrypoint_handling(tmp_path, setup_pdb_repo_env):
+    pdb, env = setup_pdb_repo_env(tmp_path)
+
+    # Try with an invalid entrypoint that should fail to start pdb
+    invalid_entrypoint = "nonexistent-command-that-should-fail"
+    output = pdb.use(env, command="l", entrypoint=invalid_entrypoint)
+
+    # Should contain failure message
+    assert "entrypoint failed to start a pdb session" in output.observation
+    assert not pdb.pdb_is_running
+
+
+def test_pdb_changing_entrypoint(tmp_path, setup_pdb_repo_env):
+    pdb, env = setup_pdb_repo_env(tmp_path)
+    wd = env.working_dir
+
+    # Create a simple Python script to debug
+    with (wd / "simple_script.py").open("w") as f:
+        f.write(
+            """
+def main():
+    x = 42
+    print(f"Value is {x}")
+    return x
+
+if __name__ == "__main__":
+    main()
+"""
+        )
+
+    # Use entrypoint to debug the simple script instead of pytest
+    script_entrypoint = "python -m pdb simple_script.py"
+    output = pdb.use(env, command="l", entrypoint=script_entrypoint)
+    initial_session = pdb._session
+
+    # Should see the script content
+    assert "def main():" in output.observation
+    assert pdb.entrypoint == script_entrypoint
+
+    # Subsequent commands should retain the entrypoint and session
+    pdb.use(env, command="b")
+    assert pdb.entrypoint == script_entrypoint
+    assert pdb._session == initial_session
+
+    pdb.use(env, command="where")
+    assert pdb.entrypoint == script_entrypoint
+    assert pdb._session == initial_session
+
+    # Switch back to pytest
+    pytest_entrypoint = "python -m pdb -m pytest -sv ."
+    output = pdb.use(env, command="l", entrypoint=pytest_entrypoint)
+
+    # Should see pytest content and a new session
+    assert """The pytest entry point.""" in output.observation
+    assert pdb.entrypoint == pytest_entrypoint
+    assert pdb._session != initial_session

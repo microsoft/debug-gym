@@ -172,6 +172,7 @@ def test_apply_gold_patch(get_swe_smith_env):
 def test_calculate_score_with_pytest_error(get_swe_smith_env):
     """Test that the indentation error in pytest is handled correctly."""
     env = get_swe_smith_env()
+    env.add_tool(Toolbox.get_tool("eval"))
     task_name = "john-kurkowski__tldextract.3d1bf184.combine_file__1vnuqpt4"
     env.reset(options={"task_name": task_name})
 

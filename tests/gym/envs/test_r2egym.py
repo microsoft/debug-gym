@@ -158,6 +158,7 @@ def test_readonly_file(get_r2egym_env):
 @pytest.if_docker_running
 def test_apply_gold_patch(get_r2egym_env):
     env = get_r2egym_env()
+    env.add_tool(Toolbox.get_tool("eval"))
     env_info = env.reset(
         options={"task_name": "aiohttp_final:d7cd0613472fd4d9940e37f1c55921f6a1515324"}
     )
@@ -167,7 +168,6 @@ def test_apply_gold_patch(get_r2egym_env):
     assert env_info.score == env.score == 0
 
     env.apply_gold_patch()
-    eval_output = env.eval()
-    score = env.calculate_score(eval_output)
-
-    assert score == env.max_score
+    env_info = env.step(ToolCall(id="eval_id", name="eval", arguments={}))
+    assert env_info.step_observation.source == "eval"
+    assert env_info.score == env_info.max_score
