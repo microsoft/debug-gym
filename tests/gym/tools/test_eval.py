@@ -40,8 +40,6 @@ def test_eval(env):
 @pytest.mark.parametrize(
     "method,env_auto_eval_on_rewrite,expected",
     [
-        ("on_env_reset", False, "1 passed in "),
-        ("on_env_reset", True, "1 passed in "),
         ("on_rewrite_success", True, "1 passed in "),
         ("on_rewrite_success", False, "FAILED test_1.py::test_1"),
     ],
@@ -56,7 +54,7 @@ def test_eval_on_event(env, method, env_auto_eval_on_rewrite, expected):
     assert env_info.step_observation.source == "eval"
     assert "FAILED test_1.py::test_1" in env_info.step_observation.observation
 
-    # Edit test file to pass. If eval is called, env.done is set to True
+    # Edit test file to pass. If eval is called, env.terminated is set to True
     with open(env.working_dir / "test_1.py", "w") as f:
         f.write("def test_1():\n  assert True\n")
 

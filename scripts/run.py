@@ -191,7 +191,12 @@ def create_env(config: dict, logger: DebugGymLogger):
 def add_tools(env, config: dict, logger: DebugGymLogger):
     """Add tools to the environment"""
     for tool in config["tools"]:
-        tool_instantiated = Toolbox.get_tool(tool)
+        tool_config = {}
+        if isinstance(tool, dict):
+            assert len(tool) == 1, "Tool dict must have exactly one key"
+            tool, tool_config = list(tool.items())[0]
+
+        tool_instantiated = Toolbox.get_tool(tool, **tool_config)
         env.add_tool(tool_instantiated)
         logger.debug(f"Adding tool to toolbox: {tool_instantiated.__class__.__name__}")
 

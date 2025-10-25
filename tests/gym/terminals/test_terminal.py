@@ -84,6 +84,7 @@ def test_terminal_init_no_os_env_vars():
         "NO_COLOR": "1",
         "PS1": DEFAULT_PS1,
         "PYTHONSTARTUP": "",
+        "PYTHONDONTWRITEBYTECODE": "1",
     }
 
 

@@ -25,7 +25,12 @@ DEFAULT_PS1 = "DEBUG_GYM_PS1"
 class ProcessNotRunningError(Exception):
     """Raised when the shell process is not running after initialization."""
 
-    pass
+    def __init__(self, command: str, output: str):
+        self.output = output
+        self.command = command
+        super().__init__(
+            f"Process not running after command: {self.command}\nOutput:\n{self.output}"
+        )
 
 
 class ShellSession:
@@ -115,7 +120,8 @@ class ShellSession:
 
         if not self.is_running:
             self.close()
-            raise ProcessNotRunningError(f"{self} failed to start. Output:\n{output}")
+            self.logger.debug(f"{self} failed to start {entrypoint}. stderr:\n{output}")
+            raise ProcessNotRunningError(command=command, output=output)
 
         # Run session commands after starting the session if command was not provided
         if not command and self.session_commands:

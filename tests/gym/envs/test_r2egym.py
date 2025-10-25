@@ -69,15 +69,19 @@ def test_setup_terminal(get_r2egym_env):
 @pytest.if_docker_running
 def test_reset_and_step(get_r2egym_env):
     env = get_r2egym_env()
+    env.add_tool(Toolbox.get_tool("eval"))
     env_info = env.reset(
         options={"task_name": "aiohttp_final:d7cd0613472fd4d9940e37f1c55921f6a1515324"}
     )
 
-    assert "short test summary info" in env_info.step_observation.observation
+    assert env.instructions == env_info.step_observation.observation
+    assert "short test summary info" in env_info.eval_observation.observation
     assert env_info.score == env.score == 0
     assert env_info.max_score == 1
-    assert not env_info.done
-    assert not env.done
+    assert not env_info.terminated
+    assert not env_info.resolved
+    assert not env.terminated
+    assert not env.resolved
 
     tool_call = ToolCall(id="listdir_id", name="listdir", arguments={})
     env_info = env.step(tool_call)
@@ -154,15 +158,16 @@ def test_readonly_file(get_r2egym_env):
 @pytest.if_docker_running
 def test_apply_gold_patch(get_r2egym_env):
     env = get_r2egym_env()
+    env.add_tool(Toolbox.get_tool("eval"))
     env_info = env.reset(
         options={"task_name": "aiohttp_final:d7cd0613472fd4d9940e37f1c55921f6a1515324"}
     )
 
-    assert not env_info.done
+    assert not env_info.terminated
+    assert not env_info.resolved
     assert env_info.score == env.score == 0
 
     env.apply_gold_patch()
-    eval_output = env.eval()
-    score = env.calculate_score(eval_output)
-
-    assert score == env.max_score
+    env_info = env.step(ToolCall(id="eval_id", name="eval", arguments={}))
+    assert env_info.step_observation.source == "eval"
+    assert env_info.score == env_info.max_score
