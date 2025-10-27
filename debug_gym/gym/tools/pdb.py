@@ -10,16 +10,17 @@ from debug_gym.gym.tools.toolbox import Toolbox
 @Toolbox.register()
 class PDBTool(EnvironmentTool):
     name: str = "pdb"
-    # TODO: add example of providing an entrypoint
     examples = [
         """pdb(command="b mttl/models/modifiers/mlp.py:42") to set a breakpoint at line 42 in the file with the path 'mttl/models/modifiers/mlp.py'.""",
         """pdb(command="c") to continue the execution until the next breakpoint.""",
         """pdb(command="p x") to print the value of the variable x in the current context.""",
         """pdb(command="cl src/code.py:26") to clear the breakpoint at line 26 in the file 'src/code.py'.""",
+        """pdb(command="l", entrypoint="python -m pdb src/app.py") to list the source around the current frame after starting the PDB session for 'src/app.py'.""",
     ]
     description = (
         "An interface to the Python debugger PDB. Send a command to the PDB terminal. The command should be a valid PDB command."
         + "\nWhen using the breakpoint command (e.g., 'b', 'break', 'cl', 'clear'), make sure you specify the file path and line number in the format `file_path:line_number`."
+        + "\nPDB sessions are restarted upon successful rewrite, or if the entrypoint changes. Breakpoints are persistent across PDB sessions and will be restored automatically."
         + "\nExamples (for demonstration purposes only, you need to adjust the tool calling format according to your specific syntax):"
         + "\n".join(examples)
     )
@@ -30,7 +31,7 @@ class PDBTool(EnvironmentTool):
         },
         "entrypoint": {
             "type": ["string", "null"],
-            "description": "The entrypoint command to start the pdb session. If null, the environment's debug_entrypoint will be used.",
+            "description": "The entrypoint command to start the pdb session. If null, the last provided entrypoint or the environment's debug_entrypoint will be used, in priority order.",
         },
     }
 
