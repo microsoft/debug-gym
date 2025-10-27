@@ -259,13 +259,13 @@ class RepoEnv(TooledEnv):
         self.empty_event_queue()
 
     def set_entrypoints(self, entrypoint: str, debug_entrypoint: str | None = None):
-        debug_entrypoint = debug_entrypoint or entrypoint.replace(
-            "python ", "python -m pdb "
-        )
         self.entrypoint = self._prepare_entrypoint(entrypoint)
-        self.debug_entrypoint = self._prepare_entrypoint(debug_entrypoint)
-        # self.entrypoint = "PYTHONPATH=$PYTHONPATH:$PWD " + self.entrypoint
-        # self.debug_entrypoint = "PYTHONPATH=$PYTHONPATH:$PWD " + self.debug_entrypoint
+        self.debug_entrypoint = self._prepare_entrypoint(debug_entrypoint or entrypoint)
+
+        if "python -m pdb" not in self.debug_entrypoint:
+            self.debug_entrypoint = self.debug_entrypoint.replace(
+                "python ", "python -m pdb "
+            )
 
     @staticmethod
     def _prepare_entrypoint(entrypoint):
