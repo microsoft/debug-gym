@@ -6,6 +6,8 @@ This site is built with Jekyll, allowing you to write content in Markdown while 
 
 ### Prerequisites
 - Ruby (2.6 or higher recommended)
+  - conda install conda-forge::ruby
+  - conda install -c conda-forge gcc_linux-64 gxx_linux-64 make openssl -y
 - Bundler (`gem install bundler`)
 
 ### Installation
