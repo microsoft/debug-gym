@@ -6,6 +6,8 @@ This site is built with Jekyll, allowing you to write content in Markdown while 
 
 ### Prerequisites
 - Ruby (2.6 or higher recommended)
+  - conda install conda-forge::ruby
+  - conda install -c conda-forge gcc_linux-64 gxx_linux-64 make openssl -y
 - Bundler (`gem install bundler`)
 
 ### Installation
@@ -210,12 +212,12 @@ Output will be in `_site/` directory.
 
 ## Key Features
 
-✅ **Write in Markdown** - No HTML required for content  
-✅ **Auto-generated index** - Projects and blog posts automatically listed  
-✅ **Preserved design** - Same beautiful UI as before  
-✅ **BibTeX support** - Copy-to-clipboard functionality  
-✅ **Responsive** - Mobile-friendly design  
-✅ **SEO-friendly** - Meta tags and structured data  
+✅ **Write in Markdown** - No HTML required for content
+✅ **Auto-generated index** - Projects and blog posts automatically listed
+✅ **Preserved design** - Same beautiful UI as before
+✅ **BibTeX support** - Copy-to-clipboard functionality
+✅ **Responsive** - Mobile-friendly design
+✅ **SEO-friendly** - Meta tags and structured data
 
 ## Troubleshooting
 
