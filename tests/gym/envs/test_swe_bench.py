@@ -1,6 +1,7 @@
 import pytest
 from anyio import Path
 
+from debug_gym.agents.solution_agent import AgentSolution
 from debug_gym.gym.entities import Observation
 from debug_gym.gym.tools.tool import ToolCall
 from debug_gym.gym.tools.toolbox import Toolbox
@@ -222,3 +223,11 @@ def test_apply_gold_patch(get_swe_bench_env):
     env_info = env.step(ToolCall(id="eval_id", name="eval", arguments={}))
     assert env_info.step_observation.source == "eval"
     assert env_info.score == env_info.max_score
+
+
+@pytest.if_docker_running
+def test_running_solution_agent(get_swe_bench_env):
+    env = get_swe_bench_env()
+    agent = AgentSolution(env=env, llm=None, logger=env.logger)
+    success = agent.run(task_name="astropy__astropy-14096")
+    assert success
