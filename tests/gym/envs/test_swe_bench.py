@@ -226,8 +226,30 @@ def test_apply_gold_patch(get_swe_bench_env):
 
 
 @pytest.if_docker_running
-def test_running_solution_agent(get_swe_bench_env):
+def test_running_solution_agent(get_swe_bench_env, tmp_path):
     env = get_swe_bench_env()
-    agent = AgentSolution(env=env, llm=None, logger=env.logger)
+    # BaseAgent requires a config dict with at least: output_path, random_seed, memory_size.
+    # Provide a minimal config for the SolutionAgent run.
+    config = {
+        "output_path": str(tmp_path),
+        "random_seed": 0,
+        "memory_size": 8,
+        # Optional values that BaseAgent.run would use; harmless to include here.
+        "max_steps": 1,
+        "env_kwargs": {},
+    }
+    for tool_name in ["pdb", "eval"]:
+        env.add_tool(Toolbox.get_tool(tool_name))
+    agent = AgentSolution(config=config, env=env, llm=None, logger=env.logger)
     success = agent.run(task_name="astropy__astropy-14096")
     assert success
+
+
+@pytest.if_docker_running
+def test_debug_entrypoint_contains_pdb(get_swe_bench_env):
+    """Ensure the environment's debug_entrypoint includes '-m pdb' for interactive debugging."""
+    env = get_swe_bench_env()
+    env.reset(options={"task_name": "astropy__astropy-14096"})
+    assert (
+        "python -m pdb" in env.debug_entrypoint
+    ), f"Expected '-m pdb' in debug_entrypoint, got: {env.debug_entrypoint}"

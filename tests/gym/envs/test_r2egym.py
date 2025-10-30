@@ -2,6 +2,7 @@ from pathlib import Path
 
 import pytest
 
+from debug_gym.agents.solution_agent import AgentSolution
 from debug_gym.gym.entities import Observation
 from debug_gym.gym.tools.tool import ToolCall
 from debug_gym.gym.tools.toolbox import Toolbox
@@ -171,3 +172,34 @@ def test_apply_gold_patch(get_r2egym_env):
     env_info = env.step(ToolCall(id="eval_id", name="eval", arguments={}))
     assert env_info.step_observation.source == "eval"
     assert env_info.score == env_info.max_score
+
+
+@pytest.if_docker_running
+def test_running_solution_agent(get_r2egym_env, tmp_path):
+    """End-to-end SolutionAgent run for R2E-Gym environment, asserting successful resolution after gold patch."""
+    env = get_r2egym_env()
+    task_name = "aiohttp_final:d7cd0613472fd4d9940e37f1c55921f6a1515324"
+    config = {
+        "output_path": str(tmp_path),
+        "random_seed": 0,
+        "memory_size": 8,
+        "max_steps": 1,
+        "env_kwargs": {},
+    }
+    for tool_name in ["pdb", "eval"]:
+        env.add_tool(Toolbox.get_tool(tool_name))
+    agent = AgentSolution(config=config, env=env, llm=None, logger=env.logger)
+    success = agent.run(task_name=task_name)
+    assert success
+
+
+@pytest.if_docker_running
+def test_debug_entrypoint_contains_pdb(get_r2egym_env):
+    """Ensure the environment's debug_entrypoint includes '-m pdb' for interactive debugging."""
+    env = get_r2egym_env()
+    env.reset(
+        options={"task_name": "aiohttp_final:d7cd0613472fd4d9940e37f1c55921f6a1515324"}
+    )
+    assert (
+        "python -m pdb" in env.debug_entrypoint
+    ), f"Expected '-m pdb' in debug_entrypoint, got: {env.debug_entrypoint}"

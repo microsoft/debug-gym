@@ -2,6 +2,7 @@ from pathlib import Path
 
 import pytest
 
+from debug_gym.agents.solution_agent import AgentSolution
 from debug_gym.gym.entities import Observation
 from debug_gym.gym.tools.tool import ToolCall
 from debug_gym.gym.tools.toolbox import Toolbox
@@ -200,3 +201,36 @@ def test_calculate_score_with_pytest_error(get_swe_smith_env):
 
     score = env.calculate_score(eval_output)
     assert score == 0
+
+
+@pytest.if_docker_running
+def test_running_solution_agent(get_swe_smith_env, tmp_path):
+    """Analogous to SWE Bench solution agent test: run SolutionAgent end-to-end and assert success."""
+    env = get_swe_smith_env()
+    task_name = "john-kurkowski__tldextract.3d1bf184.combine_file__1vnuqpt4"
+    config = {
+        "output_path": str(tmp_path),
+        "random_seed": 0,
+        "memory_size": 8,
+        "max_steps": 1,
+        "env_kwargs": {},
+    }
+    for tool_name in ["pdb", "eval"]:
+        env.add_tool(Toolbox.get_tool(tool_name))
+    agent = AgentSolution(config=config, env=env, llm=None, logger=env.logger)
+    success = agent.run(task_name=task_name)
+    assert success
+
+
+@pytest.if_docker_running
+def test_debug_entrypoint_contains_pdb(get_swe_smith_env):
+    """Ensure the environment's debug_entrypoint includes '-m pdb' for interactive debugging."""
+    env = get_swe_smith_env()
+    env.reset(
+        options={
+            "task_name": "john-kurkowski__tldextract.3d1bf184.combine_file__1vnuqpt4"
+        }
+    )
+    assert (
+        "python -m pdb" in env.debug_entrypoint
+    ), f"Expected '-m pdb' in debug_entrypoint, got: {env.debug_entrypoint}"
