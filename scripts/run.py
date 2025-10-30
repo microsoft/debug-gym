@@ -1,199 +1,310 @@
+import datetime
 import json
 import os
+import signal
+import subprocess
+import traceback
 import uuid
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 
-from termcolor import colored
-from tqdm import tqdm
+from debug_gym import version as dg_version
+from debug_gym.agents.base_agent import AGENT_REGISTRY, create_agent
+from debug_gym.agents.utils import load_config
+from debug_gym.gym.envs import select_env
+from debug_gym.gym.terminals import select_terminal
+from debug_gym.gym.tools.toolbox import Toolbox
+from debug_gym.llms.base import LLM
+from debug_gym.llms.human import Human
+from debug_gym.logger import DebugGymLogger, load_previous_run_status
 
-from froggy.envs import select_env
-from froggy.logger import FroggyLogger
-from froggy.terminal import select_terminal
-from froggy.tools.toolbox import Toolbox
-from froggy.utils import load_config
 
+class AgentTimeoutException(BaseException):
+    """Custom exception to handle timeouts in agent
+    execution. Inherits from BaseException to ensure
+    it is not caught by agent exception handling."""
 
-class BreakTaskLoop(Exception):
     pass
 
 
-def run_agent(args, problem, config):
-    exp_path = Path(config["output_path"]) / config["uuid"] / problem
+def set_signal(timeout_seconds):
+    """Set a signal handler for timeouts.
+    Only works on Unix-like systems."""
 
-    task_logger = FroggyLogger(
+    def timeout_handler(signum, frame):
+        """Signal handler for timeout."""
+        raise AgentTimeoutException
+
+    if timeout_seconds > 0:
+        signal.signal(signal.SIGALRM, timeout_handler)
+        signal.alarm(timeout_seconds)
+
+
+def run_agent(args, problem, config):
+    set_signal(args.timeout)
+    success = True
+    env = None
+
+    # Flag to not report errors from the agent, since they report
+    # errors themselves and we want to avoid double reporting.
+    report_progress_error = True
+
+    exp_path = Path(config["output_path"]) / config["uuid"]
+    problem_path = exp_path / problem
+
+    task_logger = DebugGymLogger(
         problem,
-        log_dir=exp_path,
+        log_dir=problem_path,
         level=args.logging_level,
         mode="w" if args.force_all else "a",
     )
     try:
-        previous_run = exp_path / "froggy.jsonl"
-        if not args.force_all and os.path.exists(previous_run):
-            task_logger.debug(f"Previous run found: {previous_run}")
-            with open(previous_run) as reader:
-                success = json.load(reader)["success"]
-
-            task_logger.debug(f"Previous run success: {success}")
+        previous_run = load_previous_run_status(problem_path, problem)
+        if (
+            not args.force_all
+            and previous_run is not None
+            and previous_run.status in ["resolved", "unresolved"]
+        ):
+            task_logger.debug(f"Previous run found: {problem_path}")
+            success = previous_run.status == "resolved"
+            task_logger.debug(f"Previous run status: {previous_run.status}")
             if not args.force_failed or success:
-                task_logger.info("[bold gray]Skipped, already done.")
+                status = "skip-resolved" if success else "skip-unresolved"
+                task_logger.report_progress(
+                    problem_id=previous_run.problem_id,
+                    step=previous_run.step,
+                    total_steps=previous_run.total_steps,
+                    score=previous_run.score,
+                    max_score=previous_run.max_score,
+                    status=status,
+                )
+                task_logger.debug(f"Skipping {problem}, already done.")
                 return success
 
+        task_logger.report_progress(
+            problem_id=problem,
+            step=0,
+            total_steps=1,
+            score=0,
+            max_score=1,
+            status="running",
+        )
+
         env = create_env(config, task_logger)
-        agent = create_agent(args.agent, config=config, env=env, logger=task_logger)
-        success = agent.run(task_name=problem, debug=args.debug)
+        add_tools(env, config, task_logger)
+
+        llm = LLM.instantiate(
+            llm_name=config["llm_name"],
+            llm_config_file_path=config.get("llm_config_file_path"),
+            logger=task_logger,
+        )
+
+        agent = create_agent(
+            config["agent_type"],
+            config=config,
+            env=env,
+            llm=llm,
+            logger=task_logger,
+        )
+
+        try:
+            success = agent.run(task_name=problem, debug=args.debug)
+        except KeyboardInterrupt:
+            task_logger.error("Agent run was interrupted by user.")
+            task_logger.report_progress(
+                problem_id=problem,
+                step=1,
+                total_steps=1,
+                score=0,
+                max_score=1,
+                status="error",
+            )
+            success = False
+            raise
+        except AgentTimeoutException:
+            task_logger.error(
+                f"Timeout: Problem `{problem}` exceeded "
+                f"the time limit of {args.timeout} seconds."
+            )
+            task_logger.report_progress(
+                problem_id=problem,
+                step=1,
+                total_steps=1,
+                score=0,
+                max_score=1,
+                status="error",
+            )
+            success = False
+            raise
+        except:
+            report_progress_error = False
+            raise
+
+        # save trajectory
+        agent.save_trajectory(task_name=problem)
 
         # optionally apply patch
         if config["save_patch"]:
             agent.save_patch(task_name=problem)
 
-        # save log
-        agent.log(task_name=problem)
-    except KeyboardInterrupt:
-        raise BreakTaskLoop
-
     except Exception as e:
-        task_logger.warning(
-            f"Task Error: {problem} - {e!r}. Run with --very-verbose or check {task_logger.log_file} for more information."
+        task_logger.error(
+            f"Task Error: {problem} - {e!r}. Run with --very-verbose "
+            f"or check {task_logger.log_file} for more information."
         )
         task_logger.debug(
-            f"Task {problem} generated an exception: {e!r}", exc_info=True
+            f"Task {problem} generated an exception: {e!r}. Traceback: {traceback.format_exc()}"
         )
+        if report_progress_error:
+            task_logger.report_progress(
+                problem_id=problem,
+                step=1,
+                total_steps=1,
+                score=0,
+                max_score=1,
+                status="error",
+            )
         if args.debug:
             raise e
 
         success = False
-
-    task_logger.info(f"[bold green]Completed, log saved at: {task_logger.log_file}")
+    finally:
+        # Close env and cancel any pending alarm
+        signal.alarm(0)
+        if env:
+            env.close()
     return success
 
 
-def create_env(config: dict, logger: FroggyLogger):
-    terminal = select_terminal(config.get("terminal"), logger)
+def create_env(config: dict, logger: DebugGymLogger):
+    terminal = select_terminal(config.get("terminal"), logger, uuid=config["uuid"])
     env_class = select_env(config.get("benchmark"))
-    env = env_class(**config["env_kwargs"], terminal=terminal, logger=logger)
-
-    # import tools to the environment
-    for tool in config["tools"]:
-        kwargs = {}
-
-        if tool == "pdb":
-            kwargs["persistent_breakpoints"] = config["persistent_breakpoints"]
-            kwargs["auto_list"] = config["auto_list"]
-
-        tool_instantiated = Toolbox.get_tool(tool, **kwargs)
-        env.add_tool(tool_instantiated)
-        logger.debug(f"Adding tool to toolbox: {tool_instantiated.__class__.__name__}")
-
+    env = env_class(
+        **config["env_kwargs"],
+        problems=config.get("problems", ["custom"]),
+        terminal=terminal,
+        logger=logger,
+    )
     return env
 
 
-def create_agent(agent_type, **kwargs):
-    match agent_type:
-        case "pdb_agent":
-            from example_agent import PdbAgent as agent_class
-        case "rewrite_only":
-            from example_agent import RewriteOnly as agent_class
-        case "pdb_after_rewrites":
-            from example_agent import PdbAfterRewrites as agent_class
-        case _:
-            raise ValueError(f"Unknown agent {agent_type}")
+def add_tools(env, config: dict, logger: DebugGymLogger):
+    """Add tools to the environment"""
+    for tool in config["tools"]:
+        tool_instantiated = Toolbox.get_tool(tool)
+        env.add_tool(tool_instantiated)
+        logger.debug(f"Adding tool to toolbox: {tool_instantiated.__class__.__name__}")
 
-    agent = agent_class(**kwargs)
 
-    return agent
+def dump_experiment_info(config: dict, args: dict):
+    """Dump experiment information to a JSONL file.
+    Each line is one experiment run with its metadata."""
+
+    try:  # Get git commit hash
+        git_hash = (
+            subprocess.check_output(
+                ["git", "rev-parse", "HEAD"], cwd=os.path.dirname(__file__)
+            )
+            .decode()
+            .strip()
+        )
+    except Exception:
+        git_hash = ""
+
+    try:  # Get git diff
+        git_diff = subprocess.check_output(
+            ["git", "diff"], cwd=os.path.dirname(__file__)
+        ).decode()
+    except Exception:
+        git_diff = ""
+
+    version_info = {
+        "debug_gym_version": dg_version.__version__,
+        "datetime": datetime.datetime.now().isoformat(),
+        "git_hash": git_hash,
+        "git_diff": git_diff,
+        "config": config,
+        "args": vars(args),
+        "python_version": os.sys.version,
+    }
+
+    file = Path(config["output_path"]) / config["uuid"] / "experiment_info.jsonl"
+    with open(file, "a") as f:
+        f.write(f"{json.dumps(version_info)}\n")
 
 
 def main():
     config, args = load_config()
-    logger = FroggyLogger("froggy", level=args.logging_level)
-
-    available_agents = list(config.keys())
-    if args.agent not in available_agents:
-        raise ValueError(
-            f"Invalid agent: {args.agent}. Available agents: {available_agents}"
-        )
-
-    config = config[args.agent]
     config["uuid"] = config.get("uuid", str(uuid.uuid4()))
-    logger.warning(f"Experiment log path: {config['output_path']}/{config['uuid']}")
+    exp_output_path = Path(config["output_path"]) / config["uuid"]
+    exp_output_path.mkdir(parents=True, exist_ok=True)
+    logger = DebugGymLogger("debug-gym", level=args.logging_level)
+    logger.info(f"Experiment log path: {exp_output_path}")
+    dump_experiment_info(config, args)
 
-    # Figure out which problems to solve.
-    problems = config.get("problems", ["custom"])
-    if problems == "all" and "benchmark" in config:
-        env = create_env(config, logger=logger)
-        problems = list(env.dataset.keys())  # all tasks
+    # Create the environment to get the list of problems to run.
+    env = create_env(config, logger=logger)
+    problems = sorted(env.dataset)
 
-    num_workers = int(os.environ.get("FROGGY_WORKERS", 1))
-    logger.warning(f"Running with {num_workers} workers")
+    if args.list:
+        print(f"\n# Available problems in {config.get('benchmark', 'config')}:")
+        for problem in problems:
+            print(f" - {problem}")
+
+        # list agent
+        print("\n# Available agents:")
+        for agent in AGENT_REGISTRY:
+            print(f" - {agent}")
+
+        return
+
+    llm = LLM.instantiate(
+        llm_name=config["llm_name"],
+        llm_config_file_path=config.get("llm_config_file_path"),
+        logger=logger,
+    )
+
+    # Stop live progress display if --no-live-display is set
+    # or in Human mode (avoid conflicts with prompt_toolkit)
+    if args.no_live_display or isinstance(llm, Human) or args.debug:
+        logger.set_no_live()
+
+    num_workers = args.num_workers or int(os.environ.get("DEBUG_GYM_WORKERS", 1))
     if args.debug:
+        logger.warning("Running in debug mode, num_workers set to 1")
         num_workers = 1
+    # make sure number of workers is in range [1, len(problems)]
+    num_workers = min(max(1, num_workers), len(problems))
+    logger.info(f"Running with {num_workers} workers")
 
-    tasks_done = 0
-    mean_perf = 0
-    tasks_succeeded = []
-
-    if num_workers > 1:
-        # Multi-thread
-        with ThreadPoolExecutor(num_workers) as executor:
-            futures = {
-                executor.submit(run_agent, args, problem, config): problem
-                for problem in problems
-            }
-            mean_perf_text = colored(f"{mean_perf}", "green")
-            desc = f"Overall progress ({mean_perf_text} are successful)"
-            pbar = tqdm(as_completed(futures), desc=desc, total=len(problems))
-            for future in pbar:
-                if future.cancelled():
-                    continue
-
+    with logger.rich_progress(problems, max_display=args.max_display):
+        if num_workers == 1:  # run sequentially for easier debugging
+            for problem in problems:
                 try:
-                    problem = futures[future]
-                    success = future.result()
-                    mean_perf += success
-                    tasks_done += 1
-
-                    if success:
-                        tasks_succeeded.append(problem)
-
-                    # update message on overall progress bar
-                    mean_perf_text = colored(f"{mean_perf}", "green")
-                    pbar.set_description(
-                        f"Overall tasks done ({mean_perf_text} are successful)"
-                    )
-                except (KeyboardInterrupt, BreakTaskLoop) as e:
-                    executor.shutdown(wait=False, cancel_futures=True)
+                    success = run_agent(args, problem, config)
+                except AgentTimeoutException:
+                    pass  # Handleled in run_agent, just continue
+                except (KeyboardInterrupt, Exception) as e:
                     raise e
-                except Exception as e:
-                    executor.shutdown(wait=False, cancel_futures=True)
-                    raise e
-
-    else:
-        # Single thread
-        mean_perf_text = colored(f"{mean_perf}", "green")
-        desc = f"Overall tasks done ({mean_perf_text} are successful)"
-        pbar = tqdm(problems, desc=desc, total=len(problems))
-        for problem in pbar:
-            try:
-                success = run_agent(args, problem, config)
-                mean_perf += success
-                tasks_done += 1
-
-                if success:
-                    tasks_succeeded.append(problem)
-
-                # update message on overall progress bar
-                mean_perf_text = colored(f"{mean_perf}", "green")
-                pbar.set_description(
-                    f"Overall tasks done ({mean_perf_text} are successful)"
-                )
-            except (KeyboardInterrupt, BreakTaskLoop) as e:
-                raise e
-            except Exception as e:
-                raise e
-
-        logger.info(f"Tasks that succeeded: {tasks_succeeded}")
-        logger.info(f"Tasks that failed: {set(problems) - set(tasks_succeeded)}")
+        else:
+            with ProcessPoolExecutor(
+                num_workers, initializer=DebugGymLogger.set_as_worker
+            ) as executor:
+                futures = {
+                    executor.submit(run_agent, args, problem, config): problem
+                    for problem in problems
+                }
+                for future in as_completed(futures):
+                    if future.cancelled():
+                        continue
+                    try:
+                        problem = futures[future]
+                        success = future.result()
+                    except AgentTimeoutException:
+                        pass  # Handled in run_agent, just continue
+                    except (KeyboardInterrupt, Exception) as e:
+                        executor.shutdown(wait=True, cancel_futures=True)
+                        raise e
 
 
 if __name__ == "__main__":

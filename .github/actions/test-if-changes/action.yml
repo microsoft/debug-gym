@@ -1,0 +1,46 @@
+
+name: Run env tests.
+inputs:
+  name:
+    description: 'Name for the coverage file.'
+    required: true
+  changed-files:
+    description: 'Files to look for changes.'
+    required: true
+  test-files:
+    description: 'Test files to run.'
+    required: true
+  version:
+    description: 'Specific version to install from PyPI (e.g., "1.0.0"). If not provided, builds from source.'
+    required: false
+
+runs:
+  using: "composite"
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+        cache: 'pip'
+    - name: Install dependencies
+      shell: bash
+      run: |
+        pip install --upgrade pip
+        if [[ -z "${{ inputs.version }}" ]]; then
+          pip install -e '.[dev]'
+        else
+          pip install "debug-gym[dev]==${{ inputs.version }}"
+        fi
+    - name: Run tests
+      env:
+        DEBUG_GYM_DEBUG: 1
+      shell: bash
+      run: |
+        pytest ${{ inputs.test-files }} -vv -n 16 --timeout=600 --cov=debug_gym --cov-report=term-missing
+    - name: Store coverage report
+      uses: actions/upload-artifact@v4
+      with:
+        name: .coverage-${{ inputs.name }}
+        path: .coverage
+        if-no-files-found: error
+        include-hidden-files: true

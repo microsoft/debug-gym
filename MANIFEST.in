@@ -1,0 +1,2 @@
+include debug_gym/envs/configs/*.yaml
+include scripts/templates/*.jinja

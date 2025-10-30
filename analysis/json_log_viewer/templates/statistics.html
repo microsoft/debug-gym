@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🐸 Froggy Statistics - Debugging Trajectory Analysis</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #5A827E 0%, #84AE92 50%, #B9D4AA 100%);
+            min-height: 100vh;
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 25px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .header h1 {
+            color: #2c5530;
+            font-size: 2.2rem;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+        
+        .metadata {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+        
+        .metadata-item {
+            background: rgba(250, 255, 202, 0.3);
+            padding: 10px;
+            border-radius: 8px;
+            border-left: 4px solid #5A827E;
+        }
+        
+        .metadata-item strong {
+            color: #2c5530;
+            font-weight: 600;
+        }
+        
+        .navigation {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin-bottom: 25px;
+        }
+        
+        .nav-btn {
+            background: linear-gradient(135deg, #5A827E, #84AE92);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 25px;
+            font-size: 16px;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(90, 130, 126, 0.3);
+        }
+        
+        .nav-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(90, 130, 126, 0.4);
+            background: linear-gradient(135deg, #4a6f6b, #73997e);
+        }
+        
+        .stats-container {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .stats-header {
+            text-align: center;
+            margin-bottom: 25px;
+        }
+        
+        .stats-header h2 {
+            color: #2c5530;
+            font-size: 1.8rem;
+            margin-bottom: 10px;
+        }
+        
+        .summary-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+        
+        .summary-item {
+            background: rgba(185, 212, 170, 0.3);
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+            border: 2px solid rgba(90, 130, 126, 0.2);
+        }
+        
+        .summary-item .number {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #2c5530;
+            display: block;
+        }
+        
+        .summary-item .label {
+            font-size: 0.9rem;
+            color: #5A827E;
+            margin-top: 5px;
+        }
+        
+        .actions-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        
+        .actions-table th,
+        .actions-table td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid rgba(90, 130, 126, 0.2);
+        }
+        
+        .actions-table th {
+            background: rgba(90, 130, 126, 0.1);
+            color: #2c5530;
+            font-weight: 600;
+            font-size: 1rem;
+        }
+        
+        .actions-table tr:hover {
+            background: rgba(185, 212, 170, 0.2);
+        }
+        
+        .action-name {
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            background: rgba(90, 130, 126, 0.1);
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.9rem;
+        }
+        
+        .percentage-bar {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .bar {
+            flex: 1;
+            height: 8px;
+            background: rgba(90, 130, 126, 0.2);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        
+        .bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #5A827E, #84AE92);
+            border-radius: 4px;
+            transition: width 0.5s ease;
+        }
+        
+        .percentage-text {
+            font-weight: 600;
+            color: #2c5530;
+            min-width: 50px;
+        }
+        
+        .count {
+            font-weight: 600;
+            color: #5A827E;
+        }
+        
+        .no-data {
+            text-align: center;
+            color: #666;
+            font-style: italic;
+            padding: 40px;
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                padding: 15px;
+            }
+            
+            .header h1 {
+                font-size: 1.8rem;
+            }
+            
+            .navigation {
+                flex-direction: column;
+                align-items: center;
+            }
+            
+            .actions-table {
+                font-size: 0.9rem;
+            }
+            
+            .actions-table th,
+            .actions-table td {
+                padding: 8px 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🐸 Froggy Statistics</h1>
+            <div class="metadata">
+                <div class="metadata-item">
+                    <strong>Problem:</strong> {{ metadata.problem }}
+                </div>
+                <div class="metadata-item">
+                    <strong>UUID:</strong> {{ metadata.uuid }}
+                </div>
+                <div class="metadata-item">
+                    <strong>Success:</strong> {{ "✅ Yes" if metadata.success else "❌ No" }}
+                </div>
+                <div class="metadata-item">
+                    <strong>File:</strong> {{ current_file }}
+                </div>
+            </div>
+        </div>
+        
+        <div class="navigation">
+            <a href="{{ url_for('index') }}" class="nav-btn">
+                🔍 View Trajectory
+            </a>
+            <a href="{{ url_for('change_file') }}" class="nav-btn">
+                📁 Change File
+            </a>
+        </div>
+        
+        <div class="stats-container">
+            <div class="stats-header">
+                <h2>Action Analysis</h2>
+                <p>Statistics for actions taken during the debugging trajectory</p>
+            </div>
+            
+            <div class="summary-stats">
+                <div class="summary-item">
+                    <span class="number">{{ total_actions }}</span>
+                    <div class="label">Total Actions</div>
+                </div>
+                <div class="summary-item">
+                    <span class="number">{{ total_steps }}</span>
+                    <div class="label">Total Steps</div>
+                </div>
+                <div class="summary-item">
+                    <span class="number">{{ statistics_data|length }}</span>
+                    <div class="label">Unique Actions</div>
+                </div>
+                <div class="summary-item">
+                    <span class="number">{{ "%.1f"|format(total_actions / total_steps * 100) }}%</span>
+                    <div class="label">Action Rate</div>
+                </div>
+            </div>
+            
+            {% if statistics_data %}
+            <table class="actions-table">
+                <thead>
+                    <tr>
+                        <th>Action Name</th>
+                        <th>Count</th>
+                        <th>Percentage</th>
+                        <th>Distribution</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for action in statistics_data %}
+                    <tr>
+                        <td><span class="action-name">{{ action.name }}</span></td>
+                        <td><span class="count">{{ action.count }}</span></td>
+                        <td><span class="percentage-text">{{ action.percentage }}%</span></td>
+                        <td>
+                            <div class="percentage-bar">
+                                <div class="bar">
+                                    <div class="bar-fill" style="width: {{ action.percentage }}%"></div>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="no-data">
+                No action data available for this trajectory.
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</body>
+</html>

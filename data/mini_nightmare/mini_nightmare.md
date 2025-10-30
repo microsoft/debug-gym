@@ -52,37 +52,28 @@ Hint:
          ...
 ```
 
-### 7.pytorch
-Sequence of bugs.
-
-Hint:
-- L21: `=` vs `==`;
-- L66: `cat` needs to happen on `dim=1`;
-- L106: the right key is `attention_mask`;
-- L98: wrong shape, see `self.max_length`.
-
-### 8.scienfitic calculator
+### 7.scienfitic calculator
 String split.
 
 Hint:
 
 L6: `action_str` vs `action`
 
-### 9.shopping_cart
+### 8.shopping_cart
 Logic bug.
 
 Hint:
 
 `apply_discount()` does not apply discount to future items.
 
-### 10.sum_tree
+### 9.sum_tree
 Loop in data structure
 
 Hint:
 
 Catch loop in tree traversal.
 
-### 11.tomorrow_date
+### 10.tomorrow_date
 Condition coverage.
 
 Hint:
