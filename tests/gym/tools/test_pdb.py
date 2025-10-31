@@ -694,9 +694,7 @@ def test_pdb_list_output_indentation(tmp_path, setup_pdb_repo_env):
         f.write("\n".join(f"    'Line {i+1}'" for i in range(1, 2000)))
         f.write("\n\nif __name__ == '__main__':\n")
         f.write("    dummy_function()\n")
-    # env.set_entrypoints("python large_file.py", "python -m pdb large_file.py")
     debug_entrypoint = "python -m pdb large_file.py"
-    # pdb_tool.start_pdb(env)
     pdb_obs = pdb_tool.use(env, "b large_file.py:100", debug_entrypoint)
     assert (
         f"Pdb command output:\nBreakpoint 5 at {wd}/large_file.py:100"
