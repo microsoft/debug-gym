@@ -27,6 +27,7 @@ class Terminal(ABC):
         self.env_vars["PYTHONSTARTUP"] = ""  # prevent Python from loading startup files
         # use a sentinel to know when to stop reading
         self.env_vars["PS1"] = DEFAULT_PS1
+        self.env_vars["PYTHONDONTWRITEBYTECODE"] = "1"  # prevent creation of .pyc files
 
         self._working_dir = working_dir
         self.sessions = []

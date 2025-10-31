@@ -217,7 +217,8 @@ def test_format_tool_call_history_initial_state(mock_llm_config, logger_mock):
         instructions={},
         score=0,
         max_score=100,
-        done=False,
+        terminated=False,
+        resolved=False,
         rewrite_counter=0,
         tools=[],
     )
@@ -272,7 +273,8 @@ def test_format_tool_call_history_with_action(mock_llm_config, logger_mock):
         instructions={},
         score=0,
         max_score=100,
-        done=False,
+        terminated=False,
+        resolved=False,
         rewrite_counter=0,
         tools=[],
     )
@@ -351,7 +353,8 @@ def test_format_tool_call_history_complex_arguments(mock_llm_config, logger_mock
         instructions={},
         score=0,
         max_score=100,
-        done=False,
+        terminated=False,
+        resolved=False,
         rewrite_counter=0,
         tools=[],
     )

@@ -24,8 +24,6 @@ def test_listdir_default(tmp_path, setup_listdir_repo_env):
     assert obs.observation == (
         f"{env.working_dir}/\n"
         "|-- .git/\n"
-        "|-- .pytest_cache/\n"
-        "|-- __pycache__/\n"
         "|-- file1.py\n"
         "|-- file2.py\n"
         "|-- test_fail.py\n"

@@ -39,6 +39,7 @@ def test_kubernetes_terminal_init():
         "NO_COLOR": "1",
         "PS1": DEFAULT_PS1,
         "PYTHONSTARTUP": "",
+        "PYTHONDONTWRITEBYTECODE": "1",
     }
     for key, value in expected_base_env.items():
         assert terminal.env_vars[key] == value

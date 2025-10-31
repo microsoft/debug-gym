@@ -108,7 +108,7 @@ class SWESmithEnv(SWEBenchEnv):
             self.ds_row["base_commit"] if "base_commit" in self.ds_row else "main"
         )
         self.branch_name = self.ds_row["instance_id"]
-        self.test_patch = self.ds_row["patch"]
+        self.bug_patch = self.ds_row["patch"]
         self.image_name = self.ds_row["image_name"]
         self.repo, self.commit = get_repo_commit_from_image_name(self.image_name)
         self.install_configs = MAP_REPO_TO_SPECS[self.repo][self.commit]
@@ -179,7 +179,14 @@ class SWESmithEnv(SWEBenchEnv):
         # Note that the `gold_patch` is the same as the `test_patch` but will
         # be used in conjunction with --reverse.
         self.git_apply_cmd = f"git apply --reverse -"
-        self.gold_patch = self.test_patch
+        self.gold_patch = self.bug_patch
+
+    def setup_terminal(self):
+        super().setup_terminal()
+
+        # Apply bug patch.
+        self.terminal.run(f"git apply - <<'EOF'\n{self.bug_patch}\nEOF", raises=True)
+        self.terminal.run(f"git commit -am 'Applying bug patch for {self.task_name}'")
 
     def calculate_score(self, eval_output: EvalOutput) -> int:
         test_status_map = self.log_parser(eval_output.output)
@@ -206,3 +213,8 @@ class SWESmithEnv(SWEBenchEnv):
             f"Score: {score}/{self.max_score} ({score/self.max_score:.1%})"
         )
         return score
+
+    def eval(self, **kwargs) -> EvalOutput:
+        success, output = self.terminal.run(self.entrypoint, timeout=self.run_timeout)
+        self.last_eval = EvalOutput(success, output)
+        return self.last_eval

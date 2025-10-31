@@ -2,7 +2,7 @@ import copy
 import re
 
 from debug_gym.gym.entities import Observation
-from debug_gym.gym.terminals.shell_session import ShellSession
+from debug_gym.gym.terminals.shell_session import ProcessNotRunningError, ShellSession
 from debug_gym.gym.tools.tool import EnvironmentTool
 from debug_gym.gym.tools.toolbox import Toolbox
 
@@ -15,10 +15,12 @@ class PDBTool(EnvironmentTool):
         """pdb(command="c") to continue the execution until the next breakpoint.""",
         """pdb(command="p x") to print the value of the variable x in the current context.""",
         """pdb(command="cl src/code.py:26") to clear the breakpoint at line 26 in the file 'src/code.py'.""",
+        """pdb(command="l", entrypoint="python -m pdb src/app.py") to list the source around the current frame after starting the PDB session for 'src/app.py'.""",
     ]
     description = (
         "An interface to the Python debugger PDB. Send a command to the PDB terminal. The command should be a valid PDB command."
         + "\nWhen using the breakpoint command (e.g., 'b', 'break', 'cl', 'clear'), make sure you specify the file path and line number in the format `file_path:line_number`."
+        + "\nPDB sessions are restarted upon successful rewrite, or if the entrypoint changes. Breakpoints are persistent across PDB sessions and will be restored automatically."
         + "\nExamples (for demonstration purposes only, you need to adjust the tool calling format according to your specific syntax):"
         + "\n".join(examples)
     )
@@ -27,12 +29,32 @@ class PDBTool(EnvironmentTool):
             "type": ["string"],
             "description": "The command to be sent to the PDB terminal. The command should be a valid PDB command. See https://docs.python.org/3/library/pdb.html for more information.",
         },
+        "entrypoint": {
+            "type": ["string", "null"],
+            "description": "The entrypoint command to start the pdb session. If null, the last provided entrypoint or the environment's debug_entrypoint will be used, in priority order.",
+        },
     }
 
-    def __init__(self):
+    def __init__(self, set_default_entrypoint: bool = True):
         super().__init__()
         self.current_frame_file = None
         self._session: ShellSession = None
+        self.set_default_entrypoint = set_default_entrypoint
+        self.entrypoint = None
+        if not self.set_default_entrypoint:
+            # Force the agent to provide an entrypoint when using the tool.
+            self.arguments = copy.deepcopy(
+                self.arguments
+            )  # Avoid modifying the class variable.
+            self.arguments["entrypoint"]["type"].remove("null")
+            self.arguments["entrypoint"][
+                "description"
+            ] = "The entrypoint command to start the pdb session. Must be provided when using the pdb tool."
+            self.description += (
+                "\nNote: When using the pdb tool, an entrypoint must be provided."
+            )
+        else:
+            self.description += "\nNote: You can optionally specify an 'entrypoint' argument to control how the PDB session is started. If not provided, the environment's default debug entrypoint will be used."
 
     def __getstate__(self):
         """Handles serialisation of the PDBTool instance (for pickle) without un-picklable attributes"""
@@ -76,19 +98,19 @@ class PDBTool(EnvironmentTool):
 
         return output.replace("(Pdb)", "").strip()  # remove the prompt
 
-    def close_pdb(self):
-        self._session.close()
+    def stop_pdb(self):
         self.current_frame_file = None
+        if self._session is not None:
+            self._session.close()
 
     def start_pdb(self, environment) -> str:
         self._session = environment.terminal.new_shell_session()
         # init pdb and wait for the prompt
-        initial_output = self._session.start(
-            environment.debug_entrypoint, read_until="(Pdb)"
-        )
+        self.entrypoint = self.entrypoint or environment.debug_entrypoint
+        initial_output = self._session.start(self.entrypoint, read_until="(Pdb)")
 
         if "The program finished and will be restarted" in initial_output:
-            self.close_pdb()
+            self.stop_pdb()
 
         if self.pdb_is_running:
             if environment.persistent_breakpoints:
@@ -119,14 +141,37 @@ class PDBTool(EnvironmentTool):
 
     def restart_pdb(self, environment) -> str:
         """Restart the pdb session and restore the breakpoints."""
-        self.close_pdb()
+        self.stop_pdb()
         return self.start_pdb(environment)
 
-    def use(self, environment, command: str) -> Observation:
+    def use(
+        self, environment, command: str, entrypoint: str | None = None
+    ) -> Observation:
         if command == "":
             return Observation(
                 self.name, "Failure calling pdb:\nEmpty commands are not allowed."
             )
+
+        if entrypoint is None and not self.set_default_entrypoint:
+            return Observation(
+                self.name,
+                "Failure calling pdb:\nAn entrypoint must be provided when using the pdb tool.",
+            )
+
+        # Set the entrypoint. Priority: tool argument > last entrypoint > default entrypoint.
+        entrypoint = entrypoint or self.entrypoint or environment.debug_entrypoint
+
+        # Check if we need to restart pdb due to a different entrypoint.
+        if entrypoint != self.entrypoint:
+            try:
+                # TODO: allow entrypoint to simply be a file to call with 'python -m pdb <file>'
+                self.entrypoint = entrypoint
+                self.restart_pdb(environment)
+            except ProcessNotRunningError as e:
+                return Observation(
+                    self.name,
+                    f"Provided entrypoint failed to start a pdb session:\n{e.output}",
+                )
 
         _warning = ""
         # if print, it's OK to have ";" or "\n" in the command
