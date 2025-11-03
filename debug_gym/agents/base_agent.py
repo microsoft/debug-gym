@@ -271,7 +271,7 @@ class BaseAgent:
                         "terminated" if info.resolved else "max_rewrite_steps reached"
                     )
                     self.logger.info(
-                        f"Step: {step} | Score: {info.score}/{info.max_score} ({info.score/info.max_score:.1%}) | Reason: {reason}"
+                        f"Step: {step} | Score: {info.score}/{info.max_score if info.max_score else '-'} | Reason: {reason}"
                     )
                     # early stop, set current step and total steps to be the same
                     self.logger.report_progress(
@@ -309,7 +309,7 @@ class BaseAgent:
                 step=step + 1,
                 total_steps=step + 1,
                 score=info.score if info else 0,
-                max_score=info.max_score if info else 1,
+                max_score=info.max_score,
                 status="error",
             )
             raise

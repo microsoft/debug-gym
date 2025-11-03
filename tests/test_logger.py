@@ -24,13 +24,13 @@ from debug_gym.logger import (
 
 
 def test_task_progress_manager_score_fallback_and_update():
-    """Ensure max_score fallback ('-') logic works and Rich render doesn't raise.
+    """Ensure max_score fallback ('?') logic works and Rich render doesn't raise.
 
     Steps:
-    1. Initialize TaskProgressManager with a problem (implicit max_score=0 => '-').
+    1. Initialize TaskProgressManager with a problem (implicit max_score=None => '?').
     2. Advance with max_score=5 (numeric appears).
-    3. Advance again with max_score=0 (reverts to '-').
-    4. Render tasks panel to verify no formatting exceptions.
+    3. Advance again with max_score=0 (numeric still appears).
+    4. Advance again with max_score=None (? appears).
     """
     problems = ["dummy-problem"]
     logger = DebugGymLogger("debug-gym-test")
@@ -39,46 +39,35 @@ def test_task_progress_manager_score_fallback_and_update():
     # Initial fallback state
     assert len(pm.progress.tasks) == 1
     task = pm.progress.tasks[0]
-    assert task.fields["max_score"] == "-"
+    assert task.fields["max_score"] is None
     assert task.fields["score"] == 0
 
-    # Update with a real max_score
-    pm.advance(
-        TaskProgress(
-            problem_id="dummy-problem",
-            step=1,
-            total_steps=3,
-            score=1,
-            max_score=5,
-            status="running",
-            logdir="",
-        )
-    )
-    task = pm.progress.tasks[0]
-    assert task.fields["max_score"] == 5
-    assert task.fields["score"] == 1
-
-    # Update reverting max_score to 0 (fallback again)
-    pm.advance(
-        TaskProgress(
-            problem_id="dummy-problem",
-            step=2,
-            total_steps=3,
-            score=2,
-            max_score=0,
-            status="running",
-            logdir="",
-        )
-    )
-    task = pm.progress.tasks[0]
-    assert task.fields["max_score"] == "-"
-    assert task.fields["score"] == 2
-
-    # Rich render smoke test
+    # Check Rich rendering for initial fallback
     console = Console(record=True)
     console.print(pm._tasks_panel)
     rendered = console.export_text()
-    assert "Score" in rendered
+    assert "/  ?" in rendered
+
+    # Test updating max_score through 5, 0, None
+    for max_score, expected in [(5, "5"), (0, "0"), (None, "?")]:
+        pm.advance(
+            TaskProgress(
+                problem_id="dummy-problem",
+                step=1,
+                total_steps=3,
+                score=1,
+                max_score=max_score,
+                status="running",
+                logdir="",
+            )
+        )
+        task = pm.progress.tasks[0]
+        assert task.fields["max_score"] == max_score
+        assert task.fields["score"] == 1
+        console = Console(record=True)
+        console.print(pm._tasks_panel)
+        rendered = console.export_text()
+        assert f"/  {expected}" in rendered
 
 
 @pytest.fixture

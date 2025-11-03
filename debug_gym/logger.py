@@ -140,6 +140,19 @@ class StatusColumn(SpinnerColumn):
         )
 
 
+class ScoreColumn(TextColumn):
+    """Custom column for displaying score with proper None handling."""
+
+    def __init__(self):
+        super().__init__("")
+
+    def render(self, task: Task):
+        score = task.fields.get("score", 0)
+        max_score = task.fields.get("max_score")
+        max_score_str = str(max_score) if max_score is not None else "?"
+        return Text(f"Score: {score:>3}/{max_score_str:>3}", style="green")
+
+
 def log_file_path(log_dir, problem_id, relative=False) -> Path:
     """Return the path to the log file for a given problem. If `relative` is True,
     it returns a relative path from the current working directory. If the log_dir
@@ -184,16 +197,12 @@ class TaskProgressManager:
         self._tasks: Dict[str, TaskProgress] = {}
         self._progress_task_ids = {}  # Maps problem IDs to Rich task IDs
 
-        # NOTE: Python format fields cannot contain expressions like `or '-'`.
-        # We sanitize max_score before passing into Rich task fields instead.
         self.progress = Progress(
             StatusColumn(),
             TextColumn("[progress.description]{task.description:<20}"),
             TextColumn("[blue]{task.fields[logfile]}[/blue]"),
             TextColumn("Step: [green]{task.completed:<4}[/green]  "),
-            TextColumn(
-                "Score: [green]{task.fields[score]:>3}/{task.fields[max_score]}[/green]"
-            ),
+            ScoreColumn(),
             BarColumn(bar_width=None),
             TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
             expand=True,
@@ -218,19 +227,18 @@ class TaskProgressManager:
             step=0,
             total_steps=total_steps,
             score=0,
-            max_score=0,
+            max_score=None,
             status="pending",
             logdir="",
         )
         self._tasks[task_id] = task
-        display_max_score = task.max_score if task.max_score not in (None, 0) else "-"
         pid = self.progress.add_task(
             task.problem_id,
             status=task.status,
             completed=task.step,
             total=task.total_steps,
             score=task.score,
-            max_score=display_max_score,
+            max_score=task.max_score,
             logfile=task.log_file_path,
         )
         self._progress_task_ids[task.problem_id] = pid
@@ -260,16 +268,13 @@ class TaskProgressManager:
             # Update the Rich task
             pid = self._progress_task_ids.get(task.problem_id)
             if pid is not None:
-                display_max_score = (
-                    task.max_score if task.max_score not in (None, 0) else "-"
-                )
                 self.progress.update(
                     pid,
                     completed=task.step,
                     total=task.total_steps,
                     status=task.status,
                     score=task.score,
-                    max_score=display_max_score,
+                    max_score=task.max_score,
                     logfile=task.log_file_path,
                 )
 

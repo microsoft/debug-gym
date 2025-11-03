@@ -86,7 +86,7 @@ def run_agent(args, problem, config):
             step=0,
             total_steps=1,
             score=0,
-            max_score=1,
+            max_score=None,
             status="running",
         )
 
@@ -116,7 +116,7 @@ def run_agent(args, problem, config):
                 step=1,
                 total_steps=1,
                 score=0,
-                max_score=1,
+                max_score=None,
                 status="error",
             )
             success = False
@@ -131,7 +131,7 @@ def run_agent(args, problem, config):
                 step=1,
                 total_steps=1,
                 score=0,
-                max_score=1,
+                max_score=None,
                 status="error",
             )
             success = False
@@ -161,7 +161,7 @@ def run_agent(args, problem, config):
                 step=1,
                 total_steps=1,
                 score=0,
-                max_score=1,
+                max_score=None,
                 status="error",
             )
         if args.debug:
