@@ -1,7 +1,7 @@
 base:
     # Environment configs
     output_path: "exps/swebench-verified"
-    benchmark: "swebench"
+    benchmark: "swebench-debug"
     problems: "all"  # list of problems, e.g., ["astropy__astropy-12907"], or "all"
     env_kwargs: {
         "dir_tree_depth": 1,
@@ -47,6 +47,7 @@ solution_agent:
     tools: ["eval", "pdb", "submit"]
 
 swe_agent:
+    benchmark: "swebench"
     max_steps: 100
     max_rewrite_steps: 20
     tools:

@@ -148,12 +148,17 @@ def test_setup_terminal(get_swe_bench_env):
     for test_directive in env.test_directives:
         assert test_directive not in code_diff
 
-    # After calling eval, the test patch should be applied.
-    env.eval()
+    # The test patch will be applied during eval.
+    eval_output = env.eval()
+    env.max_score = env.calculate_max_score(eval_output)
+    score = env.calculate_score(eval_output)
+    assert score < env.max_score
+    assert score == 0
 
-    _, git_diff = env.terminal.run("git diff", strip_output=False)
-    git_diff = [l for l in git_diff.split("\n") if not l.startswith("index ")]
-    assert git_diff == env.test_patch.split("\n")
+    # But after calling eval, the gold test patch is removed.
+    _, code_diff = env.terminal.run("git diff")
+    for test_directive in env.test_directives:
+        assert test_directive not in code_diff
 
 
 @pytest.if_docker_running
@@ -253,6 +258,19 @@ def test_debug_entrypoint_contains_pdb(get_swe_bench_env):
     assert (
         "python -m pdb" in env.debug_entrypoint
     ), f"Expected '-m pdb' in debug_entrypoint, got: {env.debug_entrypoint}"
+
+
+@pytest.if_docker_running
+def test_setup_terminal_debug_mode(get_swe_bench_debug_env):
+    env = get_swe_bench_debug_env()
+    task_name = "astropy__astropy-14096"
+    env.reset(options={"task_name": task_name})
+    _, git_logs = env.terminal.run("git log -n 4")
+    assert env.base_commit in git_logs
+    assert f"Applying test patch for {task_name}" in git_logs
+
+    _, git_diff = env.terminal.run("git show HEAD", strip_output=False)
+    git_diff = git_diff[git_diff.index("diff --git") :]
 
 
 @pytest.if_docker_running

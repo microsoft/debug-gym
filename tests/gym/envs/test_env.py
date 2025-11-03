@@ -231,7 +231,7 @@ def test_reset(tmp_path):
         action_tool_call=None,
         instructions="",
         score=0,
-        max_score=1,
+        max_score=None,
         terminated=False,
         resolved=False,
         rewrite_counter=0,
