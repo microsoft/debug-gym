@@ -7,6 +7,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
+from rich.console import Console
 from rich.markup import escape
 
 from debug_gym.logger import (
@@ -20,6 +21,64 @@ from debug_gym.logger import (
     log_with_color,
     status_json_path,
 )
+
+
+def test_task_progress_manager_score_fallback_and_update():
+    """Ensure max_score fallback ('-') logic works and Rich render doesn't raise.
+
+    Steps:
+    1. Initialize TaskProgressManager with a problem (implicit max_score=0 => '-').
+    2. Advance with max_score=5 (numeric appears).
+    3. Advance again with max_score=0 (reverts to '-').
+    4. Render tasks panel to verify no formatting exceptions.
+    """
+    problems = ["dummy-problem"]
+    logger = DebugGymLogger("debug-gym-test")
+    pm = TaskProgressManager(problems, max_display=5, logger=logger)
+
+    # Initial fallback state
+    assert len(pm.progress.tasks) == 1
+    task = pm.progress.tasks[0]
+    assert task.fields["max_score"] == "-"
+    assert task.fields["score"] == 0
+
+    # Update with a real max_score
+    pm.advance(
+        TaskProgress(
+            problem_id="dummy-problem",
+            step=1,
+            total_steps=3,
+            score=1,
+            max_score=5,
+            status="running",
+            logdir="",
+        )
+    )
+    task = pm.progress.tasks[0]
+    assert task.fields["max_score"] == 5
+    assert task.fields["score"] == 1
+
+    # Update reverting max_score to 0 (fallback again)
+    pm.advance(
+        TaskProgress(
+            problem_id="dummy-problem",
+            step=2,
+            total_steps=3,
+            score=2,
+            max_score=0,
+            status="running",
+            logdir="",
+        )
+    )
+    task = pm.progress.tasks[0]
+    assert task.fields["max_score"] == "-"
+    assert task.fields["score"] == 2
+
+    # Rich render smoke test
+    console = Console(record=True)
+    console.print(pm._tasks_panel)
+    rendered = console.export_text()
+    assert "Score" in rendered
 
 
 @pytest.fixture
