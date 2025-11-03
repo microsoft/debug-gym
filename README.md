@@ -109,7 +109,7 @@ We provide the below LLM-based agents, they all have minimal design and serve th
 
 #### 2.3. Benchmarks
 
-To demonstrate how to integrate `debug-gym` with coding tasks and repositories, we provide example code importing two widely used benchmarks, namely `aider` and `swebench`, and a small set of minimal buggy code snippets, namely `mini_nightmare`.
+To demonstrate how to integrate `debug-gym` with coding tasks and repositories, we provide example code importing widely used benchmarks, namely `aider`, `swebench`, `swesmith` and `r2egym`, and a small set of minimal buggy code snippets, namely `mini_nightmare`.
 
 | Benchmark name | Link |
 | :-: | :----- |
@@ -119,6 +119,8 @@ To demonstrate how to integrate `debug-gym` with coding tasks and repositories, 
 | `r2egym`| [https://github.com/R2E-Gym/R2E-Gym](https://github.com/R2E-Gym/R2E-Gym) |
 | `mini_nightmare` | A set of 10 hand-crafted minimal buggy code snippet where rewrite only agents have harder time to tackle. Read details [here](https://github.com/microsoft/debug-gym/blob/main/data/mini_nightmare/mini_nightmare.md). |
 
+> [!NOTE]
+> Since debug-gym focuses on debugging task with the use of a debugger, we provide a customized version of `swebench`, called `swebench-debug`, where each problem's codebase already has the gold test patch applied. This allows us to better simulate real-world debugging scenarios where the buggy code is expected to have failing tests and we can set the debugger's entrypoint accordingly. To use `swebench-debug`, set `benchmark: "swebench-debug"` in your config file (see [Running Baselines](#3-running-baselines)).
 
 ---
 
