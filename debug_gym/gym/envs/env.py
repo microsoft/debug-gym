@@ -8,7 +8,7 @@ from debug_gym.gym.terminals.local import LocalTerminal
 from debug_gym.gym.terminals.terminal import Terminal
 from debug_gym.gym.tools.tool import EnvironmentTool, ToolCall
 from debug_gym.gym.workspace import Workspace
-from debug_gym.logger import DebugGymLogger, log_with_color
+from debug_gym.logger import DebugGymLogger
 
 
 @dataclass
@@ -16,7 +16,7 @@ class EnvInfo:
     # obs from tool triggered by `env.step` or eval if `env.reset`
     step_observation: Observation
     all_observations: list[Observation]  #  env.step + triggered tools obs
-    eval_observation: Observation  # last eval observation
+    eval_observation: Observation | None  # last eval observation
     dir_tree: str
     current_breakpoints: str
     action_reasoning: str | None
@@ -25,7 +25,8 @@ class EnvInfo:
     instructions: dict
     score: int
     max_score: int
-    done: bool
+    terminated: bool  # Whether the task has finished running
+    resolved: bool  # Whether the task was successfully solved
     rewrite_counter: int
     tools: list[EnvironmentTool]
 
@@ -38,7 +39,7 @@ class EnvInfo:
 
         # Status section
         lines.append(
-            f"📊 Status: {'✅ (DONE)' if self.done else '🔄 (IN PROGRESS)'}\t"
+            f"📊 Status: {('✅' if self.resolved else '❌') + ' (TERMINATED)' if self.terminated else '🔄 (IN PROGRESS)'}\t"
             f"🎯 Score: {self.score}/{self.max_score}\t"
             f"✏️ Rewrites: {self.rewrite_counter}"
         )
@@ -251,19 +252,20 @@ class RepoEnv(TooledEnv):
         self.rewrite_counter = 0
         self.last_eval: EvalOutput = None
         self.score = 0
-        self.done = False
+        self.terminated = False
+        self.resolved = False
         # clear all observations and event queue (queue should be empty already)
         self.clear_all_observations()
         self.empty_event_queue()
 
     def set_entrypoints(self, entrypoint: str, debug_entrypoint: str | None = None):
-        debug_entrypoint = debug_entrypoint or entrypoint.replace(
-            "python ", "python -m pdb "
-        )
         self.entrypoint = self._prepare_entrypoint(entrypoint)
-        self.debug_entrypoint = self._prepare_entrypoint(debug_entrypoint)
-        # self.entrypoint = "PYTHONPATH=$PYTHONPATH:$PWD " + self.entrypoint
-        # self.debug_entrypoint = "PYTHONPATH=$PYTHONPATH:$PWD " + self.debug_entrypoint
+        self.debug_entrypoint = self._prepare_entrypoint(debug_entrypoint or entrypoint)
+
+        if "python -m pdb" not in self.debug_entrypoint:
+            self.debug_entrypoint = self.debug_entrypoint.replace(
+                "python ", "python -m pdb "
+            )
 
     @staticmethod
     def _prepare_entrypoint(entrypoint):
@@ -313,7 +315,7 @@ class RepoEnv(TooledEnv):
         """Setup the terminal.
         Override in subclasses for different behavior. Called once at reset."""
 
-        log_with_color(self.logger, f"Configuring {self.terminal}...", "blue")
+        self.logger.debug(f"Configuring {self.terminal}...")
 
         self.terminal.run("git init -b main")
         self.terminal.run("git config user.name 'debug-gym'")
@@ -328,7 +330,7 @@ class RepoEnv(TooledEnv):
     def reset(self, *, options: dict = None):
         """Resets the environment and returns eval as the initial observation."""
         options = options or {}
-        self.logger.info("Resetting environment")
+        self.logger.debug("Resetting environment")
         self.setup_task(task_name=options.get("task_name"), options=options)
         self.setup_workspace()
         self.setup_terminal()
@@ -338,28 +340,29 @@ class RepoEnv(TooledEnv):
         self.queue_event(Event.ENV_RESET, source="env")
         self.all_observations = self.process_events()
 
-        # Gets eval (initial observation) from cache or by running env.eval
-        if self.last_eval:  # if eval tool was triggered by Event.ENV_RESET
-            self.step_observation = Observation("env", self.last_eval.output)
-        else:  # if eval tool was not triggered by Event.ENV_RESET
-            self.last_eval = self.eval()
-            self.step_observation = Observation("env", self.last_eval.output)
-            self.all_observations.insert(0, self.step_observation)
+        # First observation always include the task instructions.
+        self.step_observation = Observation("env", self.instructions)
+        self.all_observations.insert(0, self.step_observation)
 
-        self.max_score = self.calculate_max_score(self.last_eval)
-        self.score = self.calculate_score(self.last_eval)
-        self.done = self.calculate_done(self.last_eval)
+        if self.last_eval:
+            self.max_score = self.calculate_max_score(self.last_eval)
+            self.score = self.calculate_score(self.last_eval)
+            self.resolved = self.calculate_resolved(self.last_eval)
+            self.terminated = self.calculate_terminated(self.last_eval)
 
         self.infos = EnvInfo(
             step_observation=self.step_observation,
             all_observations=self.all_observations,
-            eval_observation=Observation("env", self.last_eval.output),
+            eval_observation=(
+                Observation("env", self.last_eval.output) if self.last_eval else None
+            ),
             dir_tree=self.workspace.display_files(self.dir_tree_depth),
             current_breakpoints=self.current_breakpoints(),
             action_reasoning=None,
             action_content=None,
             action_tool_call=None,
-            done=self.done,
+            terminated=self.terminated,
+            resolved=self.resolved,
             score=self.score,
             max_score=self.max_score,
             instructions=self.instructions,
@@ -375,18 +378,22 @@ class RepoEnv(TooledEnv):
     def calculate_max_score(self, eval_output: EvalOutput) -> int:
         """Calculate the maximum score. Called once at reset.
         Override in subclasses for different behavior."""
-        # Default to 1 (eval) if max_score is not set
-        return self.max_score or 1
+        return self.max_score
 
     def calculate_score(self, eval_output: EvalOutput) -> int:
         """Calculate the score from the eval output.
         Override in subclasses for different behavior."""
         return eval_output.success
 
-    def calculate_done(self, eval_output: EvalOutput) -> bool:
-        """Determine if the task is done.
+    def calculate_resolved(self, eval_output: EvalOutput) -> bool:
+        """Determine if the task has been resolved.
         Override in subclasses for different behavior."""
         return self.score == self.max_score
+
+    def calculate_terminated(self, eval_output: EvalOutput) -> bool:
+        """Determine if the task is terminated.
+        Override in subclasses for different behavior."""
+        return self.calculate_resolved(eval_output)
 
     def eval(self, **kwargs) -> EvalOutput:
         """Evaluates the current code using the provided entrypoint.
@@ -464,13 +471,18 @@ class RepoEnv(TooledEnv):
         self.all_observations.insert(0, self.step_observation)
 
         # Calculate score and done based on the last eval output
-        self.score = self.calculate_score(self.last_eval)
-        self.done = self.calculate_done(self.last_eval)
+        if self.last_eval:
+            self.max_score = self.calculate_max_score(self.last_eval)
+            self.score = self.calculate_score(self.last_eval)
+            self.terminated = self.calculate_terminated(self.last_eval)
+            self.resolved = self.calculate_resolved(self.last_eval)
 
         self.infos = EnvInfo(
             step_observation=self.step_observation,
             all_observations=self.all_observations,
-            eval_observation=Observation("env", self.last_eval.output),
+            eval_observation=(
+                Observation("env", self.last_eval.output) if self.last_eval else None
+            ),
             dir_tree=self.workspace.display_files(self.dir_tree_depth),
             current_breakpoints=self.current_breakpoints(),
             action_reasoning=action_reasoning,
@@ -479,7 +491,8 @@ class RepoEnv(TooledEnv):
             instructions=self.instructions,
             score=self.score,
             max_score=self.max_score,
-            done=self.done,
+            terminated=self.terminated,
+            resolved=self.resolved,
             rewrite_counter=self.rewrite_counter,
             tools=self.tools,
         )

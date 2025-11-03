@@ -87,6 +87,7 @@ def test_steps(env):
         "The file `clock.py` has been updated successfully."
     )
     assert env.auto_eval_on_rewrite is True
+    assert infos.all_observations[-1].source == "eval"
     assert infos.score == 1
 
     infos = env.step(eval_call)
@@ -109,10 +110,13 @@ def test_build_docker_image(mock_build_docker_image):
 @pytest.if_docker_running
 def test_reset_with_docker_terminal(setup_aider_repo):
     env = AiderBenchmarkEnv()
+    env.add_tool(Toolbox.get_tool("eval"))
     assert isinstance(env.terminal, DockerTerminal)
 
     infos = env.reset(options={"task_name": "clock"})
-    assert "1 failed" in infos.step_observation.observation
+    assert env.instructions == infos.step_observation.observation
+    assert "1 failed" in infos.eval_observation.observation
     assert infos.max_score == 1
     assert infos.score == 0
-    assert not infos.done
+    assert not infos.terminated
+    assert not infos.resolved

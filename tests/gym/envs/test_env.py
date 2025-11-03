@@ -201,7 +201,8 @@ def test_step(
     mock_pdb_tool.assert_called_once_with(env, command="b 10")
     assert infos.step_observation == observation
     assert infos.score == 0
-    assert not infos.done
+    assert not infos.terminated
+    assert not infos.resolved
     assert isinstance(infos, EnvInfo)
 
 
@@ -212,13 +213,13 @@ def test_reset(tmp_path):
     env = RepoEnv(path=tmp_path, entrypoint="pytest test.py")
     infos = env.reset()
 
+    assert env.last_eval is None
     assert env.current_breakpoints_state == {}
     assert env.rewrite_counter == 0
-    assert "FAILED test.py::test_1 - assert False" in env.last_eval.output
     assert infos == EnvInfo(
-        step_observation=Observation(source="env", observation=env.last_eval.output),
-        all_observations=[Observation(source="env", observation=env.last_eval.output)],
-        eval_observation=Observation(source="env", observation=env.last_eval.output),
+        step_observation=Observation(source="env", observation=env.instructions),
+        all_observations=[Observation(source="env", observation=env.instructions)],
+        eval_observation=None,
         dir_tree=(
             "Listing files in the current working directory. (read-only) indicates read-only files. Max depth: 1.\n"
             f"{env.working_dir}/\n"
@@ -230,8 +231,9 @@ def test_reset(tmp_path):
         action_tool_call=None,
         instructions="",
         score=0,
-        max_score=1,
-        done=False,
+        max_score=None,
+        terminated=False,
+        resolved=False,
         rewrite_counter=0,
         tools=[],
     )
@@ -273,6 +275,16 @@ def test_rewrite_counter(env):
     assert env_info.all_observations == [rewrite_obs]
     with open(env.working_dir / "file1.txt", "r") as f:
         assert f.read() == "print('Hello')"
+
+
+def test_eval(tmp_path):
+    (tmp_path / "test.py").write_text("def test_1():\n  assert False\n")
+    (tmp_path / ".debugignore").write_text("__pycache__/\n.git/\n.pytest_cache/\n")
+
+    env = RepoEnv(path=tmp_path, entrypoint="pytest test.py")
+    env.reset()
+    env.eval()
+    assert "FAILED test.py::test_1 - assert False" in env.last_eval.output
 
 
 def test_eval_success(tmp_path):

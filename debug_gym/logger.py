@@ -36,7 +36,7 @@ class TaskProgress:
     step: int
     total_steps: int  # Total steps for the problem considering early stopping
     score: int
-    max_score: int
+    max_score: int | None
     status: str
     logdir: str = ""
 
@@ -140,6 +140,19 @@ class StatusColumn(SpinnerColumn):
         )
 
 
+class ScoreColumn(TextColumn):
+    """Custom column for displaying score with proper None handling."""
+
+    def __init__(self):
+        super().__init__("")
+
+    def render(self, task: Task):
+        score = task.fields.get("score", 0)
+        max_score = task.fields.get("max_score")
+        max_score_str = str(max_score) if max_score is not None else "?"
+        return Text(f"Score: {score:>3}/{max_score_str:>3}", style="green")
+
+
 def log_file_path(log_dir, problem_id, relative=False) -> Path:
     """Return the path to the log file for a given problem. If `relative` is True,
     it returns a relative path from the current working directory. If the log_dir
@@ -189,9 +202,7 @@ class TaskProgressManager:
             TextColumn("[progress.description]{task.description:<20}"),
             TextColumn("[blue]{task.fields[logfile]}[/blue]"),
             TextColumn("Step: [green]{task.completed:<4}[/green]  "),
-            TextColumn(
-                "Score: [green]{task.fields[score]:>3}/{task.fields[max_score]:<3}[/green]"
-            ),
+            ScoreColumn(),
             BarColumn(bar_width=None),
             TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
             expand=True,
@@ -216,7 +227,7 @@ class TaskProgressManager:
             step=0,
             total_steps=total_steps,
             score=0,
-            max_score=0,
+            max_score=None,
             status="pending",
             logdir="",
         )
@@ -646,7 +657,7 @@ class DebugGymLogger(logging.Logger):
         step: int,
         total_steps: int,
         score: int,
-        max_score: int,
+        max_score: int | None,
         status: str,
         max_attempts: int = 5,
     ) -> None:

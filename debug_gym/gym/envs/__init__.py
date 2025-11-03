@@ -3,6 +3,7 @@ from debug_gym.gym.envs.env import RepoEnv, TooledEnv
 from debug_gym.gym.envs.mini_nightmare import MiniNightmareEnv
 from debug_gym.gym.envs.r2egym import R2EGymEnv
 from debug_gym.gym.envs.swe_bench import SWEBenchEnv
+from debug_gym.gym.envs.swe_bench_debug import SWEBenchDebugEnv
 from debug_gym.gym.envs.swe_smith import SWESmithEnv
 
 
@@ -14,6 +15,8 @@ def select_env(env_type: str = None) -> type[RepoEnv]:
             return AiderBenchmarkEnv
         case "swebench":
             return SWEBenchEnv
+        case "swebench-debug":
+            return SWEBenchDebugEnv
         case "swesmith":
             return SWESmithEnv
         case "mini_nightmare":

@@ -2,6 +2,7 @@ import pytest
 from filelock import FileLock
 
 from debug_gym.gym.envs import R2EGymEnv, SWEBenchEnv, SWESmithEnv
+from debug_gym.gym.envs.swe_bench_debug import SWEBenchDebugEnv
 
 BUILD_ENV_CONFIGS = {
     "swe_smith": {
@@ -10,6 +11,10 @@ BUILD_ENV_CONFIGS = {
     },
     "swe_bench": {
         "env_class": SWEBenchEnv,
+        "problems": ["astropy__astropy-14096"],
+    },
+    "swe_bench-debug": {
+        "env_class": SWEBenchDebugEnv,
         "problems": ["astropy__astropy-14096"],
     },
     "r2egym": {
@@ -50,6 +55,11 @@ def get_swe_smith_env(worker_id, tmp_path_factory):
 @pytest.fixture(scope="session")
 def get_swe_bench_env(worker_id, tmp_path_factory):
     return make_env_factory("swe_bench", worker_id, tmp_path_factory)
+
+
+@pytest.fixture(scope="session")
+def get_swe_bench_debug_env(worker_id, tmp_path_factory):
+    return make_env_factory("swe_bench-debug", worker_id, tmp_path_factory)
 
 
 @pytest.fixture(scope="session")

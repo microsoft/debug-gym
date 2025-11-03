@@ -18,7 +18,8 @@ def build_env_info():
         instructions=None,
         score=5,
         max_score=10,
-        done=False,
+        terminated=False,
+        resolved=False,
         rewrite_counter=0,
         tools=[],
     ):
@@ -34,7 +35,8 @@ def build_env_info():
             instructions=instructions if instructions is not None else {},
             score=score,
             max_score=max_score,
-            done=done,
+            terminated=terminated,
+            resolved=resolved,
             rewrite_counter=rewrite_counter,
             tools=tools if tools is not None else [],
         )

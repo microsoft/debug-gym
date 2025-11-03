@@ -44,4 +44,4 @@ debug_5_agent:
 
 solution_agent:
     llm_name: null  # No need for an LLM.
-    tools: ["eval", "pdb"]
+    tools: ["eval", "pdb", "submit"]

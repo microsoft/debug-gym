@@ -106,7 +106,7 @@ class SWEBenchEnv(RepoEnv):
         if self.package_name == "sphinx" or self.package_name == "sympy":
             # use pytest instead of `sympy bin/test` and `sphinx tox` so pdb breakpoints work
             expression = " ".join(self.test_directives)
-            self.debug_entrypoint = f"python -m pytest {expression}"
+            self.entrypoint = f"python -m pytest {expression}"
 
             if self.entrypoint.startswith("PYTHONWARNINGS"):
                 # Move PYTHONWARNINGS from the entrypoint to the session commands
@@ -143,7 +143,7 @@ class SWEBenchEnv(RepoEnv):
         self.set_entrypoints(self.entrypoint, self.debug_entrypoint)
 
     def setup_terminal(self):
-        self.logger.info(f"Configuring {self.terminal}...")
+        self.logger.debug(f"Configuring {self.terminal}...")
 
         # Install tree for listdir.
         self.terminal.run("apt update && apt install -y tree")
@@ -169,22 +169,32 @@ class SWEBenchEnv(RepoEnv):
         # Apply any changes needed to the install commands.
         self.terminal.run("git config user.name 'debug-gym'")
         self.terminal.run("git config user.email '<>'")
-        self.terminal.run(
-            f"git commit -am 'Changes needed for setting up {self.task_name}'"
-        )
-
-        # Apply the test patch directly.
-        self.terminal.run(f"git apply - <<'EOF'\n{self.test_patch}\nEOF")
-        self.terminal.run(f"git commit -am 'Applying test patch for {self.task_name}'")
+        self.terminal.run(f"git commit -am 'Setting up {self.task_name}'")
 
         # Remove the remote so the agent won't see newer commits.
         self.terminal.run("git remote remove origin")
 
     def apply_gold_patch(self):
-        self.logger.info(f"Applying gold patch to {self.working_dir}.")
+        self.logger.debug(f"Applying gold patch to {self.working_dir}.")
         command = self.git_apply_cmd + f" <<'EOF'\n{self.gold_patch}\nEOF"
         self.terminal.run(command, raises=True)
-        self.logger.info("Patch applied successfully.")
+        self.logger.debug("Patch applied successfully.")
+
+    def eval(self, **kwargs) -> EvalOutput:
+        # We need to apply the test patch before running any evaluation.
+        # Reset any changes made to test_directives files.
+        self.terminal.run(f"git checkout -- {' '.join(self.test_directives)}")
+
+        # Apply official test patch (hidden until now)
+        self.terminal.run(f"git apply - <<'EOF'\n{self.test_patch}\nEOF")
+
+        success, output = self.terminal.run(self.entrypoint, timeout=self.run_timeout)
+        self.last_eval = EvalOutput(success, output)
+
+        # Reset any changes made to test_directives files.
+        self.terminal.run(f"git checkout -- {' '.join(self.test_directives)}")
+
+        return self.last_eval
 
     def calculate_max_score(self, eval_output: EvalOutput) -> int:
         return len(self.fail_to_pass)

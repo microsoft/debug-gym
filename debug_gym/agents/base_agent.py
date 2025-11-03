@@ -227,7 +227,7 @@ class BaseAgent:
             # initial state does not have prompt and response
             self.history.step(info, None)
 
-            if info.done is True:
+            if info.resolved is True:
                 self.logger.report_progress(
                     problem_id=task_name,
                     step=1,
@@ -247,9 +247,8 @@ class BaseAgent:
             for step in range(max_steps):
                 self.logger.info(f"\n{'='*20} STEP {step+1} {'='*20}\n")
                 highscore = max(highscore, info.score)
-                self.logger.info(
-                    f"[{task_name[:10]:<10}] | Step: {step:<4} | Score: {info.score:>4}/{info.max_score:<4} ({info.score/info.max_score:.1%}) [Best: {highscore}]"
-                )
+                msg = f"[{task_name[:10]:<10}] Step {step} | Score: {info.score}/{info.max_score or '-'} [Best: {highscore}]"
+                self.logger.info(msg)
 
                 messages = self.build_prompt(info)
                 llm_response = self.llm(messages, info.tools)
@@ -265,12 +264,14 @@ class BaseAgent:
                 self.history.step(info, llm_response)
 
                 if (
-                    info.done
+                    info.terminated
                     or info.rewrite_counter >= self.config["max_rewrite_steps"]
                 ):
-                    reason = "done" if info.done else "max_rewrite_steps reached"
+                    reason = (
+                        "terminated" if info.resolved else "max_rewrite_steps reached"
+                    )
                     self.logger.info(
-                        f"Step: {step} | Score: {info.score}/{info.max_score} ({info.score/info.max_score:.1%}) | Reason: {reason}"
+                        f"Step: {step} | Score: {info.score}/{info.max_score if info.max_score else '-'} | Reason: {reason}"
                     )
                     # early stop, set current step and total steps to be the same
                     self.logger.report_progress(
@@ -279,7 +280,7 @@ class BaseAgent:
                         total_steps=step + 1,
                         score=info.score,
                         max_score=info.max_score,
-                        status="resolved" if info.done else "unresolved",
+                        status="resolved" if info.resolved else "unresolved",
                     )
                     break
                 # keep progress bar running until max_steps is reached
@@ -298,9 +299,9 @@ class BaseAgent:
                 total_steps=step + 1,
                 score=info.score,
                 max_score=info.max_score,
-                status="resolved" if info.done else "unresolved",
+                status="resolved" if info.resolved else "unresolved",
             )
-            return info.done
+            return info.resolved
         except Exception:
             # report any error that happens during the run
             self.logger.report_progress(
@@ -308,7 +309,7 @@ class BaseAgent:
                 step=step + 1,
                 total_steps=step + 1,
                 score=info.score if info else 0,
-                max_score=info.max_score if info else 1,
+                max_score=info.max_score,
                 status="error",
             )
             raise
@@ -353,7 +354,7 @@ class BaseAgent:
             "config": self.config,
             "tools": self.llm.define_tools(self.env.tools) if self.llm else tools,
             "uuid": self._uuid,
-            "success": self.env.done,
+            "success": self.env.resolved,
             "log": [],
             "agent_type": self.__class__.__name__,
             "logger": str(self.logger.log_file),
