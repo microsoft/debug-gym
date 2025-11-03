@@ -247,9 +247,8 @@ class BaseAgent:
             for step in range(max_steps):
                 self.logger.info(f"\n{'='*20} STEP {step+1} {'='*20}\n")
                 highscore = max(highscore, info.score)
-                self.logger.info(
-                    f"[{task_name[:10]:<10}] | Step: {step:<4} | Score: {info.score:>4}/{info.max_score:<4} ({info.score/info.max_score:.1%}) [Best: {highscore}]"
-                )
+                msg = f"[{task_name[:10]:<10}] Step {step} | Score: {info.score}/{info.max_score or '-'} [Best: {highscore}]"
+                self.logger.info(msg)
 
                 messages = self.build_prompt(info)
                 llm_response = self.llm(messages, info.tools)

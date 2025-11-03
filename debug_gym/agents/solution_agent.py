@@ -37,9 +37,7 @@ class AgentSolution(BaseAgent):
                 self._report_progress(task_name, info, "resolved")
                 return True
 
-            self.logger.info(
-                f"Score: {info.score}/{info.max_score} ({info.score/info.max_score:.1%})"
-            )
+            self.logger.info(f"Score: {info.score}/{info.max_score or '-'}")
             # Make a simple pdb call to make sure it is working.
             action = ToolCall(name="pdb", id="pdb", arguments={"command": "help help"})
             pdb_help_info = self.env.step(action, None, None)
@@ -68,14 +66,12 @@ class AgentSolution(BaseAgent):
             if debug:
                 breakpoint()
 
-            action = ToolCall(name="eval", id="eval", arguments={})
+            action = ToolCall(name="submit", id="submit", arguments={})
             info = self.env.step(action, None, None)
 
             self.history.step(info)
 
-            self.logger.info(
-                f"Score: {info.score}/{info.max_score} ({info.score/info.max_score:.1%})"
-            )
+            self.logger.info(f"Score: {info.score}/{info.max_score or '-'}")
             assert info.resolved, (
                 "The task is not done after applying the gold patch.\n"
                 f"{info.step_observation.observation}"

@@ -106,7 +106,7 @@ class SWEBenchEnv(RepoEnv):
         if self.package_name == "sphinx" or self.package_name == "sympy":
             # use pytest instead of `sympy bin/test` and `sphinx tox` so pdb breakpoints work
             expression = " ".join(self.test_directives)
-            self.debug_entrypoint = f"python -m pytest {expression}"
+            self.entrypoint = f"python -m pytest {expression}"
 
             if self.entrypoint.startswith("PYTHONWARNINGS"):
                 # Move PYTHONWARNINGS from the entrypoint to the session commands
@@ -190,6 +190,9 @@ class SWEBenchEnv(RepoEnv):
 
         success, output = self.terminal.run(self.entrypoint, timeout=self.run_timeout)
         self.last_eval = EvalOutput(success, output)
+
+        # Reset any changes made to test_directives files.
+        self.terminal.run(f"git checkout -- {' '.join(self.test_directives)}")
 
         return self.last_eval
 

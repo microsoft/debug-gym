@@ -53,5 +53,10 @@ def get_swe_bench_env(worker_id, tmp_path_factory):
 
 
 @pytest.fixture(scope="session")
+def get_swe_bench_debug_env(worker_id, tmp_path_factory):
+    return make_env_factory("swe_bench", worker_id, tmp_path_factory)
+
+
+@pytest.fixture(scope="session")
 def get_r2egym_env(worker_id, tmp_path_factory):
     return make_env_factory("r2egym", worker_id, tmp_path_factory)

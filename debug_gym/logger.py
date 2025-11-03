@@ -36,7 +36,7 @@ class TaskProgress:
     step: int
     total_steps: int  # Total steps for the problem considering early stopping
     score: int
-    max_score: int
+    max_score: int | None
     status: str
     logdir: str = ""
 
@@ -190,7 +190,7 @@ class TaskProgressManager:
             TextColumn("[blue]{task.fields[logfile]}[/blue]"),
             TextColumn("Step: [green]{task.completed:<4}[/green]  "),
             TextColumn(
-                "Score: [green]{task.fields[score]:>3}/{task.fields[max_score]:<3}[/green]"
+                "Score: [green]{task.fields[score]:>3}/{task.fields[max_score] or '-'}[/green]"
             ),
             BarColumn(bar_width=None),
             TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
@@ -646,7 +646,7 @@ class DebugGymLogger(logging.Logger):
         step: int,
         total_steps: int,
         score: int,
-        max_score: int,
+        max_score: int | None,
         status: str,
         max_attempts: int = 5,
     ) -> None:

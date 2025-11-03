@@ -238,7 +238,7 @@ def test_running_solution_agent(get_swe_bench_env, tmp_path):
         "max_steps": 1,
         "env_kwargs": {},
     }
-    for tool_name in ["pdb", "eval"]:
+    for tool_name in ["pdb", "submit"]:
         env.add_tool(Toolbox.get_tool(tool_name))
     agent = AgentSolution(config=config, env=env, llm=None, logger=env.logger)
     success = agent.run(task_name="astropy__astropy-14096")
@@ -253,3 +253,23 @@ def test_debug_entrypoint_contains_pdb(get_swe_bench_env):
     assert (
         "python -m pdb" in env.debug_entrypoint
     ), f"Expected '-m pdb' in debug_entrypoint, got: {env.debug_entrypoint}"
+
+
+@pytest.if_docker_running
+def test_running_solution_agent_in_debug_mode(get_swe_bench_debug_env, tmp_path):
+    env = get_swe_bench_debug_env()
+    # BaseAgent requires a config dict with at least: output_path, random_seed, memory_size.
+    # Provide a minimal config for the SolutionAgent run.
+    config = {
+        "output_path": str(tmp_path),
+        "random_seed": 0,
+        "memory_size": 8,
+        # Optional values that BaseAgent.run would use; harmless to include here.
+        "max_steps": 1,
+        "env_kwargs": {},
+    }
+    for tool_name in ["pdb", "eval", "submit"]:
+        env.add_tool(Toolbox.get_tool(tool_name))
+    agent = AgentSolution(config=config, env=env, llm=None, logger=env.logger)
+    success = agent.run(task_name="astropy__astropy-14096")
+    assert success

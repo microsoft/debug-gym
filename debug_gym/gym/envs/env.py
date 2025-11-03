@@ -227,7 +227,7 @@ class RepoEnv(TooledEnv):
         super().__init__()
 
         self.path = path
-        self._max_score = max_score
+        self.max_score = max_score
         self.auto_eval_on_rewrite = auto_eval_on_rewrite
         self.run_timeout = run_timeout
         self.dir_tree_depth = dir_tree_depth
@@ -290,10 +290,6 @@ class RepoEnv(TooledEnv):
         return entrypoint
 
     @property
-    def max_score(self):
-        return self._max_score or 1
-
-    @property
     def working_dir(self) -> Path:
         return self.workspace.working_dir
 
@@ -349,7 +345,7 @@ class RepoEnv(TooledEnv):
         self.all_observations.insert(0, self.step_observation)
 
         if self.last_eval:
-            self._max_score = self.calculate_max_score(self.last_eval)
+            self.max_score = self.calculate_max_score(self.last_eval)
             self.score = self.calculate_score(self.last_eval)
             self.resolved = self.calculate_resolved(self.last_eval)
             self.terminated = self.calculate_terminated(self.last_eval)
@@ -382,8 +378,7 @@ class RepoEnv(TooledEnv):
     def calculate_max_score(self, eval_output: EvalOutput) -> int:
         """Calculate the maximum score. Called once at reset.
         Override in subclasses for different behavior."""
-        # Default to 1 (eval) if max_score is not set
-        return self.max_score or 1
+        return self.max_score
 
     def calculate_score(self, eval_output: EvalOutput) -> int:
         """Calculate the score from the eval output.
@@ -477,7 +472,7 @@ class RepoEnv(TooledEnv):
 
         # Calculate score and done based on the last eval output
         if self.last_eval:
-            self._max_score = self.max_score or self.calculate_max_score(self.last_eval)
+            self.max_score = self.calculate_max_score(self.last_eval)
             self.score = self.calculate_score(self.last_eval)
             self.terminated = self.calculate_terminated(self.last_eval)
             self.resolved = self.calculate_resolved(self.last_eval)
