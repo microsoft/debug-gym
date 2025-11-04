@@ -124,6 +124,13 @@ title: "MSR Montréal - Froggy Team"
                 <span class="icon"><i class="ai ai-arxiv"></i></span>
                 <span>Paper</span>
               </a>
+                {% if post.github_url %}
+                <a href="{{ post.github_url }}" target="_blank" class="button is-dark">
+                <span class="icon"><i class="fab fa-github"></i></span>
+                <span>Code</span>
+                </a>
+                {% endif %}
+              </a>
             </div>
           </div>
         {% endcapture %}
