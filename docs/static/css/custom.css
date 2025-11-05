@@ -4,7 +4,7 @@
   --color-background-accent: #edf1ff;
   --color-surface: #ffffff;
   --color-surface-muted: #f7f8fc;
-  --color-primary: #5c6bff;
+  --color-primary: #525fe5;
   --color-primary-dark: #434ed1;
   --color-secondary: #ff7aa8;
   --color-success: #34c38f;
@@ -321,7 +321,7 @@ a:hover {
 }
 
 .initial-avatar--variant-1 {
-  background: linear-gradient(135deg, #5c6bff 0%, #7f5cff 100%);
+  background: linear-gradient(135deg, #525fe5 0%, #7f5cff 100%);
 }
 
 .initial-avatar--variant-2 {
@@ -365,7 +365,7 @@ a:hover {
 /* Hero Section */
 .hero.is-primary {
   background: radial-gradient(circle at 20% 20%, rgba(255, 255, 255, 0.25) 0%, rgba(255, 255, 255, 0) 55%),
-              linear-gradient(135deg, #5c6bff 0%, #7f5cff 45%, #a657ff 100%);
+              linear-gradient(135deg, #525fe5 0%, #7f5cff 45%, #a657ff 100%);
   position: relative;
   overflow: hidden;
   margin-top: 0;
