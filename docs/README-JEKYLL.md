@@ -43,8 +43,15 @@ docs/
 │   └── gistify.md
 ├── _posts/               # Blog posts (Markdown)
 │   └── 2025-01-15-building-ai-debugging-agents.md
+│   └── 2025-10-22-bug-pilot.md
+│   └── 2025-10-28-gistify.md
 ├── index.html            # Landing page (auto-generates from collections)
-└── static/               # CSS, JS, images
+├── static/               # CSS, JS, pdf
+└── figures/              # figures for post
+    ├── bug-pilot         # folder for figures
+    └── gistify           # folder for figures
+
+
 
 ```
 
