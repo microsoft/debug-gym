@@ -11,6 +11,10 @@ class EvalTool(EnvironmentTool):
     description = "Evaluate the current code against pre-defined test cases."
     arguments = {}
 
+    def __init__(self, auto_eval_on_rewrite=None):
+        super().__init__()
+        self.auto_eval_on_rewrite = auto_eval_on_rewrite
+
     def use(self, environment) -> Observation:
         eval_output = environment.eval()
         return Observation(self.name, eval_output.output)
@@ -20,6 +24,12 @@ class EvalTool(EnvironmentTool):
         return self(environment)
 
     def on_rewrite_success(self, environment, **kwargs):
-        if environment.auto_eval_on_rewrite:
+        # Determine whether to auto-evaluate on rewrite (tool overrides env if set)
+        auto = (
+            self.auto_eval_on_rewrite
+            if self.auto_eval_on_rewrite is not None
+            else environment.auto_eval_on_rewrite
+        )
+        if auto:
             return self(environment)
         return None
