@@ -20,7 +20,9 @@ from debug_gym.llms.base import LLMResponse, TokenUsage
 
 def test_default_system_prompt(agent_setup, build_env_info):
     agent, env, _ = next(agent_setup(DebugAgent))
-    env.get_tool = MagicMock(side_effect=Exception("no tools for testing"))
+    env.get_tool = MagicMock(
+        side_effect=KeyError("no tools for testing")
+    )  # KeyError to simulate missing tool
     agent.system_prompt = "some task"
     agent.shortcut_features = Mock(return_value=["f1", "f2"])
     info = build_env_info(
@@ -81,7 +83,9 @@ def test_load_system_prompt_template_default_no_shortcuts_or_eval(
     agent_setup, build_env_info
 ):
     agent, env, _ = next(agent_setup(DebugAgent))
-    env.get_tool = MagicMock(side_effect=Exception("no tools for testing"))
+    env.get_tool = MagicMock(
+        side_effect=KeyError("no tools for testing")
+    )  # KeyError to simulate missing tool
     agent.system_prompt = "some task"
     agent.shortcut_features = Mock(return_value=[])
     info = build_env_info(
@@ -324,7 +328,9 @@ def test_create_agent():
 def test_system_prompt_building_with_no_template():
     """Test system prompt building when no template is provided"""
     mock_env = MagicMock()
-    mock_env.get_tool = MagicMock(side_effect=Exception("no tools for testing"))
+    mock_env.get_tool = MagicMock(
+        side_effect=KeyError("no tools for testing")
+    )  # KeyError to simulate missing tool
     agent = BaseAgent(
         {"output_path": "/tmp", "random_seed": 42, "memory_size": 10}, mock_env
     )
