@@ -73,7 +73,7 @@ class BaseAgent:
         """Check if auto eval on rewrite is enabled."""
         try:
             return self.env.get_tool("eval").auto_eval_on_rewrite
-        except:
+        except KeyError:
             return False  # no eval tool
 
     def _show_current_breakpoints(self):

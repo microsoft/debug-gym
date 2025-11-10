@@ -75,6 +75,6 @@ def test_eval_tool_auto_eval_on_rewrite_respects_default(env):
     with open(env.working_dir / "test_1.py", "w") as f:
         f.write("def test_1():\n  assert True\n")
 
-    # Tool's None should defer to env's True setting
+    # should not have eval'd automatically, since default is False
     eval_tool_default.on_rewrite_success(env)
     assert "FAILED test_1.py::test_1" in env.last_eval.output

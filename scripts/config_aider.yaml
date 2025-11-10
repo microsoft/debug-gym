@@ -30,11 +30,26 @@ base:
     # system_prompt_template_file: "script/templates/system_prompt.jinja"
 
 rewrite_agent:
-    tools: ["grep", "view", "rewrite", "eval"]
+    tools:
+        - grep
+        - view
+        - rewrite
+        - eval:
+            auto_eval_on_rewrite: False  # If True, the environment will automatically call the Eval tool after a successful rewrite. If this is set to True, the agent does not need to call the Eval tool itself.
 
 debug_agent:
-    tools: ["grep", "pdb", "view", "rewrite", "eval"]
+    tools:
+        - grep
+        - pdb
+        - view
+        - rewrite
+        - eval
 
 debug_5_agent:
     n_rewrites_before_pdb: 5
-    tools: ["grep", "pdb", "view", "rewrite", "eval"]
+    tools:
+        - grep
+        - pdb
+        - view
+        - rewrite
+        - eval
