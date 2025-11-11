@@ -61,7 +61,7 @@ def test_is_editable_files(env):
 
 
 def test_steps(env):
-    eval_tool = Toolbox.get_tool("eval")
+    eval_tool = Toolbox.get_tool("eval", auto_eval_on_rewrite=True)
     env.add_tool(eval_tool)
     eval_call = ToolCall(id="eval_id", name="eval", arguments={})
     infos = env.step(eval_call)
@@ -86,7 +86,7 @@ def test_steps(env):
     assert infos.step_observation.observation.startswith(
         "The file `clock.py` has been updated successfully."
     )
-    assert env.auto_eval_on_rewrite is True
+    assert env.get_tool("eval").auto_eval_on_rewrite is True
     assert infos.all_observations[-1].source == "eval"
     assert infos.score == 1
 

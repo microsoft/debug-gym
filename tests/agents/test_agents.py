@@ -14,11 +14,15 @@ from debug_gym.agents.base_agent import (
 )
 from debug_gym.agents.debug_agent import Debug_5_Agent, DebugAgent
 from debug_gym.agents.rewrite_agent import RewriteAgent
+from debug_gym.gym.tools.toolbox import Toolbox
 from debug_gym.llms.base import LLMResponse, TokenUsage
 
 
 def test_default_system_prompt(agent_setup, build_env_info):
-    agent, _, _ = next(agent_setup(DebugAgent))
+    agent, env, _ = next(agent_setup(DebugAgent))
+    env.get_tool = MagicMock(
+        side_effect=KeyError("no tools for testing")
+    )  # KeyError to simulate missing tool
     agent.system_prompt = "some task"
     agent.shortcut_features = Mock(return_value=["f1", "f2"])
     info = build_env_info(
@@ -45,10 +49,12 @@ def test_default_system_prompt(agent_setup, build_env_info):
 
 
 def test_default_system_prompt_auto_eval(agent_setup, build_env_info):
-    agent, _, _ = next(agent_setup(DebugAgent))
+    agent, env, _ = next(agent_setup(DebugAgent))
     agent.system_prompt = "some task"
     agent.shortcut_features = Mock(return_value=["f1", "f2"])
-    agent.config["env_kwargs"] = {"auto_eval_on_rewrite": True}
+
+    eval_tool = Toolbox.get_tool("eval", auto_eval_on_rewrite=True)
+    env.add_tool(eval_tool)
     info = build_env_info(
         instructions="some instruction",
         dir_tree="dir tree",
@@ -76,7 +82,10 @@ def test_default_system_prompt_auto_eval(agent_setup, build_env_info):
 def test_load_system_prompt_template_default_no_shortcuts_or_eval(
     agent_setup, build_env_info
 ):
-    agent, _, _ = next(agent_setup(DebugAgent))
+    agent, env, _ = next(agent_setup(DebugAgent))
+    env.get_tool = MagicMock(
+        side_effect=KeyError("no tools for testing")
+    )  # KeyError to simulate missing tool
     agent.system_prompt = "some task"
     agent.shortcut_features = Mock(return_value=[])
     info = build_env_info(
@@ -121,9 +130,10 @@ def test_load_system_prompt_template_file_not_found(agent_setup):
 
 
 def test_build_system_prompt(agent_setup, build_env_info):
-    agent, _, _ = next(agent_setup(DebugAgent))
+    agent, env, _ = next(agent_setup(DebugAgent))
+    eval_tool = Toolbox.get_tool("eval", auto_eval_on_rewrite=True)
+    env.add_tool(eval_tool)
     agent.config["env_kwargs"] = {
-        "auto_eval_on_rewrite": True,
         "show_current_breakpoints": True,
         "show_directory_tree": True,
     }
@@ -317,8 +327,12 @@ def test_create_agent():
 
 def test_system_prompt_building_with_no_template():
     """Test system prompt building when no template is provided"""
+    mock_env = MagicMock()
+    mock_env.get_tool = MagicMock(
+        side_effect=KeyError("no tools for testing")
+    )  # KeyError to simulate missing tool
     agent = BaseAgent(
-        {"output_path": "/tmp", "random_seed": 42, "memory_size": 10}, MagicMock()
+        {"output_path": "/tmp", "random_seed": 42, "memory_size": 10}, mock_env
     )
 
     # Create a mock info object
@@ -387,10 +401,10 @@ def test_parse_reasoning_model_response(agent_setup):
 def test_shortcut_features_comprehensive(agent_setup):
     """Test all shortcut features combinations"""
     agent, env, _ = next(agent_setup(DebugAgent))
-
+    eval_tool = Toolbox.get_tool("eval", auto_eval_on_rewrite=True)
+    env.add_tool(eval_tool)
     # Test with all features enabled
     agent.config["env_kwargs"] = {
-        "auto_eval_on_rewrite": True,
         "show_directory_tree": True,
         "show_current_breakpoints": True,
         "persistent_breakpoints": True,
@@ -413,6 +427,7 @@ def test_shortcut_features_comprehensive(agent_setup):
 
     # Test with no features
     agent.config["env_kwargs"] = {}
+    env.get_tool("eval").auto_eval_on_rewrite = False
     features = agent.shortcut_features()
     assert len(features) == 0
 

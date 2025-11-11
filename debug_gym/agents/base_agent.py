@@ -71,7 +71,10 @@ class BaseAgent:
 
     def _auto_eval_on_rewrite(self):
         """Check if auto eval on rewrite is enabled."""
-        return self.config.get("env_kwargs", {}).get("auto_eval_on_rewrite", False)
+        try:
+            return self.env.get_tool("eval").auto_eval_on_rewrite
+        except KeyError:
+            return False  # no eval tool
 
     def _show_current_breakpoints(self):
         """Check if current breakpoints should be shown in the system prompt."""

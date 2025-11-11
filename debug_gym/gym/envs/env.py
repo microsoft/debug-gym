@@ -214,7 +214,6 @@ class RepoEnv(TooledEnv):
         debug_entrypoint: str | None = None,
         max_score: int | None = None,
         readonly_patterns: list[str] | None = None,  # TODO: remove
-        auto_eval_on_rewrite: bool = True,
         run_timeout: int | None = None,
         dir_tree_depth: int = 1,
         persistent_breakpoints: bool = True,  # TODO: remove
@@ -228,7 +227,6 @@ class RepoEnv(TooledEnv):
 
         self.path = path
         self.max_score = max_score
-        self.auto_eval_on_rewrite = auto_eval_on_rewrite
         self.run_timeout = run_timeout
         self.dir_tree_depth = dir_tree_depth
         self.terminal = terminal or LocalTerminal()  # TODO: default to DockerTerminal
@@ -240,6 +238,13 @@ class RepoEnv(TooledEnv):
         self.infos: EnvInfo | None = None
         self.rng = None
         self.additional_kwargs = kwargs
+
+        if "auto_eval_on_rewrite" in kwargs:
+            raise ValueError(
+                "The 'auto_eval_on_rewrite' parameter is no longer supported. "
+                "Please remove it from your initialization arguments."
+                "Instead, set 'auto_eval_on_rewrite' in the EvalTool instance."
+            )
 
         self.workspace = Workspace(self.terminal, logger=self.logger)
         self.dataset = self.load_dataset(problems)

@@ -197,10 +197,13 @@ def test_pdb_use_docker_terminal(tmp_path, setup_test_repo):
     terminal = DockerTerminal(
         base_image="python:3.12-slim",
         setup_commands=["apt update", "apt install -y git tree", "pip install pytest"],
-        env_vars={"PYTHONDONTWRITEBYTECODE": "1"},  # avoid __pycache__
+        env_vars={
+            "PYTHONDONTWRITEBYTECODE": "1",  # avoid __pycache__
+            "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",  # disable plugins that might add escape sequences
+        },
     )
-    # no:cacheprovider to avoid .pytest_cache
-    debug_entrypoint = "python -m pdb -m pytest -p no:cacheprovider -sv ."
+    # no:cacheprovider to avoid .pytest_cache, --tb=short to reduce output
+    debug_entrypoint = "python -m pdb -m pytest -p no:cacheprovider --color=no -sv ."
     env = RepoEnv(path=tests_path, terminal=terminal, debug_entrypoint=debug_entrypoint)
     env.reset()
     pdb = PDBTool()
@@ -212,8 +215,8 @@ def test_pdb_use_docker_terminal(tmp_path, setup_test_repo):
 
     output = pdb.use(env, command="c").observation
     assert "1 failed, 1 passed" in output
-    assert "test_fail.py::test_fail FAILED" in output
-    assert "test_pass.py::test_pass PASSED" in output
+    assert "test_fail.py::test_fail" in output and "FAILED" in output
+    assert "test_pass.py::test_pass" in output and "PASSED" in output
     assert "Reached the end of the program. Restarting the debugging session." in output
     assert "pytest/__main__.py" in output
     assert '-> """The pytest entry point."""' in output

@@ -10,7 +10,6 @@ base:
         dataset_revision: "8d3163011f01f9393bb3dc7700497a79a8686ae5",
 
         # shortcut features
-        "auto_eval_on_rewrite": False,  # If True, the environment will automatically call the Eval tool after a successful rewrite. If this is set to True, the agent does not need to call the Eval tool itself.
         "show_current_breakpoints": False,  # If True, the environment will automatically show the current breakpoints at every step in the system prompt.
         "show_directory_tree": True,  # If set to True, the environment will show the directory tree in the system prompt.
         "persistent_breakpoints": True,  # If True, the environemnt will keep a set of breakpoint states across PDB sessions. When a new PDB session is started, the environment will automatically load the breakpoints from the previous session.
@@ -34,15 +33,36 @@ base:
     # system_prompt_template_file: "script/templates/system_prompt.jinja"
 
 rewrite_agent:
-    tools: ["grep", "view", "rewrite", "listdir", "eval"]
+    tools:
+        - grep
+        - view
+        - rewrite
+        - listdir
+        - eval:
+            auto_eval_on_rewrite: False  # If True, the environment will automatically call the Eval tool after a successful rewrite. If this is set to True, the agent does not need to call the Eval tool itself.
 
 debug_agent:
-    tools: ["grep", "pdb", "view", "rewrite", "listdir", "eval"]
+    tools:
+        - grep
+        - pdb
+        - view
+        - rewrite
+        - listdir
+        - eval
 
 debug_5_agent:
     n_rewrites_before_pdb: 5
-    tools: ["grep", "pdb", "view", "rewrite", "listdir", "eval"]
+    tools:
+        - grep
+        - pdb
+        - view
+        - rewrite
+        - listdir
+        - eval
 
 solution_agent:
     llm_name: "human"  # No need for an LLM.
-    tools: ["eval", "pdb", "submit"]
+    tools:
+        - eval
+        - pdb
+        - submit
