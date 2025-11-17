@@ -48,6 +48,11 @@ class SWESmithEnv(SWEBenchEnv):
             self.ds = datasets.load_dataset("json", data_files=self.dataset_id)[
                 self.split
             ]
+        elif Path(self.dataset_id).is_file() and self.dataset_id.endswith(".parquet"):
+            # Loading from local Parquet file.
+            self.ds = datasets.load_dataset("parquet", data_files=self.dataset_id)[
+                self.split
+            ]
         elif Path(self.dataset_id).is_dir():
             # Loading from local folder.
             self.ds = load_from_disk(self.dataset_id)[self.split]
