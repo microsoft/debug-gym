@@ -19,12 +19,51 @@ except ImportError:
         return f"chatcmpl-tool-{uuid.uuid4().hex[:24]}"
 from vllm.transformers_utils.tokenizer import AnyTokenizer
 
+
+def escape_unescaped_newlines_in_json_strings(text):
+    """
+    Escape literal newlines/tabs/control chars that appear INSIDE JSON string values.
+    This handles cases where LLMs output multi-line formatted JSON with literal
+    newlines inside string content, which is invalid JSON syntax.
+
+    The regex pattern matches JSON strings and escapes control characters within them,
+    while preserving the JSON formatting newlines (between keys/values).
+
+    Also handles implicit string concatenation where models output:
+        "string1"
+        "string2"
+    Which should be concatenated as "string1string2" in valid JSON.
+    """
+    # First, handle implicit string concatenation (quote-newline-quote pattern)
+    # This occurs when models break strings across lines
+    # Pattern: closing quote, optional whitespace, newline, optional whitespace, opening quote
+    text = re.sub(r'"\s*\n\s*"', '', text)
+
+    def escape_match(match):
+        # Get the matched JSON string (including quotes)
+        full = match.group(0)
+        # Extract content between quotes
+        content = full[1:-1]
+        # Escape literal whitespace/control chars inside the string
+        content = content.replace('\n', '\\n')
+        content = content.replace('\t', '\\t')
+        content = content.replace('\r', '\\r')
+        content = content.replace('\f', '\\f')
+        content = content.replace('\b', '\\b')
+        # Return with quotes restored
+        return '"' + content + '"'
+
+    # Pattern matches JSON strings: " followed by (non-quote or escaped-anything) followed by "
+    # This correctly handles escaped quotes within strings
+    pattern = r'"(?:[^"\\]|\\.)*"'
+    return re.sub(pattern, escape_match, text)
+
 # define a tool parser and register it to vllm
 # the name list in register_module can be used
 # in --tool-call-parser. you can define as many
 # tool parsers as you want here.
 @ToolParserManager.register_module(["froggy"])
-class ExampleToolParser(ToolParser):
+class FrogyToolParser(ToolParser):
     def __init__(self, tokenizer: AnyTokenizer):
         super().__init__(tokenizer)
 
@@ -69,16 +108,7 @@ class ExampleToolParser(ToolParser):
                 try:
                     # Clean and parse JSON
                     json_str = match.strip()
-                    json_str = json_str.replace('\\n', '\x00NEWLINE\x00')
-                    json_str = json_str.replace('\\t', '\x00TAB\x00')
-                    json_str = json_str.replace('\\r', '\x00RETURN\x00')
-                    json_str = json_str.replace('\n', '\\n')
-                    json_str = json_str.replace('\t', '\\t')
-                    json_str = json_str.replace('\r', '\\r')
-                    json_str = json_str.replace('\x00NEWLINE\x00', '\\n')
-                    json_str = json_str.replace('\x00TAB\x00', '\\t')
-                    json_str = json_str.replace('\x00RETURN\x00', '\\r')
-                    
+                    json_str = escape_unescaped_newlines_in_json_strings(json_str)
                     tool_data = json.loads(json_str)
                     
                     # Handle both single and multiple tool formats
@@ -142,36 +172,12 @@ class ExampleToolParser(ToolParser):
         tool_calls = []
         for i, match in enumerate(matches):
             try:
-                # Clean up the JSON string - handle common escaping issues
-                # 1. Strip whitespace
+                # Clean and parse JSON
                 json_str = match.strip()
-                
-                # 2. Handle improperly escaped newlines in string values
-                # This fixes cases where the model outputs literal newlines in JSON strings
-                # We need to preserve newlines that are already properly escaped \\n
-                # but escape literal newlines that aren't
-                
-                # First, temporarily replace properly escaped newlines
-                json_str = json_str.replace('\\n', '\x00NEWLINE\x00')
-                json_str = json_str.replace('\\t', '\x00TAB\x00')
-                json_str = json_str.replace('\\r', '\x00RETURN\x00')
-                json_str = json_str.replace('\\\\', '\x00BACKSLASH\x00')
-                
-                # Now escape any literal newlines/tabs/returns
-                json_str = json_str.replace('\n', '\\n')
-                json_str = json_str.replace('\t', '\\t')
-                json_str = json_str.replace('\r', '\\r')
-                
-                # Restore the properly escaped ones
-                json_str = json_str.replace('\x00NEWLINE\x00', '\\n')
-                json_str = json_str.replace('\x00TAB\x00', '\\t')
-                json_str = json_str.replace('\x00RETURN\x00', '\\r')
-                json_str = json_str.replace('\x00BACKSLASH\x00', '\\\\')
-                
-                # 3. Parse the cleaned JSON
+                json_str = escape_unescaped_newlines_in_json_strings(json_str)
                 tool_data = json.loads(json_str)
-                
-                # 4. Handle both single tool and multiple tools formats
+
+                # Handle both single tool and multiple tools formats
                 # Hermes can output {"name": "...", "arguments": {...}}
                 # or {"tools": [{"name": "...", "arguments": {...}}]}
                 if "tools" in tool_data and isinstance(tool_data["tools"], list):
