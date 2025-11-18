@@ -45,10 +45,10 @@ def test_load_dataset_from_parquet(mock_docker_from_env, tmp_path):
     mock_docker_client = MagicMock()
     mock_docker_client.images.list.return_value = []
     mock_docker_from_env.return_value = mock_docker_client
-    
+
     # Create a minimal test Parquet file with expected schema
     parquet_file = tmp_path / "test_dataset.parquet"
-    
+
     data = {
         "commit_hash": ["test_hash_123"],
         "docker_image": ["test_repo:test_hash_123"],
@@ -65,20 +65,16 @@ def test_load_dataset_from_parquet(mock_docker_from_env, tmp_path):
         "relevant_files": [["file1.py"]],
         "repo_name": ["test_repo"],
     }
-    
+
     table = pa.table(data)
     pq.write_table(table, str(parquet_file))
-    
+
     # Mock the terminal to avoid actual Docker operations
     mock_terminal = MagicMock(spec=DockerTerminal)
-    
+
     # Load the dataset from the Parquet file
-    env = R2EGymEnv(
-        dataset_id=str(parquet_file), 
-        split="train", 
-        terminal=mock_terminal
-    )
-    
+    env = R2EGymEnv(dataset_id=str(parquet_file), split="train", terminal=mock_terminal)
+
     # Verify the dataset contains the expected features
     assert sorted(env.ds.features.keys()) == sorted(
         [
@@ -98,7 +94,7 @@ def test_load_dataset_from_parquet(mock_docker_from_env, tmp_path):
             "repo_name",
         ]
     )
-    
+
     # Verify the dataset has the expected data
     assert len(env.ds) == 1
     assert env.ds[0]["docker_image"] == "test_repo:test_hash_123"
