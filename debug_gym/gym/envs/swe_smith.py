@@ -43,12 +43,12 @@ class SWESmithEnv(SWEBenchEnv):
         )
 
     def load_dataset(self, problems: str | list[str] | None = None):
-        if Path(self.dataset_id).is_file() and self.dataset_id.endswith(".json"):
+        if Path(self.dataset_id).is_file() and self.dataset_id.lower().endswith(".json"):
             # Loading from local JSON file.
             self.ds = datasets.load_dataset("json", data_files=self.dataset_id)[
                 self.split
             ]
-        elif Path(self.dataset_id).is_file() and self.dataset_id.endswith(".parquet"):
+        elif Path(self.dataset_id).is_file() and self.dataset_id.lower().endswith(".parquet"):
             # Loading from local Parquet file.
             self.ds = datasets.load_dataset("parquet", data_files=self.dataset_id)[
                 self.split
