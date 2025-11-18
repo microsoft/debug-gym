@@ -22,6 +22,14 @@ runs:
       with:
         python-version: '3.12'
         cache: 'pip'
+    - name: Free disk space before dependency installation
+      shell: bash
+      run: |
+        df -h
+        sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/share/boost
+        docker system prune -af
+        sudo apt-get clean
+        df -h
     - name: Install dependencies
       shell: bash
       run: |
