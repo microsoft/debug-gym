@@ -259,6 +259,30 @@ We provide a set of scripts to help analyze the log files (e.g., the `.jsonl` fi
 - In the `analysis` folder, we provide scripts that used to generate the corresponding figures in our technical report.
 - In the `analysis/json_log_viewer` folder, we provide a Flask app to view a `.jsonl` log file in the browser.
 
+#### 3.9. Custom Tool Call Parser for vLLM
+
+`debug-gym` provides `FrogyToolParser`, a custom vLLM tool parser that handles common JSON formatting issues from LLM-generated tool calls. This is particularly useful when working with open-source models or models that may generate slightly malformed JSON.
+
+**Features:**
+- Fixes invalid escape sequences (e.g., `\'` → `'`)
+- Handles implicit string concatenation across lines
+- Escapes literal control characters within JSON strings
+- Compatible with both streaming and non-streaming tool call extraction
+
+**Usage with vLLM:**
+
+To use the FrogyToolParser when serving a model with vLLM:
+
+```bash
+python -m debug_gym.frogboss serve <model-name> \
+  --tensor-parallel-size 4 \
+  --enable-auto-tool-choice \
+  --tool-call-parser froggy \
+  --enable-log-requests \
+  --enable-log-outputs \
+  --max-model-len 32768
+```
+
 ## Citation
 ```
 @article{yuan2025debuggym,
