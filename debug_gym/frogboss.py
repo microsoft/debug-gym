@@ -22,41 +22,41 @@ from vllm.transformers_utils.tokenizer import AnyTokenizer
 
 def escape_unescaped_newlines_in_json_strings(text):
     """
-    Escape literal newlines/tabs/control chars that appear INSIDE JSON string values.
-    This handles cases where LLMs output multi-line formatted JSON with literal
-    newlines inside string content, which is invalid JSON syntax.
-
-    The regex pattern matches JSON strings and escapes control characters within them,
-    while preserving the JSON formatting newlines (between keys/values).
-
-    Also handles implicit string concatenation where models output:
-        "string1"
-        "string2"
-    Which should be concatenated as "string1string2" in valid JSON.
+    Fix common JSON issues in LLM-generated tool calls.
+    Handles:
+    1. String concatenation across lines: "str1" "str2" -> "str1str2"
+    2. Invalid escape sequences: \' -> '
+    3. Literal control characters within JSON strings: actual newlines -> \\n
     """
-    # First, handle implicit string concatenation (quote-newline-quote pattern)
-    # This occurs when models break strings across lines
-    # Pattern: closing quote, optional whitespace, newline, optional whitespace, opening quote
+    # Step 1: Handle implicit string concatenation (quote-newline-quote)
     text = re.sub(r'"\s*\n\s*"', '', text)
 
-    def escape_match(match):
-        # Get the matched JSON string (including quotes)
+    # Step 2: Fix invalid escape sequences and literal control chars using regex on quoted strings
+    def fix_string(match):
+        # Get the full matched string with quotes
         full = match.group(0)
         # Extract content between quotes
         content = full[1:-1]
-        # Escape literal whitespace/control chars inside the string
+
+        # Fix invalid \' escape sequences
+        content = content.replace(r"\\\'", '\x00TEMP_BSLASH_QUOTE\x00')
+        content = content.replace(r"\'", "'")
+        content = content.replace('\x00TEMP_BSLASH_QUOTE\x00', r"\\'")
+
+        # Fix literal control characters
         content = content.replace('\n', '\\n')
         content = content.replace('\t', '\\t')
         content = content.replace('\r', '\\r')
         content = content.replace('\f', '\\f')
         content = content.replace('\b', '\\b')
-        # Return with quotes restored
+
+        # Return with quotes
         return '"' + content + '"'
 
-    # Pattern matches JSON strings: " followed by (non-quote or escaped-anything) followed by "
-    # This correctly handles escaped quotes within strings
+    # Match JSON strings: " followed by (non-quote or \\ followed by anything) followed by "
+    # This regex correctly identifies JSON string boundaries
     pattern = r'"(?:[^"\\]|\\.)*"'
-    return re.sub(pattern, escape_match, text)
+    return re.sub(pattern, fix_string, text)
 
 # define a tool parser and register it to vllm
 # the name list in register_module can be used
