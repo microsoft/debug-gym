@@ -274,6 +274,16 @@ We provide a set of scripts to help analyze the log files (e.g., the `.jsonl` fi
 To use the FrogyToolParser when serving a model with vLLM:
 
 ```bash
+vllm serve <model-name> \
+  --tensor-parallel-size 4 \
+  --enable-auto-tool-choice \
+  --tool-parser-plugin ./debug_gym/frogboss.py \
+  --tool-call-parser froggy \
+  --enable-log-requests \
+  --enable-log-outputs \
+  --max-model-len 32768
+
+# Or just import it from the package
 python -m debug_gym.frogboss serve <model-name> \
   --tensor-parallel-size 4 \
   --enable-auto-tool-choice \
