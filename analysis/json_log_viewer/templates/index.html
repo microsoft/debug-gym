@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+    <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -161,49 +161,18 @@
             font-weight: 600;
         }
 
-        /* Color-coding for different action types */
-        .step.action-pdb {
-            background: #ef476f;
-            color: white;
-            border-color: #ef476f;
+        {% for action in combined_action_styles %}
+        .step.{{ action.class }} {
+            background: {{ action.background }};
+            color: {{ action.text_color }};
+            border-color: {{ action.background }};
         }
 
-        .step.action-view {
-            background: #f78c6b;
-            color: white;
-            border-color: #f78c6b;
+        .legend-color.{{ action.class }} {
+            background: {{ action.background }};
+            border-color: {{ action.background }};
         }
-
-        .step.action-rewrite {
-            background: #ffd166;
-            color: black;
-            border-color: #ffd166;
-        }
-
-        .step.action-listdir {
-            background: #06d6a0;
-            color: white;
-            border-color: #06d6a0;
-        }
-
-        .step.action-eval {
-            background: #118ab2;
-            color: white;
-            border-color: #118ab2;
-        }
-
-        .step.action-grep {
-            background: #9b59b6;
-            color: white;
-            border-color: #9b59b6;
-        }
-
-        .step.action-no_action,
-        .step.action-unknown {
-            background: #073b4c;
-            color: white;
-            border-color: #073b4c;
-        }
+        {% endfor %}
 
         .step:hover {
             transform: translateY(-5px);
@@ -237,7 +206,7 @@
 
         .legend-items {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
             gap: 10px;
         }
 
@@ -246,6 +215,7 @@
             align-items: center;
             gap: 8px;
             padding: 5px;
+            min-width: 0;
         }
 
         .legend-color {
@@ -253,35 +223,27 @@
             height: 20px;
             border-radius: 4px;
             border: 1px solid rgba(0, 0, 0, 0.1);
+            flex-shrink: 0;
         }
 
-        /* Apply the same colors to legend items */
-        .legend-color.action-pdb {
-            background: #ef476f;
+        .toggle-btn {
+            background: linear-gradient(45deg, #2c3e50, #34495e);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 15px;
         }
 
-        .legend-color.action-view {
-            background: #f78c6b;
-        }
-
-        .legend-color.action-rewrite {
-            background: #ffd166;
-        }
-
-        .legend-color.action-listdir {
-            background: #06d6a0;
-        }
-
-        .legend-color.action-eval {
-            background: #118ab2;
-        }
-
-        .legend-color.action-grep {
-            background: #9b59b6;
-        }
-
-        .legend-color.action-no_action {
-            background: #073b4c;
+        .toggle-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(44, 62, 80, 0.3);
         }
 
         .nav-buttons {
@@ -323,6 +285,68 @@
             padding: 30px;
             box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
             min-height: 400px;
+            position: relative;
+        }
+
+        .floating-nav {
+            position: fixed;
+            top: 50%;
+            right: 35px;
+            transform: translateY(-50%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 14px;
+            z-index: 1200;
+        }
+
+        .floating-nav .nav-btn {
+            padding: 16px;
+            border-radius: 50%;
+            width: 54px;
+            height: 54px;
+            justify-content: center;
+            box-shadow: 0 12px 26px rgba(0, 0, 0, 0.15);
+        }
+
+        .floating-step-indicator {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+            text-align: center;
+        }
+
+        .floating-step-indicator .indicator-dot {
+            width: 38px;
+            height: 38px;
+            border-radius: 50%;
+            border: 3px solid rgba(255, 255, 255, 0.8);
+            box-shadow: 0 8px 18px rgba(0, 0, 0, 0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            color: #ffffff;
+            background: #2c3e50;
+        }
+
+        .floating-step-indicator .indicator-label {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+
+        @media (max-width: 900px) {
+            .floating-nav {
+                right: 15px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .floating-nav {
+                display: none;
+            }
         }
 
         .details h3 {
@@ -482,6 +506,19 @@
     </style>
 </head>
 <body>
+    <div class="floating-nav" aria-hidden="false">
+        <button type="button" id="floating-prev" class="nav-btn" title="Previous step" aria-label="Previous step">
+            <i class="fas fa-chevron-left"></i>
+        </button>
+        <div class="floating-step-indicator" aria-live="polite">
+            <div id="floating-indicator-dot" class="indicator-dot">0</div>
+            <div id="floating-indicator-label" class="indicator-label">Step 0</div>
+        </div>
+        <button type="button" id="floating-next" class="nav-btn" title="Next step" aria-label="Next step">
+            <i class="fas fa-chevron-right"></i>
+        </button>
+    </div>
+
     <div class="container">
         <div class="header">
             <h1>🐸 Froggy Debugging Trajectory</h1>
@@ -537,10 +574,10 @@
             <div class="timeline-section">
                 <h2><i class="fas fa-route"></i> Trajectory ({{ total_steps }} steps)</h2>
                 <div class="timeline">
-                    {% for i in range(total_steps) %}
-                        <div class="step action-{{ step_actions[i] }}" data-step-id="{{ i }}">
+                    {% for step in steps %}
+                        <div class="step {{ step.base_class }}" data-step-id="{{ step.index }}" data-base-class="{{ step.base_class }}" data-detailed-class="{{ step.detailed_class }}" data-base-label="{{ step.base_label }}" data-detailed-label="{{ step.detailed_label }}" title="{{ step.base_label }}">
                             <i class="fas fa-step-forward"></i>
-                            Step {{ i }}
+                            Step {{ step.index }}
                         </div>
                     {% endfor %}
                 </div>
@@ -548,36 +585,11 @@
                 <!-- Color Legend -->
                 <div class="color-legend">
                     <h3><i class="fas fa-palette"></i> Action Types Legend</h3>
-                    <div class="legend-items">
-                        <div class="legend-item">
-                            <div class="legend-color action-pdb"></div>
-                            <span>pdb</span>
-                        </div>
-                        <div class="legend-item">
-                            <div class="legend-color action-view"></div>
-                            <span>view</span>
-                        </div>
-                        <div class="legend-item">
-                            <div class="legend-color action-rewrite"></div>
-                            <span>rewrite</span>
-                        </div>
-                        <div class="legend-item">
-                            <div class="legend-color action-listdir"></div>
-                            <span>listdir</span>
-                        </div>
-                        <div class="legend-item">
-                            <div class="legend-color action-eval"></div>
-                            <span>eval</span>
-                        </div>
-                        <div class="legend-item">
-                            <div class="legend-color action-grep"></div>
-                            <span>grep</span>
-                        </div>
-                        <div class="legend-item">
-                            <div class="legend-color action-no_action"></div>
-                            <span>no action</span>
-                        </div>
-                    </div>
+                    <div class="legend-items" id="legend-items"></div>
+                    <button id="bash-toggle" class="toggle-btn">
+                        <i class="fas fa-terminal"></i>
+                        Detailed bash colors: Off
+                    </button>
                 </div>
 
                 <!-- Navigation Buttons -->
@@ -605,6 +617,9 @@
     <script>
         const totalSteps = {{ total_steps }};
         let currentStep = 0;
+        const baseLegend = {{ base_action_styles | tojson }};
+        const detailedLegend = {{ detailed_action_styles | tojson }};
+        let detailedBashMode = false;
 
         // Toggle section visibility
         function toggleSection(sectionId) {
@@ -614,6 +629,18 @@
             
             content.classList.toggle('expanded');
             header.classList.toggle('expanded');
+        }
+
+        function escapeHTML(value) {
+            if (value === null || value === undefined) {
+                return '';
+            }
+            return String(value)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
         }
 
         // Create collapsible JSON viewer
@@ -687,7 +714,7 @@
 
         function formatJSONValue(value) {
             if (typeof value === 'string') {
-                return `<span class="json-string">"${value}"</span>`;
+                return `<span class="json-string">"${escapeHTML(value)}"</span>`;
             } else if (typeof value === 'number') {
                 return `<span class="json-number">${value}</span>`;
             } else if (typeof value === 'boolean') {
@@ -695,7 +722,7 @@
             } else if (value === null) {
                 return `<span class="json-null">null</span>`;
             }
-            return value;
+            return `<span>${escapeHTML(value)}</span>`;
         }
 
         // Helper function to format empty/null values consistently
@@ -703,7 +730,113 @@
             if (value === null || value === undefined || value === '' || value === 'None') {
                 return 'None';
             }
-            return value;
+            if (typeof value === 'object') {
+                try {
+                    return escapeHTML(JSON.stringify(value, null, 2));
+                } catch (e) {
+                    return 'Unsupported object';
+                }
+            }
+            return escapeHTML(value);
+        }
+
+        function updateBashToggleLabel() {
+            const button = document.getElementById('bash-toggle');
+            if (!button) {
+                return;
+            }
+            button.innerHTML = detailedBashMode
+                ? '<i class="fas fa-terminal"></i> Detailed bash colors: On'
+                : '<i class="fas fa-terminal"></i> Detailed bash colors: Off';
+            button.setAttribute('aria-pressed', detailedBashMode ? 'true' : 'false');
+        }
+
+        function renderLegend(items) {
+            const legendContainer = document.getElementById('legend-items');
+            if (!legendContainer) {
+                return;
+            }
+            legendContainer.innerHTML = '';
+            items.forEach(item => {
+                const legendItem = document.createElement('div');
+                legendItem.className = 'legend-item';
+
+                const colorBlock = document.createElement('div');
+                colorBlock.className = `legend-color ${item.class}`;
+
+                const label = document.createElement('span');
+                label.textContent = item.display_name;
+
+                legendItem.appendChild(colorBlock);
+                legendItem.appendChild(label);
+                legendContainer.appendChild(legendItem);
+            });
+        }
+
+        function updateFloatingIndicator() {
+            const dot = document.getElementById('floating-indicator-dot');
+            const label = document.getElementById('floating-indicator-label');
+            if (!dot || !label) {
+                return;
+            }
+
+            dot.style.backgroundColor = '#2c3e50';
+            dot.style.color = '#ffffff';
+            dot.style.borderColor = 'rgba(255, 255, 255, 0.8)';
+
+            const stepElement = document.querySelector(`.step[data-step-id="${currentStep}"]`);
+            const classToInspect = detailedBashMode
+                ? stepElement?.dataset.detailedClass
+                : stepElement?.dataset.baseClass;
+
+            if (classToInspect) {
+                const legendItems = detailedBashMode ? detailedLegend : baseLegend;
+                const legendMatch = legendItems.find(item => item.class === classToInspect);
+                if (legendMatch) {
+                    dot.style.backgroundColor = legendMatch.background;
+                    dot.style.color = legendMatch.text_color || '#ffffff';
+                }
+            }
+
+            dot.textContent = currentStep;
+            const baseLabel = stepElement?.dataset.baseLabel || '';
+            const detailedLabel = stepElement?.dataset.detailedLabel || '';
+            const labelToUse = detailedBashMode && detailedLabel ? detailedLabel : baseLabel;
+            label.textContent = labelToUse
+                ? `Step ${currentStep} • ${labelToUse}`
+                : `Step ${currentStep}`;
+        }
+
+        function applyBashColorMode() {
+            const useDetailed = detailedBashMode;
+            document.querySelectorAll('.step').forEach(step => {
+                const baseClass = step.dataset.baseClass;
+                const detailedClass = step.dataset.detailedClass;
+                const baseLabel = step.dataset.baseLabel || '';
+                const detailedLabel = step.dataset.detailedLabel || '';
+                if (baseClass) {
+                    step.classList.remove(baseClass);
+                }
+                if (detailedClass) {
+                    step.classList.remove(detailedClass);
+                }
+                const classToAdd = useDetailed && detailedClass ? detailedClass : baseClass;
+                if (classToAdd) {
+                    step.classList.add(classToAdd);
+                }
+                const labelToUse = useDetailed && detailedLabel ? detailedLabel : baseLabel;
+                if (labelToUse) {
+                    step.setAttribute('title', labelToUse);
+                    step.setAttribute('aria-label', `${labelToUse} (step ${step.dataset.stepId})`);
+                } else {
+                    step.removeAttribute('title');
+                    step.removeAttribute('aria-label');
+                }
+            });
+
+            const legendItems = useDetailed ? detailedLegend : baseLegend;
+            renderLegend(legendItems);
+            updateFloatingIndicator();
         }
 
         // Fetch step data from the server
@@ -836,8 +969,25 @@
             document.querySelector(`.step[data-step-id="${newStep}"]`).classList.add('active');
             currentStep = newStep;
             fetchStep(currentStep);
-            document.getElementById('prev-btn').disabled = currentStep === 0;
-            document.getElementById('next-btn').disabled = currentStep === totalSteps - 1;
+            const prevBtn = document.getElementById('prev-btn');
+            const nextBtn = document.getElementById('next-btn');
+            const floatingPrev = document.getElementById('floating-prev');
+            const floatingNext = document.getElementById('floating-next');
+
+            if (prevBtn) {
+                prevBtn.disabled = currentStep === 0;
+            }
+            if (nextBtn) {
+                nextBtn.disabled = currentStep === totalSteps - 1;
+            }
+            if (floatingPrev) {
+                floatingPrev.disabled = currentStep === 0;
+                floatingPrev.setAttribute('aria-disabled', floatingPrev.disabled ? 'true' : 'false');
+            }
+            if (floatingNext) {
+                floatingNext.disabled = currentStep === totalSteps - 1;
+                floatingNext.setAttribute('aria-disabled', floatingNext.disabled ? 'true' : 'false');
+            }
             
             // Scroll active step into view horizontally only, without affecting vertical scroll
             const activeStep = document.querySelector(`.step[data-step-id="${newStep}"]`);
@@ -848,23 +998,39 @@
                     inline: 'center' 
                 });
             }
+
+            updateFloatingIndicator();
         }
 
-        // Event listeners for timeline steps
-        document.querySelectorAll('.step').forEach(step => {
-            step.addEventListener('click', () => {
-                const stepId = parseInt(step.dataset.stepId);
-                updateStep(stepId);
+        function attachStepListeners() {
+            document.querySelectorAll('.step').forEach(step => {
+                step.addEventListener('click', () => {
+                    const stepId = parseInt(step.dataset.stepId);
+                    updateStep(stepId);
+                });
             });
-        });
+        }
 
-        // Navigation button listeners
-        document.getElementById('prev-btn').addEventListener('click', () => {
-            if (currentStep > 0) updateStep(currentStep - 1);
-        });
-        document.getElementById('next-btn').addEventListener('click', () => {
-            if (currentStep < totalSteps - 1) updateStep(currentStep + 1);
-        });
+        attachStepListeners();
+
+        function setupNavButton(buttonId, direction) {
+            const button = document.getElementById(buttonId);
+            if (!button) {
+                return;
+            }
+            button.addEventListener('click', () => {
+                if (direction === 'prev' && currentStep > 0) {
+                    updateStep(currentStep - 1);
+                } else if (direction === 'next' && currentStep < totalSteps - 1) {
+                    updateStep(currentStep + 1);
+                }
+            });
+        }
+
+        setupNavButton('prev-btn', 'prev');
+        setupNavButton('next-btn', 'next');
+        setupNavButton('floating-prev', 'prev');
+        setupNavButton('floating-next', 'next');
 
         // Keyboard navigation
         document.addEventListener('keydown', (e) => {
@@ -887,6 +1053,19 @@
                     // Keep original content if parsing fails
                 }
             }
+
+            const bashToggleButton = document.getElementById('bash-toggle');
+            if (bashToggleButton) {
+                bashToggleButton.addEventListener('click', () => {
+                    detailedBashMode = !detailedBashMode;
+                    updateBashToggleLabel();
+                    applyBashColorMode();
+                });
+            }
+
+            updateBashToggleLabel();
+            applyBashColorMode();
+            updateFloatingIndicator();
         });
 
         // Load the first step by default
