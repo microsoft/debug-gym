@@ -23,43 +23,42 @@ current_file = None
 
 
 ACTION_COLOR_PALETTE = [
-    "#ef476f",
-    "#f78c6b",
-    "#ffd166",
-    "#06d6a0",
-    "#118ab2",
-    "#9b59b6",
-    "#073b4c",
-    "#2c3e50",
-    "#ff6f91",
-    "#ff9671",
-    "#ffc75f",
-    "#d65db1",
-    "#845ec2",
-    "#3cb44b",
-    "#ffe119",
-    "#0082c8",
-    "#f58231",
-    "#911eb4",
-    "#46f0f0",
-    "#f032e6",
-    "#d2f53c",
-    "#008080",
-    "#e6beff",
-    "#aa6e28",
-    "#ffd8b1",
-    "#000080",
-    "#808000",
-    "#ffa700",
-    "#6a4c93",
-    "#3f88c5",
-    "#f49f0a",
-    "#16db93",
-    "#efea5a",
-    "#ff4d6d",
-    "#4cc9f0",
-    "#7209b7",
-    "#2b9348",
+    "#2b2d42",
+    "#43616f",
+    "#6c91a1",
+    "#99bbad",
+    "#c4d6b0",
+    "#f3d5a9",
+    "#e09f70",
+    "#c26d51",
+    "#8f4f3f",
+    "#663d3c",
+    "#3f3a37",
+    "#756d54",
+    "#a5907e",
+    "#d6b69f",
+    "#f4c095",
+    "#c39a8d",
+    "#926c7f",
+    "#5f4b66",
+    "#3f3351",
+    "#2d1e2f",
+    "#3a5a78",
+    "#567f89",
+    "#7aa6a6",
+    "#a5c4b8",
+    "#d0d8b7",
+    "#f6e5b5",
+    "#e7b98a",
+    "#c48f6a",
+    "#a86f5c",
+    "#7f4d46",
+    "#553a3d",
+    "#392e34",
+    "#594f4f",
+    "#867b6f",
+    "#b7a99a",
+    "#e1c9b3",
 ]
 
 
@@ -130,9 +129,9 @@ def color_for_index(index: int) -> str:
 
     generated_index = index - len(ACTION_COLOR_PALETTE)
 
-    hue = (generated_index * 0.37 + 0.11) % 1.0
-    saturation_options = [0.70, 0.55, 0.80]
-    lightness_options = [0.45, 0.60, 0.35]
+    hue = (generated_index * 0.29 + 0.1) % 1.0
+    saturation_options = [0.58, 0.46, 0.36]
+    lightness_options = [0.42, 0.56, 0.68]
 
     saturation = saturation_options[generated_index % len(saturation_options)]
     lightness = lightness_options[
@@ -150,10 +149,10 @@ def color_for_key(key: str, fallback_index: int) -> str:
     digest = hashlib.sha256(normalized.encode("utf-8")).digest()
 
     hue_raw = int.from_bytes(digest[0:2], "big") / 65535.0
-    hue = (hue_raw + fallback_index * 0.17) % 1.0
+    hue = (hue_raw + fallback_index * 0.19) % 1.0
 
-    saturation_options = [0.70, 0.55, 0.80, 0.65]
-    lightness_options = [0.45, 0.60, 0.35, 0.52]
+    saturation_options = [0.55, 0.42, 0.48, 0.35]
+    lightness_options = [0.40, 0.55, 0.68, 0.48]
 
     saturation = saturation_options[digest[2] % len(saturation_options)]
     lightness = lightness_options[digest[3] % len(lightness_options)]
