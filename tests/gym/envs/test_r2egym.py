@@ -1,9 +1,14 @@
 from pathlib import Path
+from unittest.mock import MagicMock, patch
 
+import pyarrow as pa
+import pyarrow.parquet as pq
 import pytest
 
 from debug_gym.agents.solution_agent import AgentSolution
 from debug_gym.gym.entities import Observation
+from debug_gym.gym.envs.r2egym import R2EGymEnv
+from debug_gym.gym.terminals.docker import DockerTerminal
 from debug_gym.gym.tools.tool import ToolCall
 from debug_gym.gym.tools.toolbox import Toolbox
 
@@ -31,6 +36,70 @@ def test_load_dataset(get_r2egym_env):
             "repo_name",
         ]
     )
+
+
+@patch("docker.from_env")
+def test_load_dataset_from_parquet(mock_docker_from_env, tmp_path):
+    """Test loading R2EGym dataset from a local Parquet file."""
+    # Mock Docker client to avoid trying to pull images
+    mock_docker_client = MagicMock()
+    mock_docker_client.images.list.return_value = []
+    mock_docker_from_env.return_value = mock_docker_client
+
+    # Create a minimal test Parquet file with expected schema
+    parquet_file = tmp_path / "test_dataset.parquet"
+
+    data = {
+        "commit_hash": ["test_hash_123"],
+        "docker_image": ["test_repo:test_hash_123"],
+        "execution_result_content": ["test execution result"],
+        "expected_output_json": ['{"test": "output"}'],
+        "modified_entity_summaries": ["test summaries"],
+        "modified_files": [["file1.py", "file2.py"]],
+        "num_non_test_files": [5],
+        "num_non_test_func_methods": [10],
+        "num_non_test_lines": [100],
+        "parsed_commit_content": ["test commit content"],
+        "problem_statement": ["[ISSUE]Test problem statement[/ISSUE]"],
+        "prompt": ["test prompt"],
+        "relevant_files": [["file1.py"]],
+        "repo_name": ["test_repo"],
+    }
+
+    table = pa.table(data)
+    pq.write_table(table, str(parquet_file))
+
+    # Mock the terminal to avoid actual Docker operations
+    mock_terminal = MagicMock(spec=DockerTerminal)
+
+    # Load the dataset from the Parquet file
+    env = R2EGymEnv(dataset_id=str(parquet_file), split="train", terminal=mock_terminal)
+
+    # Verify the dataset contains the expected features
+    assert sorted(env.ds.features.keys()) == sorted(
+        [
+            "commit_hash",
+            "docker_image",
+            "execution_result_content",
+            "expected_output_json",
+            "modified_entity_summaries",
+            "modified_files",
+            "num_non_test_files",
+            "num_non_test_func_methods",
+            "num_non_test_lines",
+            "parsed_commit_content",
+            "problem_statement",
+            "prompt",
+            "relevant_files",
+            "repo_name",
+        ]
+    )
+
+    # Verify the dataset has the expected data
+    assert len(env.ds) == 1
+    assert env.ds[0]["docker_image"] == "test_repo:test_hash_123"
+    assert env.ds[0]["commit_hash"] == "test_hash_123"
+    assert "Test problem statement" in env.ds[0]["problem_statement"]
 
 
 @pytest.if_docker_running
