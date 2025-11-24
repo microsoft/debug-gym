@@ -198,6 +198,26 @@ class FrogyToolParser(ToolParser):
         matches = re.findall(pattern, model_output, re.DOTALL)
 
         tool_calls = []
+        
+        # Also check for self-closing tags like <submit />, <bash />, etc.
+        # These are generated when the model writes tool calls as XML instead of JSON
+        self_closing_pattern = r'<(\w+)\s*/>'
+        self_closing_matches = re.findall(self_closing_pattern, model_output)
+        
+        # Convert self-closing tags to tool calls
+        for tag_name in self_closing_matches:
+            # Only process known tool names (bash, submit, rewrite)
+            if tag_name.lower() in ['bash', 'submit', 'rewrite']:
+                tool_call = ToolCall(
+                    id=make_tool_call_id(),
+                    type="function",
+                    function=FunctionCall(
+                        name=tag_name.lower(),
+                        arguments=json.dumps({}, ensure_ascii=False, separators=(",", ":")),
+                    ),
+                )
+                tool_calls.append(tool_call)
+                print(f"Extracted self-closing tag: <{tag_name} /> as tool call")
         for i, match in enumerate(matches):
             try:
                 # Clean and parse JSON
