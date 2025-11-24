@@ -1,9 +1,11 @@
 from pathlib import Path
 
+import datasets
 import pytest
 
 from debug_gym.agents.solution_agent import AgentSolution
 from debug_gym.gym.entities import Observation
+from debug_gym.gym.envs import SWESmithEnv
 from debug_gym.gym.tools.tool import ToolCall
 from debug_gym.gym.tools.toolbox import Toolbox
 
@@ -26,6 +28,50 @@ def test_load_dataset(get_swe_smith_env):
             "problem_statement",
         ]
     )
+
+
+def test_load_dataset_from_parquet(tmp_path):
+    """Test that loading from a local Parquet file works correctly."""
+    # Create a sample parquet file with the required features
+    sample_data = {
+        "instance_id": ["test-instance-1", "test-instance-2"],
+        "repo": ["test/repo1", "test/repo2"],
+        "patch": ["diff --git a/file.py", "diff --git b/file2.py"],
+        "FAIL_TO_PASS": [["test1"], ["test2"]],
+        "PASS_TO_PASS": [["test3"], ["test4"]],
+        "created_at": ["2024-01-01", "2024-01-02"],
+        "image_name": ["image1", "image2"],
+        "base_commit": ["abc123", "def456"],
+        "problem_statement": ["Problem 1", "Problem 2"],
+    }
+
+    # Create a dataset and save as parquet
+    ds = datasets.Dataset.from_dict(sample_data)
+    parquet_path = tmp_path / "test_dataset.parquet"
+    ds.to_parquet(str(parquet_path))
+
+    # Test that the parquet file can be loaded using datasets library
+    # mimicking what SWESmithEnv.load_dataset() does for parquet files
+    loaded_ds = datasets.load_dataset("parquet", data_files=str(parquet_path))["train"]
+
+    # Verify that the dataset was loaded correctly with expected features
+    assert sorted(loaded_ds.features.keys()) == sorted(
+        [
+            "instance_id",
+            "repo",
+            "patch",
+            "FAIL_TO_PASS",
+            "PASS_TO_PASS",
+            "created_at",
+            "image_name",
+            "base_commit",
+            "problem_statement",
+        ]
+    )
+    # Verify that the data is accessible
+    assert len(loaded_ds) == 2
+    assert loaded_ds[0]["instance_id"] == "test-instance-1"
+    assert loaded_ds[1]["instance_id"] == "test-instance-2"
 
 
 @pytest.if_docker_running

@@ -3,10 +3,9 @@ import re
 from importlib.resources import files as importlib_files
 from pathlib import Path
 
-import datasets
 import docker
 import yaml
-from datasets import load_from_disk
+from datasets import load_dataset, load_from_disk
 
 from debug_gym.constants import DEBUG_GYM_CACHE_DIR
 from debug_gym.gym.entities import EvalOutput
@@ -95,19 +94,22 @@ class R2EGymEnv(RepoEnv):
             return self.ds_row["problem_statement"]
 
     def load_dataset(self, problems: str | list[str] | None = None):
-        if Path(self.dataset_id).is_file() and self.dataset_id.endswith(".json"):
-            # Loading from local JSON file.
-            self.ds = datasets.load_dataset("json", data_files=self.dataset_id)[
-                self.split
-            ]
-        elif Path(self.dataset_id).is_dir():
+        data_path = Path(self.dataset_id)
+        if data_path.is_file():
+            # Loading from local file.
+            if data_path.suffix.lower() == ".json":
+                self.ds = load_dataset("json", data_files=self.dataset_id)
+            elif data_path.suffix.lower() == ".parquet":
+                self.ds = load_dataset("parquet", data_files=self.dataset_id)
+        elif data_path.is_dir():
             # Loading from local folder.
-            self.ds = load_from_disk(self.dataset_id)[self.split]
+            self.ds = load_from_disk(self.dataset_id)
         else:
             # Loading from HuggingFace or a folder.
-            self.ds = datasets.load_dataset(
-                self.dataset_id, revision=self.dataset_revision
-            )[self.split]
+            self.ds = load_dataset(self.dataset_id, revision=self.dataset_revision)
+
+        # Select the split.
+        self.ds = self.ds[self.split]
 
         # Load custom dataset splits from config.
         with open(R2EGymEnv.CONFIG) as f:
