@@ -185,14 +185,7 @@ class FreeEnv(RepoEnv):
 
     @property
     def instructions(self) -> str:
-        if self._custom_instructions:
-            return self._custom_instructions
-        return (
-            "Interact freely with the environment.\n"
-            "There is no predefined task or evaluation.\n"
-            f"Container image: {self.container_image}\n"
-            f"Workspace root: {self.container_workdir}"
-        )
+        return self._custom_instructions
 
     def calculate_max_score(self, eval_output):
         return 0
