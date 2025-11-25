@@ -267,7 +267,7 @@ class OpenAILLM(LLM):
         self.logger.debug(f"Tool calls: {response.choices[0].message.tool_calls}")
         self.logger.debug(f"Finish reason: {response.choices[0].finish_reason}")
         self.logger.debug(f"Usage: {response.usage}")
-        
+
         if not response.choices[0].message.tool_calls:
             # LLM failed to call a tool - retry with a prompt to force tool calling
             content = response.choices[0].message.content
@@ -280,7 +280,10 @@ class OpenAILLM(LLM):
                 # Add the assistant's message and a user message to force tool calling
                 retry_messages = messages + [
                     {"role": "assistant", "content": content},
-                    {"role": "user", "content": "Please call the appropriate tool now. Do not explain, just call the tool."}
+                    {
+                        "role": "user",
+                        "content": "Please call the appropriate tool now. Do not explain, just call the tool.",
+                    },
                 ]
                 try:
                     response = retry_on_exception(
@@ -292,11 +295,17 @@ class OpenAILLM(LLM):
                         tool_choice="auto",
                         **kwargs,
                     )
-                    self.logger.debug(f"Retry response - Tool calls: {response.choices[0].message.tool_calls}")
-                    self.logger.debug(f"Retry response - Finish reason: {response.choices[0].finish_reason}")
+                    self.logger.debug(
+                        f"Retry response - Tool calls: {response.choices[0].message.tool_calls}"
+                    )
+                    self.logger.debug(
+                        f"Retry response - Finish reason: {response.choices[0].finish_reason}"
+                    )
                     if response.choices[0].message.tool_calls:
                         tool_call = response.choices[0].message.tool_calls[0]
-                        self.logger.debug(f"Tool call obtained after retry: {tool_call}")
+                        self.logger.debug(
+                            f"Tool call obtained after retry: {tool_call}"
+                        )
                         assert tool_call.type == "function"
                     else:
                         tool_call = None
@@ -305,7 +314,7 @@ class OpenAILLM(LLM):
                     tool_call = None
             else:
                 tool_call = None
-            
+
             if tool_call is None:
                 # Still no tool calls after retry
                 self.logger.warning(
