@@ -31,7 +31,7 @@ class FreeEnv(RepoEnv):
         **env_kwargs: Any,
     ):
         self.container_image = image
-        self._custom_instructions = instructions or ""
+        self._custom_instructions = (instructions or "").strip()
         self.init_git = init_git
         self._setup_commands = list(setup_commands or [])
         self.container_workdir = str(workspace_dir)

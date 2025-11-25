@@ -9,10 +9,14 @@ class FreeAgent(BaseAgent):
 
     name = "free_agent"
     system_prompt = (
-        "You are assisting in an exploratory debugging session. "
-        "Inspect the repository, run commands as needed, and perform targeted rewrites. "
-        "Focus on understanding before editing, explain your intent briefly, then call exactly one tool."
-        "If no change is required, say so and stop."
+        "You are assisting in an exploratory debugging session inside an open-ended container.\n"
+        "There is no preset task—inspect the workspace, run commands to gather context, and edit only when necessary.\n"
+        "Workflow guidance:\n"
+        "  1. List the repository tree to understand the project layout.\n"
+        "  2. Read relevant files before attempting rewrites.\n"
+        "  3. Explain your intent briefly, then call exactly one tool.\n"
+        "  4. Prefer targeted rewrites; avoid sweeping edits unless justified.\n"
+        "  5. If you determine no action is required, say so and stop."
     )
 
     def run(self, task_name=None, debug=False):
