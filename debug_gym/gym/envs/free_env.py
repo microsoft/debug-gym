@@ -98,7 +98,13 @@ class FreeEnv(RepoEnv):
             setattr(terminal, "base_image", self.container_image)
 
         if hasattr(terminal, "working_dir") and not isinstance(terminal, LocalTerminal):
-            terminal.working_dir = self.container_workdir
+            try:
+                terminal.working_dir = self.container_workdir
+            except ValueError:
+                logger.debug(
+                    "Terminal already active; keeping working_dir=%s",
+                    getattr(terminal, "working_dir", self.container_workdir),
+                )
 
         if self._setup_commands and hasattr(terminal, "setup_commands"):
             existing = list(getattr(terminal, "setup_commands", []))
@@ -138,16 +144,28 @@ class FreeEnv(RepoEnv):
         self.base_image = self.container_image
 
     def setup_workspace(self) -> None:
-        self.workspace.reset()
-        target_dir = self.workspace.working_dir
-        if not isinstance(self.terminal, LocalTerminal):
-            self.workspace.working_dir = Path(self.container_workdir)
+        if isinstance(self.terminal, LocalTerminal):
+            super().setup_workspace()
+            return
+
+        self.workspace.cleanup()
+        self.workspace.working_dir = Path(self.container_workdir)
+
+        try:
             self.terminal.working_dir = self.container_workdir
-            target_dir = self.workspace.working_dir
-            # Ensure the working directory exists inside the container/pod.
-            self.terminal.run(f"mkdir -p {target_dir}", raises=True)
+        except ValueError:
+            self.logger.debug(
+                "Terminal already running; keeping working_dir=%s",
+                getattr(self.terminal, "working_dir", self.container_workdir),
+            )
+
+        # Ensure the tree utility is available for directory listings.
+        self.terminal.run("apt update && apt install -y tree")
+        self.terminal.run(f"mkdir -p {self.container_workdir}", raises=True)
+
         if self.path:
             self.workspace.copy_content(self.path)
+
         self.workspace.setup_file_filters()
 
     def setup_terminal(self) -> None:
