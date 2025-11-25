@@ -2,7 +2,7 @@
 task_name: free-session
 
 llm:
-  name: "gpt-4o"
+  name: "4o-az"
 
 # Tools to load into the environment toolbox.
 tools:

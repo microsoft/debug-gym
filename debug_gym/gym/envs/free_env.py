@@ -221,7 +221,7 @@ class FreeEnv(RepoEnv):
     def instructions(self) -> str:
         return (
             self._custom_instructions
-            or "You are placed in an isolated Linux environment where you can run bash commands to explore the file system, read files, and modify files. Your goal is to understand the contents of this environment and perform tasks as needed. Use the available tools to interact with the environment effectively."
+            or "You are placed in an isolated Linux environment, use the available tools to interact with the environment effectively."
         )
 
     def calculate_max_score(self, eval_output):
