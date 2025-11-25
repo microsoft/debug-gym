@@ -12,7 +12,7 @@ tools:
   - bash
 
 environment:
-  image: ghcr.io/princeton-nlp/swe-agent:lite-latest
+  image: swesmith.x86_64.amueller__word_cloud.ec24191c
   workspace_dir: /testbed
 
 agent:
