@@ -11,7 +11,7 @@ from debug_gym.llms.human import Human
 from debug_gym.logger import DebugGymLogger
 
 DEFAULT_IMAGE = "swesmith.x86_64.amueller__word_cloud.ec24191c"
-DEFAULT_TOOLS = ["listdir", "view", "rewrite", "bash"]
+DEFAULT_TOOLS = ["listdir", "view", "grep", "rewrite", "bash"]
 
 
 def format_observations(env_info) -> list[dict]:
@@ -54,7 +54,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--workspace-dir",
-        default="/workspace",
+        default="/testbed",
         help="Working directory inside the container or pod.",
     )
     parser.add_argument(

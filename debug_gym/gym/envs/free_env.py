@@ -25,7 +25,7 @@ class FreeEnv(RepoEnv):
         setup_commands: list[str] | None = None,
         instructions: str | None = None,
         init_git: bool = True,
-        workspace_dir: str | Path = "/workspace",
+        workspace_dir: str | Path = "/testbed",
         logger: DebugGymLogger | None = None,
         terminal_kwargs: dict[str, Any] | None = None,
         **env_kwargs: Any,
@@ -190,7 +190,8 @@ class FreeEnv(RepoEnv):
         return (
             "Interact freely with the environment.\n"
             "There is no predefined task or evaluation.\n"
-            f"Container image: {self.container_image}"
+            f"Container image: {self.container_image}\n"
+            f"Workspace root: {self.container_workdir}"
         )
 
     def calculate_max_score(self, eval_output):
