@@ -94,6 +94,7 @@ class OpenAILLM(LLM):
             "openai.APIError",
             "openai.APIConnectionError",
             "openai.RateLimitError",
+            "openai.InternalServerError",
             "openai.PermissionDeniedError",
             "openai.BadRequestError",
             # Add more as needed
@@ -184,10 +185,24 @@ class OpenAILLM(LLM):
                 name="empty_tool_response",
                 arguments={},
             )
+        raw_arguments = response.function.arguments if response.function else "{}"
+        try:
+            parsed_arguments = json.loads(raw_arguments)
+            if not isinstance(parsed_arguments, dict):
+                raise ValueError("Tool arguments must decode to a JSON object")
+        except (json.JSONDecodeError, TypeError, ValueError) as exc:
+            snippet = (raw_arguments or "")[:2000]
+            self.logger.warning(
+                "Failed to decode tool call arguments as JSON (%s)."
+                " Falling back to empty arguments. Snippet: %s",
+                exc,
+                snippet,
+            )
+            parsed_arguments = {}
         return ToolCall(
             id=response.id,
             name=response.function.name,
-            arguments=json.loads(response.function.arguments),
+            arguments=parsed_arguments,
         )
 
     def format_tool_call_history(
@@ -261,6 +276,11 @@ class OpenAILLM(LLM):
             if self.is_context_length_error(e):
                 raise ContextLengthExceededError
             raise e
+        if not hasattr(response, "choices"):
+            raise RuntimeError(
+                "OpenAI chat completion returned unexpected payload without 'choices'"
+            )
+
         # LLM may select multiple tool calls, we only care about the first action
         if not response.choices[0].message.tool_calls:
             # LLM failed to call a tool

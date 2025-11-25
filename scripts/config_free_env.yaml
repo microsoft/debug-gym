@@ -1,0 +1,42 @@
+# Configuration for standalone FreeEnv + FreeAgent runs.
+task_name: free-session
+
+llm:
+  name: "4o-az"
+
+# Tools to load into the environment toolbox.
+tools:
+  - rewrite
+  - bash
+  - submit:
+      eval_on_submit: False  # Here we only terminate after submission, no auto-eval.
+
+environment:
+  image: jyangballin/swesmith.x86_64.amueller_1776_word_cloud.ec24191c:latest
+  workspace_dir: /testbed
+  terminal:
+    type: docker
+    # type: kubernetes
+    # registry: debuggymacr.azurecr.io
+    # namespace: mtl-cpu-jobs
+    # kube_config: ~/.kube/config
+    # # kube_context: null
+    # pod_spec_kwargs:
+    #   tolerations:
+    #     - key: node.kubernetes.io/disk-pressure
+    #       operator: Exists
+    #       effect: NoExecute
+    #       tolerationSeconds: 10800
+    #     - key: kubernetes.azure.com/scalesetpriority
+    #       operator: Equal
+    #       value: spot
+    #       effect: NoSchedule
+    #     - key: CriticalAddonsOnly
+    #       operator: Equal
+    #       value: "true"
+    #       effect: NoSchedule
+
+agent:
+  random_seed: 42
+  max_steps: 20
+  output_path: exps/free_env

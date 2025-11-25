@@ -505,6 +505,7 @@ class DebugGymLogger(logging.Logger):
     LOG_QUEUE = mp.Queue(maxsize=10000)
     PROGRESS_QUEUE = mp.Queue(maxsize=50000)  # Increased from 10000 to 50000
     _is_worker = False
+    _main_process_logger = None
 
     @classmethod
     def is_worker(cls):
@@ -541,6 +542,8 @@ class DebugGymLogger(logging.Logger):
         self.propagate = False
 
         self.setLevel(level)  # Set logger level, might be overridden by file handler
+        if DebugGymLogger._main_process_logger is not None:
+            self._is_worker = True
 
         # Placeholders for rich live, log listener thread, and stop event
         # Will be initialized if the logger is the main process logger
@@ -550,6 +553,8 @@ class DebugGymLogger(logging.Logger):
         self._log_listener_thread = None  # Thread to process logs from workers
         if self.is_main():
             self._initialize_main_logger(level)
+            DebugGymLogger._main_process_logger = self
+
         self.log_file = None  # File handler for logging to a file
         self.log_dir = Path(log_dir) if log_dir else None
         if self.log_dir:  # Directory to store log files

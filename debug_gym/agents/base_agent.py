@@ -45,10 +45,8 @@ class BaseAgent:
         self._uuid = self.config.get("uuid", str(uuid.uuid4()))
         self._output_path = pjoin(self.config["output_path"], self._uuid)
 
-        os.makedirs(self._output_path, exist_ok=True)
-
-        self.set_seed(self.config["random_seed"])
-        self.history = HistoryTracker(self.config["memory_size"])
+        self.set_seed(self.args.random_seed)
+        self.history = HistoryTracker(self.args.memory_size)
 
     def set_seed(self, seed):
         np.random.seed(seed)
@@ -223,7 +221,7 @@ class BaseAgent:
     def run(self, task_name=None, debug=False):
         step = 0
         info = None
-        max_steps = self.config["max_steps"]
+        max_steps = self.args.max_steps
         try:
             self.history.reset()
             info = self.env.reset(options={"task_name": task_name})
@@ -268,7 +266,7 @@ class BaseAgent:
 
                 if (
                     info.terminated
-                    or info.rewrite_counter >= self.config["max_rewrite_steps"]
+                    or info.rewrite_counter >= self.args.max_rewrite_steps
                 ):
                     reason = (
                         "terminated" if info.resolved else "max_rewrite_steps reached"
@@ -312,7 +310,7 @@ class BaseAgent:
                 step=step + 1,
                 total_steps=step + 1,
                 score=info.score if info else 0,
-                max_score=info.max_score,
+                max_score=info.max_score if info else None,
                 status="error",
             )
             raise

@@ -23,7 +23,7 @@ logging.getLogger("openai").setLevel(logging.WARNING)
 
 
 class CopilotLLM(OpenAILLM):
-    CLIENT_MAX_AGE_SECONDS = 20
+    CLIENT_MAX_AGE_SECONDS = 1200  # 20 minutes
     AUTH_RETRY_DELAY_SECONDS = 5
 
     def __init__(self, model_name, logger=None, llm_config=None, llm_config_file=None):
