@@ -47,6 +47,9 @@ class BaseAgent:
 
         os.makedirs(self._output_path, exist_ok=True)
 
+        if "memory_size" not in self.config:
+            self.config["memory_size"] = self.config["max_steps"]
+
         self.set_seed(self.config["random_seed"])
         self.history = HistoryTracker(self.config["memory_size"])
 

@@ -17,6 +17,5 @@ environment:
 
 agent:
   random_seed: 42
-  memory_size: 50
-  max_steps: 50
+  max_steps: 20
   output_path: exps/free_env
