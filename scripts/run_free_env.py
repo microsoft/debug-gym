@@ -60,7 +60,6 @@ def main() -> int:
         terminal=env_cfg.get("terminal"),
         mount_path=env_cfg.get("mount_path"),
         setup_commands=env_cfg.get("setup_commands"),
-        instructions=env_cfg.get("instructions"),
         workspace_dir=env_cfg.get("workspace_dir", "/testbed"),
         logger=logger,
         dir_tree_depth=env_cfg.get("dir_tree_depth", 2),
