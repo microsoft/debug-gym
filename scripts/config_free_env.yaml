@@ -1,0 +1,22 @@
+# Configuration for standalone FreeEnv + FreeAgent runs.
+task_name: free-session
+
+llm:
+  name: "gpt-4o"
+
+# Tools to load into the environment toolbox.
+tools:
+  - listdir
+  - view
+  - rewrite
+  - bash
+
+environment:
+  image: ghcr.io/princeton-nlp/swe-agent:lite-latest
+  workspace_dir: /testbed
+
+agent:
+  random_seed: 42
+  memory_size: 50
+  max_steps: 50
+  output_path: exps/free_env

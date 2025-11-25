@@ -224,6 +224,7 @@ class BaseAgent:
         step = 0
         info = None
         max_steps = self.config["max_steps"]
+        max_rewrite_steps = self.config.get("max_rewrite_steps")
         try:
             self.history.reset()
             info = self.env.reset(options={"task_name": task_name})
@@ -266,13 +267,18 @@ class BaseAgent:
                 )
                 self.history.step(info, llm_response)
 
-                if (
-                    info.terminated
-                    or info.rewrite_counter >= self.config["max_rewrite_steps"]
-                ):
-                    reason = (
-                        "terminated" if info.resolved else "max_rewrite_steps reached"
-                    )
+                limit_reached = (
+                    max_rewrite_steps is not None
+                    and info.rewrite_counter >= max_rewrite_steps
+                )
+
+                if info.terminated or limit_reached:
+                    if info.resolved:
+                        reason = "terminated"
+                    elif limit_reached:
+                        reason = "max_rewrite_steps reached"
+                    else:
+                        reason = "terminated"
                     self.logger.info(
                         f"Step: {step} | Score: {info.score}/{info.max_score if info.max_score else '-'} | Reason: {reason}"
                     )

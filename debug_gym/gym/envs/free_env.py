@@ -24,7 +24,7 @@ class FreeEnv(RepoEnv):
         mount_path: str | Path | None = None,
         setup_commands: list[str] | None = None,
         instructions: str | None = None,
-        init_git: bool = True,
+        init_git: bool = True,  # Default value is already True
         workspace_dir: str | Path = "/testbed",
         logger: DebugGymLogger | None = None,
         terminal_kwargs: dict[str, Any] | None = None,
@@ -123,6 +123,40 @@ class FreeEnv(RepoEnv):
 
         terminal.logger = logger
 
+    def _update_terminal(self, restart: bool = False) -> None:
+        if isinstance(self.terminal, LocalTerminal):
+            return
+
+        if restart:
+            try:
+                self.terminal.close()
+            except Exception as exc:  # noqa: BLE001 - surface in logs only
+                self.logger.debug("Failed to close terminal cleanly: %s", exc)
+
+        if hasattr(self.terminal, "base_image"):
+            setattr(self.terminal, "base_image", self.container_image)
+
+        if hasattr(self.terminal, "setup_commands"):
+            setattr(self.terminal, "setup_commands", list(self._setup_commands))
+
+        if hasattr(self.terminal, "working_dir"):
+            try:
+                self.terminal.working_dir = self.container_workdir
+            except ValueError:
+                # Existing sessions prevent changing the working dir; restart once more.
+                self.terminal.close()
+                self.terminal.working_dir = self.container_workdir
+
+        if isinstance(self.terminal, KubernetesTerminal):
+            try:
+                self.terminal.task_name = self.DEFAULT_TASK_NAME
+            except ValueError:
+                self.logger.debug(
+                    "Kubernetes pod already created; keeping existing task name."
+                )
+
+        self.workspace.terminal = self.terminal
+
     def set_entrypoints(self, entrypoint: str, debug_entrypoint: str | None = None):
         self._entrypoint = entrypoint
         self._debug_entrypoint = debug_entrypoint or entrypoint
@@ -201,3 +235,38 @@ class FreeEnv(RepoEnv):
 
     def eval(self, **kwargs):
         raise NotImplementedError("FreeEnv does not support evaluation.")
+
+    def reset(self, *, options: dict | None = None):
+        options = options or {}
+
+        image = options.get("image")
+        workspace_dir = options.get("workspace_dir")
+        setup_commands = options.get("setup_commands")
+        instructions = options.get("instructions")
+        init_git = options.get("init_git")
+
+        restart_terminal = False
+
+        if image and image != self.container_image:
+            self.container_image = image
+            restart_terminal = True
+
+        if workspace_dir and str(workspace_dir) != self.container_workdir:
+            self.container_workdir = str(workspace_dir)
+            restart_terminal = True
+
+        if setup_commands is not None:
+            new_commands = list(setup_commands)
+            if new_commands != self._setup_commands:
+                self._setup_commands = new_commands
+                restart_terminal = True
+
+        if instructions is not None:
+            self._custom_instructions = instructions
+
+        if init_git is not None:
+            self.init_git = bool(init_git)
+
+        self._update_terminal(restart=restart_terminal)
+
+        return super().reset(options=options)
