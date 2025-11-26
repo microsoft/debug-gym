@@ -31,6 +31,8 @@ class FreeEnv(RepoEnv):
         terminal_kwargs: dict[str, Any] | None = None,
         **env_kwargs: Any,
     ):
+        """Create a free-form repository environment running inside `image`."""
+
         self.container_image = image
         self._custom_instructions = (instructions or "").strip()
         self.init_git = init_git
@@ -61,6 +63,13 @@ class FreeEnv(RepoEnv):
         logger: DebugGymLogger,
         terminal_kwargs: dict[str, Any],
     ) -> Terminal:
+        """Resolve the desired terminal implementation and preconfigure its working directory.
+
+        Accepts either a Terminal instance, a string alias ("docker"/"kubernetes"),
+        or None to fall back to Docker. The resolved terminal inherits the
+        environment's working directory and setup commands so that subsequent
+        calls to `reset` behave consistently.
+        """
         terminal_kwargs = dict(terminal_kwargs)
         terminal_kwargs.setdefault("working_dir", self.container_workdir)
 
@@ -95,6 +104,7 @@ class FreeEnv(RepoEnv):
     def _configure_terminal(
         self, *, terminal: Terminal, logger: DebugGymLogger
     ) -> None:
+        """Propagate FreeEnv specific configuration onto an already constructed terminal."""
         if hasattr(terminal, "base_image"):
             setattr(terminal, "base_image", self.container_image)
 
@@ -125,6 +135,13 @@ class FreeEnv(RepoEnv):
         terminal.logger = logger
 
     def _update_terminal(self, restart: bool = False) -> None:
+        """Refresh terminal attributes when reset() overrides runtime parameters.
+
+        When `restart` is True we close the existing remote session up-front so
+        Docker/Kubernetes terminals restart with the new base image or working
+        directory the next time a command runs. Local terminals are left untouched
+        because they share filesystem state with the host.
+        """
         if isinstance(self.terminal, LocalTerminal):
             return
 
@@ -144,7 +161,7 @@ class FreeEnv(RepoEnv):
             try:
                 self.terminal.working_dir = self.container_workdir
             except ValueError:
-                # Existing sessions prevent changing the working dir; restart once more.
+                # Active sessions may hold the old working dir; close them and retry.
                 self.terminal.close()
                 self.terminal.working_dir = self.container_workdir
 
@@ -179,6 +196,7 @@ class FreeEnv(RepoEnv):
         self.base_image = self.container_image
 
     def setup_workspace(self) -> None:
+        """Prepare the remote workspace and ensure baseline tooling exists."""
         if isinstance(self.terminal, LocalTerminal):
             super().setup_workspace()
             return

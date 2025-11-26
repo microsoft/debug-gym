@@ -8,6 +8,8 @@ class FreeAgent(BaseAgent):
     """Minimal reasoning agent tailored for FreeEnv sessions."""
 
     name = "free_agent"
+    # Customized system instructions keep FreeEnv light-weight while still
+    # providing the model with a structured exploration checklist.
     system_prompt = (
         "You are assisting in an exploratory codebase understanding session inside an open-ended container.\n"
         "You have access to a set of tools to inspect and modify the codebase.\n"
@@ -17,6 +19,7 @@ class FreeAgent(BaseAgent):
     )
 
     def run(self, task_name=None, debug=False):
+        """Wrap BaseAgent.run to surface clearer errors when startup fails."""
         try:
             return super().run(task_name=task_name, debug=debug)
         except AttributeError as exc:

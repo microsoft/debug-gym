@@ -16,6 +16,7 @@ DEFAULT_TOOLS = ["listdir", "view", "grep", "rewrite", "bash"]
 
 
 def build_parser() -> argparse.ArgumentParser:
+    """Create the CLI parser that exposes the runner configuration flag."""
     parser = argparse.ArgumentParser(description="Run FreeAgent against FreeEnv.")
     parser.add_argument(
         "--config",
@@ -27,6 +28,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def load_app_config(path: Path) -> dict:
+    """Load the YAML configuration used to seed the environment and agent."""
     import yaml
 
     with open(path, "r", encoding="utf-8") as handle:
@@ -34,6 +36,7 @@ def load_app_config(path: Path) -> dict:
 
 
 def build_llm(config: dict, logger: DebugGymLogger):
+    """Instantiate the LLM (or human driver) based on configuration defaults."""
     llm_cfg = config.get("llm") or {}
     llm_name = llm_cfg.get("name") or config.get("llm_name") or "human"
 
@@ -49,12 +52,14 @@ def build_llm(config: dict, logger: DebugGymLogger):
 
 
 def main() -> int:
+    """Entrypoint for running FreeAgent against FreeEnv from the command line."""
     args = build_parser().parse_args()
     config = load_app_config(args.config)
 
     logger = DebugGymLogger("free-agent-run")
 
     env_cfg = config["environment"]
+    # Copy only the knobs understood by FreeEnv, leaving unrelated config behind.
     env_kwargs = dict(
         image=env_cfg["image"],
         terminal=env_cfg.get("terminal"),
