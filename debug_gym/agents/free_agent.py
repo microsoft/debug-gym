@@ -18,6 +18,13 @@ class FreeAgent(BaseAgent):
         "When you are done exploring, use the submit tool as the final action to end the session."
     )
 
+    def __init__(self, config, env, llm=None, logger=None):
+        super().__init__(config=config, env=env, llm=llm, logger=logger)
+
+        override_prompt = config.get("system_prompt")
+        if override_prompt is not None:
+            self.system_prompt = str(override_prompt)
+
     def run(self, task_name=None, debug=False):
         """Wrap BaseAgent.run to surface clearer errors when startup fails."""
         try:

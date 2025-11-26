@@ -8,8 +8,8 @@ from debug_gym.agents.free_agent import FreeAgent
 
 @pytest.fixture
 def make_free_agent(agent_setup):
-    def _factory():
-        agent, env, llm = next(agent_setup(FreeAgent))
+    def _factory(*, config_override=None):
+        agent, env, llm = next(agent_setup(FreeAgent, config_override=config_override))
         agent.logger = MagicMock()
         return agent, env, llm
 
@@ -53,3 +53,10 @@ def test_free_agent_bubbles_unrelated_attribute_error(make_free_agent):
             agent.run(task_name="demo")
 
     agent.logger.error.assert_not_called()
+
+
+def test_free_agent_system_prompt_override(make_free_agent):
+    custom_prompt = "Inspect quietly."
+    agent, _, _ = make_free_agent(config_override={"system_prompt": custom_prompt})
+
+    assert agent.system_prompt == custom_prompt
