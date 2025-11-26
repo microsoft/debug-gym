@@ -6,10 +6,9 @@ llm:
 
 # Tools to load into the environment toolbox.
 tools:
-  - listdir
-  - view
   - rewrite
   - bash
+  - submit
 
 environment:
   image: swesmith.x86_64.amueller__word_cloud.ec24191c

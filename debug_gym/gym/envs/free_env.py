@@ -236,8 +236,8 @@ class FreeEnv(RepoEnv):
     def calculate_terminated(self, eval_output) -> bool:
         return False
 
-    def eval(self, **kwargs):
-        raise NotImplementedError("FreeEnv does not support evaluation.")
+    def eval(self, **kwargs) -> EvalOutput:
+        return EvalOutput(True, "The agent terminated the session.")
 
     def reset(self, *, options: dict | None = None):
         options = options or {}

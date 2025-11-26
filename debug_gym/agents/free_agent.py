@@ -13,7 +13,7 @@ class FreeAgent(BaseAgent):
         "You have access to a set of tools to inspect and modify the codebase.\n"
         "Your goal is to use the tools to gather as much information about the codebase as possible.\n"
         "Output both your thinking process (if any) and the tool call (must) in the response.\n"
-        "Note you can only interact with codebase via the provided tools, do not ask me questions such as 'let me know if you'd like further help ...'"
+        "When you are done exploring, use the submit tool as the final action to end the session."
     )
 
     def run(self, task_name=None, debug=False):
