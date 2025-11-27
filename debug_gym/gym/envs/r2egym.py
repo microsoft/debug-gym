@@ -90,7 +90,13 @@ def load_r2egym_dataset(
         excluded_ids = custom_splits.get("excluded", [])
 
     # add instance id to each example (name of the image)
-    ds["instance_id"] = [id.split("/", 1)[-1] for id in ds["docker_image"]]
+    def extract_instance_id(docker_image: str) -> str:
+        return docker_image.split("/", 1)[-1]
+
+    # create a column "instance_id" in the dataset
+    instance_ids = [extract_instance_id(id) for id in ds["docker_image"]]
+    ds = ds.add_column("instance_id", instance_ids)
+
     problems = filter_problems(ds["instance_id"], problems, custom_splits, excluded_ids)
     ds = ds.filter(lambda example: example["instance_id"] in problems)
 
@@ -154,7 +160,7 @@ class R2EGymEnv(RepoEnv):
 
     def setup_task(self, task_data: dict, options: dict = None):
         self.ds_row = task_data
-        self.task_name = task_data["instance_id"]
+        self.task_name = self.ds_row["instance_id"]
         self.base_image = self.ds_row["docker_image"]
         self.package_name = self.ds_row["repo_name"]
         self.expected_output = json.loads(self.ds_row["expected_output_json"])

@@ -4,12 +4,13 @@ from pathlib import Path
 import docker
 import yaml
 from datasets import load_dataset, load_from_disk
-from swesmith.build_repo.download_images import DOCKER_ORG, TAG
-from swesmith.constants import MAP_REPO_TO_SPECS
-from swesmith.harness.grading import TestStatus
-from swesmith.harness.log_parsers import MAP_REPO_TO_PARSER, parse_log_pytest
-from swesmith.harness.utils import get_test_command
-from swesmith.utils import get_repo_commit_from_image_name
+
+from .swe_smith_constants import DOCKER_ORG, TAG, MAP_REPO_TO_SPECS
+from .swe_smith_utils import get_test_command, get_repo_commit_from_image_name
+
+from swebench.harness.constants import TestStatus
+from swebench.harness.grading import MAP_REPO_TO_PARSER
+from swebench.harness.log_parsers.python import parse_log_pytest
 
 from debug_gym.constants import DEBUG_GYM_CACHE_DIR
 from debug_gym.gym.entities import EvalOutput
@@ -49,7 +50,7 @@ def load_swesmith_dataset(
         custom_splits = yaml.safe_load(f)
         excluded_ids = custom_splits.get("excluded", [])
 
-    problems = filter_problems(ds["instance_id"], problems)
+    problems = filter_problems(ds["instance_id"], problems, custom_splits, excluded_ids)
     ds = ds.filter(lambda example: example["instance_id"] in problems)
 
     image_names = set(ds["image_name"])

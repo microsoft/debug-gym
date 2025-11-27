@@ -257,7 +257,9 @@ class Pod:
 
 
 class KubernetesTerminal(Terminal):
-
+    """
+    Note: reads values of env variables K8S_NAMESPACE, K8S_DOCKER_SECRET, K8S_DOCKER_CONSTRAINT.
+    """
     def __init__(
         self,
         working_dir: str | None = None,
@@ -268,8 +270,9 @@ class KubernetesTerminal(Terminal):
         setup_commands: list[str] | None = None,
         pod_name: str | None = None,
         base_image: str | None = None,
-        registry: str = "",
-        namespace: str = "default",
+        image_pull_secret: str | None = None,
+        registry: str = "docker.io",
+        namespace: str | None = None,
         kube_config: str | None = None,
         kube_context: str | None = None,
         extra_labels: dict | None = None,
@@ -286,7 +289,9 @@ class KubernetesTerminal(Terminal):
         self.base_image = base_image
         self._task_name = base_image
         self.setup_commands = setup_commands or []
-        self.namespace = namespace
+        self.namespace = namespace or os.environ.get("K8S_NAMESPACE", "default")
+        self.image_pull_secret = image_pull_secret or os.environ.get("K8S_DOCKER_SECRET")
+        self.in_node_constraint = os.environ.get("K8S_NODE_CONSTRAINT", False)
         self.kubernetes_kwargs = kwargs  # e.g., nodeSelector, tolerations
         self.registry = registry.rstrip("/") + "/" if registry else ""
         self._pod_name = pod_name
@@ -497,6 +502,30 @@ class KubernetesTerminal(Terminal):
                 f"Setting up pod {pod_name} (attempt {attempt + 1}/{max_retries}) "
                 f"with image: {self.registry}{self.base_image}"
             )
+
+            # set image pull secrets, don't override imagePullSecrets
+            if self.image_pull_secret and not "imagePullSecrets" in pod_spec_kwargs:
+                pod_spec_kwargs["imagePullSecrets"] = [{"name": self.image_pull_secret}]
+
+            # set in node constraint, don't override affinity
+            if self.in_node_constraint and not "affinity" in pod_spec_kwargs:
+                pod_spec_kwargs["affinity"] = {
+                    "nodeAffinity": {
+                        "requiredDuringSchedulingIgnoredDuringExecution": {
+                            "nodeSelectorTerms": [
+                                {
+                                    "matchExpressions": [
+                                        {
+                                            "key": "kubernetes.io/hostname",
+                                            "operator": "In",
+                                            "values": [os.environ["HOSTNAME"]],
+                                        }
+                                    ]
+                                }
+                            ]
+                        }
+                    }
+                }
 
             # Create pod specification for Kubernetes.
             pod_body = {
