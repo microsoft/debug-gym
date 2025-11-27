@@ -13,6 +13,14 @@ def select_terminal(
     if terminal_config is None:
         return None
 
+    if isinstance(terminal_config, Terminal):
+        return terminal_config
+
+    if not isinstance(terminal_config, dict):
+        raise TypeError(
+            "terminal configuration must be a dict, Terminal instance, or None",
+        )
+
     config = dict(terminal_config)
     terminal_type = str(config.pop("type", "")).lower()
     if not terminal_type:
