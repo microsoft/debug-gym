@@ -512,7 +512,7 @@ class KubernetesTerminal(Terminal):
                     "restartPolicy": "Never",
                     "containers": [
                         {
-                            "name": pod_name,
+                            "name": "main",
                             "image": f"{self.registry}{self.base_image}",
                             "imagePullPolicy": "IfNotPresent",
                             "command": ["/bin/bash"],

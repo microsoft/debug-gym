@@ -196,7 +196,7 @@ def extract_reward_from_pytest_output(output):
 
 
 def filter_problems(
-    dataset: dict[str, Any],
+    dataset_instances: list[str],
     problems: str | list[str] | None = None,
     custom_splits: dict[str, Any] | None = None,
     excluded_ids: list[str] | None = None,
@@ -208,9 +208,9 @@ def filter_problems(
     if not isinstance(problems, str):
         # Check that all problems are valid task names.
         for problem in problems:
-            if problem not in dataset:
+            if problem not in dataset_instances:
                 raise ValueError(
-                    f"Invalid problem id: '{problem}'.\nChoose from: {sorted(dataset)}"
+                    f"Invalid problem id: '{problem}'.\nChoose from: {sorted(dataset_instances)}"
                 )
 
         # Make sure all problems are unique.
@@ -220,14 +220,14 @@ def filter_problems(
         return problems  # Assuming a list of problem IDs.
 
     if problems == "all":
-        return [k for k in dataset if k not in excluded_ids]
-    elif problems in dataset:
+        return [k for k in dataset_instances if k not in excluded_ids]
+    elif problems in dataset_instances:
         return [problems]  # Single task
     elif problems in custom_splits:
         return custom_splits[problems]
     else:
         raise ValueError(
-            f"Invalid split or problem id: '{problems}'.\nChoose from: {sorted(dataset) + ['all'] + sorted(custom_splits)}"
+            f"Invalid split or problem id: '{problems}'.\nChoose from: {sorted(dataset_instances) + ['all'] + sorted(custom_splits)}"
         )
 
 

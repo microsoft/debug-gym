@@ -49,14 +49,13 @@ def load_swesmith_dataset(
         custom_splits = yaml.safe_load(f)
         excluded_ids = custom_splits.get("excluded", [])
 
-    dataset = {id: i for i, id in enumerate(ds["instance_id"])}
-    problems = filter_problems(dataset, problems, custom_splits, excluded_ids)
-    dataset = {id: i for id, i in dataset.items() if id in problems}
+    problems = filter_problems(ds["instance_id"], problems)
+    ds = ds.filter(lambda example: example["instance_id"] in problems)
 
-    image_names = set(ds[dataset[id]]["image_name"] for id in dataset)
+    image_names = set(ds["image_name"])
     if logger is not None:
         logger.debug(
-            f"Loaded {len(dataset)} tasks accross {len(image_names)} Docker images from {dataset_id}."
+            f"Loaded {len(ds)} tasks across {len(image_names)} Docker images from {dataset_id}."
         )
 
     if prepull_images:
@@ -81,7 +80,7 @@ def load_swesmith_dataset(
                 client.images.pull(docker_hub_image)
                 # Rename images via tagging
                 client.images.get(docker_hub_image).tag(image_name)
-    return dataset
+    return ds
 
 
 class SWESmithEnv(SWEBenchEnv):

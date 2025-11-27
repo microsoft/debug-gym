@@ -89,14 +89,15 @@ def load_r2egym_dataset(
         custom_splits = yaml.safe_load(f)
         excluded_ids = custom_splits.get("excluded", [])
 
-    dataset = {id.split("/", 1)[-1]: i for i, id in enumerate(ds["docker_image"])}
-    problems = filter_problems(dataset, problems, custom_splits, excluded_ids)
-    dataset = {id: i for id, i in dataset.items() if id in problems}
+    # add instance id to each example (name of the image)
+    ds["instance_id"] = [id.split("/", 1)[-1] for id in ds["docker_image"]]
+    problems = filter_problems(ds["instance_id"], problems, custom_splits, excluded_ids)
+    ds = ds.filter(lambda example: example["instance_id"] in problems)
 
-    image_names = set(ds[dataset[id]]["docker_image"] for id in dataset)
+    image_names = set(ds["docker_image"])
     if logger is not None:
         logger.debug(
-            f"Loaded {len(dataset)} tasks accross {len(image_names)} Docker images from {dataset_id}."
+            f"Loaded {len(ds)} tasks across {len(image_names)} Docker images from {dataset_id}."
         )
 
     if prepull_images:
@@ -116,8 +117,7 @@ def load_r2egym_dataset(
                             f"Pulling Docker image {i + 1}/{len(missing_images)} `{image_name}`."
                         )
                     client.images.pull(image_name)
-
-    return dataset
+    return ds
 
 
 class R2EGymEnv(RepoEnv):

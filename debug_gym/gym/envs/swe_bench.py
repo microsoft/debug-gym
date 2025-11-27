@@ -25,11 +25,11 @@ def load_swebench_dataset(
     logger: DebugGymLogger | None = None,
 ):
     ds = datasets.load_dataset(dataset_id, revision=dataset_revision)[split]
-    dataset = {id: i for i, id in enumerate(ds["instance_id"])}
-    problems = filter_problems(dataset, problems)
-    dataset = {id: i for id, i in dataset.items() if id in problems}
+    problems = filter_problems(ds["instance_id"], problems)
 
-    instance_ids = [ds[dataset[id]]["instance_id"] for id in dataset]
+    ds = ds.filter(lambda example: example["instance_id"] in problems)
+    instance_ids = ds["instance_id"]
+
     image_names = set(
         f"sweb.eval.x86_64.{id.replace('__', '_1776_')}" for id in instance_ids
     )
@@ -52,7 +52,7 @@ def load_swebench_dataset(
                         f"Pulling Docker images {i + 1}/{len(missing_images)}: `{image_name}`."
                     )
                 client.images.pull(image_name)
-    return dataset
+    return ds
 
 
 class SWEBenchEnv(RepoEnv):
