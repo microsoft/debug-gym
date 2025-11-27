@@ -508,7 +508,7 @@ class KubernetesTerminal(Terminal):
                     "restartPolicy": "Never",
                     "containers": [
                         {
-                            "name": pod_name,
+                            "name": str(uuid.uuid4())[:8],
                             "image": f"{self.registry}{self.base_image}",
                             "imagePullPolicy": "IfNotPresent",
                             "command": ["/bin/bash"],
