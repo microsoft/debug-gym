@@ -88,7 +88,18 @@ class FreeEnv(RepoEnv):
         self.workspace.reset()
         self.workspace.working_dir = Path(self._workspace_dir)
         if self.terminal is not None:
-            self.terminal.working_dir = self._workspace_dir
+            current_dir = getattr(self.terminal, "working_dir", None)
+            if current_dir != self._workspace_dir:
+                try:
+                    self.terminal.working_dir = self._workspace_dir
+                except ValueError:
+                    self.logger.debug(
+                        "Terminal already active; keeping working_dir=%s", current_dir
+                    )
+            # Ensure core utilities exist before RepoEnv renders directory listings.
+            self.terminal.run(
+                "apt-get update -y && apt-get install -y tree", raises=True
+            )
             self.terminal.run(
                 f"mkdir -p {shlex.quote(self._workspace_dir)}",
                 raises=True,
