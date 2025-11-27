@@ -1,7 +1,9 @@
+from pathlib import Path
 from typing import Any
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 from debug_gym.gym.envs.free_env import FreeEnv
+from debug_gym.gym.terminals.local import LocalTerminal
 from debug_gym.gym.terminals.terminal import Terminal
 
 
@@ -41,28 +43,13 @@ class DummyTerminal(Terminal):
         self.closed = True
 
 
-def test_free_env_uses_docker_terminal_by_default():
+def test_free_env_defaults_to_local_terminal():
     logger = MagicMock()
-    docker_instance = MagicMock(spec=Terminal)
 
-    with patch(
-        "debug_gym.gym.envs.free_env.DockerTerminal", return_value=docker_instance
-    ) as mock_docker:
-        env = FreeEnv(
-            image="ubuntu:22.04",
-            logger=logger,
-            setup_commands=["apt update"],
-            terminal_kwargs={"foo": "bar"},
-        )
+    env = FreeEnv(image="ubuntu:22.04", logger=logger)
 
-    mock_docker.assert_called_once()
-    _, kwargs = mock_docker.call_args
-    assert kwargs["base_image"] == "ubuntu:22.04"
-    assert kwargs["setup_commands"] == ["apt update"]
-    assert kwargs["working_dir"] == "/testbed"
-    assert kwargs["logger"] is logger
-    assert kwargs["foo"] == "bar"
-    assert env.terminal is docker_instance
+    assert isinstance(env.terminal, LocalTerminal)
+    assert env.container_image == "ubuntu:22.04"
 
 
 def test_free_env_configures_existing_terminal():
@@ -81,7 +68,10 @@ def test_free_env_configures_existing_terminal():
         setup_commands=["apt update"],
         workspace_dir="/workspace",
         logger=logger,
+        init_git=False,
     )
+
+    env.reset()
 
     assert env.terminal is terminal
     assert terminal.base_image == "ubuntu:22.04"
@@ -90,19 +80,19 @@ def test_free_env_configures_existing_terminal():
     assert terminal.setup_commands == ["existing", "apt update"]
 
 
-def test_free_env_update_terminal_restarts_remote_session():
+def test_free_env_respects_custom_workspace(tmp_path):
     logger = MagicMock()
     terminal = DummyTerminal(logger=logger)
 
-    env = FreeEnv(image="ubuntu:22.04", terminal=terminal, logger=logger)
-    env.container_image = "ubuntu:24.04"
-    env.container_workdir = "/new"
-    env._setup_commands = ["echo ready"]
+    env = FreeEnv(
+        image="ubuntu:22.04",
+        terminal=terminal,
+        workspace_dir="/workspace",
+        logger=logger,
+        init_git=False,
+    )
 
-    env._update_terminal(restart=True)
+    env.reset()
 
-    assert terminal.closed is True
-    assert terminal.base_image == "ubuntu:24.04"
-    assert terminal.setup_commands == ["echo ready"]
-    assert terminal.working_dir == "/new"
-    assert env.workspace.terminal is terminal
+    assert env.workspace.working_dir == Path("/workspace")
+    assert terminal.working_dir == "/workspace"

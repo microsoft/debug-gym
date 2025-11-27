@@ -9,7 +9,18 @@ class SubmitTool(EnvironmentTool):
     description = "Submit your changes once the task is complete."
     arguments = {}
 
+    def __init__(self, apply_eval=True):
+        super().__init__()
+        self.apply_eval = apply_eval
+
     def use(self, environment, **kwargs) -> Observation:
-        eval_output = environment.eval()
+        eval_output = environment.eval() if self.apply_eval else None
         environment.terminated = True
-        return Observation(self.name, eval_output.output)
+        return Observation(
+            self.name,
+            (
+                eval_output.output
+                if self.apply_eval
+                else "The agent terminated the session."
+            ),
+        )

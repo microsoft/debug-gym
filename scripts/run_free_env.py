@@ -4,9 +4,12 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
+from typing import Any, Mapping
 
 from debug_gym.agents.free_agent import FreeAgent
 from debug_gym.gym.envs.free_env import FreeEnv
+from debug_gym.gym.terminals import select_terminal
+from debug_gym.gym.terminals.terminal import Terminal
 from debug_gym.gym.tools.toolbox import Toolbox
 from debug_gym.llms.base import LLM
 from debug_gym.llms.human import Human
@@ -51,6 +54,44 @@ def build_llm(config: dict, logger: DebugGymLogger):
     )
 
 
+def resolve_terminal(
+    env_config: Mapping[str, Any],
+    logger: DebugGymLogger,
+) -> Terminal | None:
+    """Resolve the requested terminal backend, normalizing legacy config shapes."""
+    terminal_setting = env_config.get("terminal")
+
+    if isinstance(terminal_setting, Terminal):
+        return terminal_setting
+
+    if terminal_setting is None:
+        terminal_config: dict[str, Any] = {"type": "docker"}
+    elif isinstance(terminal_setting, str):
+        terminal_config = {"type": terminal_setting}
+    elif isinstance(terminal_setting, Mapping):
+        terminal_config = dict(terminal_setting)
+    else:
+        raise TypeError(
+            "terminal configuration must be a mapping, string, Terminal, or None",
+        )
+
+    overrides = dict(env_config.get("terminal_kwargs") or {})
+    terminal_config = {**terminal_config, **overrides}
+
+    terminal_config.setdefault("type", "docker")
+    terminal_config["type"] = str(terminal_config["type"]).lower()
+    terminal_config.setdefault("base_image", env_config["image"])
+    terminal_config.setdefault(
+        "working_dir", env_config.get("workspace_dir", "/testbed")
+    )
+
+    setup_commands = env_config.get("setup_commands")
+    if setup_commands:
+        terminal_config.setdefault("setup_commands", list(setup_commands))
+
+    return select_terminal(terminal_config, logger=logger)
+
+
 def main() -> int:
     """Entrypoint for running FreeAgent against FreeEnv from the command line."""
     args = build_parser().parse_args()
@@ -59,18 +100,21 @@ def main() -> int:
     logger = DebugGymLogger("free-agent-run")
 
     env_cfg = config["environment"]
+    terminal = resolve_terminal(env_cfg, logger)
     # Copy only the knobs understood by FreeEnv, leaving unrelated config behind.
     env_kwargs = dict(
         image=env_cfg["image"],
-        terminal=env_cfg.get("terminal"),
+        terminal=terminal,
         mount_path=env_cfg.get("mount_path"),
         setup_commands=env_cfg.get("setup_commands"),
+        instructions=env_cfg.get("instructions"),
+        init_git=env_cfg.get("init_git", True),
         workspace_dir=env_cfg.get("workspace_dir", "/testbed"),
         logger=logger,
         dir_tree_depth=env_cfg.get("dir_tree_depth", 2),
-        terminal_kwargs=env_cfg.get("terminal_kwargs", {}),
     )
 
+    # Instantiate the environment once the terminal and core parameters are ready.
     env = FreeEnv(**env_kwargs)
 
     for tool_name in config.get("tools", DEFAULT_TOOLS):

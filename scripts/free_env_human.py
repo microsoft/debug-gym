@@ -4,8 +4,11 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
+from typing import Any
 
 from debug_gym.gym.envs.free_env import FreeEnv
+from debug_gym.gym.terminals import select_terminal
+from debug_gym.gym.terminals.terminal import Terminal
 from debug_gym.gym.tools.toolbox import Toolbox
 from debug_gym.llms.human import Human
 from debug_gym.logger import DebugGymLogger
@@ -44,7 +47,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--terminal",
         default="docker",
-        choices=["docker", "kubernetes", "k8s"],
+        choices=["docker", "kubernetes"],
         help="Terminal backend to use.",
     )
     parser.add_argument(
@@ -109,20 +112,27 @@ def main(argv: list[str] | None = None) -> int:
 
     tool_names = args.tools if args.tools else DEFAULT_TOOLS
 
-    terminal_kwargs: dict[str, str] = {}
+    terminal_config: dict[str, Any] = {
+        "type": args.terminal,
+        "base_image": args.image,
+        "working_dir": args.workspace_dir,
+    }
+    if args.setup_command:
+        terminal_config["setup_commands"] = list(args.setup_command)
     if args.registry:
-        terminal_kwargs["registry"] = args.registry
+        terminal_config["registry"] = args.registry
+
+    terminal: Terminal | None = select_terminal(terminal_config, logger=logger)
 
     env = FreeEnv(
         image=args.image,
-        terminal=args.terminal,
+        terminal=terminal,
         mount_path=args.mount_path,
         setup_commands=args.setup_command,
         instructions=args.instructions,
         init_git=args.init_git,
         workspace_dir=args.workspace_dir,
         logger=logger,
-        terminal_kwargs=terminal_kwargs,
         dir_tree_depth=args.dir_tree_depth,
     )
 

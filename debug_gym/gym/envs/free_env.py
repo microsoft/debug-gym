@@ -1,19 +1,17 @@
 from __future__ import annotations
 
+import shlex
 from pathlib import Path
 from typing import Any
 
-from debug_gym.gym.entities import EvalOutput
 from debug_gym.gym.envs.env import RepoEnv
-from debug_gym.gym.terminals.docker import DockerTerminal
-from debug_gym.gym.terminals.kubernetes import KubernetesTerminal
 from debug_gym.gym.terminals.local import LocalTerminal
 from debug_gym.gym.terminals.terminal import Terminal
 from debug_gym.logger import DebugGymLogger
 
 
 class FreeEnv(RepoEnv):
-    """Minimal RepoEnv wrapper that exposes a container image without tasks."""
+    """Lightweight RepoEnv wrapper for running arbitrary container images."""
 
     DEFAULT_TASK_NAME = "free-session"
 
@@ -21,30 +19,24 @@ class FreeEnv(RepoEnv):
         self,
         image: str,
         *,
-        terminal: Terminal | str | None = None,
+        terminal: Terminal | None = None,
         mount_path: str | Path | None = None,
         setup_commands: list[str] | None = None,
         instructions: str | None = None,
-        init_git: bool = True,  # Default value is already True
+        init_git: bool = True,
         workspace_dir: str | Path = "/testbed",
         logger: DebugGymLogger | None = None,
-        terminal_kwargs: dict[str, Any] | None = None,
         **env_kwargs: Any,
-    ):
-        """Create a free-form repository environment running inside `image`."""
-
+    ) -> None:
+        """Create a free-form environment backed by an existing repository terminal."""
         self.container_image = image
         self._custom_instructions = (instructions or "").strip()
         self.init_git = init_git
         self._setup_commands = list(setup_commands or [])
-        self.container_workdir = str(workspace_dir)
+        self._workspace_dir = str(workspace_dir)
 
         shared_logger = logger or DebugGymLogger("debug-gym")
-        terminal_obj = self._ensure_terminal(
-            terminal=terminal,
-            logger=shared_logger,
-            terminal_kwargs=terminal_kwargs or {},
-        )
+        terminal_obj = terminal
 
         super().__init__(
             path=str(mount_path) if mount_path is not None else None,
@@ -56,165 +48,51 @@ class FreeEnv(RepoEnv):
             **env_kwargs,
         )
 
-    def _ensure_terminal(
-        self,
-        *,
-        terminal: Terminal | str | None,
-        logger: DebugGymLogger,
-        terminal_kwargs: dict[str, Any],
-    ) -> Terminal:
-        """Resolve the desired terminal implementation and preconfigure its working directory.
+        if self.terminal is not None:
+            self.terminal.logger = shared_logger
 
-        Accepts either a Terminal instance, a string alias ("docker"/"kubernetes"),
-        or None to fall back to Docker. The resolved terminal inherits the
-        environment's working directory and setup commands so that subsequent
-        calls to `reset` behave consistently.
-        """
-        terminal_kwargs = dict(terminal_kwargs)
-        terminal_kwargs.setdefault("working_dir", self.container_workdir)
+    def _apply_terminal_settings(self) -> None:
+        """Keep terminal metadata (image/setup commands) in sync with env state."""
+        terminal = self.terminal
+        if terminal is None:
+            return
 
-        if terminal is None or isinstance(terminal, str):
-            kind = (terminal or "docker").lower()
-            if kind in ("kubernetes", "k8s"):
-                k8s_terminal = KubernetesTerminal(
-                    base_image=self.container_image,
-                    setup_commands=list(self._setup_commands),
-                    logger=logger,
-                    **terminal_kwargs,
-                )
-                k8s_terminal.task_name = self.DEFAULT_TASK_NAME
-                return k8s_terminal
-            if kind != "docker":
-                raise ValueError(
-                    "FreeEnv terminal must be 'docker', 'kubernetes', or a Terminal instance."
-                )
-            return DockerTerminal(
-                base_image=self.container_image,
-                setup_commands=list(self._setup_commands),
-                logger=logger,
-                **terminal_kwargs,
-            )
-
-        if not isinstance(terminal, Terminal):
-            raise TypeError("terminal must be a Terminal instance, a string, or None")
-
-        self._configure_terminal(terminal=terminal, logger=logger)
-        return terminal
-
-    def _configure_terminal(
-        self, *, terminal: Terminal, logger: DebugGymLogger
-    ) -> None:
-        """Propagate FreeEnv specific configuration onto an already constructed terminal."""
         if hasattr(terminal, "base_image"):
             setattr(terminal, "base_image", self.container_image)
 
-        if hasattr(terminal, "working_dir") and not isinstance(terminal, LocalTerminal):
-            try:
-                terminal.working_dir = self.container_workdir
-            except ValueError:
-                logger.debug(
-                    "Terminal already active; keeping working_dir=%s",
-                    getattr(terminal, "working_dir", self.container_workdir),
-                )
-
         if self._setup_commands and hasattr(terminal, "setup_commands"):
             existing = list(getattr(terminal, "setup_commands", []))
-            for cmd in self._setup_commands:
-                if cmd not in existing:
-                    existing.append(cmd)
-            setattr(terminal, "setup_commands", existing)
-
-        if isinstance(terminal, KubernetesTerminal):
-            try:
-                terminal.task_name = self.DEFAULT_TASK_NAME
-            except ValueError:
-                logger.debug(
-                    "Kubernetes pod already created; unable to update task name."
-                )
-
-        terminal.logger = logger
-
-    def _update_terminal(self, restart: bool = False) -> None:
-        """Refresh terminal attributes when reset() overrides runtime parameters.
-
-        When `restart` is True we close the existing remote session up-front so
-        Docker/Kubernetes terminals restart with the new base image or working
-        directory the next time a command runs. Local terminals are left untouched
-        because they share filesystem state with the host.
-        """
-        if isinstance(self.terminal, LocalTerminal):
-            return
-
-        if restart:
-            try:
-                self.terminal.close()
-            except Exception as exc:  # noqa: BLE001 - surface in logs only
-                self.logger.debug("Failed to close terminal cleanly: %s", exc)
-
-        if hasattr(self.terminal, "base_image"):
-            setattr(self.terminal, "base_image", self.container_image)
-
-        if hasattr(self.terminal, "setup_commands"):
-            setattr(self.terminal, "setup_commands", list(self._setup_commands))
-
-        if hasattr(self.terminal, "working_dir"):
-            try:
-                self.terminal.working_dir = self.container_workdir
-            except ValueError:
-                # Active sessions may hold the old working dir; close them and retry.
-                self.terminal.close()
-                self.terminal.working_dir = self.container_workdir
-
-        if isinstance(self.terminal, KubernetesTerminal):
-            try:
-                self.terminal.task_name = self.DEFAULT_TASK_NAME
-            except ValueError:
-                self.logger.debug(
-                    "Kubernetes pod already created; keeping existing task name."
-                )
-
-        self.workspace.terminal = self.terminal
-
-    def set_entrypoints(self, entrypoint: str, debug_entrypoint: str | None = None):
-        self._entrypoint = entrypoint
-        self._debug_entrypoint = debug_entrypoint or entrypoint
-        self.entrypoint = entrypoint
-        self.debug_entrypoint = debug_entrypoint or entrypoint
+            for command in self._setup_commands:
+                if command not in existing:
+                    existing.append(command)
+            terminal.setup_commands = existing
+        terminal.logger = self.logger
 
     def load_dataset(self, problems: str | list[str] | None = None):
+        """Expose a single synthetic task keyed by DEFAULT_TASK_NAME."""
         return {self.DEFAULT_TASK_NAME: {"image": self.container_image}}
 
     def setup_task(self, task_name: str | None, options: dict | None = None) -> None:
+        """Record base image metadata for consistency with RepoEnv expectations."""
         self.task_name = task_name or self.DEFAULT_TASK_NAME
-        if isinstance(self.terminal, KubernetesTerminal):
-            try:
-                self.terminal.task_name = self.task_name
-            except ValueError:
-                self.logger.debug(
-                    "Kubernetes pod already created; keeping existing task name."
-                )
         self.base_image = self.container_image
+        if hasattr(self.terminal, "base_image"):
+            setattr(self.terminal, "base_image", self.base_image)
 
     def setup_workspace(self) -> None:
-        """Prepare the remote workspace and ensure baseline tooling exists."""
+        """Ensure the remote workspace matches the configured working directory."""
         if isinstance(self.terminal, LocalTerminal):
             super().setup_workspace()
             return
 
-        self.workspace.cleanup()
-        self.workspace.working_dir = Path(self.container_workdir)
-
-        try:
-            self.terminal.working_dir = self.container_workdir
-        except ValueError:
-            self.logger.debug(
-                "Terminal already running; keeping working_dir=%s",
-                getattr(self.terminal, "working_dir", self.container_workdir),
+        self.workspace.reset()
+        self.workspace.working_dir = Path(self._workspace_dir)
+        if self.terminal is not None:
+            self.terminal.working_dir = self._workspace_dir
+            self.terminal.run(
+                f"mkdir -p {shlex.quote(self._workspace_dir)}",
+                raises=True,
             )
-
-        # Ensure the tree utility is available for directory listings.
-        self.terminal.run("apt update && apt install -y tree")
-        self.terminal.run(f"mkdir -p {self.container_workdir}", raises=True)
 
         if self.path:
             self.workspace.copy_content(self.path)
@@ -222,73 +100,32 @@ class FreeEnv(RepoEnv):
         self.workspace.setup_file_filters()
 
     def setup_terminal(self) -> None:
+        """Apply FreeEnv tweaks and reuse RepoEnv git bootstrapping when enabled."""
+        self._apply_terminal_settings()
+
+        if self.terminal is not None:
+            self.terminal.run("touch .debugignore .debugreadonly")
+
         if not self.init_git:
             return
         if not self._git_available():
             self.logger.debug(
-                "Git is not available in the container; skipping repository setup."
+                "Git is not available in the container; skipping repository setup.",
             )
             return
-        self.terminal.run("touch .debugignore .debugreadonly")
         super().setup_terminal()
 
     def _git_available(self) -> bool:
+        """Check for git presence before attempting repository initialization."""
+        if self.terminal is None:
+            return False
         success, _ = self.terminal.run("command -v git")
         return success
 
     @property
     def instructions(self) -> str:
+        """Provide user-facing guidance, falling back to a generic sandbox blurb."""
         return (
             self._custom_instructions
             or "You are placed in an isolated Linux environment, use the available tools to interact with the environment effectively."
         )
-
-    def calculate_max_score(self, eval_output):
-        return 0
-
-    def calculate_score(self, eval_output):
-        return 0
-
-    def calculate_resolved(self, eval_output) -> bool:
-        return False
-
-    def calculate_terminated(self, eval_output) -> bool:
-        return False
-
-    def eval(self, **kwargs) -> EvalOutput:
-        return EvalOutput(True, "The agent terminated the session.")
-
-    def reset(self, *, options: dict | None = None):
-        options = options or {}
-
-        image = options.get("image")
-        workspace_dir = options.get("workspace_dir")
-        setup_commands = options.get("setup_commands")
-        instructions = options.get("instructions")
-        init_git = options.get("init_git")
-
-        restart_terminal = False
-
-        if image and image != self.container_image:
-            self.container_image = image
-            restart_terminal = True
-
-        if workspace_dir and str(workspace_dir) != self.container_workdir:
-            self.container_workdir = str(workspace_dir)
-            restart_terminal = True
-
-        if setup_commands is not None:
-            new_commands = list(setup_commands)
-            if new_commands != self._setup_commands:
-                self._setup_commands = new_commands
-                restart_terminal = True
-
-        if instructions is not None:
-            self._custom_instructions = instructions
-
-        if init_git is not None:
-            self.init_git = bool(init_git)
-
-        self._update_terminal(restart=restart_terminal)
-
-        return super().reset(options=options)
