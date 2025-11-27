@@ -531,21 +531,6 @@ class KubernetesTerminal(Terminal):
                             },
                         }
                     ],
-                    "tolerations": [
-                        {
-                            "key": "node.kubernetes.io/disk-pressure",
-                            "operator": "Exists",
-                            "effect": "NoExecute",
-                            "tolerationSeconds": 10800,
-                        },
-                        {
-                            "key": "kubernetes.azure.com/scalesetpriority",
-                            "operator": "Equal",
-                            "value": "spot",
-                            "effect": "NoSchedule",
-                        },
-                        {"key": "CriticalAddonsOnly", "operator": "Exists"},
-                    ],
                     **pod_spec_kwargs,  # e.g., nodeSelector, tolerations
                 },
             }
