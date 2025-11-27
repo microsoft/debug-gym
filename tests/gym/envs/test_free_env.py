@@ -79,7 +79,7 @@ def test_free_env_configures_existing_terminal():
     assert terminal.base_image == "ubuntu:22.04"
     assert terminal.working_dir == "/workspace"
     assert terminal.logger is logger
-    assert terminal.setup_commands == ["existing", "apt update"]
+    assert terminal.setup_commands == ["apt update"]
 
 
 def test_free_env_respects_custom_workspace(tmp_path):

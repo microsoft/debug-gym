@@ -36,36 +36,48 @@ class FreeEnv(RepoEnv):
         self._workspace_dir = str(workspace_dir)
 
         shared_logger = logger or DebugGymLogger("debug-gym")
-        terminal_obj = terminal
 
         super().__init__(
             path=str(mount_path) if mount_path is not None else None,
             entrypoint="true",
             debug_entrypoint="true",
             max_score=0,
-            terminal=terminal_obj,
+            terminal=terminal,
             logger=shared_logger,
             **env_kwargs,
         )
 
         if self.terminal is not None:
-            self.terminal.logger = shared_logger
+            self._apply_terminal_settings()
 
     def _apply_terminal_settings(self) -> None:
         """Keep terminal metadata (image/setup commands) in sync with env state."""
         terminal = self.terminal
         if terminal is None:
             return
-
         if hasattr(terminal, "base_image"):
             setattr(terminal, "base_image", self.container_image)
 
         if hasattr(terminal, "setup_commands"):
-            existing = list(getattr(terminal, "setup_commands", []))
-            for command in self._setup_commands:
-                if command not in existing:
-                    existing.append(command)
-            terminal.setup_commands = existing
+            terminal.setup_commands = list(self._setup_commands)
+
+        if hasattr(terminal, "working_dir") and not isinstance(terminal, LocalTerminal):
+            try:
+                terminal.working_dir = self._workspace_dir
+            except ValueError:
+                self.logger.debug(
+                    "Terminal already active; keeping working_dir=%s",
+                    getattr(terminal, "working_dir", self._workspace_dir),
+                )
+
+        if hasattr(terminal, "task_name"):
+            try:
+                terminal.task_name = self.DEFAULT_TASK_NAME
+            except ValueError:
+                self.logger.debug(
+                    "Terminal already active; keeping existing task name."
+                )
+
         terminal.logger = self.logger
 
     def load_dataset(self, problems: str | list[str] | None = None):
