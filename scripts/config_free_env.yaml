@@ -14,6 +14,8 @@ tools:
 environment:
   image: swesmith.x86_64.amueller__word_cloud.ec24191c
   workspace_dir: /testbed
+  terminal:
+    type: docker
 
 agent:
   random_seed: 42

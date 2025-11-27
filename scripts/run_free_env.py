@@ -73,9 +73,6 @@ def resolve_terminal(
             "terminal configuration must be a mapping, string, Terminal, or None",
         )
 
-    overrides = dict(env_config.get("terminal_kwargs") or {})
-    terminal_config = {**terminal_config, **overrides}
-
     terminal_config.setdefault("type", "docker")
     terminal_config["type"] = str(terminal_config["type"]).lower()
     terminal_config.setdefault("base_image", env_config["image"])
@@ -86,6 +83,9 @@ def resolve_terminal(
     setup_commands = env_config.get("setup_commands")
     if setup_commands:
         terminal_config.setdefault("setup_commands", list(setup_commands))
+
+        overrides = dict(env_config.get("terminal_kwargs") or {})
+        terminal_config.update(overrides)
 
     return select_terminal(terminal_config, logger=logger)
 
