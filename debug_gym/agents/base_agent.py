@@ -312,7 +312,7 @@ class BaseAgent:
                 step=step + 1,
                 total_steps=step + 1,
                 score=info.score if info else 0,
-                max_score=info.max_score,
+                max_score=info.max_score if info else None,
                 status="error",
             )
             raise
