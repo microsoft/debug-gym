@@ -21,8 +21,8 @@ from debug_gym.logger import DebugGymLogger, load_previous_run_status
 from debug_gym.gym.envs.swe_bench import load_swebench_dataset
 from debug_gym.gym.envs.swe_smith import load_swesmith_dataset
 from debug_gym.gym.envs.r2egym import load_r2egym_dataset
-        
-        
+
+
 class AgentTimeoutException(BaseException):
     """Custom exception to handle timeouts in agent
     execution. Inherits from BaseException to ensure
@@ -44,11 +44,7 @@ def set_signal(timeout_seconds):
         signal.alarm(timeout_seconds)
 
 
-def run_agent(
-    args,
-    problem: dict,
-    config: dict
-):
+def run_agent(args, problem: dict, config: dict):
     set_signal(args.timeout)
     success = True
     env = None
@@ -260,7 +256,7 @@ def main():
         "dataset_id": config.env_kwargs.get("dataset_id"),
         "dataset_revision": config.env_kwargs.get("dataset_revision"),
         "problems": config.get("problems", "all"),
-        "prepull_images": config.env_kwargs.get("prepull_images", False)
+        "prepull_images": config.env_kwargs.get("prepull_images", False),
     }
     load_dataset_fn = {
         "swebench": load_swebench_dataset,
@@ -269,8 +265,8 @@ def main():
         "r2egym": load_r2egym_dataset,
     }
 
-    if config['benchmark'] in load_dataset_fn:
-        dataset = load_dataset_fn[config['benchmark']](
+    if config["benchmark"] in load_dataset_fn:
+        dataset = load_dataset_fn[config["benchmark"]](
             **dataset_info,
         )
     else:

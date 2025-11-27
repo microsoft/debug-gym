@@ -7,7 +7,7 @@ import pytest
 
 from debug_gym.agents.solution_agent import AgentSolution
 from debug_gym.gym.entities import Observation
-from debug_gym.gym.envs.r2egym import R2EGymEnv
+from debug_gym.gym.envs.r2egym import R2EGymEnv, load_r2egym_dataset
 from debug_gym.gym.terminals.docker import DockerTerminal
 from debug_gym.gym.tools.tool import ToolCall
 from debug_gym.gym.tools.toolbox import Toolbox
@@ -73,10 +73,12 @@ def test_load_dataset_from_parquet(mock_docker_from_env, tmp_path):
     mock_terminal = MagicMock(spec=DockerTerminal)
 
     # Load the dataset from the Parquet file
-    env = R2EGymEnv(dataset_id=str(parquet_file), split="train", terminal=mock_terminal)
+    dataset = load_r2egym_dataset(
+        dataset_id=str(parquet_file), split="train", terminal=mock_terminal
+    )
 
     # Verify the dataset contains the expected features
-    assert sorted(env.ds.features.keys()) == sorted(
+    assert sorted(dataset.features.keys()) == sorted(
         [
             "commit_hash",
             "docker_image",
@@ -96,10 +98,10 @@ def test_load_dataset_from_parquet(mock_docker_from_env, tmp_path):
     )
 
     # Verify the dataset has the expected data
-    assert len(env.ds) == 1
-    assert env.ds[0]["docker_image"] == "test_repo:test_hash_123"
-    assert env.ds[0]["commit_hash"] == "test_hash_123"
-    assert "Test problem statement" in env.ds[0]["problem_statement"]
+    assert len(dataset) == 1
+    assert dataset[0]["docker_image"] == "test_repo:test_hash_123"
+    assert dataset[0]["commit_hash"] == "test_hash_123"
+    assert "Test problem statement" in dataset[0]["problem_statement"]
 
 
 @pytest.if_docker_running
