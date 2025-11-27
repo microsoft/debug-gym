@@ -15,7 +15,14 @@ from debug_gym.llms.base import LLM
 from debug_gym.llms.human import Human
 from debug_gym.logger import DebugGymLogger
 
-DEFAULT_TOOLS = ["listdir", "view", "grep", "rewrite", "bash"]
+DEFAULT_TOOLS = [
+    "listdir",
+    "view",
+    "grep",
+    "rewrite",
+    "bash",
+    {"submit": {"apply_eval": False}},
+]
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -92,6 +99,26 @@ def resolve_terminal(
     return select_terminal(terminal_config, logger=logger)
 
 
+def add_tools(env: FreeEnv, tools_config: list[Any], logger: DebugGymLogger) -> None:
+    """Instantiate tools defined in config, honoring optional per-tool kwargs."""
+
+    for tool_entry in tools_config:
+        tool_kwargs: dict[str, Any] = {}
+        if isinstance(tool_entry, Mapping):
+            if len(tool_entry) != 1:
+                raise ValueError("Tool mapping entries must contain a single tool name")
+            tool_entry = dict(tool_entry)
+            tool_name, tool_kwargs = next(iter(tool_entry.items()))
+        else:
+            tool_name = str(tool_entry)
+
+        if tool_name == "submit" and "apply_eval" not in tool_kwargs:
+            tool_kwargs = {**tool_kwargs, "apply_eval": False}
+
+        env.add_tool(Toolbox.get_tool(tool_name, **tool_kwargs))
+        logger.debug("Added tool %s with options %s", tool_name, tool_kwargs)
+
+
 def main() -> int:
     """Entrypoint for running FreeAgent against FreeEnv from the command line."""
     args = build_parser().parse_args()
@@ -117,8 +144,7 @@ def main() -> int:
     # Instantiate the environment once the terminal and core parameters are ready.
     env = FreeEnv(**env_kwargs)
 
-    for tool_name in config.get("tools", DEFAULT_TOOLS):
-        env.add_tool(Toolbox.get_tool(tool_name))
+    add_tools(env, config.get("tools", DEFAULT_TOOLS), logger)
 
     llm = build_llm(config, logger)
     agent_config = config.get("agent", {})

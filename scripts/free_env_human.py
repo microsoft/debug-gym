@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterable
 
 from debug_gym.gym.envs.free_env import FreeEnv
 from debug_gym.gym.terminals import select_terminal
@@ -14,7 +14,14 @@ from debug_gym.llms.human import Human
 from debug_gym.logger import DebugGymLogger
 
 DEFAULT_IMAGE = "swesmith.x86_64.amueller__word_cloud.ec24191c"
-DEFAULT_TOOLS = ["listdir", "view", "grep", "rewrite", "bash"]
+DEFAULT_TOOLS = [
+    "listdir",
+    "view",
+    "grep",
+    "rewrite",
+    "bash",
+    {"submit": {"apply_eval": False}},
+]
 
 
 def format_observations(env_info) -> list[dict]:
@@ -104,13 +111,38 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _add_tools(env: FreeEnv, tool_specs: Iterable[Any], logger: DebugGymLogger) -> None:
+    """Attach toolbox entries, defaulting submit to apply_eval=False for humans."""
+
+    for spec in tool_specs:
+        tool_kwargs: dict[str, Any] = {}
+        if isinstance(spec, dict):
+            if len(spec) != 1:
+                raise ValueError("Tool dictionary must contain exactly one entry")
+            spec = dict(spec)
+            tool_name, tool_kwargs = next(iter(spec.items()))
+        else:
+            tool_name = str(spec)
+
+        if tool_name == "submit" and "apply_eval" not in tool_kwargs:
+            tool_kwargs = {**tool_kwargs, "apply_eval": False}
+
+        env.add_tool(Toolbox.get_tool(tool_name, **tool_kwargs))
+        logger.debug("Loaded tool %s with options %s", tool_name, tool_kwargs)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
 
     logger = DebugGymLogger("free-env-demo")
 
-    tool_names = args.tools if args.tools else DEFAULT_TOOLS
+    tool_specs: list[Any]
+    if args.tools:
+        # User-specified tools override defaults but still respect submit behaviour.
+        tool_specs = list(args.tools)
+    else:
+        tool_specs = list(DEFAULT_TOOLS)
 
     terminal_config: dict[str, Any] = {
         "type": args.terminal,
@@ -136,8 +168,7 @@ def main(argv: list[str] | None = None) -> int:
         dir_tree_depth=args.dir_tree_depth,
     )
 
-    for tool_name in tool_names:
-        env.add_tool(Toolbox.get_tool(tool_name))
+    _add_tools(env, tool_specs, logger)
     logger.info("Loaded tools: %s", env.tool_names)
 
     info = env.reset()
