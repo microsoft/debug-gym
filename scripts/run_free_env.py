@@ -84,8 +84,8 @@ def resolve_terminal(
     if setup_commands:
         terminal_config.setdefault("setup_commands", list(setup_commands))
 
-        overrides = dict(env_config.get("terminal_kwargs") or {})
-        terminal_config.update(overrides)
+    overrides = dict(env_config.get("terminal_kwargs") or {})
+    terminal_config.update(overrides)
 
     return select_terminal(terminal_config, logger=logger)
 
