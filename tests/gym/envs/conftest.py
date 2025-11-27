@@ -34,11 +34,11 @@ def make_env_factory(env_name, worker_id, tmp_path_factory):
     env_class = kwargs.pop("env_class")
 
     def _make_env():
-        if isinstance(env_class, (SWEBenchEnv, SWEBenchDebugEnv)):
+        if issubclass(env_class, (SWEBenchEnv, SWEBenchDebugEnv)):
             fn = load_swebench_dataset
-        elif isinstance(env_class, SWESmithEnv):
+        elif issubclass(env_class, SWESmithEnv):
             fn = load_swesmith_dataset
-        elif isinstance(env_class, R2EGymEnv):
+        elif issubclass(env_class, R2EGymEnv):
             fn = load_r2egym_dataset
         else:
             raise ValueError(f"Unknown env_class: {env_class}")

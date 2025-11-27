@@ -69,12 +69,9 @@ def test_load_dataset_from_parquet(mock_docker_from_env, tmp_path):
     table = pa.table(data)
     pq.write_table(table, str(parquet_file))
 
-    # Mock the terminal to avoid actual Docker operations
-    mock_terminal = MagicMock(spec=DockerTerminal)
-
     # Load the dataset from the Parquet file
     dataset = load_r2egym_dataset(
-        dataset_id=str(parquet_file), split="train", terminal=mock_terminal
+        dataset_id=str(parquet_file), split="train"
     )
 
     # Verify the dataset contains the expected features
