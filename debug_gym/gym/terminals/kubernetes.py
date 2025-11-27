@@ -508,7 +508,7 @@ class KubernetesTerminal(Terminal):
                     "restartPolicy": "Never",
                     "containers": [
                         {
-                            "name": "main",
+                            "name": pod_name,
                             "image": f"{self.registry}{self.base_image}",
                             "imagePullPolicy": "IfNotPresent",
                             "command": ["/bin/bash"],
@@ -518,14 +518,31 @@ class KubernetesTerminal(Terminal):
                             "stdinOnce": False,
                             "tty": True,
                             "env": [
-                                {"name": k, "value": v}
-                                for k, v in self.env_vars.items()
+                                {"name": k, "value": v} for k, v in self.env_vars.items()
                             ],
                             "resources": {
                                 "requests": {"cpu": "0.5", "memory": "1Gi"},
                                 "limits": {"cpu": "2", "memory": "8Gi"},
                             },
                         }
+                    ],
+                    "tolerations": [
+                        {
+                            "key": "node.kubernetes.io/disk-pressure",
+                            "operator": "Exists",
+                            "effect": "NoExecute",
+                            "tolerationSeconds": 10800
+                        },
+                        {
+                            "key": "kubernetes.azure.com/scalesetpriority",
+                            "operator": "Equal",
+                            "value": "spot",
+                            "effect": "NoSchedule"
+                        },
+                        {
+                            "key": "CriticalAddonsOnly",
+                            "operator": "Exists"
+                        },
                     ],
                     **pod_spec_kwargs,  # e.g., nodeSelector, tolerations
                 },
