@@ -1,8 +1,12 @@
 import argparse
+import json
 import logging
 import os
+from pathlib import Path
 
 import yaml
+
+from debug_gym.logger import DebugGymLogger
 
 
 def load_config():
@@ -139,3 +143,24 @@ def load_config():
         return_config["agent_type"] = args.agent
 
     return return_config, args
+
+
+def save_patch(env, problem_path: Path, logger: DebugGymLogger):
+    """Persist the current environment patch to disk."""
+    problem_path.mkdir(parents=True, exist_ok=True)
+    patch_path = problem_path / "debug_gym.patch"
+    with open(patch_path, "w") as f:
+        f.write(env.patch)
+
+    logger.debug(f"Patch saved in {patch_path}")
+
+
+def save_trajectory(agent, problem: str, problem_path: Path, logger: DebugGymLogger):
+    """Persist the agent trajectory to disk."""
+    problem_path.mkdir(parents=True, exist_ok=True)
+    trajectory = agent.build_trajectory(task_name=problem)
+    json_file = problem_path / "trajectory.json"
+    with open(json_file, "w") as f:
+        json.dump(trajectory, f, indent=4)
+
+    logger.debug(f"Trajectory saved in {json_file}")

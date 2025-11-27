@@ -14,9 +14,9 @@ from debug_gym.agents.base_agent import (
 )
 from debug_gym.agents.debug_agent import Debug_5_Agent, DebugAgent
 from debug_gym.agents.rewrite_agent import RewriteAgent
+from debug_gym.agents.utils import save_patch, save_trajectory
 from debug_gym.gym.tools.toolbox import Toolbox
 from debug_gym.llms.base import LLMResponse, TokenUsage
-from debug_gym.scripts.run import save_patch, save_trajectory
 
 
 def test_default_system_prompt(agent_setup, build_env_info):
@@ -133,11 +133,11 @@ def test_load_system_prompt_template_file_not_found(agent_setup):
 def test_build_system_prompt(agent_setup, build_env_info):
     agent, env, _ = next(agent_setup(DebugAgent))
     eval_tool = Toolbox.get_tool("eval", auto_eval_on_rewrite=True)
+    pdb_tool = Toolbox.get_tool("pdb", auto_list=True, persistent_breakpoints=True)
     env.add_tool(eval_tool)
-    agent.args.env_kwargs = {
-        "show_current_breakpoints": True,
-        "show_directory_tree": True,
-    }
+    env.add_tool(pdb_tool)
+    agent.args.show_directory_tree = 2
+    agent.args.show_current_breakpoints = True
     agent.system_prompt = "Test overall task"
     info = build_env_info(
         instructions="Do X",
@@ -145,6 +145,7 @@ def test_build_system_prompt(agent_setup, build_env_info):
         current_breakpoints=[1, 2],
         eval_observation="eval obs",
     )
+
     messages = agent.build_system_prompt(info)
     expected = {
         "Overall task": "Test overall task",
@@ -159,6 +160,8 @@ def test_build_system_prompt(agent_setup, build_env_info):
             "updated automatically in the system prompt.",
             "The environment will show the directory tree of the repository in the system prompt.",
             "The environment will show the current breakpoints in the system prompt.",
+            "The environment will automatically restore existing breakpoints when a new PDB session is started (e.g., after a rewrite).",
+            "After every valid PDB tool calling, the environment will automatically call the PDB tool again with a `list .` command, which will show the code around the current frame.",
         ],
     }
     assert messages == [{"role": "system", "content": json.dumps(expected, indent=2)}]
@@ -289,8 +292,8 @@ def test_create_agent():
     class TestRegisteredAgent(BaseAgent):
         name = "test_registered"
 
-        def __init__(self, config, env, **kwargs):
-            super().__init__(config, env, **kwargs)
+        def __init__(self, args, env, **kwargs):
+            super().__init__(args, env, **kwargs)
 
     # Clear and setup registry
     original_registry = AGENT_REGISTRY.copy()
@@ -336,19 +339,18 @@ def test_create_agent():
 def test_system_prompt_building_with_no_template():
     """Test system prompt building when no template is provided"""
     mock_env = MagicMock()
-    mock_env.get_tool = MagicMock(
-        side_effect=KeyError("no tools for testing")
-    )  # KeyError to simulate missing tool
-    agent = BaseAgent(
+    agent_args = AgentArgs.from_dict(
         {
-            "output_path": "/tmp",
             "random_seed": 42,
             "memory_size": 10,
             "max_steps": 1,
             "max_rewrite_steps": 1,
-        },
-        mock_env,
+        }
     )
+    llm = MagicMock()
+    llm.context_length = 2000
+    llm.count_tokens = Mock(return_value=500)
+    agent = BaseAgent(agent_args, mock_env, llm=llm)
 
     # Create a mock info object
     mock_info = MagicMock()
@@ -444,9 +446,13 @@ def test_shortcut_features_comprehensive(agent_setup):
     assert len(features) == 2  # Only auto_eval and directory_tree
 
     # Test with no features
-    agent.args.env_kwargs = {}
+    agent.args.show_directory_tree = 0
+    agent.args.show_current_breakpoints = False
     env.get_tool("eval").auto_eval_on_rewrite = False
+    env.get_tool("pdb").auto_list = False
+    env.get_tool("pdb").persistent_breakpoints = False
     features = agent.shortcut_features()
+    print(features)
     assert len(features) == 0
 
 

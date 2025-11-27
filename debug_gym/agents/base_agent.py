@@ -233,12 +233,12 @@ class BaseAgent:
             "Instructions": info.instructions,
         }
 
-        if self._show_directory_tree():
+        if self.args.show_directory_tree > 0:
             system_prompt_dict["Repo directory tree"] = self.trim_message(
                 info.dir_tree, max_length_percentage=0.1, where="end"
             )
 
-        if self._show_current_breakpoints():
+        if self.args.show_current_breakpoints:
             system_prompt_dict["Current breakpoints"] = info.current_breakpoints
 
         if self._auto_eval_on_rewrite():
@@ -445,5 +445,5 @@ def create_agent(
     if isinstance(agent_args, dict):
         agent_args = AgentArgs.from_dict(agent_args)
 
-    agent = agent_class(agent_args=agent_args, **agent_kwargs)
+    agent = agent_class(args=agent_args, **agent_kwargs)
     return agent
