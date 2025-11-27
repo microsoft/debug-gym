@@ -2,7 +2,8 @@ import json
 import os
 import subprocess
 import uuid
-from os.path import join as pjoin
+from dataclasses import asdict, dataclass, field
+from typing import Any, Dict
 
 import numpy as np
 from jinja2 import Environment, Template
@@ -15,6 +16,71 @@ from debug_gym.llms.utils import trim
 from debug_gym.logger import DebugGymLogger
 
 AGENT_REGISTRY = {}
+
+
+@dataclass
+class AgentArgs:
+    random_seed: int
+    memory_size: int
+    max_steps: int
+    max_rewrite_steps: int
+    env_kwargs: Dict[str, Any] = field(default_factory=dict)
+    reset_prompt_history_after_rewrite: bool = False
+    system_prompt_template_file: str | None = None
+    n_rewrites_before_pdb: int = 0
+    uuid: str = field(default_factory=lambda: str(uuid.uuid4()))
+    extras: Dict[str, Any] = field(default_factory=dict)
+
+    @classmethod
+    def from_dict(cls, config: Dict[str, Any]) -> "AgentArgs":
+        required_keys = ["random_seed", "memory_size", "max_steps", "max_rewrite_steps"]
+        missing = [key for key in required_keys if key not in config]
+        if missing:
+            raise ValueError(
+                f"Missing required agent config keys: {', '.join(sorted(missing))}"
+            )
+
+        known_keys = {
+            "random_seed",
+            "memory_size",
+            "max_steps",
+            "max_rewrite_steps",
+            "env_kwargs",
+            "reset_prompt_history_after_rewrite",
+            "system_prompt_template_file",
+            "n_rewrites_before_pdb",
+            "uuid",
+            # Explicitly excluded to decouple the agent from filesystem concerns.
+            "output_path",
+        }
+        extras = {k: v for k, v in config.items() if k not in known_keys}
+        env_kwargs = dict(config.get("env_kwargs") or {})
+
+        return cls(
+            random_seed=config["random_seed"],
+            memory_size=config["memory_size"],
+            max_steps=config["max_steps"],
+            max_rewrite_steps=config["max_rewrite_steps"],
+            env_kwargs=env_kwargs,
+            reset_prompt_history_after_rewrite=config.get(
+                "reset_prompt_history_after_rewrite", False
+            ),
+            system_prompt_template_file=config.get("system_prompt_template_file"),
+            n_rewrites_before_pdb=config.get("n_rewrites_before_pdb", 0),
+            uuid=config.get("uuid", str(uuid.uuid4())),
+            extras=extras,
+        )
+
+    def get(self, key: str, default=None):
+        if key in self.__dataclass_fields__:
+            return getattr(self, key)
+        return self.extras.get(key, default)
+
+    def to_dict(self) -> Dict[str, Any]:
+        data = asdict(self)
+        extras = data.pop("extras", {})
+        data.update(extras)
+        return data
 
 
 def register_agent(cls):
@@ -33,22 +99,21 @@ class BaseAgent:
 
     def __init__(
         self,
-        config: dict,
+        agent_args: AgentArgs | Dict[str, Any],
         env: RepoEnv,
         llm: LLM | None = None,
         logger: DebugGymLogger | None = None,
     ):
-        self.config = config
+        if isinstance(agent_args, dict):
+            agent_args = AgentArgs.from_dict(agent_args)
+        self.args = agent_args
         self.env = env
         self.logger = logger or DebugGymLogger("debug-gym")
         self.llm = llm
-        self._uuid = self.config.get("uuid", str(uuid.uuid4()))
-        self._output_path = pjoin(self.config["output_path"], self._uuid)
+        self._uuid = self.args.uuid
 
-        os.makedirs(self._output_path, exist_ok=True)
-
-        self.set_seed(self.config["random_seed"])
-        self.history = HistoryTracker(self.config["memory_size"])
+        self.set_seed(self.args.random_seed)
+        self.history = HistoryTracker(self.args.memory_size)
 
     def set_seed(self, seed):
         np.random.seed(seed)
@@ -57,7 +122,7 @@ class BaseAgent:
         messages = build_history_prompt(
             self.history,
             self.llm,
-            self.config.get("reset_prompt_history_after_rewrite", False),
+            self.args.reset_prompt_history_after_rewrite,
         )
         return messages
 
@@ -78,11 +143,11 @@ class BaseAgent:
 
     def _show_current_breakpoints(self):
         """Check if current breakpoints should be shown in the system prompt."""
-        return self.config.get("env_kwargs", {}).get("show_current_breakpoints", False)
+        return self.args.env_kwargs.get("show_current_breakpoints", False)
 
     def _show_directory_tree(self):
         """Check if directory tree should be shown in the system prompt."""
-        return self.config.get("env_kwargs", {}).get("show_directory_tree", False)
+        return self.args.env_kwargs.get("show_directory_tree", False)
 
     def shortcut_features(self):
         features = []
@@ -102,12 +167,12 @@ class BaseAgent:
                 features.append(
                     "The environment will show the current breakpoints in the system prompt."
                 )
-            if self.config.get("env_kwargs", {}).get("persistent_breakpoints"):
+            if self.args.env_kwargs.get("persistent_breakpoints"):
                 features.append(
                     "The environment will automatically restore existing breakpoints "
                     "when a new PDB session is started (e.g., after a rewrite)."
                 )
-            if self.config.get("env_kwargs", {}).get("auto_list"):
+            if self.args.env_kwargs.get("auto_list"):
                 features.append(
                     "After every valid PDB tool calling, the environment will "
                     "automatically call the PDB tool again with a `list .` command, "
@@ -150,7 +215,7 @@ class BaseAgent:
         """Load system prompt template from config if specified and register custom filters.
         If no template is specified, return None.
         """
-        system_prompt_template = self.config.get("system_prompt_template_file")
+        system_prompt_template = self.args.system_prompt_template_file
         if system_prompt_template:
             if not os.path.isfile(system_prompt_template):
                 error_msg = (
@@ -223,7 +288,7 @@ class BaseAgent:
     def run(self, task_name=None, debug=False):
         step = 0
         info = None
-        max_steps = self.config["max_steps"]
+        max_steps = self.args.max_steps
         try:
             self.history.reset()
             info = self.env.reset(options={"task_name": task_name})
@@ -268,7 +333,7 @@ class BaseAgent:
 
                 if (
                     info.terminated
-                    or info.rewrite_counter >= self.config["max_rewrite_steps"]
+                    or info.rewrite_counter >= self.args.max_rewrite_steps
                 ):
                     reason = (
                         "terminated" if info.resolved else "max_rewrite_steps reached"
@@ -339,22 +404,12 @@ class BaseAgent:
             print("Error:", e.stderr)
             return False
 
-    def save_patch(self, task_name="custom"):
-        os.makedirs(pjoin(self._output_path, task_name), exist_ok=True)
-        patch_path = pjoin(self._output_path, task_name, "debug_gym.patch")
-        with open(patch_path, "w") as f:
-            f.write(self.env.patch)
-
-        self.logger.debug(
-            f"Patch saved in {pjoin(self._output_path, task_name, 'debug_gym.patch')}"
-        )
-
-    def save_trajectory(self, task_name="custom"):
-        # Simple tools list.
+    def build_trajectory(self, task_name="custom"):
+        """Return the trajectory as a JSON-serializable dict without writing it."""
         tools = [f"{tool.name}({tool.arguments})" for tool in self.env.tools]
         json_output = {
             "problem": task_name,
-            "config": self.config,
+            "config": self.args.to_dict(),
             "tools": self.llm.define_tools(self.env.tools) if self.llm else tools,
             "uuid": self._uuid,
             "success": self.env.resolved,
@@ -365,15 +420,16 @@ class BaseAgent:
         for step_id in range(len(self.history)):
             step_json = self.history.json(step_id)
             json_output["log"].append(step_json)
-        os.makedirs(pjoin(self._output_path, task_name), exist_ok=True)
-        json_file = pjoin(self._output_path, task_name, "trajectory.json")
-        with open(json_file, "w") as f:
-            json.dump(json_output, f, indent=4)
-
-        self.logger.debug(f"Trajectory saved in {json_file}")
+        return json_output
 
 
-def create_agent(agent_type: str, **agent_kwargs):
+def create_agent(
+    agent_type: str,
+    *,
+    agent_args: AgentArgs | Dict[str, Any] | None = None,
+    config: Dict[str, Any] | None = None,
+    **agent_kwargs,
+):
     if agent_type in AGENT_REGISTRY:
         agent_class = AGENT_REGISTRY[agent_type]
     elif "." in agent_type:
@@ -389,5 +445,13 @@ def create_agent(agent_type: str, **agent_kwargs):
     else:
         raise ValueError(f"Unknown agent type: {agent_type}")
 
-    agent = agent_class(**agent_kwargs)
+    if agent_args is None:
+        if config is None:
+            raise ValueError("Either agent_args or config must be provided.")
+        agent_args = config
+
+    if isinstance(agent_args, dict):
+        agent_args = AgentArgs.from_dict(agent_args)
+
+    agent = agent_class(agent_args=agent_args, **agent_kwargs)
     return agent

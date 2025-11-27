@@ -9,7 +9,7 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 
 from debug_gym import version as dg_version
-from debug_gym.agents.base_agent import AGENT_REGISTRY, create_agent
+from debug_gym.agents.base_agent import AGENT_REGISTRY, AgentArgs, create_agent
 from debug_gym.agents.utils import load_config
 from debug_gym.gym.envs import select_env
 from debug_gym.gym.terminals import select_terminal
@@ -99,9 +99,10 @@ def run_agent(args, problem, config):
             logger=task_logger,
         )
 
+        agent_args = AgentArgs.from_dict(config)
         agent = create_agent(
             config["agent_type"],
-            config=config,
+            agent_args=agent_args,
             env=env,
             llm=llm,
             logger=task_logger,
@@ -141,11 +142,11 @@ def run_agent(args, problem, config):
             raise
 
         # save trajectory
-        agent.save_trajectory(task_name=problem)
+        save_trajectory(agent, problem, problem_path, task_logger)
 
         # optionally apply patch
         if config["save_patch"]:
-            agent.save_patch(task_name=problem)
+            save_patch(env, problem_path, task_logger)
 
     except Exception as e:
         task_logger.error(
@@ -199,6 +200,27 @@ def add_tools(env, config: dict, logger: DebugGymLogger):
         tool_instantiated = Toolbox.get_tool(tool, **tool_config)
         env.add_tool(tool_instantiated)
         logger.debug(f"Adding tool to toolbox: {tool_instantiated.__class__.__name__}")
+
+
+def save_patch(env, problem_path: Path, logger: DebugGymLogger):
+    """Persist the current environment patch to disk."""
+    problem_path.mkdir(parents=True, exist_ok=True)
+    patch_path = problem_path / "debug_gym.patch"
+    with open(patch_path, "w") as f:
+        f.write(env.patch)
+
+    logger.debug(f"Patch saved in {patch_path}")
+
+
+def save_trajectory(agent, problem: str, problem_path: Path, logger: DebugGymLogger):
+    """Persist the agent trajectory to disk."""
+    problem_path.mkdir(parents=True, exist_ok=True)
+    trajectory = agent.build_trajectory(task_name=problem)
+    json_file = problem_path / "trajectory.json"
+    with open(json_file, "w") as f:
+        json.dump(trajectory, f, indent=4)
+
+    logger.debug(f"Trajectory saved in {json_file}")
 
 
 def dump_experiment_info(config: dict, args: dict):

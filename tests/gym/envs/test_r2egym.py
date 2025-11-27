@@ -253,6 +253,7 @@ def test_running_solution_agent(get_r2egym_env, tmp_path):
         "random_seed": 0,
         "memory_size": 8,
         "max_steps": 1,
+        "max_rewrite_steps": 1,
         "env_kwargs": {},
     }
     for tool_name in ["pdb", "eval", "submit"]:

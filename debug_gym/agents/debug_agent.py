@@ -13,7 +13,7 @@ class Debug_5_Agent(DebugAgent):
 
     def run(self, task_name=None, debug=False):
         step = 0
-        max_steps = self.config["max_steps"]
+        max_steps = self.args.max_steps
         try:
             # remove the pdb tool from the environment
             pdb_tool = self.env.remove_tool("pdb")
@@ -57,7 +57,7 @@ class Debug_5_Agent(DebugAgent):
 
                 # re-introduce pdb tool at the right time
                 if (
-                    info.rewrite_counter >= self.config["n_rewrites_before_pdb"]
+                    info.rewrite_counter >= self.args.n_rewrites_before_pdb
                     and pdb_tool.name not in self.env.tools
                 ):
                     self.env.add_tool(pdb_tool)
@@ -70,7 +70,7 @@ class Debug_5_Agent(DebugAgent):
 
                 if (
                     info.terminated
-                    or info.rewrite_counter >= self.config["max_rewrite_steps"]
+                    or info.rewrite_counter >= self.args.max_rewrite_steps
                 ):
                     reason = "done" if info.resolved else "max_rewrite_steps reached"
                     self.logger.info(
