@@ -15,7 +15,7 @@ from debug_gym.constants import DEBUG_GYM_CACHE_DIR
 from debug_gym.gym.entities import EvalOutput
 from debug_gym.gym.envs.swe_bench import SWEBenchEnv
 from debug_gym.gym.terminals.kubernetes import KubernetesTerminal
-from debug_gym.gym.terminals.terminal import Terminal
+from debug_gym.gym.terminals.terminal import DebugGymLogger, Terminal
 from debug_gym.gym.utils import filter_problems
 
 
@@ -23,9 +23,9 @@ def load_swesmith_dataset(
     dataset_id: str = "SWE-bench/SWE-smith",
     dataset_revision: str = "699b53400d3855206a0fbf3ff4beaf1a52f4f232",
     split: str = "train",
-    problems: str | list[str] | None = None,
+    problems: list | None = None,
     prepull_images: bool = False,
-    logger=None,
+    logger: DebugGymLogger | None = None,
 ):
     data_path = Path(dataset_id)
     if data_path.is_file():

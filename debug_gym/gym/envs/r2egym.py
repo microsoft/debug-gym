@@ -14,6 +14,7 @@ from debug_gym.gym.terminals.docker import DockerTerminal
 from debug_gym.gym.terminals.kubernetes import KubernetesTerminal
 from debug_gym.gym.terminals.terminal import Terminal
 from debug_gym.gym.utils import filter_problems
+from debug_gym.logger import DebugGymLogger
 
 
 def decolor_dict_keys(key):
@@ -58,13 +59,13 @@ def parse_log_pytest(log: str | None) -> dict[str, str]:
     return test_status_map
 
 
-def load_dataset(
+def load_r2egym_dataset(
     dataset_id: str = "R2E-Gym/R2E-Gym-Lite",
     dataset_revision: str = "8d3163011f01f9393bb3dc7700497a79a8686ae5",
     split: str = "train",
-    problems=None,
-    prepull_images=False,
-    logger=None,
+    problems: list | None = None,
+    prepull_images: bool = False,
+    logger: DebugGymLogger | None = None,
 ):
     data_path = Path(dataset_id)
     if data_path.is_file():

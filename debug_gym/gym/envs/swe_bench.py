@@ -12,17 +12,17 @@ from debug_gym.gym.entities import EvalOutput
 from debug_gym.gym.envs.env import RepoEnv
 from debug_gym.gym.terminals.docker import DockerTerminal
 from debug_gym.gym.terminals.kubernetes import KubernetesTerminal
-from debug_gym.gym.terminals.terminal import Terminal
+from debug_gym.gym.terminals.terminal import DebugGymLogger, Terminal
 from debug_gym.gym.utils import filter_problems
 
 
 def load_swebench_dataset(
     dataset_id: str = "SWE-bench/SWE-bench_Verified",
     dataset_revision: str = "99450355ca8c611021187a57ffac304b66666738",
-    split="test",
-    problems=None,
-    prepull_images=False,
-    logger=None,
+    split: str = "test",
+    problems: list | None = None,
+    prepull_images: bool = False,
+    logger: DebugGymLogger | None = None,
 ):
     ds = datasets.load_dataset(dataset_id, revision=dataset_revision)[split]
     dataset = {id: i for i, id in enumerate(ds["instance_id"])}
