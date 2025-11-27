@@ -35,12 +35,26 @@ class PDBTool(EnvironmentTool):
         },
     }
 
-    def __init__(self, set_default_entrypoint: bool = True):
+    def __init__(
+        self,
+        set_default_entrypoint: bool = True,
+        auto_list: bool = True,
+        persistent_breakpoints: bool = True,
+    ):
+        """
+        Args:
+            set_default_entrypoint (bool): If True, the tool will use the environment's default debug entrypoint
+                when no entrypoint is provided. If False, the agent must provide an entrypoint when using the tool.
+            auto_list (bool): If True, the tool will automatically provide context around the current frame after each command.
+            persistent_breakpoints (bool): If True, the tool will keep breakpoints across PDB sessions.
+        """
         super().__init__()
         self.current_frame_file = None
         self._session: ShellSession = None
         self.set_default_entrypoint = set_default_entrypoint
         self.entrypoint = None
+        self.auto_list = auto_list
+        self.persistent_breakpoints = persistent_breakpoints
         if not self.set_default_entrypoint:
             # Force the agent to provide an entrypoint when using the tool.
             self.arguments = copy.deepcopy(

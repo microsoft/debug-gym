@@ -7,8 +7,8 @@ from jinja2 import Template
 
 from debug_gym.agents.base_agent import (
     AGENT_REGISTRY,
-    BaseAgent,
     AgentArgs,
+    BaseAgent,
     create_agent,
     register_agent,
 )
@@ -309,9 +309,7 @@ def test_create_agent():
         agent_args = AgentArgs.from_dict(mock_config)
         mock_env = MagicMock()
 
-        agent = create_agent(
-            "test_registered", agent_args=agent_args, env=mock_env
-        )
+        agent = create_agent("test_registered", agent_args=agent_args, env=mock_env)
         assert isinstance(agent, TestRegisteredAgent)
 
         # Test unknown agent type
@@ -428,12 +426,8 @@ def test_shortcut_features_comprehensive(agent_setup):
     eval_tool = Toolbox.get_tool("eval", auto_eval_on_rewrite=True)
     env.add_tool(eval_tool)
     # Test with all features enabled
-    agent.args.env_kwargs = {
-        "show_directory_tree": True,
-        "show_current_breakpoints": True,
-        "persistent_breakpoints": True,
-        "auto_list": True,
-    }
+    agent.args.show_directory_tree = 1
+    agent.args.show_current_breakpoints = True
     env.has_tool.return_value = True
 
     features = agent.shortcut_features()

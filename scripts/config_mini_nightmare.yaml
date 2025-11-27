@@ -7,10 +7,6 @@ base:
         "dir_tree_depth": 1,
         "run_timeout": 30,
         # shortcut features
-        "show_current_breakpoints": False,  # If True, the environment will automatically show the current breakpoints at every step in the system prompt.
-        "show_directory_tree": True,  # If set to True, the environment will show the directory tree in the system prompt.
-        "persistent_breakpoints": True,  # If True, the environemnt will keep a set of breakpoint states across PDB sessions. When a new PDB session is started, the environment will automatically load the breakpoints from the previous session.
-        "auto_list": True,  # If True, the environment will automatically call `list .` via the PDB tool after every pdb tool call, which will show the code around the current frame.
     }
 
     terminal: {
@@ -29,6 +25,10 @@ base:
     reset_prompt_history_after_rewrite: False
     # Optionally loads a custom system prompt template from a file.
     # system_prompt_template_file: "script/templates/system_prompt.jinja"
+
+    # Shortcut features
+    "show_current_breakpoints": False  # If True, the environment will automatically show the current breakpoints at every step in the system prompt.
+    "show_directory_tree": 0  # Value indicated the depth of the directory shown in the system prompt. 0 means no directory tree is shown.
 
 rewrite_agent:
     tools:

@@ -215,9 +215,6 @@ class RepoEnv(TooledEnv):
         max_score: int | None = None,
         readonly_patterns: list[str] | None = None,  # TODO: remove
         run_timeout: int | None = None,
-        dir_tree_depth: int = 1,
-        persistent_breakpoints: bool = True,  # TODO: remove
-        auto_list: bool = True,  # TODO: remove
         terminal: Terminal | None = None,
         logger: DebugGymLogger | None = None,
         problems: str | list[str] | None = None,
@@ -228,12 +225,10 @@ class RepoEnv(TooledEnv):
         self.path = path
         self.max_score = max_score
         self.run_timeout = run_timeout
-        self.dir_tree_depth = dir_tree_depth
+        self.dir_tree_depth = 0
         self.terminal = terminal or LocalTerminal()  # TODO: default to DockerTerminal
         self._entrypoint = entrypoint
         self._debug_entrypoint = debug_entrypoint
-        self.persistent_breakpoints = persistent_breakpoints
-        self.auto_list = auto_list
         self.logger = logger or DebugGymLogger("debug-gym")
         self.infos: EnvInfo | None = None
         self.rng = None

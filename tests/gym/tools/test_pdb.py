@@ -61,13 +61,11 @@ def setup_pdb_repo_env(setup_test_repo, setup_breakpoints_state):
     def _setup_pdb_repo_env(base_dir):
         test_repo = setup_test_repo(base_dir)
         env = RepoEnv(path=str(test_repo))
-        pdb_tool = PDBTool()
+        pdb_tool = PDBTool(persistent_breakpoints=True, auto_list=True)
         pdb_tool.register(env)
         env.reset()
         breakpoints = setup_breakpoints_state(env.working_dir)
         env.current_breakpoints_state = breakpoints
-        env.persistent_breakpoints = True
-        env.auto_list = True
         pdb_tool.start_pdb(env)
         return pdb_tool, env
 

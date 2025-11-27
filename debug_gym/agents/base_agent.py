@@ -24,7 +24,8 @@ class AgentArgs:
     memory_size: int
     max_steps: int
     max_rewrite_steps: int
-    env_kwargs: Dict[str, Any] = field(default_factory=dict)
+    show_directory_tree: int = 0
+    show_current_breakpoints: bool = False
     reset_prompt_history_after_rewrite: bool = False
     system_prompt_template_file: str | None = None
     n_rewrites_before_pdb: int = 0
@@ -45,23 +46,22 @@ class AgentArgs:
             "memory_size",
             "max_steps",
             "max_rewrite_steps",
-            "env_kwargs",
+            "show_directory_tree",
+            "show_current_breakpoints",
             "reset_prompt_history_after_rewrite",
             "system_prompt_template_file",
             "n_rewrites_before_pdb",
             "uuid",
-            # Explicitly excluded to decouple the agent from filesystem concerns.
-            "output_path",
         }
         extras = {k: v for k, v in config.items() if k not in known_keys}
-        env_kwargs = dict(config.get("env_kwargs") or {})
 
         return cls(
             random_seed=config["random_seed"],
             memory_size=config["memory_size"],
             max_steps=config["max_steps"],
             max_rewrite_steps=config["max_rewrite_steps"],
-            env_kwargs=env_kwargs,
+            show_directory_tree=config.get("show_directory_tree", 0),
+            show_current_breakpoints=config.get("show_current_breakpoints", False),
             reset_prompt_history_after_rewrite=config.get(
                 "reset_prompt_history_after_rewrite", False
             ),
@@ -99,18 +99,18 @@ class BaseAgent:
 
     def __init__(
         self,
-        agent_args: AgentArgs | Dict[str, Any],
+        args: AgentArgs | Dict[str, Any],
         env: RepoEnv,
         llm: LLM | None = None,
         logger: DebugGymLogger | None = None,
     ):
-        if isinstance(agent_args, dict):
-            agent_args = AgentArgs.from_dict(agent_args)
-        self.args = agent_args
+        self.args = AgentArgs.from_dict(args) if isinstance(args, dict) else args
         self.env = env
         self.logger = logger or DebugGymLogger("debug-gym")
         self.llm = llm
         self._uuid = self.args.uuid
+
+        self.env.dir_tree_depth = self.args.show_directory_tree
 
         self.set_seed(self.args.random_seed)
         self.history = HistoryTracker(self.args.memory_size)
@@ -141,14 +141,6 @@ class BaseAgent:
         except KeyError:
             return False  # no eval tool
 
-    def _show_current_breakpoints(self):
-        """Check if current breakpoints should be shown in the system prompt."""
-        return self.args.env_kwargs.get("show_current_breakpoints", False)
-
-    def _show_directory_tree(self):
-        """Check if directory tree should be shown in the system prompt."""
-        return self.args.env_kwargs.get("show_directory_tree", False)
-
     def shortcut_features(self):
         features = []
         if self._auto_eval_on_rewrite():
@@ -158,21 +150,21 @@ class BaseAgent:
                 "you do not need to call the Eval tool yourself. The evaluation "
                 "output will be updated automatically in the system prompt."
             )
-        if self._show_directory_tree():
+        if self.args.show_directory_tree:
             features.append(
                 "The environment will show the directory tree of the repository in the system prompt."
             )
         if self.env.has_tool("pdb"):
-            if self._show_current_breakpoints():
+            if self.args.show_current_breakpoints:
                 features.append(
                     "The environment will show the current breakpoints in the system prompt."
                 )
-            if self.args.env_kwargs.get("persistent_breakpoints"):
+            if self.env.get_tool("pdb").persistent_breakpoints:
                 features.append(
                     "The environment will automatically restore existing breakpoints "
                     "when a new PDB session is started (e.g., after a rewrite)."
                 )
-            if self.args.env_kwargs.get("auto_list"):
+            if self.env.get_tool("pdb").auto_list:
                 features.append(
                     "After every valid PDB tool calling, the environment will "
                     "automatically call the PDB tool again with a `list .` command, "
