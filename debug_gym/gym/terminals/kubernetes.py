@@ -26,6 +26,12 @@ from debug_gym.logger import DebugGymLogger
 NB_RETRIES_RUN = 50  # Number of retries for running a command
 
 
+class SandboxReservationError(Exception):
+    """Raised when a pod cannot be created due to sandbox name reservation conflict."""
+
+    pass
+
+
 def _clean_for_kubernetes(name: str) -> str:
     """Clean pod name to conform to Kubernetes naming conventions."""
     # replace any characters not in the regex with hyphens
@@ -94,6 +100,10 @@ class Pod:
         self.logger.debug(f"{self} Waiting to be ready...")
 
         w = watch.Watch()
+        start_time = time.time()
+        sandbox_check_interval = 30  # Check for sandbox errors every 30 seconds
+        last_sandbox_check = 0
+
         try:
             for event in w.stream(
                 self.k8s_client.list_namespaced_pod,
@@ -114,10 +124,22 @@ class Pod:
                     return
                 elif phase in ["Failed", "Unknown", "Succeeded"]:
                     raise ValueError(f"{self} is in {phase} state instead of running.")
-                elif phase == "Pending" and event_type == "ADDED":
-                    # Only log pending status on initial ADDED event or when reason changes
-                    self._log_pending_status(pod)
+                elif phase == "Pending":
+                    if event_type == "ADDED":
+                        # Only log pending status on initial ADDED event or when reason changes
+                        self._log_pending_status(pod)
 
+                    # Periodically check for sandbox reservation errors while pending
+                    elapsed = time.time() - start_time
+                    if elapsed - last_sandbox_check >= sandbox_check_interval:
+                        last_sandbox_check = elapsed
+                        if self._has_sandbox_reservation_error():
+                            raise SandboxReservationError(
+                                f"{self} has sandbox reservation conflict"
+                            )
+
+        except SandboxReservationError:
+            raise  # Re-raise sandbox errors without wrapping
         except Exception as e:
             self.logger.debug(f"{self} Error during pod watch: {e}")
             raise ValueError(f"Error watching pod {self.name}: {e}")
@@ -128,6 +150,24 @@ class Pod:
         raise ValueError(
             f"Pod {self.name} did not become ready within {timeout} seconds"
         )
+
+    def _has_sandbox_reservation_error(self) -> bool:
+        """Check pod events for sandbox reservation errors."""
+        try:
+            events = self.k8s_client.list_namespaced_event(
+                namespace=self.namespace,
+                field_selector=f"involvedObject.name={self.name}",
+            )
+            for event in events.items:
+                if event.reason == "FailedCreatePodSandBox" and event.message:
+                    if "is reserved for" in event.message:
+                        self.logger.warning(
+                            f"{self} Sandbox reservation conflict detected: {event.message}"
+                        )
+                        return True
+        except ApiException as e:
+            self.logger.debug(f"{self} Error checking pod events: {e}")
+        return False
 
     def _log_pending_status(self, pod):
         """Log pending status only if it's different from the last one."""
@@ -431,15 +471,12 @@ class KubernetesTerminal(Terminal):
         self.logger.debug(f"[{self.pod.name}] Output success `{success}`:\n{output}")
         return success, output
 
-    def setup_pod(self) -> None:
-        """Create and start a Kubernetes pod."""
+    def setup_pod(self, max_retries: int = 3) -> None:
+        """Create and start a Kubernetes pod.
 
-        pod_name = _clean_for_kubernetes(
-            self._pod_name or f"dbg-gym.{self.task_name}.{str(uuid.uuid4())[:8]}"
-        )
-        self.logger.debug(
-            f"Setting up pod {pod_name} with image: {self.registry}{self.base_image}"
-        )
+        If a sandbox reservation conflict is detected, the pod is cleaned up
+        and a new pod with a fresh UUID is created.
+        """
 
         # Render pod_spec_kwargs as a Jinja2 template, replace variables, then load as dict.
         pod_spec_yaml = dump(self.pod_spec_kwargs)
@@ -447,51 +484,81 @@ class KubernetesTerminal(Terminal):
         rendered_yaml = pod_spec_template.render(os.environ)
         pod_spec_kwargs = safe_load(rendered_yaml)
 
-        # Create pod specification for Kubernetes.
-        pod_body = {
-            "apiVersion": "v1",
-            "kind": "Pod",
-            "metadata": {
-                "name": pod_name,
-                "namespace": self.namespace,
-                "labels": self.labels,
-            },
-            "spec": {
-                "activeDeadlineSeconds": 3600 * 24,  # a day
-                "restartPolicy": "Never",
-                "containers": [
-                    {
-                        "name": "main",
-                        "image": f"{self.registry}{self.base_image}",
-                        "imagePullPolicy": "IfNotPresent",
-                        "command": ["/bin/bash"],
-                        "args": ["-c", "sleep infinity"],
-                        "workingDir": self.working_dir,
-                        "stdin": True,
-                        "stdinOnce": False,
-                        "tty": True,
-                        "env": [
-                            {"name": k, "value": v} for k, v in self.env_vars.items()
-                        ],
-                        "resources": {
-                            "requests": {"cpu": "0.5", "memory": "1Gi"},
-                            "limits": {"cpu": "2", "memory": "8Gi"},
-                        },
-                    }
-                ],
-                **pod_spec_kwargs,  # e.g., nodeSelector, tolerations
-            },
-        }
+        for attempt in range(max_retries):
+            # Generate a new pod name for each attempt to avoid sandbox conflicts
+            pod_name = _clean_for_kubernetes(
+                self._pod_name or f"dbg-gym.{self.task_name}.{str(uuid.uuid4())[:8]}"
+            )
+            self.logger.debug(
+                f"Setting up pod {pod_name} (attempt {attempt + 1}/{max_retries}) "
+                f"with image: {self.registry}{self.base_image}"
+            )
 
-        try:
-            self._pod = Pod(self.k8s_client, pod_body, logger=self.logger)
+            # Create pod specification for Kubernetes.
+            pod_body = {
+                "apiVersion": "v1",
+                "kind": "Pod",
+                "metadata": {
+                    "name": pod_name,
+                    "namespace": self.namespace,
+                    "labels": self.labels,
+                },
+                "spec": {
+                    "activeDeadlineSeconds": 3600 * 24,  # a day
+                    "restartPolicy": "Never",
+                    "containers": [
+                        {
+                            "name": "main",
+                            "image": f"{self.registry}{self.base_image}",
+                            "imagePullPolicy": "IfNotPresent",
+                            "command": ["/bin/bash"],
+                            "args": ["-c", "sleep infinity"],
+                            "workingDir": self.working_dir,
+                            "stdin": True,
+                            "stdinOnce": False,
+                            "tty": True,
+                            "env": [
+                                {"name": k, "value": v}
+                                for k, v in self.env_vars.items()
+                            ],
+                            "resources": {
+                                "requests": {"cpu": "0.5", "memory": "1Gi"},
+                                "limits": {"cpu": "2", "memory": "8Gi"},
+                            },
+                        }
+                    ],
+                    **pod_spec_kwargs,  # e.g., nodeSelector, tolerations
+                },
+            }
 
-            # Run setup commands
-            self._run_setup_commands()
-            self.logger.debug(f"{self.pod} started successfully.")
+            try:
+                self._pod = Pod(self.k8s_client, pod_body, logger=self.logger)
 
-        except ApiException as e:
-            raise ValueError(f"Failed to create pod: {e}")
+                # Run setup commands
+                self._run_setup_commands()
+                self.logger.debug(f"{self.pod} started successfully.")
+                return  # Success, exit the retry loop
+
+            except SandboxReservationError as e:
+                self.logger.warning(
+                    f"Sandbox reservation conflict for {pod_name}: {e}. "
+                    f"Cleaning up and retrying with new pod name..."
+                )
+                # Clean up the failed pod
+                if self._pod is not None:
+                    self._pod.clean_up()
+                    self._pod = None
+
+                # Wait a bit before retrying to allow the container runtime to clean up
+                time.sleep(5)
+
+                if attempt == max_retries - 1:
+                    raise ValueError(
+                        f"Failed to create pod after {max_retries} attempts "
+                        f"due to sandbox reservation conflicts"
+                    )
+            except ApiException as e:
+                raise ValueError(f"Failed to create pod: {e}")
 
     def _run_setup_commands(self):
         """Run setup commands if any. If commands fail, delete the pod."""
