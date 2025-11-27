@@ -16,14 +16,51 @@ from debug_gym.gym.terminals.terminal import Terminal
 from debug_gym.gym.utils import filter_problems
 
 
+def load_swebench_dataset(
+    dataset_id: str = "SWE-bench/SWE-bench_Verified",
+    dataset_revision: str = "99450355ca8c611021187a57ffac304b66666738",
+    split="test",
+    problems=None,
+    prepull_images=False,
+    logger=None,
+):
+    ds = datasets.load_dataset(dataset_id, revision=dataset_revision)[split]
+    dataset = {id: i for i, id in enumerate(ds["instance_id"])}
+    problems = filter_problems(dataset, problems)
+    dataset = {id: i for id, i in dataset.items() if id in problems}
+
+    instance_ids = [ds[dataset[id]]["instance_id"] for id in dataset]
+    image_names = set(
+        f"sweb.eval.x86_64.{id.replace('__', '_1776_')}" for id in instance_ids
+    )
+
+    if prepull_images:
+        # Download all images needed for SWE-Bench.
+        client = docker.from_env()
+        tagged_image_names = set(f"swebench/{name}:latest" for name in image_names)
+
+        existing_images = set(
+            tag for image in client.images.list() for tag in image.tags
+        )
+        missing_images = tagged_image_names - existing_images
+        if missing_images:
+            if logger:
+                logger.info(f"Found {len(missing_images)} missing Docker images.")
+            for i, image_name in enumerate(missing_images):
+                if logger:
+                    logger.info(
+                        f"Pulling Docker images {i + 1}/{len(missing_images)}: `{image_name}`."
+                    )
+                client.images.pull(image_name)
+    return dataset
+
+
 class SWEBenchEnv(RepoEnv):
     CACHE = DEBUG_GYM_CACHE_DIR / "swe-bench"
 
     def __init__(
         self,
-        dataset_id: str = "SWE-bench/SWE-bench_Verified",
-        dataset_revision: str = "99450355ca8c611021187a57ffac304b66666738",
-        split: str = "test",
+        task_data: dict,
         terminal: Terminal | None = None,
         **kwargs,
     ):
@@ -33,58 +70,18 @@ class SWEBenchEnv(RepoEnv):
                 f"{self.__class__.__name__} only supports DockerTerminal and KubernetesTerminal."
             )
 
-        self.dataset_id = dataset_id
-        self.dataset_revision = dataset_revision
-        self.split = split
+        self.ds_row = task_data
+        self.setup_task(self.ds_row)
         self.test_directives = []
-
         super().__init__(terminal=terminal, **kwargs)
 
     @property
     def instructions(self) -> str:
         return self.ds_row["problem_statement"]
 
-    def load_dataset(self, problems: str | list[str] | None = None):
-        self.ds = datasets.load_dataset(
-            self.dataset_id, revision=self.dataset_revision
-        )[self.split]
-        dataset = {id: i for i, id in enumerate(self.ds["instance_id"])}
-        problems = filter_problems(dataset, problems)
-        dataset = {id: i for id, i in dataset.items() if id in problems}
-
-        instance_ids = [self.ds[dataset[id]]["instance_id"] for id in dataset]
-        image_names = set(
-            f"sweb.eval.x86_64.{id.replace('__', '_1776_')}" for id in instance_ids
-        )
-
-        if not isinstance(self.terminal, KubernetesTerminal):
-            # Download all images needed for SWE-Bench.
-            client = docker.from_env()
-            tagged_image_names = set(f"swebench/{name}:latest" for name in image_names)
-
-            existing_images = set(
-                tag for image in client.images.list() for tag in image.tags
-            )
-            missing_images = tagged_image_names - existing_images
-            if missing_images:
-                self.logger.info(f"Found {len(missing_images)} missing Docker images.")
-                for i, image_name in enumerate(missing_images):
-                    self.logger.info(
-                        f"Pulling Docker images {i + 1}/{len(missing_images)}: `{image_name}`."
-                    )
-                    client.images.pull(image_name)
-
-        return dataset
-
-    def setup_task(self, task_name: str, options: dict = None):
-        if task_name not in self.dataset:
-            raise ValueError(
-                f"Task `{task_name}` was not found in dataset. The available tasks are: {sorted(self.dataset)}.\n"
-                "Please provide a valid task or initialize the environment without problems to load all tasks."
-            )
-
-        self.task_name = task_name
-        self.ds_row = self.ds[self.dataset[self.task_name]]
+    def setup_task(self, task_data: dict, options: dict = None):
+        self.ds_row = task_data
+        self.task_name = task_data["instance_id"]
         self.repo = self.ds_row["repo"]
         self.package_name = self.repo.split("/")[1]
         self.version = self.ds_row["version"]

@@ -522,7 +522,8 @@ class KubernetesTerminal(Terminal):
                             "stdinOnce": False,
                             "tty": True,
                             "env": [
-                                {"name": k, "value": v} for k, v in self.env_vars.items()
+                                {"name": k, "value": v}
+                                for k, v in self.env_vars.items()
                             ],
                             "resources": {
                                 "requests": {"cpu": "0.5", "memory": "1Gi"},
@@ -535,18 +536,15 @@ class KubernetesTerminal(Terminal):
                             "key": "node.kubernetes.io/disk-pressure",
                             "operator": "Exists",
                             "effect": "NoExecute",
-                            "tolerationSeconds": 10800
+                            "tolerationSeconds": 10800,
                         },
                         {
                             "key": "kubernetes.azure.com/scalesetpriority",
                             "operator": "Equal",
                             "value": "spot",
-                            "effect": "NoSchedule"
+                            "effect": "NoSchedule",
                         },
-                        {
-                            "key": "CriticalAddonsOnly",
-                            "operator": "Exists"
-                        },
+                        {"key": "CriticalAddonsOnly", "operator": "Exists"},
                     ],
                     **pod_spec_kwargs,  # e.g., nodeSelector, tolerations
                 },

@@ -19,6 +19,71 @@ from debug_gym.gym.terminals.terminal import Terminal
 from debug_gym.gym.utils import filter_problems
 
 
+def load_swesmith_dataset(
+    dataset_id: str = "SWE-bench/SWE-smith",
+    dataset_revision: str = "699b53400d3855206a0fbf3ff4beaf1a52f4f232",
+    split: str = "train",
+    problems: str | list[str] | None = None,
+    prepull_images: bool = False,
+    logger=None,
+):
+    data_path = Path(dataset_id)
+    if data_path.is_file():
+        # Loading from local file.
+        if data_path.suffix.lower() == ".json":
+            ds = load_dataset("json", data_files=dataset_id)
+        elif data_path.suffix.lower() == ".parquet":
+            ds = load_dataset("parquet", data_files=dataset_id)
+    elif data_path.is_dir():
+        # Loading from local folder.
+        ds = load_from_disk(dataset_id)
+    else:
+        # Loading from HuggingFace or a folder.
+        ds = load_dataset(dataset_id, revision=dataset_revision)
+
+    # Select the split.
+    ds = ds[split]
+
+    # Load custom dataset splits from config.
+    with open(SWESmithEnv.CONFIG) as f:
+        custom_splits = yaml.safe_load(f)
+        excluded_ids = custom_splits.get("excluded", [])
+
+    dataset = {id: i for i, id in enumerate(ds["instance_id"])}
+    problems = filter_problems(dataset, problems, custom_splits, excluded_ids)
+    dataset = {id: i for id, i in dataset.items() if id in problems}
+
+    image_names = set(ds[dataset[id]]["image_name"] for id in dataset)
+    if logger is not None:
+        logger.debug(
+            f"Loaded {len(dataset)} tasks accross {len(image_names)} Docker images from {dataset_id}."
+        )
+
+    if prepull_images:
+        # Download all images needed for SWE-Smith.
+        client = docker.from_env()
+        tagged_image_names = set(f"{DOCKER_ORG}/{name}:{TAG}" for name in image_names)
+
+        existing_images = set(
+            tag for image in client.images.list() for tag in image.tags
+        )
+        missing_images = tagged_image_names - existing_images
+        if missing_images:
+            if logger is not None:
+                logger.info(f"Found {len(missing_images)} missing Docker images.")
+
+            for image_name in missing_images:
+                docker_hub_image = image_name.replace("__", "_1776_")
+                if logger is not None:
+                    logger.info(
+                        f"Pulling Docker image `{docker_hub_image}` to `{image_name}`."
+                    )
+                client.images.pull(docker_hub_image)
+                # Rename images via tagging
+                client.images.get(docker_hub_image).tag(image_name)
+    return dataset
+
+
 class SWESmithEnv(SWEBenchEnv):
     CACHE = DEBUG_GYM_CACHE_DIR / "swe-smith"
     CONFIG = (
@@ -27,85 +92,19 @@ class SWESmithEnv(SWEBenchEnv):
 
     def __init__(
         self,
-        dataset_id: str = "SWE-bench/SWE-smith",
-        dataset_revision: str = "699b53400d3855206a0fbf3ff4beaf1a52f4f232",
-        split: str = "train",
+        task_data: dict,
         terminal: Terminal | None = None,
         **kwargs,
     ):
         super().__init__(
-            dataset_id=dataset_id,
-            dataset_revision=dataset_revision,
-            split=split,
+            task_data=task_data,
             terminal=terminal,
             **kwargs,
         )
 
-    def load_dataset(self, problems: str | list[str] | None = None):
-        data_path = Path(self.dataset_id)
-        if data_path.is_file():
-            # Loading from local file.
-            if data_path.suffix.lower() == ".json":
-                self.ds = load_dataset("json", data_files=self.dataset_id)
-            elif data_path.suffix.lower() == ".parquet":
-                self.ds = load_dataset("parquet", data_files=self.dataset_id)
-        elif data_path.is_dir():
-            # Loading from local folder.
-            self.ds = load_from_disk(self.dataset_id)
-        else:
-            # Loading from HuggingFace or a folder.
-            self.ds = load_dataset(self.dataset_id, revision=self.dataset_revision)
-
-        # Select the split.
-        self.ds = self.ds[self.split]
-
-        # Load custom dataset splits from config.
-        with open(SWESmithEnv.CONFIG) as f:
-            custom_splits = yaml.safe_load(f)
-            excluded_ids = custom_splits.get("excluded", [])
-
-        dataset = {id: i for i, id in enumerate(self.ds["instance_id"])}
-        problems = filter_problems(dataset, problems, custom_splits, excluded_ids)
-        dataset = {id: i for id, i in dataset.items() if id in problems}
-
-        image_names = set(self.ds[dataset[id]]["image_name"] for id in dataset)
-        self.logger.debug(
-            f"Loaded {len(dataset)} tasks accross {len(image_names)} Docker images from {self.dataset_id}."
-        )
-
-        if not isinstance(self.terminal, KubernetesTerminal):
-            # Download all images needed for SWE-Smith.
-            client = docker.from_env()
-            tagged_image_names = set(
-                f"{DOCKER_ORG}/{name}:{TAG}" for name in image_names
-            )
-
-            existing_images = set(
-                tag for image in client.images.list() for tag in image.tags
-            )
-            missing_images = tagged_image_names - existing_images
-            if missing_images:
-                self.logger.info(f"Found {len(missing_images)} missing Docker images.")
-                for image_name in missing_images:
-                    docker_hub_image = image_name.replace("__", "_1776_")
-                    self.logger.info(
-                        f"Pulling Docker image `{docker_hub_image}` to `{image_name}`."
-                    )
-                    client.images.pull(docker_hub_image)
-                    # Rename images via tagging
-                    client.images.get(docker_hub_image).tag(image_name)
-
-        return dataset
-
-    def setup_task(self, task_name: str, options: dict = None):
-        if task_name not in self.dataset:
-            raise ValueError(
-                f"Task `{task_name}` was not found in dataset. The available tasks are: {sorted(self.dataset)}.\n"
-                "Please provide a valid task or initialize the environment without problems to load all tasks."
-            )
-
-        self.task_name = task_name
-        self.ds_row = self.ds[self.dataset[self.task_name]]
+    def setup_task(self, task_data: dict, options: dict = None):
+        self.task_name = task_data["instance_id"]
+        self.ds_row = task_data
         self.base_commit = (
             self.ds_row["base_commit"] if "base_commit" in self.ds_row else "main"
         )
