@@ -15,15 +15,6 @@ from debug_gym.llms.base import LLM
 from debug_gym.llms.human import Human
 from debug_gym.logger import DebugGymLogger
 
-DEFAULT_TOOLS = [
-    "listdir",
-    "view",
-    "grep",
-    "rewrite",
-    "bash",
-    {"submit": {"apply_eval": False}},
-]
-
 
 def build_parser() -> argparse.ArgumentParser:
     """Create the CLI parser that exposes the runner configuration flag."""
@@ -144,7 +135,13 @@ def main() -> int:
     # Instantiate the environment once the terminal and core parameters are ready.
     env = FreeEnv(**env_kwargs)
 
-    add_tools(env, config.get("tools", DEFAULT_TOOLS), logger)
+    tools_config = config.get("tools")
+    if not tools_config:
+        raise ValueError(
+            "Configuration must specify a non-empty 'tools' list for FreeEnv sessions."
+        )
+
+    add_tools(env, tools_config, logger)
 
     llm = build_llm(config, logger)
     agent_config = config.get("agent", {})
