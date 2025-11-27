@@ -315,7 +315,7 @@ def main():
                 try:
                     success = run_agent(args, problem, config)
                 except AgentTimeoutException:
-                    pass  # Handleled in run_agent, just continue
+                    pass  # Handled in run_agent, just continue
                 except (KeyboardInterrupt, Exception) as e:
                     raise e
         else:

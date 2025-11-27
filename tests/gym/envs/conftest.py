@@ -2,7 +2,10 @@ import pytest
 from filelock import FileLock
 
 from debug_gym.gym.envs import R2EGymEnv, SWEBenchEnv, SWESmithEnv
+from debug_gym.gym.envs.r2egym import load_r2egym_dataset
+from debug_gym.gym.envs.swe_bench import load_swebench_dataset
 from debug_gym.gym.envs.swe_bench_debug import SWEBenchDebugEnv
+from debug_gym.gym.envs.swe_smith import load_swesmith_dataset
 
 BUILD_ENV_CONFIGS = {
     "swe_smith": {
@@ -31,7 +34,16 @@ def make_env_factory(env_name, worker_id, tmp_path_factory):
     env_class = kwargs.pop("env_class")
 
     def _make_env():
-        return env_class(**kwargs)
+        if type(env_class) in [SWEBenchEnv, SWEBenchDebugEnv]:
+            fn = load_swebench_dataset
+        elif type(env_class) == SWESmithEnv:
+            fn = load_swesmith_dataset
+        elif type(env_class) == R2EGymEnv:
+            fn = load_r2egym_dataset
+        else:
+            raise ValueError(f"Unknown env_class: {env_class}")
+        task_data = fn(problems=kwargs["problems"])[0]
+        return env_class(task_data=task_data)
 
     if worker_id == "master":
         # Not running with pytest-xdist or we are in the master process
