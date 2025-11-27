@@ -518,7 +518,8 @@ class KubernetesTerminal(Terminal):
                             "stdinOnce": False,
                             "tty": True,
                             "env": [
-                                {"name": k, "value": v} for k, v in self.env_vars.items()
+                                {"name": k, "value": v}
+                                for k, v in self.env_vars.items()
                             ],
                             "resources": {
                                 "requests": {"cpu": "0.5", "memory": "1Gi"},
