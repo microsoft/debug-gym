@@ -60,7 +60,7 @@ class FreeEnv(RepoEnv):
         if hasattr(terminal, "base_image"):
             setattr(terminal, "base_image", self.container_image)
 
-        if self._setup_commands and hasattr(terminal, "setup_commands"):
+        if hasattr(terminal, "setup_commands"):
             existing = list(getattr(terminal, "setup_commands", []))
             for command in self._setup_commands:
                 if command not in existing:
@@ -140,3 +140,45 @@ class FreeEnv(RepoEnv):
             self._custom_instructions
             or "You are placed in an isolated Linux environment, use the available tools to interact with the environment effectively."
         )
+
+    def reset(self, *, options: dict | None = None):
+        """Allow callers to mutate container settings before delegating to RepoEnv."""
+        options = options or {}
+
+        image = options.get("image")
+        workspace_dir = options.get("workspace_dir")
+        setup_commands = options.get("setup_commands")
+        instructions = options.get("instructions")
+        init_git = options.get("init_git")
+
+        restart_terminal = False
+
+        if image and image != self.container_image:
+            self.container_image = image
+            restart_terminal = True
+
+        if workspace_dir and str(workspace_dir) != self._workspace_dir:
+            self._workspace_dir = str(workspace_dir)
+            restart_terminal = True
+
+        if setup_commands is not None:
+            new_commands = list(setup_commands)
+            if new_commands != self._setup_commands:
+                self._setup_commands = new_commands
+                restart_terminal = True
+
+        if instructions is not None:
+            self._custom_instructions = instructions
+
+        if init_git is not None:
+            self.init_git = bool(init_git)
+
+        if restart_terminal and self.terminal is not None:
+            try:
+                self.terminal.close()
+            except Exception as exc:  # noqa: BLE001 - diagnostics only
+                self.logger.debug("Failed to close terminal cleanly: %s", exc)
+
+        self._apply_terminal_settings()
+
+        return super().reset(options=options)

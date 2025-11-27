@@ -98,3 +98,36 @@ def test_free_env_respects_custom_workspace(tmp_path):
 
     assert env.workspace.working_dir == Path("/workspace")
     assert terminal.working_dir == "/workspace"
+
+
+def test_free_env_reset_allows_dynamic_overrides():
+    logger = MagicMock()
+    terminal = DummyTerminal(logger=logger, setup_commands=["initial"])
+
+    env = FreeEnv(
+        image="ubuntu:22.04",
+        terminal=terminal,
+        setup_commands=["initial"],
+        workspace_dir="/workspace",
+        logger=logger,
+        init_git=True,
+    )
+
+    env.reset(
+        options={
+            "image": "ubuntu:24.04",
+            "workspace_dir": "/new",
+            "setup_commands": ["echo ready"],
+            "instructions": "Inspect carefully.",
+            "init_git": False,
+        }
+    )
+
+    assert env.container_image == "ubuntu:24.04"
+    assert env.instructions == "Inspect carefully."
+    assert env.init_git is False
+    assert env._workspace_dir == "/new"
+    assert terminal.working_dir == "/new"
+    assert terminal.setup_commands == ["echo ready"]
+    assert terminal.base_image == "ubuntu:24.04"
+    assert terminal.closed is True
