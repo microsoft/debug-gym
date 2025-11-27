@@ -27,6 +27,8 @@ class DummyTerminal(Terminal):
         return ["/bin/true"]
 
     def run(self, entrypoint, timeout=None, raises=False, strip_output=True):
+        if isinstance(entrypoint, str) and "tree" in entrypoint:
+            return True, "/workspace\n"
         return True, ""
 
     @property
