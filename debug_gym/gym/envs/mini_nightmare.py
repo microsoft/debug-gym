@@ -115,14 +115,14 @@ class MiniNightmareEnv(RepoEnv):
     def setup_workspace(self):
         self.workspace.reset()
 
-        self.logger.info("Copying files..")
+        self.logger.debug("Copying files..")
         self.workspace.copy_content(
             src=self.current_task["codebase"], target=self.workspace.working_dir
         )
         self.workspace.setup_file_filters()  # Use codebase's .debugignore and .debugreadonly.
 
     def setup_terminal(self):
-        self.logger.info(f"Configuring {self.terminal}...")
+        self.logger.debug(f"Configuring {self.terminal}...")
 
         self.terminal.run("git init")
         self.terminal.run("git config user.name 'debug-gym'")
