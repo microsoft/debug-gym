@@ -8,7 +8,8 @@ llm:
 tools:
   - rewrite
   - bash
-  - submit
+  - submit:
+      apply_eval: False  # Here we only terminate after submission, no auto-eval.
 
 environment:
   image: swesmith.x86_64.amueller__word_cloud.ec24191c
