@@ -10,7 +10,6 @@ transformers==4.51.3
 tiktoken==0.9.0
 docker==7.1.0
 swebench==4.0.3
-swesmith==0.0.4
 prompt_toolkit==3.0.51
 anthropic==0.51.0
 jinja2==3.1.6
