@@ -18,7 +18,11 @@ from debug_gym.llms.base import LLM
 from debug_gym.llms.human import Human
 from debug_gym.logger import DebugGymLogger, load_previous_run_status
 
-
+from debug_gym.gym.envs.swe_bench import load_swebench_dataset
+from debug_gym.gym.envs.swe_smith import load_swesmith_dataset
+from debug_gym.gym.envs.r2egym import load_r2egym_dataset
+        
+        
 class AgentTimeoutException(BaseException):
     """Custom exception to handle timeouts in agent
     execution. Inherits from BaseException to ensure
@@ -40,7 +44,11 @@ def set_signal(timeout_seconds):
         signal.alarm(timeout_seconds)
 
 
-def run_agent(args, problem, config):
+def run_agent(
+    args,
+    problem: dict,
+    config: dict
+):
     set_signal(args.timeout)
     success = True
     env = None
@@ -90,7 +98,7 @@ def run_agent(args, problem, config):
             status="running",
         )
 
-        env = create_env(config, task_logger)
+        env = create_env(config, problem, task_logger)
         add_tools(env, config, task_logger)
 
         llm = LLM.instantiate(
@@ -176,14 +184,14 @@ def run_agent(args, problem, config):
     return success
 
 
-def create_env(config: dict, logger: DebugGymLogger):
+def create_env(config: dict, problem: dict, logger: DebugGymLogger):
     terminal = select_terminal(config.get("terminal"), logger, uuid=config["uuid"])
     env_class = select_env(config.get("benchmark"))
     env = env_class(
-        **config["env_kwargs"],
-        problems=config.get("problems", ["custom"]),
+        task_data=problem,
         terminal=terminal,
         logger=logger,
+        **config["env_kwargs"],
     )
     return env
 
@@ -248,8 +256,27 @@ def main():
     dump_experiment_info(config, args)
 
     # Create the environment to get the list of problems to run.
-    env = create_env(config, logger=logger)
-    problems = sorted(env.dataset)
+    dataset_info = {
+        "dataset_id": config.env_kwargs.get("dataset_id"),
+        "dataset_revision": config.env_kwargs.get("dataset_revision"),
+        "problems": config.get("problems", "all"),
+        "prepull_images": config.env_kwargs.get("prepull_images", False)
+    }
+    load_dataset_fn = {
+        "swebench": load_swebench_dataset,
+        "swebench-debug": load_swebench_dataset,
+        "swesmith": load_swesmith_dataset,
+        "r2egym": load_r2egym_dataset,
+    }
+
+    if config['benchmark'] in load_dataset_fn:
+        dataset = load_dataset_fn[config['benchmark']](
+            **dataset_info,
+        )
+    else:
+        raise ValueError(f"Unsupported benchmark: {config['benchmark']}")
+
+    problems = sorted(dataset)
 
     if args.list:
         print(f"\n# Available problems in {config.get('benchmark', 'config')}:")
