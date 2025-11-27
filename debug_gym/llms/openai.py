@@ -262,11 +262,70 @@ class OpenAILLM(LLM):
                 raise ContextLengthExceededError
             raise e
         # LLM may select multiple tool calls, we only care about the first action
+        # DEBUG: Log the raw response to understand what's happening
+        self.logger.debug(f"Response message: {response.choices[0].message}")
+        self.logger.debug(f"Tool calls: {response.choices[0].message.tool_calls}")
+        self.logger.debug(f"Finish reason: {response.choices[0].finish_reason}")
+        self.logger.debug(f"Usage: {response.usage}")
+
         if not response.choices[0].message.tool_calls:
-            # LLM failed to call a tool
-            tool_call = None
+            # LLM failed to call a tool - retry with a prompt to force tool calling
+            content = response.choices[0].message.content
+            if content and response.choices[0].finish_reason == "stop":
+                self.logger.warning(
+                    f"Model generated text without tool call, retrying with prompt.\n"
+                    f"  Content: {content[:200]}...\n"
+                    f"  Tokens: prompt={response.usage.prompt_tokens}, completion={response.usage.completion_tokens}"
+                )
+                # Add the assistant's message and a user message to force tool calling
+                retry_messages = messages + [
+                    {"role": "assistant", "content": content},
+                    {
+                        "role": "user",
+                        "content": "Please call the appropriate tool now. Do not explain, just call the tool.",
+                    },
+                ]
+                try:
+                    response = retry_on_exception(
+                        self._perform_chat_completion, self.need_to_be_retried
+                    )(
+                        model=self.config.model,
+                        messages=retry_messages,
+                        tools=self.define_tools(tools),
+                        tool_choice="auto",
+                        **kwargs,
+                    )
+                    self.logger.debug(
+                        f"Retry response - Tool calls: {response.choices[0].message.tool_calls}"
+                    )
+                    self.logger.debug(
+                        f"Retry response - Finish reason: {response.choices[0].finish_reason}"
+                    )
+                    if response.choices[0].message.tool_calls:
+                        tool_call = response.choices[0].message.tool_calls[0]
+                        self.logger.debug(
+                            f"Tool call obtained after retry: {tool_call}"
+                        )
+                        assert tool_call.type == "function"
+                    else:
+                        tool_call = None
+                except Exception as e:
+                    self.logger.error(f"Retry failed: {e}")
+                    tool_call = None
+            else:
+                tool_call = None
+
+            if tool_call is None:
+                # Still no tool calls after retry
+                self.logger.warning(
+                    f"No tool calls found in response.\n"
+                    f"  Finish reason: {response.choices[0].finish_reason}\n"
+                    f"  Message content: {response.choices[0].message.content[:200] if response.choices[0].message.content else None}\n"
+                    f"  Tokens: prompt={response.usage.prompt_tokens}, completion={response.usage.completion_tokens}"
+                )
         else:
             tool_call = response.choices[0].message.tool_calls[0]
+            self.logger.debug(f"Selected tool call: {tool_call}")
             assert tool_call.type == "function"
 
         # In openai call, the content is in response.choices[0].message.content
