@@ -3,6 +3,7 @@ import json
 import os
 import random
 import subprocess
+import hashlib
 import time
 import uuid
 from pathlib import Path
@@ -37,6 +38,9 @@ def _clean_for_kubernetes(name: str) -> str:
     # replace any characters not in the regex with hyphens
     cleaned = "".join(c if c.isalnum() or c in "-." else "-" for c in name).lower()
     # ensure it starts and ends with alphanumeric character
+    cleaned = cleaned.replace("/", "-")
+    cleaned = cleaned.replace(":", "-")
+    cleaned = cleaned.replace(".", "-")
     cleaned = cleaned.strip("-").strip(".")
     # truncate to 253 characters
     return cleaned[:253]
@@ -487,7 +491,7 @@ class KubernetesTerminal(Terminal):
         for attempt in range(max_retries):
             # Generate a new pod name for each attempt to avoid sandbox conflicts
             pod_name = _clean_for_kubernetes(
-                self._pod_name or f"dbg-gym.{self.task_name}.{str(uuid.uuid4())[:8]}"
+                self._pod_name or f"dbg-gym-{self.task_name}-{str(uuid.uuid4())[:8]}"
             )
             self.logger.debug(
                 f"Setting up pod {pod_name} (attempt {attempt + 1}/{max_retries}) "
@@ -508,7 +512,7 @@ class KubernetesTerminal(Terminal):
                     "restartPolicy": "Never",
                     "containers": [
                         {
-                            "name": str(uuid.uuid4())[:8],
+                            "name": pod_name,
                             "image": f"{self.registry}{self.base_image}",
                             "imagePullPolicy": "IfNotPresent",
                             "command": ["/bin/bash"],
