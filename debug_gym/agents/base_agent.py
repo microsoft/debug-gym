@@ -105,12 +105,11 @@ class BaseAgent:
         logger: DebugGymLogger | None = None,
     ):
         self.args = AgentArgs.from_dict(args) if isinstance(args, dict) else args
-        self.env = env
         self.logger = logger or DebugGymLogger("debug-gym")
         self.llm = llm
         self._uuid = self.args.uuid
 
-        self.env.dir_tree_depth = self.args.show_directory_tree
+        self.dir_tree_depth = self.args.show_directory_tree
 
         self.set_seed(self.args.random_seed)
         self.history = HistoryTracker(self.args.memory_size)
@@ -235,11 +234,13 @@ class BaseAgent:
 
         if self.args.show_directory_tree > 0:
             system_prompt_dict["Repo directory tree"] = self.trim_message(
-                info.dir_tree, max_length_percentage=0.1, where="end"
+                self.env.workspace.display_files(self.args.show_directory_tree),
+                max_length_percentage=0.1,
+                where="end",
             )
 
         if self.args.show_current_breakpoints:
-            system_prompt_dict["Current breakpoints"] = info.current_breakpoints
+            system_prompt_dict["Current breakpoints"] = self.env.current_breakpoints()
 
         if self._auto_eval_on_rewrite():
             system_prompt_dict["Evaluation output of current code"] = self.trim_message(
@@ -277,13 +278,15 @@ class BaseAgent:
         messages.extend(self.build_question_prompt())
         return messages
 
-    def run(self, task_name=None, debug=False):
+    def run(self, env: RepoEnv, debug=False):
+        self.env = env
+        task_name = self.env.task_name or "custom"  # Used for reporting
         step = 0
         info = None
         max_steps = self.args.max_steps
         try:
             self.history.reset()
-            info = self.env.reset(options={"task_name": task_name})
+            info = self.env.reset()
             # initial state does not have prompt and response
             self.history.step(info, None)
 

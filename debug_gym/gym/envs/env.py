@@ -17,7 +17,6 @@ class EnvInfo:
     step_observation: Observation
     all_observations: list[Observation]  #  env.step + triggered tools obs
     eval_observation: Observation | None  # last eval observation
-    dir_tree: str
     current_breakpoints: str
     action_reasoning: str | None
     action_content: str | None
@@ -78,7 +77,7 @@ class EnvInfo:
 
         # Directory tree section (truncated)
         lines.append("📁 Directory Structure:")
-        tree_lines = self.dir_tree.split("\n")
+        tree_lines = self.workspace.display_files(2).split("\n")
         for line in tree_lines[:10]:  # Show first 10 lines
             lines.append(f"   {line}")
         if len(tree_lines) > 10:
@@ -225,7 +224,6 @@ class RepoEnv(TooledEnv):
         self.path = path
         self.max_score = max_score
         self.run_timeout = run_timeout
-        self.dir_tree_depth = 0
         self.terminal = terminal or LocalTerminal()  # TODO: default to DockerTerminal
         self._entrypoint = entrypoint
         self._debug_entrypoint = debug_entrypoint
@@ -356,7 +354,6 @@ class RepoEnv(TooledEnv):
             eval_observation=(
                 Observation("env", self.last_eval.output) if self.last_eval else None
             ),
-            dir_tree=self.workspace.display_files(self.dir_tree_depth),
             current_breakpoints=self.current_breakpoints(),
             action_reasoning=None,
             action_content=None,
@@ -483,7 +480,6 @@ class RepoEnv(TooledEnv):
             eval_observation=(
                 Observation("env", self.last_eval.output) if self.last_eval else None
             ),
-            dir_tree=self.workspace.display_files(self.dir_tree_depth),
             current_breakpoints=self.current_breakpoints(),
             action_reasoning=action_reasoning,
             action_content=action_content,
