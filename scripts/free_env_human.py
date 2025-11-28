@@ -112,7 +112,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def _add_tools(env: FreeEnv, tool_specs: Iterable[Any], logger: DebugGymLogger) -> None:
-    """Attach toolbox entries, defaulting submit to apply_eval=False for humans."""
+    """Attach toolbox entries, defaulting submit to eval_on_submit=False for humans."""
 
     for spec in tool_specs:
         tool_kwargs: dict[str, Any] = {}
@@ -124,8 +124,8 @@ def _add_tools(env: FreeEnv, tool_specs: Iterable[Any], logger: DebugGymLogger) 
         else:
             tool_name = str(spec)
 
-        if tool_name == "submit" and "apply_eval" not in tool_kwargs:
-            tool_kwargs = {**tool_kwargs, "apply_eval": False}
+        if tool_name == "submit" and "eval_on_submit" not in tool_kwargs:
+            tool_kwargs = {**tool_kwargs, "eval_on_submit": False}
 
         env.add_tool(Toolbox.get_tool(tool_name, **tool_kwargs))
         logger.debug("Loaded tool %s with options %s", tool_name, tool_kwargs)
