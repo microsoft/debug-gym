@@ -1,19 +1,20 @@
 import json
-import os
 import subprocess
-from unittest.mock import MagicMock, Mock, mock_open, patch
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 from jinja2 import Template
 
 from debug_gym.agents.base_agent import (
     AGENT_REGISTRY,
+    AgentArgs,
     BaseAgent,
     create_agent,
     register_agent,
 )
 from debug_gym.agents.debug_agent import Debug_5_Agent, DebugAgent
 from debug_gym.agents.rewrite_agent import RewriteAgent
+from debug_gym.agents.utils import save_patch, save_trajectory
 from debug_gym.gym.tools.toolbox import Toolbox
 from debug_gym.llms.base import LLMResponse, TokenUsage
 
@@ -27,7 +28,6 @@ def test_default_system_prompt(agent_setup, build_env_info):
     agent.shortcut_features = Mock(return_value=["f1", "f2"])
     info = build_env_info(
         instructions="some instruction",
-        dir_tree="dir tree",
         current_breakpoints=[],
         eval_observation="eval obs",
     )
@@ -57,7 +57,6 @@ def test_default_system_prompt_auto_eval(agent_setup, build_env_info):
     env.add_tool(eval_tool)
     info = build_env_info(
         instructions="some instruction",
-        dir_tree="dir tree",
         current_breakpoints=[],
         eval_observation="eval obs",
     )
@@ -90,7 +89,6 @@ def test_load_system_prompt_template_default_no_shortcuts_or_eval(
     agent.shortcut_features = Mock(return_value=[])
     info = build_env_info(
         instructions="some instruction",
-        dir_tree="dir tree",
         current_breakpoints=[1, 2],
         eval_observation="",
     )
@@ -116,7 +114,7 @@ def test_load_system_prompt_template_from_file(tmp_path, agent_setup):
     template_content = "Task: {{ agent.system_prompt }}"
     template_path = tmp_path / "template.jinja"
     template_path.write_text(template_content)
-    agent.config["system_prompt_template_file"] = str(template_path)
+    agent.args.system_prompt_template_file = str(template_path)
     template = agent._load_system_prompt_template()
     assert isinstance(template, Template)
     assert template.render(agent=agent) == "Task: test task"
@@ -124,7 +122,7 @@ def test_load_system_prompt_template_from_file(tmp_path, agent_setup):
 
 def test_load_system_prompt_template_file_not_found(agent_setup):
     agent, _, _ = next(agent_setup(DebugAgent))
-    agent.config["system_prompt_template_file"] = "non_existent_template.jinja"
+    agent.args.system_prompt_template_file = "non_existent_template.jinja"
     with pytest.raises(FileNotFoundError):
         agent._load_system_prompt_template()
 
@@ -132,18 +130,21 @@ def test_load_system_prompt_template_file_not_found(agent_setup):
 def test_build_system_prompt(agent_setup, build_env_info):
     agent, env, _ = next(agent_setup(DebugAgent))
     eval_tool = Toolbox.get_tool("eval", auto_eval_on_rewrite=True)
+    pdb_tool = Toolbox.get_tool("pdb", auto_list=True, persistent_breakpoints=True)
     env.add_tool(eval_tool)
-    agent.config["env_kwargs"] = {
-        "show_current_breakpoints": True,
-        "show_directory_tree": True,
-    }
+    env.add_tool(pdb_tool)
+    env.workspace = MagicMock()
+    env.workspace.display_files = MagicMock(return_value="repo/tree")
+    agent.args.show_directory_tree = 2
+    agent.args.show_current_breakpoints = True
     agent.system_prompt = "Test overall task"
+    agent.env = env
     info = build_env_info(
         instructions="Do X",
-        dir_tree="repo/tree",
         current_breakpoints=[1, 2],
         eval_observation="eval obs",
     )
+
     messages = agent.build_system_prompt(info)
     expected = {
         "Overall task": "Test overall task",
@@ -158,6 +159,8 @@ def test_build_system_prompt(agent_setup, build_env_info):
             "updated automatically in the system prompt.",
             "The environment will show the directory tree of the repository in the system prompt.",
             "The environment will show the current breakpoints in the system prompt.",
+            "The environment will automatically restore existing breakpoints when a new PDB session is started (e.g., after a rewrite).",
+            "After every valid PDB tool calling, the environment will automatically call the PDB tool again with a `list .` command, which will show the code around the current frame.",
         ],
     }
     assert messages == [{"role": "system", "content": json.dumps(expected, indent=2)}]
@@ -167,7 +170,6 @@ def test_build_prompt(agent_setup, build_env_info):
     agent, _, _ = next(agent_setup(DebugAgent))
     info = build_env_info(
         instructions="Test instructions",
-        dir_tree="Test dir tree",
         current_breakpoints="Test breakpoints",
         step_observation="Test last run obs",
     )
@@ -183,7 +185,6 @@ def test_run(agent_setup, build_env_info):
         score=0,
         max_score=10,
         instructions="Test instructions",
-        dir_tree="Test dir tree",
         current_breakpoints="Test breakpoints",
         step_observation="Test last run obs",
     )
@@ -193,12 +194,11 @@ def test_run(agent_setup, build_env_info):
         score=10,
         max_score=10,
         instructions="Test instructions",
-        dir_tree="Test dir tree",
         current_breakpoints="Test breakpoints",
         step_observation="Test last run obs",
     )
     llm.return_value = LLMResponse("Prompt", "Expected answer", TokenUsage(2, 4))
-    result = agent.run(task_name="test_task", debug=False)
+    result = agent.run(env, debug=False)
     assert result
 
 
@@ -206,7 +206,6 @@ def test_build_system_prompt_rewrite_agent(agent_setup, build_env_info):
     agent, _, _ = next(agent_setup(RewriteAgent))
     info = build_env_info(
         instructions="Test instructions",
-        dir_tree="Test dir tree",
         current_breakpoints="Test breakpoints",
         step_observation="Test last run obs",
     )
@@ -224,7 +223,6 @@ def test_run_debug_5_agent(agent_setup, build_env_info):
         max_score=10,
         rewrite_counter=0,
         instructions="Test instructions",
-        dir_tree="Test dir tree",
         current_breakpoints="Test breakpoints",
         step_observation="Test last run obs",
     )
@@ -235,13 +233,12 @@ def test_run_debug_5_agent(agent_setup, build_env_info):
         max_score=10,
         rewrite_counter=0,
         instructions="Test instructions",
-        dir_tree="Test dir tree",
         current_breakpoints="Test breakpoints",
         step_observation="Test last run obs",
     )
     llm.return_value = LLMResponse("Prompt", "Expected answer", TokenUsage(2, 4))
     env.tools = {"pdb": MagicMock()}
-    result = agent.run(task_name="test_task", debug=False)
+    result = agent.run(env, debug=False)
     assert result
 
 
@@ -288,8 +285,8 @@ def test_create_agent():
     class TestRegisteredAgent(BaseAgent):
         name = "test_registered"
 
-        def __init__(self, config, env, **kwargs):
-            super().__init__(config, env, **kwargs)
+        def __init__(self, args, env, **kwargs):
+            super().__init__(args, env, **kwargs)
 
     # Clear and setup registry
     original_registry = AGENT_REGISTRY.copy()
@@ -298,15 +295,22 @@ def test_create_agent():
 
     try:
         # Mock the required parameters
-        mock_config = {"output_path": "/tmp", "random_seed": 42, "memory_size": 10}
+        mock_config = {
+            "output_path": "/tmp",
+            "random_seed": 42,
+            "memory_size": 10,
+            "max_steps": 5,
+            "max_rewrite_steps": 3,
+        }
+        agent_args = AgentArgs.from_dict(mock_config)
         mock_env = MagicMock()
 
-        agent = create_agent("test_registered", config=mock_config, env=mock_env)
+        agent = create_agent("test_registered", agent_args=agent_args, env=mock_env)
         assert isinstance(agent, TestRegisteredAgent)
 
         # Test unknown agent type
         with pytest.raises(ValueError, match="Unknown agent type: unknown_agent"):
-            create_agent("unknown_agent", config=mock_config, env=mock_env)
+            create_agent("unknown_agent", agent_args=agent_args, env=mock_env)
 
         # Test module import (mock importlib)
         with patch("importlib.import_module") as mock_import:
@@ -315,7 +319,7 @@ def test_create_agent():
             mock_import.return_value = mock_module
 
             agent = create_agent(
-                "some.module.TestClass", config=mock_config, env=mock_env
+                "some.module.TestClass", agent_args=agent_args, env=mock_env
             )
             assert isinstance(agent, TestRegisteredAgent)
             mock_import.assert_called_once_with("some.module")
@@ -328,17 +332,23 @@ def test_create_agent():
 def test_system_prompt_building_with_no_template():
     """Test system prompt building when no template is provided"""
     mock_env = MagicMock()
-    mock_env.get_tool = MagicMock(
-        side_effect=KeyError("no tools for testing")
-    )  # KeyError to simulate missing tool
-    agent = BaseAgent(
-        {"output_path": "/tmp", "random_seed": 42, "memory_size": 10}, mock_env
+    agent_args = AgentArgs.from_dict(
+        {
+            "random_seed": 42,
+            "memory_size": 10,
+            "max_steps": 1,
+            "max_rewrite_steps": 1,
+        }
     )
+    llm = MagicMock()
+    llm.context_length = 2000
+    llm.count_tokens = Mock(return_value=500)
+    agent = BaseAgent(agent_args, llm=llm)
+    agent.env = mock_env
 
     # Create a mock info object
     mock_info = MagicMock()
     mock_info.instructions = "test instructions"
-    mock_info.dir_tree = "test dir tree"
     mock_info.current_breakpoints = []
     mock_info.eval_observation = MagicMock()
     mock_info.eval_observation.observation = "test eval"
@@ -356,7 +366,14 @@ def test_system_prompt_building_with_no_template():
 def test_system_prompt_building_with_template():
     """Test system prompt building with template file"""
     agent = BaseAgent(
-        {"output_path": "/tmp", "random_seed": 42, "memory_size": 10}, MagicMock()
+        {
+            "output_path": "/tmp",
+            "random_seed": 42,
+            "memory_size": 10,
+            "max_steps": 1,
+            "max_rewrite_steps": 1,
+        },
+        MagicMock(),
     )
 
     # Create a mock info object
@@ -404,12 +421,8 @@ def test_shortcut_features_comprehensive(agent_setup):
     eval_tool = Toolbox.get_tool("eval", auto_eval_on_rewrite=True)
     env.add_tool(eval_tool)
     # Test with all features enabled
-    agent.config["env_kwargs"] = {
-        "show_directory_tree": True,
-        "show_current_breakpoints": True,
-        "persistent_breakpoints": True,
-        "auto_list": True,
-    }
+    agent.args.show_directory_tree = 1
+    agent.args.show_current_breakpoints = True
     env.has_tool.return_value = True
 
     features = agent.shortcut_features()
@@ -426,9 +439,13 @@ def test_shortcut_features_comprehensive(agent_setup):
     assert len(features) == 2  # Only auto_eval and directory_tree
 
     # Test with no features
-    agent.config["env_kwargs"] = {}
+    agent.args.show_directory_tree = 0
+    agent.args.show_current_breakpoints = False
     env.get_tool("eval").auto_eval_on_rewrite = False
+    env.get_tool("pdb").auto_list = False
+    env.get_tool("pdb").persistent_breakpoints = False
     features = agent.shortcut_features()
+    print(features)
     assert len(features) == 0
 
 
@@ -484,12 +501,11 @@ def test_run_early_completion(agent_setup, build_env_info):
         score=10,
         max_score=10,
         instructions="Test instructions",
-        dir_tree="Test dir tree",
         current_breakpoints="Test breakpoints",
         step_observation="Test last run obs",
     )
 
-    result = agent.run(task_name="test_task")
+    result = agent.run(env)
     assert result is True
     env.step.assert_not_called()  # Should not step if already done
 
@@ -497,7 +513,7 @@ def test_run_early_completion(agent_setup, build_env_info):
 def test_run_max_rewrite_steps(agent_setup, build_env_info):
     """Test run method when max rewrite steps is reached"""
     agent, env, llm = next(agent_setup(DebugAgent))
-    agent.config["max_rewrite_steps"] = 2
+    agent.args.max_rewrite_steps = 2
 
     env.reset.return_value = build_env_info(
         terminated=False,
@@ -506,7 +522,6 @@ def test_run_max_rewrite_steps(agent_setup, build_env_info):
         max_score=10,
         rewrite_counter=0,
         instructions="Test instructions",
-        dir_tree="Test dir tree",
         current_breakpoints="Test breakpoints",
         step_observation="Test last run obs",
     )
@@ -519,14 +534,13 @@ def test_run_max_rewrite_steps(agent_setup, build_env_info):
         max_score=10,
         rewrite_counter=2,  # Reaches max_rewrite_steps
         instructions="Test instructions",
-        dir_tree="Test dir tree",
         current_breakpoints="Test breakpoints",
         step_observation="Test last run obs",
     )
 
     llm.return_value = LLMResponse("Prompt", "Expected answer", TokenUsage(2, 4))
 
-    result = agent.run(task_name="test_task")
+    result = agent.run(env)
     assert result is False  # Task not completed, but stopped due to max rewrites
 
 
@@ -540,7 +554,6 @@ def test_run_exception_handling(agent_setup, build_env_info):
         score=0,
         max_score=10,
         instructions="Test instructions",
-        dir_tree="Test dir tree",
         current_breakpoints="Test breakpoints",
         step_observation="Test last run obs",
     )
@@ -549,7 +562,7 @@ def test_run_exception_handling(agent_setup, build_env_info):
     llm.side_effect = RuntimeError("Test error")
 
     with pytest.raises(RuntimeError, match="Test error"):
-        agent.run(task_name="test_task")
+        agent.run(env)
 
 
 def test_apply_patch_success(agent_setup, tmp_path):
@@ -587,34 +600,30 @@ def test_apply_patch_failure(agent_setup, tmp_path):
 def test_save_patch(agent_setup, tmp_path):
     """Test patch saving functionality"""
     agent, env, _ = next(agent_setup(DebugAgent))
-    agent._output_path = str(tmp_path)
     env.patch = "test patch content"
+    logger = MagicMock()
 
-    agent.save_patch("test_task")
+    problem_path = tmp_path / "test_task"
+    save_patch(env, problem_path, logger)
 
-    patch_file = tmp_path / "test_task" / "debug_gym.patch"
+    patch_file = problem_path / "debug_gym.patch"
     assert patch_file.exists()
     assert patch_file.read_text() == "test patch content"
 
 
-def test_save_trajectory(agent_setup, tmp_path):
-    """Test trajectory saving functionality"""
+def test_build_trajectory(agent_setup, tmp_path):
+    """Test trajectory building and persistence helpers"""
     agent, env, llm = next(agent_setup(DebugAgent))
-    agent._output_path = str(tmp_path)
     env.terminated = True
     env.resolved = True
 
-    # Make all fields JSON serializable
-    agent.config = {"output_path": str(tmp_path), "random_seed": 42}
     agent._uuid = "test-uuid-123"
 
-    # Create mock tools with proper attributes
     mock_tool = MagicMock()
     mock_tool.name = "test_tool"
     mock_tool.arguments = "test_args"
     env.tools = [mock_tool]
 
-    # Mock history with simple implementation
     class MockHistory:
         def __len__(self):
             return 2
@@ -624,73 +633,28 @@ def test_save_trajectory(agent_setup, tmp_path):
 
     agent.history = MockHistory()
 
-    # Mock logger with JSON serializable log_file
     agent.logger = MagicMock()
     agent.logger.log_file = "/tmp/test.log"
+    llm.define_tools = lambda tools: [
+        {"name": tool.name, "args": tool.arguments} for tool in tools
+    ]
 
-    # Test with LLM - patch the method directly
-    with patch.object(agent, "save_trajectory") as mock_save:
-        agent.save_trajectory("test_task")
-        mock_save.assert_called_once_with("test_task")
-        # Test the method manually with controlled data
-        json_output = {
-            "problem": "test_task",
-            "config": agent.config,
-            "tools": [{"name": "test_tool", "args": "test_args"}],
-            "uuid": agent._uuid,
-            "success": env.resolved,
-            "log": [
-                {"step": 0, "action": "test_action_0"},
-                {"step": 1, "action": "test_action_1"},
-            ],
-            "agent_type": agent.__class__.__name__,
-            "logger": str(agent.logger.log_file),
-        }
+    trajectory = agent.build_trajectory("test_task")
+    assert trajectory["problem"] == "test_task"
+    assert trajectory["uuid"] == "test-uuid-123"
+    assert len(trajectory["log"]) == 2
+    assert trajectory["logger"] == "/tmp/test.log"
+    assert trajectory["config"]["random_seed"] == agent.args.random_seed
 
-        # Manually create the trajectory file to test the content
-        os.makedirs(tmp_path / "test_task", exist_ok=True)
-        with open(tmp_path / "test_task" / "trajectory.json", "w") as f:
-            json.dump(json_output, f, indent=4)
+    problem_path = tmp_path / "test_task"
+    save_trajectory(agent, "test_task", problem_path, MagicMock())
 
-    trajectory_file = tmp_path / "test_task" / "trajectory.json"
+    trajectory_file = problem_path / "trajectory.json"
     assert trajectory_file.exists()
 
-    with open(trajectory_file) as f:
-        data = json.load(f)
-
-    assert data["problem"] == "test_task"
-    assert data["success"] is True
-    assert len(data["log"]) == 2
-    assert data["tools"] == [{"name": "test_tool", "args": "test_args"}]
-    assert data["uuid"] == "test-uuid-123"
-
-    # Test without LLM - create simplified test case
-    json_output_no_llm = {
-        "problem": "test_task_no_llm",
-        "config": agent.config,
-        "tools": ["test_tool(test_args)"],  # String format when no LLM
-        "uuid": agent._uuid,
-        "success": env.resolved,
-        "log": [
-            {"step": 0, "action": "test_action_0"},
-            {"step": 1, "action": "test_action_1"},
-        ],
-        "agent_type": agent.__class__.__name__,
-        "logger": str(agent.logger.log_file),
-    }
-
-    os.makedirs(tmp_path / "test_task_no_llm", exist_ok=True)
-    with open(tmp_path / "test_task_no_llm" / "trajectory.json", "w") as f:
-        json.dump(json_output_no_llm, f, indent=4)
-
-    trajectory_file_no_llm = tmp_path / "test_task_no_llm" / "trajectory.json"
-    assert trajectory_file_no_llm.exists()
-
-    with open(trajectory_file_no_llm) as f:
-        data_no_llm = json.load(f)
-
-    # Without LLM, tools should be formatted as strings
-    assert data_no_llm["tools"] == ["test_tool(test_args)"]
+    saved = json.loads(trajectory_file.read_text())
+    assert saved["problem"] == "test_task"
+    assert saved["uuid"] == "test-uuid-123"
 
 
 def test_build_question_prompt(agent_setup):
@@ -722,7 +686,7 @@ def test_load_system_prompt_template_with_filters(agent_setup, tmp_path):
     template_file = tmp_path / "template.jinja"
     template_file.write_text(template_content)
 
-    agent.config["system_prompt_template_file"] = str(template_file)
+    agent.args.system_prompt_template_file = str(template_file)
     agent.system_prompt = "Test task"
 
     template = agent._load_system_prompt_template()

@@ -9,8 +9,8 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 
 from debug_gym import version as dg_version
-from debug_gym.agents.base_agent import AGENT_REGISTRY, create_agent
-from debug_gym.agents.utils import load_config
+from debug_gym.agents.base_agent import AGENT_REGISTRY, AgentArgs, create_agent
+from debug_gym.agents.utils import load_config, save_patch, save_trajectory
 from debug_gym.gym.envs import select_env
 from debug_gym.gym.terminals import select_terminal
 from debug_gym.gym.tools.toolbox import Toolbox
@@ -99,9 +99,10 @@ def run_agent(args, problem, config):
             logger=task_logger,
         )
 
+        agent_args = AgentArgs.from_dict(config)
         agent = create_agent(
             config["agent_type"],
-            config=config,
+            agent_args=agent_args,
             env=env,
             llm=llm,
             logger=task_logger,
@@ -141,11 +142,11 @@ def run_agent(args, problem, config):
             raise
 
         # save trajectory
-        agent.save_trajectory(task_name=problem)
+        save_trajectory(agent, problem, problem_path, task_logger)
 
         # optionally apply patch
         if config["save_patch"]:
-            agent.save_patch(task_name=problem)
+            save_patch(env, problem_path, task_logger)
 
     except Exception as e:
         task_logger.error(
