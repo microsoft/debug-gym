@@ -2,7 +2,8 @@ import json
 import os
 import subprocess
 import uuid
-from os.path import join as pjoin
+from dataclasses import MISSING, asdict, dataclass, field, fields
+from typing import Any, Dict
 
 import numpy as np
 from jinja2 import Environment, Template
@@ -15,6 +16,55 @@ from debug_gym.llms.utils import trim
 from debug_gym.logger import DebugGymLogger
 
 AGENT_REGISTRY = {}
+
+
+@dataclass
+class AgentArgs:
+    random_seed: int
+    memory_size: int
+    max_steps: int
+    max_rewrite_steps: int
+    system_prompt_template_file: str | None = None
+    uuid: str = field(default_factory=lambda: str(uuid.uuid4()))
+    extras: Dict[str, Any] = field(default_factory=dict)
+
+    @classmethod
+    def from_dict(cls, config: Dict[str, Any]) -> "AgentArgs":
+        # Get all field names from the dataclass
+        field_names = {f.name for f in fields(cls)}
+
+        # Check for required fields (those without defaults)
+        required_fields = {
+            f.name
+            for f in fields(cls)
+            if f.default is MISSING and f.default_factory is MISSING
+        }
+        missing = required_fields - config.keys()
+        if missing:
+            raise ValueError(
+                f"Missing required agent config keys: {', '.join(sorted(missing))}"
+            )
+
+        # Separate known fields from extras
+        known_values = {k: v for k, v in config.items() if k in field_names}
+        extras = {k: v for k, v in config.items() if k not in field_names}
+
+        # Add extras if that field exists
+        if "extras" in field_names:
+            known_values["extras"] = extras
+
+        return cls(**known_values)
+
+    def get(self, key: str, default=None):
+        if key in self.__dataclass_fields__:
+            return getattr(self, key)
+        return self.extras.get(key, default)
+
+    def to_dict(self) -> Dict[str, Any]:
+        data = asdict(self)
+        extras = data.pop("extras", {})
+        data.update(extras)
+        return data
 
 
 def register_agent(cls):
@@ -33,33 +83,28 @@ class BaseAgent:
 
     def __init__(
         self,
-        config: dict,
-        env: RepoEnv,
+        agent_args: AgentArgs | Dict[str, Any],
         llm: LLM | None = None,
         logger: DebugGymLogger | None = None,
     ):
-        self.config = config
-        self.env = env
+        self.args = (
+            AgentArgs.from_dict(agent_args)
+            if isinstance(agent_args, dict)
+            else agent_args
+        )
         self.logger = logger or DebugGymLogger("debug-gym")
         self.llm = llm
-        self._uuid = self.config.get("uuid", str(uuid.uuid4()))
-        self._output_path = pjoin(self.config["output_path"], self._uuid)
+        self._uuid = self.args.uuid
+        self.env = None
 
-        os.makedirs(self._output_path, exist_ok=True)
-
-        self.set_seed(self.config["random_seed"])
-        self.history = HistoryTracker(self.config["memory_size"])
+        self.set_seed(self.args.random_seed)
+        self.history = HistoryTracker(self.args.memory_size)
 
     def set_seed(self, seed):
         np.random.seed(seed)
 
     def build_history_prompt(self):
-        messages = build_history_prompt(
-            self.history,
-            self.llm,
-            self.config.get("reset_prompt_history_after_rewrite", False),
-        )
-        return messages
+        return build_history_prompt(self.history, self.llm)
 
     def parse_reasoning_model_response(self, response, reasoning_end_token):
         # Strip the reasoning, e.g., in Deepseek r1, between <think> and </think>.
@@ -75,45 +120,6 @@ class BaseAgent:
             return self.env.get_tool("eval").auto_eval_on_rewrite
         except KeyError:
             return False  # no eval tool
-
-    def _show_current_breakpoints(self):
-        """Check if current breakpoints should be shown in the system prompt."""
-        return self.config.get("env_kwargs", {}).get("show_current_breakpoints", False)
-
-    def _show_directory_tree(self):
-        """Check if directory tree should be shown in the system prompt."""
-        return self.config.get("env_kwargs", {}).get("show_directory_tree", False)
-
-    def shortcut_features(self):
-        features = []
-        if self._auto_eval_on_rewrite():
-            features.append(
-                "After successful rewrites, the environment will automatically "
-                "call the Eval tool to evaluate the rewritten code. Therefore, "
-                "you do not need to call the Eval tool yourself. The evaluation "
-                "output will be updated automatically in the system prompt."
-            )
-        if self._show_directory_tree():
-            features.append(
-                "The environment will show the directory tree of the repository in the system prompt."
-            )
-        if self.env.has_tool("pdb"):
-            if self._show_current_breakpoints():
-                features.append(
-                    "The environment will show the current breakpoints in the system prompt."
-                )
-            if self.config.get("env_kwargs", {}).get("persistent_breakpoints"):
-                features.append(
-                    "The environment will automatically restore existing breakpoints "
-                    "when a new PDB session is started (e.g., after a rewrite)."
-                )
-            if self.config.get("env_kwargs", {}).get("auto_list"):
-                features.append(
-                    "After every valid PDB tool calling, the environment will "
-                    "automatically call the PDB tool again with a `list .` command, "
-                    "which will show the code around the current frame."
-                )
-        return features
 
     @staticmethod
     def to_pretty_json(value):
@@ -150,7 +156,7 @@ class BaseAgent:
         """Load system prompt template from config if specified and register custom filters.
         If no template is specified, return None.
         """
-        system_prompt_template = self.config.get("system_prompt_template_file")
+        system_prompt_template = self.args.system_prompt_template_file
         if system_prompt_template:
             if not os.path.isfile(system_prompt_template):
                 error_msg = (
@@ -173,27 +179,7 @@ class BaseAgent:
 
         system_prompt_dict = {
             "Overall task": self.system_prompt,
-            "Instructions": info.instructions,
         }
-
-        if self._show_directory_tree():
-            system_prompt_dict["Repo directory tree"] = self.trim_message(
-                info.dir_tree, max_length_percentage=0.1, where="end"
-            )
-
-        if self._show_current_breakpoints():
-            system_prompt_dict["Current breakpoints"] = info.current_breakpoints
-
-        if self._auto_eval_on_rewrite():
-            system_prompt_dict["Evaluation output of current code"] = self.trim_message(
-                info.eval_observation.observation,
-                max_length_percentage=0.8,
-                where="middle",
-            )
-
-        shortcut_features = self.shortcut_features()
-        if shortcut_features:
-            system_prompt_dict["Shortcut features"] = shortcut_features
 
         return self.to_pretty_json(system_prompt_dict)
 
@@ -220,19 +206,20 @@ class BaseAgent:
         messages.extend(self.build_question_prompt())
         return messages
 
-    def run(self, task_name=None, debug=False):
+    def run(self, env: RepoEnv, debug=False):
+        self.env = env
         step = 0
         info = None
-        max_steps = self.config["max_steps"]
+        max_steps = self.args.max_steps
         try:
             self.history.reset()
-            info = self.env.reset(options={"task_name": task_name})
+            info = self.env.reset()
             # initial state does not have prompt and response
             self.history.step(info, None)
 
             if info.resolved is True:
                 self.logger.report_progress(
-                    problem_id=task_name,
+                    problem_id=env.task_name,
                     step=1,
                     total_steps=1,
                     score=info.score,
@@ -250,7 +237,7 @@ class BaseAgent:
             for step in range(max_steps):
                 self.logger.info(f"\n{'='*20} STEP {step+1} {'='*20}\n")
                 highscore = max(highscore, info.score)
-                msg = f"[{task_name[:10]:<10}] Step {step} | Score: {info.score}/{info.max_score or '-'} [Best: {highscore}]"
+                msg = f"[{env.task_name[:10]:<10}] Step {step} | Score: {info.score}/{info.max_score or '-'} [Best: {highscore}]"
                 self.logger.info(msg)
 
                 messages = self.build_prompt(info)
@@ -268,7 +255,7 @@ class BaseAgent:
 
                 if (
                     info.terminated
-                    or info.rewrite_counter >= self.config["max_rewrite_steps"]
+                    or info.rewrite_counter >= self.args.max_rewrite_steps
                 ):
                     reason = (
                         "terminated" if info.resolved else "max_rewrite_steps reached"
@@ -278,7 +265,7 @@ class BaseAgent:
                     )
                     # early stop, set current step and total steps to be the same
                     self.logger.report_progress(
-                        problem_id=task_name,
+                        problem_id=env.task_name,
                         step=step + 1,
                         total_steps=step + 1,
                         score=info.score,
@@ -288,7 +275,7 @@ class BaseAgent:
                     break
                 # keep progress bar running until max_steps is reached
                 self.logger.report_progress(
-                    problem_id=task_name,
+                    problem_id=env.task_name,
                     step=step + 1,
                     total_steps=max_steps + 1,
                     score=info.score,
@@ -297,7 +284,7 @@ class BaseAgent:
                 )
             # max_steps was reached, task was either resolved or unresolved
             self.logger.report_progress(
-                problem_id=task_name,
+                problem_id=env.task_name,
                 step=step + 1,
                 total_steps=step + 1,
                 score=info.score,
@@ -308,7 +295,7 @@ class BaseAgent:
         except Exception:
             # report any error that happens during the run
             self.logger.report_progress(
-                problem_id=task_name,
+                problem_id=env.task_name,
                 step=step + 1,
                 total_steps=step + 1,
                 score=info.score if info else 0,
@@ -339,22 +326,12 @@ class BaseAgent:
             print("Error:", e.stderr)
             return False
 
-    def save_patch(self, task_name="custom"):
-        os.makedirs(pjoin(self._output_path, task_name), exist_ok=True)
-        patch_path = pjoin(self._output_path, task_name, "debug_gym.patch")
-        with open(patch_path, "w") as f:
-            f.write(self.env.patch)
-
-        self.logger.debug(
-            f"Patch saved in {pjoin(self._output_path, task_name, 'debug_gym.patch')}"
-        )
-
-    def save_trajectory(self, task_name="custom"):
-        # Simple tools list.
+    def build_trajectory(self, task_name) -> Dict[str, Any]:
+        """Return the trajectory as a JSON-serializable dict without writing it."""
         tools = [f"{tool.name}({tool.arguments})" for tool in self.env.tools]
         json_output = {
             "problem": task_name,
-            "config": self.config,
+            "config": self.args.to_dict(),
             "tools": self.llm.define_tools(self.env.tools) if self.llm else tools,
             "uuid": self._uuid,
             "success": self.env.resolved,
@@ -365,15 +342,16 @@ class BaseAgent:
         for step_id in range(len(self.history)):
             step_json = self.history.json(step_id)
             json_output["log"].append(step_json)
-        os.makedirs(pjoin(self._output_path, task_name), exist_ok=True)
-        json_file = pjoin(self._output_path, task_name, "trajectory.json")
-        with open(json_file, "w") as f:
-            json.dump(json_output, f, indent=4)
-
-        self.logger.debug(f"Trajectory saved in {json_file}")
+        return json_output
 
 
-def create_agent(agent_type: str, **agent_kwargs):
+def create_agent(
+    agent_type: str,
+    *,
+    agent_args: AgentArgs | Dict[str, Any] | None = None,
+    config: Dict[str, Any] | None = None,
+    **agent_kwargs,
+):
     if agent_type in AGENT_REGISTRY:
         agent_class = AGENT_REGISTRY[agent_type]
     elif "." in agent_type:
@@ -389,5 +367,9 @@ def create_agent(agent_type: str, **agent_kwargs):
     else:
         raise ValueError(f"Unknown agent type: {agent_type}")
 
-    agent = agent_class(**agent_kwargs)
+    agent_args = agent_args or config
+    if agent_args is None:
+        raise ValueError("Either agent_args or config must be provided.")
+
+    agent = agent_class(args=agent_args, **agent_kwargs)
     return agent

@@ -233,20 +233,22 @@ def test_apply_gold_patch(get_swe_bench_env):
 @pytest.if_docker_running
 def test_running_solution_agent(get_swe_bench_env, tmp_path):
     env = get_swe_bench_env()
-    # BaseAgent requires a config dict with at least: output_path, random_seed, memory_size.
-    # Provide a minimal config for the SolutionAgent run.
+    # AgentArgs requires at least random_seed, memory_size, max_steps, and max_rewrite_steps.
+    # Provide a minimal agent config for the SolutionAgent run.
     config = {
         "output_path": str(tmp_path),
         "random_seed": 0,
         "memory_size": 8,
         # Optional values that BaseAgent.run would use; harmless to include here.
         "max_steps": 1,
+        "max_rewrite_steps": 1,
         "env_kwargs": {},
     }
     for tool_name in ["pdb", "submit"]:
         env.add_tool(Toolbox.get_tool(tool_name))
-    agent = AgentSolution(config=config, env=env, llm=None, logger=env.logger)
-    success = agent.run(task_name="astropy__astropy-14096")
+    agent = AgentSolution(agent_args=config, llm=None, logger=env.logger)
+    env.reset(options={"task_name": "astropy__astropy-14096"})
+    success = agent.run(env)
     assert success
 
 
@@ -276,18 +278,20 @@ def test_setup_terminal_debug_mode(get_swe_bench_debug_env):
 @pytest.if_docker_running
 def test_running_solution_agent_in_debug_mode(get_swe_bench_debug_env, tmp_path):
     env = get_swe_bench_debug_env()
-    # BaseAgent requires a config dict with at least: output_path, random_seed, memory_size.
-    # Provide a minimal config for the SolutionAgent run.
+    # AgentArgs requires at least random_seed, memory_size, max_steps, and max_rewrite_steps.
+    # Provide a minimal agent config for the SolutionAgent run.
     config = {
         "output_path": str(tmp_path),
         "random_seed": 0,
         "memory_size": 8,
         # Optional values that BaseAgent.run would use; harmless to include here.
         "max_steps": 1,
+        "max_rewrite_steps": 1,
         "env_kwargs": {},
     }
     for tool_name in ["pdb", "eval", "submit"]:
         env.add_tool(Toolbox.get_tool(tool_name))
-    agent = AgentSolution(config=config, env=env, llm=None, logger=env.logger)
-    success = agent.run(task_name="astropy__astropy-14096")
+    agent = AgentSolution(agent_args=config, llm=None, logger=env.logger)
+    env.reset(options={"task_name": "astropy__astropy-14096"})
+    success = agent.run(env)
     assert success
