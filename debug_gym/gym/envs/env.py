@@ -40,14 +40,16 @@ class EnvInfo:
         # Status section
         lines.append(
             f"📊 Status: {('✅' if self.resolved else '❌') + ' (TERMINATED)' if self.terminated else '🔄 (IN PROGRESS)'}\t"
-            f"🎯 Score: {self.score}/{self.max_score}\t"
+            f"🎯 Score: {self.score}/{self.max_score or '?'}\t"
             f"✏️ Rewrites: {self.rewrite_counter}"
         )
 
         # Action section
-        if self.action:
+        if self.action_tool_call:
             lines.append("🔧 Last Action:")
-            lines.append(f"   Tool: {self.action.name}")
+            lines.append(f"   Tool: {self.action_tool_call.name}")
+            if self.action_content:
+                lines.append(f"   Explanation: {self.action_content}")
             if self.action_reasoning:
                 lines.append(f"   Reasoning: {self.action_reasoning}")
             lines.append("")
@@ -336,6 +338,7 @@ class RepoEnv(TooledEnv):
         """Resets the environment and returns eval as the initial observation."""
         options = options or {}
         self.logger.debug("Resetting environment")
+        self.close()  # Clean up previous workspace and terminal.
         self.setup_task(task_name=options.get("task_name"), options=options)
         self.setup_workspace()
         self.setup_terminal()
