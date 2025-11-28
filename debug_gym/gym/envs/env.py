@@ -323,7 +323,8 @@ class RepoEnv(TooledEnv):
         options = options or {}
         self.logger.debug("Resetting environment")
         self.close()  # Clean up previous workspace and terminal.
-        self.setup_task(task_name=options.get("task_name"), options=options)
+        self.task_name = options.get("task_name")
+        self.setup_task(task_name=self.task_name, options=options)
         self.setup_workspace()
         self.setup_terminal()
         self._reset_env_state()
@@ -504,6 +505,3 @@ class RepoEnv(TooledEnv):
 
     def load_dataset(self, problems: str | list[str] | None = None):
         return {"custom": None}
-
-    def __str__(self) -> str:
-        return f"RepoEnv(path={self.path})"

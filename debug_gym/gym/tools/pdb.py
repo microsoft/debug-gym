@@ -128,7 +128,7 @@ class PDBTool(EnvironmentTool):
             self.stop_pdb()
 
         if self.pdb_is_running:
-            if environment.persistent_breakpoints:
+            if self.persistent_breakpoints:
                 # restore persistent breakpoints
                 for _, _command in environment.current_breakpoints_state.items():
                     self.interact_with_pdb(_command, environment.run_timeout)
@@ -266,7 +266,7 @@ class PDBTool(EnvironmentTool):
 
             # free 'list' to provide context around the current frame
             list_output = ""
-            if environment.auto_list and command.split()[0] not in ["l", "list"]:
+            if self.auto_list and command.split()[0] not in ["l", "list"]:
                 list_output = self.interact_with_pdb("l .", environment.run_timeout)
 
             if current_frame:

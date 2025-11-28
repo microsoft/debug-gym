@@ -36,7 +36,7 @@ class Debug_5_Agent(DebugAgent):
             if info.resolved is True:
                 # msg = "Environment started with entrypoint passing without errors."
                 self.logger.report_progress(
-                    problem_id=str(env),
+                    problem_id=env.task_name,
                     step=1,
                     total_steps=1,
                     score=info.score,
@@ -49,7 +49,7 @@ class Debug_5_Agent(DebugAgent):
             for step in range(max_steps):
                 self.logger.info(f"\n{'='*20} STEP {step+1} {'='*20}\n")
                 highscore = max(highscore, info.score)
-                msg = f"[{str(env)[:10]:<10}] Step {step} | Score: {info.score}/{info.max_score or '-'} [Best: {highscore}]"
+                msg = f"[{env.task_name[:10]:<10}] Step {step} | Score: {info.score}/{info.max_score or '-'} [Best: {highscore}]"
                 self.logger.info(msg)
 
                 messages = self.build_prompt(info)
@@ -89,7 +89,7 @@ class Debug_5_Agent(DebugAgent):
                     )
                     # early stop, set current step and total steps to be the same
                     self.logger.report_progress(
-                        problem_id=str(env),
+                        problem_id=env.task_name,
                         step=step + 1,
                         total_steps=step + 1,
                         score=info.score,
@@ -99,7 +99,7 @@ class Debug_5_Agent(DebugAgent):
                     break
                 # keep progress bar running until max_steps is reached
                 self.logger.report_progress(
-                    problem_id=str(env),
+                    problem_id=env.task_name,
                     step=step + 1,
                     total_steps=max_steps + 1,
                     score=info.score,
@@ -108,7 +108,7 @@ class Debug_5_Agent(DebugAgent):
                 )
             # max_steps was reached, task was either resolved or unresolved
             self.logger.report_progress(
-                problem_id=str(env),
+                problem_id=env.task_name,
                 step=step + 1,
                 total_steps=step + 1,
                 score=info.score,
@@ -119,7 +119,7 @@ class Debug_5_Agent(DebugAgent):
         except Exception:
             # report any error that happens during the run
             self.logger.report_progress(
-                problem_id=str(env),
+                problem_id=env.task_name,
                 step=step + 1,
                 total_steps=step + 1,
                 score=info.score if info else 0,

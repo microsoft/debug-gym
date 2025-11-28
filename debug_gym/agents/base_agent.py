@@ -219,7 +219,7 @@ class BaseAgent:
 
             if info.resolved is True:
                 self.logger.report_progress(
-                    problem_id=str(env),
+                    problem_id=env.task_name,
                     step=1,
                     total_steps=1,
                     score=info.score,
@@ -237,7 +237,7 @@ class BaseAgent:
             for step in range(max_steps):
                 self.logger.info(f"\n{'='*20} STEP {step+1} {'='*20}\n")
                 highscore = max(highscore, info.score)
-                msg = f"[{str(env)[:10]:<10}] Step {step} | Score: {info.score}/{info.max_score or '-'} [Best: {highscore}]"
+                msg = f"[{env.task_name[:10]:<10}] Step {step} | Score: {info.score}/{info.max_score or '-'} [Best: {highscore}]"
                 self.logger.info(msg)
 
                 messages = self.build_prompt(info)
@@ -265,7 +265,7 @@ class BaseAgent:
                     )
                     # early stop, set current step and total steps to be the same
                     self.logger.report_progress(
-                        problem_id=str(env),
+                        problem_id=env.task_name,
                         step=step + 1,
                         total_steps=step + 1,
                         score=info.score,
@@ -275,7 +275,7 @@ class BaseAgent:
                     break
                 # keep progress bar running until max_steps is reached
                 self.logger.report_progress(
-                    problem_id=str(env),
+                    problem_id=env.task_name,
                     step=step + 1,
                     total_steps=max_steps + 1,
                     score=info.score,
@@ -284,7 +284,7 @@ class BaseAgent:
                 )
             # max_steps was reached, task was either resolved or unresolved
             self.logger.report_progress(
-                problem_id=str(env),
+                problem_id=env.task_name,
                 step=step + 1,
                 total_steps=step + 1,
                 score=info.score,
@@ -295,7 +295,7 @@ class BaseAgent:
         except Exception:
             # report any error that happens during the run
             self.logger.report_progress(
-                problem_id=str(env),
+                problem_id=env.task_name,
                 step=step + 1,
                 total_steps=step + 1,
                 score=info.score if info else 0,
