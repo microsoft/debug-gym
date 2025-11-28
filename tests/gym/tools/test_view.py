@@ -29,7 +29,7 @@ def env(tmp_path):
 
     (repo_path / "empty.py").touch()  # Create an empty file
 
-    env = RepoEnv(path=repo_path, dir_tree_depth=2)
+    env = RepoEnv(path=repo_path)
     view_tool = Toolbox.get_tool("view")
     env.add_tool(view_tool)
     env.reset()

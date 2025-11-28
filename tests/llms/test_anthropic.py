@@ -322,7 +322,6 @@ def test_format_tool_call_history_initial_state(mock_llm_config, logger_mock):
         step_observation=Observation(source="tool1", observation="Initial observation"),
         all_observations=[],
         eval_observation=Observation(source="tool1", observation=""),
-        dir_tree="",
         current_breakpoints="",
         action_reasoning=None,  # No reasoning yet
         action_content=None,  # No content yet
@@ -367,7 +366,6 @@ def test_format_tool_call_history_with_action(mock_llm_config, logger_mock):
         ),
         all_observations=[],
         eval_observation=Observation(source="tool_456", observation=""),
-        dir_tree="",
         current_breakpoints="",
         action_reasoning="Edited the file to fix the bug",
         action_content="Edited the file to fix the bug",

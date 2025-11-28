@@ -30,7 +30,7 @@ def env(tmp_path):
     with open(subdir / "nested.txt", "w") as f:
         f.write("nested file content")
 
-    env = RepoEnv(path=repo_path, dir_tree_depth=2)
+    env = RepoEnv(path=repo_path)
     bash_tool = Toolbox.get_tool("bash")
     env.add_tool(bash_tool)
     env.reset()

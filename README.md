@@ -210,7 +210,7 @@ In addition to all [built-in Jinja filters](https://jinja.palletsprojects.com/en
     - **`where`**: Specifies where to trim the message if it exceeds the limit. The default is `"middle"`, which trims from the middle of the message. Other options are `start` or `end`.
 
     ```jinja
-    {{ info.dir_tree | trim_message(max_length_percentage=0.1, where="end") }}
+    {{ info.instructions | trim_message(max_length_percentage=0.1, where="end") }}
     ```
 
 #### Example Template
@@ -222,9 +222,6 @@ Task: {{ agent.system_prompt }}
 
 Instructions:
 {{ info.instructions }}
-
-Directory Tree:
-{{ info.dir_tree | trim_message(max_length=1000) }}
 
 Current Breakpoints:
 {{ info.current_breakpoints | to_pretty_json }}
