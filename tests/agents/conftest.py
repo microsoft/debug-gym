@@ -50,6 +50,7 @@ def agent_setup(tmp_path, open_data):
                 "random_seed": 42,
             }
             env = MagicMock()
+            env.task_name = "test_task"
             llm = MagicMock()
             llm.reasoning_end_token = None
             llm.context_length = 4096

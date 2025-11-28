@@ -224,6 +224,8 @@ class RepoEnv(TooledEnv):
         self.infos: EnvInfo | None = None
         self.rng = None
         self.additional_kwargs = kwargs
+        self.task_name: str | None = None
+        self.options: dict = {}
 
         if "auto_eval_on_rewrite" in kwargs:
             raise ValueError(
@@ -320,11 +322,11 @@ class RepoEnv(TooledEnv):
 
     def reset(self, *, options: dict = None):
         """Resets the environment and returns eval as the initial observation."""
-        options = options or {}
+        self.options = options if options is not None else self.options
         self.logger.debug("Resetting environment")
         self.close()  # Clean up previous workspace and terminal.
-        self.task_name = options.get("task_name")
-        self.setup_task(task_name=self.task_name, options=options)
+        self.task_name = self.options.get("task_name")
+        self.setup_task(task_name=self.task_name, options=self.options)
         self.setup_workspace()
         self.setup_terminal()
         self._reset_env_state()
