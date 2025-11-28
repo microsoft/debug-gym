@@ -15,7 +15,7 @@ def env(tmp_path):
     with open(repo_path / "test_1.py", "w") as f:
         f.write("def test_1():\n  assert False\n")
 
-    env = RepoEnv(path=repo_path)
+    env = RepoEnv(path=repo_path, dir_tree_depth=2)
     env.reset()
     return env
 

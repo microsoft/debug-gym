@@ -147,7 +147,7 @@ def env(tmp_path):
     (repo_path / "file2.txt").touch()
     (subdir_path / "subfile1.txt").touch()
 
-    env = RepoEnv(path=repo_path)
+    env = RepoEnv(path=repo_path, dir_tree_depth=2)
     return env
 
 
@@ -220,6 +220,11 @@ def test_reset(tmp_path):
         step_observation=Observation(source="env", observation=env.instructions),
         all_observations=[Observation(source="env", observation=env.instructions)],
         eval_observation=None,
+        dir_tree=(
+            "Listing files in the current working directory. (read-only) indicates read-only files. Max depth: 1.\n"
+            f"{env.working_dir}/\n"
+            "|-- test.py"
+        ),
         current_breakpoints="No breakpoints are set.",
         action_reasoning=None,
         action_content=None,

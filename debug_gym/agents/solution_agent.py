@@ -20,8 +20,7 @@ class AgentSolution(BaseAgent):
         """Fail early if the environment does not implement apply_gold_patch."""
         return hasattr(self.env, "apply_gold_patch")
 
-    def run(self, env, debug=False):
-        self.env = env
+    def run(self, task_name=None, debug=False):
         info = None
         try:
             if not self._env_implements_apply_gold_patch():
@@ -31,11 +30,11 @@ class AgentSolution(BaseAgent):
                 )
 
             self.history.reset()
-            info = self.env.reset()
+            info = self.env.reset(options={"task_name": task_name})
             self.history.step(info)
 
             if info.resolved is True:
-                self._report_progress(env.task_name, info, "resolved")
+                self._report_progress(task_name, info, "resolved")
                 return True
 
             self.logger.info(f"Score: {info.score}/{info.max_score or '-'}")
@@ -77,8 +76,8 @@ class AgentSolution(BaseAgent):
                 "The task is not done after applying the gold patch.\n"
                 f"{info.step_observation.observation}"
             )
-            self._report_progress(env.task_name, info, "resolved")
+            self._report_progress(task_name, info, "resolved")
         except Exception:
-            self._report_progress(env.task_name, info, "error")
+            self._report_progress(task_name, info, "error")
             raise
         return info.resolved
