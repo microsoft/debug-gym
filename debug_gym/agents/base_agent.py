@@ -100,7 +100,6 @@ class BaseAgent:
     def __init__(
         self,
         args: AgentArgs | Dict[str, Any],
-        env: RepoEnv,
         llm: LLM | None = None,
         logger: DebugGymLogger | None = None,
     ):
@@ -108,8 +107,7 @@ class BaseAgent:
         self.logger = logger or DebugGymLogger("debug-gym")
         self.llm = llm
         self._uuid = self.args.uuid
-
-        self.dir_tree_depth = self.args.show_directory_tree
+        self.env = None
 
         self.set_seed(self.args.random_seed)
         self.history = HistoryTracker(self.args.memory_size)
@@ -240,7 +238,7 @@ class BaseAgent:
             )
 
         if self.args.show_current_breakpoints:
-            system_prompt_dict["Current breakpoints"] = self.env.current_breakpoints()
+            system_prompt_dict["Current breakpoints"] = info.current_breakpoints
 
         if self._auto_eval_on_rewrite():
             system_prompt_dict["Evaluation output of current code"] = self.trim_message(

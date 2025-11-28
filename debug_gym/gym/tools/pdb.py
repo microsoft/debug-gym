@@ -121,7 +121,8 @@ class PDBTool(EnvironmentTool):
         self._session = environment.terminal.new_shell_session()
         # init pdb and wait for the prompt
         self.entrypoint = self.entrypoint or environment.debug_entrypoint
-        initial_output = self._session.start(self.entrypoint, read_until="(Pdb)")
+        initial_output = f"Starting pdb session with entrypoint: {self.entrypoint}\n"
+        initial_output += self._session.start(self.entrypoint, read_until="(Pdb)")
 
         if "The program finished and will be restarted" in initial_output:
             self.stop_pdb()
