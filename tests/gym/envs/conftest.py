@@ -2,10 +2,8 @@ import pytest
 from filelock import FileLock
 
 from debug_gym.gym.envs import R2EGymEnv, SWEBenchEnv, SWESmithEnv
-from debug_gym.gym.envs.r2egym import load_r2egym_dataset
-from debug_gym.gym.envs.swe_bench import load_swebench_dataset
 from debug_gym.gym.envs.swe_bench_debug import SWEBenchDebugEnv
-from debug_gym.gym.envs.swe_smith import load_swesmith_dataset
+
 
 BUILD_ENV_CONFIGS = {
     "swe_smith": {
