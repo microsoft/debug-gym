@@ -370,9 +370,28 @@ class KubernetesTerminal(Terminal):
         bash_cmd = "/bin/bash --noprofile --norc --noediting"
         return f"kubectl {kubeconfig}exec -it {self.pod.name} -c main -n {self.pod.namespace} -- {bash_cmd}"
 
+    def _ensure_pod_running(self) -> None:
+        """Ensure the backing pod exists and is in Running phase."""
+        if self._pod is None:
+            self.setup_pod()
+            return
+
+        try:
+            if self._pod.is_running():
+                return
+        except Exception as exc:  # noqa: BLE001 - diagnostics only
+            self.logger.debug(f"{self._pod} status check failed: {exc}")
+
+        self.logger.warning(f"{self._pod} not running; recreating pod.")
+        try:
+            self._pod.clean_up()
+        except Exception as exc:  # noqa: BLE001 - best-effort cleanup
+            self.logger.debug(f"Failed to clean up {self._pod}: {exc}")
+        self._pod = None
+        self.setup_pod()
+
     def new_shell_session(self):
-        if not self.pod.is_running():
-            raise ValueError("Pod is not running. Cannot create shell session.")
+        self._ensure_pod_running()
 
         session = ShellSession(
             shell_command=self.default_shell_command,
@@ -416,8 +435,7 @@ class KubernetesTerminal(Terminal):
         strip_output: bool = True,
     ) -> tuple[bool, str]:
         """Run a command in the pod. Return command status and output."""
-        if not self.pod.is_running():
-            raise ValueError("Pod is not running. Cannot run commands.")
+        self._ensure_pod_running()
 
         command = self.prepare_command(entrypoint)
 
