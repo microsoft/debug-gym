@@ -235,7 +235,6 @@ class RepoEnv(TooledEnv):
             )
 
         self.workspace = Workspace(self.terminal, logger=self.logger)
-        self.dataset = self.load_dataset(problems)
         self.set_entrypoints(self._entrypoint, self._debug_entrypoint)
 
     def _reset_env_state(self):
@@ -503,6 +502,3 @@ class RepoEnv(TooledEnv):
 
     def __del__(self):
         self.close()
-
-    def load_dataset(self, problems: str | list[str] | None = None):
-        return {"custom": None}
