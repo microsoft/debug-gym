@@ -156,6 +156,7 @@ class SWESmithEnv(SWEBenchEnv):
 
     @classmethod
     def load_dataset(
+        cls,
         dataset_id: str = "SWE-bench/SWE-smith",
         dataset_revision: str = "699b53400d3855206a0fbf3ff4beaf1a52f4f232",
         split: str = "train",

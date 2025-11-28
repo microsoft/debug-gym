@@ -174,6 +174,7 @@ class SWEBenchEnv(RepoEnv):
 
     @classmethod
     def load_dataset(
+        cls,
         dataset_id: str = "SWE-bench/SWE-bench_Verified",
         dataset_revision: str = "99450355ca8c611021187a57ffac304b66666738",
         split: str = "test",

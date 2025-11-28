@@ -254,6 +254,7 @@ class R2EGymEnv(RepoEnv):
 
     @classmethod
     def load_dataset(
+        cls,
         dataset_id: str = "R2E-Gym/R2E-Gym-Lite",
         dataset_revision: str = "8d3163011f01f9393bb3dc7700497a79a8686ae5",
         split: str = "train",
