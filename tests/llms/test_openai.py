@@ -209,7 +209,6 @@ def test_format_tool_call_history_initial_state(mock_llm_config, logger_mock):
         step_observation=Observation(source="tool1", observation="Initial observation"),
         all_observations=[],
         eval_observation=Observation(source="tool1", observation=""),
-        dir_tree="",
         current_breakpoints="",
         action_reasoning=None,  # No reasoning yet
         action_content=None,  # No content yet
@@ -265,7 +264,6 @@ def test_format_tool_call_history_with_action(mock_llm_config, logger_mock):
         ),
         all_observations=[],
         eval_observation=Observation(source="tool_456", observation=""),
-        dir_tree="",
         current_breakpoints="",
         action_reasoning="Edited the file to fix the bug",  # Reasoning for action
         action_content="Edited the file to fix the bug",  # Content for action
@@ -345,7 +343,6 @@ def test_format_tool_call_history_complex_arguments(mock_llm_config, logger_mock
         ),
         all_observations=[],
         eval_observation=Observation(source="tool_456", observation=""),
-        dir_tree="",
         current_breakpoints="",
         action_reasoning="Configured the environment with complex settings",
         action_content="Configured the environment with complex settings",

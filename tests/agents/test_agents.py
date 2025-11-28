@@ -28,7 +28,6 @@ def test_default_system_prompt(agent_setup, build_env_info):
     agent.shortcut_features = Mock(return_value=["f1", "f2"])
     info = build_env_info(
         instructions="some instruction",
-        dir_tree="dir tree",
         current_breakpoints=[],
         eval_observation="eval obs",
     )
@@ -58,7 +57,6 @@ def test_default_system_prompt_auto_eval(agent_setup, build_env_info):
     env.add_tool(eval_tool)
     info = build_env_info(
         instructions="some instruction",
-        dir_tree="dir tree",
         current_breakpoints=[],
         eval_observation="eval obs",
     )
@@ -91,7 +89,6 @@ def test_load_system_prompt_template_default_no_shortcuts_or_eval(
     agent.shortcut_features = Mock(return_value=[])
     info = build_env_info(
         instructions="some instruction",
-        dir_tree="dir tree",
         current_breakpoints=[1, 2],
         eval_observation="",
     )
@@ -136,12 +133,14 @@ def test_build_system_prompt(agent_setup, build_env_info):
     pdb_tool = Toolbox.get_tool("pdb", auto_list=True, persistent_breakpoints=True)
     env.add_tool(eval_tool)
     env.add_tool(pdb_tool)
+    env.workspace = MagicMock()
+    env.workspace.display_files = MagicMock(return_value="repo/tree")
     agent.args.show_directory_tree = 2
     agent.args.show_current_breakpoints = True
     agent.system_prompt = "Test overall task"
+    agent.env = env
     info = build_env_info(
         instructions="Do X",
-        dir_tree="repo/tree",
         current_breakpoints=[1, 2],
         eval_observation="eval obs",
     )
@@ -171,7 +170,6 @@ def test_build_prompt(agent_setup, build_env_info):
     agent, _, _ = next(agent_setup(DebugAgent))
     info = build_env_info(
         instructions="Test instructions",
-        dir_tree="Test dir tree",
         current_breakpoints="Test breakpoints",
         step_observation="Test last run obs",
     )
@@ -187,7 +185,6 @@ def test_run(agent_setup, build_env_info):
         score=0,
         max_score=10,
         instructions="Test instructions",
-        dir_tree="Test dir tree",
         current_breakpoints="Test breakpoints",
         step_observation="Test last run obs",
     )
@@ -197,12 +194,11 @@ def test_run(agent_setup, build_env_info):
         score=10,
         max_score=10,
         instructions="Test instructions",
-        dir_tree="Test dir tree",
         current_breakpoints="Test breakpoints",
         step_observation="Test last run obs",
     )
     llm.return_value = LLMResponse("Prompt", "Expected answer", TokenUsage(2, 4))
-    result = agent.run(task_name="test_task", debug=False)
+    result = agent.run(env, debug=False)
     assert result
 
 
@@ -210,7 +206,6 @@ def test_build_system_prompt_rewrite_agent(agent_setup, build_env_info):
     agent, _, _ = next(agent_setup(RewriteAgent))
     info = build_env_info(
         instructions="Test instructions",
-        dir_tree="Test dir tree",
         current_breakpoints="Test breakpoints",
         step_observation="Test last run obs",
     )
@@ -228,7 +223,6 @@ def test_run_debug_5_agent(agent_setup, build_env_info):
         max_score=10,
         rewrite_counter=0,
         instructions="Test instructions",
-        dir_tree="Test dir tree",
         current_breakpoints="Test breakpoints",
         step_observation="Test last run obs",
     )
@@ -239,13 +233,12 @@ def test_run_debug_5_agent(agent_setup, build_env_info):
         max_score=10,
         rewrite_counter=0,
         instructions="Test instructions",
-        dir_tree="Test dir tree",
         current_breakpoints="Test breakpoints",
         step_observation="Test last run obs",
     )
     llm.return_value = LLMResponse("Prompt", "Expected answer", TokenUsage(2, 4))
     env.tools = {"pdb": MagicMock()}
-    result = agent.run(task_name="test_task", debug=False)
+    result = agent.run(env, debug=False)
     assert result
 
 
@@ -350,12 +343,12 @@ def test_system_prompt_building_with_no_template():
     llm = MagicMock()
     llm.context_length = 2000
     llm.count_tokens = Mock(return_value=500)
-    agent = BaseAgent(agent_args, mock_env, llm=llm)
+    agent = BaseAgent(agent_args, llm=llm)
+    agent.env = mock_env
 
     # Create a mock info object
     mock_info = MagicMock()
     mock_info.instructions = "test instructions"
-    mock_info.dir_tree = "test dir tree"
     mock_info.current_breakpoints = []
     mock_info.eval_observation = MagicMock()
     mock_info.eval_observation.observation = "test eval"
@@ -508,12 +501,11 @@ def test_run_early_completion(agent_setup, build_env_info):
         score=10,
         max_score=10,
         instructions="Test instructions",
-        dir_tree="Test dir tree",
         current_breakpoints="Test breakpoints",
         step_observation="Test last run obs",
     )
 
-    result = agent.run(task_name="test_task")
+    result = agent.run(env)
     assert result is True
     env.step.assert_not_called()  # Should not step if already done
 
@@ -530,7 +522,6 @@ def test_run_max_rewrite_steps(agent_setup, build_env_info):
         max_score=10,
         rewrite_counter=0,
         instructions="Test instructions",
-        dir_tree="Test dir tree",
         current_breakpoints="Test breakpoints",
         step_observation="Test last run obs",
     )
@@ -543,14 +534,13 @@ def test_run_max_rewrite_steps(agent_setup, build_env_info):
         max_score=10,
         rewrite_counter=2,  # Reaches max_rewrite_steps
         instructions="Test instructions",
-        dir_tree="Test dir tree",
         current_breakpoints="Test breakpoints",
         step_observation="Test last run obs",
     )
 
     llm.return_value = LLMResponse("Prompt", "Expected answer", TokenUsage(2, 4))
 
-    result = agent.run(task_name="test_task")
+    result = agent.run(env)
     assert result is False  # Task not completed, but stopped due to max rewrites
 
 
@@ -564,7 +554,6 @@ def test_run_exception_handling(agent_setup, build_env_info):
         score=0,
         max_score=10,
         instructions="Test instructions",
-        dir_tree="Test dir tree",
         current_breakpoints="Test breakpoints",
         step_observation="Test last run obs",
     )
@@ -573,7 +562,7 @@ def test_run_exception_handling(agent_setup, build_env_info):
     llm.side_effect = RuntimeError("Test error")
 
     with pytest.raises(RuntimeError, match="Test error"):
-        agent.run(task_name="test_task")
+        agent.run(env)
 
 
 def test_apply_patch_success(agent_setup, tmp_path):

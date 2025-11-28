@@ -504,3 +504,6 @@ class RepoEnv(TooledEnv):
 
     def load_dataset(self, problems: str | list[str] | None = None):
         return {"custom": None}
+
+    def __str__(self) -> str:
+        return f"RepoEnv(path={self.path})"

@@ -4,7 +4,6 @@ base:
     benchmark: "mini_nightmare"
     problems: "all"  # list of problems, e.g., ["config"], or "all"
     env_kwargs: {
-        "dir_tree_depth": 1,
         "run_timeout": 30,
         # shortcut features
     }
