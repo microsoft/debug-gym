@@ -261,6 +261,11 @@ class OpenAILLM(LLM):
             if self.is_context_length_error(e):
                 raise ContextLengthExceededError
             raise e
+        if not hasattr(response, "choices"):
+            raise RuntimeError(
+                "OpenAI chat completion returned unexpected payload without 'choices'"
+            )
+
         # LLM may select multiple tool calls, we only care about the first action
         if not response.choices[0].message.tool_calls:
             # LLM failed to call a tool
