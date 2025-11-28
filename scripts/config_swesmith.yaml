@@ -1,15 +1,15 @@
 base:
     # Environment configs
     output_path: "exps/swesmith"
-    benchmark: "swesmith"
-    problems: "all"  # list of problems, e.g., ["astropy__astropy-12907"], or strings like "test-125" (defined in gym/envs/configs), or "all",
-    env_kwargs: {
-        "run_timeout": 300,
-        "dataset_id": "SWE-bench/SWE-smith"
-    }
-    terminal: {
-        type: "docker",  # "docker", "kubernetes"
-    }
+    env:
+        # type: "swesmith"  # Not needed Will be inferred from dataset.
+        run_timeout: 300
+    terminal:
+        type: "docker"  # "docker", "kubernetes"
+    dataset:
+        type: "swesmith"
+        dataset_id: "SWE-bench/SWE-smith"
+        problems: "all"  # list of problems, e.g., ["astropy__astropy-12907"], or strings like "test-125" (defined in gym/envs/configs), or "all",
 
     # LLM configs
     llm_name: "gpt-4o"

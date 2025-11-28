@@ -31,17 +31,18 @@ class SWEBenchEnv(RepoEnv):
                 f"{self.__class__.__name__} only supports DockerTerminal and KubernetesTerminal."
             )
 
-        self.task_data = task_data
-        self.setup_task()
         self.test_directives = []
-        super().__init__(terminal=terminal, **kwargs)
+        super().__init__(task_data=task_data, terminal=terminal, **kwargs)
 
     @property
     def instructions(self) -> str:
         return self.task_data["problem_statement"]
 
-    def setup_task(self, options: dict = None):
-        self.task_name = self.task_data["instance_id"]
+    @property
+    def task_name(self) -> str:
+        return self.task_data["instance_id"]
+
+    def setup_task(self):
         self.repo = self.task_data["repo"]
         self.package_name = self.repo.split("/")[1]
         self.version = self.task_data["version"]

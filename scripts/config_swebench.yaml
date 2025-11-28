@@ -3,14 +3,13 @@ base:
     output_path: "exps/swebench-verified"
     benchmark: "swebench-debug"
     problems: "all"  # list of problems, e.g., ["astropy__astropy-12907"], or "all"
-    env_kwargs: {
-        "run_timeout": 300,
-        "dataset_id": "SWE-bench/SWE-bench_Verified",
-        "dataset_revision": "99450355ca8c611021187a57ffac304b66666738",
-    }
-    terminal: {
-        type: "docker",  # "docker", "kubernetes"
-    }
+    env:
+        type: "swebench-debug"
+        run_timeout: 300
+        dataset_id: "SWE-bench/SWE-bench_Verified"
+        dataset_revision: "99450355ca8c611021187a57ffac304b66666738"
+    terminal:
+        type: "docker"  # "docker", "kubernetes"
 
     # LLM configs
     llm_name: "gpt-4o"
@@ -66,6 +65,8 @@ solution_agent:
 
 swe_agent:
     benchmark: "swebench"
+    env:
+        type: "swebench"
     max_steps: 100
     max_rewrite_steps: 20
     tools:

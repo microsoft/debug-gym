@@ -186,7 +186,7 @@ def create_env(config: dict, task_data: dict, logger: DebugGymLogger):
         task_data=task_data,
         terminal=terminal,
         logger=logger,
-        **config["env_kwargs"],
+        **config.get("env", {}),
     )
     return env
 
@@ -252,10 +252,10 @@ def main():
 
     # Create the environment to get the list of problems to run.
     dataset_info = {
-        "dataset_id": config.env_kwargs.get("dataset_id"),
-        "dataset_revision": config.env_kwargs.get("dataset_revision"),
+        "dataset_id": config.get("env", {}).get("dataset_id"),
+        "dataset_revision": config.get("env", {}).get("dataset_revision"),
         "problems": config.get("problems", "all"),
-        "prepull_images": config.env_kwargs.get("prepull_images", False),
+        "prepull_images": config.get("env", {}).get("prepull_images", False),
     }
     dataset = select_env(config.get("benchmark")).load_dataset(**dataset_info)
     problems = sorted(dataset)

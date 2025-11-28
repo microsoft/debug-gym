@@ -201,38 +201,27 @@ class RepoEnv(TooledEnv):
 
     def __init__(
         self,
-        path: str | None = None,
+        task_data: dict,
         entrypoint: str = "python -m pytest -sq .",
         debug_entrypoint: str | None = None,
         max_score: int | None = None,
-        readonly_patterns: list[str] | None = None,  # TODO: remove
         run_timeout: int | None = None,
         terminal: Terminal | None = None,
         logger: DebugGymLogger | None = None,
-        problems: str | list[str] | None = None,
         **kwargs,
     ):
         super().__init__()
 
-        self.path = path
+        self.task_data = task_data
         self.max_score = max_score
         self.run_timeout = run_timeout
-        self.terminal = terminal or LocalTerminal()  # TODO: default to DockerTerminal
+        self.terminal = terminal
         self._entrypoint = entrypoint
         self._debug_entrypoint = debug_entrypoint
         self.logger = logger or DebugGymLogger("debug-gym")
         self.infos: EnvInfo | None = None
         self.rng = None
         self.additional_kwargs = kwargs
-        self.task_name: str | None = None
-        self.options: dict = {}
-
-        if "auto_eval_on_rewrite" in kwargs:
-            raise ValueError(
-                "The 'auto_eval_on_rewrite' parameter is no longer supported. "
-                "Please remove it from your initialization arguments."
-                "Instead, set 'auto_eval_on_rewrite' in the EvalTool instance."
-            )
 
         self.workspace = Workspace(self.terminal, logger=self.logger)
         self.set_entrypoints(self._entrypoint, self._debug_entrypoint)
@@ -289,44 +278,39 @@ class RepoEnv(TooledEnv):
     def instructions(self) -> str:
         """Instructions for the current task.
         Override in subclasses for different behavior."""
-        return ""
+        raise NotImplementedError(
+            "Subclasses must implement the instructions property."
+        )
 
-    def setup_task(self, options: dict = None) -> None:
+    @property
+    def task_name(self) -> str:
+        raise NotImplementedError("Subclasses must implement the task_name property.")
+
+    def setup_task(self) -> None:
         """Setup the task information.
         Override in subclasses for different behavior. Called once at reset."""
-        pass
+        raise NotImplementedError("Subclasses must implement setup_task method.")
 
     def setup_workspace(self) -> None:
         """Setup the workspace.
         Override in subclasses for different behavior. Called once at reset."""
-        self.workspace.reset()
-        self.workspace.copy_content(self.path)
-        self.workspace.setup_file_filters()
+        raise NotImplementedError("Subclasses must implement setup_workspace method.")
 
     def setup_terminal(self) -> None:
         """Setup the terminal.
         Override in subclasses for different behavior. Called once at reset."""
-
-        self.logger.debug(f"Configuring {self.terminal}...")
-
-        self.terminal.run("git init -b main")
-        self.terminal.run("git config user.name 'debug-gym'")
-        self.terminal.run("git config user.email '<>'")
-
-        self.terminal.run("git add *")
-        self.terminal.run("git commit -am 'Init'")
-
-        self.terminal.run("git add .debugignore .debugreadonly")
-        self.terminal.run("git commit -am 'Add debug-gym ignore and read-only files'")
+        raise NotImplementedError("Subclasses must implement setup_terminal method.")
 
     def reset(self, *, options: dict = None):
         """Resets the environment and returns eval as the initial observation."""
-        self.options = options if options is not None else self.options
+        options = options if options is not None else {}
         self.logger.debug("Resetting environment")
-        self.close()  # Clean up previous workspace and terminal.
-        self.setup_task(options=self.options)
-        self.setup_workspace()
-        self.setup_terminal()
+        if options.get("reset_runtime", True):
+            self.close()  # Clean up previous workspace and terminal.
+            self.setup_task()
+            self.setup_workspace()
+            self.setup_terminal()
+
         self._reset_env_state()
 
         # Notify all tools that the environment is reset and get their observations

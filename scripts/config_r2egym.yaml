@@ -3,14 +3,13 @@ base:
     output_path: "exps/re2gym"
     benchmark: "r2egym"
     problems: "all"  # list of problems, e.g., ["astropy__astropy-12907"], or strings like "test-125" (defined in gym/envs/configs), or "all",
-    env_kwargs: {
-        "run_timeout": 300,
-        dataset_id: "R2E-Gym/R2E-Gym-Lite",
+    env:
+        type: "r2egym"
+        run_timeout: 300
+        dataset_id: "R2E-Gym/R2E-Gym-Lite"
         dataset_revision: "8d3163011f01f9393bb3dc7700497a79a8686ae5"
-    }
-    terminal: {
-        type: "docker",  # "docker", "kubernetes"
-    }
+    terminal:
+        type: "docker"  # "docker", "kubernetes"
 
     # LLM configs
     llm_name: "gpt-4o"

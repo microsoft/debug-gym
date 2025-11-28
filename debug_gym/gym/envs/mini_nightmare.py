@@ -111,7 +111,7 @@ class MiniNightmareEnv(RepoEnv):
         self.last_eval = EvalOutput(success, output)
         return self.last_eval
 
-    def setup_task(self, options: dict = None):
+    def setup_task(self):
         pass
 
     def setup_workspace(self):
