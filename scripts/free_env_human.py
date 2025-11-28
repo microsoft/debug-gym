@@ -20,7 +20,7 @@ DEFAULT_TOOLS = [
     "grep",
     "rewrite",
     "bash",
-    {"submit": {"apply_eval": False}},
+    {"submit": {"eval_on_submit": False}},
 ]
 
 

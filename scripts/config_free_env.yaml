@@ -9,7 +9,7 @@ tools:
   - rewrite
   - bash
   - submit:
-      apply_eval: False  # Here we only terminate after submission, no auto-eval.
+      eval_on_submit: False  # Here we only terminate after submission, no auto-eval.
 
 environment:
   image: jyangballin/swesmith.x86_64.amueller_1776_word_cloud.ec24191c:latest

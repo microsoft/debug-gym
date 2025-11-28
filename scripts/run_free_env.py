@@ -103,8 +103,8 @@ def add_tools(env: FreeEnv, tools_config: list[Any], logger: DebugGymLogger) -> 
         else:
             tool_name = str(tool_entry)
 
-        if tool_name == "submit" and "apply_eval" not in tool_kwargs:
-            tool_kwargs = {**tool_kwargs, "apply_eval": False}
+        if tool_name == "submit" and "eval_on_submit" not in tool_kwargs:
+            tool_kwargs = {**tool_kwargs, "eval_on_submit": False}
 
         env.add_tool(Toolbox.get_tool(tool_name, **tool_kwargs))
         logger.debug("Added tool %s with options %s", tool_name, tool_kwargs)
