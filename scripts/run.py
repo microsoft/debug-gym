@@ -259,20 +259,9 @@ def main():
         "problems": config.get("problems", "all"),
         "prepull_images": config.env_kwargs.get("prepull_images", False),
     }
-    load_dataset_fn = {
-        "swebench": load_swebench_dataset,
-        "swebench-debug": load_swebench_dataset,
-        "swesmith": load_swesmith_dataset,
-        "r2egym": load_r2egym_dataset,
-    }
-
-    if config["benchmark"] in load_dataset_fn:
-        dataset = load_dataset_fn[config["benchmark"]](
-            **dataset_info,
-        )
-    else:
-        raise ValueError(f"Unsupported benchmark: {config['benchmark']}")
-
+    dataset = select_env(config.get("benchmark")).load_dataset(
+        **dataset_info
+    )
     problems = sorted(dataset)
 
     if args.list:
