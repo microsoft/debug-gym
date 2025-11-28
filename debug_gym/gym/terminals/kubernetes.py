@@ -260,6 +260,7 @@ class KubernetesTerminal(Terminal):
     """
     Note: reads values of env variables K8S_NAMESPACE, K8S_DOCKER_SECRET, K8S_DOCKER_CONSTRAINT.
     """
+
     def __init__(
         self,
         working_dir: str | None = None,
@@ -290,8 +291,10 @@ class KubernetesTerminal(Terminal):
         self._task_name = base_image
         self.setup_commands = setup_commands or []
         self.namespace = namespace or os.environ.get("K8S_NAMESPACE", "default")
-        self.image_pull_secret = image_pull_secret or os.environ.get("K8S_DOCKER_SECRET")
-        self.in_node_constraint = os.environ.get("K8S_NODE_CONSTRAINT", False)
+        self.image_pull_secret = image_pull_secret or os.environ.get(
+            "K8S_DOCKER_SECRET"
+        )
+        self.in_node_constraint = os.environ.get("K8S_IN_NODE_CONSTRAINT", False)
         self.kubernetes_kwargs = kwargs  # e.g., nodeSelector, tolerations
         self.registry = registry.rstrip("/") + "/" if registry else ""
         self._pod_name = pod_name

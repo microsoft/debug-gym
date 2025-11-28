@@ -292,7 +292,7 @@ class RepoEnv(TooledEnv):
         Override in subclasses for different behavior."""
         return ""
 
-    def setup_task(self, task_name: str, options: dict = None) -> None:
+    def setup_task(self, options: dict = None) -> None:
         """Setup the task information.
         Override in subclasses for different behavior. Called once at reset."""
         pass
@@ -325,8 +325,7 @@ class RepoEnv(TooledEnv):
         self.options = options if options is not None else self.options
         self.logger.debug("Resetting environment")
         self.close()  # Clean up previous workspace and terminal.
-        self.task_name = self.options.get("task_name")
-        self.setup_task(task_name=self.task_name, options=self.options)
+        self.setup_task(options=self.options)
         self.setup_workspace()
         self.setup_terminal()
         self._reset_env_state()

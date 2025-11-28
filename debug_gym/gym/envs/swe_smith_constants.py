@@ -1,4 +1,3 @@
-
 DOCKER_ORG = "jyangballin"
 TAG = "latest"
 
@@ -78,9 +77,11 @@ INSTALL_CMAKE = (
         for v in CMAKE_VERSIONS
     ]
     + [
-        f"tar -xvzf cmake-{v}-Linux-x86_64.tar.gz && mv cmake-{v}-Linux-x86_64 /usr/share/cmake-{v}"
-        if v not in ["3.23.5", "3.27.9"]
-        else f"tar -xvzf cmake-{v}-Linux-x86_64.tar.gz && mv cmake-{v}-linux-x86_64 /usr/share/cmake-{v}"
+        (
+            f"tar -xvzf cmake-{v}-Linux-x86_64.tar.gz && mv cmake-{v}-Linux-x86_64 /usr/share/cmake-{v}"
+            if v not in ["3.23.5", "3.27.9"]
+            else f"tar -xvzf cmake-{v}-Linux-x86_64.tar.gz && mv cmake-{v}-linux-x86_64 /usr/share/cmake-{v}"
+        )
         for v in CMAKE_VERSIONS
     ]
     + [

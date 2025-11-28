@@ -74,6 +74,7 @@ class MiniNightmareEnv(RepoEnv):
 
     def __init__(
         self,
+        task_data: dict,
         entrypoint: str = "python -m pytest --tb=no -s test.py",
         terminal: Terminal | None = None,
         **kwargs,
@@ -84,6 +85,9 @@ class MiniNightmareEnv(RepoEnv):
         )
         if hasattr(terminal, "base_image") and terminal.base_image is None:
             terminal.base_image = DOCKER_MINI_NIGHTMARE_IMAGE_NAME
+
+        self.task_data = task_data
+        self.task_name = task_data["task_name"]
 
         super().__init__(entrypoint=entrypoint, terminal=terminal, **kwargs)
 
@@ -107,10 +111,8 @@ class MiniNightmareEnv(RepoEnv):
         self.last_eval = EvalOutput(success, output)
         return self.last_eval
 
-    def setup_task(self, task_name: str, options: dict = None):
-        if task_name not in self.dataset:
-            raise ValueError(f"Task {task_name} not found in the dataset.")
-        self.current_task = self.dataset[task_name]
+    def setup_task(self, options: dict = None):
+        pass
 
     def setup_workspace(self):
         self.workspace.reset()
@@ -138,19 +140,27 @@ class MiniNightmareEnv(RepoEnv):
         )  # Mini-nightmare tasks come with those.
         self.terminal.run("git commit -am 'Add debug-gym ignore and read-only files'")
 
-    def load_dataset(self, problems: str | list[str] | None = None):
-        if isinstance(self.terminal, DockerTerminal):
-            build_docker_image(self.logger)
+    @classmethod
+    def load_dataset(
+        cls,
+        problems: str | list[str] | None = None,
+        build_image: bool = False,
+        logger: object = None,
+    ) -> dict:
+        if build_image:
+            build_docker_image(logger)
 
-        if not self.DATA_PATH.exists():
+        if not MiniNightmareEnv.DATA_PATH.exists():
             zipped_data = utils.download(
-                self.DATA_URL, self.DATA_PATH, f"Downloading mini-nightmare dataset."
+                MiniNightmareEnv.DATA_URL,
+                MiniNightmareEnv.DATA_PATH,
+                f"Downloading mini-nightmare dataset.",
             )
-            utils.unzip(zipped_data, dst=self.DATA_PATH.parent)
+            utils.unzip(zipped_data, dst=cls.DATA_PATH.parent)
 
         dataset = {}
-        for task_name in self.TASK_NAMES:
-            task_path = self.DATA_PATH / task_name
+        for task_name in cls.TASK_NAMES:
+            task_path = cls.DATA_PATH / task_name
             assert (task_path / "test.py").exists()
             assert (task_path / f"{task_name}_code.py").exists()
             assert (task_path / ".debugignore").exists()
@@ -162,5 +172,5 @@ class MiniNightmareEnv(RepoEnv):
             }
 
         problems = utils.filter_problems(dataset, problems)
-        dataset = {id: i for id, i in dataset.items() if id in problems}
+        dataset = {id: data for id, data in dataset.items() if id in problems}
         return dataset

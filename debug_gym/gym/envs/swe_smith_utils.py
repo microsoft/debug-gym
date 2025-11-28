@@ -1,6 +1,7 @@
 """
 Pulled from official SWE-Smith repository.
 """
+
 import os
 import re
 from pathlib import Path
@@ -19,11 +20,13 @@ FAIL_TO_PASS = "FAIL_TO_PASS"
 PASS_TO_PASS = "PASS_TO_PASS"
 INSTANCE_REF = "instance_ref"
 
+
 def get_repo_name(repo, commit) -> str:
     """
     Get the SWE-smith GitHub repository name for a repository at a specific commit.
     """
     return f"{repo.replace('/', '__')}.{commit[:8]}"
+
 
 def get_test_paths(dir_path: str, ext: str = ".py") -> list[Path]:
     """
@@ -53,6 +56,7 @@ def get_full_commit(repo, partial_commit) -> str:
             return commit
 
     raise ValueError(f"Commit {partial_commit} not found for repository {repo}.")
+
 
 def get_repo_commit_from_image_name(image_name: str) -> tuple[str, str]:
     """
@@ -88,9 +92,11 @@ def get_test_command_mypy(instance: dict):
         )
     return f'{MAP_REPO_TO_SPECS[repo][commit][KEY_TEST_CMD]} "{test_keys}"'
 
+
 MAP_REPO_TO_TEST_CMD = {
     "python/mypy": get_test_command_mypy,
 }
+
 
 def get_test_command(instance: dict):
     """
