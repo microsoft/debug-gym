@@ -164,7 +164,7 @@ def test_select_terminal_kubernetes_extra_labels(monkeypatch):
             captured.update(kwargs)
 
     monkeypatch.setattr(
-        "debug_gym.gym.terminals.__init__.KubernetesTerminal",
+        "debug_gym.gym.terminals.KubernetesTerminal",
         DummyK8s,
     )
 

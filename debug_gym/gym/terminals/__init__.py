@@ -1,13 +1,8 @@
-import sys
-
 from debug_gym.gym.terminals.docker import DockerTerminal
 from debug_gym.gym.terminals.kubernetes import KubernetesTerminal
 from debug_gym.gym.terminals.local import LocalTerminal
 from debug_gym.gym.terminals.terminal import Terminal
 from debug_gym.logger import DebugGymLogger
-
-# Preserve legacy debug_gym.gym.terminals.__init__.* access patterns.
-__init__ = sys.modules[__name__]
 
 
 def select_terminal(
