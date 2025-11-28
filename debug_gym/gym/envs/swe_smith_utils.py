@@ -5,6 +5,7 @@ Pulled from official SWE-Smith repository.
 import os
 import re
 from pathlib import Path
+
 from unidiff import PatchSet
 
 from .swe_smith_constants import (
@@ -14,7 +15,6 @@ from .swe_smith_constants import (
     KEY_TEST_CMD,
     MAP_REPO_TO_SPECS,
 )
-
 
 FAIL_TO_PASS = "FAIL_TO_PASS"
 PASS_TO_PASS = "PASS_TO_PASS"

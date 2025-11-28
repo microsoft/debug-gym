@@ -5,10 +5,6 @@ from typing import List
 import docker
 import yaml
 from datasets import load_dataset, load_from_disk
-
-from .swe_smith_constants import DOCKER_ORG, TAG, MAP_REPO_TO_SPECS
-from .swe_smith_utils import get_test_command, get_repo_commit_from_image_name
-
 from swebench.harness.constants import TestStatus
 from swebench.harness.grading import MAP_REPO_TO_PARSER
 from swebench.harness.log_parsers.python import parse_log_pytest
@@ -18,6 +14,9 @@ from debug_gym.gym.entities import EvalOutput
 from debug_gym.gym.envs.swe_bench import SWEBenchEnv
 from debug_gym.gym.terminals.terminal import DebugGymLogger, Terminal
 from debug_gym.gym.utils import filter_problems
+
+from .swe_smith_constants import DOCKER_ORG, MAP_REPO_TO_SPECS, TAG
+from .swe_smith_utils import get_repo_commit_from_image_name, get_test_command
 
 
 class SWESmithEnv(SWEBenchEnv):

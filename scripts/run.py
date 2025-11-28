@@ -12,15 +12,14 @@ from debug_gym import version as dg_version
 from debug_gym.agents.base_agent import AGENT_REGISTRY, AgentArgs, create_agent
 from debug_gym.agents.utils import load_config, save_patch, save_trajectory
 from debug_gym.gym.envs import select_env
+from debug_gym.gym.envs.r2egym import load_r2egym_dataset
+from debug_gym.gym.envs.swe_bench import load_swebench_dataset
+from debug_gym.gym.envs.swe_smith import load_swesmith_dataset
 from debug_gym.gym.terminals import select_terminal
 from debug_gym.gym.tools.toolbox import Toolbox
 from debug_gym.llms.base import LLM
 from debug_gym.llms.human import Human
 from debug_gym.logger import DebugGymLogger, load_previous_run_status
-
-from debug_gym.gym.envs.swe_bench import load_swebench_dataset
-from debug_gym.gym.envs.swe_smith import load_swesmith_dataset
-from debug_gym.gym.envs.r2egym import load_r2egym_dataset
 
 
 class AgentTimeoutException(BaseException):
@@ -306,7 +305,9 @@ def main():
                 num_workers, initializer=DebugGymLogger.set_as_worker
             ) as executor:
                 futures = {
-                    executor.submit(run_agent, args, problem, dataset[problem], config): problem
+                    executor.submit(
+                        run_agent, args, problem, dataset[problem], config
+                    ): problem
                     for problem in problems
                 }
                 for future in as_completed(futures):

@@ -4,7 +4,6 @@ from filelock import FileLock
 from debug_gym.gym.envs import R2EGymEnv, SWEBenchEnv, SWESmithEnv
 from debug_gym.gym.envs.swe_bench_debug import SWEBenchDebugEnv
 
-
 BUILD_ENV_CONFIGS = {
     "swe_smith": {
         "env_class": SWESmithEnv,
