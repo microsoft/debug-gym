@@ -7,7 +7,7 @@ import pytest
 
 from debug_gym.agents.solution_agent import AgentSolution
 from debug_gym.gym.entities import Observation
-from debug_gym.gym.envs.r2egym import R2EGymEnv, load_r2egym_dataset
+from debug_gym.gym.envs.r2egym import R2EGymEnv
 from debug_gym.gym.terminals.docker import DockerTerminal
 from debug_gym.gym.tools.tool import ToolCall
 from debug_gym.gym.tools.toolbox import Toolbox
@@ -70,17 +70,17 @@ def test_load_dataset_from_parquet(mock_docker_from_env, tmp_path):
     pq.write_table(table, str(parquet_file))
 
     # Load the dataset from the Parquet file
-    dataset = load_r2egym_dataset(
-        dataset_id=str(parquet_file), split="train"
-    )
+    dataset = R2EGymEnv.load_dataset(dataset_id=str(parquet_file), split="train")
+    dataset_entry = next(iter(dataset.values()))
 
     # Verify the dataset contains the expected features
-    assert sorted(dataset.features.keys()) == sorted(
+    assert sorted(dataset_entry) == sorted(
         [
             "commit_hash",
             "docker_image",
             "execution_result_content",
             "expected_output_json",
+            "instance_id",
             "modified_entity_summaries",
             "modified_files",
             "num_non_test_files",

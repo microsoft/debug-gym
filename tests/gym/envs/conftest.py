@@ -34,15 +34,8 @@ def make_env_factory(env_name, worker_id, tmp_path_factory):
     env_class = kwargs.pop("env_class")
 
     def _make_env():
-        if issubclass(env_class, (SWEBenchEnv, SWEBenchDebugEnv)):
-            fn = load_swebench_dataset
-        elif issubclass(env_class, SWESmithEnv):
-            fn = load_swesmith_dataset
-        elif issubclass(env_class, R2EGymEnv):
-            fn = load_r2egym_dataset
-        else:
-            raise ValueError(f"Unknown env_class: {env_class}")
-        task_data = fn(problems=kwargs["problems"])[0]
+        dataset = env_class.load_dataset(problems=kwargs["problems"])
+        task_data = next(iter(dataset.values()))
         return env_class(task_data=task_data)
 
     if worker_id == "master":
