@@ -259,9 +259,7 @@ def main():
         "problems": config.get("problems", "all"),
         "prepull_images": config.env_kwargs.get("prepull_images", False),
     }
-    dataset = select_env(config.get("benchmark")).load_dataset(
-        **dataset_info
-    )
+    dataset = select_env(config.get("benchmark")).load_dataset(**dataset_info)
     problems = sorted(dataset)
 
     if args.list:
