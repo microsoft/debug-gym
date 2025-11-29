@@ -5,9 +5,12 @@ from typing import List
 import docker
 import yaml
 from datasets import load_dataset, load_from_disk
-from swebench.harness.constants import TestStatus
-from swebench.harness.grading import MAP_REPO_TO_PARSER
-from swebench.harness.log_parsers.python import parse_log_pytest
+from swesmith.build_repo.download_images import DOCKER_ORG, TAG
+from swesmith.constants import MAP_REPO_TO_SPECS
+from swesmith.harness.grading import TestStatus
+from swesmith.harness.log_parsers import MAP_REPO_TO_PARSER, parse_log_pytest
+from swesmith.harness.utils import get_test_command
+from swesmith.utils import get_repo_commit_from_image_name
 
 from debug_gym.constants import DEBUG_GYM_CACHE_DIR
 from debug_gym.gym.entities import EvalOutput
@@ -25,20 +28,7 @@ class SWESmithEnv(SWEBenchEnv):
         importlib_files("debug_gym") / "gym" / "envs" / "configs" / "swe_smith.yaml"
     )
 
-    def __init__(
-        self,
-        task_data: dict,
-        terminal: Terminal | None = None,
-        **kwargs,
-    ):
-        super().__init__(
-            task_data=task_data,
-            terminal=terminal,
-            **kwargs,
-        )
-
-    def setup_task(self, options: dict = None):
-        self.task_name = self.task_data["instance_id"]
+    def setup_task(self):
         self.base_commit = (
             self.task_data["base_commit"] if "base_commit" in self.task_data else "main"
         )

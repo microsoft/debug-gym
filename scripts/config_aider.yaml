@@ -3,12 +3,11 @@ base:
     output_path: "exps/aider"
     benchmark: "aider"
     problems: "all"  # list of problems, e.g., ["wordy"], or "all"
-    env_kwargs: {
-        "run_timeout": 20,
-    }
-    terminal: {
-        type: "docker",  # "docker", "kubernetes", or "local"
-    }
+    env:
+        type: "aider"
+        run_timeout: 20
+    terminal:
+        type: "docker"  # "docker", "kubernetes", or "local"
 
     # LLM configs
     llm_name: "gpt-4o"

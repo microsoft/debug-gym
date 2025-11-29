@@ -75,24 +75,24 @@ class R2EGymEnv(RepoEnv):
                 "R2EGymEnv only supports DockerTerminal and KubernetesTerminal."
             )
 
-        self.task_data = task_data
-        self.setup_task()
-
+        super().__init__(task_data=task_data, terminal=terminal, **kwargs)
         self.session_commands = []
-        super().__init__(terminal=terminal, **kwargs)
+
+    @property
+    def task_name(self) -> str:
+        return self.task_data["instance_id"]
 
     @property
     def instructions(self) -> str:
         # try getting the content inside of [ISSUE] [/ISSUE] using regex tags for ds['problem_statement'] else return ds['problem_statement']
         # ref: https://github.com/R2E-Gym/R2E-Gym/blob/main/src/r2egym/agenthub/runtime/docker.py#L592
         try:
-            content = self.ds_row["problem_statement"]
+            content = self.task_data["problem_statement"]
             return re.search(r"\[ISSUE\](.*)\[/ISSUE\]", content, re.DOTALL).group(1)
         except Exception as e:
             return self.task_data["problem_statement"]
 
-    def setup_task(self, options: dict = None):
-        self.task_name = self.task_data["instance_id"]
+    def setup_task(self):
         self.base_image = self.task_data["docker_image"]
         self.package_name = self.task_data["repo_name"]
         self.expected_output = json.loads(self.task_data["expected_output_json"])
