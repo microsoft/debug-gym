@@ -1,13 +1,58 @@
+import json
+import subprocess
 from dataclasses import dataclass
 from typing import Any, Dict
 
-from debug_gym.agents.base_agent import AgentArgs, BaseAgent, register_agent
-from debug_gym.agents.history_tracker import build_history_prompt
+from jinja2 import Template
+
+from debug_gym.agents.base_agent import (
+    LLM,
+    AgentArgs,
+    BaseAgent,
+    Environment,
+    register_agent,
+)
+from debug_gym.agents.history_tracker import HistoryTracker
+from debug_gym.gym.envs.env import EnvInfo
+from debug_gym.gym.utils import filter_non_utf8
+from debug_gym.llms.utils import trim
+
+
+def build_history_prompt(
+    history: HistoryTracker, llm: LLM, reset_prompt_history_after_rewrite: bool = False
+):
+    env_observations, llm_responses = history.get()
+    latest_rewrite_step = 0
+    # Find the latest rewrite step if reset_prompt_history_after_rewrite
+    if reset_prompt_history_after_rewrite:
+        for i, obs in enumerate(env_observations):
+            if obs.rewrite_counter == env_observations[-1].rewrite_counter:
+                latest_rewrite_step = i
+                break
+
+    env_observations = env_observations[latest_rewrite_step:]
+    llm_responses = llm_responses[latest_rewrite_step:]
+
+    messages = []
+    for obs, response in zip(env_observations, llm_responses):
+        # environment observation
+        messages.extend(
+            llm.convert_observation_to_message(
+                obs.step_observation.observation,
+                obs.action_tool_call.id if obs.action_tool_call else None,
+                obs.action_tool_call.name if obs.action_tool_call else None,
+            )
+        )
+        # llm response
+        messages.extend(llm.convert_response_to_message(response))
+    return messages
 
 
 @dataclass
 class FroggyAgentArgs(AgentArgs):
+    max_rewrite_steps: int = -1
     show_directory_tree: int = 0
+    system_prompt_template_file: str | None = None
     show_current_breakpoints: bool = False
     reset_prompt_history_after_rewrite: bool = False
     n_rewrites_before_pdb: int = 0
@@ -77,6 +122,89 @@ class FroggyAgent(BaseAgent):
                 )
         return features
 
+    @staticmethod
+    def to_pretty_json(value):
+        """Convert a value to a pretty JSON string."""
+        return json.dumps(value, indent=2, sort_keys=False)
+
+    def build_system_prompt(self, info):
+        """Build system prompt using jinja template from config or default template."""
+        system_prompt_template = self._load_system_prompt_template()
+        if system_prompt_template is not None:
+            system_prompt = system_prompt_template.render(agent=self, info=info)
+        else:
+            system_prompt = self._default_system_prompt(info)
+        messages = [{"role": "system", "content": filter_non_utf8(system_prompt)}]
+        messages += [
+            self.llm.convert_observation_to_message(
+                self.history.initial_observation.step_observation.observation
+            )
+        ]
+        return messages
+
+    def build_prompt(self, info: EnvInfo = None):
+        messages = []
+        messages.extend(self.build_system_prompt(info))
+        messages.extend(self.build_history_prompt())
+        return messages
+
+    def _default_system_prompt(self, info) -> str:
+        """Return the default system prompt as pretty JSON.
+        Trimmed to fit within the token limit."""
+
+        system_prompt_dict = {
+            "Overall task": self.system_prompt,
+        }
+
+        return self.to_pretty_json(system_prompt_dict)
+
+    def trim_message(
+        self,
+        message: str,
+        count_tokens=None,
+        max_length=None,
+        max_length_percentage=0,
+        where="middle",
+    ):
+        """Filter non utf8 and trim the message to fit within the token limit.
+        If the message exceeds the max_length, it will be trimmed to fit.
+        The `max_length` can be specified as an absolute value or a percentage
+        of the LLM's context length, if any."""
+        message = filter_non_utf8(message)
+        count_tokens = count_tokens or self.llm.count_tokens
+        if self.llm.context_length is not None:
+            max_length = (
+                max_length
+                or (max_length_percentage * self.llm.context_length)
+                or self.llm.context_length
+            )
+
+        if count_tokens is None or max_length is None or max_length <= 0:
+            return message
+
+        return trim(message, max_length, count_tokens=count_tokens, where=where)
+
+    def _load_system_prompt_template(self) -> Template | None:
+        """Load system prompt template from config if specified and register custom filters.
+        If no template is specified, return None.
+        """
+        system_prompt_template = self.args.system_prompt_template_file
+        if system_prompt_template:
+            if not os.path.isfile(system_prompt_template):
+                error_msg = (
+                    f"System prompt template file `{system_prompt_template}` not found."
+                )
+                self.logger.error(error_msg)
+                raise FileNotFoundError(error_msg)
+            with open(system_prompt_template, "r") as f:
+                system_prompt_template = f.read()
+            # Add custom filter to Jinja2 environment
+            env = Environment()
+            env.filters["to_pretty_json"] = self.to_pretty_json
+            env.filters["trim_message"] = self.trim_message
+            return env.from_string(system_prompt_template)
+        return None
+
     def _default_system_prompt(self, info) -> str:
         """Return the default system prompt as pretty JSON.
         Trimmed to fit within the token limit."""
@@ -108,3 +236,25 @@ class FroggyAgent(BaseAgent):
             system_prompt_dict["Shortcut features"] = shortcut_features
 
         return self.to_pretty_json(system_prompt_dict)
+
+    def apply_patch(self, patch_path: str) -> bool:
+        patch_command = ["patch", "-p1"]
+        try:
+            # Open the patch file
+            with open(patch_path, "r") as patch:
+                # Run the patch command
+                result = subprocess.run(
+                    patch_command,
+                    stdin=patch,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                    check=True,
+                )
+            print("Patch applied successfully.")
+            print("Output:", result.stdout)
+            return True
+        except subprocess.CalledProcessError as e:
+            print("Failed to apply patch.")
+            print("Error:", e.stderr)
+            return False

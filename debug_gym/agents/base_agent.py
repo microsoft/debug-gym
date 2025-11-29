@@ -2,6 +2,8 @@ import json
 import os
 import subprocess
 import uuid
+from collections import namedtuple
+from copy import copy
 from dataclasses import MISSING, asdict, dataclass, field, fields
 from typing import Any, Dict
 
@@ -9,7 +11,7 @@ import numpy as np
 from jinja2 import Environment, Template
 
 from debug_gym.agents.history_tracker import HistoryTracker, build_history_prompt
-from debug_gym.gym.envs.env import RepoEnv
+from debug_gym.gym.envs.env import EnvInfo, RepoEnv
 from debug_gym.gym.utils import filter_non_utf8
 from debug_gym.llms.base import LLM
 from debug_gym.llms.utils import trim
@@ -20,11 +22,11 @@ AGENT_REGISTRY = {}
 
 @dataclass
 class AgentArgs:
-    random_seed: int
-    memory_size: int
-    max_steps: int
-    max_rewrite_steps: int
-    system_prompt_template_file: str | None = None
+    random_seed: int = 42
+    max_rewrite_steps: int = -1
+    max_steps: int = 100
+    system_prompt: str | None = None
+    problem_prompt: str | None = None
     uuid: str = field(default_factory=lambda: str(uuid.uuid4()))
     extras: Dict[str, Any] = field(default_factory=dict)
 
@@ -79,7 +81,7 @@ def register_agent(cls):
 class BaseAgent:
     name: str = None
     system_prompt: str = None
-    action_prompt: str = None
+    problem_prompt: str = None
 
     def __init__(
         self,
@@ -96,15 +98,14 @@ class BaseAgent:
         self.llm = llm
         self._uuid = self.args.uuid
         self.env = None
+        self.system_prompt = self.args.system_prompt or self.system_prompt
+        self.problem_prompt = self.args.problem_prompt or self.problem_prompt
 
         self.set_seed(self.args.random_seed)
-        self.history = HistoryTracker(self.args.memory_size)
+        self.history = HistoryTracker()
 
     def set_seed(self, seed):
         np.random.seed(seed)
-
-    def build_history_prompt(self):
-        return build_history_prompt(self.history, self.llm)
 
     def parse_reasoning_model_response(self, response, reasoning_end_token):
         # Strip the reasoning, e.g., in Deepseek r1, between <think> and </think>.
@@ -114,108 +115,54 @@ class BaseAgent:
             response = response[reasoning_end:].strip()
         return response
 
-    def _auto_eval_on_rewrite(self):
-        """Check if auto eval on rewrite is enabled."""
-        try:
-            return self.env.get_tool("eval").auto_eval_on_rewrite
-        except KeyError:
-            return False  # no eval tool
+    def build_system_prompt(self):
+        return [
+            {"role": "system", "content": self.system_prompt},
+            self.llm.convert_observation_to_message(self.problem_prompt),
+        ]
 
-    @staticmethod
-    def to_pretty_json(value):
-        """Convert a value to a pretty JSON string."""
-        return json.dumps(value, indent=2, sort_keys=False)
-
-    def trim_message(
-        self,
-        message: str,
-        count_tokens=None,
-        max_length=None,
-        max_length_percentage=0,
-        where="middle",
-    ):
-        """Filter non utf8 and trim the message to fit within the token limit.
-        If the message exceeds the max_length, it will be trimmed to fit.
-        The `max_length` can be specified as an absolute value or a percentage
-        of the LLM's context length, if any."""
-        message = filter_non_utf8(message)
-        count_tokens = count_tokens or self.llm.count_tokens
-        if self.llm.context_length is not None:
-            max_length = (
-                max_length
-                or (max_length_percentage * self.llm.context_length)
-                or self.llm.context_length
-            )
-
-        if count_tokens is None or max_length is None or max_length <= 0:
-            return message
-
-        return trim(message, max_length, count_tokens=count_tokens, where=where)
-
-    def _load_system_prompt_template(self) -> Template | None:
-        """Load system prompt template from config if specified and register custom filters.
-        If no template is specified, return None.
-        """
-        system_prompt_template = self.args.system_prompt_template_file
-        if system_prompt_template:
-            if not os.path.isfile(system_prompt_template):
-                error_msg = (
-                    f"System prompt template file `{system_prompt_template}` not found."
+    def build_history_prompt(self):
+        messages = []
+        for observation, response in zip(
+            self.history.env_observations, self.history.llm_responses
+        ):
+            # environment observation
+            messages.extend(
+                self.llm.convert_observation_to_message(
+                    observation.step_observation.observation,
+                    (
+                        observation.action_tool_call.id
+                        if observation.action_tool_call
+                        else None
+                    ),
+                    (
+                        observation.action_tool_call.name
+                        if observation.action_tool_call
+                        else None
+                    ),
                 )
-                self.logger.error(error_msg)
-                raise FileNotFoundError(error_msg)
-            with open(system_prompt_template, "r") as f:
-                system_prompt_template = f.read()
-            # Add custom filter to Jinja2 environment
-            env = Environment()
-            env.filters["to_pretty_json"] = self.to_pretty_json
-            env.filters["trim_message"] = self.trim_message
-            return env.from_string(system_prompt_template)
-        return None
-
-    def _default_system_prompt(self, info) -> str:
-        """Return the default system prompt as pretty JSON.
-        Trimmed to fit within the token limit."""
-
-        system_prompt_dict = {
-            "Overall task": self.system_prompt,
-        }
-
-        return self.to_pretty_json(system_prompt_dict)
-
-    def build_system_prompt(self, info):
-        """Build system prompt using jinja template from config or default template."""
-        system_prompt_template = self._load_system_prompt_template()
-        if system_prompt_template is not None:
-            system_prompt = system_prompt_template.render(agent=self, info=info)
-        else:
-            system_prompt = self._default_system_prompt(info)
-        messages = [{"role": "system", "content": filter_non_utf8(system_prompt)}]
+            )
+            # llm response
+            messages.extend(self.llm.convert_response_to_message(response))
         return messages
 
-    def build_question_prompt(self):
+    def build_prompt(self, info: EnvInfo = None):
         messages = []
-        if self.action_prompt is not None:
-            messages.append({"role": "user", "content": self.action_prompt})
-        return messages
-
-    def build_prompt(self, info):
-        messages = []
-        messages.extend(self.build_system_prompt(info))
+        messages.extend(self.build_system_prompt())
         messages.extend(self.build_history_prompt())
-        messages.extend(self.build_question_prompt())
         return messages
 
     def run(self, env: RepoEnv, debug=False):
-        self.env = env
         step = 0
         info = None
+        self.env = env
         max_steps = self.args.max_steps
+
         try:
-            self.history.reset()
             info = self.env.reset()
+
             # initial state does not have prompt and response
-            self.history.step(info, None)
+            self.history.init(self.system_prompt, self.problem_prompt, info)
 
             if info.resolved is True:
                 self.logger.report_progress(
@@ -226,7 +173,7 @@ class BaseAgent:
                     max_score=info.max_score,
                     status="resolved",
                 )
-                return True
+                return self._build_trajectory()
 
             self.logger.info(
                 "Available tools (in LLM's tool calling format):\n"
@@ -234,7 +181,9 @@ class BaseAgent:
             )
 
             highscore = info.score
-            for step in range(max_steps):
+            current_status = "running"
+
+            while step < max_steps or current_status not in ["resolved", "unresolved"]:
                 self.logger.info(f"\n{'='*20} STEP {step+1} {'='*20}\n")
                 highscore = max(highscore, info.score)
                 msg = f"[{env.task_name[:10]:<10}] Step {step} | Score: {info.score}/{info.max_score or '-'} [Best: {highscore}]"
@@ -253,9 +202,9 @@ class BaseAgent:
                 )
                 self.history.step(info, llm_response)
 
-                if (
-                    info.terminated
-                    or info.rewrite_counter >= self.args.max_rewrite_steps
+                if info.terminated or (
+                    self.args.max_rewrite_steps >= 0
+                    and info.rewrite_counter >= self.args.max_rewrite_steps
                 ):
                     reason = (
                         "terminated" if info.resolved else "max_rewrite_steps reached"
@@ -263,16 +212,10 @@ class BaseAgent:
                     self.logger.info(
                         f"Step: {step} | Score: {info.score}/{info.max_score if info.max_score else '-'} | Reason: {reason}"
                     )
-                    # early stop, set current step and total steps to be the same
-                    self.logger.report_progress(
-                        problem_id=env.task_name,
-                        step=step + 1,
-                        total_steps=step + 1,
-                        score=info.score,
-                        max_score=info.max_score,
-                        status="resolved" if info.resolved else "unresolved",
-                    )
-                    break
+                    current_status = "resolved" if info.resolved else "unresolved"
+                else:
+                    current_status = "running"
+
                 # keep progress bar running until max_steps is reached
                 self.logger.report_progress(
                     problem_id=env.task_name,
@@ -280,18 +223,9 @@ class BaseAgent:
                     total_steps=max_steps + 1,
                     score=info.score,
                     max_score=info.max_score,
-                    status="running",
+                    status=current_status,
                 )
-            # max_steps was reached, task was either resolved or unresolved
-            self.logger.report_progress(
-                problem_id=env.task_name,
-                step=step + 1,
-                total_steps=step + 1,
-                score=info.score,
-                max_score=info.max_score,
-                status="resolved" if info.resolved else "unresolved",
-            )
-            return info.resolved
+            return self._build_trajectory()
         except Exception:
             # report any error that happens during the run
             self.logger.report_progress(
@@ -304,33 +238,11 @@ class BaseAgent:
             )
             raise
 
-    def apply_patch(self, patch_path: str) -> bool:
-        patch_command = ["patch", "-p1"]
-        try:
-            # Open the patch file
-            with open(patch_path, "r") as patch:
-                # Run the patch command
-                result = subprocess.run(
-                    patch_command,
-                    stdin=patch,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    text=True,
-                    check=True,
-                )
-            print("Patch applied successfully.")
-            print("Output:", result.stdout)
-            return True
-        except subprocess.CalledProcessError as e:
-            print("Failed to apply patch.")
-            print("Error:", e.stderr)
-            return False
-
-    def build_trajectory(self, task_name) -> Dict[str, Any]:
+    def _build_trajectory(self) -> Dict[str, Any]:
         """Return the trajectory as a JSON-serializable dict without writing it."""
         tools = [f"{tool.name}({tool.arguments})" for tool in self.env.tools]
         json_output = {
-            "problem": task_name,
+            "problem": self.env.task_name,
             "config": self.args.to_dict(),
             "tools": self.llm.define_tools(self.env.tools) if self.llm else tools,
             "uuid": self._uuid,

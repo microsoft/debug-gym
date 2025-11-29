@@ -331,14 +331,29 @@ class LLM(ABC):
         )
 
     @abstractmethod
-    def format_tool_call_history(
-        self, history_info: EnvInfo, response: list[LLMResponse]
-    ) -> list[dict]:
+    def convert_response_to_message(
+        self,
+        response: LLMResponse,
+    ) -> dict:
         """Format the tool call history for different LLMs.
         The method should be overridden by subclasses.
         """
         raise NotImplementedError(
-            "The format_tool_call_history method should be overridden by subclasses."
+            "The convert_response_to_message method should be overridden by subclasses."
+        )
+
+    @abstractmethod
+    def convert_observation_to_message(
+        self,
+        observation: str,
+        last_tool_call_id: int = None,
+        last_tool_call_name: str = None,
+    ) -> dict:
+        """Format the tool call history for different LLMs.
+        The method should be overridden by subclasses.
+        """
+        raise NotImplementedError(
+            "The convert_observation_to_message method should be overridden by subclasses."
         )
 
     def __call__(self, messages, tools, *args, **kwargs) -> LLMResponse:

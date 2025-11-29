@@ -190,58 +190,44 @@ class OpenAILLM(LLM):
             arguments=json.loads(response.function.arguments),
         )
 
-    def format_tool_call_history(
-        self, history_info: EnvInfo, response: list[LLMResponse]
-    ) -> list[dict]:
-        _messages = []
-        if isinstance(response, list) and len(response) > 0:
-            _response = {
-                "role": "assistant",
-                "tool_calls": [
-                    {
-                        "type": "function",
-                        "id": response[0].tool.id,
-                        "function": {
-                            "name": response[0].tool.name,
-                            "arguments": json.dumps(response[0].tool.arguments),
-                        },
-                    },
-                ],
-                "content": filter_non_utf8(f"{response[0].response}"),
-            }
-            if response[0].reasoning_response:
-                _response["reasoning_content"] = filter_non_utf8(
-                    f"{response[0].reasoning_response}"
-                )
-            _messages.append(_response)
-        if (
-            history_info.action_tool_call is None
-            and history_info.action_content is None
-            and history_info.action_reasoning is None
-        ):
-            # This is the initial state, no action taken yet
-            _messages.append(
+    def convert_response_to_message(self, response: LLMResponse) -> dict:
+        response = {
+            "role": "assistant",
+            "tool_calls": [
                 {
-                    "role": "user",
-                    "content": filter_non_utf8(
-                        history_info.step_observation.observation
-                    ),
-                }
+                    "type": "function",
+                    "id": response.tool.id,
+                    "function": {
+                        "name": response[0].tool.name,
+                        "arguments": json.dumps(response[0].tool.arguments),
+                    },
+                },
+            ],
+            "content": filter_non_utf8(f"{response[0].response}"),
+        }
+        if response.reasoning_response:
+            response["reasoning_content"] = filter_non_utf8(
+                f"{response.reasoning_response}"
             )
+        return response
+
+    def convert_observation_to_message(
+        self, observation: str, last_tool_call_id=None, last_tool_call_name=None
+    ) -> dict:
+        if last_tool_call_id is None:
+            # This is the initial state, no action taken yet
+            return {
+                "role": "user",
+                "content": filter_non_utf8(observation),
+            }
         else:
             # This is a step with an action taken
-            _messages.append(
-                {
-                    "role": "tool",
-                    "tool_call_id": history_info.action_tool_call.id,
-                    "name": history_info.action_tool_call.name,
-                    "content": filter_non_utf8(
-                        history_info.step_observation.observation
-                    ),
-                }
-            )
-
-        return _messages
+            return {
+                "role": "tool",
+                "tool_call_id": last_tool_call_id,
+                "name": last_tool_call_name,
+                "content": filter_non_utf8(observation),
+            }
 
     def generate(self, messages, tools, **kwargs) -> LLMResponse:
         # set max tokens if not provided
