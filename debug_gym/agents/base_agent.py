@@ -164,8 +164,8 @@ class BaseAgent:
             # initial state does not have prompt and response
             self.history.init(self.system_prompt, self.problem_prompt, info)
 
-            if info.resolved is True:
-                self.logger.report_progress(
+            if info.resolved:
+                self.logger.step_progress(
                     problem_id=env.task_name,
                     step=1,
                     total_steps=1,
@@ -183,7 +183,7 @@ class BaseAgent:
             highscore = info.score
             current_status = "running"
 
-            while step < max_steps or current_status not in ["resolved", "unresolved"]:
+            while step < max_steps and current_status == "running":
                 self.logger.info(f"\n{'='*20} STEP {step+1} {'='*20}\n")
                 highscore = max(highscore, info.score)
                 msg = f"[{env.task_name[:10]:<10}] Step {step} | Score: {info.score}/{info.max_score or '-'} [Best: {highscore}]"
@@ -202,13 +202,21 @@ class BaseAgent:
                 )
                 self.history.step(info, llm_response)
 
-                if info.terminated or (
+                max_steps_reached = step + 1 >= max_steps
+                max_rewrite_steps_reached = (
                     self.args.max_rewrite_steps >= 0
                     and info.rewrite_counter >= self.args.max_rewrite_steps
-                ):
-                    reason = (
-                        "terminated" if info.resolved else "max_rewrite_steps reached"
-                    )
+                )
+                should_stop = (
+                    info.terminated or max_steps_reached or max_rewrite_steps_reached
+                )
+                if should_stop:
+                    if info.terminated:
+                        reason = "terminated"
+                    elif max_steps_reached:
+                        reason = "max_steps reached"
+                    else:
+                        reason = "max_rewrite_steps reached"
                     self.logger.info(
                         f"Step: {step} | Score: {info.score}/{info.max_score if info.max_score else '-'} | Reason: {reason}"
                     )
@@ -225,6 +233,8 @@ class BaseAgent:
                     max_score=info.max_score,
                     status=current_status,
                 )
+                step += 1
+
             return self._build_trajectory()
         except Exception:
             # report any error that happens during the run

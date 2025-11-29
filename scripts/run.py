@@ -73,6 +73,7 @@ def run_agent(args, task_name: str, task_data: dict, config: dict):
             task_logger.debug(f"Previous run status: {previous_run.status}")
             if not args.force_failed or success:
                 status = "skip-resolved" if success else "skip-unresolved"
+
                 task_logger.report_progress(
                     problem_id=previous_run.problem_id,
                     step=previous_run.step,
@@ -83,15 +84,6 @@ def run_agent(args, task_name: str, task_data: dict, config: dict):
                 )
                 task_logger.debug(f"Skipping {task_name}, already done.")
                 return success
-
-        task_logger.report_progress(
-            problem_id=task_name,
-            step=0,
-            total_steps=1,
-            score=0,
-            max_score=None,
-            status="running",
-        )
 
         env = create_env(config, task_data, task_logger)
         add_tools(env, config, task_logger)
@@ -114,28 +106,12 @@ def run_agent(args, task_name: str, task_data: dict, config: dict):
             success = agent.run(env, debug=args.debug)
         except KeyboardInterrupt:
             task_logger.error("Agent run was interrupted by user.")
-            task_logger.report_progress(
-                problem_id=task_name,
-                step=1,
-                total_steps=1,
-                score=0,
-                max_score=None,
-                status="error",
-            )
             success = False
             raise
         except AgentTimeoutException:
             task_logger.error(
                 f"Timeout: Problem `{task_name}` exceeded "
                 f"the time limit of {args.timeout} seconds."
-            )
-            task_logger.report_progress(
-                problem_id=task_name,
-                step=1,
-                total_steps=1,
-                score=0,
-                max_score=None,
-                status="error",
             )
             success = False
             raise
