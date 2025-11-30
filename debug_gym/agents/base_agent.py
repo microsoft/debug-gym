@@ -250,7 +250,7 @@ class BaseAgent:
 
     def should_stop(self, step: int, info: EnvInfo):
         should_stop, reason = False, None
-        max_steps_reached = step + 1 >= self.args.max_steps
+        max_steps_reached = step >= self.args.max_steps
         if info.terminated:
             should_stop = True
             reason = "terminated"
@@ -260,7 +260,6 @@ class BaseAgent:
         return should_stop, reason
 
     def run(self, env: RepoEnv, debug=False):
-        step = 0
         info = None
         self.env = env
 
@@ -285,7 +284,10 @@ class BaseAgent:
             )
 
             highscore = info.score
-            for step in range(self.args.max_steps):
+            should_stop = False
+            step = 1
+
+            while not should_stop:
                 self.logger.info(f"\n{'='*20} STEP {step+1} {'='*20}\n")
 
                 messages = self.build_prompt(info)
@@ -301,36 +303,35 @@ class BaseAgent:
                 )
                 self.history.step(info, llm_response)
                 should_stop, reason = self.should_stop(step, info)
+                status = (
+                    "resolved"
+                    if info.resolved
+                    else ("unresolved" if should_stop else "running")
+                )
 
                 highscore = max(highscore, info.score)
                 msg = f"[{env.task_name[:10]:<10}] Step {step} | Score: {info.score}/{info.max_score or '-'} [Best: {highscore}]"
                 if should_stop:
                     msg += f" | Stopping Reason: {reason}"
                 self.logger.info(msg)
+                step += 1
 
                 # keep progress bar running until max_steps is reached
                 self.logger.report_progress(
                     problem_id=env.task_name,
-                    step=step + 1,
-                    total_steps=self.args.max_steps + 1,
+                    step=step,
+                    total_steps=self.args.max_steps,
                     score=info.score,
                     max_score=info.max_score,
-                    status=(
-                        "resolved"
-                        if info.resolved
-                        else ("unresolved" if should_stop else "running")
-                    ),
+                    status=status,
                 )
-                if should_stop:
-                    break
-
             return self._build_trajectory()
         except Exception:
             # report any error that happens during the run
             self.logger.report_progress(
                 problem_id=env.task_name,
-                step=step + 1,
-                total_steps=step + 1,
+                step=step,
+                total_steps=step,
                 score=info.score if info else 0,
                 max_score=info.max_score,
                 status="error",
