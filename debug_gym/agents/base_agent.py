@@ -22,11 +22,11 @@ AGENT_REGISTRY = {}
 
 @dataclass
 class AgentArgs:
-    random_seed: int = 42
-    max_rewrite_steps: int = -1
-    max_steps: int = 100
     system_prompt: str | None = None
-    problem_prompt: str | None = None
+    instance_prompt: str | None = None
+    random_seed: int = 42
+    max_steps: int = 100
+    max_rewrite_steps: int = -1
     uuid: str = field(default_factory=lambda: str(uuid.uuid4()))
     extras: Dict[str, Any] = field(default_factory=dict)
 
@@ -81,7 +81,7 @@ def register_agent(cls):
 class BaseAgent:
     name: str = None
     system_prompt: str = None
-    problem_prompt: str = None
+    instance_prompt: str = None
 
     def __init__(
         self,
@@ -94,31 +94,26 @@ class BaseAgent:
             if isinstance(agent_args, dict)
             else agent_args
         )
+
+        self.env = None
+        self._uuid = self.args.uuid
+        if self.args.system_prompt:
+            self.system_prompt = self.args.system_prompt
+        if self.args.instance_prompt:
+            self.instance_prompt = self.args.instance_prompt
         self.logger = logger or DebugGymLogger("debug-gym")
         self.llm = llm
-        self._uuid = self.args.uuid
-        self.env = None
-        self.system_prompt = self.args.system_prompt or self.system_prompt
-        self.problem_prompt = self.args.problem_prompt or self.problem_prompt
-
         self.set_seed(self.args.random_seed)
+
         self.history = HistoryTracker()
 
     def set_seed(self, seed):
         np.random.seed(seed)
 
-    def parse_reasoning_model_response(self, response, reasoning_end_token):
-        # Strip the reasoning, e.g., in Deepseek r1, between <think> and </think>.
-        reasoning_end = response.find(reasoning_end_token)
-        if reasoning_end != -1:
-            reasoning_end += len(reasoning_end_token)
-            response = response[reasoning_end:].strip()
-        return response
-
     def build_system_prompt(self):
         return [
             {"role": "system", "content": self.system_prompt},
-            self.llm.convert_observation_to_message(self.problem_prompt),
+            self.llm.convert_observation_to_message(self.instance_prompt),
         ]
 
     def build_history_prompt(self):
@@ -156,16 +151,13 @@ class BaseAgent:
         step = 0
         info = None
         self.env = env
-        max_steps = self.args.max_steps
 
         try:
             info = self.env.reset()
-
-            # initial state does not have prompt and response
-            self.history.init(self.system_prompt, self.problem_prompt, info)
+            self.history.init(self.system_prompt, self.instance_prompt, info)
 
             if info.resolved:
-                self.logger.step_progress(
+                self.logger.report_progress(
                     problem_id=env.task_name,
                     step=1,
                     total_steps=1,
@@ -181,13 +173,11 @@ class BaseAgent:
             )
 
             highscore = info.score
+            should_stop = False
             current_status = "running"
 
-            while step < max_steps and current_status == "running":
+            while not should_stop:
                 self.logger.info(f"\n{'='*20} STEP {step+1} {'='*20}\n")
-                highscore = max(highscore, info.score)
-                msg = f"[{env.task_name[:10]:<10}] Step {step} | Score: {info.score}/{info.max_score or '-'} [Best: {highscore}]"
-                self.logger.info(msg)
 
                 messages = self.build_prompt(info)
                 llm_response = self.llm(messages, info.tools)
@@ -202,37 +192,42 @@ class BaseAgent:
                 )
                 self.history.step(info, llm_response)
 
-                max_steps_reached = step + 1 >= max_steps
+                max_steps_reached = step + 1 >= self.args.max_steps
                 max_rewrite_steps_reached = (
                     self.args.max_rewrite_steps >= 0
                     and info.rewrite_counter >= self.args.max_rewrite_steps
                 )
-                should_stop = (
-                    info.terminated or max_steps_reached or max_rewrite_steps_reached
-                )
-                if should_stop:
-                    if info.terminated:
-                        reason = "terminated"
-                    elif max_steps_reached:
-                        reason = "max_steps reached"
-                    else:
-                        reason = "max_rewrite_steps reached"
-                    self.logger.info(
-                        f"Step: {step} | Score: {info.score}/{info.max_score if info.max_score else '-'} | Reason: {reason}"
-                    )
-                    current_status = "resolved" if info.resolved else "unresolved"
-                else:
-                    current_status = "running"
+                if info.terminated:
+                    should_stop = True
+                    reason = "terminated"
+                elif max_steps_reached:
+                    should_stop = True
+                    reason = "max_steps reached"
+                elif max_rewrite_steps_reached:
+                    should_stop = True
+                    reason = "max_rewrite_steps reached"
+
+                if info.resolved:
+                    current_status = "resolved"
+                elif should_stop:
+                    current_status = "unresolved"
 
                 # keep progress bar running until max_steps is reached
                 self.logger.report_progress(
                     problem_id=env.task_name,
                     step=step + 1,
-                    total_steps=max_steps + 1,
+                    total_steps=self.args.max_steps + 1,
                     score=info.score,
                     max_score=info.max_score,
                     status=current_status,
                 )
+                highscore = max(highscore, info.score)
+
+                msg = f"[{env.task_name[:10]:<10}] Step {step} | Score: {info.score}/{info.max_score or '-'} [Best: {highscore}]"
+                if should_stop:
+                    msg += f" | Stopping Reason: {reason}"
+
+                self.logger.info(msg)
                 step += 1
 
             return self._build_trajectory()
