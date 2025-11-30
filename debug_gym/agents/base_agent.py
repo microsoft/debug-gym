@@ -28,7 +28,6 @@ class AgentArgs:
     system_prompt_template_file: str | None = None
     instance_prompt_template_file: str | None = None
     max_steps: int = 100
-    max_rewrite_steps: int = -1
     uuid: str = field(default_factory=lambda: str(uuid.uuid4()))
     extras: Dict[str, Any] = field(default_factory=dict)
 
