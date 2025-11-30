@@ -147,6 +147,17 @@ class BaseAgent:
         messages.extend(self.build_history_prompt())
         return messages
 
+    def should_stop(self, step, info):
+        should_stop, reason = False, None
+        max_steps_reached = step + 1 >= self.args.max_steps
+        if info.terminated:
+            should_stop = True
+            reason = "terminated"
+        elif max_steps_reached:
+            should_stop = True
+            reason = "max_steps reached"
+        return should_stop, reason
+
     def run(self, env: RepoEnv, debug=False):
         step = 0
         info = None
@@ -173,10 +184,7 @@ class BaseAgent:
             )
 
             highscore = info.score
-            should_stop = False
-            current_status = "running"
-
-            while not should_stop:
+            for step in range(self.args.max_steps):
                 self.logger.info(f"\n{'='*20} STEP {step+1} {'='*20}\n")
 
                 messages = self.build_prompt(info)
@@ -191,26 +199,13 @@ class BaseAgent:
                     llm_response.reasoning_response,
                 )
                 self.history.step(info, llm_response)
+                should_stop, reason = self.should_stop(step, info)
 
-                max_steps_reached = step + 1 >= self.args.max_steps
-                max_rewrite_steps_reached = (
-                    self.args.max_rewrite_steps >= 0
-                    and info.rewrite_counter >= self.args.max_rewrite_steps
-                )
-                if info.terminated:
-                    should_stop = True
-                    reason = "terminated"
-                elif max_steps_reached:
-                    should_stop = True
-                    reason = "max_steps reached"
-                elif max_rewrite_steps_reached:
-                    should_stop = True
-                    reason = "max_rewrite_steps reached"
-
-                if info.resolved:
-                    current_status = "resolved"
-                elif should_stop:
-                    current_status = "unresolved"
+                highscore = max(highscore, info.score)
+                msg = f"[{env.task_name[:10]:<10}] Step {step} | Score: {info.score}/{info.max_score or '-'} [Best: {highscore}]"
+                if should_stop:
+                    msg += f" | Stopping Reason: {reason}"
+                self.logger.info(msg)
 
                 # keep progress bar running until max_steps is reached
                 self.logger.report_progress(
@@ -219,16 +214,14 @@ class BaseAgent:
                     total_steps=self.args.max_steps + 1,
                     score=info.score,
                     max_score=info.max_score,
-                    status=current_status,
+                    status=(
+                        "resolved"
+                        if info.resolved
+                        else ("unresolved" if should_stop else "running")
+                    ),
                 )
-                highscore = max(highscore, info.score)
-
-                msg = f"[{env.task_name[:10]:<10}] Step {step} | Score: {info.score}/{info.max_score or '-'} [Best: {highscore}]"
                 if should_stop:
-                    msg += f" | Stopping Reason: {reason}"
-
-                self.logger.info(msg)
-                step += 1
+                    break
 
             return self._build_trajectory()
         except Exception:
