@@ -12,14 +12,16 @@ class HistoryTracker:
     def reset(self) -> None:
         self.system_prompt: dict | None = None
         self.problem_prompt: dict | None = None
-        self.env_init: EnvInfo | None = None
+        self.env_initial_observation: EnvInfo | None = None
         self.env_observations: list[EnvInfo] = []
         self.llm_responses: list[LLMResponse | None] = []
 
-    def init(self, system_prompt: str, problem_prompt: str, env_init: EnvInfo) -> None:
+    def init(
+        self, system_prompt: str, problem_prompt: str, env_initial_observation: EnvInfo
+    ) -> None:
         self.system_prompt = system_prompt
         self.problem_prompt = problem_prompt
-        self.env_init = copy.deepcopy(env_init)
+        self.env_initial_observation = copy.deepcopy(env_initial_observation)
         self.llm_responses = []
         self.env_observations = []
 
@@ -59,7 +61,7 @@ class HistoryTracker:
                 "reasoning": None,
                 "content": None,
                 "action": None,  # env reset
-                "obs": self.env_init.step_observation.observation,
+                "obs": self.env_initial_observation.step_observation.observation,
                 "rewrite_consumed": 0,
                 "prompt_response_pairs": None,
                 "system_prompt": self.system_prompt,

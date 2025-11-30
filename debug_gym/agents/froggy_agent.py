@@ -52,7 +52,6 @@ def build_history_prompt(
 class FroggyAgentArgs(AgentArgs):
     max_rewrite_steps: int = -1
     show_directory_tree: int = 0
-    system_prompt_template_file: str | None = None
     show_current_breakpoints: bool = False
     reset_prompt_history_after_rewrite: bool = False
     n_rewrites_before_pdb: int = 0
@@ -122,95 +121,12 @@ class FroggyAgent(BaseAgent):
                 )
         return features
 
-    @staticmethod
-    def to_pretty_json(value):
-        """Convert a value to a pretty JSON string."""
-        return json.dumps(value, indent=2, sort_keys=False)
-
-    def build_system_prompt(self, info):
-        """Build system prompt using jinja template from config or default template."""
-        system_prompt_template = self._load_system_prompt_template()
-        if system_prompt_template is not None:
-            system_prompt = system_prompt_template.render(agent=self, info=info)
-        else:
-            system_prompt = self._default_system_prompt(info)
-        messages = [{"role": "system", "content": filter_non_utf8(system_prompt)}]
-        messages += [
-            self.llm.convert_observation_to_message(
-                self.history.initial_observation.step_observation.observation
-            )
-        ]
-        return messages
-
-    def build_prompt(self, info: EnvInfo = None):
-        messages = []
-        messages.extend(self.build_system_prompt(info))
-        messages.extend(self.build_history_prompt())
-        return messages
-
-    def _default_system_prompt(self, info) -> str:
-        """Return the default system prompt as pretty JSON.
-        Trimmed to fit within the token limit."""
-
-        system_prompt_dict = {
-            "Overall task": self.system_prompt,
-        }
-
-        return self.to_pretty_json(system_prompt_dict)
-
     def should_stop(self, step: int, info: EnvInfo):
         should_stop, reason = super().should_stop(step, info)
         if info.rewrite_counter > self.args.max_rewrite_steps:
             should_stop = True
             reason = "max_rewrite_steps reached"
         return should_stop, reason
-
-    def trim_message(
-        self,
-        message: str,
-        count_tokens=None,
-        max_length=None,
-        max_length_percentage=0,
-        where="middle",
-    ):
-        """Filter non utf8 and trim the message to fit within the token limit.
-        If the message exceeds the max_length, it will be trimmed to fit.
-        The `max_length` can be specified as an absolute value or a percentage
-        of the LLM's context length, if any."""
-        message = filter_non_utf8(message)
-        count_tokens = count_tokens or self.llm.count_tokens
-        if self.llm.context_length is not None:
-            max_length = (
-                max_length
-                or (max_length_percentage * self.llm.context_length)
-                or self.llm.context_length
-            )
-
-        if count_tokens is None or max_length is None or max_length <= 0:
-            return message
-
-        return trim(message, max_length, count_tokens=count_tokens, where=where)
-
-    def _load_system_prompt_template(self) -> Template | None:
-        """Load system prompt template from config if specified and register custom filters.
-        If no template is specified, return None.
-        """
-        system_prompt_template = self.args.system_prompt_template_file
-        if system_prompt_template:
-            if not os.path.isfile(system_prompt_template):
-                error_msg = (
-                    f"System prompt template file `{system_prompt_template}` not found."
-                )
-                self.logger.error(error_msg)
-                raise FileNotFoundError(error_msg)
-            with open(system_prompt_template, "r") as f:
-                system_prompt_template = f.read()
-            # Add custom filter to Jinja2 environment
-            env = Environment()
-            env.filters["to_pretty_json"] = self.to_pretty_json
-            env.filters["trim_message"] = self.trim_message
-            return env.from_string(system_prompt_template)
-        return None
 
     def _default_system_prompt(self, info) -> str:
         """Return the default system prompt as pretty JSON.

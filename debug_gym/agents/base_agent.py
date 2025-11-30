@@ -22,9 +22,11 @@ AGENT_REGISTRY = {}
 
 @dataclass
 class AgentArgs:
-    system_prompt: str | None = None
-    instance_prompt: str | None = None
     random_seed: int = 42
+    system_prompt_template: str | None = None
+    instance_prompt_template: str | None = None
+    system_prompt_template_file: str | None = None
+    instance_prompt_template_file: str | None = None
     max_steps: int = 100
     max_rewrite_steps: int = -1
     uuid: str = field(default_factory=lambda: str(uuid.uuid4()))
@@ -96,25 +98,125 @@ class BaseAgent:
         )
 
         self.env = None
-        self._uuid = self.args.uuid
-        if self.args.system_prompt:
-            self.system_prompt = self.args.system_prompt
-        if self.args.instance_prompt:
-            self.instance_prompt = self.args.instance_prompt
-        self.logger = logger or DebugGymLogger("debug-gym")
         self.llm = llm
-        self.set_seed(self.args.random_seed)
-
         self.history = HistoryTracker()
+        self.logger = logger or DebugGymLogger("debug-gym")
+        self.set_seed(self.args.random_seed)
 
     def set_seed(self, seed):
         np.random.seed(seed)
 
-    def build_system_prompt(self):
-        return [
-            {"role": "system", "content": self.system_prompt},
-            self.llm.convert_observation_to_message(self.instance_prompt),
+    @staticmethod
+    def to_pretty_json(value):
+        """Convert a value to a pretty JSON string."""
+        return json.dumps(value, indent=2, sort_keys=False)
+
+    def _load_system_prompt_template(self) -> Template | None:
+        """Load system prompt template from config if specified and register custom filters.
+        If no template is specified, return None.
+        """
+        system_prompt_template_file = self.args.system_prompt_template_file
+        if system_prompt_template_file:
+            if not os.path.isfile(system_prompt_template):
+                error_msg = (
+                    f"System prompt template file `{system_prompt_template}` not found."
+                )
+                self.logger.error(error_msg)
+                raise FileNotFoundError(error_msg)
+            with open(system_prompt_template, "r") as f:
+                system_prompt_template = f.read()
+
+        system_prompt_template = (
+            system_prompt_template or self.args.system_prompt_template
+        )
+        if system_prompt_template:
+            # Add custom filter to Jinja2 environment
+            env = Environment()
+            env.filters["to_pretty_json"] = self.to_pretty_json
+            env.filters["trim_message"] = self.trim_message
+            return env.from_string(system_prompt_template)
+        return None
+
+    def _load_instance_prompt_template(self) -> Template | None:
+        """Load instance prompt template from config if specified and register custom filters.
+        If no template is specified, return None.
+        """
+        instance_prompt_template_file = self.args.instance_prompt_template_file
+        if instance_prompt_template_file:
+            if not os.path.isfile(instance_prompt_template_file):
+                error_msg = f"Instance prompt template file `{instance_prompt_template_file}` not found."
+                self.logger.error(error_msg)
+                raise FileNotFoundError(error_msg)
+            with open(instance_prompt_template_file, "r") as f:
+                instance_prompt_template = f.read()
+
+        instance_prompt_template = (
+            instance_prompt_template or self.args.instance_prompt_template
+        )
+        if instance_prompt_template:
+            # Add custom filter to Jinja2 environment
+            env = Environment()
+            env.filters["to_pretty_json"] = self.to_pretty_json
+            env.filters["trim_message"] = self.trim_message
+            return env.from_string(instance_prompt_template)
+        return None
+
+    def trim_message(
+        self,
+        message: str,
+        count_tokens=None,
+        max_length=None,
+        max_length_percentage=0,
+        where="middle",
+    ):
+        """Filter non utf8 and trim the message to fit within the token limit.
+        If the message exceeds the max_length, it will be trimmed to fit.
+        The `max_length` can be specified as an absolute value or a percentage
+        of the LLM's context length, if any."""
+        message = filter_non_utf8(message)
+        count_tokens = count_tokens or self.llm.count_tokens
+        if self.llm.context_length is not None:
+            max_length = (
+                max_length
+                or (max_length_percentage * self.llm.context_length)
+                or self.llm.context_length
+            )
+
+        if count_tokens is None or max_length is None or max_length <= 0:
+            return message
+
+        return trim(message, max_length, count_tokens=count_tokens, where=where)
+
+    def _default_system_prompt(self, info) -> str:
+        """Return the default system prompt as pretty JSON.
+        Trimmed to fit within the token limit."""
+
+        system_prompt_dict = {
+            "Overall task": self.system_prompt,
+        }
+
+        return self.to_pretty_json(system_prompt_dict)
+
+    def build_system_prompt(self, info):
+        """Build system prompt using jinja template from config or default template."""
+        system_prompt_template = self._load_system_prompt_template()
+
+        if system_prompt_template is not None:
+            system_prompt = system_prompt_template.render(agent=self, info=info)
+        else:
+            system_prompt = self._default_system_prompt(info)
+
+        instance_prompt_template = self._load_instance_prompt_template()
+        if instance_prompt_template is not None:
+            instance_prompt = instance_prompt_template.render(agent=self, info=info)
+        else:
+            instance_prompt = info.instructions
+
+        messages = [
+            {"role": "system", "content": filter_non_utf8(system_prompt)},
+            self.llm.convert_observation_to_message(instance_prompt),
         ]
+        return messages
 
     def build_history_prompt(self):
         messages = []
@@ -143,7 +245,7 @@ class BaseAgent:
 
     def build_prompt(self, info: EnvInfo = None):
         messages = []
-        messages.extend(self.build_system_prompt())
+        messages.extend(self.build_system_prompt(info))
         messages.extend(self.build_history_prompt())
         return messages
 
@@ -243,7 +345,7 @@ class BaseAgent:
             "problem": self.env.task_name,
             "config": self.args.to_dict(),
             "tools": self.llm.define_tools(self.env.tools) if self.llm else tools,
-            "uuid": self._uuid,
+            "uuid": self.args.uuid,
             "success": self.env.resolved,
             "log": [],
             "agent_type": self.__class__.__name__,
