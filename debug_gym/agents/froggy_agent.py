@@ -158,6 +158,13 @@ class FroggyAgent(BaseAgent):
 
         return self.to_pretty_json(system_prompt_dict)
 
+    def should_stop(self, step: int, info: EnvInfo):
+        should_stop, reason = super().should_stop(step, info)
+        if info.rewrite_counter > self.args.max_rewrite_steps:
+            should_stop = True
+            reason = "max_rewrite_steps reached"
+        return should_stop, reason
+
     def trim_message(
         self,
         message: str,

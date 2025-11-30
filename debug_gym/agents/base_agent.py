@@ -147,7 +147,7 @@ class BaseAgent:
         messages.extend(self.build_history_prompt())
         return messages
 
-    def should_stop(self, step, info):
+    def should_stop(self, step: int, info: EnvInfo):
         should_stop, reason = False, None
         max_steps_reached = step + 1 >= self.args.max_steps
         if info.terminated:
