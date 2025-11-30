@@ -195,10 +195,9 @@ class BaseAgent:
         system_prompt_dict = {
             "Overall task": self.system_prompt,
         }
-
         return self.to_pretty_json(system_prompt_dict)
 
-    def build_system_prompt(self, info):
+    def build_system_prompt(self, info) -> dict:
         """Build system prompt using jinja template from config or default template."""
         system_prompt_template = self._load_system_prompt_template()
 
@@ -206,47 +205,39 @@ class BaseAgent:
             system_prompt = system_prompt_template.render(agent=self, info=info)
         else:
             system_prompt = self._default_system_prompt(info)
+        return {"role": "system", "content": filter_non_utf8(system_prompt)}
 
+    def build_instance_prompt(self, info) -> dict:
+        """Build instance prompt using jinja template from config or default template."""
         instance_prompt_template = self._load_instance_prompt_template()
         if instance_prompt_template is not None:
             instance_prompt = instance_prompt_template.render(agent=self, info=info)
         else:
-            instance_prompt = info.instructions
+            instance_prompt = self.to_pretty_json({"Instructions": info.instructions})
+        return self.llm.convert_observation_to_message(instance_prompt)
 
-        messages = [
-            {"role": "system", "content": filter_non_utf8(system_prompt)},
-            self.llm.convert_observation_to_message(instance_prompt),
-        ]
-        return messages
-
-    def build_history_prompt(self):
+    def build_history_prompt(self) -> list[dict]:
+        """Here, we rebuild the history prompt from scratch at each time."""
         messages = []
         for observation, response in zip(
-            self.history.env_observations, self.history.llm_responses
+            self.history.env_observations, self.history.llm_responses, strict=True
         ):
             # environment observation
-            messages.extend(
-                self.llm.convert_observation_to_message(
-                    observation.step_observation.observation,
-                    (
-                        observation.action_tool_call.id
-                        if observation.action_tool_call
-                        else None
-                    ),
-                    (
-                        observation.action_tool_call.name
-                        if observation.action_tool_call
-                        else None
-                    ),
-                )
-            )
+            kwargs = {
+                "observation": observation.step_observation.observation,
+            }
+            if observation.action_tool_call:
+                kwargs["action_tool_call_id"] = observation.action_tool_call.id
+                kwargs["action_tool_call_name"] = observation.action_tool_call.name
+            messages.append(self.llm.convert_observation_to_message(**kwargs))
             # llm response
-            messages.extend(self.llm.convert_response_to_message(response))
+            messages.append(self.llm.convert_response_to_message(response))
         return messages
 
     def build_prompt(self, info: EnvInfo = None):
         messages = []
-        messages.extend(self.build_system_prompt(info))
+        messages.append(self.build_system_prompt(info))
+        messages.append(self.build_instance_prompt(info))
         messages.extend(self.build_history_prompt())
         return messages
 
@@ -267,7 +258,9 @@ class BaseAgent:
 
         try:
             info = self.env.reset()
-            self.history.init(self.system_prompt, self.instance_prompt, info)
+            self.history.init(
+                self.build_system_prompt(info), self.build_instance_prompt(info), info
+            )
 
             if info.resolved:
                 self.logger.report_progress(

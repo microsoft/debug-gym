@@ -10,17 +10,20 @@ class HistoryTracker:
         self.reset()
 
     def reset(self) -> None:
-        self.system_prompt: dict | None = None
-        self.problem_prompt: dict | None = None
+        self.system_message: dict | None = None
+        self.problem_message: dict | None = None
         self.env_initial_observation: EnvInfo | None = None
         self.env_observations: list[EnvInfo] = []
         self.llm_responses: list[LLMResponse | None] = []
 
     def init(
-        self, system_prompt: str, problem_prompt: str, env_initial_observation: EnvInfo
+        self,
+        system_message: dict,
+        problem_message: dict,
+        env_initial_observation: EnvInfo,
     ) -> None:
-        self.system_prompt = system_prompt
-        self.problem_prompt = problem_prompt
+        self.system_message = system_message
+        self.problem_message = problem_message
         self.env_initial_observation = copy.deepcopy(env_initial_observation)
         self.llm_responses = []
         self.env_observations = []
@@ -64,8 +67,8 @@ class HistoryTracker:
                 "obs": self.env_initial_observation.step_observation.observation,
                 "rewrite_consumed": 0,
                 "prompt_response_pairs": None,
-                "system_prompt": self.system_prompt,
-                "problem_prompt": self.problem_prompt,
+                "system_message": self.system_message,
+                "problem_message": self.problem_message,
             }
         else:
             json_out = {
