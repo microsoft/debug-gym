@@ -262,6 +262,7 @@ class R2EGymEnv(RepoEnv):
         prepull_images: bool = False,
         logger: DebugGymLogger | None = None,
     ) -> dict:
+        logger = logger or DebugGymLogger("debug_gym")
         data_path = Path(dataset_id)
         if data_path.is_file():
             # Loading from local file.
@@ -299,10 +300,9 @@ class R2EGymEnv(RepoEnv):
         dataset = {pid: dataset[pid] for pid in problems}
 
         image_names = set(example["docker_image"] for example in dataset.values())
-        if logger is not None:
-            logger.debug(
-                f"Loaded {len(dataset)} tasks across {len(image_names)} Docker images from {dataset_id}."
-            )
+        logger.debug(
+            f"Loaded {len(dataset)} tasks across {len(image_names)} Docker images from {dataset_id}."
+        )
 
         if prepull_images:
             # Download all images needed for R2E-Gym.
@@ -313,14 +313,10 @@ class R2EGymEnv(RepoEnv):
             )
             missing_images = image_names - existing_images
             if missing_images:
-                if logger is not None:
+                logger.warning(f"Found {len(missing_images)} missing Docker images.")
+                for i, image_name in enumerate(missing_images):
                     logger.warning(
-                        f"Found {len(missing_images)} missing Docker images."
+                        f"Pulling Docker image {i + 1}/{len(missing_images)} `{image_name}`."
                     )
-                    for i, image_name in enumerate(missing_images):
-                        if logger is not None:
-                            logger.warning(
-                                f"Pulling Docker image {i + 1}/{len(missing_images)} `{image_name}`."
-                            )
-                        client.images.pull(image_name)
+                    client.images.pull(image_name)
         return dataset

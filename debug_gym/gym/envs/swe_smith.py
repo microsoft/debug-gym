@@ -154,6 +154,7 @@ class SWESmithEnv(SWEBenchEnv):
         prepull_images: bool = False,
         logger: DebugGymLogger | None = None,
     ) -> dict:
+        logger = logger or DebugGymLogger("debug_gym")
         data_path = Path(dataset_id)
         if data_path.is_file():
             # Loading from local file.
@@ -181,10 +182,9 @@ class SWESmithEnv(SWEBenchEnv):
         dataset = {pid: dataset[pid] for pid in problems}
 
         image_names = set([problem["image_name"] for problem in dataset.values()])
-        if logger is not None:
-            logger.debug(
-                f"Loaded {len(dataset)} tasks across {len(image_names)} Docker images from {dataset_id}."
-            )
+        logger.debug(
+            f"Loaded {len(dataset)} tasks across {len(image_names)} Docker images from {dataset_id}."
+        )
 
         if prepull_images:
             # Download all images needed for SWE-Smith.
@@ -198,15 +198,13 @@ class SWESmithEnv(SWEBenchEnv):
             )
             missing_images = tagged_image_names - existing_images
             if missing_images:
-                if logger is not None:
-                    logger.info(f"Found {len(missing_images)} missing Docker images.")
+                logger.info(f"Found {len(missing_images)} missing Docker images.")
 
                 for image_name in missing_images:
                     docker_hub_image = image_name.replace("__", "_1776_")
-                    if logger is not None:
-                        logger.info(
-                            f"Pulling Docker image `{docker_hub_image}` to `{image_name}`."
-                        )
+                    logger.info(
+                        f"Pulling Docker image `{docker_hub_image}` to `{image_name}`."
+                    )
                     client.images.pull(docker_hub_image)
                     # Rename images via tagging
                     client.images.get(docker_hub_image).tag(image_name)
