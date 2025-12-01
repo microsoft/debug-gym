@@ -2,6 +2,7 @@ import os
 import platform
 import subprocess
 import time
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -322,3 +323,179 @@ def test_kubernetes_terminal_readonly_properties_after_pod_creation():
         terminal.working_dir = "/new/path"
 
     terminal.close()
+
+
+# Tests for pod spec shortcut functionality (don't require Kubernetes cluster)
+
+
+def test_build_pod_spec_from_shortcuts_affinity_same_host():
+    """Test building pod spec with same_host affinity mode."""
+    from debug_gym.gym.terminals.kubernetes import \
+        _build_pod_spec_from_shortcuts
+
+    spec = _build_pod_spec_from_shortcuts(
+        affinity_mode="same_host", affinity_hostname_key="MY_HOST"
+    )
+
+    assert "affinity" in spec
+    node_affinity = spec["affinity"]["nodeAffinity"]
+    required = node_affinity["requiredDuringSchedulingIgnoredDuringExecution"]
+    term = required["nodeSelectorTerms"][0]
+    match_expr = term["matchExpressions"][0]
+
+    assert match_expr["key"] == "kubernetes.io/hostname"
+    assert match_expr["operator"] == "In"
+    assert match_expr["values"] == ["{{MY_HOST}}"]
+
+
+def test_build_pod_spec_from_shortcuts_tolerations_single():
+    """Test building pod spec with a single toleration preset."""
+    from debug_gym.gym.terminals.kubernetes import \
+        _build_pod_spec_from_shortcuts
+
+    spec = _build_pod_spec_from_shortcuts(tolerations_preset="spot")
+
+    assert "tolerations" in spec
+    assert len(spec["tolerations"]) == 1
+    assert spec["tolerations"][0]["key"] == "kubernetes.azure.com/scalesetpriority"
+    assert spec["tolerations"][0]["value"] == "spot"
+
+
+def test_build_pod_spec_from_shortcuts_tolerations_multiple():
+    """Test building pod spec with multiple toleration presets."""
+    from debug_gym.gym.terminals.kubernetes import \
+        _build_pod_spec_from_shortcuts
+
+    spec = _build_pod_spec_from_shortcuts(tolerations_preset=["spot", "critical"])
+
+    assert "tolerations" in spec
+    assert len(spec["tolerations"]) == 2
+
+    keys = [t["key"] for t in spec["tolerations"]]
+    assert "kubernetes.azure.com/scalesetpriority" in keys
+    assert "CriticalAddonsOnly" in keys
+
+
+def test_build_pod_spec_from_shortcuts_combined():
+    """Test building pod spec with both affinity and tolerations."""
+    from debug_gym.gym.terminals.kubernetes import \
+        _build_pod_spec_from_shortcuts
+
+    spec = _build_pod_spec_from_shortcuts(
+        affinity_mode="same_host",
+        tolerations_preset=["spot", "critical"],
+    )
+
+    assert "affinity" in spec
+    assert "tolerations" in spec
+    assert len(spec["tolerations"]) == 2
+
+
+def test_build_pod_spec_from_shortcuts_invalid_affinity_mode():
+    """Test that invalid affinity_mode raises ValueError."""
+    from debug_gym.gym.terminals.kubernetes import \
+        _build_pod_spec_from_shortcuts
+
+    with pytest.raises(ValueError, match="Unknown affinity_mode 'invalid'"):
+        _build_pod_spec_from_shortcuts(affinity_mode="invalid")
+
+
+def test_build_pod_spec_from_shortcuts_invalid_tolerations_preset():
+    """Test that invalid tolerations_preset raises ValueError."""
+    from debug_gym.gym.terminals.kubernetes import \
+        _build_pod_spec_from_shortcuts
+
+    with pytest.raises(ValueError, match="Unknown tolerations_preset 'invalid'"):
+        _build_pod_spec_from_shortcuts(tolerations_preset="invalid")
+
+
+def test_deep_merge_dicts():
+    """Test deep merging of dictionaries."""
+    from debug_gym.gym.terminals.kubernetes import _deep_merge_dicts
+
+    base = {
+        "a": 1,
+        "b": {"c": 2, "d": 3},
+        "e": [1, 2],
+    }
+    override = {
+        "b": {"c": 10, "f": 4},
+        "e": [3, 4],
+        "g": 5,
+    }
+
+    result = _deep_merge_dicts(base, override)
+
+    assert result["a"] == 1  # Unchanged from base
+    assert result["b"]["c"] == 10  # Override wins
+    assert result["b"]["d"] == 3  # Preserved from base
+    assert result["b"]["f"] == 4  # Added from override
+    assert result["e"] == [3, 4]  # Override replaces list
+    assert result["g"] == 5  # Added from override
+
+
+@patch("debug_gym.gym.terminals.kubernetes.config.load_kube_config")
+@patch("debug_gym.gym.terminals.kubernetes.client.CoreV1Api")
+def test_kubernetes_terminal_with_affinity_mode(mock_api, mock_config):
+    """Test KubernetesTerminal initialization with affinity_mode shortcut."""
+    os.environ["MY_NODE"] = "test-node-1"
+    terminal = KubernetesTerminal(
+        base_image="ubuntu:latest",
+        affinity_mode="same_host",
+        affinity_hostname_key="MY_NODE",
+    )
+
+    assert "affinity" in terminal.pod_spec_kwargs
+    node_affinity = terminal.pod_spec_kwargs["affinity"]["nodeAffinity"]
+    required = node_affinity["requiredDuringSchedulingIgnoredDuringExecution"]
+    term = required["nodeSelectorTerms"][0]
+    match_expr = term["matchExpressions"][0]
+    assert match_expr["values"] == ["{{MY_NODE}}"]
+
+
+@patch("debug_gym.gym.terminals.kubernetes.config.load_kube_config")
+@patch("debug_gym.gym.terminals.kubernetes.client.CoreV1Api")
+def test_kubernetes_terminal_with_tolerations_preset(mock_api, mock_config):
+    """Test KubernetesTerminal initialization with tolerations_preset shortcut."""
+    terminal = KubernetesTerminal(
+        base_image="ubuntu:latest",
+        tolerations_preset=["spot", "critical"],
+    )
+
+    assert "tolerations" in terminal.pod_spec_kwargs
+    assert len(terminal.pod_spec_kwargs["tolerations"]) == 2
+
+
+@patch("debug_gym.gym.terminals.kubernetes.config.load_kube_config")
+@patch("debug_gym.gym.terminals.kubernetes.client.CoreV1Api")
+def test_kubernetes_terminal_shortcuts_with_explicit_pod_spec_kwargs(
+    mock_api, mock_config
+):
+    """Test that explicit pod_spec_kwargs override shortcut-generated values."""
+    custom_tolerations = [{"key": "custom", "value": "value", "effect": "NoSchedule"}]
+    terminal = KubernetesTerminal(
+        base_image="ubuntu:latest",
+        tolerations_preset="spot",  # This would normally add spot toleration
+        pod_spec_kwargs={"tolerations": custom_tolerations},  # But explicit overrides
+    )
+
+    # Explicit pod_spec_kwargs should override the shortcut-generated tolerations
+    assert terminal.pod_spec_kwargs["tolerations"] == custom_tolerations
+
+
+@patch("debug_gym.gym.terminals.kubernetes.config.load_kube_config")
+@patch("debug_gym.gym.terminals.kubernetes.client.CoreV1Api")
+def test_kubernetes_terminal_shortcuts_merge_with_pod_spec_kwargs(
+    mock_api, mock_config
+):
+    """Test that shortcuts and pod_spec_kwargs are properly merged."""
+    terminal = KubernetesTerminal(
+        base_image="ubuntu:latest",
+        affinity_mode="same_host",  # Adds affinity
+        pod_spec_kwargs={"nodeSelector": {"disktype": "ssd"}},  # Adds nodeSelector
+    )
+
+    # Both should be present
+    assert "affinity" in terminal.pod_spec_kwargs
+    assert "nodeSelector" in terminal.pod_spec_kwargs
+    assert terminal.pod_spec_kwargs["nodeSelector"]["disktype"] == "ssd"

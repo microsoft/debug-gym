@@ -11,12 +11,8 @@ from jinja2 import Template
 from kubernetes import client, config, stream, watch
 from kubernetes.client.rest import ApiException
 from kubernetes.stream.ws_client import ERROR_CHANNEL
-from tenacity import (
-    retry,
-    retry_if_exception_type,
-    stop_after_attempt,
-    wait_random_exponential,
-)
+from tenacity import (retry, retry_if_exception_type, stop_after_attempt,
+                      wait_random_exponential)
 from yaml import dump, safe_load
 
 from debug_gym.gym.terminals.shell_session import ShellSession
@@ -40,6 +36,113 @@ def _clean_for_kubernetes(name: str) -> str:
     cleaned = cleaned.strip("-").strip(".")
     # truncate to 253 characters
     return cleaned[:253]
+
+
+# Preset definitions for common Kubernetes configurations
+AFFINITY_PRESETS = {
+    "same_host": lambda hostname_key: {
+        "nodeAffinity": {
+            "requiredDuringSchedulingIgnoredDuringExecution": {
+                "nodeSelectorTerms": [
+                    {
+                        "matchExpressions": [
+                            {
+                                "key": "kubernetes.io/hostname",
+                                "operator": "In",
+                                "values": [f"{{{{{hostname_key}}}}}"],
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+    },
+}
+
+TOLERATION_PRESETS = {
+    "spot": {
+        "key": "kubernetes.azure.com/scalesetpriority",
+        "operator": "Equal",
+        "value": "spot",
+        "effect": "NoSchedule",
+    },
+    "azure_spot": {
+        "key": "kubernetes.azure.com/scalesetpriority",
+        "operator": "Equal",
+        "value": "spot",
+        "effect": "NoSchedule",
+    },
+    "critical": {
+        "key": "CriticalAddonsOnly",
+        "operator": "Equal",
+        "value": "true",
+        "effect": "NoSchedule",
+    },
+}
+
+
+def _build_pod_spec_from_shortcuts(
+    affinity_mode: str | None = None,
+    affinity_hostname_key: str = "HOSTNAME",
+    tolerations_preset: str | list[str] | None = None,
+) -> dict:
+    """Build pod_spec_kwargs from convenient shortcut parameters.
+
+    Args:
+        affinity_mode: Affinity preset name. Currently supports:
+            - "same_host": Schedule pod on a specific host identified by the
+              environment variable specified in affinity_hostname_key.
+        affinity_hostname_key: Environment variable name containing the hostname
+            for "same_host" affinity mode. Defaults to "HOSTNAME".
+        tolerations_preset: Toleration preset name(s). Can be a single string
+            or a list of strings. Currently supports:
+            - "spot" or "azure_spot": Tolerate Azure spot instance nodes
+            - "critical": Tolerate CriticalAddonsOnly taint
+
+    Returns:
+        A dictionary suitable for use as pod_spec_kwargs.
+    """
+    pod_spec = {}
+
+    # Build affinity from preset
+    if affinity_mode:
+        if affinity_mode not in AFFINITY_PRESETS:
+            raise ValueError(
+                f"Unknown affinity_mode '{affinity_mode}'. "
+                f"Available modes: {list(AFFINITY_PRESETS.keys())}"
+            )
+        pod_spec["affinity"] = AFFINITY_PRESETS[affinity_mode](affinity_hostname_key)
+
+    # Build tolerations from preset(s)
+    if tolerations_preset:
+        if isinstance(tolerations_preset, str):
+            tolerations_preset = [tolerations_preset]
+
+        tolerations = []
+        for preset in tolerations_preset:
+            if preset not in TOLERATION_PRESETS:
+                raise ValueError(
+                    f"Unknown tolerations_preset '{preset}'. "
+                    f"Available presets: {list(TOLERATION_PRESETS.keys())}"
+                )
+            tolerations.append(TOLERATION_PRESETS[preset])
+        pod_spec["tolerations"] = tolerations
+
+    return pod_spec
+
+
+def _deep_merge_dicts(base: dict, override: dict) -> dict:
+    """Deep merge two dictionaries, with override taking precedence.
+
+    For nested dictionaries, merges recursively. For lists, override replaces base.
+    """
+    result = base.copy()
+    for key, value in override.items():
+        if key in result and isinstance(result[key], dict) and isinstance(value, dict):
+            result[key] = _deep_merge_dicts(result[key], value)
+        else:
+            result[key] = value
+    return result
 
 
 class Pod:
@@ -270,6 +373,10 @@ class KubernetesTerminal(Terminal):
         kube_context: str | None = None,
         extra_labels: dict | None = None,
         pod_spec_kwargs: dict = None,
+        # Convenient shortcut parameters for common pod spec configurations
+        affinity_mode: str | None = None,
+        affinity_hostname_key: str = "HOSTNAME",
+        tolerations_preset: str | list[str] | None = None,
         **kwargs,
     ):
         super().__init__(
@@ -286,7 +393,15 @@ class KubernetesTerminal(Terminal):
         self.kubernetes_kwargs = kwargs  # e.g., nodeSelector, tolerations
         self.registry = registry.rstrip("/") + "/" if registry else ""
         self._pod_name = pod_name
-        self.pod_spec_kwargs = pod_spec_kwargs or {}
+
+        # Build pod_spec_kwargs from shortcuts and merge with explicit pod_spec_kwargs
+        shortcut_spec = _build_pod_spec_from_shortcuts(
+            affinity_mode=affinity_mode,
+            affinity_hostname_key=affinity_hostname_key,
+            tolerations_preset=tolerations_preset,
+        )
+        explicit_spec = pod_spec_kwargs or {}
+        self.pod_spec_kwargs = _deep_merge_dicts(shortcut_spec, explicit_spec)
         user = _clean_for_kubernetes(os.environ.get("USER", "unknown"))
         self.labels = {"app": "dbg-gym", "user": user} | (extra_labels or {})
         self._pod = None
