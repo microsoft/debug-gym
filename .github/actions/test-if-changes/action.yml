@@ -39,6 +39,7 @@ runs:
         else
           pip install "debug-gym[dev]==${{ inputs.version }}"
         fi
+        df -h
     - name: Run tests
       env:
         DEBUG_GYM_DEBUG: 1
