@@ -31,13 +31,16 @@ def make_env_factory(env_name, worker_id, tmp_path_factory):
     env_class = kwargs.pop("env_class")
 
     def _make_env():
-        dataset = env_class.load_dataset(problems=kwargs["problems"])
+        dataset = env_class.load_dataset(
+            problems=kwargs["problems"], prepull_images=True
+        )
         task_data = next(iter(dataset.values()))
         return env_class(task_data=task_data)
 
     if worker_id == "master":
         # Not running with pytest-xdist or we are in the master process
-        _make_env()
+        env = _make_env()
+        env.reset()
     else:
         # When running with pytest-xdist, synchronize between workers using a lock
         root_tmp_dir = tmp_path_factory.getbasetemp().parent
