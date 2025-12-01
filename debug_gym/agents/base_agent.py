@@ -219,19 +219,19 @@ class BaseAgent:
     def build_history_prompt(self) -> list[dict]:
         """Here, we rebuild the history prompt from scratch at each time."""
         messages = []
-        for observation, response in zip(
-            self.history.env_observations, self.history.llm_responses, strict=True
+        for llm_response, next_observation in zip(
+            self.history.llm_responses, self.history.env_observations, strict=True
         ):
-            # environment observation
-            kwargs = {
-                "observation": observation.step_observation.observation,
-            }
-            if observation.action_tool_call:
-                kwargs["action_tool_call_id"] = observation.action_tool_call.id
-                kwargs["action_tool_call_name"] = observation.action_tool_call.name
-            messages.append(self.llm.convert_observation_to_message(**kwargs))
             # llm response
-            messages.append(self.llm.convert_response_to_message(response))
+            messages.append(self.llm.convert_response_to_message(llm_response))
+            # next environment observation
+            kwargs = {
+                "observation": next_observation.step_observation.observation,
+            }
+            if next_observation.action_tool_call:
+                kwargs["action_tool_call_id"] = next_observation.action_tool_call.id
+                kwargs["action_tool_call_name"] = next_observation.action_tool_call.name
+            messages.append(self.llm.convert_observation_to_message(**kwargs))
         return messages
 
     def build_prompt(self, info: EnvInfo = None):
