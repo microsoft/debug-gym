@@ -16,8 +16,8 @@ from debug_gym.gym.tools.toolbox import Toolbox
 def test_load_dataset(get_swe_smith_env):
     env = get_swe_smith_env()
 
-    dataset = env.load_dataset()
     task_name = "john-kurkowski__tldextract.3d1bf184.combine_file__1vnuqpt4"
+    dataset = env.load_dataset(problems=[task_name])
     assert task_name in dataset
 
     # check if the dataset contains features that SWESmithEnv expects

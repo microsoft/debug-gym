@@ -39,8 +39,7 @@ def make_env_factory(env_name, worker_id, tmp_path_factory):
 
     if worker_id == "master":
         # Not running with pytest-xdist or we are in the master process
-        env = _make_env()
-        env.reset()
+        _make_env()
     else:
         # When running with pytest-xdist, synchronize between workers using a lock
         root_tmp_dir = tmp_path_factory.getbasetemp().parent
