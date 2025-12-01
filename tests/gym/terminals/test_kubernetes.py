@@ -330,8 +330,7 @@ def test_kubernetes_terminal_readonly_properties_after_pod_creation():
 
 def test_build_pod_spec_from_shortcuts_affinity_same_host():
     """Test building pod spec with same_host affinity mode."""
-    from debug_gym.gym.terminals.kubernetes import \
-        _build_pod_spec_from_shortcuts
+    from debug_gym.gym.terminals.kubernetes import _build_pod_spec_from_shortcuts
 
     spec = _build_pod_spec_from_shortcuts(
         affinity_mode="same_host", affinity_hostname_key="MY_HOST"
@@ -350,8 +349,7 @@ def test_build_pod_spec_from_shortcuts_affinity_same_host():
 
 def test_build_pod_spec_from_shortcuts_tolerations_single():
     """Test building pod spec with a single toleration preset."""
-    from debug_gym.gym.terminals.kubernetes import \
-        _build_pod_spec_from_shortcuts
+    from debug_gym.gym.terminals.kubernetes import _build_pod_spec_from_shortcuts
 
     spec = _build_pod_spec_from_shortcuts(tolerations_preset="spot")
 
@@ -363,8 +361,7 @@ def test_build_pod_spec_from_shortcuts_tolerations_single():
 
 def test_build_pod_spec_from_shortcuts_tolerations_multiple():
     """Test building pod spec with multiple toleration presets."""
-    from debug_gym.gym.terminals.kubernetes import \
-        _build_pod_spec_from_shortcuts
+    from debug_gym.gym.terminals.kubernetes import _build_pod_spec_from_shortcuts
 
     spec = _build_pod_spec_from_shortcuts(tolerations_preset=["spot", "critical"])
 
@@ -378,8 +375,7 @@ def test_build_pod_spec_from_shortcuts_tolerations_multiple():
 
 def test_build_pod_spec_from_shortcuts_combined():
     """Test building pod spec with both affinity and tolerations."""
-    from debug_gym.gym.terminals.kubernetes import \
-        _build_pod_spec_from_shortcuts
+    from debug_gym.gym.terminals.kubernetes import _build_pod_spec_from_shortcuts
 
     spec = _build_pod_spec_from_shortcuts(
         affinity_mode="same_host",
@@ -393,8 +389,7 @@ def test_build_pod_spec_from_shortcuts_combined():
 
 def test_build_pod_spec_from_shortcuts_invalid_affinity_mode():
     """Test that invalid affinity_mode raises ValueError."""
-    from debug_gym.gym.terminals.kubernetes import \
-        _build_pod_spec_from_shortcuts
+    from debug_gym.gym.terminals.kubernetes import _build_pod_spec_from_shortcuts
 
     with pytest.raises(ValueError, match="Unknown affinity_mode 'invalid'"):
         _build_pod_spec_from_shortcuts(affinity_mode="invalid")
@@ -402,8 +397,7 @@ def test_build_pod_spec_from_shortcuts_invalid_affinity_mode():
 
 def test_build_pod_spec_from_shortcuts_invalid_tolerations_preset():
     """Test that invalid tolerations_preset raises ValueError."""
-    from debug_gym.gym.terminals.kubernetes import \
-        _build_pod_spec_from_shortcuts
+    from debug_gym.gym.terminals.kubernetes import _build_pod_spec_from_shortcuts
 
     with pytest.raises(ValueError, match="Unknown tolerations_preset 'invalid'"):
         _build_pod_spec_from_shortcuts(tolerations_preset="invalid")
@@ -436,9 +430,9 @@ def test_deep_merge_dicts():
 
 @patch("debug_gym.gym.terminals.kubernetes.config.load_kube_config")
 @patch("debug_gym.gym.terminals.kubernetes.client.CoreV1Api")
-def test_kubernetes_terminal_with_affinity_mode(mock_api, mock_config):
+def test_kubernetes_terminal_with_affinity_mode(mock_api, mock_config, monkeypatch):
     """Test KubernetesTerminal initialization with affinity_mode shortcut."""
-    os.environ["MY_NODE"] = "test-node-1"
+    monkeypatch.setenv("MY_NODE", "test-node-1")
     terminal = KubernetesTerminal(
         base_image="ubuntu:latest",
         affinity_mode="same_host",

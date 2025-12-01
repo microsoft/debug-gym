@@ -11,8 +11,12 @@ from jinja2 import Template
 from kubernetes import client, config, stream, watch
 from kubernetes.client.rest import ApiException
 from kubernetes.stream.ws_client import ERROR_CHANNEL
-from tenacity import (retry, retry_if_exception_type, stop_after_attempt,
-                      wait_random_exponential)
+from tenacity import (
+    retry,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_random_exponential,
+)
 from yaml import dump, safe_load
 
 from debug_gym.gym.terminals.shell_session import ShellSession
@@ -49,7 +53,8 @@ AFFINITY_PRESETS = {
                             {
                                 "key": "kubernetes.io/hostname",
                                 "operator": "In",
-                                "values": [f"{{{{{hostname_key}}}}}"],
+                                # Use Jinja2 template syntax: {{HOSTNAME}} -> value from env var
+                                "values": ["{{" + hostname_key + "}}"],
                             }
                         ]
                     }
