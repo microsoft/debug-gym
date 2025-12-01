@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from debug_gym.gym.envs.env import RepoEnv
+from debug_gym.gym.envs.local import LocalEnv
 from debug_gym.gym.tools.rewrite import RewriteTool
 
 
@@ -23,7 +23,7 @@ def env(tmp_path):
     with open(repo_path / "test.py", "w") as f:
         f.write(file_content)
 
-    env = RepoEnv(path=repo_path)
+    env = LocalEnv(path=repo_path)
 
     rewrite_tool = RewriteTool()
     env.add_tool(rewrite_tool)

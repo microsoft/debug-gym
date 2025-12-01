@@ -37,8 +37,10 @@ def setup_aider_repo(tmp_path_factory):
 @pytest.fixture
 def env(setup_aider_repo):
     terminal = LocalTerminal()
-    env = AiderBenchmarkEnv(terminal=terminal)
-    env.reset(options={"task_name": "clock"})
+    dataset = AiderBenchmarkEnv.load_dataset()
+    task_data = dataset["clock"]
+    env = AiderBenchmarkEnv(task_data=task_data, terminal=terminal)
+    env.reset()
     return env
 
 
@@ -103,13 +105,15 @@ def test_instructions(env):
 
 @patch("debug_gym.gym.envs.aider.build_docker_image")
 def test_build_docker_image(mock_build_docker_image):
-    AiderBenchmarkEnv()
+    dataset = AiderBenchmarkEnv.load_dataset()
     mock_build_docker_image.assert_called_once()
 
 
 @pytest.if_docker_running
 def test_reset_with_docker_terminal(setup_aider_repo):
-    env = AiderBenchmarkEnv()
+    dataset = AiderBenchmarkEnv.load_dataset()
+    task_data = dataset["clock"]
+    env = AiderBenchmarkEnv(task_data=task_data)
     env.add_tool(Toolbox.get_tool("eval"))
     assert isinstance(env.terminal, DockerTerminal)
 
