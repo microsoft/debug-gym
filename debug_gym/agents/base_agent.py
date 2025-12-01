@@ -239,6 +239,33 @@ class BaseAgent:
         messages.append(self.build_system_prompt(info))
         messages.append(self.build_instance_prompt(info))
         messages.extend(self.build_history_prompt())
+
+        if self.args.max_history_steps_cutoff:
+            # keep at most max_history_steps_cutoff history messages including the first 2 messages (system and instance prompts)
+            if len(messages) > self.args.max_history_steps_cutoff + 2:
+                messages = (
+                    messages[:2] + messages[-(self.args.max_history_steps_cutoff) :]
+                )
+
+        if self.args.max_history_token_cutoff:
+            first_two = messages[:2]
+            remaining = messages[2:]
+
+            # Calculate tokens for the first two messages
+            first_two_tokens = sum(self.llm.count_tokens(msg) for msg in first_two)
+            available_tokens = self.args.max_history_token_cutoff - first_two_tokens
+
+            # Add messages from the end until we exceed the token limit
+            kept_messages = []
+            current_tokens = 0
+            for msg in reversed(remaining):
+                msg_tokens = self.llm.count_tokens(msg)
+                if current_tokens + msg_tokens <= available_tokens:
+                    kept_messages.insert(0, msg)
+                    current_tokens += msg_tokens
+                else:
+                    break
+            messages = first_two + kept_messages
         return messages
 
     def should_stop(self, step: int, info: EnvInfo):
