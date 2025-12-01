@@ -18,12 +18,32 @@ class BaseConfig:
     This class defines the structure and defaults for configuration options.
     It can be used with or without a YAML config file - all values can be
     specified via command line arguments.
+
+    Attributes:
+        output_path: Path for experiment outputs.
+        benchmark: Name of the benchmark to run (e.g., 'aider', 'mini_nightmare').
+        problems: Either "all" to run all problems, or a list of specific problem names.
+        env_kwargs: Additional keyword arguments passed to the environment.
+        terminal: Terminal configuration dict with 'type' key ('local', 'docker', 'kubernetes').
+        tools: List of tool names or tool config dicts to enable.
+        llm_name: Name/identifier of the LLM to use.
+        llm_config_file_path: Path to LLM configuration file.
+        agent_type: Type of agent to use (e.g., 'rewrite_agent', 'debug_agent').
+        random_seed: Random seed for reproducibility.
+        max_steps: Maximum number of steps per problem.
+        max_rewrite_steps: Maximum number of rewrite steps allowed.
+        memory_size: Size of the agent's memory/history buffer.
+        save_patch: Whether to save the final patch after solving.
+        reset_prompt_history_after_rewrite: Whether to reset prompt history after rewrites.
+        system_prompt_template_file: Path to custom system prompt Jinja template.
+        show_current_breakpoints: Whether to show breakpoints in system prompt.
+        show_directory_tree: Depth of directory tree to show (0 = disabled).
     """
 
     # Environment configs
     output_path: str = "exps/default"
     benchmark: str | None = None
-    problems: str | list[str] = "all"
+    problems: str | list[str] = "all"  # "all" or list of problem names
     env_kwargs: dict[str, Any] = field(default_factory=dict)
     terminal: dict[str, Any] = field(default_factory=lambda: {"type": "local"})
     tools: list[str | dict] = field(
@@ -218,13 +238,16 @@ def load_config():
     )
     config_group.add_argument(
         "--save-patch",
-        action="store_true",
+        action="store_const",
+        const=True,
         default=None,
         help="Save patch after solving",
     )
     config_group.add_argument(
         "--no-save-patch",
-        action="store_true",
+        dest="save_patch",
+        action="store_const",
+        const=False,
         help="Do not save patch after solving",
     )
     config_group.add_argument(
@@ -337,9 +360,7 @@ def _apply_cli_overrides(config: dict[str, Any], args: argparse.Namespace) -> di
     if args.memory_size is not None:
         config["memory_size"] = args.memory_size
 
-    if args.no_save_patch:
-        config["save_patch"] = False
-    elif args.save_patch is not None:
+    if args.save_patch is not None:
         config["save_patch"] = args.save_patch
 
     if args.terminal_type is not None:
