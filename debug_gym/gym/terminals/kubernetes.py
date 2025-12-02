@@ -382,13 +382,32 @@ class KubernetesTerminal(Terminal):
         except Exception as exc:  # noqa: BLE001 - diagnostics only
             self.logger.debug(f"{self._pod} status check failed: {exc}")
 
-        self.logger.warning(f"{self._pod} not running; recreating pod.")
+        self.logger.debug(f"{self._pod} not running anymore.")
+
+        # Check logs and describe for diagnostics
+        try:
+            pod_logs = self.k8s_client.read_namespaced_pod_log(
+                name=self._pod.name, namespace=self._pod.namespace
+            )
+            pod_description = self.k8s_client.read_namespaced_pod(
+                name=self._pod.name, namespace=self._pod.namespace
+            )
+            self.logger.debug(
+                f"[{self._pod.name}] Pod logs before failure:\n{pod_logs}\n"
+                f"Pod description before failure:\n{pod_description}"
+            )
+        except Exception as log_exc:
+            self.logger.debug(
+                f"[{self._pod.name}] Failed to get pod logs/description: {log_exc}"
+            )
+
+        self.logger.debug(f"Cleaning up {self._pod} after failure.")
         try:
             self._pod.clean_up()
         except Exception as exc:  # noqa: BLE001 - best-effort cleanup
             self.logger.debug(f"Failed to clean up {self._pod}: {exc}")
-        self._pod = None
-        self.setup_pod()
+
+        raise RuntimeError("Pod is not running anymore.")
 
     def new_shell_session(self):
         self._ensure_pod_running()
@@ -473,8 +492,25 @@ class KubernetesTerminal(Terminal):
             except ApiException as e:
                 success = False
                 self.logger.debug(
-                    f"[{self.pod.name}] Exception during command execution: {e}"
+                    f"[{self.pod.name}] Exception during command `{command}`: {e}"
                 )
+                # Get kubectl logs and describe for diagnostics
+                try:
+                    pod_logs = self.k8s_client.read_namespaced_pod_log(
+                        name=self.pod.name, namespace=self.pod.namespace
+                    )
+                    pod_description = self.k8s_client.read_namespaced_pod(
+                        name=self.pod.name, namespace=self.pod.namespace
+                    )
+                    self.logger.debug(
+                        f"[{self.pod.name}] Pod logs:\n{pod_logs}\n"
+                        f"Pod description:\n{pod_description}"
+                    )
+                except Exception as log_exc:
+                    self.logger.debug(
+                        f"[{self.pod.name}] Failed to get pod logs/description: {log_exc}"
+                    )
+
                 output = f"Command execution failed: {str(e)}"
                 backoff = random.uniform(5, 10)  # seconds
                 time.sleep(backoff)
