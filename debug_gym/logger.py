@@ -540,7 +540,7 @@ class DebugGymLogger(logging.Logger):
         # Prevent the log messages from being propagated to the root logger
         self.propagate = False
 
-        self.setLevel(level)  # Set logger level, might be overridden by file handler
+        super().setLevel(level)  # Set initial logger level
 
         # Placeholders for rich live, log listener thread, and stop event
         # Will be initialized if the logger is the main process logger
@@ -548,6 +548,7 @@ class DebugGymLogger(logging.Logger):
         self.no_live = False  # Flag to disable live updates
         self._log_listener_stop_event = None  # Event to stop the log listener thread
         self._log_listener_thread = None  # Thread to process logs from workers
+        self._rich_handler = None  # Handler for Rich console output
         if self.is_main():
             self._initialize_main_logger(level)
         self.log_file = None  # File handler for logging to a file
@@ -559,15 +560,17 @@ class DebugGymLogger(logging.Logger):
 
     def _initialize_main_logger(self, level):
         self._live = Live(transient=True, refresh_per_second=2)
-        rich_handler = RichHandler(
+        self._rich_handler = RichHandler(
             console=self._live.console,
             show_time=False,
             rich_tracebacks=True,
             markup=False,
         )
-        rich_handler.setFormatter(logging.Formatter("🐸 [%(name)-12s]: %(message)s"))
-        rich_handler.setLevel(level)
-        self.addHandler(rich_handler)
+        self._rich_handler.setFormatter(
+            logging.Formatter("🐸 [%(name)-12s]: %(message)s")
+        )
+        self._rich_handler.setLevel(level)
+        self.addHandler(self._rich_handler)
 
         # Start log listener thread
         self._log_listener_stop_event = threading.Event()
@@ -577,7 +580,7 @@ class DebugGymLogger(logging.Logger):
         self._log_listener_thread.start()
 
     def _initialize_file_handler(self, name: str, mode: str):
-        self.setLevel(logging.DEBUG)  # Ensure logger operates at DEBUG level
+        super().setLevel(logging.DEBUG)  # Ensure logger operates at DEBUG level
         self.log_file = log_file_path(self.log_dir, "debug_gym")
         fh = logging.FileHandler(self.log_file, mode=mode)
         formatter = StripAnsiFormatter("%(asctime)s %(levelname)-8s %(message)s")
@@ -617,6 +620,20 @@ class DebugGymLogger(logging.Logger):
 
     def __del__(self):
         self.close()
+
+    def setLevel(self, level: int | str) -> None:
+        """Set the logging level.
+
+        When a file handler is configured, the logger's internal level remains at
+        DEBUG to ensure all messages are saved to the log file. This method only
+        changes the level of the rich_handler (console output), allowing users to
+        control what is displayed to stdout without affecting the file logs.
+        """
+        if self._rich_handler is not None:
+            self._rich_handler.setLevel(level)
+        else:
+            # Fallback for when rich_handler is not initialized (e.g., worker process)
+            super().setLevel(level)
 
     def set_no_live(self):
         """Set the logger to not use the Rich Live display."""
