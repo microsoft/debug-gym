@@ -185,10 +185,24 @@ class OpenAILLM(LLM):
                 name="empty_tool_response",
                 arguments={},
             )
+        raw_arguments = response.function.arguments if response.function else "{}"
+        try:
+            parsed_arguments = json.loads(raw_arguments)
+            if not isinstance(parsed_arguments, dict):
+                raise ValueError("Tool arguments must decode to a JSON object")
+        except (json.JSONDecodeError, TypeError, ValueError) as exc:
+            snippet = (raw_arguments or "")[:2000]
+            self.logger.warning(
+                "Failed to decode tool call arguments as JSON (%s)."
+                " Falling back to empty arguments. Snippet: %s",
+                exc,
+                snippet,
+            )
+            parsed_arguments = {}
         return ToolCall(
             id=response.id,
             name=response.function.name,
-            arguments=json.loads(response.function.arguments),
+            arguments=parsed_arguments,
         )
 
     def format_tool_call_history(
