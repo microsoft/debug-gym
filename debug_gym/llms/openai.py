@@ -94,6 +94,7 @@ class OpenAILLM(LLM):
             "openai.APIError",
             "openai.APIConnectionError",
             "openai.RateLimitError",
+            "openai.InternalServerError",
             "openai.PermissionDeniedError",
             "openai.BadRequestError",
             # Add more as needed
