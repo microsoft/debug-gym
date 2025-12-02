@@ -1,4 +1,5 @@
 import json
+import logging
 import re
 from importlib.resources import files as importlib_files
 from pathlib import Path
@@ -15,6 +16,8 @@ from debug_gym.gym.terminals.kubernetes import KubernetesTerminal
 from debug_gym.gym.terminals.terminal import Terminal
 from debug_gym.gym.utils import filter_problems
 from debug_gym.logger import DebugGymLogger
+
+main_logger = logging.getLogger(__name__)
 
 
 def decolor_dict_keys(key):
@@ -262,8 +265,13 @@ class R2EGymEnv(RepoEnv):
         prepull_images: bool = False,
         logger: DebugGymLogger | None = None,
     ) -> dict:
+        main_logger.info(
+            f"Loading R2E-Gym dataset `{dataset_id}` (rev: {dataset_revision})..."
+        )
+
         logger = logger or DebugGymLogger("debug_gym")
         data_path = Path(dataset_id)
+
         if data_path.is_file():
             # Loading from local file.
             if data_path.suffix.lower() == ".json":
@@ -277,6 +285,7 @@ class R2EGymEnv(RepoEnv):
             # Loading from HuggingFace or a folder.
             ds = load_dataset(dataset_id, revision=dataset_revision)
 
+        main_logger.info("Dataset loaded.")
         # Select the split.
         ds = ds[split]
 
@@ -285,19 +294,19 @@ class R2EGymEnv(RepoEnv):
             custom_splits = yaml.safe_load(f)
             excluded_ids = custom_splits.get("excluded", [])
 
-        # add instance id to each example (name of the image)
         def extract_instance_id(docker_image: str) -> str:
             return docker_image.split("/", 1)[-1]
 
-        # create a column "instance_id" in the dataset
-        dataset = {}
-        for example in ds:
-            instance_id = extract_instance_id(example["docker_image"])
-            example["instance_id"] = instance_id
-            dataset[instance_id] = example
-
+        dataset = {
+            extract_instance_id(docker_image): i
+            for i, docker_image in enumerate(ds["docker_image"])
+        }
         problems = filter_problems(dataset, problems, custom_splits, excluded_ids)
-        dataset = {pid: dataset[pid] for pid in problems}
+        dataset = {problem: ds[dataset[problem]] for problem in problems}
+
+        # add instance id to each example (name of the image)
+        for instance_id in dataset:
+            dataset[instance_id]["instance_id"] = instance_id
 
         image_names = set(example["docker_image"] for example in dataset.values())
         logger.debug(

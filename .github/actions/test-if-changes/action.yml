@@ -45,7 +45,7 @@ runs:
         DEBUG_GYM_DEBUG: 1
       shell: bash
       run: |
-        pytest ${{ inputs.test-files }} -vv -n 4 --timeout=600 --cov=debug_gym --cov-report=term-missing
+        pytest ${{ inputs.test-files }} -vv -n 16 --timeout=600 --cov=debug_gym --cov-report=term-missing
     - name: Store coverage report
       uses: actions/upload-artifact@v4
       with:
