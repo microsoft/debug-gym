@@ -25,8 +25,6 @@ BUILD_ENV_CONFIGS = {
     },
 }
 
-logger = logging.getLogger(__name__)
-
 
 def make_env_factory(env_name, worker_id, tmp_path_factory):
     """Build the `env_name`'s docker image only once."""
@@ -35,19 +33,15 @@ def make_env_factory(env_name, worker_id, tmp_path_factory):
     env_class = kwargs.pop("env_class")
 
     def _make_env():
-        logger.info("\n**Calling load_dataset.**\n")
         dataset = env_class.load_dataset(
             problems=kwargs["problems"], prepull_images=True
         )
         task_data = next(iter(dataset.values()))
-        logger.info(f"\n**Creating env.** {env_class}\n")
         env = env_class(task_data=task_data)
-        logger.info("\n**Done.**\n")
         return env
 
     if worker_id == "master":
         # Not running with pytest-xdist or we are in the master process
-        logger.warning("Environment initialized in master process.")
         _make_env()
     else:
         # When running with pytest-xdist, synchronize between workers using a lock
@@ -55,7 +49,6 @@ def make_env_factory(env_name, worker_id, tmp_path_factory):
         lock_file = root_tmp_dir / f"{env_class.__name__}_init.lock"
         with FileLock(str(lock_file)):
             # Only the first worker to acquire the lock will initialize the environment
-            logger.warning(f"Environment running in worker {worker_id}.")
             _make_env()
 
     return _make_env

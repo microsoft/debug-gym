@@ -177,11 +177,12 @@ class SWESmithEnv(SWEBenchEnv):
             custom_splits = yaml.safe_load(f)
             excluded_ids = custom_splits.get("excluded", [])
 
-        dataset = {d["instance_id"]: d for d in ds}
-        problems = filter_problems(dataset, problems, custom_splits, excluded_ids)
-        dataset = {pid: dataset[pid] for pid in problems}
+        # Memory efficient filtering of problems.
+        id2idx = {id: i for i, id in enumerate(ds["instance_id"])}
+        problems = filter_problems(id2idx, problems, custom_splits, excluded_ids)
+        dataset = {problem: ds[id2idx[problem]] for problem in problems}
 
-        image_names = set([problem["image_name"] for problem in dataset.values()])
+        image_names = set(task_data["image_name"] for task_data in dataset.values())
         logger.debug(
             f"Loaded {len(dataset)} tasks across {len(image_names)} Docker images from {dataset_id}."
         )

@@ -17,8 +17,6 @@ from debug_gym.gym.terminals.terminal import Terminal
 from debug_gym.gym.utils import filter_problems
 from debug_gym.logger import DebugGymLogger
 
-main_logger = logging.getLogger(__name__)
-
 
 def decolor_dict_keys(key):
     """Remove ANSI escape codes"""
@@ -265,10 +263,6 @@ class R2EGymEnv(RepoEnv):
         prepull_images: bool = False,
         logger: DebugGymLogger | None = None,
     ) -> dict:
-        main_logger.info(
-            f"Loading R2E-Gym dataset `{dataset_id}` (rev: {dataset_revision})..."
-        )
-
         logger = logger or DebugGymLogger("debug_gym")
         data_path = Path(dataset_id)
 
@@ -285,7 +279,6 @@ class R2EGymEnv(RepoEnv):
             # Loading from HuggingFace or a folder.
             ds = load_dataset(dataset_id, revision=dataset_revision)
 
-        main_logger.info("Dataset loaded.")
         # Select the split.
         ds = ds[split]
 
@@ -297,18 +290,18 @@ class R2EGymEnv(RepoEnv):
         def extract_instance_id(docker_image: str) -> str:
             return docker_image.split("/", 1)[-1]
 
-        dataset = {
+        id2idx = {
             extract_instance_id(docker_image): i
             for i, docker_image in enumerate(ds["docker_image"])
         }
-        problems = filter_problems(dataset, problems, custom_splits, excluded_ids)
-        dataset = {problem: ds[dataset[problem]] for problem in problems}
+        problems = filter_problems(id2idx, problems, custom_splits, excluded_ids)
+        dataset = {problem: ds[id2idx[problem]] for problem in problems}
 
         # add instance id to each example (name of the image)
-        for instance_id in dataset:
-            dataset[instance_id]["instance_id"] = instance_id
+        for instance_id, task_data in dataset.items():
+            task_data["instance_id"] = instance_id
 
-        image_names = set(example["docker_image"] for example in dataset.values())
+        image_names = set(task_data["docker_image"] for task_data in dataset.values())
         logger.debug(
             f"Loaded {len(dataset)} tasks across {len(image_names)} Docker images from {dataset_id}."
         )

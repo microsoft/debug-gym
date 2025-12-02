@@ -185,12 +185,13 @@ class SWEBenchEnv(RepoEnv):
     ) -> dict:
         ds = datasets.load_dataset(dataset_id, revision=dataset_revision)[split]
 
-        dataset = {problem["instance_id"]: problem for problem in ds}
-        problems = filter_problems(dataset, problems)
-        dataset = {id: i for id, i in dataset.items() if id in problems}
+        # Memory efficient filtering of problems.
+        id2idx = {id: i for i, id in enumerate(ds["instance_id"])}
+        problems = filter_problems(id2idx, problems)
+        dataset = {problem: ds[id2idx[problem]] for problem in problems}
 
         image_names = set(
-            f"sweb.eval.x86_64.{id.replace('__', '_1776_')}" for id in problems
+            f"sweb.eval.x86_64.{id.replace('__', '_1776_')}" for id in dataset
         )
 
         if prepull_images:
