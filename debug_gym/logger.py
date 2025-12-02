@@ -622,12 +622,16 @@ class DebugGymLogger(logging.Logger):
         self.close()
 
     def setLevel(self, level: int | str) -> None:
-        """Set the logging level.
+        """Set the logging level for console output.
 
         When a file handler is configured, the logger's internal level remains at
         DEBUG to ensure all messages are saved to the log file. This method only
         changes the level of the rich_handler (console output), allowing users to
         control what is displayed to stdout without affecting the file logs.
+
+        Args:
+            level: The logging level to set. Can be an integer (e.g., logging.INFO,
+                logging.DEBUG) or a string (e.g., 'INFO', 'DEBUG').
         """
         if self._rich_handler is not None:
             self._rich_handler.setLevel(level)
