@@ -11,10 +11,7 @@ from pathlib import Path
 from debug_gym import version as dg_version
 from debug_gym.agents.base_agent import AGENT_REGISTRY, AgentArgs, create_agent
 from debug_gym.agents.utils import load_config, save_patch, save_trajectory
-from debug_gym.gym.envs import select_env
-from debug_gym.gym.envs.r2egym import load_r2egym_dataset
-from debug_gym.gym.envs.swe_bench import load_swebench_dataset
-from debug_gym.gym.envs.swe_smith import load_swesmith_dataset
+from debug_gym.gym.envs import load_dataset, select_env
 from debug_gym.gym.terminals import select_terminal
 from debug_gym.gym.tools.toolbox import Toolbox
 from debug_gym.llms.base import LLM
@@ -181,7 +178,7 @@ def run_agent(args, task_name: str, task_data: dict, config: dict):
 
 def create_env(config: dict, task_data: dict, logger: DebugGymLogger):
     terminal = select_terminal(config.get("terminal"), logger, uuid=config["uuid"])
-    env_class = select_env(config.get("benchmark"))
+    env_class = select_env(task_data["env_type"])
     env = env_class(
         task_data=task_data,
         terminal=terminal,
@@ -250,14 +247,8 @@ def main():
     logger.info(f"Experiment log path: {exp_output_path}")
     dump_experiment_info(config, args)
 
-    # Create the environment to get the list of problems to run.
-    dataset_info = {
-        "dataset_id": config.get("env", {}).get("dataset_id"),
-        "dataset_revision": config.get("env", {}).get("dataset_revision"),
-        "problems": config.get("problems", "all"),
-        "prepull_images": config.get("env", {}).get("prepull_images", False),
-    }
-    dataset = select_env(config.get("benchmark")).load_dataset(**dataset_info)
+    # Load the dataset based on the information found in the config.
+    dataset = load_dataset(config["dataset"], logger=logger)
     problems = sorted(dataset)
 
     if args.list:

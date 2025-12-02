@@ -138,6 +138,7 @@ class AiderBenchmarkEnv(RepoEnv):
         problems: str | list[str] | None = None,
         build_image: bool = True,
         logger: object = None,
+        **kwargs,
     ) -> dict:
         if build_image:
             build_docker_image(logger)
@@ -184,4 +185,9 @@ class AiderBenchmarkEnv(RepoEnv):
 
         problems = utils.filter_problems(dataset, problems)
         dataset = {id: data for id, data in dataset.items() if id in problems}
+
+        # Add env_type to each task_data.
+        for task_data in dataset.values():
+            task_data["env_type"] = "aider"
+
         return dataset

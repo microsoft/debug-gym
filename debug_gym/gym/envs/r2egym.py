@@ -262,6 +262,7 @@ class R2EGymEnv(RepoEnv):
         problems: list | None = None,
         prepull_images: bool = False,
         logger: DebugGymLogger | None = None,
+        **kwargs,
     ) -> dict:
         logger = logger or DebugGymLogger("debug_gym")
         data_path = Path(dataset_id)
@@ -297,9 +298,10 @@ class R2EGymEnv(RepoEnv):
         problems = filter_problems(id2idx, problems, custom_splits, excluded_ids)
         dataset = {problem: ds[id2idx[problem]] for problem in problems}
 
-        # add instance id to each example (name of the image)
+        # Add instance_id (name of the image) and env_type to each task_data.
         for instance_id, task_data in dataset.items():
             task_data["instance_id"] = instance_id
+            task_data["env_type"] = "r2egym"
 
         image_names = set(task_data["docker_image"] for task_data in dataset.values())
         logger.debug(

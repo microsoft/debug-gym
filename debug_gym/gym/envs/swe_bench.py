@@ -182,6 +182,7 @@ class SWEBenchEnv(RepoEnv):
         problems: list | None = None,
         prepull_images: bool = False,
         logger: DebugGymLogger | None = None,
+        **kwargs,
     ) -> dict:
         ds = datasets.load_dataset(dataset_id, revision=dataset_revision)[split]
 
@@ -189,6 +190,10 @@ class SWEBenchEnv(RepoEnv):
         id2idx = {id: i for i, id in enumerate(ds["instance_id"])}
         problems = filter_problems(id2idx, problems)
         dataset = {problem: ds[id2idx[problem]] for problem in problems}
+
+        # Add env_type to each task_data.
+        for task_data in dataset.values():
+            task_data["env_type"] = "swebench"
 
         image_names = set(
             f"sweb.eval.x86_64.{id.replace('__', '_1776_')}" for id in dataset

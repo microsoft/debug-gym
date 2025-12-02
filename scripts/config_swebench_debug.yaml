@@ -1,16 +1,18 @@
 base:
     # Environment configs
-    output_path: "exps/mini_nightmare"
+    output_path: "exps/swebench-verified-debugmode"
 
     env:
-        run_timeout: 30
-
-    terminal:
-        type: "docker"  # "docker", "kubernetes", or "local"
+        run_timeout: 300
 
     dataset:
-        type: "mini_nightmare"
-        problems: "all"  # list of problems, e.g., ["config"], or "all"
+        type: "swebench-debug"
+        problems: "all"  # list of problems, e.g., ["astropy__astropy-12907"], or "all"
+        dataset_id: "SWE-bench/SWE-bench_Verified"
+        dataset_revision: "99450355ca8c611021187a57ffac304b66666738"
+
+    terminal:
+        type: "docker"  # "docker" or "kubernetes"
 
     # LLM configs
     llm_name: "gpt-4o"
@@ -34,6 +36,7 @@ rewrite_agent:
         - grep
         - view
         - rewrite
+        - listdir
         - eval:
             auto_eval_on_rewrite: False  # If True, the environment will automatically call the Eval tool after a successful rewrite. If this is set to True, the agent does not need to call the Eval tool itself.
 
@@ -43,6 +46,7 @@ debug_agent:
         - pdb
         - view
         - rewrite
+        - listdir
         - eval
 
 debug_5_agent:
@@ -52,4 +56,12 @@ debug_5_agent:
         - pdb
         - view
         - rewrite
+        - listdir
         - eval
+
+solution_agent:
+    llm_name: null  # No need for an LLM.
+    tools:
+        - eval
+        - pdb
+        - submit

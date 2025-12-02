@@ -6,12 +6,11 @@ from debug_gym.gym.envs.r2egym import R2EGymEnv
 from debug_gym.gym.envs.swe_bench import SWEBenchEnv
 from debug_gym.gym.envs.swe_bench_debug import SWEBenchDebugEnv
 from debug_gym.gym.envs.swe_smith import SWESmithEnv
+from debug_gym.logger import DebugGymLogger
 
 
 def select_env(env_type: str = None) -> type[RepoEnv]:
     match env_type:
-        case None:
-            return RepoEnv
         case "local":
             return LocalEnv
         case "aider":
@@ -27,4 +26,20 @@ def select_env(env_type: str = None) -> type[RepoEnv]:
         case "r2egym":
             return R2EGymEnv
         case _:
-            raise ValueError(f"Unknown benchmark {env_type}")
+            raise ValueError(f"Unknown environment {env_type}")
+
+
+def load_dataset(config: dict, logger: DebugGymLogger | None = None) -> dict:
+    """Load dataset based on the given config."""
+    if config.get("type") is None:
+        raise ValueError("Dataset config must specify 'type' field.")
+
+    try:
+        env = select_env(config.get("type"))
+    except ValueError as e:
+        raise ValueError(
+            f"Unknown environment type '{config.get('type')}' from dataset's config: {config}"
+        )
+
+    dataset = env.load_dataset(logger=logger, **config)
+    return dataset

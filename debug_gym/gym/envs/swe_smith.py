@@ -153,6 +153,7 @@ class SWESmithEnv(SWEBenchEnv):
         problems: list | None = None,
         prepull_images: bool = False,
         logger: DebugGymLogger | None = None,
+        **kwargs,
     ) -> dict:
         logger = logger or DebugGymLogger("debug_gym")
         data_path = Path(dataset_id)
@@ -181,6 +182,10 @@ class SWESmithEnv(SWEBenchEnv):
         id2idx = {id: i for i, id in enumerate(ds["instance_id"])}
         problems = filter_problems(id2idx, problems, custom_splits, excluded_ids)
         dataset = {problem: ds[id2idx[problem]] for problem in problems}
+
+        # Add env_type to each task_data.
+        for task_data in dataset.values():
+            task_data["env_type"] = "swesmith"
 
         image_names = set(task_data["image_name"] for task_data in dataset.values())
         logger.debug(

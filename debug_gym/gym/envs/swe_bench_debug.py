@@ -15,3 +15,13 @@ class SWEBenchDebugEnv(SWEBenchEnv):
         success, output = self.terminal.run(self.entrypoint, timeout=self.run_timeout)
         self.last_eval = EvalOutput(success, output)
         return self.last_eval
+
+    @classmethod
+    def load_dataset(*args, **kwargs) -> dict:
+        dataset = SWEBenchEnv.load_dataset(*args, **kwargs)
+
+        # Add env_type to each task_data.
+        for task_data in dataset.values():
+            task_data["env_type"] = "swebench-debug"
+
+        return dataset
