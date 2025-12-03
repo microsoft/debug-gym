@@ -154,3 +154,37 @@ def test_select_terminal_unknown():
 def test_select_terminal_invalid_config():
     with pytest.raises(TypeError):
         select_terminal("not a dict")
+
+
+def test_select_terminal_kubernetes_extra_labels(monkeypatch):
+    captured = {}
+
+    class DummyK8s:
+        def __init__(self, **kwargs):
+            captured.update(kwargs)
+
+    monkeypatch.setattr(
+        "debug_gym.gym.terminals.KubernetesTerminal",
+        DummyK8s,
+    )
+
+    config = {
+        "type": "kubernetes",
+        "namespace": "example",
+        "extra_labels": {"foo": "bar"},
+        "pod_spec_kwargs": {"tolerations": []},
+    }
+
+    terminal = select_terminal(config, uuid="1234")
+
+    assert isinstance(terminal, DummyK8s)
+    assert captured["namespace"] == "example"
+    assert captured["pod_spec_kwargs"] == {"tolerations": []}
+    assert captured["extra_labels"] == {"foo": "bar", "uuid": "1234"}
+    assert "logger" in captured
+    assert config == {
+        "type": "kubernetes",
+        "namespace": "example",
+        "extra_labels": {"foo": "bar"},
+        "pod_spec_kwargs": {"tolerations": []},
+    }

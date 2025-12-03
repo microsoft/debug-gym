@@ -370,9 +370,47 @@ class KubernetesTerminal(Terminal):
         bash_cmd = "/bin/bash --noprofile --norc --noediting"
         return f"kubectl {kubeconfig}exec -it {self.pod.name} -c main -n {self.pod.namespace} -- {bash_cmd}"
 
+    def _ensure_pod_running(self) -> None:
+        """Ensure the backing pod exists and is in Running phase."""
+        if self._pod is None:
+            self.setup_pod()
+            return
+
+        try:
+            if self._pod.is_running():
+                return
+        except Exception as exc:  # noqa: BLE001 - diagnostics only
+            self.logger.debug(f"{self._pod} status check failed: {exc}")
+
+        self.logger.debug(f"{self._pod} not running anymore.")
+
+        # Check logs and describe for diagnostics
+        try:
+            pod_logs = self.k8s_client.read_namespaced_pod_log(
+                name=self._pod.name, namespace=self._pod.namespace
+            )
+            pod_description = self.k8s_client.read_namespaced_pod(
+                name=self._pod.name, namespace=self._pod.namespace
+            )
+            self.logger.debug(
+                f"[{self._pod.name}] Pod logs before failure:\n{pod_logs}\n"
+                f"Pod description before failure:\n{pod_description}"
+            )
+        except Exception as log_exc:
+            self.logger.debug(
+                f"[{self._pod.name}] Failed to get pod logs/description: {log_exc}"
+            )
+
+        self.logger.debug(f"Cleaning up {self._pod} after failure.")
+        try:
+            self._pod.clean_up()
+        except Exception as exc:  # noqa: BLE001 - best-effort cleanup
+            self.logger.debug(f"Failed to clean up {self._pod}: {exc}")
+
+        raise RuntimeError("Pod is not running anymore.")
+
     def new_shell_session(self):
-        if not self.pod.is_running():
-            raise ValueError("Pod is not running. Cannot create shell session.")
+        self._ensure_pod_running()
 
         session = ShellSession(
             shell_command=self.default_shell_command,
@@ -416,8 +454,7 @@ class KubernetesTerminal(Terminal):
         strip_output: bool = True,
     ) -> tuple[bool, str]:
         """Run a command in the pod. Return command status and output."""
-        if not self.pod.is_running():
-            raise ValueError("Pod is not running. Cannot run commands.")
+        self._ensure_pod_running()
 
         command = self.prepare_command(entrypoint)
 
@@ -455,8 +492,25 @@ class KubernetesTerminal(Terminal):
             except ApiException as e:
                 success = False
                 self.logger.debug(
-                    f"[{self.pod.name}] Exception during command execution: {e}"
+                    f"[{self.pod.name}] Exception during command `{command}`: {e}"
                 )
+                # Get kubectl logs and describe for diagnostics
+                try:
+                    pod_logs = self.k8s_client.read_namespaced_pod_log(
+                        name=self.pod.name, namespace=self.pod.namespace
+                    )
+                    pod_description = self.k8s_client.read_namespaced_pod(
+                        name=self.pod.name, namespace=self.pod.namespace
+                    )
+                    self.logger.debug(
+                        f"[{self.pod.name}] Pod logs:\n{pod_logs}\n"
+                        f"Pod description:\n{pod_description}"
+                    )
+                except Exception as log_exc:
+                    self.logger.debug(
+                        f"[{self.pod.name}] Failed to get pod logs/description: {log_exc}"
+                    )
+
                 output = f"Command execution failed: {str(e)}"
                 backoff = random.uniform(5, 10)  # seconds
                 time.sleep(backoff)

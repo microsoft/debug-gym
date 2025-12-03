@@ -23,7 +23,7 @@ def env(tmp_path):
     with open(repo_path / "test.py", "w") as f:
         f.write(file_content)
 
-    env = RepoEnv(path=repo_path)
+    env = RepoEnv(path=repo_path, dir_tree_depth=2)
 
     rewrite_tool = RewriteTool()
     env.add_tool(rewrite_tool)

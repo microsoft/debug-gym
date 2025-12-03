@@ -3,8 +3,6 @@ from unittest.mock import MagicMock, mock_open, patch
 
 import pytest
 
-from debug_gym.agents.base_agent import AgentArgs
-
 
 @pytest.fixture
 def open_data():
@@ -29,7 +27,7 @@ def agent_setup(tmp_path, open_data):
     def _length(text):
         return len(text)
 
-    def _agent_setup(agent_class):
+    def _agent_setup(agent_class, *, config_override=None):
         with (
             patch("tiktoken.encoding_for_model") as mock_encoding_for_model,
             patch("os.path.exists", return_value=True),
@@ -47,18 +45,19 @@ def agent_setup(tmp_path, open_data):
                 "n_rewrites_before_pdb": 2,
                 "reset_prompt_history_after_rewrite": False,
                 "memory_size": 10,
+                "output_path": str(tmp_path),
                 "random_seed": 42,
             }
+            if config_override:
+                config_dict.update(config_override)
             env = MagicMock()
-            env.task_name = "test_task"
             llm = MagicMock()
             llm.reasoning_end_token = None
             llm.context_length = 4096
             llm.count_tokens = _length
             llm.define_tools = lambda x: x
-            agent = agent_class(config_dict)
+            agent = agent_class(config_dict, env)
             agent.llm = llm
-            agent.env = env
             yield agent, env, llm
 
     return _agent_setup
