@@ -15,11 +15,8 @@ from swesmith.utils import get_repo_commit_from_image_name
 from debug_gym.constants import DEBUG_GYM_CACHE_DIR
 from debug_gym.gym.entities import EvalOutput
 from debug_gym.gym.envs.swe_bench import SWEBenchEnv
-from debug_gym.gym.terminals.terminal import DebugGymLogger, Terminal
+from debug_gym.gym.terminals.terminal import DebugGymLogger
 from debug_gym.gym.utils import filter_problems
-
-from .swe_smith_constants import DOCKER_ORG, MAP_REPO_TO_SPECS, TAG
-from .swe_smith_utils import get_repo_commit_from_image_name, get_test_command
 
 
 class SWESmithEnv(SWEBenchEnv):
@@ -111,7 +108,9 @@ class SWESmithEnv(SWEBenchEnv):
 
         # Apply bug patch.
         self.terminal.run(f"git apply - <<'EOF'\n{self.bug_patch}\nEOF", raises=True)
-        self.terminal.run(f"git commit -am 'Applying bug patch for {self.task_name}'")
+        self.terminal.run(
+            f"git commit -am 'Applying bug patch for {self.task_name}' --no-verify"
+        )
 
     def calculate_score(self, eval_output: EvalOutput) -> int:
         test_status_map = self.log_parser(eval_output.output)

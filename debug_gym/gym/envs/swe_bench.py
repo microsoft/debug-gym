@@ -62,10 +62,6 @@ class SWEBenchEnv(RepoEnv):
         self.entrypoint = " ".join([self.test_cmd, *self.test_directives])
 
         if self.package_name == "sphinx" or self.package_name == "sympy":
-            # use pytest instead of `sympy bin/test` and `sphinx tox` so pdb breakpoints work
-            expression = " ".join(self.test_directives)
-            self.entrypoint = f"python -m pytest {expression}"
-
             if self.entrypoint.startswith("PYTHONWARNINGS"):
                 # Move PYTHONWARNINGS from the entrypoint to the session commands
                 export, remaining = self.entrypoint.split(" ", 1)
@@ -85,6 +81,11 @@ class SWEBenchEnv(RepoEnv):
         # -s (capture=no) with pytest allows for debugging with pdb
         # -q (quiet) with pytest avoids long pytest output
         self.debug_entrypoint = self.entrypoint.replace("pytest", "pytest -sq")
+
+        if self.package_name == "sphinx" or self.package_name == "sympy":
+            # use pytest instead of `sympy bin/test` and `sphinx tox` so pdb breakpoints work
+            expression = " ".join(self.test_directives)
+            self.debug_entrypoint = f"python -m pytest {expression}"
 
         # --tb=short with pytest keeps the output concise
         self.entrypoint = self.entrypoint.replace("--tb=no", "--tb=short")
@@ -123,6 +124,8 @@ class SWEBenchEnv(RepoEnv):
             self.terminal.run('echo "127.0.0.1    httpbin.org" >> /etc/hosts')
         elif self.task_name == "pylint-dev__pylint-4661":
             self.terminal.run("pip install appdirs==1.4.4")
+        elif self.package_name == "sphinx" or self.package_name == "sympy":
+            self.terminal.run("pip install pytest")
 
         # Apply any changes needed to the install commands.
         self.terminal.run("git config user.name 'debug-gym'")

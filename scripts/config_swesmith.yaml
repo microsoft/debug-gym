@@ -1,43 +1,18 @@
 base:
     # Environment configs
     output_path: "exps/swesmith"
+
     env:
         # type: "swesmith"  # Not needed Will be inferred from dataset.
         run_timeout: 300
+
     dataset:
         type: "swesmith"
         dataset_id: "SWE-bench/SWE-smith"
         problems: "all"  # list of problems, e.g., ["astropy__astropy-12907"], or strings like "test-125" (defined in gym/envs/configs), or "all",
-    terminal: {
-        type: "docker",
-        # type: "kubernetes",
-        # registry: debuggymacr.azurecr.io,  # docker.io,
-        #kube_config: "incluster", # If "incluster", uses in-cluster config. Otherwise, path to kubeconfig file.
-        #kube_context: null,  # If null, uses the current context in the kubeconfig file.
-        namespace: "mtl-eval",
-        pod_spec_kwargs: {
-            tolerations: [
-                {
-                    "key": "node.kubernetes.io/disk-pressure",
-                    "operator": "Exists",
-                    "effect": "NoExecute",
-                    "tolerationSeconds": 10800
-                },
-                {
-                    key: "kubernetes.azure.com/scalesetpriority",
-                    operator: "Equal",
-                    value: "spot",
-                    effect: "NoSchedule",
-                },
-                {
-                    key: "CriticalAddonsOnly",
-                    operator: "Equal",
-                    value: "true",
-                    effect: "NoSchedule",
-                },
-            ]
-        }
-    }
+
+    terminal:
+        type: "docker"
 
     # LLM configs
     llm_name: "gpt-4o"
@@ -88,5 +63,5 @@ solution_agent:
     llm_name: null  # No need for an LLM.
     tools:
         - eval
-        - pdb
+        # - pdb
         - submit
