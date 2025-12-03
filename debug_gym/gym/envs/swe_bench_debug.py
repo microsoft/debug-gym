@@ -17,7 +17,7 @@ class SWEBenchDebugEnv(SWEBenchEnv):
         return self.last_eval
 
     @classmethod
-    def load_dataset(*args, **kwargs) -> dict:
+    def load_dataset(cls, *args, **kwargs) -> dict:
         dataset = SWEBenchEnv.load_dataset(*args, **kwargs)
 
         # Add env_type to each task_data.

@@ -108,6 +108,7 @@ def test_load_dataset(get_swe_bench_env):
     assert sorted(task_data.keys()) == sorted(
         [
             "repo",
+            "env_type",
             "instance_id",
             "base_commit",
             "patch",

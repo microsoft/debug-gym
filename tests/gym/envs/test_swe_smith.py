@@ -25,6 +25,7 @@ def test_load_dataset(get_swe_smith_env):
     assert sorted(task_data.keys()) == sorted(
         [
             "instance_id",
+            "env_type",
             "repo",
             "patch",
             "FAIL_TO_PASS",
@@ -65,6 +66,7 @@ def test_load_dataset_from_parquet(tmp_path):
     assert sorted(dataset_entry.keys()) == sorted(
         [
             "instance_id",
+            "env_type",
             "repo",
             "patch",
             "FAIL_TO_PASS",
@@ -248,6 +250,7 @@ def test_running_solution_agent(get_swe_smith_env, tmp_path):
         "memory_size": 8,
         "max_steps": 1,
         "max_rewrite_steps": 1,
+        "env": env,
     }
     for tool_name in ["pdb", "eval", "submit"]:
         env.add_tool(Toolbox.get_tool(tool_name))

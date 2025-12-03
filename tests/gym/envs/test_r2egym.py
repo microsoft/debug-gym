@@ -23,6 +23,7 @@ def test_load_dataset(get_r2egym_env):
     assert sorted(task_data.keys()) == sorted(
         [
             "commit_hash",
+            "env_type",
             "docker_image",
             "execution_result_content",
             "expected_output_json",
@@ -75,6 +76,7 @@ def test_load_dataset_from_parquet(tmp_path):
     assert sorted(dataset_entry) == sorted(
         [
             "commit_hash",
+            "env_type",
             "docker_image",
             "execution_result_content",
             "expected_output_json",
