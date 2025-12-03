@@ -25,7 +25,7 @@ class LocalEnv(RepoEnv):
 
     @property
     def instructions(self) -> str:
-        return f"Debug the local codebase at {self.path}. Investigate the repository, figure out the root cause, then rewrite the code to fix the issue."
+        return f"Investigate the current repository, run the tests to figure out any issues, then rewrite the code to fix them."
 
     @property
     def task(self) -> str:
