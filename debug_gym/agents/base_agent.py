@@ -1,16 +1,13 @@
 import json
 import os
-import subprocess
 import uuid
-from collections import namedtuple
-from copy import copy
 from dataclasses import MISSING, asdict, dataclass, field, fields
 from typing import Any, Dict
 
 import numpy as np
 from jinja2 import Environment, Template
 
-from debug_gym.agents.history_tracker import HistoryTracker, build_history_prompt
+from debug_gym.agents.history_tracker import HistoryTracker
 from debug_gym.gym.envs.env import EnvInfo, RepoEnv
 from debug_gym.gym.utils import filter_non_utf8
 from debug_gym.llms.base import LLM
@@ -142,15 +139,13 @@ class BaseAgent:
         """Load system prompt template from config if specified and register custom filters.
         If no template is specified, return None.
         """
-        system_prompt_template_file = self.args.system_prompt_template_file
-        if system_prompt_template_file:
-            if not os.path.isfile(system_prompt_template):
-                error_msg = (
-                    f"System prompt template file `{system_prompt_template}` not found."
-                )
+        system_prompt_template = None
+        if self.args.system_prompt_template_file is not None:
+            if not os.path.isfile(self.args.system_prompt_template_file):
+                error_msg = f"System prompt template file `{self.args.system_prompt_template_file}` not found."
                 self.logger.error(error_msg)
                 raise FileNotFoundError(error_msg)
-            with open(system_prompt_template, "r") as f:
+            with open(self.args.system_prompt_template_file, "r") as f:
                 system_prompt_template = f.read()
 
         system_prompt_template = (
@@ -162,19 +157,20 @@ class BaseAgent:
             env.filters["to_pretty_json"] = self.to_pretty_json
             env.filters["trim_message"] = self.trim_message
             return env.from_string(system_prompt_template)
+
         return None
 
     def _load_instance_prompt_template(self) -> Template | None:
         """Load instance prompt template from config if specified and register custom filters.
         If no template is specified, return None.
         """
-        instance_prompt_template_file = self.args.instance_prompt_template_file
-        if instance_prompt_template_file:
-            if not os.path.isfile(instance_prompt_template_file):
-                error_msg = f"Instance prompt template file `{instance_prompt_template_file}` not found."
+        instance_prompt_template = None
+        if self.args.instance_prompt_template_file is not None:
+            if not os.path.isfile(self.args.instance_prompt_template_file):
+                error_msg = f"Instance prompt template file `{self.args.instance_prompt_template_file}` not found."
                 self.logger.error(error_msg)
                 raise FileNotFoundError(error_msg)
-            with open(instance_prompt_template_file, "r") as f:
+            with open(self.args.instance_prompt_template_file, "r") as f:
                 instance_prompt_template = f.read()
 
         instance_prompt_template = (

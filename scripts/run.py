@@ -141,7 +141,7 @@ def run_agent(args, task_name: str, task_data: dict, config: dict):
             raise
 
         # save trajectory
-        save_trajectory(agent, task_name, task_path, task_logger)
+        save_trajectory(agent, task_path, task_logger)
 
         # optionally apply patch
         if config["save_patch"]:

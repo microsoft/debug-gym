@@ -191,25 +191,25 @@ class OpenAILLM(LLM):
         )
 
     def convert_response_to_message(self, response: LLMResponse) -> dict:
-        response = {
+        message = {
             "role": "assistant",
             "tool_calls": [
                 {
                     "type": "function",
                     "id": response.tool.id,
                     "function": {
-                        "name": response[0].tool.name,
-                        "arguments": json.dumps(response[0].tool.arguments),
+                        "name": response.tool.name,
+                        "arguments": json.dumps(response.tool.arguments),
                     },
                 },
             ],
-            "content": filter_non_utf8(f"{response[0].response}"),
+            "content": filter_non_utf8(f"{response.response}"),
         }
         if response.reasoning_response:
-            response["reasoning_content"] = filter_non_utf8(
+            message["reasoning_content"] = filter_non_utf8(
                 f"{response.reasoning_response}"
             )
-        return response
+        return message
 
     def convert_observation_to_message(
         self, observation: str, last_tool_call_id=None, last_tool_call_name=None

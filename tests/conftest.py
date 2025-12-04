@@ -100,7 +100,7 @@ def build_env_info():
         all_observations=[],
         eval_observation="eval_observation",
         current_breakpoints="current_breakpoints",
-        action_tool_call="action",
+        action_tool_call=ToolCall(id="tool_id", name="tool_name", arguments={}),
         action_reasoning="",
         action_content="",
         instructions=None,

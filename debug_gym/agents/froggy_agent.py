@@ -1,51 +1,9 @@
-import json
-import subprocess
 from dataclasses import dataclass
 from typing import Any, Dict
 
-from jinja2 import Template
-
-from debug_gym.agents.base_agent import (
-    LLM,
-    AgentArgs,
-    BaseAgent,
-    Environment,
-    register_agent,
-)
+from debug_gym.agents.base_agent import LLM, AgentArgs, BaseAgent, register_agent
 from debug_gym.agents.history_tracker import HistoryTracker
 from debug_gym.gym.envs.env import EnvInfo
-from debug_gym.gym.utils import filter_non_utf8
-from debug_gym.llms.utils import trim
-
-
-def build_history_prompt(
-    history: HistoryTracker, llm: LLM, reset_prompt_history_after_rewrite: bool = False
-):
-    env_observations, llm_responses = history.get()
-    latest_rewrite_step = 0
-    # Find the latest rewrite step if reset_prompt_history_after_rewrite
-    if reset_prompt_history_after_rewrite:
-        for i, obs in enumerate(env_observations):
-            if obs.rewrite_counter == env_observations[-1].rewrite_counter:
-                latest_rewrite_step = i
-                break
-
-    env_observations = env_observations[latest_rewrite_step:]
-    llm_responses = llm_responses[latest_rewrite_step:]
-
-    messages = []
-    for obs, response in zip(env_observations, llm_responses):
-        # environment observation
-        messages.extend(
-            llm.convert_observation_to_message(
-                obs.step_observation.observation,
-                obs.action_tool_call.id if obs.action_tool_call else None,
-                obs.action_tool_call.name if obs.action_tool_call else None,
-            )
-        )
-        # llm response
-        messages.extend(llm.convert_response_to_message(response))
-    return messages
 
 
 @dataclass
@@ -67,7 +25,6 @@ class FroggyAgent(BaseAgent):
         *args,
         **kwargs,
     ):
-
         agent_args = (
             FroggyAgentArgs.from_dict(agent_args)
             if isinstance(agent_args, dict)
@@ -80,6 +37,7 @@ class FroggyAgent(BaseAgent):
             self.history,
             self.llm,
             self.args.reset_prompt_history_after_rewrite,
+            history_cutoff=self.args.memory_size,
         )
         return messages
 
@@ -159,3 +117,40 @@ class FroggyAgent(BaseAgent):
             system_prompt_dict["Shortcut features"] = shortcut_features
 
         return self.to_pretty_json(system_prompt_dict)
+
+
+def build_history_prompt(
+    history: HistoryTracker,
+    llm: LLM,
+    reset_prompt_history_after_rewrite: bool = False,
+    history_cutoff: int = None,
+):
+    env_observations, llm_responses = history.get()
+    if history_cutoff is not None:
+        env_observations = env_observations[-history_cutoff:]
+        llm_responses = llm_responses[-history_cutoff:]
+
+    latest_rewrite_step = 0
+    # Find the latest rewrite step if reset_prompt_history_after_rewrite
+    if reset_prompt_history_after_rewrite:
+        for i, obs in enumerate(env_observations):
+            if obs.rewrite_counter == env_observations[-1].rewrite_counter:
+                latest_rewrite_step = i
+                break
+
+    env_observations = env_observations[latest_rewrite_step:]
+    llm_responses = llm_responses[latest_rewrite_step:]
+
+    messages = []
+    for obs, response in zip(env_observations, llm_responses):
+        # llm response
+        messages.append(llm.convert_response_to_message(response))
+        # environment observation
+        messages.append(
+            llm.convert_observation_to_message(
+                obs.step_observation.observation,
+                obs.action_tool_call.id if obs.action_tool_call else None,
+                obs.action_tool_call.name if obs.action_tool_call else None,
+            )
+        )
+    return messages

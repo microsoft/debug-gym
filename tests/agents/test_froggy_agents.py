@@ -1,22 +1,18 @@
 import json
-import subprocess
 from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 from jinja2 import Template
 
-from debug_gym.agents.base_agent import (
-    AGENT_REGISTRY,
-    AgentArgs,
-    BaseAgent,
-    create_agent,
-    register_agent,
-)
 from debug_gym.agents.debug_agent import Debug_5_Agent, DebugAgent
+from debug_gym.agents.froggy_agent import build_history_prompt
+from debug_gym.agents.history_tracker import HistoryTracker
 from debug_gym.agents.rewrite_agent import RewriteAgent
 from debug_gym.agents.utils import save_patch, save_trajectory
+from debug_gym.gym.tools.tool import ToolCall
 from debug_gym.gym.tools.toolbox import Toolbox
-from debug_gym.llms.base import LLMResponse, TokenUsage
+from debug_gym.llms.base import LLMConfigRegistry, LLMResponse, TokenUsage
+from debug_gym.llms.openai import OpenAILLM
 
 
 def test_default_system_prompt(agent_setup, build_env_info):
@@ -32,19 +28,17 @@ def test_default_system_prompt(agent_setup, build_env_info):
         eval_observation="eval obs",
     )
     system_prompt = agent.build_system_prompt(info)
-    expected = [
-        {
-            "role": "system",
-            "content": json.dumps(
-                {
-                    "Overall task": "some task",
-                    "Instructions": "some instruction",
-                    "Shortcut features": ["f1", "f2"],
-                },
-                indent=2,
-            ),
-        }
-    ]
+    expected = {
+        "role": "system",
+        "content": json.dumps(
+            {
+                "Overall task": "some task",
+                "Instructions": "some instruction",
+                "Shortcut features": ["f1", "f2"],
+            },
+            indent=2,
+        ),
+    }
     assert system_prompt == expected
 
 
@@ -61,20 +55,18 @@ def test_default_system_prompt_auto_eval(agent_setup, build_env_info):
         eval_observation="eval obs",
     )
     system_prompt = agent.build_system_prompt(info)
-    expected = [
-        {
-            "role": "system",
-            "content": json.dumps(
-                {
-                    "Overall task": "some task",
-                    "Instructions": "some instruction",
-                    "Evaluation output of current code": "eval obs",
-                    "Shortcut features": ["f1", "f2"],
-                },
-                indent=2,
-            ),
-        }
-    ]
+    expected = {
+        "role": "system",
+        "content": json.dumps(
+            {
+                "Overall task": "some task",
+                "Instructions": "some instruction",
+                "Evaluation output of current code": "eval obs",
+                "Shortcut features": ["f1", "f2"],
+            },
+            indent=2,
+        ),
+    }
     assert system_prompt == expected
 
 
@@ -93,18 +85,16 @@ def test_load_system_prompt_template_default_no_shortcuts_or_eval(
         eval_observation="",
     )
     system_prompt = agent.build_system_prompt(info)
-    expected = [
-        {
-            "role": "system",
-            "content": json.dumps(
-                {
-                    "Overall task": "some task",
-                    "Instructions": "some instruction",
-                },
-                indent=2,
-            ),
-        }
-    ]
+    expected = {
+        "role": "system",
+        "content": json.dumps(
+            {
+                "Overall task": "some task",
+                "Instructions": "some instruction",
+            },
+            indent=2,
+        ),
+    }
     assert system_prompt == expected
 
 
@@ -163,7 +153,7 @@ def test_build_system_prompt(agent_setup, build_env_info):
             "After every valid PDB tool calling, the environment will automatically call the PDB tool again with a `list .` command, which will show the code around the current frame.",
         ],
     }
-    assert messages == [{"role": "system", "content": json.dumps(expected, indent=2)}]
+    assert messages == {"role": "system", "content": json.dumps(expected, indent=2)}
 
 
 def test_build_prompt(agent_setup, build_env_info):
@@ -210,8 +200,8 @@ def test_build_system_prompt_rewrite_agent(agent_setup, build_env_info):
         step_observation="Test last run obs",
     )
     messages = agent.build_system_prompt(info)
-    assert len(messages) == 1
-    assert "Overall task" in messages[0]["content"]
+    assert len(messages) == 2
+    assert "Overall task" in messages["content"]
 
 
 def test_run_debug_5_agent(agent_setup, build_env_info):
@@ -240,179 +230,6 @@ def test_run_debug_5_agent(agent_setup, build_env_info):
     env.tools = {"pdb": MagicMock()}
     result = agent.run(env, debug=False)
     assert result
-
-
-def test_register_agent():
-    """Test agent registration functionality"""
-
-    # Test successful registration
-    class TestAgent(BaseAgent):
-        name = "test_agent"
-
-    # Clear registry to avoid conflicts
-    original_registry = AGENT_REGISTRY.copy()
-    AGENT_REGISTRY.clear()
-
-    try:
-        registered_agent = register_agent(TestAgent)
-        assert registered_agent == TestAgent
-        assert AGENT_REGISTRY["test_agent"] == TestAgent
-
-        # Test error cases
-        class NotAnAgent:
-            name = "not_an_agent"
-
-        with pytest.raises(
-            ValueError, match="agent_class must be a subclass of BaseAgent"
-        ):
-            register_agent(NotAnAgent)
-
-        class AgentWithoutName(BaseAgent):
-            name = None
-
-        with pytest.raises(ValueError, match="agent_class must have a name attribute"):
-            register_agent(AgentWithoutName)
-    finally:
-        # Restore original registry
-        AGENT_REGISTRY.clear()
-        AGENT_REGISTRY.update(original_registry)
-
-
-def test_create_agent():
-    """Test agent creation functionality"""
-
-    # Test creation from registry
-    class TestRegisteredAgent(BaseAgent):
-        name = "test_registered"
-
-        def __init__(self, agent_args, env, **kwargs):
-            super().__init__(agent_args, env, **kwargs)
-
-    # Clear and setup registry
-    original_registry = AGENT_REGISTRY.copy()
-    AGENT_REGISTRY.clear()
-    AGENT_REGISTRY["test_registered"] = TestRegisteredAgent
-
-    try:
-        # Mock the required parameters
-        mock_config = {
-            "output_path": "/tmp",
-            "random_seed": 42,
-            "memory_size": 10,
-            "max_steps": 5,
-            "max_rewrite_steps": 3,
-        }
-        agent_args = AgentArgs.from_dict(mock_config)
-        mock_env = MagicMock()
-
-        agent = create_agent("test_registered", agent_args=agent_args, env=mock_env)
-        assert isinstance(agent, TestRegisteredAgent)
-
-        # Test unknown agent type
-        with pytest.raises(ValueError, match="Unknown agent type: unknown_agent"):
-            create_agent("unknown_agent", agent_args=agent_args, env=mock_env)
-
-        # Test module import (mock importlib)
-        with patch("importlib.import_module") as mock_import:
-            mock_module = MagicMock()
-            mock_module.TestClass = TestRegisteredAgent
-            mock_import.return_value = mock_module
-
-            agent = create_agent(
-                "some.module.TestClass", agent_args=agent_args, env=mock_env
-            )
-            assert isinstance(agent, TestRegisteredAgent)
-            mock_import.assert_called_once_with("some.module")
-    finally:
-        # Restore original registry
-        AGENT_REGISTRY.clear()
-        AGENT_REGISTRY.update(original_registry)
-
-
-def test_system_prompt_building_with_no_template():
-    """Test system prompt building when no template is provided"""
-    mock_env = MagicMock()
-    agent_args = AgentArgs.from_dict(
-        {
-            "random_seed": 42,
-            "memory_size": 10,
-            "max_steps": 1,
-            "max_rewrite_steps": 1,
-        }
-    )
-    llm = MagicMock()
-    llm.context_length = 2000
-    llm.count_tokens = Mock(return_value=500)
-    agent = BaseAgent(agent_args, llm=llm)
-    agent.env = mock_env
-
-    # Create a mock info object
-    mock_info = MagicMock()
-    mock_info.instructions = "test instructions"
-    mock_info.current_breakpoints = []
-    mock_info.eval_observation = MagicMock()
-    mock_info.eval_observation.observation = "test eval"
-
-    # Mock template loading to return None
-    with patch.object(agent, "_load_system_prompt_template", return_value=None):
-        messages = agent.build_system_prompt(mock_info)
-        assert messages is not None
-        assert isinstance(messages, list)
-        assert len(messages) == 1
-        assert messages[0]["role"] == "system"
-        assert "content" in messages[0]
-
-
-def test_system_prompt_building_with_template():
-    """Test system prompt building with template file"""
-    agent = BaseAgent(
-        {
-            "output_path": "/tmp",
-            "random_seed": 42,
-            "memory_size": 10,
-            "max_steps": 1,
-            "max_rewrite_steps": 1,
-        },
-        MagicMock(),
-    )
-
-    # Create a mock info object
-    mock_info = MagicMock()
-    mock_info.instructions = "test instructions"
-
-    # Mock template loading
-    mock_template = MagicMock()
-    mock_template.render.return_value = "Task: test_task, Data: data"
-
-    with patch.object(
-        agent, "_load_system_prompt_template", return_value=mock_template
-    ):
-        messages = agent.build_system_prompt(mock_info)
-        assert len(messages) == 1
-        assert messages[0]["role"] == "system"
-        assert "Task: test_task" in messages[0]["content"]
-        assert "Data: data" in messages[0]["content"]
-        mock_template.render.assert_called_once_with(agent=agent, info=mock_info)
-
-
-def test_parse_reasoning_model_response(agent_setup):
-    """Test reasoning response parsing"""
-    agent, _, _ = next(agent_setup(DebugAgent))
-
-    # Test with reasoning end token found
-    response = "Some text <think>reasoning</think> final answer"
-    result = agent.parse_reasoning_model_response(response, "</think>")
-    assert result == "final answer"
-
-    # Test with reasoning end token not found
-    response = "Some text without reasoning token"
-    result = agent.parse_reasoning_model_response(response, "</think>")
-    assert result == "Some text without reasoning token"
-
-    # Test with empty response
-    response = ""
-    result = agent.parse_reasoning_model_response(response, "</think>")
-    assert result == ""
 
 
 def test_shortcut_features_comprehensive(agent_setup):
@@ -447,14 +264,6 @@ def test_shortcut_features_comprehensive(agent_setup):
     features = agent.shortcut_features()
     print(features)
     assert len(features) == 0
-
-
-def test_to_pretty_json():
-    """Test JSON formatting"""
-    data = {"key": "value", "number": 42, "list": [1, 2, 3]}
-    result = BaseAgent.to_pretty_json(data)
-    expected = json.dumps(data, indent=2, sort_keys=False)
-    assert result == expected
 
 
 def test_trim_message(agent_setup):
@@ -493,11 +302,12 @@ def test_trim_message(agent_setup):
 def test_run_early_completion(agent_setup, build_env_info):
     """Test run method when task is already completed on reset"""
     agent, env, llm = next(agent_setup(DebugAgent))
+    env.resolved = True
 
     # Mock environment to return completed task immediately
     env.reset.return_value = build_env_info(
         terminated=True,
-        resolved=True,
+        resolved=env.resolved,
         score=10,
         max_score=10,
         instructions="Test instructions",
@@ -506,13 +316,14 @@ def test_run_early_completion(agent_setup, build_env_info):
     )
 
     result = agent.run(env)
-    assert result is True
+    assert result["success"] is True
     env.step.assert_not_called()  # Should not step if already done
 
 
 def test_run_max_rewrite_steps(agent_setup, build_env_info):
     """Test run method when max rewrite steps is reached"""
     agent, env, llm = next(agent_setup(DebugAgent))
+    env.resolved = False
     agent.args.max_rewrite_steps = 2
 
     env.reset.return_value = build_env_info(
@@ -541,7 +352,9 @@ def test_run_max_rewrite_steps(agent_setup, build_env_info):
     llm.return_value = LLMResponse("Prompt", "Expected answer", TokenUsage(2, 4))
 
     result = agent.run(env)
-    assert result is False  # Task not completed, but stopped due to max rewrites
+    assert (
+        result["success"] is False
+    )  # Task not completed, but stopped due to max rewrites
 
 
 def test_run_exception_handling(agent_setup, build_env_info):
@@ -585,7 +398,7 @@ def test_build_trajectory(agent_setup, tmp_path):
     env.terminated = True
     env.resolved = True
 
-    agent._uuid = "test-uuid-123"
+    agent.args.uuid = "test-uuid-123"
 
     mock_tool = MagicMock()
     mock_tool.name = "test_tool"
@@ -607,37 +420,37 @@ def test_build_trajectory(agent_setup, tmp_path):
         {"name": tool.name, "args": tool.arguments} for tool in tools
     ]
 
-    trajectory = agent.build_trajectory("test_task")
-    assert trajectory["problem"] == "test_task"
+    trajectory = agent._build_trajectory()
+    assert trajectory["problem"] == env.task_name
     assert trajectory["uuid"] == "test-uuid-123"
     assert len(trajectory["log"]) == 2
     assert trajectory["logger"] == "/tmp/test.log"
     assert trajectory["config"]["random_seed"] == agent.args.random_seed
 
     problem_path = tmp_path / "test_task"
-    save_trajectory(agent, "test_task", problem_path, MagicMock())
+    save_trajectory(agent, problem_path, MagicMock())
 
     trajectory_file = problem_path / "trajectory.json"
     assert trajectory_file.exists()
 
     saved = json.loads(trajectory_file.read_text())
-    assert saved["problem"] == "test_task"
-    assert saved["uuid"] == "test-uuid-123"
+    assert saved["problem"] == env.task_name
+    assert saved["uuid"] == agent.args.uuid
 
 
-def test_build_question_prompt(agent_setup):
-    """Test question prompt building"""
+def test_build_instance_prompt(agent_setup):
+    """Test instance prompt building"""
     agent, _, _ = next(agent_setup(DebugAgent))
 
     # Test with action_prompt
     agent.action_prompt = "What should I do next?"
-    messages = agent.build_question_prompt()
+    messages = agent.build_instance_prompt()
     expected = [{"role": "user", "content": "What should I do next?"}]
     assert messages == expected
 
     # Test without action_prompt
     agent.action_prompt = None
-    messages = agent.build_question_prompt()
+    messages = agent.build_instance_prompt()
     assert messages == []
 
 
@@ -673,3 +486,254 @@ def test_set_seed(agent_setup):
     with patch("numpy.random.seed") as mock_seed:
         agent.set_seed(42)
         mock_seed.assert_called_once_with(42)
+
+
+@patch.object(
+    LLMConfigRegistry,
+    "from_file",
+    return_value=LLMConfigRegistry.register_all(
+        {
+            "openai": {
+                "model": "openai",
+                "tokenizer": "gpt-4o",
+                "context_limit": 4,
+                "api_key": "test-api-key",
+                "endpoint": "https://test-endpoint",
+                "api_version": "v1",
+                "tags": ["azure openai"],
+            }
+        }
+    ),
+)
+def test_build_history_prompt(mock_llm_config, build_env_info):
+    # test with empty history
+    ht = HistoryTracker()
+    llm = OpenAILLM("openai")
+    messages = build_history_prompt(ht, llm)
+    expected = []
+    assert messages == expected
+
+    # test with non-empty history
+    ht = HistoryTracker()
+    # prepare some data
+    tool_1 = ToolCall(id="1", name="action1", arguments={"a1_args": "a1_args"})
+    tool_2 = ToolCall(id="2", name="action2", arguments={"a2_args": "a2_args"})
+    tool_3 = ToolCall(id="3", name="action3", arguments={})
+    tool_4 = ToolCall(id="4", name="action4", arguments={"a4_args": "a4_args"})
+    tool_5 = ToolCall(id="5", name="action5", arguments={})
+    action_content_1 = "content_1_1"
+    action_content_2 = "content_2_1"
+    action_content_3 = "content_3_2"
+    action_content_4 = "content_4_1"
+    action_content_5 = "content_5_2"
+    action_reasoning_1 = "reasoning_1_1"
+    action_reasoning_2 = "reasoning_2_1"
+    action_reasoning_3 = "reasoning_3_2"
+    action_reasoning_4 = "reasoning_4_1"
+    action_reasoning_5 = "reasoning_5_2"
+    env_info_0 = build_env_info(
+        step_observation="initial_obs",
+        action_tool_call=None,
+        action_reasoning=None,
+        action_content=None,
+        score=0,
+        rewrite_counter=0,
+    )
+    env_info_1 = build_env_info(
+        step_observation="obs1",
+        action_tool_call=tool_1,
+        action_reasoning=action_reasoning_1,
+        action_content=action_content_1,
+        score=1,
+        rewrite_counter=0,
+    )
+    env_info_2 = build_env_info(
+        step_observation="obs2",
+        action_tool_call=tool_2,
+        action_reasoning=action_reasoning_2,
+        action_content=action_content_2,
+        score=2,
+        rewrite_counter=0,
+    )
+    env_info_3 = build_env_info(
+        step_observation="obs3",
+        action_tool_call=tool_3,
+        action_reasoning=action_reasoning_3,
+        action_content=action_content_3,
+        score=3,
+        rewrite_counter=1,
+    )
+    env_info_4 = build_env_info(
+        step_observation="obs4",
+        action_tool_call=tool_4,
+        action_reasoning=action_reasoning_4,
+        action_content=action_content_4,
+        score=4,
+        rewrite_counter=1,
+    )
+    env_info_5 = build_env_info(
+        step_observation="obs5",
+        action_tool_call=tool_5,
+        action_reasoning=action_reasoning_5,
+        action_content=action_content_5,
+        score=5,
+        rewrite_counter=2,
+    )
+
+    # single prompt format
+    llm_response_1 = LLMResponse("prompt_1_1", "response_1_1", tool=tool_1)
+    llm_response_2 = LLMResponse("prompt_2_1", "response_2_1", tool=tool_2)
+    # list of messages format
+    llm_response_3 = LLMResponse(
+        prompt=[
+            {"role": "user", "content": "prompt_3_1"},
+            {"role": "assistent", "content": "response_3_1"},
+            {"role": "user", "content": "prompt_3_2"},
+        ],
+        response="content_3_2",
+        reasoning_response="reasoning_3_2",
+        tool=tool_3,
+    )
+    llm_response_4 = LLMResponse(
+        "prompt_4_1",
+        "response_4_1",
+        tool=tool_4,
+        prompt_token_count=4321,
+        response_token_count=1234,
+    )
+    llm_response_5 = LLMResponse(
+        prompt=[
+            {"role": "user", "content": "prompt_5_1"},
+            {"role": "assistent", "content": "response_5_1"},
+            {"role": "user", "content": "prompt_5_2"},
+        ],
+        response="content_5_2",
+        reasoning_response="reasoning_5_2",
+        tool=tool_5,
+    )
+
+    # push some steps and prompt-response pairs
+    # at 0-th step, there is no prompt-response pair
+    ht.init(None, None, env_info_0)
+    ht.step(env_info_1, llm_response_1)
+    ht.step(env_info_2, llm_response_2)
+    ht.step(env_info_3, llm_response_3)
+    ht.step(env_info_4, llm_response_4)
+    ht.step(env_info_5, llm_response_5)
+
+    # reset_prompt_history_after_rewrite is False
+    messages = build_history_prompt(
+        ht, llm, reset_prompt_history_after_rewrite=False, history_cutoff=3
+    )
+    expected = [
+        {
+            "role": "assistant",
+            "tool_calls": [
+                {
+                    "type": "function",
+                    "id": "2",
+                    "function": {
+                        "name": "action2",
+                        "arguments": json.dumps({}),
+                    },
+                },
+            ],
+            "content": "response_2",
+        },
+        {
+            "role": "tool",
+            "tool_call_id": "2",
+            "name": "action2",
+            "content": "obs3",
+        },
+        {
+            "role": "assistant",
+            "tool_calls": [
+                {
+                    "type": "function",
+                    "id": "3",
+                    "function": {
+                        "name": "action3",
+                        "arguments": json.dumps({}),
+                    },
+                },
+            ],
+            "content": "response_3",
+        },
+        {
+            "role": "tool",
+            "tool_call_id": "3",
+            "name": "action3",
+            "content": "obs4",
+        },
+        {
+            "role": "assistant",
+            "tool_calls": [
+                {
+                    "type": "function",
+                    "id": "4",
+                    "function": {
+                        "name": "action4",
+                        "arguments": json.dumps({"a4_args": "a4_args"}),
+                    },
+                },
+            ],
+            "content": "response_4",
+        },
+        {
+            "role": "tool",
+            "tool_call_id": "4",
+            "name": "action4",
+            "content": "obs5",
+        },
+    ]
+
+    assert messages == expected
+
+    # reset_prompt_history_after_rewrite is True
+    messages = build_history_prompt(
+        ht, llm, reset_prompt_history_after_rewrite=True, history_cutoff=3
+    )
+    expected = [
+        {
+            "role": "assistant",
+            "tool_calls": [
+                {
+                    "type": "function",
+                    "id": "3",
+                    "function": {
+                        "name": "action3",
+                        "arguments": json.dumps({}),
+                    },
+                },
+            ],
+            "content": "response_3",
+        },
+        {
+            "role": "tool",
+            "tool_call_id": "3",
+            "name": "action3",
+            "content": "obs4",
+        },
+        {
+            "role": "assistant",
+            "tool_calls": [
+                {
+                    "type": "function",
+                    "id": "4",
+                    "function": {
+                        "name": "action4",
+                        "arguments": json.dumps({"a4_args": "a4_args"}),
+                    },
+                },
+            ],
+            "content": "response_4",
+        },
+        {
+            "role": "tool",
+            "tool_call_id": "4",
+            "name": "action4",
+            "content": "obs5",
+        },
+    ]
+    assert messages == expected

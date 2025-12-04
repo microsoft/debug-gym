@@ -30,32 +30,32 @@ class HistoryTracker:
 
     def step(
         self,
-        llm_response: LLMResponse,
         env_observation: EnvInfo,
+        llm_response: LLMResponse,
     ) -> None:
         """llm_responses can be None since the initial state does not have prompt and response"""
-        self.llm_responses.append(copy.deepcopy(llm_response))
         self.env_observations.append(copy.deepcopy(env_observation))
+        self.llm_responses.append(copy.deepcopy(llm_response))
 
     def get(self):
-        # return the history_steps latest steps
+        """Returns the full history of environment observations and LLM responses."""
         return (
             self.env_observations,
             self.llm_responses,
         )
 
-    def json(self, game_step=None):
-        if len(self.env_observations) == 0 and self.env_init is None:
+    def json(self, game_step: int | None = None):
+        if len(self.env_observations) == 0 and self.env_initial_observation is None:
             return {}
 
-        if game_step >= len(self.env_observations):
+        # Retrieve the most recent step by default.
+        game_step = (
+            game_step if game_step is not None else len(self.env_observations) - 1
+        )
+        if game_step < 0 or game_step >= len(self.env_observations):
             raise ValueError(
-                f"Invalid game_step: {game_step}. Max step: {len(self.env_observations)-1}"
+                f"Invalid game_step: {game_step}; should be between [0, {len(self.env_observations)-1}]."
             )
-
-        if game_step is None:
-            # retrieve the most recent step
-            game_step = len(self.env_observations) - 1
 
         if game_step == 0:
             # initial state
@@ -91,7 +91,7 @@ class HistoryTracker:
         return json_out
 
     def score(self):
-        return sum([memory.score for memory in self.env_observations])
+        return sum([obs.score for obs in self.env_observations])
 
     def __len__(self):
         return len(self.env_observations)
