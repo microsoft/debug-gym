@@ -1,3 +1,4 @@
+import logging
 import tempfile
 from pathlib import Path
 
@@ -7,14 +8,16 @@ from debug_gym.gym.entities import EvalOutput
 from debug_gym.gym.envs.env import RepoEnv
 from debug_gym.gym.terminals.docker import DockerTerminal
 from debug_gym.gym.terminals.terminal import Terminal
+from debug_gym.logger import DebugGymLogger
 
 DOCKER_MINI_NIGHTMARE_IMAGE_NAME = "debug-gym:mini-nightmare"
 
 
-def build_docker_image(logger):
+def build_docker_image(logger: logging.Logger | None = None):
     """
     Build a Docker image for the Mini Nightmare environment.
     """
+    logger = logger or DebugGymLogger("debug-gym")
     # Check if Docker image is built.
     import docker
 
@@ -86,10 +89,9 @@ class MiniNightmareEnv(RepoEnv):
         if hasattr(terminal, "base_image") and terminal.base_image is None:
             terminal.base_image = DOCKER_MINI_NIGHTMARE_IMAGE_NAME
 
-        self.task_data = task_data
-        self.task_name = task_data["task_name"]
-
-        super().__init__(entrypoint=entrypoint, terminal=terminal, **kwargs)
+        super().__init__(
+            task_data=task_data, entrypoint=entrypoint, terminal=terminal, **kwargs
+        )
 
     @property
     def instructions(self) -> str:
@@ -98,6 +100,10 @@ class MiniNightmareEnv(RepoEnv):
             " Investigate the repository, figure out the root cause, then rewrite the code to fix the issue."
             " Beaware that the bug may not be in the code you initially see."
         )
+
+    @property
+    def task_name(self) -> str:
+        return self.current_task["task_name"]
 
     def calculate_max_score(self, eval_output: EvalOutput) -> int:
         return utils.extract_max_score_from_pytest_output(eval_output.output)
@@ -112,7 +118,7 @@ class MiniNightmareEnv(RepoEnv):
         return self.last_eval
 
     def setup_task(self):
-        pass
+        self.current_task = self.task_data
 
     def setup_workspace(self):
         self.workspace.reset()
@@ -144,8 +150,9 @@ class MiniNightmareEnv(RepoEnv):
     def load_dataset(
         cls,
         problems: str | list[str] | None = None,
-        build_image: bool = False,
+        build_image: bool = True,
         logger: object = None,
+        **kwargs,
     ) -> dict:
         if build_image:
             build_docker_image(logger)
@@ -167,10 +174,16 @@ class MiniNightmareEnv(RepoEnv):
             assert (task_path / ".debugreadonly").exists()
 
             dataset[task_name] = {
+                "task_name": task_name,
                 "codebase": task_path,
                 "filename": task_name + "_code.py",
             }
 
         problems = utils.filter_problems(dataset, problems)
         dataset = {id: data for id, data in dataset.items() if id in problems}
+
+        # Add env_type to each task_data.
+        for task_data in dataset.values():
+            task_data["env_type"] = "mini_nightmare"
+
         return dataset

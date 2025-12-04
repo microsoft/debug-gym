@@ -1,18 +1,18 @@
 base:
     # Environment configs
-    output_path: "exps/swesmith"
+    output_path: "exps/swebench-verified-debugmode"
 
     env:
-        # type: "swesmith"  # Not needed Will be inferred from dataset.
         run_timeout: 300
 
     dataset:
-        type: "swesmith"
-        dataset_id: "SWE-bench/SWE-smith"
-        problems: "all"  # list of problems, e.g., ["astropy__astropy-12907"], or strings like "test-125" (defined in gym/envs/configs), or "all",
+        type: "swebench-debug"
+        problems: "all"  # list of problems, e.g., ["astropy__astropy-12907"], or "all"
+        dataset_id: "SWE-bench/SWE-bench_Verified"
+        dataset_revision: "99450355ca8c611021187a57ffac304b66666738"
 
     terminal:
-        type: "docker"
+        type: "docker"  # "docker" or "kubernetes"
 
     # LLM configs
     llm_name: "gpt-4o"
@@ -63,5 +63,5 @@ solution_agent:
     llm_name: null  # No need for an LLM.
     tools:
         - eval
-        # - pdb
+        - pdb
         - submit

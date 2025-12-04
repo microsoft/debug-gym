@@ -1,23 +1,27 @@
+import logging
 import os
 import subprocess
 import tempfile
 from pathlib import Path
-from typing import List
 
 import debug_gym.gym.utils as utils
 from debug_gym.constants import DEBUG_GYM_CACHE_DIR
 from debug_gym.gym.entities import EvalOutput
 from debug_gym.gym.envs.env import RepoEnv
+from debug_gym.gym.envs.local import LocalEnv
 from debug_gym.gym.terminals.docker import DockerTerminal
 from debug_gym.gym.terminals.terminal import Terminal
+from debug_gym.logger import DebugGymLogger
 
 DOCKER_AIDER_IMAGE_NAME = "debug-gym:aider"
 
 
-def build_docker_image(logger):
+def build_docker_image(logger: logging.Logger | None = None):
     """
     Build a Docker image for the Mini Nightmare environment.
     """
+    logger = logger or DebugGymLogger("debug-gym")
+
     # Check if Docker image is built.
     import docker
 
@@ -75,8 +79,13 @@ class AiderBenchmarkEnv(RepoEnv):
         if hasattr(terminal, "base_image") and terminal.base_image is None:
             terminal.base_image = DOCKER_AIDER_IMAGE_NAME
 
-        self.task_data = task_data
-        super().__init__(entrypoint=entrypoint, terminal=terminal, **kwargs)
+        super().__init__(
+            task_data=task_data, entrypoint=entrypoint, terminal=terminal, **kwargs
+        )
+
+    @property
+    def task_name(self) -> str:
+        return self.current_task["task_name"]
 
     @property
     def instructions(self) -> str:
@@ -95,7 +104,7 @@ class AiderBenchmarkEnv(RepoEnv):
         return self.last_eval
 
     def setup_task(self):
-        pass
+        self.current_task = self.task_data
 
     def setup_workspace(self):
         self.workspace.reset()
@@ -127,8 +136,9 @@ class AiderBenchmarkEnv(RepoEnv):
     def load_dataset(
         cls,
         problems: str | list[str] | None = None,
-        build_image: bool = False,
+        build_image: bool = True,
         logger: object = None,
+        **kwargs,
     ) -> dict:
         if build_image:
             build_docker_image(logger)
@@ -167,6 +177,7 @@ class AiderBenchmarkEnv(RepoEnv):
             )
 
             dataset[task_name] = {
+                "task_name": task_name,
                 "codebase": directory,
                 "instructions": instructions,
                 "filename": task_name + ".py",
@@ -174,4 +185,9 @@ class AiderBenchmarkEnv(RepoEnv):
 
         problems = utils.filter_problems(dataset, problems)
         dataset = {id: data for id, data in dataset.items() if id in problems}
+
+        # Add env_type to each task_data.
+        for task_data in dataset.values():
+            task_data["env_type"] = "aider"
+
         return dataset

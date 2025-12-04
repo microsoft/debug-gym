@@ -15,11 +15,8 @@ from swesmith.utils import get_repo_commit_from_image_name
 from debug_gym.constants import DEBUG_GYM_CACHE_DIR
 from debug_gym.gym.entities import EvalOutput
 from debug_gym.gym.envs.swe_bench import SWEBenchEnv
-from debug_gym.gym.terminals.terminal import DebugGymLogger, Terminal
+from debug_gym.gym.terminals.terminal import DebugGymLogger
 from debug_gym.gym.utils import filter_problems
-
-from .swe_smith_constants import DOCKER_ORG, MAP_REPO_TO_SPECS, TAG
-from .swe_smith_utils import get_repo_commit_from_image_name, get_test_command
 
 
 class SWESmithEnv(SWEBenchEnv):
@@ -111,7 +108,9 @@ class SWESmithEnv(SWEBenchEnv):
 
         # Apply bug patch.
         self.terminal.run(f"git apply - <<'EOF'\n{self.bug_patch}\nEOF", raises=True)
-        self.terminal.run(f"git commit -am 'Applying bug patch for {self.task_name}'")
+        self.terminal.run(
+            f"git commit -am 'Applying bug patch for {self.task_name}' --no-verify"
+        )
 
     def calculate_score(self, eval_output: EvalOutput) -> int:
         test_status_map = self.log_parser(eval_output.output)
@@ -153,7 +152,9 @@ class SWESmithEnv(SWEBenchEnv):
         problems: list | None = None,
         prepull_images: bool = False,
         logger: DebugGymLogger | None = None,
+        **kwargs,
     ) -> dict:
+        logger = logger or DebugGymLogger("debug_gym")
         data_path = Path(dataset_id)
         if data_path.is_file():
             # Loading from local file.
@@ -176,15 +177,19 @@ class SWESmithEnv(SWEBenchEnv):
             custom_splits = yaml.safe_load(f)
             excluded_ids = custom_splits.get("excluded", [])
 
-        dataset = {d["instance_id"]: d for d in ds}
-        problems = filter_problems(dataset, problems, custom_splits, excluded_ids)
-        dataset = {pid: dataset[pid] for pid in problems}
+        # Memory efficient filtering of problems.
+        id2idx = {id: i for i, id in enumerate(ds["instance_id"])}
+        problems = filter_problems(id2idx, problems, custom_splits, excluded_ids)
+        dataset = {problem: ds[id2idx[problem]] for problem in problems}
 
-        image_names = set([problem["image_name"] for problem in dataset.values()])
-        if logger is not None:
-            logger.debug(
-                f"Loaded {len(dataset)} tasks across {len(image_names)} Docker images from {dataset_id}."
-            )
+        # Add env_type to each task_data.
+        for task_data in dataset.values():
+            task_data["env_type"] = "swesmith"
+
+        image_names = set(task_data["image_name"] for task_data in dataset.values())
+        logger.debug(
+            f"Loaded {len(dataset)} tasks across {len(image_names)} Docker images from {dataset_id}."
+        )
 
         if prepull_images:
             # Download all images needed for SWE-Smith.
@@ -198,15 +203,13 @@ class SWESmithEnv(SWEBenchEnv):
             )
             missing_images = tagged_image_names - existing_images
             if missing_images:
-                if logger is not None:
-                    logger.info(f"Found {len(missing_images)} missing Docker images.")
+                logger.info(f"Found {len(missing_images)} missing Docker images.")
 
                 for image_name in missing_images:
                     docker_hub_image = image_name.replace("__", "_1776_")
-                    if logger is not None:
-                        logger.info(
-                            f"Pulling Docker image `{docker_hub_image}` to `{image_name}`."
-                        )
+                    logger.info(
+                        f"Pulling Docker image `{docker_hub_image}` to `{image_name}`."
+                    )
                     client.images.pull(docker_hub_image)
                     # Rename images via tagging
                     client.images.get(docker_hub_image).tag(image_name)

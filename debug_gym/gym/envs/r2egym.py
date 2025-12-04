@@ -1,4 +1,5 @@
 import json
+import logging
 import re
 from importlib.resources import files as importlib_files
 from pathlib import Path
@@ -261,8 +262,11 @@ class R2EGymEnv(RepoEnv):
         problems: list | None = None,
         prepull_images: bool = False,
         logger: DebugGymLogger | None = None,
+        **kwargs,
     ) -> dict:
+        logger = logger or DebugGymLogger("debug_gym")
         data_path = Path(dataset_id)
+
         if data_path.is_file():
             # Loading from local file.
             if data_path.suffix.lower() == ".json":
@@ -284,25 +288,25 @@ class R2EGymEnv(RepoEnv):
             custom_splits = yaml.safe_load(f)
             excluded_ids = custom_splits.get("excluded", [])
 
-        # add instance id to each example (name of the image)
         def extract_instance_id(docker_image: str) -> str:
             return docker_image.split("/", 1)[-1]
 
-        # create a column "instance_id" in the dataset
-        dataset = {}
-        for example in ds:
-            instance_id = extract_instance_id(example["docker_image"])
-            example["instance_id"] = instance_id
-            dataset[instance_id] = example
+        id2idx = {
+            extract_instance_id(docker_image): i
+            for i, docker_image in enumerate(ds["docker_image"])
+        }
+        problems = filter_problems(id2idx, problems, custom_splits, excluded_ids)
+        dataset = {problem: ds[id2idx[problem]] for problem in problems}
 
-        problems = filter_problems(dataset, problems, custom_splits, excluded_ids)
-        dataset = {pid: dataset[pid] for pid in problems}
+        # Add instance_id (name of the image) and env_type to each task_data.
+        for instance_id, task_data in dataset.items():
+            task_data["instance_id"] = instance_id
+            task_data["env_type"] = "r2egym"
 
-        image_names = set(example["docker_image"] for example in dataset.values())
-        if logger is not None:
-            logger.debug(
-                f"Loaded {len(dataset)} tasks across {len(image_names)} Docker images from {dataset_id}."
-            )
+        image_names = set(task_data["docker_image"] for task_data in dataset.values())
+        logger.debug(
+            f"Loaded {len(dataset)} tasks across {len(image_names)} Docker images from {dataset_id}."
+        )
 
         if prepull_images:
             # Download all images needed for R2E-Gym.
@@ -313,14 +317,10 @@ class R2EGymEnv(RepoEnv):
             )
             missing_images = image_names - existing_images
             if missing_images:
-                if logger is not None:
+                logger.warning(f"Found {len(missing_images)} missing Docker images.")
+                for i, image_name in enumerate(missing_images):
                     logger.warning(
-                        f"Found {len(missing_images)} missing Docker images."
+                        f"Pulling Docker image {i + 1}/{len(missing_images)} `{image_name}`."
                     )
-                    for i, image_name in enumerate(missing_images):
-                        if logger is not None:
-                            logger.warning(
-                                f"Pulling Docker image {i + 1}/{len(missing_images)} `{image_name}`."
-                            )
-                        client.images.pull(image_name)
+                    client.images.pull(image_name)
         return dataset

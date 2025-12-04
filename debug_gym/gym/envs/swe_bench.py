@@ -62,10 +62,6 @@ class SWEBenchEnv(RepoEnv):
         self.entrypoint = " ".join([self.test_cmd, *self.test_directives])
 
         if self.package_name == "sphinx" or self.package_name == "sympy":
-            # use pytest instead of `sympy bin/test` and `sphinx tox` so pdb breakpoints work
-            expression = " ".join(self.test_directives)
-            self.entrypoint = f"python -m pytest {expression}"
-
             if self.entrypoint.startswith("PYTHONWARNINGS"):
                 # Move PYTHONWARNINGS from the entrypoint to the session commands
                 export, remaining = self.entrypoint.split(" ", 1)
@@ -85,6 +81,11 @@ class SWEBenchEnv(RepoEnv):
         # -s (capture=no) with pytest allows for debugging with pdb
         # -q (quiet) with pytest avoids long pytest output
         self.debug_entrypoint = self.entrypoint.replace("pytest", "pytest -sq")
+
+        if self.package_name == "sphinx" or self.package_name == "sympy":
+            # use pytest instead of `sympy bin/test` and `sphinx tox` so pdb breakpoints work
+            expression = " ".join(self.test_directives)
+            self.debug_entrypoint = f"python -m pytest {expression}"
 
         # --tb=short with pytest keeps the output concise
         self.entrypoint = self.entrypoint.replace("--tb=no", "--tb=short")
@@ -123,6 +124,8 @@ class SWEBenchEnv(RepoEnv):
             self.terminal.run('echo "127.0.0.1    httpbin.org" >> /etc/hosts')
         elif self.task_name == "pylint-dev__pylint-4661":
             self.terminal.run("pip install appdirs==1.4.4")
+        elif self.package_name == "sphinx" or self.package_name == "sympy":
+            self.terminal.run("pip install pytest")
 
         # Apply any changes needed to the install commands.
         self.terminal.run("git config user.name 'debug-gym'")
@@ -182,15 +185,21 @@ class SWEBenchEnv(RepoEnv):
         problems: list | None = None,
         prepull_images: bool = False,
         logger: DebugGymLogger | None = None,
+        **kwargs,
     ) -> dict:
         ds = datasets.load_dataset(dataset_id, revision=dataset_revision)[split]
 
-        dataset = {problem["instance_id"]: problem for problem in ds}
-        problems = filter_problems(dataset, problems)
-        dataset = {id: i for id, i in dataset.items() if id in problems}
+        # Memory efficient filtering of problems.
+        id2idx = {id: i for i, id in enumerate(ds["instance_id"])}
+        problems = filter_problems(id2idx, problems)
+        dataset = {problem: ds[id2idx[problem]] for problem in problems}
+
+        # Add env_type to each task_data.
+        for task_data in dataset.values():
+            task_data["env_type"] = "swebench"
 
         image_names = set(
-            f"sweb.eval.x86_64.{id.replace('__', '_1776_')}" for id in problems
+            f"sweb.eval.x86_64.{id.replace('__', '_1776_')}" for id in dataset
         )
 
         if prepull_images:

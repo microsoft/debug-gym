@@ -1,13 +1,16 @@
 base:
     # Environment configs
     output_path: "exps/re2gym"
-    benchmark: "r2egym"
-    problems: "all"  # list of problems, e.g., ["astropy__astropy-12907"], or strings like "test-125" (defined in gym/envs/configs), or "all",
+
     env:
-        type: "r2egym"
         run_timeout: 300
+
+    dataset:
+        type: "r2egym"
+        problems: "all"  # list of problems, e.g., ["aiohttp_final:d7cd0613472fd4d9940e37f1c55921f6a1515324"], or strings like "d1-valid" (defined in gym/envs/configs), or "all",
         dataset_id: "R2E-Gym/R2E-Gym-Lite"
         dataset_revision: "8d3163011f01f9393bb3dc7700497a79a8686ae5"
+
     terminal:
         type: "docker"  # "docker", "kubernetes"
 
@@ -60,5 +63,5 @@ solution_agent:
     llm_name: "human"  # No need for an LLM.
     tools:
         - eval
-        - pdb
+        # - pdb
         - submit
