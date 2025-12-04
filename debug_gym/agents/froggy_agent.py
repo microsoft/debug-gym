@@ -18,28 +18,14 @@ class FroggyAgentArgs(AgentArgs):
 @register_agent
 class FroggyAgent(BaseAgent):
     name: str = "froggy"
+    args_class = FroggyAgentArgs
 
-    def __init__(
-        self,
-        agent_args: FroggyAgentArgs | Dict[str, Any],
-        *args,
-        **kwargs,
-    ):
-        agent_args = (
-            FroggyAgentArgs.from_dict(agent_args)
-            if isinstance(agent_args, dict)
-            else agent_args
-        )
-        super().__init__(agent_args, *args, **kwargs)
-
-    def build_history_prompt(self):
-        messages = build_history_prompt(
-            self.history,
-            self.llm,
-            self.args.reset_prompt_history_after_rewrite,
-            history_cutoff=self.args.memory_size,
-        )
-        return messages
+    def should_stop(self, step: int, info: EnvInfo):
+        should_stop, reason = super().should_stop(step, info)
+        if info.rewrite_counter > self.args.max_rewrite_steps:
+            should_stop = True
+            reason = "max_rewrite_steps reached"
+        return should_stop, reason
 
     def _auto_eval_on_rewrite(self):
         """Check if auto eval on rewrite is enabled."""
@@ -79,13 +65,6 @@ class FroggyAgent(BaseAgent):
                 )
         return features
 
-    def should_stop(self, step: int, info: EnvInfo):
-        should_stop, reason = super().should_stop(step, info)
-        if info.rewrite_counter > self.args.max_rewrite_steps:
-            should_stop = True
-            reason = "max_rewrite_steps reached"
-        return should_stop, reason
-
     def _default_system_prompt(self, info) -> str:
         """Return the default system prompt as pretty JSON.
         Trimmed to fit within the token limit."""
@@ -117,40 +96,3 @@ class FroggyAgent(BaseAgent):
             system_prompt_dict["Shortcut features"] = shortcut_features
 
         return self.to_pretty_json(system_prompt_dict)
-
-
-def build_history_prompt(
-    history: HistoryTracker,
-    llm: LLM,
-    reset_prompt_history_after_rewrite: bool = False,
-    history_cutoff: int = None,
-):
-    env_observations, llm_responses = history.get()
-    if history_cutoff is not None:
-        env_observations = env_observations[-history_cutoff:]
-        llm_responses = llm_responses[-history_cutoff:]
-
-    latest_rewrite_step = 0
-    # Find the latest rewrite step if reset_prompt_history_after_rewrite
-    if reset_prompt_history_after_rewrite:
-        for i, obs in enumerate(env_observations):
-            if obs.rewrite_counter == env_observations[-1].rewrite_counter:
-                latest_rewrite_step = i
-                break
-
-    env_observations = env_observations[latest_rewrite_step:]
-    llm_responses = llm_responses[latest_rewrite_step:]
-
-    messages = []
-    for obs, response in zip(env_observations, llm_responses):
-        # llm response
-        messages.append(llm.convert_response_to_message(response))
-        # environment observation
-        messages.append(
-            llm.convert_observation_to_message(
-                obs.step_observation.observation,
-                obs.action_tool_call.id if obs.action_tool_call else None,
-                obs.action_tool_call.name if obs.action_tool_call else None,
-            )
-        )
-    return messages
