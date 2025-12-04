@@ -1,16 +1,18 @@
 base:
     # Environment configs
     output_path: "exps/swebench-verified"
-    benchmark: "swebench-debug"
-    problems: "all"  # list of problems, e.g., ["astropy__astropy-12907"], or "all"
-    env_kwargs: {
-        "run_timeout": 300,
-        "dataset_id": "SWE-bench/SWE-bench_Verified",
-        "dataset_revision": "99450355ca8c611021187a57ffac304b66666738",
-    }
-    terminal: {
-        type: "docker",  # "docker", "kubernetes"
-    }
+
+    env:
+        run_timeout: 300
+
+    dataset:
+        type: "swebench"
+        problems: "all"  # list of problems, e.g., ["astropy__astropy-12907"], or "all"
+        dataset_id: "SWE-bench/SWE-bench_Verified"
+        dataset_revision: "99450355ca8c611021187a57ffac304b66666738"
+
+    terminal:
+        type: "docker"  # "docker" or "kubernetes"
 
     # LLM configs
     llm_name: "gpt-4o"
@@ -29,34 +31,6 @@ base:
     "show_current_breakpoints": False  # If True, the environment will automatically show the current breakpoints at every step in the system prompt.
     "show_directory_tree": 0  # Value indicated the depth of the directory shown in the system prompt. 0 means no directory tree is shown.
 
-rewrite_agent:
-    tools:
-        - grep
-        - view
-        - rewrite
-        - listdir
-        - eval:
-            auto_eval_on_rewrite: False  # If True, the environment will automatically call the Eval tool after a successful rewrite. If this is set to True, the agent does not need to call the Eval tool itself.
-
-debug_agent:
-    tools:
-        - grep
-        - pdb
-        - view
-        - rewrite
-        - listdir
-        - eval
-
-debug_5_agent:
-    n_rewrites_before_pdb: 5
-    tools:
-        - grep
-        - pdb
-        - view
-        - rewrite
-        - listdir
-        - eval
-
 solution_agent:
     llm_name: null  # No need for an LLM.
     tools:
@@ -65,7 +39,6 @@ solution_agent:
         - submit
 
 swe_agent:
-    benchmark: "swebench"
     max_steps: 100
     max_rewrite_steps: 20
     tools:

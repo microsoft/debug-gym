@@ -1,3 +1,4 @@
+import logging
 import os
 import subprocess
 import tempfile
@@ -7,16 +8,20 @@ import debug_gym.gym.utils as utils
 from debug_gym.constants import DEBUG_GYM_CACHE_DIR
 from debug_gym.gym.entities import EvalOutput
 from debug_gym.gym.envs.env import RepoEnv
+from debug_gym.gym.envs.local import LocalEnv
 from debug_gym.gym.terminals.docker import DockerTerminal
 from debug_gym.gym.terminals.terminal import Terminal
+from debug_gym.logger import DebugGymLogger
 
 DOCKER_AIDER_IMAGE_NAME = "debug-gym:aider"
 
 
-def build_docker_image(logger):
+def build_docker_image(logger: logging.Logger | None = None):
     """
     Build a Docker image for the Mini Nightmare environment.
     """
+    logger = logger or DebugGymLogger("debug-gym")
+
     # Check if Docker image is built.
     import docker
 
@@ -62,6 +67,7 @@ class AiderBenchmarkEnv(RepoEnv):
 
     def __init__(
         self,
+        task_data: dict,
         entrypoint: str = "python -m pytest --tb=no -s .",
         terminal: Terminal | None = None,
         **kwargs,
@@ -73,7 +79,13 @@ class AiderBenchmarkEnv(RepoEnv):
         if hasattr(terminal, "base_image") and terminal.base_image is None:
             terminal.base_image = DOCKER_AIDER_IMAGE_NAME
 
-        super().__init__(entrypoint=entrypoint, terminal=terminal, **kwargs)
+        super().__init__(
+            task_data=task_data, entrypoint=entrypoint, terminal=terminal, **kwargs
+        )
+
+    @property
+    def task_name(self) -> str:
+        return self.current_task["task_name"]
 
     @property
     def instructions(self) -> str:
@@ -91,10 +103,8 @@ class AiderBenchmarkEnv(RepoEnv):
         self.last_eval = EvalOutput(success, output)
         return self.last_eval
 
-    def setup_task(self, task_name: str, options: dict = None):
-        if task_name not in self.dataset:
-            raise ValueError(f"Task {task_name} not found in the dataset.")
-        self.current_task = self.dataset[task_name]
+    def setup_task(self):
+        self.current_task = self.task_data
 
     def setup_workspace(self):
         self.workspace.reset()
@@ -122,14 +132,21 @@ class AiderBenchmarkEnv(RepoEnv):
         )  # Aider tasks come with those.
         self.terminal.run("git commit -am 'Add debug-gym ignore and read-only files'")
 
-    def load_dataset(self, problems: str | list[str] | None = None):
-        if isinstance(self.terminal, DockerTerminal):
-            build_docker_image(self.logger)
+    @classmethod
+    def load_dataset(
+        cls,
+        problems: str | list[str] | None = None,
+        build_image: bool = True,
+        logger: object = None,
+        **kwargs,
+    ) -> dict:
+        if build_image:
+            build_docker_image(logger)
 
-        if not os.path.exists(self.REPO_PATH):
-            subprocess.run(["git", "clone", self.REPO_URL, self.REPO_PATH], check=True)
+        if not os.path.exists(cls.REPO_PATH):
+            subprocess.run(["git", "clone", cls.REPO_URL, cls.REPO_PATH], check=True)
 
-        practice_path = self.REPO_PATH / "exercises" / "practice"
+        practice_path = cls.REPO_PATH / "exercises" / "practice"
         directories = [d for d in practice_path.iterdir() if d.is_dir()]
 
         dataset = {}
@@ -160,11 +177,17 @@ class AiderBenchmarkEnv(RepoEnv):
             )
 
             dataset[task_name] = {
+                "task_name": task_name,
                 "codebase": directory,
                 "instructions": instructions,
                 "filename": task_name + ".py",
             }
 
         problems = utils.filter_problems(dataset, problems)
-        dataset = {id: i for id, i in dataset.items() if id in problems}
+        dataset = {id: data for id, data in dataset.items() if id in problems}
+
+        # Add env_type to each task_data.
+        for task_data in dataset.values():
+            task_data["env_type"] = "aider"
+
         return dataset

@@ -200,7 +200,7 @@ def filter_problems(
     problems: str | list[str] | None = None,
     custom_splits: dict[str, Any] | None = None,
     excluded_ids: list[str] | None = None,
-) -> dict[str, Any]:
+) -> list[str]:
     excluded_ids = excluded_ids or []
     custom_splits = custom_splits or {}
     problems = "all" if problems is None else problems

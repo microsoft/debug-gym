@@ -1,16 +1,16 @@
 base:
     # Environment configs
     output_path: "exps/mini_nightmare"
-    benchmark: "mini_nightmare"
-    problems: "all"  # list of problems, e.g., ["config"], or "all"
-    env_kwargs: {
-        "run_timeout": 30,
-        # shortcut features
-    }
 
-    terminal: {
-        type: "docker",  # "docker", "kubernetes", or "local"
-    }
+    env:
+        run_timeout: 30
+
+    terminal:
+        type: "docker"  # "docker", "kubernetes", or "local"
+
+    dataset:
+        type: "mini_nightmare"
+        problems: "all"  # list of problems, e.g., ["config"], or "all"
 
     # LLM configs
     llm_name: "gpt-4o"

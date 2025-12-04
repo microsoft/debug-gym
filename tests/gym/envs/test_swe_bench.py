@@ -10,16 +10,14 @@ from debug_gym.gym.tools.toolbox import Toolbox
 @pytest.if_docker_running
 def test_instructions(get_swe_bench_env):
     env = get_swe_bench_env()
-    env.ds_row = {"problem_statement": "Test problem statement"}
-    expected_instructions = "Test problem statement"
-    assert env.instructions == expected_instructions
+    assert env.instructions == env.task_data["problem_statement"]
 
 
 @pytest.if_docker_running
 def test_reset_and_step(get_swe_bench_env):
     env = get_swe_bench_env()
     env.add_tool(Toolbox.get_tool("eval"))
-    env_info = env.reset(options={"task_name": "astropy__astropy-14096"})
+    env_info = env.reset()
 
     assert env.instructions == env_info.step_observation.observation
     assert "short test summary info" in env_info.eval_observation.observation
@@ -99,46 +97,52 @@ def test_readonly_file(get_swe_bench_env):
     assert "|-- test_sky_coord.py (read-only)" in env_info.step_observation.observation
 
 
-@pytest.if_docker_running
 def test_load_dataset(get_swe_bench_env):
     env = get_swe_bench_env()
-    assert env.dataset_id == "SWE-bench/SWE-bench_Verified"
+
+    dataset = env.load_dataset()
     task_name = "astropy__astropy-14096"
-    assert task_name in env.dataset.keys()
-    assert list(env.ds.features.keys()) == [
-        "repo",
-        "instance_id",
-        "base_commit",
-        "patch",
-        "test_patch",
-        "problem_statement",
-        "hints_text",
-        "created_at",
-        "version",
-        "FAIL_TO_PASS",
-        "PASS_TO_PASS",
-        "environment_setup_commit",
-        "difficulty",
-    ]
+    assert task_name in dataset
+
+    task_data = next(iter(dataset.values()))
+    assert sorted(task_data.keys()) == sorted(
+        [
+            "repo",
+            "env_type",
+            "instance_id",
+            "base_commit",
+            "patch",
+            "test_patch",
+            "problem_statement",
+            "hints_text",
+            "created_at",
+            "version",
+            "FAIL_TO_PASS",
+            "PASS_TO_PASS",
+            "environment_setup_commit",
+            "difficulty",
+        ]
+    )
 
 
-@pytest.if_docker_running
 def test_setup_task(get_swe_bench_env):
     env = get_swe_bench_env()
     task_name = "astropy__astropy-14096"
-    env.setup_task(task_name)
     assert env.task_name == task_name
-    assert env.ds_row["repo"] == "astropy/astropy"
-    assert env.ds_row["version"] == "5.1"
-    assert isinstance(env.ds_row, dict)
-    assert isinstance(env.install_configs, dict)
+    env.setup_task()
+    assert env.repo == "astropy/astropy"
+    assert env.version == "5.1"
+    assert env.package_name == "astropy"
+    assert (
+        env.base_image == "swebench/sweb.eval.x86_64.astropy_1776_astropy-14096:latest"
+    )
 
 
 @pytest.if_docker_running
 def test_setup_terminal(get_swe_bench_env):
     env = get_swe_bench_env()
     task_name = "astropy__astropy-14096"
-    env.reset(options={"task_name": task_name})
+    env.reset()
     _, git_logs = env.terminal.run("git log -n 4")
     assert env.base_commit in git_logs
     assert f"Applying test patch for {task_name}" not in git_logs
@@ -167,7 +171,7 @@ def test_patch_property(tmp_path, get_swe_bench_env):
     env = get_swe_bench_env()
 
     # Reset with a task to set up the environment
-    env.reset(options={"task_name": "astropy__astropy-14096"})
+    env.reset()
 
     # Initially, there should be no changes (empty patch)
     initial_patch = env.patch
@@ -218,7 +222,7 @@ def new_function():
 def test_apply_gold_patch(get_swe_bench_env):
     env = get_swe_bench_env()
     env.add_tool(Toolbox.get_tool("eval"))
-    env_info = env.reset(options={"task_name": "astropy__astropy-14096"})
+    env_info = env.reset()
 
     assert not env_info.terminated
     assert not env_info.resolved
@@ -242,12 +246,11 @@ def test_running_solution_agent(get_swe_bench_env, tmp_path):
         # Optional values that BaseAgent.run would use; harmless to include here.
         "max_steps": 1,
         "max_rewrite_steps": 1,
-        "env_kwargs": {},
     }
     for tool_name in ["pdb", "submit"]:
         env.add_tool(Toolbox.get_tool(tool_name))
     agent = AgentSolution(agent_args=config, llm=None, logger=env.logger)
-    env.reset(options={"task_name": "astropy__astropy-14096"})
+    env.reset()
     success = agent.run(env)
     assert success
 
@@ -256,7 +259,7 @@ def test_running_solution_agent(get_swe_bench_env, tmp_path):
 def test_debug_entrypoint_contains_pdb(get_swe_bench_env):
     """Ensure the environment's debug_entrypoint includes '-m pdb' for interactive debugging."""
     env = get_swe_bench_env()
-    env.reset(options={"task_name": "astropy__astropy-14096"})
+    env.reset()
     assert (
         "python -m pdb" in env.debug_entrypoint
     ), f"Expected '-m pdb' in debug_entrypoint, got: {env.debug_entrypoint}"
@@ -266,7 +269,7 @@ def test_debug_entrypoint_contains_pdb(get_swe_bench_env):
 def test_setup_terminal_debug_mode(get_swe_bench_debug_env):
     env = get_swe_bench_debug_env()
     task_name = "astropy__astropy-14096"
-    env.reset(options={"task_name": task_name})
+    env.reset()
     _, git_logs = env.terminal.run("git log -n 4")
     assert env.base_commit in git_logs
     assert f"Applying test patch for {task_name}" in git_logs
@@ -287,11 +290,10 @@ def test_running_solution_agent_in_debug_mode(get_swe_bench_debug_env, tmp_path)
         # Optional values that BaseAgent.run would use; harmless to include here.
         "max_steps": 1,
         "max_rewrite_steps": 1,
-        "env_kwargs": {},
     }
     for tool_name in ["pdb", "eval", "submit"]:
         env.add_tool(Toolbox.get_tool(tool_name))
     agent = AgentSolution(agent_args=config, llm=None, logger=env.logger)
-    env.reset(options={"task_name": "astropy__astropy-14096"})
+    env.reset()
     success = agent.run(env)
     assert success
