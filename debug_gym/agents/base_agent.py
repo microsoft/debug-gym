@@ -371,5 +371,5 @@ def create_agent(
     if agent_args is None:
         raise ValueError("Either agent_args or config must be provided.")
 
-    agent = agent_class(args=agent_args, **agent_kwargs)
+    agent = agent_class(agent_args=agent_args, **agent_kwargs)
     return agent

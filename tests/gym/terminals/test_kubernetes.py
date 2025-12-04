@@ -70,7 +70,7 @@ def test_kubernetes_terminal_init():
     assert terminal._pod is not None
 
     # Pod name should be automatically generated when not provided at initialization.
-    assert terminal.pod_name.startswith("dbg-gym.")
+    assert terminal.pod_name.startswith("dbg-gym-")
     assert terminal.pod.is_running()
     assert terminal.pod.exists()
 

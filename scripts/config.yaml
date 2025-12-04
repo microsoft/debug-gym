@@ -1,16 +1,14 @@
 base:
     # Environment configs
     output_path: "exps/pytorch"
-    env_kwargs: {
-        "path": "data/pytorch",
-        "entrypoint": "python -m pytest -sv test.py",
-        "debug_entrypoint": "python -m pdb -m pytest -s test.py",
-        "run_timeout": 10,
-    }
-    tools: ["pdb", "view", "rewrite"]
-    terminal: {
-        type: "docker",  # "local", "docker", or "kubernetes"
-    }
+    env:
+        type: "local"
+        path: "data/pytorch"
+        entrypoint: "python -m pytest -sv test.py"
+        debug_entrypoint: "python -m pdb -m pytest -s test.py"
+        run_timeout: 10
+    terminal:
+        type: "docker"  # "local", "docker", or "kubernetes"
 
     # LLM configs
     llm_name: "gpt-4o"

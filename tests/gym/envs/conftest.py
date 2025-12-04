@@ -1,3 +1,5 @@
+import logging
+
 import pytest
 from filelock import FileLock
 
@@ -31,7 +33,12 @@ def make_env_factory(env_name, worker_id, tmp_path_factory):
     env_class = kwargs.pop("env_class")
 
     def _make_env():
-        return env_class(**kwargs)
+        dataset = env_class.load_dataset(
+            problems=kwargs["problems"], prepull_images=True
+        )
+        task_data = next(iter(dataset.values()))
+        env = env_class(task_data=task_data)
+        return env
 
     if worker_id == "master":
         # Not running with pytest-xdist or we are in the master process

@@ -1,4 +1,5 @@
 import json
+import logging
 import re
 from importlib.resources import files as importlib_files
 from pathlib import Path
@@ -14,6 +15,7 @@ from debug_gym.gym.terminals.docker import DockerTerminal
 from debug_gym.gym.terminals.kubernetes import KubernetesTerminal
 from debug_gym.gym.terminals.terminal import Terminal
 from debug_gym.gym.utils import filter_problems
+from debug_gym.logger import DebugGymLogger
 
 
 def decolor_dict_keys(key):
@@ -64,9 +66,7 @@ class R2EGymEnv(RepoEnv):
 
     def __init__(
         self,
-        dataset_id: str = "R2E-Gym/R2E-Gym-Lite",
-        dataset_revision: str = "8d3163011f01f9393bb3dc7700497a79a8686ae5",
-        split: str = "train",
+        task_data: dict,
         terminal: Terminal | None = None,
         **kwargs,
     ):
@@ -76,100 +76,38 @@ class R2EGymEnv(RepoEnv):
                 "R2EGymEnv only supports DockerTerminal and KubernetesTerminal."
             )
 
-        self.dataset_id = dataset_id
-        self.dataset_revision = dataset_revision
-        self.split = split
+        super().__init__(task_data=task_data, terminal=terminal, **kwargs)
         self.session_commands = []
 
-        super().__init__(terminal=terminal, **kwargs)
+    @property
+    def task_name(self) -> str:
+        return self.task_data["instance_id"]
 
     @property
     def instructions(self) -> str:
         # try getting the content inside of [ISSUE] [/ISSUE] using regex tags for ds['problem_statement'] else return ds['problem_statement']
         # ref: https://github.com/R2E-Gym/R2E-Gym/blob/main/src/r2egym/agenthub/runtime/docker.py#L592
         try:
-            content = self.ds_row["problem_statement"]
+            content = self.task_data["problem_statement"]
             return re.search(r"\[ISSUE\](.*)\[/ISSUE\]", content, re.DOTALL).group(1)
         except Exception as e:
-            return self.ds_row["problem_statement"]
+            return self.task_data["problem_statement"]
 
-    def load_dataset(self, problems: str | list[str] | None = None):
-        data_path = Path(self.dataset_id)
-        if data_path.is_file():
-            # Loading from local file.
-            if data_path.suffix.lower() == ".json":
-                self.ds = load_dataset("json", data_files=self.dataset_id)
-            elif data_path.suffix.lower() == ".parquet":
-                self.ds = load_dataset("parquet", data_files=self.dataset_id)
-        elif data_path.is_dir():
-            # Loading from local folder.
-            self.ds = load_from_disk(self.dataset_id)
-        else:
-            # Loading from HuggingFace or a folder.
-            self.ds = load_dataset(self.dataset_id, revision=self.dataset_revision)
-
-        # Select the split.
-        self.ds = self.ds[self.split]
-
-        # Load custom dataset splits from config.
-        with open(R2EGymEnv.CONFIG) as f:
-            custom_splits = yaml.safe_load(f)
-            excluded_ids = custom_splits.get("excluded", [])
-
-        dataset = {
-            id.split("/", 1)[-1]: i for i, id in enumerate(self.ds["docker_image"])
-        }
-        problems = filter_problems(dataset, problems, custom_splits, excluded_ids)
-        dataset = {id: i for id, i in dataset.items() if id in problems}
-
-        image_names = set(self.ds[dataset[id]]["docker_image"] for id in dataset)
-        self.logger.debug(
-            f"Loaded {len(dataset)} tasks accross {len(image_names)} Docker images from {self.dataset_id}."
-        )
-
-        if not isinstance(self.terminal, KubernetesTerminal):
-            # Download all images needed for R2E-Gym.
-            client = docker.from_env()
-
-            existing_images = set(
-                tag for image in client.images.list() for tag in image.tags
-            )
-            missing_images = image_names - existing_images
-            if missing_images:
-                self.logger.warning(
-                    f"Found {len(missing_images)} missing Docker images."
-                )
-                for i, image_name in enumerate(missing_images):
-                    self.logger.warning(
-                        f"Pulling Docker image {i + 1}/{len(missing_images)} `{image_name}`."
-                    )
-                    client.images.pull(image_name)
-
-        return dataset
-
-    def setup_task(self, task_name: str, options: dict = None):
-        if task_name not in self.dataset:
-            raise ValueError(
-                f"Task `{task_name}` was not found in dataset. The available tasks are: {self.dataset}.\n"
-                "Please provide a valid task or initialize the environment without problems to load all tasks."
-            )
-
-        self.task_name = task_name
-        self.ds_row = self.ds[self.dataset[self.task_name]]
-        self.base_image = self.ds_row["docker_image"]
-        self.package_name = self.ds_row["repo_name"]
-        self.expected_output = json.loads(self.ds_row["expected_output_json"])
+    def setup_task(self):
+        self.base_image = self.task_data["docker_image"]
+        self.package_name = self.task_data["repo_name"]
+        self.expected_output = json.loads(self.task_data["expected_output_json"])
         self.expected_output = decolor_dict_keys(self.expected_output)
         self.expected_output = {
             k.split(" - ")[0]: self.expected_output[k]
             for k in sorted(self.expected_output.keys())
         }
 
-        self.commit_hash = self.ds_row["commit_hash"]
+        self.commit_hash = self.task_data["commit_hash"]
 
         self.entrypoint = "python -m pytest -W ignore -rA r2e_tests"
         if self.package_name == "pillow":
-            test_file_codes = json.loads(self.ds_row["execution_result_content"])[
+            test_file_codes = json.loads(self.task_data["execution_result_content"])[
                 "test_file_codes"
             ]
             if any(["unittest" in test_code for test_code in test_file_codes]):
@@ -314,3 +252,75 @@ class R2EGymEnv(RepoEnv):
             reward = 1 if match else 0
 
         return reward
+
+    @classmethod
+    def load_dataset(
+        cls,
+        dataset_id: str = "R2E-Gym/R2E-Gym-Lite",
+        dataset_revision: str = "8d3163011f01f9393bb3dc7700497a79a8686ae5",
+        split: str = "train",
+        problems: list | None = None,
+        prepull_images: bool = False,
+        logger: DebugGymLogger | None = None,
+        **kwargs,
+    ) -> dict:
+        logger = logger or DebugGymLogger("debug_gym")
+        data_path = Path(dataset_id)
+
+        if data_path.is_file():
+            # Loading from local file.
+            if data_path.suffix.lower() == ".json":
+                ds = load_dataset("json", data_files=dataset_id)
+            elif data_path.suffix.lower() == ".parquet":
+                ds = load_dataset("parquet", data_files=dataset_id)
+        elif data_path.is_dir():
+            # Loading from local folder.
+            ds = load_from_disk(dataset_id)
+        else:
+            # Loading from HuggingFace or a folder.
+            ds = load_dataset(dataset_id, revision=dataset_revision)
+
+        # Select the split.
+        ds = ds[split]
+
+        # Load custom dataset splits from config.
+        with open(R2EGymEnv.CONFIG) as f:
+            custom_splits = yaml.safe_load(f)
+            excluded_ids = custom_splits.get("excluded", [])
+
+        def extract_instance_id(docker_image: str) -> str:
+            return docker_image.split("/", 1)[-1]
+
+        id2idx = {
+            extract_instance_id(docker_image): i
+            for i, docker_image in enumerate(ds["docker_image"])
+        }
+        problems = filter_problems(id2idx, problems, custom_splits, excluded_ids)
+        dataset = {problem: ds[id2idx[problem]] for problem in problems}
+
+        # Add instance_id (name of the image) and env_type to each task_data.
+        for instance_id, task_data in dataset.items():
+            task_data["instance_id"] = instance_id
+            task_data["env_type"] = "r2egym"
+
+        image_names = set(task_data["docker_image"] for task_data in dataset.values())
+        logger.debug(
+            f"Loaded {len(dataset)} tasks across {len(image_names)} Docker images from {dataset_id}."
+        )
+
+        if prepull_images:
+            # Download all images needed for R2E-Gym.
+            client = docker.from_env()
+
+            existing_images = set(
+                tag for image in client.images.list() for tag in image.tags
+            )
+            missing_images = image_names - existing_images
+            if missing_images:
+                logger.warning(f"Found {len(missing_images)} missing Docker images.")
+                for i, image_name in enumerate(missing_images):
+                    logger.warning(
+                        f"Pulling Docker image {i + 1}/{len(missing_images)} `{image_name}`."
+                    )
+                    client.images.pull(image_name)
+        return dataset

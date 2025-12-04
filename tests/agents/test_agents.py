@@ -285,8 +285,8 @@ def test_create_agent():
     class TestRegisteredAgent(BaseAgent):
         name = "test_registered"
 
-        def __init__(self, args, env, **kwargs):
-            super().__init__(args, env, **kwargs)
+        def __init__(self, agent_args, env, **kwargs):
+            super().__init__(agent_args, env, **kwargs)
 
     # Clear and setup registry
     original_registry = AGENT_REGISTRY.copy()

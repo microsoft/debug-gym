@@ -1,6 +1,6 @@
 import pytest
 
-from debug_gym.gym.envs.env import RepoEnv
+from debug_gym.gym.envs.local import LocalEnv
 from debug_gym.gym.tools.listdir import ListdirTool
 
 
@@ -8,7 +8,7 @@ from debug_gym.gym.tools.listdir import ListdirTool
 def setup_listdir_repo_env(setup_test_repo):
     def _setup_listdir_repo_env(base_dir):
         test_repo = setup_test_repo(base_dir)
-        env = RepoEnv(path=str(test_repo))
+        env = LocalEnv(path=str(test_repo))
         listdir_tool = ListdirTool()
         listdir_tool.register(env)
         env.reset()

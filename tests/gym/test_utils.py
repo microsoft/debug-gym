@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from debug_gym.gym.envs.env import RepoEnv
+from debug_gym.gym.envs.local import LocalEnv
 from debug_gym.gym.utils import (
     _walk,
     cleanup_pytest_output,
@@ -45,7 +45,7 @@ def test_show_line_number_no_code_path_no_breakpoints():
 
 
 def test_show_line_number_with_code_path(tmp_path):
-    env = RepoEnv(path=tmp_path)
+    env = LocalEnv(path=tmp_path)
     env.reset()
     code_path = f"{env.working_dir}/code.py"
     breakpoints_state = {f"{code_path}|||2": "b 2"}
@@ -65,7 +65,7 @@ def test_show_line_number_with_code_path(tmp_path):
 
 
 def test_show_line_number_multiple_breakpoints(tmp_path):
-    env = RepoEnv(path=tmp_path)
+    env = LocalEnv(path=tmp_path)
     env.reset()
     code_path = f"{env.working_dir}/code.py"
     breakpoints_state = {
@@ -92,7 +92,7 @@ def test_show_line_number_multiple_breakpoints(tmp_path):
 
 
 def test_show_line_number_multiple_breakpoints_with_start_index(tmp_path):
-    env = RepoEnv(path=tmp_path)
+    env = LocalEnv(path=tmp_path)
     env.reset()
     code_path = f"{env.working_dir}/code.py"
     breakpoints_state = {
