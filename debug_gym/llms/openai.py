@@ -1,12 +1,9 @@
 import json
 import logging
 
-import openai
 import tiktoken
 from openai import NOT_GIVEN, OpenAI
-from transformers import AutoTokenizer
 
-from debug_gym.gym.envs.env import EnvInfo
 from debug_gym.gym.tools.tool import EnvironmentTool, ToolCall
 from debug_gym.gym.utils import filter_non_utf8
 from debug_gym.llms.base import (

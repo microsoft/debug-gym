@@ -105,7 +105,7 @@ def test_instructions(env):
 
 @patch("debug_gym.gym.envs.aider.build_docker_image")
 def test_build_docker_image(mock_build_docker_image):
-    dataset = AiderBenchmarkEnv.load_dataset()
+    AiderBenchmarkEnv.load_dataset()
     mock_build_docker_image.assert_called_once()
 
 

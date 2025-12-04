@@ -1,17 +1,13 @@
 import json
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import MagicMock, Mock
 
 import pytest
-from jinja2 import Template
 
 from debug_gym.agents.debug_agent import DebugAgent
-from debug_gym.agents.history_tracker import HistoryTracker
 from debug_gym.agents.rewrite_agent import RewriteAgent
 from debug_gym.agents.utils import save_patch, save_trajectory
-from debug_gym.gym.tools.tool import ToolCall
 from debug_gym.gym.tools.toolbox import Toolbox
-from debug_gym.llms.base import LLMConfigRegistry, LLMResponse, TokenUsage
-from debug_gym.llms.openai import OpenAILLM
+from debug_gym.llms.base import LLMResponse, TokenUsage
 
 
 def test_default_system_prompt(agent_setup, build_env_info):

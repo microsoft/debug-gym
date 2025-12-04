@@ -4,7 +4,6 @@ import uuid
 from dataclasses import MISSING, asdict, dataclass, field, fields
 from typing import Any, Dict
 
-import numpy as np
 from jinja2 import Environment, Template
 
 from debug_gym.agents.history_tracker import HistoryTracker

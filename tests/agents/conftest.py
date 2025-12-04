@@ -3,8 +3,6 @@ from unittest.mock import MagicMock, mock_open, patch
 
 import pytest
 
-from debug_gym.agents.base_agent import AgentArgs
-
 
 @pytest.fixture
 def open_data():

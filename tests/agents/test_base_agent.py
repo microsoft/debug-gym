@@ -11,9 +11,7 @@ from debug_gym.agents.base_agent import (
     create_agent,
     register_agent,
 )
-from debug_gym.llms.base import LLMConfigRegistry
 from debug_gym.llms.human import Human
-from debug_gym.llms.openai import OpenAILLM
 
 
 def test_register_agent():

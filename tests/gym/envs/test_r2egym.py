@@ -1,5 +1,3 @@
-from unittest.mock import MagicMock, patch
-
 import pyarrow as pa
 import pyarrow.parquet as pq
 import pytest
@@ -162,7 +160,6 @@ def test_reset_and_step(get_r2egym_env):
     env_info = env.step(tool_call)
     assert env_info.step_observation.source == "listdir"
     # Verify we can see the tldextract directory structure
-    observation = env_info.step_observation.observation
     listdir_start = f"""{env.working_dir}/
 |-- CHANGES/
 |-- CHANGES.rst

@@ -1,9 +1,6 @@
-from unittest.mock import patch
-
 from debug_gym.agents.history_tracker import HistoryTracker
 from debug_gym.gym.tools.tool import ToolCall
-from debug_gym.llms import OpenAILLM
-from debug_gym.llms.base import LLMConfigRegistry, LLMResponse
+from debug_gym.llms.base import LLMResponse
 
 
 def test_history_tracker(build_env_info):

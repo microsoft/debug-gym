@@ -1,8 +1,6 @@
 from dataclasses import dataclass
-from typing import Any, Dict
 
-from debug_gym.agents.base_agent import LLM, AgentArgs, BaseAgent, register_agent
-from debug_gym.agents.history_tracker import HistoryTracker
+from debug_gym.agents.base_agent import AgentArgs, BaseAgent, register_agent
 from debug_gym.gym.envs.env import EnvInfo
 
 

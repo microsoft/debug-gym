@@ -393,7 +393,7 @@ def test_llm_call_override_generate_kwargs(
     messages = [{"role": "user", "content": "Hello"}]
     llm_mock = llm_class_mock("llm-mock", logger=logger_mock)
     # Override the temperature from config
-    llm_response = llm_mock(messages, tools, temperature=0.2)
+    llm_mock(messages, tools, temperature=0.2)
     # Check that the override worked: 0.2 from kwargs, not 0.7 from config
     assert llm_mock.called_kwargs["temperature"] == 0.2
 
@@ -416,7 +416,7 @@ def test_llm_call_override_generate_kwargs(
 def test_llm_call_ignore_kwargs(mock_llm_config, logger_mock, llm_class_mock):
     messages = [{"role": "user", "content": "Hello"}]
     llm_mock = llm_class_mock("llm-mock", logger=logger_mock)
-    llm_response = llm_mock(messages, tools, temperature=0.7, max_tokens=10)
+    llm_mock(messages, tools, temperature=0.7, max_tokens=10)
     assert "temperature" not in llm_mock.called_kwargs
     assert llm_mock.called_kwargs["max_tokens"] == 10
 
@@ -444,7 +444,7 @@ def test_llm_call_system_prompt_not_supported(
         {"role": "user", "content": "Hello"},
     ]
     llm_mock = llm_class_mock("llm-mock", logger=logger_mock)
-    llm_response = llm_mock(messages, tools)
+    llm_mock(messages, tools)
     assert llm_mock.called_messages == [
         {"role": "user", "content": "You are a helpful assistant"},
         {"role": "user", "content": "Hello"},

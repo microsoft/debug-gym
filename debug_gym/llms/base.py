@@ -13,7 +13,6 @@ from tenacity import (
     wait_random_exponential,
 )
 
-from debug_gym.gym.envs.env import EnvInfo
 from debug_gym.gym.tools.tool import EnvironmentTool, ToolCall
 from debug_gym.llms.constants import DEFAULT_LLM_CONFIG
 from debug_gym.llms.utils import print_messages, trim_prompt_messages
