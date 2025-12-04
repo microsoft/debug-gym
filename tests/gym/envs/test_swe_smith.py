@@ -1,11 +1,13 @@
 from pathlib import Path
 
 import datasets
+import pyarrow as pa
+import pyarrow.parquet as pq
 import pytest
 
 from debug_gym.agents.solution_agent import AgentSolution
 from debug_gym.gym.entities import Observation
-from debug_gym.gym.envs import SWESmithEnv
+from debug_gym.gym.envs.swe_smith import SWESmithEnv
 from debug_gym.gym.tools.tool import ToolCall
 from debug_gym.gym.tools.toolbox import Toolbox
 
@@ -13,11 +15,17 @@ from debug_gym.gym.tools.toolbox import Toolbox
 @pytest.if_docker_running
 def test_load_dataset(get_swe_smith_env):
     env = get_swe_smith_env()
-    assert env.dataset_id == "SWE-bench/SWE-smith"
+
+    task_name = "john-kurkowski__tldextract.3d1bf184.combine_file__1vnuqpt4"
+    dataset = env.load_dataset(problems=[task_name])
+    assert task_name in dataset
+
     # check if the dataset contains features that SWESmithEnv expects
-    assert sorted(env.ds.features.keys()) == sorted(
+    task_data = next(iter(dataset.values()))
+    assert sorted(task_data.keys()) == sorted(
         [
             "instance_id",
+            "env_type",
             "repo",
             "patch",
             "FAIL_TO_PASS",
@@ -32,8 +40,9 @@ def test_load_dataset(get_swe_smith_env):
 
 def test_load_dataset_from_parquet(tmp_path):
     """Test that loading from a local Parquet file works correctly."""
+
     # Create a sample parquet file with the required features
-    sample_data = {
+    data = {
         "instance_id": ["test-instance-1", "test-instance-2"],
         "repo": ["test/repo1", "test/repo2"],
         "patch": ["diff --git a/file.py", "diff --git b/file2.py"],
@@ -44,20 +53,20 @@ def test_load_dataset_from_parquet(tmp_path):
         "base_commit": ["abc123", "def456"],
         "problem_statement": ["Problem 1", "Problem 2"],
     }
+    parquet_file = tmp_path / "test_dataset.parquet"
 
-    # Create a dataset and save as parquet
-    ds = datasets.Dataset.from_dict(sample_data)
-    parquet_path = tmp_path / "test_dataset.parquet"
-    ds.to_parquet(str(parquet_path))
+    table = pa.table(data)
+    pq.write_table(table, str(parquet_file))
 
-    # Test that the parquet file can be loaded using datasets library
-    # mimicking what SWESmithEnv.load_dataset() does for parquet files
-    loaded_ds = datasets.load_dataset("parquet", data_files=str(parquet_path))["train"]
+    # Load the dataset from the Parquet file
+    dataset = SWESmithEnv.load_dataset(dataset_id=str(parquet_file), split="train")
+    dataset_entry = next(iter(dataset.values()))
 
     # Verify that the dataset was loaded correctly with expected features
-    assert sorted(loaded_ds.features.keys()) == sorted(
+    assert sorted(dataset_entry.keys()) == sorted(
         [
             "instance_id",
+            "env_type",
             "repo",
             "patch",
             "FAIL_TO_PASS",
@@ -69,25 +78,20 @@ def test_load_dataset_from_parquet(tmp_path):
         ]
     )
     # Verify that the data is accessible
-    assert len(loaded_ds) == 2
-    assert loaded_ds[0]["instance_id"] == "test-instance-1"
-    assert loaded_ds[1]["instance_id"] == "test-instance-2"
+    assert len(dataset) == 2
+    assert sorted(dataset.keys()) == ["test-instance-1", "test-instance-2"]
 
 
-@pytest.if_docker_running
 def test_instructions(get_swe_smith_env):
     env = get_swe_smith_env()
-    env.ds_row = {"problem_statement": "Test problem statement"}
-    expected_instructions = "Test problem statement"
-    assert env.instructions == expected_instructions
+    assert env.instructions == env.task_data["problem_statement"]
 
 
-@pytest.if_docker_running
 def test_setup_task(get_swe_smith_env):
     env = get_swe_smith_env()
     task_name = "john-kurkowski__tldextract.3d1bf184.combine_file__1vnuqpt4"
-    env.setup_task(task_name)
     assert env.task_name == task_name
+    env.setup_task()
     assert env.repo == "john-kurkowski/tldextract"
     assert env.branch_name == task_name
     assert env.package_name == "tldextract"
@@ -97,7 +101,7 @@ def test_setup_task(get_swe_smith_env):
 def test_setup_terminal(get_swe_smith_env):
     env = get_swe_smith_env()
     task_name = "john-kurkowski__tldextract.3d1bf184.combine_file__1vnuqpt4"
-    env.reset(options={"task_name": task_name})
+    env.reset()
     _, git_logs = env.terminal.run("git log -n 4")
     # For SWE-Smith the base commit is found in the branch associated to the
     # instance id and is different from the one in the main branch.
@@ -112,11 +116,7 @@ def test_setup_terminal(get_swe_smith_env):
 def test_reset_and_step(get_swe_smith_env):
     env = get_swe_smith_env()
     env.add_tool(Toolbox.get_tool("eval"))
-    env_info = env.reset(
-        options={
-            "task_name": "john-kurkowski__tldextract.3d1bf184.combine_file__1vnuqpt4"
-        }
-    )
+    env_info = env.reset()
 
     assert env.instructions == env_info.step_observation.observation
     assert "short test summary info" in env_info.eval_observation.observation
@@ -156,11 +156,7 @@ def test_reset_and_step(get_swe_smith_env):
 @pytest.if_docker_running
 def test_readonly_file(get_swe_smith_env):
     env = get_swe_smith_env()
-    env_info = env.reset(
-        options={
-            "task_name": "john-kurkowski__tldextract.3d1bf184.combine_file__1vnuqpt4"
-        }
-    )
+    env_info = env.reset()
 
     env.add_tool(Toolbox.get_tool("view"))
     env.add_tool(Toolbox.get_tool("listdir"))
@@ -199,11 +195,7 @@ def test_readonly_file(get_swe_smith_env):
 def test_apply_gold_patch(get_swe_smith_env):
     env = get_swe_smith_env()
     env.add_tool(Toolbox.get_tool("eval"))
-    env_info = env.reset(
-        options={
-            "task_name": "john-kurkowski__tldextract.3d1bf184.combine_file__1vnuqpt4"
-        }
-    )
+    env_info = env.reset()
 
     assert not env_info.terminated
     assert not env_info.resolved
@@ -220,8 +212,7 @@ def test_calculate_score_with_pytest_error(get_swe_smith_env):
     """Test that the indentation error in pytest is handled correctly."""
     env = get_swe_smith_env()
     env.add_tool(Toolbox.get_tool("eval"))
-    task_name = "john-kurkowski__tldextract.3d1bf184.combine_file__1vnuqpt4"
-    env.reset(options={"task_name": task_name})
+    env.reset()
 
     # Modify 'tldextract/tldextract.py' in the working_dir to introduce an indentation error.
     content = env.workspace.read_file("tldextract/tldextract.py").split("\n")
@@ -253,19 +244,18 @@ def test_calculate_score_with_pytest_error(get_swe_smith_env):
 def test_running_solution_agent(get_swe_smith_env, tmp_path):
     """Analogous to SWE Bench solution agent test: run SolutionAgent end-to-end and assert success."""
     env = get_swe_smith_env()
-    task_name = "john-kurkowski__tldextract.3d1bf184.combine_file__1vnuqpt4"
     config = {
         "output_path": str(tmp_path),
         "random_seed": 0,
         "memory_size": 8,
         "max_steps": 1,
         "max_rewrite_steps": 1,
-        "env_kwargs": {},
+        "env": env,
     }
     for tool_name in ["pdb", "eval", "submit"]:
         env.add_tool(Toolbox.get_tool(tool_name))
     agent = AgentSolution(agent_args=config, llm=None, logger=env.logger)
-    env.reset(options={"task_name": task_name})
+    env.reset()
     success = agent.run(env)
     assert success
 
@@ -274,11 +264,7 @@ def test_running_solution_agent(get_swe_smith_env, tmp_path):
 def test_debug_entrypoint_contains_pdb(get_swe_smith_env):
     """Ensure the environment's debug_entrypoint includes '-m pdb' for interactive debugging."""
     env = get_swe_smith_env()
-    env.reset(
-        options={
-            "task_name": "john-kurkowski__tldextract.3d1bf184.combine_file__1vnuqpt4"
-        }
-    )
+    env.reset()
     assert (
         "python -m pdb" in env.debug_entrypoint
     ), f"Expected '-m pdb' in debug_entrypoint, got: {env.debug_entrypoint}"

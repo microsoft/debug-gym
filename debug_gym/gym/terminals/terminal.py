@@ -32,8 +32,9 @@ class Terminal(ABC):
         self._working_dir = working_dir
         self.sessions = []
 
+        kwargs.pop("type", None)  # remove 'type' if present
         if kwargs:
-            self.logger.warning(f"Ignoring unknown parameters: {kwargs}")
+            self.logger.debug(f"Ignoring unknown parameters: {kwargs}")
 
     @property
     def working_dir(self):

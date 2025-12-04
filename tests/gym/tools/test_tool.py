@@ -1,7 +1,10 @@
+from pathlib import Path
+
 import pytest
 
 from debug_gym.gym.entities import Observation
-from debug_gym.gym.envs.env import Event, RepoEnv
+from debug_gym.gym.envs.env import Event
+from debug_gym.gym.envs.local import LocalEnv
 from debug_gym.gym.tools.tool import EnvironmentTool, Record
 from debug_gym.gym.tools.toolbox import Toolbox
 
@@ -13,9 +16,14 @@ class FakeTool(EnvironmentTool):
         return Observation("FakeTool", action)
 
 
-def test_register_valid_environment():
+@pytest.fixture
+def env(tmp_path):
+    env = LocalEnv(path=tmp_path)
+    return env
+
+
+def test_register_valid_environment(env):
     tool = FakeTool()
-    env = RepoEnv()
     tool.register(env)
     # every tool listen to ENV_RESET event to track history
     assert tool in env.event_hooks.event_listeners[Event.ENV_RESET]
@@ -46,7 +54,7 @@ def test_abstract_methods():
         tool = CompletelyFakeTool()
 
 
-def test_auto_subscribe(monkeypatch):
+def test_auto_subscribe(monkeypatch, env):
 
     @Toolbox.register()
     class ToolWithHandler(FakeTool):
@@ -55,7 +63,6 @@ def test_auto_subscribe(monkeypatch):
 
     tool = ToolWithHandler()
 
-    env = RepoEnv()
     env.add_tool(tool)
 
     assert tool in env.event_hooks.event_listeners[Event.ENV_RESET]
@@ -65,9 +72,8 @@ def test_auto_subscribe(monkeypatch):
             assert tool not in env.event_hooks.event_listeners[channel]
 
 
-def test_track_history():
+def test_track_history(env):
     tool = FakeTool()
-    env = RepoEnv()
 
     assert hasattr(tool, "history")
     assert isinstance(tool.history, list)
@@ -90,18 +96,16 @@ def test_track_history():
     )
 
 
-def test_unknown_args():
+def test_unknown_args(env):
     tool = FakeTool()
-    env = RepoEnv()
     obs = tool(env, unknown_arg="unknown_value")
     assert obs == Observation(
         "FakeTool", "FakeTool.use() got an unexpected keyword argument 'unknown_arg'"
     )
 
 
-def test_unregister():
+def test_unregister(env):
     tool = FakeTool()
-    env = RepoEnv()
     tool.register(env)
 
     # Verify tool is registered
@@ -120,7 +124,7 @@ def test_unregister_invalid_environment():
         tool.unregister(object())
 
 
-def test_unregister_with_multiple_handlers():
+def test_unregister_with_multiple_handlers(env):
     class ToolWithMultipleHandlers(FakeTool):
         def on_env_reset(self, environment, **kwargs):
             return "Handler for Event.ENV_RESET"
@@ -129,7 +133,6 @@ def test_unregister_with_multiple_handlers():
             return "Handler for Event.ENV_STEP"
 
     tool = ToolWithMultipleHandlers()
-    env = RepoEnv()
     tool.register(env)
 
     # Verify tool is registered for both events
