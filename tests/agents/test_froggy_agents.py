@@ -24,7 +24,7 @@ def test_default_system_prompt(agent_setup, build_env_info):
     info = build_env_info(
         instructions="some instruction",
         current_breakpoints=[],
-        eval_observation="eval obs",
+        eval_observation="",
     )
     system_prompt = agent.build_system_prompt(info)
     expected = {
@@ -41,13 +41,10 @@ def test_default_system_prompt(agent_setup, build_env_info):
     assert system_prompt == expected
 
 
-def test_default_system_prompt_auto_eval(agent_setup, build_env_info):
+def test_default_system_prompt_with_eval_output(agent_setup, build_env_info):
     agent, env, _ = next(agent_setup(DebugAgent))
     agent.system_prompt = "some task"
     agent.shortcut_features = Mock(return_value=["f1", "f2"])
-
-    eval_tool = Toolbox.get_tool("eval", auto_eval_on_rewrite=True)
-    env.add_tool(eval_tool)
     info = build_env_info(
         instructions="some instruction",
         current_breakpoints=[],
@@ -99,7 +96,7 @@ def test_load_system_prompt_template_default_no_shortcuts_or_eval(
 
 def test_build_system_prompt(agent_setup, build_env_info):
     agent, env, _ = next(agent_setup(DebugAgent))
-    eval_tool = Toolbox.get_tool("eval", auto_eval_on_rewrite=True)
+    eval_tool = Toolbox.get_tool("eval")
     pdb_tool = Toolbox.get_tool("pdb", auto_list=True, persistent_breakpoints=True)
     env.add_tool(eval_tool)
     env.add_tool(pdb_tool)
@@ -123,11 +120,6 @@ def test_build_system_prompt(agent_setup, build_env_info):
         "Current breakpoints": [1, 2],
         "Evaluation output of current code": "eval obs",
         "Shortcut features": [
-            "After successful rewrites, the environment will automatically call "
-            "the Eval tool to evaluate the rewritten code. Therefore, you do not "
-            "need to call the Eval tool yourself. The evaluation output will be "
-            "updated automatically in the system prompt.",
-            "The environment will show the directory tree of the repository in the system prompt.",
             "The environment will show the current breakpoints in the system prompt.",
             "The environment will automatically restore existing breakpoints when a new PDB session is started (e.g., after a rewrite).",
             "After every valid PDB tool calling, the environment will automatically call the PDB tool again with a `list .` command, which will show the code around the current frame.",
@@ -187,17 +179,13 @@ def test_build_system_prompt_rewrite_agent(agent_setup, build_env_info):
 def test_shortcut_features_comprehensive(agent_setup):
     """Test all shortcut features combinations"""
     agent, env, _ = next(agent_setup(DebugAgent))
-    eval_tool = Toolbox.get_tool("eval", auto_eval_on_rewrite=True)
-    env.add_tool(eval_tool)
     # Test with all features enabled
     agent.args.show_directory_tree = 1
     agent.args.show_current_breakpoints = True
     env.has_tool.return_value = True
 
     features = agent.shortcut_features()
-    assert len(features) == 5
-    assert any("automatically call the Eval tool" in f for f in features)
-    assert any("directory tree" in f for f in features)
+    assert len(features) == 3
     assert any("current breakpoints" in f for f in features)
     assert any("restore existing breakpoints" in f for f in features)
     assert any("list ." in f for f in features)  # Fixed to match actual text
@@ -205,12 +193,12 @@ def test_shortcut_features_comprehensive(agent_setup):
     # Test with no PDB tool
     env.has_tool.return_value = False
     features = agent.shortcut_features()
-    assert len(features) == 2  # Only auto_eval and directory_tree
+    assert len(features) == 0
 
     # Test with no features
     agent.args.show_directory_tree = 0
     agent.args.show_current_breakpoints = False
-    env.get_tool("eval").auto_eval_on_rewrite = False
+    env.has_tool.return_value = True
     env.get_tool("pdb").auto_list = False
     env.get_tool("pdb").persistent_breakpoints = False
     features = agent.shortcut_features()

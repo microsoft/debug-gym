@@ -11,7 +11,6 @@ class FroggyAgentArgs(AgentArgs):
     max_rewrite_steps: int = -1
     show_directory_tree: int = 0
     show_current_breakpoints: bool = False
-    reset_prompt_history_after_rewrite: bool = False
     n_rewrites_before_pdb: int = 0
 
 
@@ -27,26 +26,8 @@ class FroggyAgent(BaseAgent):
             reason = "max_rewrite_steps reached"
         return should_stop, reason
 
-    def _auto_eval_on_rewrite(self):
-        """Check if auto eval on rewrite is enabled."""
-        try:
-            return self.env.get_tool("eval").auto_eval_on_rewrite
-        except KeyError:
-            return False  # no eval tool
-
     def shortcut_features(self):
         features = []
-        if self._auto_eval_on_rewrite():
-            features.append(
-                "After successful rewrites, the environment will automatically "
-                "call the Eval tool to evaluate the rewritten code. Therefore, "
-                "you do not need to call the Eval tool yourself. The evaluation "
-                "output will be updated automatically in the system prompt."
-            )
-        if self.args.show_directory_tree:
-            features.append(
-                "The environment will show the directory tree of the repository in the system prompt."
-            )
         if self.env.has_tool("pdb"):
             if self.args.show_current_breakpoints:
                 features.append(
@@ -84,7 +65,11 @@ class FroggyAgent(BaseAgent):
         if self.args.show_current_breakpoints:
             system_prompt_dict["Current breakpoints"] = info.current_breakpoints
 
-        if self._auto_eval_on_rewrite():
+        if (
+            info
+            and info.eval_observation
+            and getattr(info.eval_observation, "observation", "")
+        ):
             system_prompt_dict["Evaluation output of current code"] = self.trim_message(
                 info.eval_observation.observation,
                 max_length_percentage=0.8,

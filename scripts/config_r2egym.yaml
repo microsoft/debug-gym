@@ -23,13 +23,11 @@ base:
     max_rewrite_steps: 10
     memory_size: 20
     save_patch: True
-    reset_prompt_history_after_rewrite: False
     # Optionally loads a custom system prompt template from a file.
     # system_prompt_template_file: "script/templates/system_prompt.jinja"
 
     # Shortcut features
     "show_current_breakpoints": False  # If True, the environment will automatically show the current breakpoints at every step in the system prompt.
-    "show_directory_tree": 0  # Value indicated the depth of the directory shown in the system prompt. 0 means no directory tree is shown.
 
 rewrite_agent:
     tools:
@@ -37,8 +35,7 @@ rewrite_agent:
         - view
         - rewrite
         - listdir
-        - eval:
-            auto_eval_on_rewrite: False  # If True, the environment will automatically call the Eval tool after a successful rewrite. If this is set to True, the agent does not need to call the Eval tool itself.
+        - eval
 
 debug_agent:
     tools:

@@ -45,7 +45,6 @@ def agent_setup(tmp_path, open_data):
                 "max_rewrite_steps": 5,
                 "use_conversational_prompt": True,
                 "n_rewrites_before_pdb": 2,
-                "reset_prompt_history_after_rewrite": False,
                 "memory_size": 10,
                 "random_seed": 42,
             }
