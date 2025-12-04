@@ -159,25 +159,3 @@ class FroggyAgent(BaseAgent):
             system_prompt_dict["Shortcut features"] = shortcut_features
 
         return self.to_pretty_json(system_prompt_dict)
-
-    def apply_patch(self, patch_path: str) -> bool:
-        patch_command = ["patch", "-p1"]
-        try:
-            # Open the patch file
-            with open(patch_path, "r") as patch:
-                # Run the patch command
-                result = subprocess.run(
-                    patch_command,
-                    stdin=patch,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    text=True,
-                    check=True,
-                )
-            print("Patch applied successfully.")
-            print("Output:", result.stdout)
-            return True
-        except subprocess.CalledProcessError as e:
-            print("Failed to apply patch.")
-            print("Error:", e.stderr)
-            return False

@@ -565,38 +565,6 @@ def test_run_exception_handling(agent_setup, build_env_info):
         agent.run(env)
 
 
-def test_apply_patch_success(agent_setup, tmp_path):
-    """Test successful patch application"""
-    agent, _, _ = next(agent_setup(DebugAgent))
-
-    # Create a test patch file
-    patch_content = "--- a/test.txt\n+++ b/test.txt\n@@ -1 +1 @@\n-old\n+new\n"
-    patch_file = tmp_path / "test.patch"
-    patch_file.write_text(patch_content)
-
-    with patch("subprocess.run") as mock_run:
-        mock_run.return_value = MagicMock(stdout="Patch applied successfully")
-        result = agent.apply_patch(str(patch_file))
-        assert result is True
-        mock_run.assert_called_once()
-
-
-def test_apply_patch_failure(agent_setup, tmp_path):
-    """Test failed patch application"""
-    agent, _, _ = next(agent_setup(DebugAgent))
-
-    # Create a test patch file
-    patch_file = tmp_path / "test.patch"
-    patch_file.write_text("invalid patch content")
-
-    with patch("subprocess.run") as mock_run:
-        mock_run.side_effect = subprocess.CalledProcessError(
-            1, "patch", stderr="Patch failed"
-        )
-        result = agent.apply_patch(str(patch_file))
-        assert result is False
-
-
 def test_save_patch(agent_setup, tmp_path):
     """Test patch saving functionality"""
     agent, env, _ = next(agent_setup(DebugAgent))
