@@ -297,3 +297,195 @@ def test_bash_multiple_commands(env):
     assert env_info.step_observation.source == "bash"
     observation = env_info.step_observation.observation
     assert "test" in observation
+
+
+def test_bash_file_creation_with_heredoc_eof(env):
+    """Test file creation using heredoc with EOF delimiter."""
+    bash_call = ToolCall(
+        id="bash_test",
+        name="bash",
+        arguments={
+            "command": "cat << 'EOF' > heredoc_test.txt\nLine 1\nLine 2\nLine 3\nEOF"
+        },
+    )
+    env_info = env.step(bash_call)
+    assert env_info.step_observation.source == "bash"
+
+    # Verify the file content
+    bash_call = ToolCall(
+        id="bash_test", name="bash", arguments={"command": "cat heredoc_test.txt"}
+    )
+    env_info = env.step(bash_call)
+    observation = env_info.step_observation.observation
+    assert "Line 1" in observation
+    assert "Line 2" in observation
+    assert "Line 3" in observation
+
+
+def test_bash_file_creation_newline_preservation(env):
+    """Test that newlines are preserved correctly in file creation."""
+    # Create a file with multiple lines using printf
+    bash_call = ToolCall(
+        id="bash_test",
+        name="bash",
+        arguments={"command": "printf 'Line1\\nLine2\\nLine3\\n' > newlines.txt"},
+    )
+    env_info = env.step(bash_call)
+    assert env_info.step_observation.source == "bash"
+
+    # Verify exact line count
+    bash_call = ToolCall(
+        id="bash_test", name="bash", arguments={"command": "wc -l < newlines.txt"}
+    )
+    env_info = env.step(bash_call)
+    observation = env_info.step_observation.observation.strip()
+    assert observation == "3"
+
+
+def test_bash_file_creation_trailing_newline(env):
+    """Test handling of trailing newlines in file creation."""
+    # Create file with trailing newline
+    bash_call = ToolCall(
+        id="bash_test",
+        name="bash",
+        arguments={"command": "printf 'content\\n' > with_newline.txt"},
+    )
+    env.step(bash_call)
+
+    # Create file without trailing newline
+    bash_call = ToolCall(
+        id="bash_test",
+        name="bash",
+        arguments={"command": "printf 'content' > without_newline.txt"},
+    )
+    env.step(bash_call)
+
+    # Verify difference in file sizes
+    bash_call = ToolCall(
+        id="bash_test",
+        name="bash",
+        arguments={"command": "stat -c%s with_newline.txt without_newline.txt"},
+    )
+    env_info = env.step(bash_call)
+    observation = env_info.step_observation.observation
+    sizes = observation.strip().split("\n")
+    # File with newline should be 1 byte larger
+    assert int(sizes[0]) == int(sizes[1]) + 1
+
+
+def test_bash_file_creation_multiline_content(env):
+    """Test creating files with multi-line content preserves structure."""
+    content = """def hello():
+    print("Hello")
+    return True"""
+    # Use heredoc to create file with multi-line Python code
+    bash_call = ToolCall(
+        id="bash_test",
+        name="bash",
+        arguments={"command": f"cat << 'PYEOF' > multiline.py\n{content}\nPYEOF"},
+    )
+    env_info = env.step(bash_call)
+    assert env_info.step_observation.source == "bash"
+
+    # Verify file content structure
+    bash_call = ToolCall(
+        id="bash_test", name="bash", arguments={"command": "cat multiline.py"}
+    )
+    env_info = env.step(bash_call)
+    observation = env_info.step_observation.observation
+    assert "def hello():" in observation
+    assert 'print("Hello")' in observation
+    assert "return True" in observation
+
+
+def test_bash_file_creation_special_characters_in_heredoc(env):
+    """Test heredoc handling of special characters without expansion."""
+    # Using quoted EOF to prevent variable expansion
+    bash_call = ToolCall(
+        id="bash_test",
+        name="bash",
+        arguments={
+            "command": "cat << 'EOF' > special.txt\n$HOME\n${PATH}\n`whoami`\nEOF"
+        },
+    )
+    env_info = env.step(bash_call)
+    assert env_info.step_observation.source == "bash"
+
+    # Verify special characters are preserved literally (not expanded)
+    bash_call = ToolCall(
+        id="bash_test", name="bash", arguments={"command": "cat special.txt"}
+    )
+    env_info = env.step(bash_call)
+    observation = env_info.step_observation.observation
+    # With quoted heredoc, variables should NOT be expanded
+    assert "$HOME" in observation
+    assert "${PATH}" in observation
+    assert "`whoami`" in observation
+
+
+def test_bash_file_creation_empty_lines_preserved(env):
+    """Test that empty lines are preserved in file creation."""
+    bash_call = ToolCall(
+        id="bash_test",
+        name="bash",
+        arguments={
+            "command": "cat << 'EOF' > empty_lines.txt\nLine 1\n\n\nLine 4\nEOF"
+        },
+    )
+    env_info = env.step(bash_call)
+    assert env_info.step_observation.source == "bash"
+
+    # Count total lines including empty ones
+    bash_call = ToolCall(
+        id="bash_test", name="bash", arguments={"command": "wc -l < empty_lines.txt"}
+    )
+    env_info = env.step(bash_call)
+    observation = env_info.step_observation.observation.strip()
+    # Should have 4 lines: "Line 1", "", "", "Line 4"
+    assert observation == "4"
+
+
+def test_bash_file_creation_with_tabs_and_spaces(env):
+    """Test that tabs and spaces are preserved correctly."""
+    bash_call = ToolCall(
+        id="bash_test",
+        name="bash",
+        arguments={
+            "command": "printf 'no_indent\\n\\tone_tab\\n        eight_spaces\\n' > indent.txt"
+        },
+    )
+    env_info = env.step(bash_call)
+    assert env_info.step_observation.source == "bash"
+
+    # Verify content with cat -A to show whitespace
+    bash_call = ToolCall(
+        id="bash_test", name="bash", arguments={"command": "cat indent.txt"}
+    )
+    env_info = env.step(bash_call)
+    observation = env_info.step_observation.observation
+    assert "no_indent" in observation
+    assert "one_tab" in observation
+    assert "eight_spaces" in observation
+
+
+def test_bash_file_creation_unicode_content(env):
+    """Test file creation with unicode characters."""
+    bash_call = ToolCall(
+        id="bash_test",
+        name="bash",
+        arguments={
+            "command": "printf 'Hello 世界\\nПривет мир\\n🎉 emoji\\n' > unicode.txt"
+        },
+    )
+    env_info = env.step(bash_call)
+    assert env_info.step_observation.source == "bash"
+
+    # Verify unicode content is preserved
+    bash_call = ToolCall(
+        id="bash_test", name="bash", arguments={"command": "cat unicode.txt"}
+    )
+    env_info = env.step(bash_call)
+    observation = env_info.step_observation.observation
+    assert "世界" in observation
+    assert "Привет мир" in observation
+    assert "🎉" in observation
