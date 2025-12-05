@@ -97,95 +97,13 @@ def test_create_agent():
         AGENT_REGISTRY.update(original_registry)
 
 
-def test_system_prompt_building_with_no_template():
-    """Test system prompt building when no template is provided"""
-    llm = MagicMock()
-    llm.context_length = 2000
-    llm.count_tokens = Mock(return_value=500)
-    agent = BaseAgent(llm=llm)
-
-    # Create a mock info object
-    mock_info = MagicMock()
-    mock_info.instructions = "test instructions"
-    mock_info.current_breakpoints = []
-    mock_info.eval_observation = MagicMock()
-    mock_info.eval_observation.observation = "test eval"
-
-    # Mock template loading to return None
-    with patch.object(agent, "_load_prompt_template", return_value=None):
-        system_message = agent.build_system_prompt(mock_info)
-        assert system_message is not None
-        assert isinstance(system_message, dict)
-        assert len(system_message) == 2
-        assert system_message["role"] == "system"
-
-
-def test_system_prompt_override_via_agent_args():
-    llm = MagicMock()
-    agent = BaseAgent(agent_args={"system_prompt": "Custom system prompt"}, llm=llm)
-
-    assert agent.system_prompt == "Custom system prompt"
-
-    mock_info = MagicMock()
-    mock_info.instructions = {}
-    mock_info.current_breakpoints = []
-    mock_info.eval_observation = MagicMock()
-    mock_info.eval_observation.observation = ""
-
-    with patch.object(agent, "_load_prompt_template", return_value=None):
-        system_message = agent.build_system_prompt(mock_info)
-        content = json.loads(system_message["content"])
-        assert content["Overall task"] == "Custom system prompt"
-
-
-def test_instance_prompt_override_via_agent_args():
-    llm = MagicMock()
-    llm.convert_observation_to_message.return_value = {
-        "role": "user",
-        "content": "converted",
-    }
-    agent = BaseAgent(agent_args={"instance_prompt": "Custom instance prompt"}, llm=llm)
-
-    mock_info = MagicMock()
-    mock_info.instructions = {}
-    mock_info.current_breakpoints = []
-    mock_info.eval_observation = MagicMock()
-    mock_info.eval_observation.observation = ""
-
-    with patch.object(agent, "_load_prompt_template", return_value=None):
-        agent.build_instance_prompt(mock_info)
-
-    llm.convert_observation_to_message.assert_called_once_with("Custom instance prompt")
-
-
-def test_system_prompt_building_with_template():
-    """Test system prompt building with template file"""
-    agent = BaseAgent()
-
-    # Create a mock info object
-    mock_info = MagicMock()
-    mock_info.instructions = "test instructions"
-
-    # Mock template loading
-    mock_template = MagicMock()
-    mock_template.render.return_value = "Task: test_task, Data: data"
-
-    with patch.object(agent, "_load_prompt_template", return_value=mock_template):
-        system_message = agent.build_system_prompt(mock_info)
-        assert len(system_message) == 2
-        assert system_message["role"] == "system"
-        assert "Task: test_task" in system_message["content"]
-        assert "Data: data" in system_message["content"]
-        mock_template.render.assert_called_once_with(agent=agent, info=mock_info)
-
-
 def test_load_prompt_template_from_file(tmp_path):
     agent = BaseAgent()
     agent.system_prompt = "test task"
     template_content = "Task: {{ agent.system_prompt }}"
     template_path = tmp_path / "template.jinja"
     template_path.write_text(template_content)
-    template = agent._load_prompt_template(template_file=str(template_path))
+    template = agent._load_prompt_template(template=str(template_path))
     assert isinstance(template, Template)
     assert template.render(agent=agent) == "Task: test task"
 
@@ -193,7 +111,7 @@ def test_load_prompt_template_from_file(tmp_path):
 def test_load_prompt_template_file_not_found():
     agent = BaseAgent()
     with pytest.raises(FileNotFoundError):
-        agent._load_prompt_template(template_file="non_existent_template.jinja")
+        agent._load_prompt_template(template="non_existent_template.jinja")
 
 
 def test_to_pretty_json():
@@ -202,15 +120,6 @@ def test_to_pretty_json():
     result = BaseAgent.to_pretty_json(data)
     expected = json.dumps(data, indent=2, sort_keys=False)
     assert result == expected
-
-
-def test_build_instance_prompt():
-    """Test instance prompt building"""
-    agent = BaseAgent(llm=Human())
-    info = MagicMock()
-    info.instructions = "test instructions"
-    message = agent.build_instance_prompt(info)
-    assert info.instructions in message["content"]
 
 
 def test_load_prompt_template_with_filters(tmp_path):
@@ -230,10 +139,109 @@ def test_load_prompt_template_with_filters(tmp_path):
     template_file = tmp_path / "template.jinja"
     template_file.write_text(template_content)
 
-    template = agent._load_prompt_template(template_file=str(template_file))
+    template = agent._load_prompt_template(template=str(template_file))
     assert template is not None
 
     # Test that custom filters are available
     rendered = template.render(agent=agent)
     assert "Test task" in rendered
     assert '"key": "value"' in rendered
+
+
+def test_build_system_prompt_with_no_template():
+    agent = BaseAgent()
+    system_message = agent.build_system_prompt()
+    assert sorted(system_message.keys()) == ["content", "role"]
+    assert system_message["role"] == "system"
+    assert system_message["content"] == ""
+
+
+def test_build_system_prompt_provided_in_args():
+    system_prompt = "Custom system prompt"
+    agent = BaseAgent(agent_args={"system_prompt": system_prompt})
+    assert agent.system_prompt == system_prompt
+    system_message = agent.build_system_prompt()
+    assert sorted(system_message.keys()) == ["content", "role"]
+    assert system_message["role"] == "system"
+    assert system_message["content"] == system_prompt
+
+
+def test_build_system_prompt_with_template():
+    system_prompt_template = "Your Mission: {{ info.instructions }}"
+    agent = BaseAgent(agent_args={"system_prompt": system_prompt_template})
+
+    mock_info = MagicMock()
+    mock_info.instructions = "If you choose to accept it."
+
+    system_message = agent.build_system_prompt(mock_info)
+    assert sorted(system_message.keys()) == ["content", "role"]
+    assert system_message["role"] == "system"
+    assert system_message["content"] == "Your Mission: If you choose to accept it."
+
+
+def test_build_system_prompt_with_template_file(tmp_path):
+    system_prompt_template = "Your Mission: {{ info.instructions }}"
+    system_prompt_template_file = tmp_path / "system_prompt.jinja"
+    system_prompt_template_file.write_text(system_prompt_template)
+    agent = BaseAgent(agent_args={"system_prompt": system_prompt_template_file})
+
+    mock_info = MagicMock()
+    mock_info.instructions = "If you choose to accept it."
+
+    system_message = agent.build_system_prompt(mock_info)
+    assert sorted(system_message.keys()) == ["content", "role"]
+    assert system_message["role"] == "system"
+    assert system_message["content"] == "Your Mission: If you choose to accept it."
+
+
+def test_build_instance_prompt_with_no_template():
+    agent = BaseAgent(llm=Human())
+
+    mock_info = MagicMock()
+    mock_info.instructions = "Test instructions."
+
+    instance_message = agent.build_instance_prompt(mock_info)
+    assert sorted(instance_message.keys()) == ["content", "role"]
+    assert instance_message["role"] == "user"
+    assert mock_info.instructions in instance_message["content"]
+
+
+def test_build_instance_prompt_provided_in_args():
+    instance_prompt = "Custom instance prompt"
+    agent = BaseAgent(agent_args={"instance_prompt": instance_prompt}, llm=Human())
+    assert agent.instance_prompt == instance_prompt
+    instance_message = agent.build_instance_prompt()
+    assert sorted(instance_message.keys()) == ["content", "role"]
+    assert instance_message["role"] == "user"
+    assert instance_message["content"] == instance_prompt
+
+
+def test_build_instance_prompt_with_template():
+    instance_prompt_template = "Your Mission: {{ info.instructions }}"
+    agent = BaseAgent(
+        agent_args={"instance_prompt": instance_prompt_template}, llm=Human()
+    )
+
+    mock_info = MagicMock()
+    mock_info.instructions = "If you choose to accept it."
+
+    instance_message = agent.build_instance_prompt(mock_info)
+    assert sorted(instance_message.keys()) == ["content", "role"]
+    assert instance_message["role"] == "user"
+    assert instance_message["content"] == "Your Mission: If you choose to accept it."
+
+
+def test_build_instance_prompt_with_template_file(tmp_path):
+    instance_prompt_template = "Your Mission: {{ info.instructions }}"
+    instance_prompt_template_file = tmp_path / "instance_prompt.jinja"
+    instance_prompt_template_file.write_text(instance_prompt_template)
+    agent = BaseAgent(
+        agent_args={"instance_prompt": instance_prompt_template_file}, llm=Human()
+    )
+    mock_info = MagicMock()
+    mock_info.instructions = "If you choose to accept it."
+
+    instance_message = agent.build_instance_prompt(mock_info)
+    assert sorted(instance_message.keys()) == ["content", "role"]
+    assert instance_message["role"] == "user"
+    assert instance_message["content"] == "Your Mission: If you choose to accept it."

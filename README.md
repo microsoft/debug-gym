@@ -175,21 +175,21 @@ The `-p` flag is a handy way to override values defined in the config file. For 
         --agent froggy_agent \
         -v \
         -p froggy_agent.llm_name="human" \
-        -p froggy_agent.system_prompt_template_file="scripts/templates/human_friendly_system_prompt.jinja"
+        -p froggy_agent.system_prompt="scripts/templates/human_friendly_system_prompt.jinja"
 
 
 #### 3.4. Customizing the System Prompt with Jinja Templates
 
 `debug-gym` allows you to fully customize the system prompt by providing a [Jinja](https://jinja.palletsprojects.com/) template file. This enables you to control the format and content of the prompt sent to the LLM, making it easier to adapt the environment to your specific needs or research experiments.
 
-To use a custom system prompt template, specify the path to your Jinja template file in your agent's configuration under `system_prompt_template_file`. For example:
+To use a custom system prompt template, specify the path to your Jinja template file in your agent's configuration under `system_prompt`. For example:
 
 ```yaml
 froggy_agent:
-    system_prompt_template_file: scripts/templates/custom_system_prompt.jinja
+    system_prompt: scripts/templates/custom_system_prompt.jinja
 ```
 
-Alternatively, you can provide a custom template from the command line with `-p <agent>.system_prompt_template_file="<path/to/template.jinja>"` (see above).
+Alternatively, you can provide a custom template from the command line with `-p <agent>.system_prompt="<path/to/template.jinja>"` (see above).
 
 Within your Jinja template, you have access to the `agent` and `info` objects, which provide all relevant context about the current environment and agent state.
 
@@ -213,10 +213,10 @@ In addition to all [built-in Jinja filters](https://jinja.palletsprojects.com/en
 
 #### Example Template
 
-```jinja
-System Prompt for Debug-Gym
+Here is an example of a custom system prompt template using Jinja:
 
-Task: {{ agent.system_prompt }}
+```jinja
+You are an autonomous debugging agent designed to fix bugs in Python code repositories.
 
 Instructions:
 {{ info.instructions }}

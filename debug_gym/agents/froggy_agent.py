@@ -20,6 +20,7 @@ class FroggyAgentArgs(AgentArgs):
 class FroggyAgent(BaseAgent):
     name: str = "froggy_agent"
     args_class = FroggyAgentArgs
+    system_prompt: str = "{{ agent._default_system_prompt(info) }}"
 
     def should_stop(self, step: int, info: EnvInfo):
         should_stop, reason = super().should_stop(step, info)
@@ -53,7 +54,6 @@ class FroggyAgent(BaseAgent):
         Trimmed to fit within the token limit."""
 
         system_prompt_dict = {
-            "Overall task": self.system_prompt,
             "Instructions": info.instructions,
         }
 

@@ -29,10 +29,6 @@ def register_agent(cls):
 class AgentArgs:
     system_prompt: str | None = None
     instance_prompt: str | None = None
-    system_prompt_template: str | None = None
-    instance_prompt_template: str | None = None
-    system_prompt_template_file: str | None = None
-    instance_prompt_template_file: str | None = None
     max_steps: int = 100
     max_history_token_cutoff: int = -1
     max_history_steps_cutoff: int = -1
@@ -87,8 +83,11 @@ class AgentArgs:
 class BaseAgent:
     name: str = None
     args_class = AgentArgs
-    system_prompt: str = None
-    instance_prompt: str = None
+    system_prompt: str = ""
+    instance_prompt: str = """\
+{
+  "Instructions": {{ info.instructions }}
+}"""
 
     def __init__(
         self,
@@ -97,15 +96,16 @@ class BaseAgent:
         logger: DebugGymLogger | None = None,
     ):
         self.args = self.args_class.make(agent_args or {})
-        # Allow overriding the system prompt through configuration.
-        if getattr(self.args, "system_prompt", None) is not None:
-            self.system_prompt = self.args.system_prompt
-        if getattr(self.args, "instance_prompt", None) is not None:
-            self.instance_prompt = self.args.instance_prompt
         self.llm = llm
         self.history = HistoryTracker()
         self.logger = logger or DebugGymLogger("debug-gym")
         self.env = None
+
+        # Override prompts if provided in args
+        if self.args.system_prompt is not None:
+            self.system_prompt = str(self.args.system_prompt)
+        if self.args.instance_prompt is not None:
+            self.instance_prompt = str(self.args.instance_prompt)
 
     @staticmethod
     def to_pretty_json(value):
@@ -138,28 +138,20 @@ class BaseAgent:
 
         return trim(message, max_length, count_tokens=count_tokens, where=where)
 
-    def _load_prompt_template(
-        self, template: str | None = None, template_file: str | None = None
-    ) -> Template | None:
-        """Load prompt template from and register custom filters.
-        If no template is specified, return None.
+    def _load_prompt_template(self, template: str) -> Template:
+        """Load a prompt template and register custom filters.
+
+        Args:
+            template (str): The prompt template as a string or
+                            a Jinja file path with a `.jinja` extension.
         """
-        if template is None and template_file is None:
-            return None
-
-        # Only one of template or template_file should be provided
-        if template is not None and template_file is not None:
-            raise ValueError(
-                "Only one of template or template_file should be provided."
-            )
-
-        if template_file is not None:
-            if not os.path.isfile(template_file):
-                error_msg = f"Prompt template file `{template_file}` not found."
+        if template.endswith(".jinja"):
+            if not os.path.isfile(template):
+                error_msg = f"Prompt template file `{template}` not found."
                 self.logger.error(error_msg)
                 raise FileNotFoundError(error_msg)
 
-            with open(template_file, "r") as f:
+            with open(template, "r") as f:
                 template = f.read()
 
         # Add custom filter to Jinja2 environment
@@ -168,35 +160,18 @@ class BaseAgent:
         env.filters["trim_message"] = self.trim_message
         return env.from_string(template)
 
-    def _default_system_prompt(self, info: EnvInfo | None = None) -> str:
-        """Return the default system prompt as pretty JSON."""
-        system_prompt_dict = {"Overall task": self.system_prompt}
-        return self.to_pretty_json(system_prompt_dict)
-
     def build_system_prompt(self, info: EnvInfo | None = None) -> dict:
-        """Build system prompt using jinja template from config or default template."""
-        system_prompt_template = self._load_prompt_template(
-            template=self.args.system_prompt_template,
-            template_file=self.args.system_prompt_template_file,
-        )
-        if system_prompt_template is not None:
-            system_prompt = system_prompt_template.render(agent=self, info=info)
-        else:
-            system_prompt = self._default_system_prompt(info)
+        """Build system prompt using the default template or one provided in args."""
+        system_prompt_template = self._load_prompt_template(self.system_prompt)
+        system_prompt = system_prompt_template.render(agent=self, info=info)
+
+        # TODO: should we call self.llm.convert_observation_to_message(system_prompt) ?
         return {"role": "system", "content": filter_non_utf8(system_prompt)}
 
     def build_instance_prompt(self, info: EnvInfo | None = None) -> dict:
-        """Build instance prompt using jinja template from config or default template."""
-        instance_prompt_template = self._load_prompt_template(
-            template=self.args.instance_prompt_template,
-            template_file=self.args.instance_prompt_template_file,
-        )
-        if instance_prompt_template is not None:
-            instance_prompt = instance_prompt_template.render(agent=self, info=info)
-        elif self.instance_prompt is not None:
-            instance_prompt = self.instance_prompt
-        else:
-            instance_prompt = self.to_pretty_json({"Instructions": info.instructions})
+        """Build instance prompt using the default template or one provided in args."""
+        instance_prompt_template = self._load_prompt_template(self.instance_prompt)
+        instance_prompt = instance_prompt_template.render(agent=self, info=info)
         return self.llm.convert_observation_to_message(instance_prompt)
 
     def build_history_prompt(self) -> list[dict]:

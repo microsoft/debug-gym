@@ -14,7 +14,6 @@ def test_default_system_prompt(agent_setup, build_env_info):
     env.get_tool = MagicMock(
         side_effect=KeyError("no tools for testing")
     )  # KeyError to simulate missing tool
-    agent.system_prompt = "some task"
     agent.shortcut_features = Mock(return_value=["f1", "f2"])
     info = build_env_info(
         instructions="some instruction",
@@ -26,7 +25,6 @@ def test_default_system_prompt(agent_setup, build_env_info):
         "role": "system",
         "content": json.dumps(
             {
-                "Overall task": "some task",
                 "Instructions": "some instruction",
                 "Shortcut features": ["f1", "f2"],
             },
@@ -38,7 +36,6 @@ def test_default_system_prompt(agent_setup, build_env_info):
 
 def test_default_system_prompt_with_eval_output(agent_setup, build_env_info):
     agent, env, _ = next(agent_setup(FroggyAgent))
-    agent.system_prompt = "some task"
     agent.shortcut_features = Mock(return_value=["f1", "f2"])
     info = build_env_info(
         instructions="some instruction",
@@ -50,7 +47,6 @@ def test_default_system_prompt_with_eval_output(agent_setup, build_env_info):
         "role": "system",
         "content": json.dumps(
             {
-                "Overall task": "some task",
                 "Instructions": "some instruction",
                 "Evaluation output of current code": "eval obs",
                 "Shortcut features": ["f1", "f2"],
@@ -68,7 +64,6 @@ def test_load_system_prompt_template_default_no_shortcuts_or_eval(
     env.get_tool = MagicMock(
         side_effect=KeyError("no tools for testing")
     )  # KeyError to simulate missing tool
-    agent.system_prompt = "some task"
     agent.shortcut_features = Mock(return_value=[])
     info = build_env_info(
         instructions="some instruction",
@@ -80,7 +75,6 @@ def test_load_system_prompt_template_default_no_shortcuts_or_eval(
         "role": "system",
         "content": json.dumps(
             {
-                "Overall task": "some task",
                 "Instructions": "some instruction",
             },
             indent=2,
@@ -99,7 +93,6 @@ def test_build_system_prompt(agent_setup, build_env_info):
     env.workspace.display_files = MagicMock(return_value="repo/tree")
     agent.args.show_directory_tree = 2
     agent.args.show_current_breakpoints = True
-    agent.system_prompt = "Test overall task"
     agent.env = env
     info = build_env_info(
         instructions="Do X",
@@ -109,7 +102,6 @@ def test_build_system_prompt(agent_setup, build_env_info):
 
     messages = agent.build_system_prompt(info)
     expected = {
-        "Overall task": "Test overall task",
         "Instructions": "Do X",
         "Repo directory tree": "repo/tree",
         "Current breakpoints": [1, 2],

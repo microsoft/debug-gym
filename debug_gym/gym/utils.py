@@ -11,13 +11,9 @@ import requests
 from tqdm import tqdm
 
 
-def filter_non_utf8(text):
+def filter_non_utf8(text: str) -> str:
     """Filter out non-UTF-8 characters from text."""
-    if not text:
-        return None
-    if isinstance(text, str):
-        return text.encode("utf-8", errors="ignore").decode("utf-8")
-    return text
+    return text.encode("utf-8", errors="ignore").decode("utf-8")
 
 
 def show_line_number(code_string, code_path=None, environment=None, start_index=1):
