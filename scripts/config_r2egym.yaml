@@ -46,16 +46,6 @@ debug_agent:
         - listdir
         - eval
 
-debug_5_agent:
-    n_rewrites_before_pdb: 5
-    tools:
-        - grep
-        - pdb
-        - view
-        - rewrite
-        - listdir
-        - eval
-
 solution_agent:
     llm_name: "human"  # No need for an LLM.
     tools:

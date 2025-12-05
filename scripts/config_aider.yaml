@@ -42,11 +42,3 @@ debug_agent:
         - rewrite
         - eval
 
-debug_5_agent:
-    n_rewrites_before_pdb: 5
-    tools:
-        - grep
-        - pdb
-        - view
-        - rewrite
-        - eval

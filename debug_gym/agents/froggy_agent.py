@@ -9,7 +9,6 @@ class FroggyAgentArgs(AgentArgs):
     max_rewrite_steps: int = -1
     show_directory_tree: int = 0
     show_current_breakpoints: bool = False
-    n_rewrites_before_pdb: int = 0
 
 
 @register_agent

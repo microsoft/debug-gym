@@ -101,7 +101,6 @@ We provide the below LLM-based agents, they all have minimal design and serve th
 | :-: | :-: | :----- |
 | `debug_agent` | `pdb`, `rewrite`, `view`, `eval` | A minimal agent that dumps all available information into its prompt and queries the LLM to generate a command. |
 | `rewrite_agent` | `rewrite`, `view`, `eval`  | A `debug_agent` but `pdb` tool is disabled (an agent keeps rewriting). |
-| `debug_5_agent` | `pdb`, `rewrite`, `view`, `eval`  | A `debug_agent`, but `pdb` tool is only enabled after certain amount of rewrites. |
 | `grep_agent` | `grep`, `rewrite`, `view`, `eval`  | A variant of `rewrite_agent` that includes the `grep` tool for searching patterns in the codebase before making changes. |
 | `solution_agent` | `pdb`, `eval`  | An oracle agent that applies a gold patch (only works with `swebench` and `swesmith` benchmarks for now). The agent checks that tests are failing before applying the patch, and passing after. It also checks that `pdb` tool can be used as expected. |
 
