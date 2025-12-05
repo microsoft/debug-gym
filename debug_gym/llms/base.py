@@ -345,8 +345,8 @@ class LLM(ABC):
     def convert_observation_to_message(
         self,
         observation: str,
-        last_tool_call_id: int = None,
-        last_tool_call_name: str = None,
+        action_tool_call_id: int = None,
+        action_tool_call_name: str = None,
     ) -> dict:
         """Format the tool call history for different LLMs.
         The method should be overridden by subclasses.

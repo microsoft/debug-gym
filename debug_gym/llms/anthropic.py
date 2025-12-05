@@ -162,9 +162,12 @@ class AnthropicLLM(LLM):
         return message
 
     def convert_observation_to_message(
-        self, observation: str, last_tool_call_id=None, **kwargs
+        self,
+        observation: str,
+        action_tool_call_id=None,
+        action_tool_call_name: str = None,
     ) -> dict:
-        if last_tool_call_id is None:
+        if action_tool_call_id is None:
             # This is the initial state, no action taken yet
             return {
                 "role": "user",
@@ -177,7 +180,7 @@ class AnthropicLLM(LLM):
                 "content": [
                     {
                         "type": "tool_result",
-                        "tool_use_id": last_tool_call_id,  # 'toolu_01SdR84CsnTKRpdH4zwFjvGj'
+                        "tool_use_id": action_tool_call_id,  # 'toolu_01SdR84CsnTKRpdH4zwFjvGj'
                         "content": filter_non_utf8(
                             observation
                         ),  # 'Viewing `hangman_test.py`. The file is read-only, it is not editable.'
