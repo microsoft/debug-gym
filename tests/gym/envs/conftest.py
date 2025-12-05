@@ -1,5 +1,3 @@
-import logging
-
 import pytest
 from filelock import FileLock
 

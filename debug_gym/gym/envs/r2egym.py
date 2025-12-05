@@ -1,5 +1,4 @@
 import json
-import logging
 import re
 from importlib.resources import files as importlib_files
 from pathlib import Path
@@ -90,7 +89,7 @@ class R2EGymEnv(RepoEnv):
         try:
             content = self.task_data["problem_statement"]
             return re.search(r"\[ISSUE\](.*)\[/ISSUE\]", content, re.DOTALL).group(1)
-        except Exception as e:
+        except Exception:
             return self.task_data["problem_statement"]
 
     def setup_task(self):

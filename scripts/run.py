@@ -141,7 +141,7 @@ def run_agent(args, task_name: str, task_data: dict, config: dict):
             raise
 
         # save trajectory
-        save_trajectory(agent, task_name, task_path, task_logger)
+        save_trajectory(agent, task_path, task_logger)
 
         # optionally apply patch
         if config["save_patch"]:
@@ -286,7 +286,7 @@ def main():
         if num_workers == 1:  # run sequentially for easier debugging
             for problem in problems:
                 try:
-                    success = run_agent(args, problem, dataset[problem], config)
+                    run_agent(args, problem, dataset[problem], config)
                 except AgentTimeoutException:
                     pass  # Handled in run_agent, just continue
                 except (KeyboardInterrupt, Exception) as e:
@@ -306,7 +306,7 @@ def main():
                         continue
                     try:
                         problem = futures[future]
-                        success = future.result()
+                        future.result()
                     except AgentTimeoutException:
                         pass  # Handled in run_agent, just continue
                     except (KeyboardInterrupt, Exception) as e:

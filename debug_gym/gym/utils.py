@@ -1,4 +1,3 @@
-import codecs
 import os
 import re
 import shutil
@@ -12,13 +11,9 @@ import requests
 from tqdm import tqdm
 
 
-def filter_non_utf8(text):
+def filter_non_utf8(text: str) -> str:
     """Filter out non-UTF-8 characters from text."""
-    if not text:
-        return None
-    if isinstance(text, str):
-        return text.encode("utf-8", errors="ignore").decode("utf-8")
-    return text
+    return text.encode("utf-8", errors="ignore").decode("utf-8")
 
 
 def show_line_number(code_string, code_path=None, environment=None, start_index=1):
@@ -130,29 +125,6 @@ def create_ignore_file(
 
     with open(path, "w") as f:
         f.write("\n".join(patterns + [path.name]))
-
-
-def _walk(path, depth: int | None = None, skip: Callable | None = None):
-    """recursively list files and directories up to a certain depth"""
-    depth = 1e5 if depth is None else depth
-    if depth <= 0:  # stop recursion
-        return
-
-    with os.scandir(path) as p:
-        for entry in sorted(p, key=lambda x: x.name):
-            if skip and skip(entry.path):
-                continue
-
-            yield Path(entry)
-            if entry.is_dir() and depth > 0:
-                yield from _walk(entry.path, depth=depth - 1, skip=skip)
-
-
-def is_subdirectory(path, directory):
-    directory = str(directory)
-    if not path.startswith(directory):
-        path = pjoin(directory, path)
-    return not os.path.relpath(path, directory).startswith("..")
 
 
 def cleanup_pytest_output(output):

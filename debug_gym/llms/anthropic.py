@@ -1,4 +1,3 @@
-from debug_gym.gym.envs.env import EnvInfo
 from debug_gym.gym.tools.tool import EnvironmentTool, ToolCall
 from debug_gym.gym.utils import filter_non_utf8
 from debug_gym.llms.base import (
@@ -130,73 +129,61 @@ class AnthropicLLM(LLM):
             arguments=response.input,
         )
 
-    def format_tool_call_history(
-        self, history_info: EnvInfo, response: list[LLMResponse]
-    ) -> list[dict]:
-        _messages = []
-        if isinstance(response, list) and len(response) > 0:
-            content = []
-            if response[0].reasoning_response:
-                content.append(
-                    {
-                        "type": "thinking",
-                        "text": filter_non_utf8(response[0].reasoning_response),
-                    }
-                )
-            if response[0].response:
-                content.append(
-                    {
-                        "type": "text",
-                        "text": filter_non_utf8(response[0].response),
-                    }
-                )
-            if response[0].tool:
-                content.append(
-                    {
-                        "type": "tool_use",
-                        "id": response[0].tool.id,
-                        "name": response[0].tool.name,
-                        "input": response[0].tool.arguments,
-                    }
-                )
-            _messages.append(
+    def convert_response_to_message(self, response: LLMResponse) -> dict:
+        content = []
+        if response.reasoning_response:
+            content.append(
                 {
-                    "role": "assistant",
-                    "content": content,
+                    "type": "thinking",
+                    "text": filter_non_utf8(response.reasoning_response),
                 }
             )
-        if (
-            history_info.action_tool_call is None
-            and history_info.action_content is None
-            and history_info.action_reasoning is None
-        ):
-            # This is the initial state, no action taken yet
-            _messages.append(
+        if response.response:
+            content.append(
                 {
-                    "role": "user",
-                    "content": filter_non_utf8(
-                        history_info.step_observation.observation
-                    ),
+                    "type": "text",
+                    "text": filter_non_utf8(response.response),
                 }
             )
-        else:
-            # This is a step with an action taken
-            _messages.append(
+        if response.tool:
+            content.append(
                 {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "tool_result",
-                            "tool_use_id": history_info.action_tool_call.id,  # 'toolu_01SdR84CsnTKRpdH4zwFjvGj'
-                            "content": filter_non_utf8(
-                                history_info.step_observation.observation
-                            ),  # 'Viewing `hangman_test.py`. The file is read-only, it is not editable.'
-                        }
-                    ],
+                    "type": "tool_use",
+                    "id": response.tool.id,
+                    "name": response.tool.name,
+                    "input": response.tool.arguments,
                 }
             )
 
-        return _messages
+        message = {
+            "role": "assistant",
+            "content": content,
+        }
+        return message
+
+    def convert_observation_to_message(
+        self, observation: str, last_tool_call_id=None, **kwargs
+    ) -> dict:
+        if last_tool_call_id is None:
+            # This is the initial state, no action taken yet
+            return {
+                "role": "user",
+                "content": filter_non_utf8(observation),
+            }
+        else:
+            # This is a step with an action taken
+            return {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "tool_result",
+                        "tool_use_id": last_tool_call_id,  # 'toolu_01SdR84CsnTKRpdH4zwFjvGj'
+                        "content": filter_non_utf8(
+                            observation
+                        ),  # 'Viewing `hangman_test.py`. The file is read-only, it is not editable.'
+                    }
+                ],
+            }
 
     def generate(self, messages, tools, **kwargs) -> LLMResponse:
         import anthropic

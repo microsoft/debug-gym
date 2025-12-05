@@ -28,7 +28,7 @@ def test_load_dataset(mini_nightmare_env):
 
 @patch("debug_gym.gym.envs.mini_nightmare.build_docker_image")
 def test_build_docker_image(mock_build_docker_image):
-    dataset = MiniNightmareEnv.load_dataset()
+    MiniNightmareEnv.load_dataset()
     mock_build_docker_image.assert_called_once()
 
 

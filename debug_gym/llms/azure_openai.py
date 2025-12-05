@@ -13,7 +13,6 @@ logging.getLogger("azure.core.pipeline.policies.http_logging_policy").setLevel(
 
 
 class AzureOpenAILLM(OpenAILLM):
-
     @property
     def client(self):
         if getattr(self, "_client", None) is None:
