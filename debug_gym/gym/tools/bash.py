@@ -36,11 +36,11 @@ class BashTool(EnvironmentTool):
 
             from debug_gym.gym.terminals.local import LocalTerminal
 
-            # Require remote terminal unless local is explicitly allowed
-            require_remote = (
-                os.environ.get("ALLOW_LOCAL_TERMINAL", "false").lower() == "false"
-            )
-            if require_remote and type(environment.terminal) is LocalTerminal:
+            # Treat local terminals as allowed unless explicitly disabled via env var
+            allow_local = os.environ.get("ALLOW_LOCAL_TERMINAL", "true").lower()
+            if allow_local not in {"true", "false"}:
+                allow_local = "true"
+            if allow_local == "false" and type(environment.terminal) is LocalTerminal:
                 return Observation(
                     self.name,
                     "Error: bash tool requires a non-local terminal. Current terminal type is not supported.",
