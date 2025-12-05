@@ -182,15 +182,28 @@ class R2EGymEnv(RepoEnv):
             "r2e_tests",
         ]
         for skip_file in SKIP_FILES_NEW:
+            src = f"{self.repo_path}/{skip_file}"
+            dest = f"{self.alt_path}/{skip_file}"
             self.terminal.run(
-                f"mv {self.repo_path}/{skip_file} {self.alt_path}/{skip_file}"
+                f"if [ -e {src} ]; then rm -rf {dest} && mv {src} {dest}; fi",
+                raises=True,
             )
 
-        # r2e_tests are in the / directory, move them to /root
-        self.terminal.run(f"mv /r2e_tests {self.alt_path}/r2e_tests")
+        # Some images also ship tests under /r2e_tests; merge them into /root.
+        self.terminal.run(
+            "if [ -d /r2e_tests ]; then "
+            f"mkdir -p {self.alt_path}/r2e_tests && "
+            f"cp -a /r2e_tests/. {self.alt_path}/r2e_tests/ && "
+            "rm -rf /r2e_tests; "
+            "fi",
+            raises=True,
+        )
 
-        # make a softlink for /root/r2e_tests (if present)
-        self.terminal.run(f"ln -s {self.alt_path}/r2e_tests {self.repo_path}/r2e_tests")
+        # Ensure the repository always sees the tests at /testbed/r2e_tests.
+        self.terminal.run(
+            f"ln -sfn {self.alt_path}/r2e_tests {self.repo_path}/r2e_tests",
+            raises=True,
+        )
 
         self.terminal.session_commands.append("source .venv/bin/activate")
 
