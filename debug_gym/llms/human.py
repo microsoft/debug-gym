@@ -516,11 +516,11 @@ class Human(LLM):
     def convert_observation_to_message(
         self,
         observation: str,
-        last_tool_call_id=None,
-        last_tool_call_name=None,
+        action_tool_call_id=None,
+        action_tool_call_name=None,
         **kwargs,
     ) -> dict:
-        if last_tool_call_id is None:
+        if action_tool_call_id is None:
             # This is the initial state, no action taken yet
             return {
                 "role": "user",
@@ -533,7 +533,8 @@ class Human(LLM):
                 "content": [
                     {
                         "type": "tool_result",
-                        "tool_use_id": last_tool_call_id,
+                        "tool_use_id": action_tool_call_id,
+                        "tool_use_name": action_tool_call_name,
                         "content": filter_non_utf8(observation),
                     }
                 ],
