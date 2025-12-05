@@ -30,9 +30,7 @@ class AgentSolution(BaseAgent):
                     " Check the README.md to see which environments are compatible."
                 )
 
-            self.history.reset()
             info = self.env.reset()
-            self.history.step(info)
 
             if info.resolved is True:
                 self._report_progress(env.task_name, info, "resolved")
@@ -77,8 +75,6 @@ class AgentSolution(BaseAgent):
 
             action = ToolCall(name="submit", id="submit", arguments={})
             info = self.env.step(action, None, None)
-
-            self.history.step(info)
 
             self.logger.info(f"Score: {info.score}/{info.max_score or '-'}")
             assert info.resolved, (
