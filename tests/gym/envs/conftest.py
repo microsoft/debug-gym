@@ -3,7 +3,6 @@ from filelock import FileLock
 
 from debug_gym.gym.envs import R2EGymEnv, SWEBenchEnv, SWESmithEnv
 from debug_gym.gym.envs.swe_bench_debug import SWEBenchDebugEnv
-from tests.gym.conftest import is_docker_running
 
 BUILD_ENV_CONFIGS = {
     "swe_smith": {
@@ -25,13 +24,6 @@ BUILD_ENV_CONFIGS = {
 }
 
 
-def _get_worker_id(request):
-    worker_input = getattr(request.config, "workerinput", None)
-    if worker_input and "workerid" in worker_input:
-        return worker_input["workerid"]
-    return "master"
-
-
 def make_env_factory(env_name, worker_id, tmp_path_factory):
     """Build the `env_name`'s docker image only once."""
     # Ref: https://pytest-xdist.readthedocs.io/en/stable/how-to.html#making-session-scoped-fixtures-execute-only-once
@@ -45,9 +37,6 @@ def make_env_factory(env_name, worker_id, tmp_path_factory):
         task_data = next(iter(dataset.values()))
         env = env_class(task_data=task_data)
         return env
-
-    if not is_docker_running():
-        return _make_env
 
     if worker_id == "master":
         # Not running with pytest-xdist or we are in the master process
@@ -64,24 +53,20 @@ def make_env_factory(env_name, worker_id, tmp_path_factory):
 
 
 @pytest.fixture(scope="session")
-def get_swe_smith_env(request, tmp_path_factory):
-    worker_id = _get_worker_id(request)
+def get_swe_smith_env(worker_id, tmp_path_factory):
     return make_env_factory("swe_smith", worker_id, tmp_path_factory)
 
 
 @pytest.fixture(scope="session")
-def get_swe_bench_env(request, tmp_path_factory):
-    worker_id = _get_worker_id(request)
+def get_swe_bench_env(worker_id, tmp_path_factory):
     return make_env_factory("swe_bench", worker_id, tmp_path_factory)
 
 
 @pytest.fixture(scope="session")
-def get_swe_bench_debug_env(request, tmp_path_factory):
-    worker_id = _get_worker_id(request)
+def get_swe_bench_debug_env(worker_id, tmp_path_factory):
     return make_env_factory("swe_bench-debug", worker_id, tmp_path_factory)
 
 
 @pytest.fixture(scope="session")
-def get_r2egym_env(request, tmp_path_factory):
-    worker_id = _get_worker_id(request)
+def get_r2egym_env(worker_id, tmp_path_factory):
     return make_env_factory("r2egym", worker_id, tmp_path_factory)
