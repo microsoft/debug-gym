@@ -99,10 +99,9 @@ def run_agent(args, task_name: str, task_data: dict, config: dict):
             logger=task_logger,
         )
 
-        agent_args = AgentArgs.from_dict(config)
         agent = create_agent(
             config["agent_type"],
-            agent_args=agent_args,
+            agent_args=config,
             llm=llm,
             logger=task_logger,
         )
