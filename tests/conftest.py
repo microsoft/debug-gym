@@ -1,3 +1,4 @@
+import json
 import logging
 from unittest.mock import patch
 
@@ -58,6 +59,45 @@ def llm_class_mock():
 
         def parse_tool_call_response(self, response):
             return response
+
+        def convert_response_to_message(self, response: LLMResponse) -> dict:
+            message = {
+                "role": "assistant",
+                "content": response.response,
+            }
+
+            tool = getattr(response, "tool", None)
+            if isinstance(tool, ToolCall):
+                message["tool_calls"] = [
+                    {
+                        "type": "function",
+                        "id": tool.id,
+                        "function": {
+                            "name": tool.name,
+                            "arguments": json.dumps(tool.arguments),
+                        },
+                    }
+                ]
+
+            return message
+
+        def convert_observation_to_message(
+            self,
+            observation: str,
+            action_tool_call_id: str | None = None,
+            action_tool_call_name: str | None = None,
+        ) -> dict:
+            if action_tool_call_id:
+                return {
+                    "role": "tool",
+                    "tool_call_id": action_tool_call_id,
+                    "name": action_tool_call_name,
+                    "content": observation,
+                }
+            return {
+                "role": "user",
+                "content": observation,
+            }
 
     return LLMMock
 
