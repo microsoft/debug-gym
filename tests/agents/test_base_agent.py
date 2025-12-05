@@ -118,7 +118,44 @@ def test_system_prompt_building_with_no_template():
         assert isinstance(system_message, dict)
         assert len(system_message) == 2
         assert system_message["role"] == "system"
-        assert "content" in system_message
+
+
+def test_system_prompt_override_via_agent_args():
+    llm = MagicMock()
+    agent = BaseAgent(agent_args={"system_prompt": "Custom system prompt"}, llm=llm)
+
+    assert agent.system_prompt == "Custom system prompt"
+
+    mock_info = MagicMock()
+    mock_info.instructions = {}
+    mock_info.current_breakpoints = []
+    mock_info.eval_observation = MagicMock()
+    mock_info.eval_observation.observation = ""
+
+    with patch.object(agent, "_load_prompt_template", return_value=None):
+        system_message = agent.build_system_prompt(mock_info)
+        content = json.loads(system_message["content"])
+        assert content["Overall task"] == "Custom system prompt"
+
+
+def test_instance_prompt_override_via_agent_args():
+    llm = MagicMock()
+    llm.convert_observation_to_message.return_value = {
+        "role": "user",
+        "content": "converted",
+    }
+    agent = BaseAgent(agent_args={"instance_prompt": "Custom instance prompt"}, llm=llm)
+
+    mock_info = MagicMock()
+    mock_info.instructions = {}
+    mock_info.current_breakpoints = []
+    mock_info.eval_observation = MagicMock()
+    mock_info.eval_observation.observation = ""
+
+    with patch.object(agent, "_load_prompt_template", return_value=None):
+        agent.build_instance_prompt(mock_info)
+
+    llm.convert_observation_to_message.assert_called_once_with("Custom instance prompt")
 
 
 def test_system_prompt_building_with_template():

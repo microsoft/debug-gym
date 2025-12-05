@@ -25,14 +25,7 @@ base:
     # Shortcut features
     "show_current_breakpoints": False  # If True, the environment will automatically show the current breakpoints at every step in the system prompt.
 
-rewrite_agent:
-    tools:
-        - grep
-        - view
-        - rewrite
-        - eval
-
-debug_agent:
+froggy_agent:
     tools:
         - grep
         - pdb

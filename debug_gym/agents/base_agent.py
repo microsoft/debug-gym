@@ -27,6 +27,8 @@ def register_agent(cls):
 
 @dataclass
 class AgentArgs:
+    system_prompt: str | None = None
+    instance_prompt: str | None = None
     system_prompt_template: str | None = None
     instance_prompt_template: str | None = None
     system_prompt_template_file: str | None = None
@@ -95,6 +97,11 @@ class BaseAgent:
         logger: DebugGymLogger | None = None,
     ):
         self.args = self.args_class.make(agent_args or {})
+        # Allow overriding the system prompt through configuration.
+        if getattr(self.args, "system_prompt", None) is not None:
+            self.system_prompt = self.args.system_prompt
+        if getattr(self.args, "instance_prompt", None) is not None:
+            self.instance_prompt = self.args.instance_prompt
         self.llm = llm
         self.history = HistoryTracker()
         self.logger = logger or DebugGymLogger("debug-gym")
@@ -186,6 +193,8 @@ class BaseAgent:
         )
         if instance_prompt_template is not None:
             instance_prompt = instance_prompt_template.render(agent=self, info=info)
+        elif self.instance_prompt is not None:
+            instance_prompt = self.instance_prompt
         else:
             instance_prompt = self.to_pretty_json({"Instructions": info.instructions})
         return self.llm.convert_observation_to_message(instance_prompt)

@@ -3,15 +3,14 @@ from unittest.mock import MagicMock, Mock
 
 import pytest
 
-from debug_gym.agents.debug_agent import DebugAgent
-from debug_gym.agents.rewrite_agent import RewriteAgent
+from debug_gym.agents.froggy_agent import FroggyAgent
 from debug_gym.agents.utils import save_patch, save_trajectory
 from debug_gym.gym.tools.toolbox import Toolbox
 from debug_gym.llms.base import LLMResponse, TokenUsage
 
 
 def test_default_system_prompt(agent_setup, build_env_info):
-    agent, env, _ = next(agent_setup(DebugAgent))
+    agent, env, _ = next(agent_setup(FroggyAgent))
     env.get_tool = MagicMock(
         side_effect=KeyError("no tools for testing")
     )  # KeyError to simulate missing tool
@@ -38,7 +37,7 @@ def test_default_system_prompt(agent_setup, build_env_info):
 
 
 def test_default_system_prompt_with_eval_output(agent_setup, build_env_info):
-    agent, env, _ = next(agent_setup(DebugAgent))
+    agent, env, _ = next(agent_setup(FroggyAgent))
     agent.system_prompt = "some task"
     agent.shortcut_features = Mock(return_value=["f1", "f2"])
     info = build_env_info(
@@ -65,7 +64,7 @@ def test_default_system_prompt_with_eval_output(agent_setup, build_env_info):
 def test_load_system_prompt_template_default_no_shortcuts_or_eval(
     agent_setup, build_env_info
 ):
-    agent, env, _ = next(agent_setup(DebugAgent))
+    agent, env, _ = next(agent_setup(FroggyAgent))
     env.get_tool = MagicMock(
         side_effect=KeyError("no tools for testing")
     )  # KeyError to simulate missing tool
@@ -91,7 +90,7 @@ def test_load_system_prompt_template_default_no_shortcuts_or_eval(
 
 
 def test_build_system_prompt(agent_setup, build_env_info):
-    agent, env, _ = next(agent_setup(DebugAgent))
+    agent, env, _ = next(agent_setup(FroggyAgent))
     eval_tool = Toolbox.get_tool("eval")
     pdb_tool = Toolbox.get_tool("pdb", auto_list=True, persistent_breakpoints=True)
     env.add_tool(eval_tool)
@@ -125,7 +124,7 @@ def test_build_system_prompt(agent_setup, build_env_info):
 
 
 def test_build_prompt(agent_setup, build_env_info):
-    agent, _, _ = next(agent_setup(DebugAgent))
+    agent, _, _ = next(agent_setup(FroggyAgent))
     info = build_env_info(
         instructions="Test instructions",
         current_breakpoints="Test breakpoints",
@@ -136,7 +135,7 @@ def test_build_prompt(agent_setup, build_env_info):
 
 
 def test_run(agent_setup, build_env_info):
-    agent, env, llm = next(agent_setup(DebugAgent))
+    agent, env, llm = next(agent_setup(FroggyAgent))
     env.reset.return_value = build_env_info(
         terminated=False,
         resolved=False,
@@ -160,8 +159,9 @@ def test_run(agent_setup, build_env_info):
     assert result
 
 
-def test_build_system_prompt_rewrite_agent(agent_setup, build_env_info):
-    agent, _, _ = next(agent_setup(RewriteAgent))
+def test_build_system_prompt_custom_prompt(agent_setup, build_env_info):
+    agent, _, _ = next(agent_setup(FroggyAgent))
+    agent.system_prompt = "Custom rewrite prompt"
     info = build_env_info(
         instructions="Test instructions",
         current_breakpoints="Test breakpoints",
@@ -169,12 +169,12 @@ def test_build_system_prompt_rewrite_agent(agent_setup, build_env_info):
     )
     messages = agent.build_system_prompt(info)
     assert len(messages) == 2
-    assert "Overall task" in messages["content"]
+    assert "Custom rewrite prompt" in messages["content"]
 
 
 def test_shortcut_features_comprehensive(agent_setup):
     """Test all shortcut features combinations"""
-    agent, env, _ = next(agent_setup(DebugAgent))
+    agent, env, _ = next(agent_setup(FroggyAgent))
     # Test with all features enabled
     agent.args.show_directory_tree = 1
     agent.args.show_current_breakpoints = True
@@ -204,7 +204,7 @@ def test_shortcut_features_comprehensive(agent_setup):
 
 def test_trim_message(agent_setup):
     """Test message trimming functionality"""
-    agent, _, llm = next(agent_setup(DebugAgent))
+    agent, _, llm = next(agent_setup(FroggyAgent))
     llm.context_length = 1000
     llm.count_tokens = Mock(return_value=500)
 
@@ -237,7 +237,7 @@ def test_trim_message(agent_setup):
 
 def test_run_early_completion(agent_setup, build_env_info):
     """Test run method when task is already completed on reset"""
-    agent, env, llm = next(agent_setup(DebugAgent))
+    agent, env, llm = next(agent_setup(FroggyAgent))
     env.resolved = True
 
     # Mock environment to return completed task immediately
@@ -258,7 +258,7 @@ def test_run_early_completion(agent_setup, build_env_info):
 
 def test_run_max_rewrite_steps(agent_setup, build_env_info):
     """Test run method when max rewrite steps is reached"""
-    agent, env, llm = next(agent_setup(DebugAgent))
+    agent, env, llm = next(agent_setup(FroggyAgent))
     env.resolved = False
     agent.args.max_rewrite_steps = 2
 
@@ -295,7 +295,7 @@ def test_run_max_rewrite_steps(agent_setup, build_env_info):
 
 def test_run_exception_handling(agent_setup, build_env_info):
     """Test run method exception handling"""
-    agent, env, llm = next(agent_setup(DebugAgent))
+    agent, env, llm = next(agent_setup(FroggyAgent))
 
     env.reset.return_value = build_env_info(
         terminated=False,
@@ -316,7 +316,7 @@ def test_run_exception_handling(agent_setup, build_env_info):
 
 def test_save_patch(agent_setup, tmp_path):
     """Test patch saving functionality"""
-    agent, env, _ = next(agent_setup(DebugAgent))
+    agent, env, _ = next(agent_setup(FroggyAgent))
     env.patch = "test patch content"
     logger = MagicMock()
 
@@ -330,7 +330,7 @@ def test_save_patch(agent_setup, tmp_path):
 
 def test_build_trajectory(agent_setup, tmp_path):
     """Test trajectory building and persistence helpers"""
-    agent, env, llm = next(agent_setup(DebugAgent))
+    agent, env, llm = next(agent_setup(FroggyAgent))
     env.terminated = True
     env.resolved = True
 

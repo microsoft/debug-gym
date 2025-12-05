@@ -1,6 +1,11 @@
 from dataclasses import dataclass
 
-from debug_gym.agents.base_agent import AgentArgs, BaseAgent, register_agent
+from debug_gym.agents.base_agent import (
+    AGENT_REGISTRY,
+    AgentArgs,
+    BaseAgent,
+    register_agent,
+)
 from debug_gym.gym.envs.env import EnvInfo
 
 
@@ -13,7 +18,7 @@ class FroggyAgentArgs(AgentArgs):
 
 @register_agent
 class FroggyAgent(BaseAgent):
-    name: str = "froggy"
+    name: str = "froggy_agent"
     args_class = FroggyAgentArgs
 
     def should_stop(self, step: int, info: EnvInfo):
@@ -78,3 +83,8 @@ class FroggyAgent(BaseAgent):
             system_prompt_dict["Shortcut features"] = shortcut_features
 
         return self.to_pretty_json(system_prompt_dict)
+
+
+# Backward compatibility for configs still referencing "froggy".
+# TODO: remove when all configs and consumers migrate to "froggy_agent".
+AGENT_REGISTRY.setdefault("froggy", FroggyAgent)

@@ -99,10 +99,9 @@ We provide the below LLM-based agents, they all have minimal design and serve th
 
 | Agent name | Available Tools | Description |
 | :-: | :-: | :----- |
-| `debug_agent` | `pdb`, `rewrite`, `view`, `eval` | A minimal agent that dumps all available information into its prompt and queries the LLM to generate a command. |
-| `rewrite_agent` | `rewrite`, `view`, `eval`  | A `debug_agent` but `pdb` tool is disabled (an agent keeps rewriting). |
-| `grep_agent` | `grep`, `rewrite`, `view`, `eval`  | A variant of `rewrite_agent` that includes the `grep` tool for searching patterns in the codebase before making changes. |
+| `froggy_agent` | `grep`, `pdb`, `view`, `rewrite`, `eval` (configurable) | Primary debugging agent. Adjust prompts and tool lists in YAML to mimic rewrite-only, grep-heavy, or other workflows. |
 | `solution_agent` | `pdb`, `eval`  | An oracle agent that applies a gold patch (only works with `swebench` and `swesmith` benchmarks for now). The agent checks that tests are failing before applying the patch, and passing after. It also checks that `pdb` tool can be used as expected. |
+| `swe_agent` | `bash`, `rewrite`, `submit` | Baseline agent tailored for the SWE-bench setting that executes bash commands in addition to rewrites. |
 
 ---
 
@@ -170,13 +169,13 @@ We provide a human mode that enables developers to manually interact with `debug
 
 #### 3.3. Overriding Values in Config
 
-The `-p` flag is a handy way to override values defined in the config file. For example, the command below will run the rewrite_agent agent on Aider with human mode (even if the config file specifies gpt-4o). The command also overrides the default system prompt (see below for more information).
+The `-p` flag is a handy way to override values defined in the config file. For example, the command below will run the `froggy_agent` configuration on Aider with human mode (even if the config file specifies gpt-4o). The command also overrides the default system prompt (see below for more information).
 
     python scripts/run.py scripts/config_aider.yaml \
-        --agent debug_agent \
+        --agent froggy_agent \
         -v \
-        -p debug_agent.llm_name="human" \
-        -p debug_agent.system_prompt_template_file="scripts/templates/human_friendly_system_prompt.jinja"
+        -p froggy_agent.llm_name="human" \
+        -p froggy_agent.system_prompt_template_file="scripts/templates/human_friendly_system_prompt.jinja"
 
 
 #### 3.4. Customizing the System Prompt with Jinja Templates
@@ -186,8 +185,8 @@ The `-p` flag is a handy way to override values defined in the config file. For 
 To use a custom system prompt template, specify the path to your Jinja template file in your agent's configuration under `system_prompt_template_file`. For example:
 
 ```yaml
-debug_agent:
-  system_prompt_template_file: scripts/templates/custom_system_prompt.jinja
+froggy_agent:
+    system_prompt_template_file: scripts/templates/custom_system_prompt.jinja
 ```
 
 Alternatively, you can provide a custom template from the command line with `-p <agent>.system_prompt_template_file="<path/to/template.jinja>"` (see above).
