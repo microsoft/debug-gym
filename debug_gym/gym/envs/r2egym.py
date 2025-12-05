@@ -204,6 +204,10 @@ class R2EGymEnv(RepoEnv):
             f"ln -sfn {self.alt_path}/r2e_tests {self.repo_path}/r2e_tests",
             raises=True,
         )
+        self.terminal.run(
+            f"ln -sfn {self.alt_path}/r2e_tests /r2e_tests",
+            raises=True,
+        )
 
         self.terminal.session_commands.append("source .venv/bin/activate")
 
