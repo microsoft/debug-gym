@@ -59,9 +59,6 @@ def llm_class_mock():
         def parse_tool_call_response(self, response):
             return response
 
-        def format_tool_call_history(self, history_info, response):
-            return [{"role": "role", "content": history_info.action_tool_call}]
-
     return LLMMock
 
 
