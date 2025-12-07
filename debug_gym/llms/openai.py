@@ -1,8 +1,8 @@
 import json
 import logging
 
-import tiktoken
 import openai
+import tiktoken
 from openai import NOT_GIVEN, OpenAI
 
 from debug_gym.gym.tools.tool import EnvironmentTool, ToolCall
