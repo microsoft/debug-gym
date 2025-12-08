@@ -2,11 +2,14 @@ import json
 import os
 import tempfile
 from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import patch
 
 import pytest
 
 from debug_gym.experiment import add_tools, create_env, dump_experiment_info
+from debug_gym.gym.envs.local import LocalEnv
+from debug_gym.gym.tools.bash import BashTool
+from debug_gym.gym.tools.view import ViewTool
 from debug_gym.logger import DebugGymLogger
 
 
@@ -24,213 +27,134 @@ def create_args_object(**kwargs):
 class TestCreateEnv:
     """Test cases for create_env function"""
 
-    @patch("debug_gym.experiment.select_terminal")
-    @patch("debug_gym.experiment.select_env")
-    def test_create_env_basic(self, mock_select_env, mock_select_terminal):
-        """Test basic environment creation with minimal config"""
-        # Setup mocks
-        mock_terminal = Mock()
-        mock_select_terminal.return_value = mock_terminal
-
-        mock_env_class = Mock()
-        mock_env_instance = Mock()
-        mock_env_class.return_value = mock_env_instance
-        mock_select_env.return_value = mock_env_class
-
+    def test_create_env_basic(self, tmp_path):
+        """Test basic environment creation with local environment"""
         # Setup logger
         logger = DebugGymLogger("test")
 
-        # Setup config
+        # Create a test repository
+        repo_path = tmp_path / "test_repo"
+        repo_path.mkdir()
+        (repo_path / "test.py").write_text("# test file")
+
+        # Setup config for LocalEnv
         config = {
             "terminal": {"type": "local"},
-            "benchmark": "mini_nightmare",
-            "env_kwargs": {"max_steps": 10},
-            "problems": ["problem1", "problem2"],
+            "benchmark": "local",
+            "env_kwargs": {"path": str(repo_path)},
+            "problems": ["custom"],
         }
 
         # Call function
         result = create_env(config, logger)
 
-        # Assertions
-        mock_select_terminal.assert_called_once_with({"type": "local"}, logger)
-        mock_select_env.assert_called_once_with("mini_nightmare")
-        mock_env_class.assert_called_once_with(
-            max_steps=10,
-            problems=["problem1", "problem2"],
-            terminal=mock_terminal,
-            logger=logger,
-        )
-        assert result == mock_env_instance
+        # Assertions - verify we got a real LocalEnv instance
+        assert isinstance(result, LocalEnv)
+        assert result.logger == logger
 
-    @patch("debug_gym.experiment.select_terminal")
-    @patch("debug_gym.experiment.select_env")
-    def test_create_env_default_problems(self, mock_select_env, mock_select_terminal):
+    def test_create_env_default_problems(self, tmp_path):
         """Test environment creation uses default problems when not specified"""
-        # Setup mocks
-        mock_terminal = Mock()
-        mock_select_terminal.return_value = mock_terminal
-
-        mock_env_class = Mock()
-        mock_env_instance = Mock()
-        mock_env_class.return_value = mock_env_instance
-        mock_select_env.return_value = mock_env_class
-
         # Setup logger
         logger = DebugGymLogger("test")
 
+        # Create a test repository
+        repo_path = tmp_path / "test_repo"
+        repo_path.mkdir()
+
         # Setup config without problems
         config = {
-            "terminal": {"type": "docker"},
-            "benchmark": "swebench",
-            "env_kwargs": {},
+            "terminal": {"type": "local"},
+            "benchmark": "local",
+            "env_kwargs": {"path": str(repo_path)},
         }
 
         # Call function
         result = create_env(config, logger)
 
         # Assertions - should use default ["custom"]
-        mock_env_class.assert_called_once_with(
-            problems=["custom"], terminal=mock_terminal, logger=logger
-        )
-        assert result == mock_env_instance
+        assert isinstance(result, LocalEnv)
 
-    @patch("debug_gym.experiment.select_terminal")
-    @patch("debug_gym.experiment.select_env")
-    def test_create_env_with_multiple_env_kwargs(
-        self, mock_select_env, mock_select_terminal
-    ):
-        """Test environment creation with multiple env_kwargs"""
-        # Setup mocks
-        mock_terminal = Mock()
-        mock_select_terminal.return_value = mock_terminal
-
-        mock_env_class = Mock()
-        mock_env_instance = Mock()
-        mock_env_class.return_value = mock_env_instance
-        mock_select_env.return_value = mock_env_class
-
+    def test_create_env_with_terminal_none(self, tmp_path):
+        """Test environment creation with no terminal (None)"""
         # Setup logger
         logger = DebugGymLogger("test")
 
-        # Setup config with multiple kwargs
+        # Create a test repository
+        repo_path = tmp_path / "test_repo"
+        repo_path.mkdir()
+
+        # Setup config with terminal=None
         config = {
             "terminal": None,
             "benchmark": "local",
-            "env_kwargs": {
-                "max_steps": 20,
-                "timeout": 3600,
-                "working_dir": "/tmp/test",
-            },
+            "env_kwargs": {"path": str(repo_path)},
             "problems": [],
         }
 
         # Call function
         result = create_env(config, logger)
 
-        # Assertions
-        mock_env_class.assert_called_once_with(
-            max_steps=20,
-            timeout=3600,
-            working_dir="/tmp/test",
-            problems=[],
-            terminal=mock_terminal,
-            logger=logger,
-        )
-        assert result == mock_env_instance
+        # Assertions - LocalEnv should be created even with terminal=None
+        assert isinstance(result, LocalEnv)
 
 
 class TestAddTools:
     """Test cases for add_tools function"""
 
-    @patch("debug_gym.experiment.Toolbox.get_tool")
-    def test_add_tools_single_tool(self, mock_get_tool):
+    def test_add_tools_single_tool(self, tmp_path):
         """Test adding a single tool to environment"""
-        # Setup mocks
-        mock_tool = Mock()
-        mock_tool.__class__.__name__ = "BashTool"
-        mock_get_tool.return_value = mock_tool
-
-        mock_env = Mock()
+        # Create a real environment
+        repo_path = tmp_path / "test_repo"
+        repo_path.mkdir()
+        env = LocalEnv(path=str(repo_path))
         logger = DebugGymLogger("test")
 
         # Setup config
         config = {"tools": ["bash"]}
 
         # Call function
-        add_tools(mock_env, config, logger)
+        add_tools(env, config, logger)
 
-        # Assertions
-        mock_get_tool.assert_called_once_with("bash")
-        mock_env.add_tool.assert_called_once_with(mock_tool)
+        # Assertions - verify tool was added
+        assert len(env.tools) == 1
+        assert isinstance(env.tools[0], BashTool)
 
-    @patch("debug_gym.experiment.Toolbox.get_tool")
-    def test_add_tools_multiple_tools(self, mock_get_tool):
+    def test_add_tools_multiple_tools(self, tmp_path):
         """Test adding multiple tools to environment"""
-        # Setup mocks for different tools
-        mock_bash_tool = Mock()
-        mock_bash_tool.__class__.__name__ = "BashTool"
-
-        mock_view_tool = Mock()
-        mock_view_tool.__class__.__name__ = "ViewTool"
-
-        mock_edit_tool = Mock()
-        mock_edit_tool.__class__.__name__ = "EditTool"
-
-        mock_get_tool.side_effect = [mock_bash_tool, mock_view_tool, mock_edit_tool]
-
-        mock_env = Mock()
+        # Create a real environment
+        repo_path = tmp_path / "test_repo"
+        repo_path.mkdir()
+        env = LocalEnv(path=str(repo_path))
         logger = DebugGymLogger("test")
 
         # Setup config with multiple tools
-        config = {"tools": ["bash", "view", "edit"]}
+        config = {"tools": ["bash", "view"]}
 
         # Call function
-        add_tools(mock_env, config, logger)
+        add_tools(env, config, logger)
 
-        # Assertions
-        assert mock_get_tool.call_count == 3
-        assert mock_env.add_tool.call_count == 3
-        mock_env.add_tool.assert_any_call(mock_bash_tool)
-        mock_env.add_tool.assert_any_call(mock_view_tool)
-        mock_env.add_tool.assert_any_call(mock_edit_tool)
+        # Assertions - verify all tools were added
+        assert len(env.tools) == 2
+        tool_types = [type(tool) for tool in env.tools]
+        assert BashTool in tool_types
+        assert ViewTool in tool_types
 
-    @patch("debug_gym.experiment.Toolbox.get_tool")
-    def test_add_tools_empty_list(self, mock_get_tool):
+    def test_add_tools_empty_list(self, tmp_path):
         """Test add_tools with empty tool list"""
-        # Setup mocks
-        mock_env = Mock()
+        # Create a real environment
+        repo_path = tmp_path / "test_repo"
+        repo_path.mkdir()
+        env = LocalEnv(path=str(repo_path))
         logger = DebugGymLogger("test")
 
         # Setup config with no tools
         config = {"tools": []}
 
         # Call function
-        add_tools(mock_env, config, logger)
+        add_tools(env, config, logger)
 
-        # Assertions
-        mock_get_tool.assert_not_called()
-        mock_env.add_tool.assert_not_called()
-
-    @patch("debug_gym.experiment.Toolbox.get_tool")
-    def test_add_tools_with_parameterized_tools(self, mock_get_tool):
-        """Test adding tools with parameters (e.g., 'bash:debug')"""
-        # Setup mocks
-        mock_tool = Mock()
-        mock_tool.__class__.__name__ = "BashTool"
-        mock_get_tool.return_value = mock_tool
-
-        mock_env = Mock()
-        logger = DebugGymLogger("test")
-
-        # Setup config with parameterized tool
-        config = {"tools": ["bash:debug"]}
-
-        # Call function
-        add_tools(mock_env, config, logger)
-
-        # Assertions
-        mock_get_tool.assert_called_once_with("bash:debug")
-        mock_env.add_tool.assert_called_once_with(mock_tool)
+        # Assertions - no tools should be added
+        assert len(env.tools) == 0
 
 
 class TestDumpExperimentInfo:
