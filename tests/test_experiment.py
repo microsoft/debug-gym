@@ -10,6 +10,17 @@ from debug_gym.experiment import add_tools, create_env, dump_experiment_info
 from debug_gym.logger import DebugGymLogger
 
 
+def create_args_object(**kwargs):
+    """Helper function to create an Args object with specified attributes."""
+    class Args:
+        pass
+
+    args = Args()
+    for key, value in kwargs.items():
+        setattr(args, key, value)
+    return args
+
+
 class TestCreateEnv:
     """Test cases for create_env function"""
 
@@ -254,12 +265,7 @@ class TestDumpExperimentInfo:
             }
 
             # Create a simple object for args instead of Mock
-            class Args:
-                pass
-
-            args_mock = Args()
-            args_mock.timeout = 3600
-            args_mock.force_all = False
+            args_mock = create_args_object(timeout=3600, force_all=False)
 
             # Call function
             dump_experiment_info(config, args_mock)
@@ -307,11 +313,7 @@ class TestDumpExperimentInfo:
             }
 
             # Create a simple object for args instead of Mock
-            class Args:
-                pass
-
-            args_mock = Args()
-            args_mock.debug = True
+            args_mock = create_args_object(debug=True)
 
             # Call function - should not fail even if git commands fail
             dump_experiment_info(config, args_mock)
@@ -357,14 +359,8 @@ class TestDumpExperimentInfo:
             }
 
             # Create simple objects for args instead of Mock
-            class Args:
-                pass
-
-            args_mock1 = Args()
-            args_mock1.run = 1
-
-            args_mock2 = Args()
-            args_mock2.run = 2
+            args_mock1 = create_args_object(run=1)
+            args_mock2 = create_args_object(run=2)
 
             # Call function twice
             dump_experiment_info(config, args_mock1)
@@ -411,15 +407,13 @@ class TestDumpExperimentInfo:
             }
 
             # Create a simple object for args with various types
-            class Args:
-                pass
-
-            args_mock = Args()
-            args_mock.string_arg = "test"
-            args_mock.int_arg = 42
-            args_mock.bool_arg = True
-            args_mock.none_arg = None
-            args_mock.list_arg = ["a", "b", "c"]
+            args_mock = create_args_object(
+                string_arg="test",
+                int_arg=42,
+                bool_arg=True,
+                none_arg=None,
+                list_arg=["a", "b", "c"],
+            )
 
             # Call function
             dump_experiment_info(config, args_mock)
