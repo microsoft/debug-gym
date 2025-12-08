@@ -1,10 +1,9 @@
-import json
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 from transformers import AutoTokenizer
 
-from debug_gym.llms import HuggingFaceLLM, OpenAILLM
+from debug_gym.llms import HuggingFaceLLM
 from debug_gym.llms.base import LLMConfig, LLMConfigRegistry
 
 # Run these tests with `pytest tests/llms/test_huggingface.py -m hf_tokenizer`

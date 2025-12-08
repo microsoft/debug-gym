@@ -6,13 +6,14 @@ import pytest
 
 from debug_gym.gym.entities import EvalOutput, Event, Observation
 from debug_gym.gym.envs.env import EnvInfo, EventHooks, RepoEnv, TooledEnv
+from debug_gym.gym.envs.local import LocalEnv
 from debug_gym.gym.tools.tool import ToolCall
 from debug_gym.gym.tools.toolbox import Toolbox
 
 
 @pytest.fixture
-def env_mock():
-    env = RepoEnv()
+def env_mock(tmp_path):
+    env = LocalEnv(path=tmp_path)
     return env
 
 
@@ -109,7 +110,7 @@ def test_tool_names(env_mock):
     assert env_mock.tool_names == "tool1, tool2"
 
 
-def test_env_tools():
+def test_env_tools(env_mock):
     tool1 = MagicMock()
     tool1.name = "tool1"
     tool1.description = "instructions1"
@@ -129,11 +130,10 @@ def test_env_tools():
         },
     }
 
-    env = RepoEnv()
-    env.add_tool(tool1)
-    env.add_tool(tool2)
+    env_mock.add_tool(tool1)
+    env_mock.add_tool(tool2)
 
-    assert env.tools == [tool1, tool2]
+    assert env_mock.tools == [tool1, tool2]
 
 
 @pytest.fixture
@@ -147,7 +147,7 @@ def env(tmp_path):
     (repo_path / "file2.txt").touch()
     (subdir_path / "subfile1.txt").touch()
 
-    env = RepoEnv(path=repo_path, dir_tree_depth=2)
+    env = LocalEnv(path=repo_path)
     return env
 
 
@@ -186,7 +186,7 @@ def test_step(
     mock_pdb_tool.current_frame_file = "file.py"
     mock_get_tool.return_value = None
 
-    env = RepoEnv(path=tmp_path)
+    env = LocalEnv(path=tmp_path)
     env.reset()
     env.last_eval = EvalOutput(success=False, output="1 failed, 0 passed")
     tool_call = ToolCall(id="123", name="pdb", arguments={"command": "b 10"})
@@ -210,7 +210,7 @@ def test_reset(tmp_path):
     (tmp_path / "test.py").write_text("def test_1():\n  assert False\n")
     (tmp_path / ".debugignore").write_text("__pycache__/\n.git/\n.pytest_cache/\n")
 
-    env = RepoEnv(path=tmp_path, entrypoint="pytest test.py")
+    env = LocalEnv(path=tmp_path, entrypoint="pytest test.py")
     infos = env.reset()
 
     assert env.last_eval is None
@@ -220,16 +220,11 @@ def test_reset(tmp_path):
         step_observation=Observation(source="env", observation=env.instructions),
         all_observations=[Observation(source="env", observation=env.instructions)],
         eval_observation=None,
-        dir_tree=(
-            "Listing files in the current working directory. (read-only) indicates read-only files. Max depth: 1.\n"
-            f"{env.working_dir}/\n"
-            "|-- test.py"
-        ),
         current_breakpoints="No breakpoints are set.",
         action_reasoning=None,
         action_content=None,
         action_tool_call=None,
-        instructions="",
+        instructions=env.instructions,
         score=0,
         max_score=None,
         terminated=False,
@@ -281,7 +276,7 @@ def test_eval(tmp_path):
     (tmp_path / "test.py").write_text("def test_1():\n  assert False\n")
     (tmp_path / ".debugignore").write_text("__pycache__/\n.git/\n.pytest_cache/\n")
 
-    env = RepoEnv(path=tmp_path, entrypoint="pytest test.py")
+    env = LocalEnv(path=tmp_path, entrypoint="pytest test.py")
     env.reset()
     env.eval()
     assert "FAILED test.py::test_1 - assert False" in env.last_eval.output
@@ -292,7 +287,7 @@ def test_eval_success(tmp_path):
     # create a dummy file
     with open(tmp_path / "file.py", "w") as f:
         f.write("print('Hello, World!')")
-    env = RepoEnv(path=working_dir, entrypoint="python file.py")
+    env = LocalEnv(path=working_dir, entrypoint="python file.py")
     env.reset()
     output = env.eval()
     assert output == EvalOutput(success=True, output="Hello, World!")
@@ -303,7 +298,7 @@ def test_eval_timeout(tmp_path):
     # runs for longer than the timeout
     with open(tmp_path / "file.py", "w") as f:
         f.write("import time; time.sleep(5)")
-    env = RepoEnv(path=working_dir, entrypoint="python file.py", run_timeout=1)
+    env = LocalEnv(path=working_dir, entrypoint="python file.py", run_timeout=1)
     env.reset()
     output = env.eval()
     assert output == EvalOutput(success=False, output="Timeout expired.")
@@ -376,22 +371,20 @@ def test_event_hooks_notify():
     subscriber.on_env_start.assert_called_once()
 
 
-def test_current_breakpoints_no_breakpoints():
-    env = RepoEnv()
-    env.current_breakpoints_state = {}
-    result = env.current_breakpoints()
+def test_current_breakpoints_no_breakpoints(env_mock):
+    env_mock.current_breakpoints_state = {}
+    result = env_mock.current_breakpoints()
     assert result == "No breakpoints are set."
 
 
-def test_current_breakpoints_with_breakpoints(tmp_path):
-    env = RepoEnv()
-    env.current_breakpoints_state = {
+def test_current_breakpoints_with_breakpoints(tmp_path, env_mock):
+    env_mock.current_breakpoints_state = {
         "file1.py|||10": "b file1.py:10",
         "file1.py|||20": "b file1.py:20",
         "file1.py|||30": "b file1.py:30",
         "file2.py|||15": "b file2.py:15",
     }
-    result = env.current_breakpoints()
+    result = env_mock.current_breakpoints()
     expected_result = (
         "line 10 in file1.py\n"
         "line 20 in file1.py\n"
@@ -429,7 +422,7 @@ def test_queue_and_process_events():
 
 
 def test_has_breakpoint_true_and_false(tmp_path):
-    env = RepoEnv(path=tmp_path)
+    env = LocalEnv(path=tmp_path)
     env.reset()
     file_path = env.working_dir / "test.py"
     file_path.write_text("print('hello')")
@@ -443,7 +436,7 @@ def test_has_breakpoint_true_and_false(tmp_path):
 
 
 def test_has_breakpoint_relative_path(tmp_path):
-    env = RepoEnv(path=tmp_path)
+    env = LocalEnv(path=tmp_path)
     env.reset()
     file_path = env.working_dir / "foo.py"
     file_path.write_text("print('foo')")

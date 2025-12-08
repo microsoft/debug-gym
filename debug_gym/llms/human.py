@@ -1,4 +1,3 @@
-import json
 import re
 import sys
 from typing import Any, Dict, List, Optional, Tuple
@@ -6,7 +5,6 @@ from typing import Any, Dict, List, Optional, Tuple
 import numpy as np
 from rich.console import Console
 
-from debug_gym.gym.envs.env import EnvInfo
 from debug_gym.gym.tools.tool import EnvironmentTool, ToolCall
 from debug_gym.gym.utils import filter_non_utf8
 from debug_gym.llms.base import LLM, LLMResponse
@@ -502,55 +500,45 @@ class Human(LLM):
 
         return available_commands
 
-    def format_tool_call_history(
-        self, history_info: EnvInfo, response: LLMResponse
-    ) -> list[dict]:
-        """Anthropic-like format for tool call history"""
-        _messages = []
-        if isinstance(response, list) and len(response) > 0:
-            _messages.append(
+    def convert_response_to_message(self, response: LLMResponse) -> dict:
+        return {
+            "role": "assistant",
+            "content": [
                 {
-                    "role": "assistant",
-                    "content": [
-                        {
-                            "type": "tool_use",
-                            "id": response[0].tool.id,
-                            "name": response[0].tool.name,
-                            "input": response[0].tool.arguments,
-                        }
-                    ],
+                    "type": "tool_use",
+                    "id": response.tool.id,
+                    "name": response.tool.name,
+                    "input": response.tool.arguments,
                 }
-            )
-        if (
-            history_info.action_tool_call is None
-            and history_info.action_content is None
-            and history_info.action_reasoning is None
-        ):
+            ],
+        }
+
+    def convert_observation_to_message(
+        self,
+        observation: str,
+        action_tool_call_id=None,
+        action_tool_call_name=None,
+        **kwargs,
+    ) -> dict:
+        if action_tool_call_id is None:
             # This is the initial state, no action taken yet
-            _messages.append(
-                {
-                    "role": "user",
-                    "content": filter_non_utf8(
-                        f"{history_info.step_observation.observation}"
-                    ),
-                }
-            )
+            return {
+                "role": "user",
+                "content": filter_non_utf8(observation),
+            }
         else:
-            _messages.append(
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "tool_result",
-                            "tool_use_id": history_info.action_tool_call.id,
-                            "content": filter_non_utf8(
-                                f"{history_info.step_observation.observation}"
-                            ),
-                        }
-                    ],
-                },
-            )
-        return _messages
+            # This is a step with an action taken
+            return {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "tool_result",
+                        "tool_use_id": action_tool_call_id,
+                        "tool_use_name": action_tool_call_name,
+                        "content": filter_non_utf8(observation),
+                    }
+                ],
+            }
 
     def generate(self, messages, tools, **kwargs) -> LLMResponse:
         # Human overrides the entire __call__ method, so generate is never called.

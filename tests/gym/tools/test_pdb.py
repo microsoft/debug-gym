@@ -7,10 +7,8 @@ from unittest.mock import MagicMock
 import pytest
 
 from debug_gym.gym.entities import Event
-from debug_gym.gym.envs.env import RepoEnv
+from debug_gym.gym.envs.local import LocalEnv
 from debug_gym.gym.terminals.docker import DockerTerminal
-from debug_gym.gym.terminals.local import LocalTerminal
-from debug_gym.gym.terminals.shell_session import ProcessNotRunningError
 from debug_gym.gym.tools.pdb import PDBTool
 
 
@@ -60,14 +58,12 @@ def setup_breakpoints_state():
 def setup_pdb_repo_env(setup_test_repo, setup_breakpoints_state):
     def _setup_pdb_repo_env(base_dir):
         test_repo = setup_test_repo(base_dir)
-        env = RepoEnv(path=str(test_repo))
-        pdb_tool = PDBTool()
+        env = LocalEnv(path=str(test_repo))
+        pdb_tool = PDBTool(persistent_breakpoints=True, auto_list=True)
         pdb_tool.register(env)
         env.reset()
         breakpoints = setup_breakpoints_state(env.working_dir)
         env.current_breakpoints_state = breakpoints
-        env.persistent_breakpoints = True
-        env.auto_list = True
         pdb_tool.start_pdb(env)
         return pdb_tool, env
 
@@ -77,10 +73,8 @@ def setup_pdb_repo_env(setup_test_repo, setup_breakpoints_state):
 def test_pdb_use(tmp_path, setup_test_repo):
     # Test PDBTool with LocalTerminal, verbose pytest
     tests_path = str(setup_test_repo(tmp_path))
-    terminal = LocalTerminal()
-    env = RepoEnv(
+    env = LocalEnv(
         path=tests_path,
-        terminal=terminal,
         debug_entrypoint="python -m pdb -m pytest -sv .",
     )
     env.reset()
@@ -105,10 +99,8 @@ def test_pdb_use(tmp_path, setup_test_repo):
 def test_pdb_use_empty_command(tmp_path, setup_test_repo):
     # Test PDBTool with LocalTerminal, verbose pytest
     tests_path = str(setup_test_repo(tmp_path))
-    terminal = LocalTerminal()
-    env = RepoEnv(
+    env = LocalEnv(
         path=tests_path,
-        terminal=terminal,
         debug_entrypoint="python -m pdb -m pytest -sv .",
     )
     env.reset()
@@ -122,10 +114,8 @@ def test_pdb_use_empty_command(tmp_path, setup_test_repo):
 def test_pdb_b_fail_blank_or_comment(tmp_path, setup_test_repo):
     # Test PDBTool with LocalTerminal, verbose pytest
     tests_path = str(setup_test_repo(tmp_path))
-    terminal = LocalTerminal()
-    env = RepoEnv(
+    env = LocalEnv(
         path=tests_path,
-        terminal=terminal,
         debug_entrypoint="python -m pdb -m pytest -sv .",
     )
     env.reset()
@@ -143,10 +133,8 @@ def test_pdb_b_fail_blank_or_comment(tmp_path, setup_test_repo):
 def test_pdb_pass_empty_path_if_in_session(tmp_path, setup_test_repo):
     # Test PDBTool with LocalTerminal, verbose pytest
     tests_path = str(setup_test_repo(tmp_path))
-    terminal = LocalTerminal()
-    env = RepoEnv(
+    env = LocalEnv(
         path=tests_path,
-        terminal=terminal,
         debug_entrypoint="python -m pdb -m pytest -sv .",
     )
     env.reset()
@@ -166,8 +154,7 @@ def test_pdb_pass_empty_path_if_in_session(tmp_path, setup_test_repo):
 def test_pdb_use_default_env_entrypoint(tmp_path, setup_test_repo):
     # Test PDBTool with default env entrypoint, quiet pytest
     tests_path = str(setup_test_repo(tmp_path))
-    terminal = LocalTerminal()
-    env = RepoEnv(path=tests_path, terminal=terminal)
+    env = LocalEnv(path=tests_path)
     env.reset()
     pdb = PDBTool()
     initial_output = pdb.start_pdb(env)  # "python -m pdb -m pytest -sq ."
@@ -204,7 +191,9 @@ def test_pdb_use_docker_terminal(tmp_path, setup_test_repo):
     )
     # no:cacheprovider to avoid .pytest_cache, --tb=short to reduce output
     debug_entrypoint = "python -m pdb -m pytest -p no:cacheprovider --color=no -sv ."
-    env = RepoEnv(path=tests_path, terminal=terminal, debug_entrypoint=debug_entrypoint)
+    env = LocalEnv(
+        path=tests_path, terminal=terminal, debug_entrypoint=debug_entrypoint
+    )
     env.reset()
     pdb = PDBTool()
     pdb.start_pdb(env)
@@ -230,8 +219,8 @@ def test_initialization():
     assert pdb_tool._session is None
 
 
-def test_register():
-    env = RepoEnv()
+def test_register(tmp_path):
+    env = LocalEnv(path=tmp_path)
     pdb_tool = PDBTool()
     pdb_tool.register(env)
     # every tool listen to ENV_RESET event to track history
@@ -371,7 +360,7 @@ def test_pdb_crashing(tmp_path, setup_test_repo):
     with open(tests_path / "test_fail.py", "w") as f:
         f.write("def test_fail():\nassert False")  # IndentationError
 
-    env = RepoEnv(
+    env = LocalEnv(
         path=tests_path,
         entrypoint="python -m pytest -s test.py",
         debug_entrypoint="python -m pdb -m pytest -s test_fail.py",
@@ -392,7 +381,7 @@ def test_pdb_timeout(tmp_path, setup_test_repo):
             "def test_fail():\n  print('Sleeping...'); import time; time.sleep(10)"
         )  # IndentationError
 
-    env = RepoEnv(
+    env = LocalEnv(
         path=tests_path,
         entrypoint="python -m pytest -s test.py",
         debug_entrypoint="python -m pdb -m pytest -sv test_fail.py",

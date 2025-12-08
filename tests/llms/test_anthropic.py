@@ -4,10 +4,9 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from debug_gym.gym.entities import Observation
-from debug_gym.gym.envs.env import EnvInfo
 from debug_gym.gym.tools.tool import EnvironmentTool, ToolCall
 from debug_gym.llms import AnthropicLLM
-from debug_gym.llms.base import LLMConfig, LLMConfigRegistry, LLMResponse
+from debug_gym.llms.base import LLMConfig, LLMConfigRegistry
 
 
 class Tool1(EnvironmentTool):
@@ -306,104 +305,3 @@ def test_query_anthropic_model_max_tokens_from_config(mock_llm_config, logger_mo
     messages = [{"role": "user", "content": "Test message"}]
     llm(messages, tools)
     assert llm.client.messages.create.call_args[1]["max_tokens"] == 4000
-
-
-@patch.object(
-    LLMConfigRegistry,
-    "from_file",
-    return_value=LLMConfigRegistry.register_all(anthropic_config),
-)
-def test_format_tool_call_history_initial_state(mock_llm_config, logger_mock):
-    """Test format_tool_call_history with initial state (no action taken yet)"""
-    llm = AnthropicLLM("test-anthropic", logger=logger_mock)
-
-    # Create EnvInfo for initial state
-    history_info = EnvInfo(
-        step_observation=Observation(source="tool1", observation="Initial observation"),
-        all_observations=[],
-        eval_observation=Observation(source="tool1", observation=""),
-        dir_tree="",
-        current_breakpoints="",
-        action_reasoning=None,  # No reasoning yet
-        action_content=None,  # No content yet
-        action_tool_call=None,  # No action taken yet
-        instructions={},
-        score=0,
-        max_score=100,
-        terminated=False,
-        resolved=False,
-        rewrite_counter=0,
-        tools=[],
-    )
-
-    # llm_response is None
-    messages = llm.format_tool_call_history(history_info, [])
-    assert len(messages) == 1
-    # Only message should be the user's initial observation
-    assert messages[0]["role"] == "user"
-    assert messages[0]["content"] == "Initial observation"
-
-
-@patch.object(
-    LLMConfigRegistry,
-    "from_file",
-    return_value=LLMConfigRegistry.register_all(anthropic_config),
-)
-def test_format_tool_call_history_with_action(mock_llm_config, logger_mock):
-    """Test format_tool_call_history with an action taken"""
-    llm = AnthropicLLM("test-anthropic", logger=logger_mock)
-
-    # Create action that was taken
-    action = ToolCall(
-        id="tool_456",
-        name="edit",
-        arguments={"path": "test.py", "content": "new content"},
-    )
-
-    # Create EnvInfo with action taken
-    history_info = EnvInfo(
-        step_observation=Observation(
-            source="tool_456", observation="File edited successfully"
-        ),
-        all_observations=[],
-        eval_observation=Observation(source="tool_456", observation=""),
-        dir_tree="",
-        current_breakpoints="",
-        action_reasoning="Edited the file to fix the bug",
-        action_content="Edited the file to fix the bug",
-        action_tool_call=action,  # Action was taken
-        instructions={},
-        score=0,
-        max_score=100,
-        terminated=False,
-        resolved=False,
-        rewrite_counter=0,
-        tools=[],
-    )
-    # Create LLMResponse with the action
-    llm_response = LLMResponse(
-        prompt=[{"role": "user", "content": "test"}],
-        response="Edited the file to fix the bug",
-        tool=action,
-    )
-
-    messages = llm.format_tool_call_history(history_info, [llm_response])
-
-    assert len(messages) == 2
-    # First message should be the assistant's tool use
-    assert messages[0]["role"] == "assistant"
-    assert messages[0]["content"][0]["type"] == "text"
-    assert messages[0]["content"][0]["text"] == "Edited the file to fix the bug"
-    assert messages[0]["content"][1]["type"] == "tool_use"
-    assert messages[0]["content"][1]["id"] == "tool_456"
-    assert messages[0]["content"][1]["name"] == "edit"
-    assert messages[0]["content"][1]["input"] == {
-        "path": "test.py",
-        "content": "new content",
-    }
-
-    # Second message should be the tool result
-    assert messages[1]["role"] == "user"
-    assert messages[1]["content"][0]["type"] == "tool_result"
-    assert messages[1]["content"][0]["tool_use_id"] == "tool_456"
-    assert messages[1]["content"][0]["content"] == "File edited successfully"

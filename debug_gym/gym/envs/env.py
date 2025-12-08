@@ -4,7 +4,6 @@ from pathlib import Path
 import numpy as np
 
 from debug_gym.gym.entities import EvalOutput, Event, Observation
-from debug_gym.gym.terminals.local import LocalTerminal
 from debug_gym.gym.terminals.terminal import Terminal
 from debug_gym.gym.tools.tool import EnvironmentTool, ToolCall
 from debug_gym.gym.workspace import Workspace
@@ -17,7 +16,6 @@ class EnvInfo:
     step_observation: Observation
     all_observations: list[Observation]  #  env.step + triggered tools obs
     eval_observation: Observation | None  # last eval observation
-    dir_tree: str
     current_breakpoints: str
     action_reasoning: str | None
     action_content: str | None
@@ -40,14 +38,16 @@ class EnvInfo:
         # Status section
         lines.append(
             f"📊 Status: {('✅' if self.resolved else '❌') + ' (TERMINATED)' if self.terminated else '🔄 (IN PROGRESS)'}\t"
-            f"🎯 Score: {self.score}/{self.max_score}\t"
+            f"🎯 Score: {self.score}/{self.max_score or '?'}\t"
             f"✏️ Rewrites: {self.rewrite_counter}"
         )
 
         # Action section
-        if self.action:
+        if self.action_tool_call:
             lines.append("🔧 Last Action:")
-            lines.append(f"   Tool: {self.action.name}")
+            lines.append(f"   Tool: {self.action_tool_call.name}")
+            if self.action_content:
+                lines.append(f"   Explanation: {self.action_content}")
             if self.action_reasoning:
                 lines.append(f"   Reasoning: {self.action_reasoning}")
             lines.append("")
@@ -76,15 +76,6 @@ class EnvInfo:
                 )
         lines.append("")
 
-        # Directory tree section (truncated)
-        lines.append("📁 Directory Structure:")
-        tree_lines = self.dir_tree.split("\n")
-        for line in tree_lines[:10]:  # Show first 10 lines
-            lines.append(f"   {line}")
-        if len(tree_lines) > 10:
-            lines.append(f"   ... and {len(tree_lines) - 10} more files/directories")
-
-        lines.append("=" * 60)
         return "\n".join(lines)
 
 
@@ -209,45 +200,29 @@ class RepoEnv(TooledEnv):
 
     def __init__(
         self,
-        path: str | None = None,
+        task_data: dict,
         entrypoint: str = "python -m pytest -sq .",
         debug_entrypoint: str | None = None,
         max_score: int | None = None,
-        readonly_patterns: list[str] | None = None,  # TODO: remove
         run_timeout: int | None = None,
-        dir_tree_depth: int = 1,
-        persistent_breakpoints: bool = True,  # TODO: remove
-        auto_list: bool = True,  # TODO: remove
         terminal: Terminal | None = None,
         logger: DebugGymLogger | None = None,
-        problems: str | list[str] | None = None,
         **kwargs,
     ):
         super().__init__()
 
-        self.path = path
+        self.task_data = task_data
         self.max_score = max_score
         self.run_timeout = run_timeout
-        self.dir_tree_depth = dir_tree_depth
-        self.terminal = terminal or LocalTerminal()  # TODO: default to DockerTerminal
+        self.terminal = terminal
         self._entrypoint = entrypoint
         self._debug_entrypoint = debug_entrypoint
-        self.persistent_breakpoints = persistent_breakpoints
-        self.auto_list = auto_list
         self.logger = logger or DebugGymLogger("debug-gym")
         self.infos: EnvInfo | None = None
         self.rng = None
         self.additional_kwargs = kwargs
 
-        if "auto_eval_on_rewrite" in kwargs:
-            raise ValueError(
-                "The 'auto_eval_on_rewrite' parameter is no longer supported. "
-                "Please remove it from your initialization arguments."
-                "Instead, set 'auto_eval_on_rewrite' in the EvalTool instance."
-            )
-
         self.workspace = Workspace(self.terminal, logger=self.logger)
-        self.dataset = self.load_dataset(problems)
         self.set_entrypoints(self._entrypoint, self._debug_entrypoint)
 
     def _reset_env_state(self):
@@ -302,43 +277,39 @@ class RepoEnv(TooledEnv):
     def instructions(self) -> str:
         """Instructions for the current task.
         Override in subclasses for different behavior."""
-        return ""
+        raise NotImplementedError(
+            "Subclasses must implement the instructions property."
+        )
 
-    def setup_task(self, task_name: str, options: dict = None) -> None:
+    @property
+    def task_name(self) -> str:
+        raise NotImplementedError("Subclasses must implement the task_name property.")
+
+    def setup_task(self) -> None:
         """Setup the task information.
         Override in subclasses for different behavior. Called once at reset."""
-        pass
+        raise NotImplementedError("Subclasses must implement setup_task method.")
 
     def setup_workspace(self) -> None:
         """Setup the workspace.
         Override in subclasses for different behavior. Called once at reset."""
-        self.workspace.reset()
-        self.workspace.copy_content(self.path)
-        self.workspace.setup_file_filters()
+        raise NotImplementedError("Subclasses must implement setup_workspace method.")
 
     def setup_terminal(self) -> None:
         """Setup the terminal.
         Override in subclasses for different behavior. Called once at reset."""
-
-        self.logger.debug(f"Configuring {self.terminal}...")
-
-        self.terminal.run("git init -b main")
-        self.terminal.run("git config user.name 'debug-gym'")
-        self.terminal.run("git config user.email '<>'")
-
-        self.terminal.run("git add *")
-        self.terminal.run("git commit -am 'Init'")
-
-        self.terminal.run("git add .debugignore .debugreadonly")
-        self.terminal.run("git commit -am 'Add debug-gym ignore and read-only files'")
+        raise NotImplementedError("Subclasses must implement setup_terminal method.")
 
     def reset(self, *, options: dict = None):
         """Resets the environment and returns eval as the initial observation."""
-        options = options or {}
+        options = options if options is not None else {}
         self.logger.debug("Resetting environment")
-        self.setup_task(task_name=options.get("task_name"), options=options)
-        self.setup_workspace()
-        self.setup_terminal()
+        if options.get("reset_runtime", True):
+            self.close()  # Clean up previous workspace and terminal.
+            self.setup_task()
+            self.setup_workspace()
+            self.setup_terminal()
+
         self._reset_env_state()
 
         # Notify all tools that the environment is reset and get their observations
@@ -361,7 +332,6 @@ class RepoEnv(TooledEnv):
             eval_observation=(
                 Observation("env", self.last_eval.output) if self.last_eval else None
             ),
-            dir_tree=self.workspace.display_files(self.dir_tree_depth),
             current_breakpoints=self.current_breakpoints(),
             action_reasoning=None,
             action_content=None,
@@ -488,7 +458,6 @@ class RepoEnv(TooledEnv):
             eval_observation=(
                 Observation("env", self.last_eval.output) if self.last_eval else None
             ),
-            dir_tree=self.workspace.display_files(self.dir_tree_depth),
             current_breakpoints=self.current_breakpoints(),
             action_reasoning=action_reasoning,
             action_content=action_content,
@@ -516,6 +485,3 @@ class RepoEnv(TooledEnv):
 
     def __del__(self):
         self.close()
-
-    def load_dataset(self, problems: str | list[str] | None = None):
-        return {"custom": None}

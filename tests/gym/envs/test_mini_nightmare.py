@@ -12,23 +12,23 @@ from debug_gym.gym.tools.toolbox import Toolbox
 def mini_nightmare_env():
     # Initialize the MiniNightmareEnv with LocalTerminal
     terminal = LocalTerminal()
-    env = MiniNightmareEnv(terminal=terminal)
+    dataset = MiniNightmareEnv.load_dataset()
+    task_data = dataset["config"]
+    env = MiniNightmareEnv(task_data=task_data, terminal=terminal)
     env.add_tool(Toolbox.get_tool("eval"))
     return env
 
 
 def test_load_dataset(mini_nightmare_env):
-    dataset = mini_nightmare_env.load_dataset()
-    assert mini_nightmare_env.dataset == dataset
-
+    dataset = MiniNightmareEnv.load_dataset()
     subproblems = list(dataset.keys())[::2]
-    subset = mini_nightmare_env.load_dataset(problems=subproblems)
+    subset = MiniNightmareEnv.load_dataset(problems=subproblems)
     assert list(subset.keys()) == subproblems
 
 
 @patch("debug_gym.gym.envs.mini_nightmare.build_docker_image")
 def test_build_docker_image(mock_build_docker_image):
-    MiniNightmareEnv()
+    MiniNightmareEnv.load_dataset()
     mock_build_docker_image.assert_called_once()
 
 
@@ -53,11 +53,13 @@ def test_reset(mini_nightmare_env):
 
 @pytest.if_docker_running
 def test_reset_with_docker_terminal():
-    env = MiniNightmareEnv()
+    dataset = MiniNightmareEnv.load_dataset()
+    task_data = dataset["config"]
+    env = MiniNightmareEnv(task_data=task_data)
     env.add_tool(Toolbox.get_tool("eval"))
     assert isinstance(env.terminal, DockerTerminal)
 
-    infos = env.reset(options={"task_name": "config"})
+    infos = env.reset()
     assert env.instructions == infos.step_observation.observation
     assert "2 failed" in infos.eval_observation.observation
     assert infos.max_score == 2

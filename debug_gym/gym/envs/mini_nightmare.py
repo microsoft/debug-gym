@@ -1,3 +1,4 @@
+import logging
 import tempfile
 from pathlib import Path
 
@@ -7,14 +8,16 @@ from debug_gym.gym.entities import EvalOutput
 from debug_gym.gym.envs.env import RepoEnv
 from debug_gym.gym.terminals.docker import DockerTerminal
 from debug_gym.gym.terminals.terminal import Terminal
+from debug_gym.logger import DebugGymLogger
 
 DOCKER_MINI_NIGHTMARE_IMAGE_NAME = "debug-gym:mini-nightmare"
 
 
-def build_docker_image(logger):
+def build_docker_image(logger: logging.Logger | None = None):
     """
     Build a Docker image for the Mini Nightmare environment.
     """
+    logger = logger or DebugGymLogger("debug-gym")
     # Check if Docker image is built.
     import docker
 
@@ -74,6 +77,7 @@ class MiniNightmareEnv(RepoEnv):
 
     def __init__(
         self,
+        task_data: dict,
         entrypoint: str = "python -m pytest --tb=no -s test.py",
         terminal: Terminal | None = None,
         **kwargs,
@@ -85,7 +89,9 @@ class MiniNightmareEnv(RepoEnv):
         if hasattr(terminal, "base_image") and terminal.base_image is None:
             terminal.base_image = DOCKER_MINI_NIGHTMARE_IMAGE_NAME
 
-        super().__init__(entrypoint=entrypoint, terminal=terminal, **kwargs)
+        super().__init__(
+            task_data=task_data, entrypoint=entrypoint, terminal=terminal, **kwargs
+        )
 
     @property
     def instructions(self) -> str:
@@ -94,6 +100,10 @@ class MiniNightmareEnv(RepoEnv):
             " Investigate the repository, figure out the root cause, then rewrite the code to fix the issue."
             " Beaware that the bug may not be in the code you initially see."
         )
+
+    @property
+    def task_name(self) -> str:
+        return self.current_task["task_name"]
 
     def calculate_max_score(self, eval_output: EvalOutput) -> int:
         return utils.extract_max_score_from_pytest_output(eval_output.output)
@@ -107,22 +117,20 @@ class MiniNightmareEnv(RepoEnv):
         self.last_eval = EvalOutput(success, output)
         return self.last_eval
 
-    def setup_task(self, task_name: str, options: dict = None):
-        if task_name not in self.dataset:
-            raise ValueError(f"Task {task_name} not found in the dataset.")
-        self.current_task = self.dataset[task_name]
+    def setup_task(self):
+        self.current_task = self.task_data
 
     def setup_workspace(self):
         self.workspace.reset()
 
-        self.logger.info("Copying files..")
+        self.logger.debug("Copying files..")
         self.workspace.copy_content(
             src=self.current_task["codebase"], target=self.workspace.working_dir
         )
         self.workspace.setup_file_filters()  # Use codebase's .debugignore and .debugreadonly.
 
     def setup_terminal(self):
-        self.logger.info(f"Configuring {self.terminal}...")
+        self.logger.debug(f"Configuring {self.terminal}...")
 
         self.terminal.run("git init")
         self.terminal.run("git config user.name 'debug-gym'")
@@ -138,29 +146,44 @@ class MiniNightmareEnv(RepoEnv):
         )  # Mini-nightmare tasks come with those.
         self.terminal.run("git commit -am 'Add debug-gym ignore and read-only files'")
 
-    def load_dataset(self, problems: str | list[str] | None = None):
-        if isinstance(self.terminal, DockerTerminal):
-            build_docker_image(self.logger)
+    @classmethod
+    def load_dataset(
+        cls,
+        problems: str | list[str] | None = None,
+        build_image: bool = True,
+        logger: object = None,
+        **kwargs,
+    ) -> dict:
+        if build_image:
+            build_docker_image(logger)
 
-        if not self.DATA_PATH.exists():
+        if not MiniNightmareEnv.DATA_PATH.exists():
             zipped_data = utils.download(
-                self.DATA_URL, self.DATA_PATH, f"Downloading mini-nightmare dataset."
+                MiniNightmareEnv.DATA_URL,
+                MiniNightmareEnv.DATA_PATH,
+                f"Downloading mini-nightmare dataset.",
             )
-            utils.unzip(zipped_data, dst=self.DATA_PATH.parent)
+            utils.unzip(zipped_data, dst=cls.DATA_PATH.parent)
 
         dataset = {}
-        for task_name in self.TASK_NAMES:
-            task_path = self.DATA_PATH / task_name
+        for task_name in cls.TASK_NAMES:
+            task_path = cls.DATA_PATH / task_name
             assert (task_path / "test.py").exists()
             assert (task_path / f"{task_name}_code.py").exists()
             assert (task_path / ".debugignore").exists()
             assert (task_path / ".debugreadonly").exists()
 
             dataset[task_name] = {
+                "task_name": task_name,
                 "codebase": task_path,
                 "filename": task_name + "_code.py",
             }
 
         problems = utils.filter_problems(dataset, problems)
-        dataset = {id: i for id, i in dataset.items() if id in problems}
+        dataset = {id: data for id, data in dataset.items() if id in problems}
+
+        # Add env_type to each task_data.
+        for task_data in dataset.values():
+            task_data["env_type"] = "mini_nightmare"
+
         return dataset

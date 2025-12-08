@@ -1,18 +1,18 @@
 base:
     # Environment configs
-    output_path: "exps/swesmith"
+    output_path: "exps/swebench-verified-debugmode"
 
     env:
-        # type: "swesmith"  # Not needed Will be inferred from dataset.
         run_timeout: 300
 
     dataset:
-        type: "swesmith"
-        dataset_id: "SWE-bench/SWE-smith"
-        problems: "all"  # list of problems, e.g., ["astropy__astropy-12907"], or strings like "test-125" (defined in gym/envs/configs), or "all",
+        type: "swebench-debug"
+        problems: "all"  # list of problems, e.g., ["astropy__astropy-12907"], or "all"
+        dataset_id: "SWE-bench/SWE-bench_Verified"
+        dataset_revision: "99450355ca8c611021187a57ffac304b66666738"
 
     terminal:
-        type: "docker"
+        type: "docker"  # "docker" or "kubernetes"
 
     # LLM configs
     llm_name: "gpt-4o"
@@ -28,6 +28,7 @@ base:
 
     # Shortcut features
     "show_current_breakpoints": False  # If True, the environment will automatically show the current breakpoints at every step in the system prompt.
+
 
 froggy_agent:
     tools:
@@ -46,9 +47,10 @@ froggy_agent:
     #     - eval
     # system_prompt: You are a debugging agent specialized in fixing Python programs. Your goal is to debug a Python program to make sure it can pass a set of test functions. You have access to a set of tools including the pdb debugger to help you investigate the code before proposing a patch. While the code may seem familiar to you from your training, you should not assume you know the code. Instead, you must use the pdb debugger to investigate the code and understand the potential bugs. A common debugging workflow is to 1) find suspicious files and lines (from error messages or test failures); 2) set breakpoints at suspicious places; 3) continue execution so the frame is at the breakpoint you set; 4) then print necessary values to identify the bugs. Once you have gained enough information, propose a rewriting patch to fix the bugs. Avoid rewriting the entire code, focus on the bugs only. You must make tool calls to interact with the environment, but you can only call one tool at a time. Do not repeat your previous action, especially if it returned tool calling errors or it resulted in information that you already know. You can spend some time thinking to help you make the decision when you are stuck, but you must be concise and avoid overthinking. If you already had a plan in the previous steps, you can just follow it without repeating the thinking process. If you are confident that you have enough information, propose a patch to fix the bugs by calling the rewrite tool. If you are not sure, continue using the pdb tool to gather more information before proposing a patch. After every rewrite, it's always a good idea to call the eval tool to execute the new code and check if it passes the tests; if it does not, the tool will return the error messages, which you can use to continue debugging. Output both your thinking process (if any) and the tool call (must) in the response.
 
+
 solution_agent:
     llm_name: null  # No need for an LLM.
     tools:
         - eval
-        # - pdb
+        - pdb
         - submit

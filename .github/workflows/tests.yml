@@ -117,7 +117,9 @@ jobs:
           ALLOW_LOCAL_TERMINAL: true
           DEBUG_GYM_DEBUG: 1
         run: |
+          df -h
           pytest -vv -n 16 -k "not test_swe_bench and not test_swe_smith and not test_r2egym and not test_kubernetes" --timeout=600 --cov=debug_gym --cov-report=term-missing
+          df -h
       - name: Store coverage report
         uses: actions/upload-artifact@v4
         with:

@@ -12,7 +12,7 @@ from debug_gym.gym.entities import EvalOutput
 from debug_gym.gym.envs.env import RepoEnv
 from debug_gym.gym.terminals.docker import DockerTerminal
 from debug_gym.gym.terminals.kubernetes import KubernetesTerminal
-from debug_gym.gym.terminals.terminal import Terminal
+from debug_gym.gym.terminals.terminal import DebugGymLogger, Terminal
 from debug_gym.gym.utils import filter_problems
 
 
@@ -21,9 +21,7 @@ class SWEBenchEnv(RepoEnv):
 
     def __init__(
         self,
-        dataset_id: str = "SWE-bench/SWE-bench_Verified",
-        dataset_revision: str = "99450355ca8c611021187a57ffac304b66666738",
-        split: str = "test",
+        task_data: dict,
         terminal: Terminal | None = None,
         **kwargs,
     ):
@@ -33,81 +31,37 @@ class SWEBenchEnv(RepoEnv):
                 f"{self.__class__.__name__} only supports DockerTerminal and KubernetesTerminal."
             )
 
-        self.dataset_id = dataset_id
-        self.dataset_revision = dataset_revision
-        self.split = split
         self.test_directives = []
-
-        super().__init__(terminal=terminal, **kwargs)
+        super().__init__(task_data=task_data, terminal=terminal, **kwargs)
 
     @property
     def instructions(self) -> str:
-        return self.ds_row["problem_statement"]
+        return self.task_data["problem_statement"]
 
-    def load_dataset(self, problems: str | list[str] | None = None):
-        self.ds = datasets.load_dataset(
-            self.dataset_id, revision=self.dataset_revision
-        )[self.split]
-        dataset = {id: i for i, id in enumerate(self.ds["instance_id"])}
-        problems = filter_problems(dataset, problems)
-        dataset = {id: i for id, i in dataset.items() if id in problems}
+    @property
+    def task_name(self) -> str:
+        return self.task_data["instance_id"]
 
-        instance_ids = [self.ds[dataset[id]]["instance_id"] for id in dataset]
-        image_names = set(
-            f"sweb.eval.x86_64.{id.replace('__', '_1776_')}" for id in instance_ids
-        )
-
-        if not isinstance(self.terminal, KubernetesTerminal):
-            # Download all images needed for SWE-Bench.
-            client = docker.from_env()
-            tagged_image_names = set(f"swebench/{name}:latest" for name in image_names)
-
-            existing_images = set(
-                tag for image in client.images.list() for tag in image.tags
-            )
-            missing_images = tagged_image_names - existing_images
-            if missing_images:
-                self.logger.info(f"Found {len(missing_images)} missing Docker images.")
-                for i, image_name in enumerate(missing_images):
-                    self.logger.info(
-                        f"Pulling Docker images {i + 1}/{len(missing_images)}: `{image_name}`."
-                    )
-                    client.images.pull(image_name)
-
-        return dataset
-
-    def setup_task(self, task_name: str, options: dict = None):
-        if task_name not in self.dataset:
-            raise ValueError(
-                f"Task `{task_name}` was not found in dataset. The available tasks are: {sorted(self.dataset)}.\n"
-                "Please provide a valid task or initialize the environment without problems to load all tasks."
-            )
-
-        self.task_name = task_name
-        self.ds_row = self.ds[self.dataset[self.task_name]]
-        self.repo = self.ds_row["repo"]
+    def setup_task(self):
+        self.repo = self.task_data["repo"]
         self.package_name = self.repo.split("/")[1]
-        self.version = self.ds_row["version"]
+        self.version = self.task_data["version"]
         self.install_configs = MAP_REPO_VERSION_TO_SPECS[self.repo][self.version]
-        self.gold_patch = self.ds_row["patch"]
-        self.test_spec = make_test_spec(self.ds_row)
+        self.gold_patch = self.task_data["patch"]
+        self.test_spec = make_test_spec(self.task_data)
         self.base_image = f"swebench/{self.test_spec.instance_image_key}".replace(
             "__", "_1776_"
         )
-        self.base_commit = self.ds_row["base_commit"]
-        self.test_patch = self.ds_row["test_patch"]
-        self.fail_to_pass = json.loads(self.ds_row["FAIL_TO_PASS"])
-        self.pass_to_pass = json.loads(self.ds_row["PASS_TO_PASS"])
+        self.base_commit = self.task_data["base_commit"]
+        self.test_patch = self.task_data["test_patch"]
+        self.fail_to_pass = json.loads(self.task_data["FAIL_TO_PASS"])
+        self.pass_to_pass = json.loads(self.task_data["PASS_TO_PASS"])
         self.test_cmd = self.install_configs["test_cmd"]
-        self.test_directives = get_test_directives(self.ds_row)
+        self.test_directives = get_test_directives(self.task_data)
 
         self.entrypoint = " ".join([self.test_cmd, *self.test_directives])
 
         if self.package_name == "sphinx" or self.package_name == "sympy":
-            # use pytest instead of `sympy bin/test` and `sphinx tox` so pdb breakpoints work
-            expression = " ".join(self.test_directives)
-            self.entrypoint = f"python -m pytest {expression}"
-
             if self.entrypoint.startswith("PYTHONWARNINGS"):
                 # Move PYTHONWARNINGS from the entrypoint to the session commands
                 export, remaining = self.entrypoint.split(" ", 1)
@@ -127,6 +81,11 @@ class SWEBenchEnv(RepoEnv):
         # -s (capture=no) with pytest allows for debugging with pdb
         # -q (quiet) with pytest avoids long pytest output
         self.debug_entrypoint = self.entrypoint.replace("pytest", "pytest -sq")
+
+        if self.package_name == "sphinx" or self.package_name == "sympy":
+            # use pytest instead of `sympy bin/test` and `sphinx tox` so pdb breakpoints work
+            expression = " ".join(self.test_directives)
+            self.debug_entrypoint = f"python -m pytest {expression}"
 
         # --tb=short with pytest keeps the output concise
         self.entrypoint = self.entrypoint.replace("--tb=no", "--tb=short")
@@ -165,6 +124,8 @@ class SWEBenchEnv(RepoEnv):
             self.terminal.run('echo "127.0.0.1    httpbin.org" >> /etc/hosts')
         elif self.task_name == "pylint-dev__pylint-4661":
             self.terminal.run("pip install appdirs==1.4.4")
+        elif self.package_name == "sphinx" or self.package_name == "sympy":
+            self.terminal.run("pip install pytest")
 
         # Apply any changes needed to the install commands.
         self.terminal.run("git config user.name 'debug-gym'")
@@ -214,3 +175,49 @@ class SWEBenchEnv(RepoEnv):
         )
         assert score <= self.max_score
         return score
+
+    @classmethod
+    def load_dataset(
+        cls,
+        dataset_id: str = "SWE-bench/SWE-bench_Verified",
+        dataset_revision: str = "99450355ca8c611021187a57ffac304b66666738",
+        split: str = "test",
+        problems: list | None = None,
+        prepull_images: bool = False,
+        logger: DebugGymLogger | None = None,
+        **kwargs,
+    ) -> dict:
+        ds = datasets.load_dataset(dataset_id, revision=dataset_revision)[split]
+
+        # Memory efficient filtering of problems.
+        id2idx = {id: i for i, id in enumerate(ds["instance_id"])}
+        problems = filter_problems(id2idx, problems)
+        dataset = {problem: ds[id2idx[problem]] for problem in problems}
+
+        # Add env_type to each task_data.
+        for task_data in dataset.values():
+            task_data["env_type"] = "swebench"
+
+        image_names = set(
+            f"sweb.eval.x86_64.{id.replace('__', '_1776_')}" for id in dataset
+        )
+
+        if prepull_images:
+            # Download all images needed for SWE-Bench.
+            client = docker.from_env()
+            tagged_image_names = set(f"swebench/{name}:latest" for name in image_names)
+
+            existing_images = set(
+                tag for image in client.images.list() for tag in image.tags
+            )
+            missing_images = tagged_image_names - existing_images
+            if missing_images:
+                if logger:
+                    logger.info(f"Found {len(missing_images)} missing Docker images.")
+                for i, image_name in enumerate(missing_images):
+                    if logger:
+                        logger.info(
+                            f"Pulling Docker images {i + 1}/{len(missing_images)}: `{image_name}`."
+                        )
+                    client.images.pull(image_name)
+        return dataset

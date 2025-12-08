@@ -34,7 +34,7 @@ def set_signal(timeout_seconds):
         signal.alarm(timeout_seconds)
 
 
-def run_agent(args, problem, config):
+def run_agent(args, task_name: str, task_data: dict, config: dict):
     set_signal(args.timeout)
     success = True
     env = None
@@ -44,22 +44,22 @@ def run_agent(args, problem, config):
     report_progress_error = True
 
     exp_path = Path(config["output_path"]) / config["uuid"]
-    problem_path = exp_path / problem
+    task_path = exp_path / task_name
 
     task_logger = DebugGymLogger(
-        problem,
-        log_dir=problem_path,
+        task_name,
+        log_dir=task_path,
         level=args.logging_level,
         mode="w" if args.force_all else "a",
     )
     try:
-        previous_run = load_previous_run_status(problem_path, problem)
+        previous_run = load_previous_run_status(task_path, task_name)
         if (
             not args.force_all
             and previous_run is not None
             and previous_run.status in ["resolved", "unresolved"]
         ):
-            task_logger.debug(f"Previous run found: {problem_path}")
+            task_logger.debug(f"Previous run found: {task_path}")
             success = previous_run.status == "resolved"
             task_logger.debug(f"Previous run status: {previous_run.status}")
             if not args.force_failed or success:
@@ -72,11 +72,11 @@ def run_agent(args, problem, config):
                     max_score=previous_run.max_score,
                     status=status,
                 )
-                task_logger.debug(f"Skipping {problem}, already done.")
+                task_logger.debug(f"Skipping {task_name}, already done.")
                 return success
 
         task_logger.report_progress(
-            problem_id=problem,
+            problem_id=task_name,
             step=0,
             total_steps=1,
             score=0,
@@ -84,7 +84,7 @@ def run_agent(args, problem, config):
             status="running",
         )
 
-        env = create_env(config, task_logger)
+        env = create_env(config, task_data, task_logger)
         add_tools(env, config, task_logger)
 
         llm = LLM.instantiate(
@@ -95,18 +95,17 @@ def run_agent(args, problem, config):
 
         agent = create_agent(
             config["agent_type"],
-            config=config,
-            env=env,
+            agent_args=config,
             llm=llm,
             logger=task_logger,
         )
 
         try:
-            success = agent.run(task_name=problem, debug=args.debug)
+            success = agent.run(env, debug=args.debug)
         except KeyboardInterrupt:
             task_logger.error("Agent run was interrupted by user.")
             task_logger.report_progress(
-                problem_id=problem,
+                problem_id=task_name,
                 step=1,
                 total_steps=1,
                 score=0,
@@ -117,11 +116,11 @@ def run_agent(args, problem, config):
             raise
         except AgentTimeoutException:
             task_logger.error(
-                f"Timeout: Problem `{problem}` exceeded "
+                f"Timeout: Problem `{task_name}` exceeded "
                 f"the time limit of {args.timeout} seconds."
             )
             task_logger.report_progress(
-                problem_id=problem,
+                problem_id=task_name,
                 step=1,
                 total_steps=1,
                 score=0,
@@ -135,23 +134,23 @@ def run_agent(args, problem, config):
             raise
 
         # save trajectory
-        agent.save_trajectory(task_name=problem)
+        save_trajectory(agent, task_path, task_logger)
 
         # optionally apply patch
         if config["save_patch"]:
-            agent.save_patch(task_name=problem)
+            save_patch(env, task_path, task_logger)
 
     except Exception as e:
         task_logger.error(
-            f"Task Error: {problem} - {e!r}. Run with --very-verbose "
+            f"Task Error: {task_name} - {e!r}. Run with --very-verbose "
             f"or check {task_logger.log_file} for more information."
         )
         task_logger.debug(
-            f"Task {problem} generated an exception: {e!r}. Traceback: {traceback.format_exc()}"
+            f"Task {task_name} generated an exception: {e!r}. Traceback: {traceback.format_exc()}"
         )
         if report_progress_error:
             task_logger.report_progress(
-                problem_id=problem,
+                problem_id=task_name,
                 step=1,
                 total_steps=1,
                 score=0,
@@ -179,9 +178,9 @@ def main():
     logger.info(f"Experiment log path: {exp_output_path}")
     dump_experiment_info(config, args)
 
-    # Create the environment to get the list of problems to run.
-    env = create_env(config, logger=logger)
-    problems = sorted(env.dataset)
+    # Load the dataset based on the information found in the config.
+    dataset = load_dataset(config["dataset"], logger=logger)
+    problems = sorted(dataset)
 
     if args.list:
         print(f"\n# Available problems in {config.get('benchmark', 'config')}:")
@@ -218,9 +217,9 @@ def main():
         if num_workers == 1:  # run sequentially for easier debugging
             for problem in problems:
                 try:
-                    success = run_agent(args, problem, config)
+                    run_agent(args, problem, dataset[problem], config)
                 except AgentTimeoutException:
-                    pass  # Handleled in run_agent, just continue
+                    pass  # Handled in run_agent, just continue
                 except (KeyboardInterrupt, Exception) as e:
                     raise e
         else:
@@ -228,7 +227,9 @@ def main():
                 num_workers, initializer=DebugGymLogger.set_as_worker
             ) as executor:
                 futures = {
-                    executor.submit(run_agent, args, problem, config): problem
+                    executor.submit(
+                        run_agent, args, problem, dataset[problem], config
+                    ): problem
                     for problem in problems
                 }
                 for future in as_completed(futures):
@@ -236,7 +237,7 @@ def main():
                         continue
                     try:
                         problem = futures[future]
-                        success = future.result()
+                        future.result()
                     except AgentTimeoutException:
                         pass  # Handled in run_agent, just continue
                     except (KeyboardInterrupt, Exception) as e:
