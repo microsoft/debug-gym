@@ -198,14 +198,14 @@ class BaseAgent:
         messages.append(self.build_instance_prompt(info))
         messages.extend(self.build_history_prompt())
 
-        if self.args.max_history_steps_cutoff:
+        if self.args.max_history_steps_cutoff > 0:
             # keep at most max_history_steps_cutoff history messages including the first 2 messages (system and instance prompts)
             if len(messages) > self.args.max_history_steps_cutoff + 2:
                 messages = (
                     messages[:2] + messages[-(self.args.max_history_steps_cutoff) :]
                 )
 
-        if self.args.max_history_token_cutoff:
+        if self.args.max_history_token_cutoff > 0:
             first_two = messages[:2]
             remaining = messages[2:]
 
@@ -240,6 +240,7 @@ class BaseAgent:
     def run(self, env: RepoEnv, debug=False):
         info = None
         self.env = env
+        step = 0
 
         try:
             info = self.env.reset()
@@ -306,17 +307,17 @@ class BaseAgent:
                     status=status,
                 )
             return self._build_trajectory()
-        except Exception:
+        except Exception as e:
             # report any error that happens during the run
             self.logger.report_progress(
                 problem_id=env.task_name,
                 step=step,
                 total_steps=step,
-                score=info.score if info else 0,
-                max_score=info.max_score,
+                score=getattr(info, "score", 0),
+                max_score=getattr(info, "max_score", None),
                 status="error",
             )
-            raise
+            raise e
 
     def _build_trajectory(self) -> Dict[str, Any]:
         """Return the trajectory as a JSON-serializable dict without writing it."""

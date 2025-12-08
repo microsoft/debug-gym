@@ -2,6 +2,7 @@ from debug_gym.gym.entities import Observation
 from debug_gym.gym.tools.tool import EnvironmentTool
 from debug_gym.gym.tools.toolbox import Toolbox
 from debug_gym.gym.utils import show_line_number
+from debug_gym.gym.workspace import WorkspaceReadError
 
 
 @Toolbox.register()
@@ -57,6 +58,8 @@ class ViewTool(EnvironmentTool):
         try:
             file_content = environment.workspace.read_file(new_file)
         except FileNotFoundError as e:
+            return Observation(self.name, f"View failed. Error message:\n{str(e)}")
+        except WorkspaceReadError as e:
             return Observation(self.name, f"View failed. Error message:\n{str(e)}")
         file_lines = file_content.splitlines()
 

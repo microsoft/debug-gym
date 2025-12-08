@@ -1,6 +1,7 @@
 import json
 import logging
 
+import openai
 import tiktoken
 from openai import NOT_GIVEN, OpenAI
 
@@ -16,6 +17,10 @@ from debug_gym.llms.constants import LLM_API_KEY_PLACEHOLDER, LLM_ENDPOINT_PLACE
 
 # Set logging level down to WARNING for endpoint queries.
 logging.getLogger("openai").setLevel(logging.WARNING)
+
+
+class OpenAIResponseParsingError(Exception):
+    """Raised when the OpenAI response is missing required fields or cannot be parsed."""
 
 
 class OpenAILLM(LLM):
@@ -80,6 +85,11 @@ class OpenAILLM(LLM):
         return result
 
     def need_to_be_retried(self, exception) -> bool:
+        if isinstance(exception, OpenAIResponseParsingError):
+            self.logger.warning(
+                "OpenAI chat completion returned an unparsable payload. Retrying..."
+            )
+            return True
         # List of fully qualified names of RateLimitError exceptions from various libraries
         _errors = [
             "openai.APIStatusError",
@@ -91,6 +101,7 @@ class OpenAILLM(LLM):
             "openai.APIError",
             "openai.APIConnectionError",
             "openai.RateLimitError",
+            "openai.InternalServerError",
             "openai.PermissionDeniedError",
             "openai.BadRequestError",
             # Add more as needed
@@ -181,10 +192,33 @@ class OpenAILLM(LLM):
                 name="empty_tool_response",
                 arguments={},
             )
+
+        try:
+            function = response.function
+            tool_name = function.name
+        except AttributeError as exc:
+            raise OpenAIResponseParsingError(
+                "OpenAI tool call is missing function metadata"
+            ) from exc
+
+        raw_arguments = function.arguments or "{}"
+        try:
+            parsed_arguments = json.loads(raw_arguments)
+        except (json.JSONDecodeError, TypeError) as exc:
+            raise OpenAIResponseParsingError(
+                "OpenAI tool call arguments are not valid JSON"
+            ) from exc
+        if parsed_arguments is None:
+            parsed_arguments = {}
+        elif not isinstance(parsed_arguments, dict):
+            raise OpenAIResponseParsingError(
+                "OpenAI tool call arguments must decode to a JSON object"
+            )
+
         return ToolCall(
             id=response.id,
-            name=response.function.name,
-            arguments=json.loads(response.function.arguments),
+            name=tool_name,
+            arguments=parsed_arguments,
         )
 
     def convert_response_to_message(self, response: LLMResponse) -> dict:
@@ -209,9 +243,9 @@ class OpenAILLM(LLM):
         return message
 
     def convert_observation_to_message(
-        self, observation: str, last_tool_call_id=None, last_tool_call_name=None
+        self, observation: str, action_tool_call_id=None, action_tool_call_name=None
     ) -> dict:
-        if last_tool_call_id is None:
+        if action_tool_call_id is None:
             # This is the initial state, no action taken yet
             return {
                 "role": "user",
@@ -221,18 +255,20 @@ class OpenAILLM(LLM):
             # This is a step with an action taken
             return {
                 "role": "tool",
-                "tool_call_id": last_tool_call_id,
-                "name": last_tool_call_name,
+                "tool_call_id": action_tool_call_id,
+                "name": action_tool_call_name,
                 "content": filter_non_utf8(observation),
             }
 
     def generate(self, messages, tools, **kwargs) -> LLMResponse:
         # set max tokens if not provided
         kwargs["max_tokens"] = kwargs.get("max_tokens", NOT_GIVEN)
+        api_call = retry_on_exception(
+            self._perform_chat_completion,
+            self.need_to_be_retried,
+        )
         try:
-            response = retry_on_exception(
-                self._perform_chat_completion, self.need_to_be_retried
-            )(
+            response = api_call(
                 model=self.config.model,
                 messages=messages,
                 tools=self.define_tools(tools),
@@ -244,28 +280,49 @@ class OpenAILLM(LLM):
             if self.is_context_length_error(e):
                 raise ContextLengthExceededError
             raise e
+        if getattr(response, "choices", None) is None:
+            self.logger.debug(
+                "OpenAI response missing 'choices' key; response type=%s",
+                type(response),
+            )
+            raise OpenAIResponseParsingError(
+                "OpenAI chat completion returned unexpected payload without 'choices'"
+            )
+        try:
+            choice = response.choices[0]
+            message = choice.message
+        except (IndexError, TypeError, AttributeError) as exc:
+            self.logger.debug(
+                "OpenAI response choices could not provide a message: %s", exc
+            )
+            raise OpenAIResponseParsingError(
+                "OpenAI chat completion returned no usable choice message"
+            ) from exc
+
         # LLM may select multiple tool calls, we only care about the first action
-        if not response.choices[0].message.tool_calls:
+        if not getattr(message, "tool_calls", None):
             # LLM failed to call a tool
             tool_call = None
         else:
-            tool_call = response.choices[0].message.tool_calls[0]
+            tool_call = message.tool_calls[0]
             assert tool_call.type == "function"
 
         # In openai call, the content is in response.choices[0].message.content
         # In some models hosted on vllm, e.g., qwen-3, there could be content in both (when reasoning is enabled)
         # response.choices[0].message.content and response.choices[0].message.reasoning_content
         # https://qwen.readthedocs.io/en/latest/deployment/vllm.html#parsing-thinking-content
-        _content = response.choices[0].message.content
+        _content = message.content
         _reasoning_content = None
-        if hasattr(response.choices[0].message, "reasoning_content"):
-            _reasoning_content = response.choices[0].message.reasoning_content
+        if hasattr(message, "reasoning_content"):
+            _reasoning_content = message.reasoning_content
+
+        parsed_tool = self.parse_tool_call_response(tool_call)
 
         llm_response = LLMResponse(
             prompt=messages,
             response=_content,
             reasoning_response=_reasoning_content,
-            tool=self.parse_tool_call_response(tool_call),
+            tool=parsed_tool,
             prompt_token_count=response.usage.prompt_tokens,
             response_token_count=response.usage.completion_tokens,
         )
