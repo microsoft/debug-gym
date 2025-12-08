@@ -285,12 +285,24 @@ def index():
     step_actions = []
     step_entries = []
     bash_detail_entries = []
+    display_name_overrides = {
+        "no_action": "No Action",
+        "unknown": "Unknown Action",
+    }
     for idx, step in enumerate(data["log"]):
         action = step.get("action")
         action_name = "no_action"
         command_text = None
 
-        if isinstance(action, dict):
+        is_initial_step = idx == 0 and (
+            step.get("system_message") is not None
+            or step.get("problem_message") is not None
+        )
+
+        if is_initial_step:
+            action_name = "initial_state"
+            display_name_overrides[action_name] = "Initial State"
+        elif isinstance(action, dict):
             action_name = action.get("name") or "unknown"
             arguments = action.get("arguments")
             if isinstance(arguments, dict) and "command" in arguments:
@@ -305,7 +317,7 @@ def index():
         step_actions.append(action_name)
 
         bash_key = None
-        if action_name == "bash":
+        if action_name == "bash" and command_text is not None:
             bash_key, bash_label = get_bash_detail(command_text)
             bash_detail_entries.append((bash_key, bash_label))
 
@@ -340,9 +352,10 @@ def index():
     for idx, key in enumerate(base_keys):
         palette_color = color_for_key(key, idx)
         css_class = make_unique_class(key, used_classes)
+        display_name = display_name_overrides.get(key, key)
         style_entry = {
             "key": key,
-            "display_name": key,
+            "display_name": display_name,
             "class": css_class,
             "background": palette_color,
             "text_color": pick_text_color(palette_color),
@@ -356,7 +369,7 @@ def index():
             bash_detail_map[key] = display_name
 
     detailed_keys = unique_preserve_order(base_keys + list(bash_detail_map.keys()))
-    display_name_map = {key: key for key in base_keys}
+    display_name_map = {key: display_name_overrides.get(key, key) for key in base_keys}
     display_name_map.update(bash_detail_map)
 
     detailed_action_style_map = {
