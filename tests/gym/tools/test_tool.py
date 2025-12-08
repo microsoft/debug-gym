@@ -1,5 +1,3 @@
-from pathlib import Path
-
 import pytest
 
 from debug_gym.gym.entities import Observation
@@ -51,7 +49,7 @@ def test_abstract_methods():
             "without an implementation for abstract method*"
         ),
     ):
-        tool = CompletelyFakeTool()
+        CompletelyFakeTool()
 
 
 def test_auto_subscribe(monkeypatch, env):

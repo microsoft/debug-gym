@@ -4,7 +4,6 @@ from pathlib import Path
 import numpy as np
 
 from debug_gym.gym.entities import EvalOutput, Event, Observation
-from debug_gym.gym.terminals.local import LocalTerminal
 from debug_gym.gym.terminals.terminal import Terminal
 from debug_gym.gym.tools.tool import EnvironmentTool, ToolCall
 from debug_gym.gym.workspace import Workspace

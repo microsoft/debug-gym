@@ -9,6 +9,14 @@ from debug_gym.gym.utils import make_file_matcher
 from debug_gym.logger import DebugGymLogger
 
 
+class WorkspaceError(Exception):
+    """Base class for workspace-related errors."""
+
+
+class WorkspaceReadError(WorkspaceError):
+    """Raised when a file exists but cannot be read."""
+
+
 class Workspace:
 
     def __init__(self, terminal: Terminal, logger: DebugGymLogger | None = None):
@@ -128,8 +136,13 @@ class Workspace:
         Raises value error if the file does not exist"""
         abs_filepath = self.resolve_path(filepath, raises=True)
         success, output = self.terminal.run(
-            f"cat {abs_filepath}", raises=True, strip_output=False
+            f"cat {abs_filepath}", raises=False, strip_output=False
         )
+        if not success:
+            message = output.strip() or "Unknown error"
+            raise WorkspaceReadError(
+                f"Failed to read `{filepath}`. Command output:\n{message}"
+            )
         return output
 
     def write_file(self, filepath: str, content: str):

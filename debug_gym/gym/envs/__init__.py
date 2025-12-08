@@ -8,6 +8,20 @@ from debug_gym.gym.envs.swe_bench_debug import SWEBenchDebugEnv
 from debug_gym.gym.envs.swe_smith import SWESmithEnv
 from debug_gym.logger import DebugGymLogger
 
+__all__ = [
+    "AiderBenchmarkEnv",
+    "RepoEnv",
+    "TooledEnv",
+    "LocalEnv",
+    "MiniNightmareEnv",
+    "R2EGymEnv",
+    "SWEBenchEnv",
+    "SWEBenchDebugEnv",
+    "SWESmithEnv",
+    "select_env",
+    "load_dataset",
+]
+
 
 def select_env(env_type: str = None) -> type[RepoEnv]:
     match env_type:
@@ -36,10 +50,10 @@ def load_dataset(config: dict, logger: DebugGymLogger | None = None) -> dict:
 
     try:
         env = select_env(config.get("type"))
-    except ValueError as e:
+    except ValueError as exc:
         raise ValueError(
             f"Unknown environment type '{config.get('type')}' from dataset's config: {config}"
-        )
+        ) from exc
 
     dataset = env.load_dataset(logger=logger, **config)
     return dataset

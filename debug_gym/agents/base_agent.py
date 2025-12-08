@@ -1,15 +1,13 @@
 import json
 import os
-import subprocess
 import uuid
 from dataclasses import MISSING, asdict, dataclass, field, fields
 from typing import Any, Dict
 
-import numpy as np
 from jinja2 import Environment, Template
 
-from debug_gym.agents.history_tracker import HistoryTracker, build_history_prompt
-from debug_gym.gym.envs.env import RepoEnv
+from debug_gym.agents.history_tracker import HistoryTracker
+from debug_gym.gym.envs.env import EnvInfo, RepoEnv
 from debug_gym.gym.utils import filter_non_utf8
 from debug_gym.llms.base import LLM
 from debug_gym.llms.utils import trim
@@ -18,15 +16,30 @@ from debug_gym.logger import DebugGymLogger
 AGENT_REGISTRY = {}
 
 
+def register_agent(cls):
+    if not issubclass(cls, BaseAgent):
+        raise ValueError("agent_class must be a subclass of BaseAgent")
+    if cls.name is None:
+        raise ValueError("agent_class must have a name attribute")
+    AGENT_REGISTRY[cls.name.lower()] = cls
+    return cls
+
+
 @dataclass
 class AgentArgs:
-    random_seed: int
-    memory_size: int
-    max_steps: int
-    max_rewrite_steps: int
-    system_prompt_template_file: str | None = None
+    system_prompt: str | None = None
+    instance_prompt: str | None = None
+    max_steps: int = 100
+    max_history_token_cutoff: int = -1
+    max_history_steps_cutoff: int = -1
     uuid: str = field(default_factory=lambda: str(uuid.uuid4()))
     extras: Dict[str, Any] = field(default_factory=dict)
+
+    @classmethod
+    def make(cls, config: Dict[str, Any] | "AgentArgs") -> "AgentArgs":
+        if isinstance(config, cls):
+            return config
+        return cls.from_dict(config)
 
     @classmethod
     def from_dict(cls, config: Dict[str, Any]) -> "AgentArgs":
@@ -67,59 +80,32 @@ class AgentArgs:
         return data
 
 
-def register_agent(cls):
-    if not issubclass(cls, BaseAgent):
-        raise ValueError("agent_class must be a subclass of BaseAgent")
-    if cls.name is None:
-        raise ValueError("agent_class must have a name attribute")
-    AGENT_REGISTRY[cls.name.lower()] = cls
-    return cls
-
-
 class BaseAgent:
     name: str = None
-    system_prompt: str = None
-    action_prompt: str = None
+    args_class = AgentArgs
+    system_prompt: str = ""
+    instance_prompt: str = """\
+{
+  "Instructions": {{ info.instructions }}
+}"""
 
     def __init__(
         self,
-        agent_args: AgentArgs | Dict[str, Any],
+        agent_args: AgentArgs | Dict[str, Any] | None = None,
         llm: LLM | None = None,
         logger: DebugGymLogger | None = None,
     ):
-        self.args = (
-            AgentArgs.from_dict(agent_args)
-            if isinstance(agent_args, dict)
-            else agent_args
-        )
-        self.logger = logger or DebugGymLogger("debug-gym")
+        self.args = self.args_class.make(agent_args or {})
         self.llm = llm
-        self._uuid = self.args.uuid
+        self.history = HistoryTracker()
+        self.logger = logger or DebugGymLogger("debug-gym")
         self.env = None
 
-        self.set_seed(self.args.random_seed)
-        self.history = HistoryTracker(self.args.memory_size)
-
-    def set_seed(self, seed):
-        np.random.seed(seed)
-
-    def build_history_prompt(self):
-        return build_history_prompt(self.history, self.llm)
-
-    def parse_reasoning_model_response(self, response, reasoning_end_token):
-        # Strip the reasoning, e.g., in Deepseek r1, between <think> and </think>.
-        reasoning_end = response.find(reasoning_end_token)
-        if reasoning_end != -1:
-            reasoning_end += len(reasoning_end_token)
-            response = response[reasoning_end:].strip()
-        return response
-
-    def _auto_eval_on_rewrite(self):
-        """Check if auto eval on rewrite is enabled."""
-        try:
-            return self.env.get_tool("eval").auto_eval_on_rewrite
-        except KeyError:
-            return False  # no eval tool
+        # Override prompts if provided in args
+        if self.args.system_prompt is not None:
+            self.system_prompt = str(self.args.system_prompt)
+        if self.args.instance_prompt is not None:
+            self.instance_prompt = str(self.args.instance_prompt)
 
     @staticmethod
     def to_pretty_json(value):
@@ -152,72 +138,117 @@ class BaseAgent:
 
         return trim(message, max_length, count_tokens=count_tokens, where=where)
 
-    def _load_system_prompt_template(self) -> Template | None:
-        """Load system prompt template from config if specified and register custom filters.
-        If no template is specified, return None.
+    def _load_prompt_template(self, template: str) -> Template:
+        """Load a prompt template and register custom filters.
+
+        Args:
+            template (str): The prompt template as a string or
+                            a Jinja file path with a `.jinja` extension.
         """
-        system_prompt_template = self.args.system_prompt_template_file
-        if system_prompt_template:
-            if not os.path.isfile(system_prompt_template):
-                error_msg = (
-                    f"System prompt template file `{system_prompt_template}` not found."
-                )
+        if template.endswith(".jinja"):
+            if not os.path.isfile(template):
+                error_msg = f"Prompt template file `{template}` not found."
                 self.logger.error(error_msg)
                 raise FileNotFoundError(error_msg)
-            with open(system_prompt_template, "r") as f:
-                system_prompt_template = f.read()
-            # Add custom filter to Jinja2 environment
-            env = Environment()
-            env.filters["to_pretty_json"] = self.to_pretty_json
-            env.filters["trim_message"] = self.trim_message
-            return env.from_string(system_prompt_template)
-        return None
 
-    def _default_system_prompt(self, info) -> str:
-        """Return the default system prompt as pretty JSON.
-        Trimmed to fit within the token limit."""
+            with open(template, "r") as f:
+                template = f.read()
 
-        system_prompt_dict = {
-            "Overall task": self.system_prompt,
-        }
+        # Add custom filter to Jinja2 environment
+        env = Environment()
+        env.filters["to_pretty_json"] = self.to_pretty_json
+        env.filters["trim_message"] = self.trim_message
+        return env.from_string(template)
 
-        return self.to_pretty_json(system_prompt_dict)
+    def build_system_prompt(self, info: EnvInfo | None = None) -> dict:
+        """Build system prompt using the default template or one provided in args."""
+        system_prompt_template = self._load_prompt_template(self.system_prompt)
+        system_prompt = system_prompt_template.render(agent=self, info=info)
 
-    def build_system_prompt(self, info):
-        """Build system prompt using jinja template from config or default template."""
-        system_prompt_template = self._load_system_prompt_template()
-        if system_prompt_template is not None:
-            system_prompt = system_prompt_template.render(agent=self, info=info)
-        else:
-            system_prompt = self._default_system_prompt(info)
-        messages = [{"role": "system", "content": filter_non_utf8(system_prompt)}]
+        # TODO: should we call self.llm.convert_observation_to_message(system_prompt) ?
+        return {"role": "system", "content": filter_non_utf8(system_prompt)}
+
+    def build_instance_prompt(self, info: EnvInfo | None = None) -> dict:
+        """Build instance prompt using the default template or one provided in args."""
+        instance_prompt_template = self._load_prompt_template(self.instance_prompt)
+        instance_prompt = instance_prompt_template.render(agent=self, info=info)
+        return self.llm.convert_observation_to_message(instance_prompt)
+
+    def build_history_prompt(self) -> list[dict]:
+        """Here, we rebuild the history prompt from scratch at each time."""
+        messages = []
+        for llm_response, next_observation in zip(
+            self.history.llm_responses, self.history.env_observations, strict=True
+        ):
+            # llm response
+            messages.append(self.llm.convert_response_to_message(llm_response))
+            # next environment observation
+            kwargs = {
+                "observation": next_observation.step_observation.observation,
+            }
+            if next_observation.action_tool_call:
+                kwargs["action_tool_call_id"] = next_observation.action_tool_call.id
+                kwargs["action_tool_call_name"] = next_observation.action_tool_call.name
+            messages.append(self.llm.convert_observation_to_message(**kwargs))
         return messages
 
-    def build_question_prompt(self):
+    def build_prompt(self, info: EnvInfo = None):
         messages = []
-        if self.action_prompt is not None:
-            messages.append({"role": "user", "content": self.action_prompt})
-        return messages
-
-    def build_prompt(self, info):
-        messages = []
-        messages.extend(self.build_system_prompt(info))
+        messages.append(self.build_system_prompt(info))
+        messages.append(self.build_instance_prompt(info))
         messages.extend(self.build_history_prompt())
-        messages.extend(self.build_question_prompt())
+
+        if self.args.max_history_steps_cutoff > 0:
+            # keep at most max_history_steps_cutoff history messages including the first 2 messages (system and instance prompts)
+            if len(messages) > self.args.max_history_steps_cutoff + 2:
+                messages = (
+                    messages[:2] + messages[-(self.args.max_history_steps_cutoff) :]
+                )
+
+        if self.args.max_history_token_cutoff > 0:
+            first_two = messages[:2]
+            remaining = messages[2:]
+
+            # Calculate tokens for the first two messages
+            first_two_tokens = sum(self.llm.count_tokens(msg) for msg in first_two)
+            available_tokens = self.args.max_history_token_cutoff - first_two_tokens
+
+            # Add messages from the end until we exceed the token limit
+            kept_messages = []
+            current_tokens = 0
+            for msg in reversed(remaining):
+                msg_tokens = self.llm.count_tokens(msg)
+                if current_tokens + msg_tokens <= available_tokens:
+                    kept_messages.insert(0, msg)
+                    current_tokens += msg_tokens
+                else:
+                    break
+            messages = first_two + kept_messages
         return messages
+
+    def should_stop(self, step: int, info: EnvInfo):
+        should_stop, reason = False, None
+        max_steps_reached = step >= self.args.max_steps
+        if info.terminated:
+            should_stop = True
+            reason = "terminated"
+        elif max_steps_reached:
+            should_stop = True
+            reason = "max_steps reached"
+        return should_stop, reason
 
     def run(self, env: RepoEnv, debug=False):
+        info = None
         self.env = env
         step = 0
-        info = None
-        max_steps = self.args.max_steps
-        try:
-            self.history.reset()
-            info = self.env.reset()
-            # initial state does not have prompt and response
-            self.history.step(info, None)
 
-            if info.resolved is True:
+        try:
+            info = self.env.reset()
+            self.history.init(
+                self.build_system_prompt(info), self.build_instance_prompt(info), info
+            )
+
+            if info.resolved:
                 self.logger.report_progress(
                     problem_id=env.task_name,
                     step=1,
@@ -226,7 +257,7 @@ class BaseAgent:
                     max_score=info.max_score,
                     status="resolved",
                 )
-                return True
+                return self._build_trajectory()
 
             self.logger.info(
                 "Available tools (in LLM's tool calling format):\n"
@@ -234,11 +265,11 @@ class BaseAgent:
             )
 
             highscore = info.score
-            for step in range(max_steps):
+            should_stop = False
+            step = 1
+
+            while not should_stop:
                 self.logger.info(f"\n{'='*20} STEP {step+1} {'='*20}\n")
-                highscore = max(highscore, info.score)
-                msg = f"[{env.task_name[:10]:<10}] Step {step} | Score: {info.score}/{info.max_score or '-'} [Best: {highscore}]"
-                self.logger.info(msg)
 
                 messages = self.build_prompt(info)
                 llm_response = self.llm(messages, info.tools)
@@ -252,88 +283,50 @@ class BaseAgent:
                     llm_response.reasoning_response,
                 )
                 self.history.step(info, llm_response)
+                should_stop, reason = self.should_stop(step, info)
+                status = (
+                    "resolved"
+                    if info.resolved
+                    else ("unresolved" if should_stop else "running")
+                )
 
-                if (
-                    info.terminated
-                    or info.rewrite_counter >= self.args.max_rewrite_steps
-                ):
-                    reason = (
-                        "terminated" if info.resolved else "max_rewrite_steps reached"
-                    )
-                    self.logger.info(
-                        f"Step: {step} | Score: {info.score}/{info.max_score if info.max_score else '-'} | Reason: {reason}"
-                    )
-                    # early stop, set current step and total steps to be the same
-                    self.logger.report_progress(
-                        problem_id=env.task_name,
-                        step=step + 1,
-                        total_steps=step + 1,
-                        score=info.score,
-                        max_score=info.max_score,
-                        status="resolved" if info.resolved else "unresolved",
-                    )
-                    break
+                highscore = max(highscore, info.score)
+                msg = f"[{env.task_name[:10]:<10}] Step {step} | Score: {info.score}/{info.max_score or '-'} [Best: {highscore}]"
+                if should_stop:
+                    msg += f" | Stopping Reason: {reason}"
+                self.logger.info(msg)
+                step += 1
+
                 # keep progress bar running until max_steps is reached
                 self.logger.report_progress(
                     problem_id=env.task_name,
-                    step=step + 1,
-                    total_steps=max_steps + 1,
+                    step=step,
+                    total_steps=self.args.max_steps,
                     score=info.score,
                     max_score=info.max_score,
-                    status="running",
+                    status=status,
                 )
-            # max_steps was reached, task was either resolved or unresolved
-            self.logger.report_progress(
-                problem_id=env.task_name,
-                step=step + 1,
-                total_steps=step + 1,
-                score=info.score,
-                max_score=info.max_score,
-                status="resolved" if info.resolved else "unresolved",
-            )
-            return info.resolved
-        except Exception:
+            return self._build_trajectory()
+        except Exception as e:
             # report any error that happens during the run
             self.logger.report_progress(
                 problem_id=env.task_name,
-                step=step + 1,
-                total_steps=step + 1,
-                score=info.score if info else 0,
-                max_score=info.max_score,
+                step=step,
+                total_steps=step,
+                score=getattr(info, "score", 0),
+                max_score=getattr(info, "max_score", None),
                 status="error",
             )
-            raise
+            raise e
 
-    def apply_patch(self, patch_path: str) -> bool:
-        patch_command = ["patch", "-p1"]
-        try:
-            # Open the patch file
-            with open(patch_path, "r") as patch:
-                # Run the patch command
-                result = subprocess.run(
-                    patch_command,
-                    stdin=patch,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    text=True,
-                    check=True,
-                )
-            print("Patch applied successfully.")
-            print("Output:", result.stdout)
-            return True
-        except subprocess.CalledProcessError as e:
-            print("Failed to apply patch.")
-            print("Error:", e.stderr)
-            return False
-
-    def build_trajectory(self, task_name) -> Dict[str, Any]:
+    def _build_trajectory(self) -> Dict[str, Any]:
         """Return the trajectory as a JSON-serializable dict without writing it."""
         tools = [f"{tool.name}({tool.arguments})" for tool in self.env.tools]
         json_output = {
-            "problem": task_name,
+            "problem": self.env.task_name,
             "config": self.args.to_dict(),
             "tools": self.llm.define_tools(self.env.tools) if self.llm else tools,
-            "uuid": self._uuid,
+            "uuid": self.args.uuid,
             "success": self.env.resolved,
             "log": [],
             "agent_type": self.__class__.__name__,

@@ -1,6 +1,5 @@
 from importlib.resources import files as importlib_files
 from pathlib import Path
-from typing import List
 
 import docker
 import yaml
