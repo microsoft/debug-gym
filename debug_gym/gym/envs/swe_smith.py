@@ -138,6 +138,9 @@ class SWESmithEnv(SWEBenchEnv):
         return score
 
     def eval(self, **kwargs) -> EvalOutput:
+        # Reset any changes made to test_directives files.
+        self.terminal.run(f"git checkout -- {' '.join(self.test_directives)}")
+
         success, output = self.terminal.run(self.entrypoint, timeout=self.run_timeout)
         self.last_eval = EvalOutput(success, output)
         return self.last_eval
