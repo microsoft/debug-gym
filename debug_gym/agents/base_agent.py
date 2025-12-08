@@ -313,8 +313,8 @@ class BaseAgent:
                 problem_id=env.task_name,
                 step=step,
                 total_steps=step,
-                score=info.score if info else 0,
-                max_score=info.max_score,
+                score=getattr(info, "score", 0),
+                max_score=getattr(info, "max_score", None),
                 status="error",
             )
             raise e
