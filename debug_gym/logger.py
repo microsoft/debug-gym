@@ -557,7 +557,6 @@ class DebugGymLogger(logging.Logger):
         self.propagate = False
 
         super().setLevel(level)  # Set initial logger level
-        self.setLevel(level)  # Set logger level, might be overridden by file handler
         if DebugGymLogger._main_process_logger is not None:
             self._is_worker = True
 
