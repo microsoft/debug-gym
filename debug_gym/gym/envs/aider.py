@@ -8,7 +8,6 @@ import debug_gym.gym.utils as utils
 from debug_gym.constants import DEBUG_GYM_CACHE_DIR
 from debug_gym.gym.entities import EvalOutput
 from debug_gym.gym.envs.env import RepoEnv
-from debug_gym.gym.envs.local import LocalEnv
 from debug_gym.gym.terminals.docker import DockerTerminal
 from debug_gym.gym.terminals.terminal import Terminal
 from debug_gym.logger import DebugGymLogger

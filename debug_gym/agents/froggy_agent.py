@@ -1,64 +1,36 @@
 from dataclasses import dataclass
-from typing import Any, Dict
 
-from debug_gym.agents.base_agent import AgentArgs, BaseAgent, register_agent
-from debug_gym.agents.history_tracker import build_history_prompt
+from debug_gym.agents.base_agent import (
+    AGENT_REGISTRY,
+    AgentArgs,
+    BaseAgent,
+    register_agent,
+)
+from debug_gym.gym.envs.env import EnvInfo
 
 
 @dataclass
 class FroggyAgentArgs(AgentArgs):
+    max_rewrite_steps: int = -1
     show_directory_tree: int = 0
     show_current_breakpoints: bool = False
-    reset_prompt_history_after_rewrite: bool = False
-    n_rewrites_before_pdb: int = 0
 
 
 @register_agent
 class FroggyAgent(BaseAgent):
-    name: str = "froggy"
+    name: str = "froggy_agent"
+    args_class = FroggyAgentArgs
+    system_prompt: str = "{{ agent._default_system_prompt(info) }}"
 
-    def __init__(
-        self,
-        agent_args: FroggyAgentArgs | Dict[str, Any],
-        *args,
-        **kwargs,
-    ):
-
-        agent_args = (
-            FroggyAgentArgs.from_dict(agent_args)
-            if isinstance(agent_args, dict)
-            else agent_args
-        )
-        super().__init__(agent_args, *args, **kwargs)
-
-    def build_history_prompt(self):
-        messages = build_history_prompt(
-            self.history,
-            self.llm,
-            self.args.reset_prompt_history_after_rewrite,
-        )
-        return messages
-
-    def _auto_eval_on_rewrite(self):
-        """Check if auto eval on rewrite is enabled."""
-        try:
-            return self.env.get_tool("eval").auto_eval_on_rewrite
-        except KeyError:
-            return False  # no eval tool
+    def should_stop(self, step: int, info: EnvInfo):
+        should_stop, reason = super().should_stop(step, info)
+        if info.rewrite_counter > self.args.max_rewrite_steps:
+            should_stop = True
+            reason = "max_rewrite_steps reached"
+        return should_stop, reason
 
     def shortcut_features(self):
         features = []
-        if self._auto_eval_on_rewrite():
-            features.append(
-                "After successful rewrites, the environment will automatically "
-                "call the Eval tool to evaluate the rewritten code. Therefore, "
-                "you do not need to call the Eval tool yourself. The evaluation "
-                "output will be updated automatically in the system prompt."
-            )
-        if self.args.show_directory_tree:
-            features.append(
-                "The environment will show the directory tree of the repository in the system prompt."
-            )
         if self.env.has_tool("pdb"):
             if self.args.show_current_breakpoints:
                 features.append(
@@ -82,7 +54,6 @@ class FroggyAgent(BaseAgent):
         Trimmed to fit within the token limit."""
 
         system_prompt_dict = {
-            "Overall task": self.system_prompt,
             "Instructions": info.instructions,
         }
 
@@ -96,7 +67,11 @@ class FroggyAgent(BaseAgent):
         if self.args.show_current_breakpoints:
             system_prompt_dict["Current breakpoints"] = info.current_breakpoints
 
-        if self._auto_eval_on_rewrite():
+        if (
+            info
+            and info.eval_observation
+            and getattr(info.eval_observation, "observation", "")
+        ):
             system_prompt_dict["Evaluation output of current code"] = self.trim_message(
                 info.eval_observation.observation,
                 max_length_percentage=0.8,
@@ -108,3 +83,8 @@ class FroggyAgent(BaseAgent):
             system_prompt_dict["Shortcut features"] = shortcut_features
 
         return self.to_pretty_json(system_prompt_dict)
+
+
+# Backward compatibility for configs still referencing "froggy".
+# TODO: remove when all configs and consumers migrate to "froggy_agent".
+AGENT_REGISTRY.setdefault("froggy", FroggyAgent)

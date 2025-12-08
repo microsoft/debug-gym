@@ -2,46 +2,61 @@ import copy
 from dataclasses import asdict
 
 from debug_gym.gym.envs.env import EnvInfo
-from debug_gym.llms.base import LLM, LLMResponse
+from debug_gym.llms.base import LLMResponse
 
 
 class HistoryTracker:
-    def __init__(self, history_steps: int) -> None:
-        self.history_steps = history_steps
+    def __init__(self) -> None:
         self.reset()
 
     def reset(self) -> None:
-        self.memory: list[EnvInfo] = []
-        self.prompt_response_pairs: list[LLMResponse | None] = []
+        self.system_message: dict | None = None
+        self.problem_message: dict | None = None
+        self.env_initial_observation: EnvInfo | None = None
+        self.env_observations: list[EnvInfo] = []
+        self.llm_responses: list[LLMResponse | None] = []
+
+    def init(
+        self,
+        system_message: dict,
+        problem_message: dict,
+        env_initial_observation: EnvInfo,
+    ) -> None:
+        self.system_message = system_message
+        self.problem_message = problem_message
+        self.env_initial_observation = copy.deepcopy(env_initial_observation)
+        self.llm_responses = []
+        self.env_observations = []
 
     def step(
         self,
-        new_info: EnvInfo,
-        llm_responses: list[LLMResponse] | LLMResponse | None = None,
+        env_observation: EnvInfo,
+        llm_response: LLMResponse,
     ) -> None:
         """llm_responses can be None since the initial state does not have prompt and response"""
-        self.memory.append(copy.deepcopy(new_info))
-        llm_responses = llm_responses or []
-        if not isinstance(llm_responses, list):
-            llm_responses = [llm_responses]
-        self.prompt_response_pairs.append(copy.deepcopy(llm_responses))
+        self.env_observations.append(copy.deepcopy(env_observation))
+        self.llm_responses.append(copy.deepcopy(llm_response))
 
     def get(self):
-        # return the history_steps latest steps
+        """Returns the full history of environment observations and LLM responses."""
         return (
-            self.memory[-self.history_steps :],
-            self.prompt_response_pairs[-self.history_steps :],
+            self.env_observations,
+            self.llm_responses,
         )
 
-    def get_all(self):
-        return self.memory
-
-    def json(self, game_step=None):
-        if len(self.memory) == 0:
+    def json(self, game_step: int | None = None):
+        if len(self.env_observations) == 0 and self.env_initial_observation is None:
             return {}
-        if game_step is None:
-            # retrieve the most recent step
-            game_step = len(self.memory) - 1
+
+        # Retrieve the most recent step by default.
+        game_step = (
+            game_step if game_step is not None else len(self.env_observations) - 1
+        )
+        if game_step < 0 or game_step >= len(self.env_observations):
+            raise ValueError(
+                f"Invalid game_step: {game_step}; should be between [0, {len(self.env_observations)-1}]."
+            )
+
         if game_step == 0:
             # initial state
             json_out = {
@@ -49,56 +64,37 @@ class HistoryTracker:
                 "reasoning": None,
                 "content": None,
                 "action": None,  # env reset
-                "obs": self.memory[0].step_observation.observation,
+                "obs": self.env_initial_observation.step_observation.observation,
                 "rewrite_consumed": 0,
                 "prompt_response_pairs": None,
+                "system_message": self.system_message,
+                "problem_message": self.problem_message,
             }
         else:
             json_out = {
                 "step_id": game_step,
-                "content": self.memory[game_step].action_content,
-                "reasoning": self.memory[game_step].action_reasoning,
-                "action": asdict(self.memory[game_step].action_tool_call),
-                "obs": self.memory[game_step].step_observation.observation,
-                "rewrite_consumed": self.memory[game_step].rewrite_counter,
+                "content": self.env_observations[game_step].action_content,
+                "reasoning": self.env_observations[game_step].action_reasoning,
+                "action": asdict(self.env_observations[game_step].action_tool_call),
+                "obs": self.env_observations[game_step].step_observation.observation,
+                "rewrite_consumed": self.env_observations[game_step].rewrite_counter,
             }
             # prompt_response_pairs could be empty for the initial state
-            if self.prompt_response_pairs[game_step]:
+            if self.llm_responses[game_step]:
                 json_out["prompt_response_pairs"] = [
                     # doesn't include None values
                     asdict(
-                        p,
+                        self.llm_responses[game_step],
                         dict_factory=lambda x: {k: v for (k, v) in x if v is not None},
                     )
-                    for p in self.prompt_response_pairs[game_step]
                 ]
-
         return json_out
 
     def score(self):
-        return sum([memory.score for memory in self.memory])
+        return sum([obs.score for obs in self.env_observations])
 
     def __len__(self):
-        return len(self.memory)
+        return len(self.env_observations)
 
     def clone(self):
         return copy.deepcopy(self)
-
-
-def build_history_prompt(
-    history: HistoryTracker, llm: LLM, reset_prompt_history_after_rewrite: bool = False
-):
-    _history, _prompt_response_pairs = history.get()
-    latest_rewrite_step = 0
-    # Find the latest rewrite step if reset_prompt_history_after_rewrite
-    if reset_prompt_history_after_rewrite:
-        for i in range(len(_history)):
-            if _history[i].rewrite_counter == _history[-1].rewrite_counter:
-                latest_rewrite_step = i
-                break
-    _messages = []
-    for history_info, response in zip(
-        _history[latest_rewrite_step:], _prompt_response_pairs[latest_rewrite_step:]
-    ):
-        _messages.extend(llm.format_tool_call_history(history_info, response))
-    return _messages

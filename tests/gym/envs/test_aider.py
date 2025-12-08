@@ -63,7 +63,7 @@ def test_is_editable_files(env):
 
 
 def test_steps(env):
-    eval_tool = Toolbox.get_tool("eval", auto_eval_on_rewrite=True)
+    eval_tool = Toolbox.get_tool("eval")
     env.add_tool(eval_tool)
     eval_call = ToolCall(id="eval_id", name="eval", arguments={})
     infos = env.step(eval_call)
@@ -88,9 +88,9 @@ def test_steps(env):
     assert infos.step_observation.observation.startswith(
         "The file `clock.py` has been updated successfully."
     )
-    assert env.get_tool("eval").auto_eval_on_rewrite is True
-    assert infos.all_observations[-1].source == "eval"
-    assert infos.score == 1
+    assert not any(obs.source == "eval" for obs in infos.all_observations)
+    assert "1 failed" in infos.eval_observation.observation
+    assert infos.score == 0
 
     infos = env.step(eval_call)
     assert infos.step_observation.source == "eval"
@@ -105,7 +105,7 @@ def test_instructions(env):
 
 @patch("debug_gym.gym.envs.aider.build_docker_image")
 def test_build_docker_image(mock_build_docker_image):
-    dataset = AiderBenchmarkEnv.load_dataset()
+    AiderBenchmarkEnv.load_dataset()
     mock_build_docker_image.assert_called_once()
 
 

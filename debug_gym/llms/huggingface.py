@@ -1,6 +1,3 @@
-import json
-from typing import Iterable
-
 from transformers import AutoTokenizer
 
 from debug_gym.llms.openai import OpenAILLM
