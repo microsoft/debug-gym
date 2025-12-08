@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from debug_gym.gym.entities import Observation
-from debug_gym.gym.envs.env import RepoEnv
+from debug_gym.gym.envs.local import LocalEnv
 from debug_gym.gym.tools.bash import BashTool
 from debug_gym.gym.tools.tool import ToolCall
 from debug_gym.gym.tools.toolbox import Toolbox
@@ -30,7 +30,7 @@ def env(tmp_path):
     with open(subdir / "nested.txt", "w") as f:
         f.write("nested file content")
 
-    env = RepoEnv(path=repo_path, dir_tree_depth=2)
+    env = LocalEnv(path=repo_path)
     bash_tool = Toolbox.get_tool("bash")
     env.add_tool(bash_tool)
     env.reset()

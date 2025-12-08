@@ -42,22 +42,21 @@ def agent_setup(tmp_path, open_data):
                 "max_steps": 10,
                 "max_rewrite_steps": 5,
                 "use_conversational_prompt": True,
-                "n_rewrites_before_pdb": 2,
-                "reset_prompt_history_after_rewrite": False,
                 "memory_size": 10,
-                "output_path": str(tmp_path),
                 "random_seed": 42,
             }
             if config_override:
                 config_dict.update(config_override)
             env = MagicMock()
+            env.task_name = "test_task"
             llm = MagicMock()
             llm.reasoning_end_token = None
             llm.context_length = 4096
             llm.count_tokens = _length
             llm.define_tools = lambda x: x
-            agent = agent_class(config_dict, env)
+            agent = agent_class(config_dict)
             agent.llm = llm
+            agent.env = env
             yield agent, env, llm
 
     return _agent_setup
