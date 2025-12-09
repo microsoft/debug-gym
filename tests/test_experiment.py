@@ -15,6 +15,7 @@ from debug_gym.logger import DebugGymLogger
 
 def create_args_object(**kwargs):
     """Helper function to create an Args object with specified attributes."""
+
     class Args:
         pass
 
