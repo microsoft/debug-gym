@@ -145,8 +145,6 @@ def test_full_edit(env):
 
 
 def test_edit_invalid_file(env):
-    # overwrite the is_editable method to simulate a read-only file
-    env.workspace.is_editable = lambda x: x != "read_only.py"
     edit_tool = env.get_tool("edit")
     patch = {
         "path": "another_file.py",
@@ -155,12 +153,13 @@ def test_edit_invalid_file(env):
         "new_code": "    print(f'Hello, {name}!')",
     }
     obs = edit_tool.use(env, **patch)
-    assert obs.observation == (
-        "Edit failed. Error message:\n"
-        "Failed to read `another_file.py` because it does not exist in "
-        f"the working directory `{env.working_dir}`.\n"
-    )
+    assert edit_tool.edit_success
+    assert (env.working_dir / "another_file.py").exists()
+    assert env.workspace.read_file("another_file.py") == "    print(f'Hello, {name}!')"
 
+    # overwrite the is_editable method to simulate a read-only existing file
+    env.workspace.is_editable = lambda x: x != "read_only.py"
+    (env.working_dir / "read_only.py").write_text("print('original')\n")
     patch["path"] = "read_only.py"
     obs = edit_tool.use(env, **patch)
     assert obs.observation == (
@@ -254,9 +253,6 @@ def test_edit_new_file(env):
 
     patch = {
         "path": filename,
-        "start": None,  # full file write
-        "end": None,
-        "is_new_file": True,
         "new_code": "def added():\n    return 'created'\n",
     }
     obs = edit_tool.use(env, **patch)
@@ -269,26 +265,3 @@ def test_edit_new_file(env):
     with open(env.working_dir / filename, "r") as f:
         content = f.read()
     assert content == "def added():\n    return 'created'\n"
-
-
-def test_edit_new_file_flag_on_existing_file(env):
-    """Reject attempts to edit existing files when is_new_file is True."""
-    edit_tool = env.get_tool("edit")
-    filename = "test.py"
-    assert (env.working_dir / filename).exists()
-
-    patch = {
-        "path": filename,
-        "start": None,
-        "end": None,
-        "is_new_file": True,
-        "new_code": "print('should fail')\n",
-    }
-
-    obs = edit_tool.use(env, **patch)
-
-    assert not edit_tool.edit_success
-    assert obs.observation == (
-        "Edit failed. Error message:\n"
-        "`is_new_file=True` is only valid for new files. Choose another path or set `is_new_file=False`.\n"
-    )

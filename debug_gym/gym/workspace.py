@@ -163,10 +163,25 @@ class Workspace:
 
     def write_file(self, filepath: str, content: str):
         """Writes `content` to `filepath` exactly as-is, preserving any trailing newlines."""
-        abs_filepath = self.resolve_path(filepath, raises="ignore")
+        try:
+            abs_filepath = self.resolve_path(filepath, raises="ignore")
+        except FileNotFoundError as exc:
+            raise WorkspaceWriteError(
+                f"Failed to write `{filepath}` because it is outside the workspace."
+            ) from exc
+
+        def _run_or_raise(command: str):
+            success, output = self.terminal.run(
+                command, raises=False, strip_output=False
+            )
+            if not success:
+                message = output.strip() or "Unknown error"
+                raise WorkspaceWriteError(
+                    f"Failed to write `{filepath}`. Command output:\n{message}"
+                )
 
         # create parent directories via the terminal if needed
-        self.terminal.run(f'mkdir -p "{str(abs_filepath.parent)}"', raises=True)
+        _run_or_raise(f'mkdir -p "{str(abs_filepath.parent)}"')
 
         # We will split content in chunks of 32kB to avoid hitting command length limits.
         chunk_size = 32 * 1024  # 32kB
@@ -179,13 +194,23 @@ class Workspace:
         # - capture the heredoc output into shell variable CONTENT since command substitution strips trailing newlines
         # - "${CONTENT%DEBUGGYM_DEL}" removes the trailing sentinel DEBUGGYM_DEL (restoring the original trailing-newline state)
         # - echo -n writes the result without adding an extra newline
-        cmd = f"CONTENT=$(cat <<'DEBUGGYM_EOF'\n{first_chunk}DEBUGGYM_DEL\nDEBUGGYM_EOF\n); echo -n \"${{CONTENT%DEBUGGYM_DEL}}\" > {abs_filepath}"
-        self.terminal.run(cmd, raises=True)
+        cmd = (
+            "CONTENT=$(cat <<'DEBUGGYM_EOF'\n"
+            f"{first_chunk}DEBUGGYM_DEL\nDEBUGGYM_EOF\n); "
+            'echo -n "${CONTENT%DEBUGGYM_DEL}" > '
+            f"{abs_filepath}"
+        )
+        _run_or_raise(cmd)
 
         for i in range(0, len(rest), chunk_size):
             chunk = rest[i : i + chunk_size]
-            cmd = f"CONTENT=$(cat <<'DEBUGGYM_EOF'\n{chunk}DEBUGGYM_DEL\nDEBUGGYM_EOF\n); echo -n \"${{CONTENT%DEBUGGYM_DEL}}\" >> {abs_filepath}"
-            self.terminal.run(cmd, raises=True)
+            cmd = (
+                "CONTENT=$(cat <<'DEBUGGYM_EOF'\n"
+                f"{chunk}DEBUGGYM_DEL\nDEBUGGYM_EOF\n); "
+                'echo -n "${CONTENT%DEBUGGYM_DEL}" >> '
+                f"{abs_filepath}"
+            )
+            _run_or_raise(cmd)
 
     def directory_tree(self, root: str | Path = None, max_depth: int = 1):
         root = self.resolve_path(root or self.working_dir, raises=True)

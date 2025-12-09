@@ -14,10 +14,10 @@ class EditTool(EnvironmentTool):
         """edit(path=\"code/utils.py\", start=10, end=None, new_code=\"    print('bonjour')\") will edit line number 10 of the specified file 'code/utils.py' to be print('bonjour'), with the indents ahead (in this case, 4 spaces).""",
         """edit(path=\"code/utils.py\", start=10, end=20, new_code=\"    print('hello')\\n    print('hi again')\") will replace the chunk of code between line number 10 and 20 in the specified file 'code/utils.py' by the two lines provided, both with indents ahead (in this case, 4 spaces).""",
         """edit(path='code/utils.py', start=4, end=6, new_code=\"        print('buongiorno')\") will replace the chunk of code between line number 4 and 6 in the specified file 'code/utils.py' by the single line provided, with the indent ahead (in this case, 8 spaces).""",
-        """edit(path='code/utils.py', is_new_file=True, new_code=\"print('greetings')\") will generate a new file at the specified path 'code/utils.py' with the content print('greetings').""",
+        """edit(path='code/new_utils.py', new_code=\"print('hello new file')\") will create 'code/new_utils.py' with the provided content when the file does not already exist.""",
     ]
     description = (
-        "Edit the content of the specified file path, between lines [start, end], with the new code. Line numbers are 1-based. When start is provided and end is None, it's assumed to edit a single line (start). When both start and end are None, it's assumed to edit the whole file, this is not recommended because most of the time the expected change is local. When is_new_file is True, a new file will be created at the specified path with the new code. The new code should be valid python code include proper indentation (can be determined from context)."
+        "Edit the content of the specified file path, between lines [start, end], with the new code. Line numbers are 1-based. When start is provided and end is None, it's assumed to edit a single line (start). When both start and end are None, it's assumed to edit the whole file, this is not recommended because most of the time the expected change is local. If the file does not exist yet, it will be created with the provided content. The new code should be valid python code include proper indentation (can be determined from context)."
         + "\nExamples (for demonstration purposes only, you need to adjust the tool calling format according to your specific syntax):"
         + "\n".join(examples)
     )
@@ -34,10 +34,6 @@ class EditTool(EnvironmentTool):
             "type": ["number", "null"],
             "description": "The ending line number to be edited. If None, end is the same as start.",
         },
-        "is_new_file": {
-            "type": ["boolean", "null"],
-            "description": "Whether the file to be modified is a new file. Default is False.",
-        },
         "new_code": {
             "type": ["string"],
             "description": "The new code to be inserted. The new code should be valid python code include proper indentation (can be determined from context).",
@@ -48,23 +44,20 @@ class EditTool(EnvironmentTool):
         environment.workspace.write_file(filepath, content)
 
     def _edit_file(
-        self, environment, file_path, start, end, new_code, is_new_file=False
+        self, environment, file_path, start, end, new_code, file_exists: bool
     ):
-        raise_on_nonexistent_file = not is_new_file
         try:
-            original_content = environment.workspace.read_file(
-                file_path, raises=raise_on_nonexistent_file
+            original_content = (
+                environment.workspace.read_file(file_path) if file_exists else ""
             )
-        except WorkspaceReadError:
-            if is_new_file:
-                original_content = ""
-            else:
-                raise
+        except WorkspaceReadError as exc:
+            # Surface unexpected read errors back to the caller.
+            raise exc
         new_code_lines = new_code.split("\n")
         new_code_length = len(new_code_lines)
 
-        if start is None or is_new_file:
-            # no line number is provided, edit the whole code
+        if start is None or not file_exists:
+            # No line number is provided or we are creating a new file.
             self._overwrite_file(environment, filepath=file_path, content=new_code)
         else:
             # edit the code given the provided line numbers
@@ -108,33 +101,33 @@ class EditTool(EnvironmentTool):
         path: str = None,
         start: int = None,
         end: int = None,
-        is_new_file: bool = False,
         new_code: str = "",
     ) -> Observation:
         self.edit_success = False
         if path is None:
             return self.fail(environment, "File path is None.")
 
-        # If creating a new file, just ensure the target directory is inside workspace and not ignored
-        if is_new_file:
-            try:
-                resolved_path = environment.workspace.resolve_path(
-                    path, raises="ignore"
-                )
-            except Exception as e:
-                return self.fail(environment, f"Invalid path `{path}`: {e}")
+        try:
+            resolved_path = environment.workspace.resolve_path(path, raises="ignore")
+        except FileNotFoundError as exc:
+            return self.fail(environment, f"Invalid path `{path}`: {exc}")
 
-            # Prevent overwriting an existing file when is_new_file is True
-            if resolved_path.exists():
-                return self.fail(
-                    environment,
-                    "`is_new_file=True` is only valid for new files. Choose another path or set `is_new_file=False`.",
-                )
-        else:
-            if not environment.workspace.is_editable(path):
-                return self.fail(environment, f"`{path}` is not editable.")
+        workspace_root = environment.workspace.working_dir
+        try:
+            resolved_path.resolve(strict=False).relative_to(
+                workspace_root.resolve(strict=False)
+            )
+        except ValueError:
+            return self.fail(
+                environment, f"`{path}` is not within the workspace directory."
+            )
 
-        if start is not None:
+        file_exists = environment.workspace.has_file(path)
+        if file_exists and not environment.workspace.is_editable(path):
+            return self.fail(environment, f"`{path}` is not editable.")
+
+        # When creating a new file, ignore start/end positions and treat as full file write.
+        if file_exists and start is not None:
             end = end or start  # only start is provided (edit that line)
             if start > end:
                 return self.fail(
@@ -146,9 +139,12 @@ class EditTool(EnvironmentTool):
                     environment, "Invalid line number, line numbers are 1-based."
                 )
             start, end = start - 1, end - 1  # 1-based to 0-based
+        else:
+            start = None
+            end = None
         try:
             diff, new_code_length = self._edit_file(
-                environment, path, start, end, new_code, is_new_file=is_new_file
+                environment, path, start, end, new_code, file_exists=file_exists
             )
         except Exception as e:
             return self.fail(environment, str(e))
