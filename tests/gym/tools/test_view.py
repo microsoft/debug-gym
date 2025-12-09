@@ -203,8 +203,8 @@ def test_view_invalid_file_not_in_working_dir(env):
         source="view",
         observation=(
             "View failed. Error message:\n"
-            "`/nonexistent/main.py` does not exist or "
-            f"is not in the working directory `{env.working_dir}`."
+            "Failed to read `/nonexistent/main.py` because it does not exist in "
+            f"the working directory `{env.working_dir}`."
         ),
     )
 
@@ -221,8 +221,7 @@ def test_view_invalid_file_do_not_exist(env):
         source="view",
         observation=(
             "View failed. Error message:\n"
-            f"`{abs_file}` does not exist or "
-            f"is not in the working directory `{env.working_dir}`."
+            f"Failed to read `{abs_file}` because it does not exist in the working directory `{env.working_dir}`."
         ),
     )
 

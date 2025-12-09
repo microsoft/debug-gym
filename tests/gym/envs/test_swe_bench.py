@@ -244,7 +244,6 @@ def test_running_solution_agent(get_swe_bench_env, tmp_path):
         "random_seed": 0,
         # Optional values that BaseAgent.run would use; harmless to include here.
         "max_steps": 1,
-        "max_rewrite_steps": 1,
     }
     for tool_name in ["pdb", "submit"]:
         env.add_tool(Toolbox.get_tool(tool_name))
@@ -287,7 +286,6 @@ def test_running_solution_agent_in_debug_mode(get_swe_bench_debug_env, tmp_path)
         "random_seed": 0,
         # Optional values that BaseAgent.run would use; harmless to include here.
         "max_steps": 1,
-        "max_rewrite_steps": 1,
     }
     for tool_name in ["pdb", "eval", "submit"]:
         env.add_tool(Toolbox.get_tool(tool_name))

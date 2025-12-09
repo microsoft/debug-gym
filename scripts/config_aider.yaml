@@ -30,5 +30,5 @@ froggy_agent:
         - grep
         - pdb
         - view
-        - rewrite
+        - edit
         - eval

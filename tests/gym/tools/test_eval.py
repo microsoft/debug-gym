@@ -38,7 +38,7 @@ def test_eval(env):
     assert "1 passed in " in env_info.step_observation.observation
 
 
-def test_eval_does_not_auto_run_on_rewrite(env):
+def test_eval_does_not_auto_run_on_edit(env):
     eval_tool = Toolbox.get_tool("eval")
     env.add_tool(eval_tool)
 
@@ -51,7 +51,7 @@ def test_eval_does_not_auto_run_on_rewrite(env):
     with open(env.working_dir / "test_1.py", "w") as f:
         f.write("def test_1():\n  assert True\n")
 
-    env.queue_event(Event.REWRITE_SUCCESS, source=None)
+    env.queue_event(Event.EDIT_SUCCESS, source=None)
     env.process_events()
 
     assert env.last_eval.output == failing_output

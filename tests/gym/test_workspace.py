@@ -5,7 +5,7 @@ import pytest
 
 from debug_gym.gym.terminals.docker import DockerTerminal
 from debug_gym.gym.terminals.local import LocalTerminal
-from debug_gym.gym.workspace import Workspace
+from debug_gym.gym.workspace import Workspace, WorkspaceReadError
 
 
 @pytest.fixture
@@ -285,10 +285,10 @@ def test_read_file_reads_existing_file(workspace):
 def test_read_file_raises_for_nonexistent_file(workspace):
     (workspace.working_dir / "test.txt").touch()
     # relative path that does not exist
-    with pytest.raises(FileNotFoundError):
+    with pytest.raises(WorkspaceReadError):
         workspace.read_file("does_not_exist.txt")
     # absolute path matching a file in the working_dir
-    with pytest.raises(FileNotFoundError):
+    with pytest.raises(WorkspaceReadError):
         workspace.read_file("/test.txt")
 
 
