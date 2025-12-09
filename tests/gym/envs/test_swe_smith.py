@@ -245,9 +245,7 @@ def test_running_solution_agent(get_swe_smith_env, tmp_path):
     config = {
         "output_path": str(tmp_path),
         "random_seed": 0,
-        "memory_size": 8,
         "max_steps": 1,
-        "max_edit_steps": 1,
         "env": env,
     }
     for tool_name in ["pdb", "eval", "submit"]:
