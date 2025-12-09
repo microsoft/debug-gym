@@ -1,6 +1,7 @@
 import json
 import logging
 import multiprocessing as mp
+import os
 import queue
 from dataclasses import asdict
 from pathlib import Path
@@ -644,3 +645,52 @@ def test_log_file_content_worker(tmp_path):
     with open(worker_logger3.log_file, "r") as f:
         content = f.read()
     assert "Worker 3 log message" in content
+
+
+def test_setlevel_only_affects_rich_handler(debug_gym_logger):
+    """Test that calling setLevel only affects the rich_handler,
+    and debug logs are still saved to the log file.
+
+    This test addresses the issue where a user calling:
+        logger.setLevel(logging.INFO)
+    would previously prevent debug information from being saved to the log file.
+    """
+    # Log a debug message before changing the level
+    debug_gym_logger.debug("Debug message before setLevel")
+
+    # User changes the level (this should only affect rich_handler)
+    debug_gym_logger.setLevel(logging.ERROR)
+
+    # Log messages at different levels
+    debug_gym_logger.debug("Debug message after setLevel")
+    debug_gym_logger.info("Info message after setLevel")
+    debug_gym_logger.error("Error message after setLevel")
+
+    # Verify all messages are in the log file (file handler level is DEBUG)
+    with open(debug_gym_logger.log_file, "r") as f:
+        content = f.read()
+
+    assert "Debug message before setLevel" in content
+    assert "Debug message after setLevel" in content
+    assert "Info message after setLevel" in content
+    assert "Error message after setLevel" in content
+
+
+def test_setlevel_changes_rich_handler_level(DebugGymLoggerTest, tmp_path):
+    """Test that setLevel changes the rich_handler's level."""
+    logger = DebugGymLoggerTest("test_rich_handler_level", log_dir=str(tmp_path))
+
+    # Check initial rich_handler level is INFO
+    assert logger._rich_handler is not None
+    if os.environ.get("DEBUG_GYM_DEBUG", "").lower() in ("1", "true", "yes"):
+        assert logger._rich_handler.level == logging.DEBUG
+    else:
+        assert logger._rich_handler.level == logging.INFO
+
+    # Change to ERROR level
+    logger.setLevel(logging.ERROR)
+    assert logger._rich_handler.level == logging.ERROR
+
+    # Change to WARNING level
+    logger.setLevel(logging.WARNING)
+    assert logger._rich_handler.level == logging.WARNING
