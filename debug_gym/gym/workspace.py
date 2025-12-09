@@ -137,11 +137,15 @@ class Workspace:
     def read_file(self, filepath: str, raises: bool = True) -> str:
         """Reads a file from the working directory.
         By default, raises value error if the file does not exist"""
-        abs_filepath = self.resolve_path(filepath, raises=raises)
-        success, output = self.terminal.run(
-            f"cat {abs_filepath}", raises=raises, strip_output=False
+        _success_resolve_path = True
+        try:
+            abs_filepath = self.resolve_path(filepath, raises=raises)
+        except FileNotFoundError:
+            _success_resolve_path = False
+        success_read, output = self.terminal.run(
+            f"cat {abs_filepath}", raises=False, strip_output=False
         )
-        if not success:
+        if not success_read or not _success_resolve_path:
             message = output.strip() or "Unknown error"
             raise WorkspaceReadError(
                 f"Failed to read `{filepath}`. Command output:\n{message}"
