@@ -53,12 +53,10 @@ class ViewTool(EnvironmentTool):
                 self.name, "Invalid file path. Please specify a valid file path."
             )
 
-        # RepoEnv.read_file raises FileNotFoundError if the file
-        # does not exist or is not in the working directory
+        # RepoEnv.read_file raises WorkspaceReadError if the file
+        # does not exist, is not accessible, or is outside the working directory
         try:
             file_content = environment.workspace.read_file(new_file)
-        except FileNotFoundError as e:
-            return Observation(self.name, f"View failed. Error message:\n{str(e)}")
         except WorkspaceReadError as e:
             return Observation(self.name, f"View failed. Error message:\n{str(e)}")
         file_lines = file_content.splitlines()

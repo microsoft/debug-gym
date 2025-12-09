@@ -5,6 +5,7 @@ import pytest
 
 from debug_gym.agents.froggy_agent import FroggyAgent
 from debug_gym.agents.utils import save_patch, save_trajectory
+from debug_gym.gym.tools.tool import ToolCall
 from debug_gym.gym.tools.toolbox import Toolbox
 from debug_gym.llms.base import LLMResponse, TokenUsage
 
@@ -108,7 +109,7 @@ def test_build_system_prompt(agent_setup, build_env_info):
         "Evaluation output of current code": "eval obs",
         "Shortcut features": [
             "The environment will show the current breakpoints in the system prompt.",
-            "The environment will automatically restore existing breakpoints when a new PDB session is started (e.g., after a rewrite).",
+            "The environment will automatically restore existing breakpoints when a new PDB session is started (e.g., after an edit).",
             "After every valid PDB tool calling, the environment will automatically call the PDB tool again with a `list .` command, which will show the code around the current frame.",
         ],
     }
@@ -146,14 +147,19 @@ def test_run(agent_setup, build_env_info):
         current_breakpoints="Test breakpoints",
         step_observation="Test last run obs",
     )
-    llm.return_value = LLMResponse("Prompt", "Expected answer", TokenUsage(2, 4))
+    llm.return_value = LLMResponse(
+        prompt="Prompt",
+        response="Expected answer",
+        tool=ToolCall(id="tool_id", name="tool_name", arguments={}),
+        token_usage=TokenUsage(2, 4),
+    )
     result = agent.run(env, debug=False)
     assert result
 
 
 def test_build_system_prompt_custom_prompt(agent_setup, build_env_info):
     agent, _, _ = next(agent_setup(FroggyAgent))
-    agent.system_prompt = "Custom rewrite prompt"
+    agent.system_prompt = "Custom edit prompt"
     info = build_env_info(
         instructions="Test instructions",
         current_breakpoints="Test breakpoints",
@@ -161,7 +167,7 @@ def test_build_system_prompt_custom_prompt(agent_setup, build_env_info):
     )
     messages = agent.build_system_prompt(info)
     assert len(messages) == 2
-    assert "Custom rewrite prompt" in messages["content"]
+    assert "Custom edit prompt" in messages["content"]
 
 
 def test_shortcut_features_comprehensive(agent_setup):
@@ -248,41 +254,43 @@ def test_run_early_completion(agent_setup, build_env_info):
     env.step.assert_not_called()  # Should not step if already done
 
 
-def test_run_max_rewrite_steps(agent_setup, build_env_info):
-    """Test run method when max rewrite steps is reached"""
+def test_run_stops_at_max_steps(agent_setup, build_env_info):
+    """The agent should stop when the configured max_steps limit is reached."""
     agent, env, llm = next(agent_setup(FroggyAgent))
     env.resolved = False
-    agent.args.max_rewrite_steps = 2
+    agent.args.max_steps = 1
 
     env.reset.return_value = build_env_info(
         terminated=False,
         resolved=False,
         score=0,
         max_score=10,
-        rewrite_counter=0,
         instructions="Test instructions",
         current_breakpoints="Test breakpoints",
-        step_observation="Test last run obs",
+        step_observation="Initial obs",
     )
 
-    # First step - increase rewrite counter to max
     env.step.return_value = build_env_info(
         terminated=False,
         resolved=False,
         score=5,
         max_score=10,
-        rewrite_counter=2,  # Reaches max_rewrite_steps
         instructions="Test instructions",
         current_breakpoints="Test breakpoints",
-        step_observation="Test last run obs",
+        step_observation="Next obs",
     )
 
-    llm.return_value = LLMResponse("Prompt", "Expected answer", TokenUsage(2, 4))
+    llm.return_value = LLMResponse(
+        prompt="Prompt",
+        response="Expected answer",
+        tool=ToolCall(id="tool_id", name="tool_name", arguments={}),
+        prompt_token_count=2,
+        response_token_count=4,
+    )
 
     result = agent.run(env)
-    assert (
-        result["success"] is False
-    )  # Task not completed, but stopped due to max rewrites
+    assert result["success"] is False
+    assert env.step.call_count == 1
 
 
 def test_run_exception_handling(agent_setup, build_env_info):

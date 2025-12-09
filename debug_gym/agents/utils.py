@@ -101,7 +101,7 @@ def load_config():
         metavar="my.setting=value",
         default=[],
         help="override params of the config file,"
-        " e.g. -p 'rewrite_only.random_seed=123'",
+        " e.g. -p 'edit_only.random_seed=123'",
     )
     args = parser.parse_args()
     assert os.path.exists(args.config_file), "Invalid config file"

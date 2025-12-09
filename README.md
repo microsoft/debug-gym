@@ -61,7 +61,7 @@ debug_gym
 └── llms
 ```
 
-`debug_gym.gym` is a simulation environment. Given a code repository, an agent can iteratively interact with a set of tools, such as `pdb`, that are designed for investigate the code. Once gathered enough information, the agent can propose a patch that rewrites certain lines of the code. The terminal will subsequently execute the new code against a set of test cases.
+`debug_gym.gym` is a simulation environment. Given a code repository, an agent can iteratively interact with a set of tools, such as `pdb`, that are designed for investigate the code. Once gathered enough information, the agent can propose a patch that edits certain lines of the code. The terminal will subsequently execute the new code against a set of test cases.
 
 `debug_gym.agents` are LLM-based debugging agents that use `debug_gym.gym` to interact with code repositories to seek necessary information and thus fix potential bugs. At an interaction step, the agent takes a text observation that describes the environment states and tool states as input, it is expected to generate a command, subsequently, the environment will provide a new text observation in response, describing the state change caused by that command.
 
@@ -85,7 +85,7 @@ One of the core designs of `debug-gym` is the notion of tools. Users can dynamic
 | `eval` | It runs the current code repository using the provided entrypoint (e.g., pytest), and returns the terminal's output (e.g., error message). |
 | `pdb` | Interactive debugger wrapping the [Python pdb tool](https://docs.python.org/3/library/pdb.html). In additon, users can choose to maintain a set of persistent breakpoints (as in some programming IDEs), which are not reset after every eval. With such feature, a new pdb debugging session is activated automatically, with all the breakpoints restored. Note such breakpoint can be cleared by pdb commands such as `cl`. |
 | `grep` | Search for patterns in files within the repository. Supports both literal string matching and regular expressions. Can search in specific files, directories, or the entire repository. Useful for finding code patterns, function definitions, variable usage, or identifying files containing specific text. |
-| `rewrite` | It can be used to rewrite a certain piece of code to fix the bug. The inputs of this tool call include the file path, the start and end line numbers, and the new code. |
+| `edit` | It can be used to edit a certain piece of code to fix the bug. The inputs of this tool call include the file path, the start and end line numbers, and the new code. |
 
 Upon importing a tool, its action space and observation space will be automatically merged into `debug-gym`'s action space and observation space; its instruction will also be merged into the overall instruction provided to the agent (e.g., as system prompt).
 
@@ -99,9 +99,9 @@ We provide the below LLM-based agents, they all have minimal design and serve th
 
 | Agent name | Available Tools | Description |
 | :-: | :-: | :----- |
-| `froggy_agent` | `grep`, `pdb`, `view`, `rewrite`, `eval` (configurable) | Primary debugging agent. Adjust prompts and tool lists in YAML to mimic rewrite-only, grep-heavy, or other workflows. |
+| `froggy_agent` | `grep`, `pdb`, `view`, `edit`, `eval` (configurable) | Primary debugging agent. Adjust prompts and tool lists in YAML to mimic edit-only, grep-heavy, or other workflows. |
 | `solution_agent` | `pdb`, `eval`  | An oracle agent that applies a gold patch (only works with `swebench` and `swesmith` benchmarks for now). The agent checks that tests are failing before applying the patch, and passing after. It also checks that `pdb` tool can be used as expected. |
-| `swe_agent` | `bash`, `rewrite`, `submit` | Baseline agent tailored for the SWE-bench setting that executes bash commands in addition to rewrites. |
+| `swe_agent` | `bash`, `edit`, `submit` | Baseline agent tailored for the SWE-bench setting that executes bash commands in addition to edits. |
 
 ---
 
@@ -115,7 +115,7 @@ To demonstrate how to integrate `debug-gym` with coding tasks and repositories, 
 | `swebench`| [https://github.com/princeton-nlp/SWE-bench](https://github.com/princeton-nlp/SWE-bench) |
 | `swesmith`| [https://github.com/SWE-bench/SWE-smith](https://github.com/SWE-bench/SWE-smith) |
 | `r2egym`| [https://github.com/R2E-Gym/R2E-Gym](https://github.com/R2E-Gym/R2E-Gym) |
-| `mini_nightmare` | A set of 10 hand-crafted minimal buggy code snippet where rewrite only agents have harder time to tackle. Read details [here](https://github.com/microsoft/debug-gym/blob/main/data/mini_nightmare/mini_nightmare.md). |
+| `mini_nightmare` | A set of 10 hand-crafted minimal buggy code snippet where edit-only agents have harder time to tackle. Read details [here](https://github.com/microsoft/debug-gym/blob/main/data/mini_nightmare/mini_nightmare.md). |
 
 > [!NOTE]
 > Since debug-gym focuses on debugging task with the use of a debugger, we provide a customized version of `swebench`, called `swebench-debug`, where each problem's codebase already has the gold test patch applied. This allows us to better simulate real-world debugging scenarios where the buggy code is expected to have failing tests and we can set the debugger's entrypoint accordingly. To use `swebench-debug`, set `benchmark: "swebench-debug"` in your config file (see [Running Baselines](#3-running-baselines)).

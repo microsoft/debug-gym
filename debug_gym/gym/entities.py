@@ -22,8 +22,8 @@ class Event(Enum):
     ENV_RESET = "env_reset"
     ENV_STEP = "env_step"
     FILE_CHANGE = "file_change"
-    REWRITE_SUCCESS = "rewrite_success"
-    REWRITE_FAIL = "rewrite_fail"
+    EDIT_SUCCESS = "edit_success"
+    EDIT_FAIL = "edit_fail"
     SWITCH_CONTEXT = "switch_context"
 
     @property

@@ -4,6 +4,7 @@ from functools import wraps
 from typing import Any, Dict
 
 from debug_gym.gym.entities import Event, Observation
+from debug_gym.gym.workspace import WorkspaceError
 
 
 @dataclass
@@ -51,6 +52,8 @@ class EnvironmentTool(ABC):
         tracks the history of tool usage."""
         try:
             return self.use(*args, **kwargs)
+        except WorkspaceError as e:
+            return Observation(self.name, str(e))
         except Exception as e:
             # Handle exceptions and return an observation
             return Observation(

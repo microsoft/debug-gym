@@ -23,9 +23,9 @@ plt.rcParams.update(
 
 def analyze_froggy_results(model_name):
     """
-    Analyzes froggy.jsonl files for a given model to extract success rates and rewrite counts.
+    Analyzes froggy.jsonl files for a given model to extract success rates and edit counts.
     Args:
-        model_name (str): Path to the model directory (e.g. 'exps/swe-bench/rewrite_4o_0')
+        model_name (str): Path to the model directory (e.g. 'exps/swe-bench/edit_4o_0')
 
     Returns:
         pd.DataFrame: DataFrame containing results by task
@@ -45,14 +45,14 @@ def analyze_froggy_results(model_name):
                 # Extract success status
                 success = data.get("success", False)
 
-                # Count rewrite commands
+                # Count tool usage
                 episode_length = 0
 
                 tool_counter = {
                     "view": 0,
                     "listdir": 0,
                     "pdb": 0,
-                    "rewrite": 0,
+                    "edit": 0,
                     "eval": 0,
                     "other": 0,
                 }
@@ -85,7 +85,7 @@ def analyze_froggy_results_with_seeds(base_model_name, seeds=[0, 1, 2]):
     Analyzes and averages results across different seeds for a base model name
 
     Args:
-        base_model_name (str): Base path without seed (e.g. '../exps/may22/rewrite_o3-mini')
+        base_model_name (str): Base path without seed (e.g. '../exps/may22/edit_o3-mini')
         seeds (list): List of seeds to average over
 
     Returns:
@@ -125,7 +125,7 @@ def plot_tool_use_categories(df_dict, model_paths, figsize=(12, 7)):
             "view": 0,
             "listdir": 0,
             "pdb": 0,
-            "rewrite": 0,
+            "edit": 0,
             "eval": 0,
             "other": 0,
         }
@@ -147,7 +147,7 @@ def plot_tool_use_categories(df_dict, model_paths, figsize=(12, 7)):
                 tool_category_per_model["view"],
                 tool_category_per_model["listdir"],
                 tool_category_per_model["pdb"],
-                tool_category_per_model["rewrite"],
+                tool_category_per_model["edit"],
                 tool_category_per_model["eval"],
                 tool_category_per_model["other"],
             ]
@@ -156,7 +156,7 @@ def plot_tool_use_categories(df_dict, model_paths, figsize=(12, 7)):
     # convert to DataFrame
     all_data = pd.DataFrame(
         all_data,
-        columns=["name", "model", "view", "listdir", "pdb", "rewrite", "eval", "other"],
+        columns=["name", "model", "view", "listdir", "pdb", "edit", "eval", "other"],
     )
     # nice palette
     palette = sns.color_palette("Set2")
@@ -164,7 +164,7 @@ def plot_tool_use_categories(df_dict, model_paths, figsize=(12, 7)):
     sns.set_palette(palette)
     # stacked bar plot showing the distribution of PDB command categories for each model
     all_data.set_index("name")[
-        ["view", "listdir", "pdb", "rewrite", "eval", "other"]
+        ["view", "listdir", "pdb", "edit", "eval", "other"]
     ].plot(kind="bar", stacked=True, figsize=figsize)
     plt.xlabel("Backbone LLM")
     plt.ylabel("Percentage")
@@ -173,7 +173,7 @@ def plot_tool_use_categories(df_dict, model_paths, figsize=(12, 7)):
     plt.xticks(
         np.arange(len(all_data)),
         [
-            item.split("/")[-1].replace("rewrite_", "rw ").replace("debug_", "dbg ")
+            item.split("/")[-1].replace("edit_", "ed ").replace("debug_", "dbg ")
             for item in model_paths
         ],
     )
