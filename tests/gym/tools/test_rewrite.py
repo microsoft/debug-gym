@@ -157,8 +157,8 @@ def test_rewrite_invalid_file(env):
     obs = rewrite_tool.use(env, **patch)
     assert obs.observation == (
         "Rewrite failed. Error message:\n"
-        "`another_file.py` does not exist or is not "
-        f"in the working directory `{env.working_dir}`.\n"
+        "Failed to read `another_file.py` because it does not exist in "
+        f"the working directory `{env.working_dir}`.\n"
     )
 
     patch["path"] = "read_only.py"

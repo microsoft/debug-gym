@@ -3,6 +3,7 @@ import difflib
 from debug_gym.gym.entities import Event, Observation
 from debug_gym.gym.tools.tool import EnvironmentTool
 from debug_gym.gym.tools.toolbox import Toolbox
+from debug_gym.gym.workspace import WorkspaceReadError
 
 
 @Toolbox.register()
@@ -50,9 +51,15 @@ class RewriteTool(EnvironmentTool):
         self, environment, file_path, start, end, new_code, is_new_file=False
     ):
         raise_on_nonexistent_file = not is_new_file
-        original_content = environment.workspace.read_file(
-            file_path, raises=raise_on_nonexistent_file
-        )
+        try:
+            original_content = environment.workspace.read_file(
+                file_path, raises=raise_on_nonexistent_file
+            )
+        except WorkspaceReadError:
+            if is_new_file:
+                original_content = ""
+            else:
+                raise
         new_code_lines = new_code.split("\n")
         new_code_length = len(new_code_lines)
 
