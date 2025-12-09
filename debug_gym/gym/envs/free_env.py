@@ -50,10 +50,10 @@ class FreeEnv(RepoEnv):
         self.terminal.base_image = self.task_data["image"]
 
     def setup_workspace(self):
-        self.workspace.working_dir = self.task_data["workspace_dir"]
+        self.workspace.working_dir = self.task_data.get("workspace_dir", "/testbed")
         self.workspace.reset()
 
-        if self.task_data["local_path"]:
+        if self.task_data.get("local_path"):
             self.logger.info(
                 f"Copying content from {self.task_data['local_path']} to {self.workspace.working_dir}."
             )

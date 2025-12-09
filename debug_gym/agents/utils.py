@@ -117,7 +117,10 @@ def load_config():
 
     # Parse overriden params.
     for param in args.params:
-        fqn_key, value = param.split("=")
+        fqn_key, value = param, ""
+        if "=" in param:
+            fqn_key, value = param.split("=")
+
         entry_to_change = config
         keys = fqn_key.split(".")
         for k in keys[:-1]:

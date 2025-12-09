@@ -173,6 +173,7 @@ def run_agent(args, task_name: str, task_data: dict, config: dict):
 def main():
     config, args = load_config()
     config["uuid"] = config.get("uuid", str(uuid.uuid4()))
+    config["output_path"] = config.get("output_path", "exps")
     exp_output_path = Path(config["output_path"]) / config["uuid"]
     exp_output_path.mkdir(parents=True, exist_ok=True)
     logger = DebugGymLogger("debug-gym", level=args.logging_level)
