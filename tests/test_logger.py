@@ -1,6 +1,7 @@
 import json
 import logging
 import multiprocessing as mp
+import os
 import queue
 from dataclasses import asdict
 from pathlib import Path
@@ -681,7 +682,10 @@ def test_setlevel_changes_rich_handler_level(DebugGymLoggerTest, tmp_path):
 
     # Check initial rich_handler level is INFO
     assert logger._rich_handler is not None
-    assert logger._rich_handler.level == logging.INFO
+    if os.environ.get("DEBUG_GYM_DEBUG", "").lower() in ("1", "true", "yes"):
+        assert logger._rich_handler.level == logging.DEBUG
+    else:
+        assert logger._rich_handler.level == logging.INFO
 
     # Change to ERROR level
     logger.setLevel(logging.ERROR)
