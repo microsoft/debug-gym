@@ -89,9 +89,6 @@ def test_build_system_prompt(agent_setup, build_env_info):
     pdb_tool = Toolbox.get_tool("pdb", auto_list=True, persistent_breakpoints=True)
     env.add_tool(eval_tool)
     env.add_tool(pdb_tool)
-    env.workspace = MagicMock()
-    env.workspace.display_files = MagicMock(return_value="repo/tree")
-    agent.args.show_directory_tree = 2
     agent.args.show_current_breakpoints = True
     agent.env = env
     info = build_env_info(
@@ -103,7 +100,6 @@ def test_build_system_prompt(agent_setup, build_env_info):
     messages = agent.build_system_prompt(info)
     expected = {
         "Instructions": "Do X",
-        "Repo directory tree": "repo/tree",
         "Current breakpoints": [1, 2],
         "Evaluation output of current code": "eval obs",
         "Shortcut features": [
@@ -168,7 +164,6 @@ def test_shortcut_features_comprehensive(agent_setup):
     """Test all shortcut features combinations"""
     agent, env, _ = next(agent_setup(FroggyAgent))
     # Test with all features enabled
-    agent.args.show_directory_tree = 1
     agent.args.show_current_breakpoints = True
     env.has_tool.return_value = True
 
@@ -184,7 +179,6 @@ def test_shortcut_features_comprehensive(agent_setup):
     assert len(features) == 0
 
     # Test with no features
-    agent.args.show_directory_tree = 0
     agent.args.show_current_breakpoints = False
     env.has_tool.return_value = True
     env.get_tool("pdb").auto_list = False
