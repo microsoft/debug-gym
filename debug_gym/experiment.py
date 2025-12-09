@@ -11,14 +11,14 @@ from debug_gym.gym.tools.toolbox import Toolbox
 from debug_gym.logger import DebugGymLogger
 
 
-def create_env(config: dict, logger: DebugGymLogger):
-    terminal = select_terminal(config.get("terminal"), logger)
-    env_class = select_env(config.get("benchmark"))
+def create_env(config: dict, task_data: dict, logger: DebugGymLogger):
+    terminal = select_terminal(config.get("terminal"), logger, uuid=config["uuid"])
+    env_class = select_env(task_data["env_type"])
     env = env_class(
-        **config["env_kwargs"],
-        problems=config.get("problems", ["custom"]),
+        task_data=task_data,
         terminal=terminal,
         logger=logger,
+        **config.get("env", {}),
     )
     return env
 
@@ -26,7 +26,12 @@ def create_env(config: dict, logger: DebugGymLogger):
 def add_tools(env, config: dict, logger: DebugGymLogger):
     """Add tools to the environment"""
     for tool in config["tools"]:
-        tool_instantiated = Toolbox.get_tool(tool)
+        tool_config = {}
+        if isinstance(tool, dict):
+            assert len(tool) == 1, "Tool dict must have exactly one key"
+            tool, tool_config = list(tool.items())[0]
+
+        tool_instantiated = Toolbox.get_tool(tool, **tool_config)
         env.add_tool(tool_instantiated)
         logger.debug(f"Adding tool to toolbox: {tool_instantiated.__class__.__name__}")
 

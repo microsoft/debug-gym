@@ -6,8 +6,9 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 
 from debug_gym.agents.base_agent import AGENT_REGISTRY, create_agent
-from debug_gym.agents.utils import load_config
+from debug_gym.agents.utils import load_config, save_patch, save_trajectory
 from debug_gym.experiment import add_tools, create_env, dump_experiment_info
+from debug_gym.gym.envs import load_dataset
 from debug_gym.llms.base import LLM
 from debug_gym.llms.human import Human
 from debug_gym.logger import DebugGymLogger, load_previous_run_status
@@ -179,7 +180,11 @@ def main():
     dump_experiment_info(config, args)
 
     # Load the dataset based on the information found in the config.
-    dataset = load_dataset(config["dataset"], logger=logger)
+    if config.get("task_data") is not None:
+        dataset = {f"custom-task": config["task_data"]}
+    else:
+        dataset = load_dataset(config["dataset"], logger=logger)
+
     problems = sorted(dataset)
 
     if args.list:

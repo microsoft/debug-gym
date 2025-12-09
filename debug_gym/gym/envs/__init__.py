@@ -41,7 +41,7 @@ def select_env(env_type: str = None) -> type[RepoEnv]:
             return MiniNightmareEnv
         case "r2egym":
             return R2EGymEnv
-        case "free":
+        case "FreeEnv":
             return FreeEnv
         case _:
             raise ValueError(f"Unknown environment {env_type}")
