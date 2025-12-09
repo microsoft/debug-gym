@@ -101,8 +101,8 @@ def run_replay_agent(agent, task_name=None, args=None):
             )
             agent.history.step(info, llm_response)
 
-            if info.terminated or info.edit_counter >= agent.config["max_edit_steps"]:
-                reason = "terminated" if info.resolved else "max_edit_steps reached"
+            if info.terminated:
+                reason = "terminated" if info.resolved else "max_steps reached"
                 agent.logger.info(
                     f"Step: {step} | Score: {info.score}/{info.max_score if info.max_score else '-'} | Reason: {reason}"
                 )

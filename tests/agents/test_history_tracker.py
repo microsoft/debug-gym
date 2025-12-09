@@ -36,7 +36,6 @@ def test_history_tracker(build_env_info):
         action_reasoning=None,
         action_content=None,
         score=0,
-        edit_counter=0,
     )
     env_info_1 = build_env_info(
         step_observation="obs1",
@@ -44,7 +43,6 @@ def test_history_tracker(build_env_info):
         action_reasoning=action_reasoning_1,
         action_content=action_content_1,
         score=1,
-        edit_counter=0,
     )
     env_info_2 = build_env_info(
         step_observation="obs2",
@@ -52,7 +50,6 @@ def test_history_tracker(build_env_info):
         action_reasoning=action_reasoning_2,
         action_content=action_content_2,
         score=2,
-        edit_counter=0,
     )
     env_info_3 = build_env_info(
         step_observation="obs3",
@@ -60,7 +57,6 @@ def test_history_tracker(build_env_info):
         action_reasoning=action_reasoning_3,
         action_content=action_content_3,
         score=3,
-        edit_counter=1,
     )
     env_info_4 = build_env_info(
         step_observation="obs4",
@@ -68,7 +64,6 @@ def test_history_tracker(build_env_info):
         action_reasoning=action_reasoning_4,
         action_content=action_content_4,
         score=4,
-        edit_counter=1,
     )
     env_info_5 = build_env_info(
         step_observation="obs5",
@@ -76,7 +71,6 @@ def test_history_tracker(build_env_info):
         action_reasoning=action_reasoning_5,
         action_content=action_content_5,
         score=5,
-        edit_counter=2,
     )
 
     # single prompt format
@@ -140,7 +134,6 @@ def test_history_tracker(build_env_info):
         "content": action_content_5,
         "action": {"id": "5", "name": "action5", "arguments": {}},
         "obs": "obs5",
-        "edit_consumed": 2,
         "prompt_response_pairs": [
             {
                 "prompt": [
@@ -162,7 +155,6 @@ def test_history_tracker(build_env_info):
         "content": action_content_3,
         "action": {"id": "3", "name": "action3", "arguments": {}},
         "obs": "obs3",
-        "edit_consumed": 1,
         "prompt_response_pairs": [
             {
                 "prompt": [
@@ -196,7 +188,6 @@ def test_history_tracker(build_env_info):
                 "token_usage": {"prompt": 4321, "response": 1234},
             }
         ],
-        "edit_consumed": 1,
     }
 
     # for 0-th step, prompt-response pairs should be None
@@ -209,7 +200,6 @@ def test_history_tracker(build_env_info):
         "system_message": None,
         "problem_message": None,
         "prompt_response_pairs": None,
-        "edit_consumed": 0,
     }
 
     # score should return the sum of the scores

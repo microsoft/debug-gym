@@ -215,7 +215,6 @@ def test_reset(tmp_path):
 
     assert env.last_eval is None
     assert env.current_breakpoints_state == {}
-    assert env.edit_counter == 0
     assert infos == EnvInfo(
         step_observation=Observation(source="env", observation=env.instructions),
         all_observations=[Observation(source="env", observation=env.instructions)],
@@ -229,47 +228,8 @@ def test_reset(tmp_path):
         max_score=None,
         terminated=False,
         resolved=False,
-        edit_counter=0,
         tools=[],
     )
-
-
-def test_edit_counter(env):
-    env_info = env.reset()
-    assert env.edit_counter == 0
-    edit_tool = Toolbox.get_tool("edit")
-    env.add_tool(edit_tool)
-
-    edit_call = ToolCall(id="edit_id", name="edit", arguments={})
-    env_info = env.step(edit_call, "let me edit the code")
-    assert env.edit_counter == 1
-    assert env_info.edit_counter == 1
-    edit_obs = Observation(
-        source="edit",
-        observation="Edit failed. Error message:\nFile path is None.\n",
-    )
-    assert env_info.step_observation == edit_obs
-    assert env_info.all_observations == [edit_obs]
-
-    edit_call = ToolCall(
-        id="edit_id",
-        name="edit",
-        arguments={
-            "path": "file1.txt",
-            "new_code": "print('Hello')",
-        },
-    )
-    env_info = env.step(edit_call, "let me edit the file1.txt")
-    assert env.edit_counter == 2
-    assert env_info.edit_counter == 2
-    edit_obs = Observation(
-        source="edit",
-        observation="The file `file1.txt` has been updated successfully.\n\nDiff:\n\n--- original\n+++ current\n@@ -0,0 +1 @@\n+print('Hello')",
-    )
-    assert env_info.step_observation == edit_obs
-    assert env_info.all_observations == [edit_obs]
-    with open(env.working_dir / "file1.txt", "r") as f:
-        assert f.read() == "print('Hello')"
 
 
 def test_eval(tmp_path):

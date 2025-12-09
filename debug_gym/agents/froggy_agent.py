@@ -11,7 +11,6 @@ from debug_gym.gym.envs.env import EnvInfo
 
 @dataclass
 class FroggyAgentArgs(AgentArgs):
-    max_edit_steps: int = -1
     show_directory_tree: int = 0
     show_current_breakpoints: bool = False
 
@@ -21,13 +20,6 @@ class FroggyAgent(BaseAgent):
     name: str = "froggy_agent"
     args_class = FroggyAgentArgs
     system_prompt: str = "{{ agent._default_system_prompt(info) }}"
-
-    def should_stop(self, step: int, info: EnvInfo):
-        should_stop, reason = super().should_stop(step, info)
-        if info.edit_counter > self.args.max_edit_steps:
-            should_stop = True
-            reason = "max_edit_steps reached"
-        return should_stop, reason
 
     def shortcut_features(self):
         features = []
