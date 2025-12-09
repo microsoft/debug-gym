@@ -14,7 +14,11 @@ class WorkspaceError(Exception):
 
 
 class WorkspaceReadError(WorkspaceError):
-    """Raised when a file exists but cannot be read."""
+    """Raised when a file cannot be read or is missing from the workspace."""
+
+
+class WorkspaceWriteError(WorkspaceError):
+    """Raised when a file cannot be written."""
 
 
 class Workspace:
@@ -136,20 +140,25 @@ class Workspace:
 
     def read_file(self, filepath: str, raises: bool = True) -> str:
         """Reads a file from the working directory.
-        By default, raises value error if the file does not exist"""
-        _success_resolve_path = True
+        By default, raises WorkspaceReadError if the file does not exist or cannot be read.
+        """
         try:
             abs_filepath = self.resolve_path(filepath, raises=raises)
-        except FileNotFoundError:
-            _success_resolve_path = False
+        except FileNotFoundError as exc:
+            raise WorkspaceReadError(
+                f"Failed to read `{filepath}` because it does not exist in the working directory `{self.working_dir}`."
+            ) from exc
+
         success_read, output = self.terminal.run(
             f"cat {abs_filepath}", raises=False, strip_output=False
         )
-        if not success_read or not _success_resolve_path:
+
+        if not success_read:
             message = output.strip() or "Unknown error"
             raise WorkspaceReadError(
                 f"Failed to read `{filepath}`. Command output:\n{message}"
             )
+
         return output
 
     def write_file(self, filepath: str, content: str):

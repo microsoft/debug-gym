@@ -269,3 +269,26 @@ def test_rewrite_new_file(env):
     with open(env.working_dir / filename, "r") as f:
         content = f.read()
     assert content == "def added():\n    return 'created'\n"
+
+
+def test_rewrite_new_file_flag_on_existing_file(env):
+    """Reject attempts to rewrite existing files when is_new_file is True."""
+    rewrite_tool = env.get_tool("rewrite")
+    filename = "test.py"
+    assert (env.working_dir / filename).exists()
+
+    patch = {
+        "path": filename,
+        "start": None,
+        "end": None,
+        "is_new_file": True,
+        "new_code": "print('should fail')\n",
+    }
+
+    obs = rewrite_tool.use(env, **patch)
+
+    assert not rewrite_tool.rewrite_success
+    assert obs.observation == (
+        "Rewrite failed. Error message:\n"
+        "`is_new_file=True` is only valid for new files. Choose another path or set `is_new_file=False`.\n"
+    )

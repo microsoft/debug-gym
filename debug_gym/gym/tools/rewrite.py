@@ -110,11 +110,19 @@ class RewriteTool(EnvironmentTool):
 
         # If creating a new file, just ensure the target directory is inside workspace and not ignored
         if is_new_file:
-            # Resolve without requiring existence
             try:
-                environment.workspace.resolve_path(path, raises="ignore")
+                resolved_path = environment.workspace.resolve_path(
+                    path, raises="ignore"
+                )
             except Exception as e:
                 return self.fail(environment, f"Invalid path `{path}`: {e}")
+
+            # Prevent overwriting an existing file when is_new_file is True
+            if resolved_path.exists():
+                return self.fail(
+                    environment,
+                    "`is_new_file=True` is only valid for new files. Choose another path or set `is_new_file=False`.",
+                )
         else:
             if not environment.workspace.is_editable(path):
                 return self.fail(environment, f"`{path}` is not editable.")
