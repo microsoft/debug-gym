@@ -40,7 +40,7 @@ def agent_setup(tmp_path, open_data):
             config_dict = {
                 "llm_name": "test-model",
                 "max_steps": 10,
-                "max_rewrite_steps": 5,
+                "max_edit_steps": 5,
                 "use_conversational_prompt": True,
                 "memory_size": 10,
                 "random_seed": 42,

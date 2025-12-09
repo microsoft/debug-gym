@@ -182,7 +182,7 @@ def test_step(
     mock_pdb_tool = MagicMock()
     observation = Observation("pdb", "PDB tool used")
     mock_pdb_tool.return_value = observation
-    mock_pdb_tool.rewrite_success = True
+    mock_pdb_tool.edit_success = True
     mock_pdb_tool.current_frame_file = "file.py"
     mock_get_tool.return_value = None
 
@@ -215,7 +215,7 @@ def test_reset(tmp_path):
 
     assert env.last_eval is None
     assert env.current_breakpoints_state == {}
-    assert env.rewrite_counter == 0
+    assert env.edit_counter == 0
     assert infos == EnvInfo(
         step_observation=Observation(source="env", observation=env.instructions),
         all_observations=[Observation(source="env", observation=env.instructions)],
@@ -229,45 +229,45 @@ def test_reset(tmp_path):
         max_score=None,
         terminated=False,
         resolved=False,
-        rewrite_counter=0,
+        edit_counter=0,
         tools=[],
     )
 
 
-def test_rewrite_counter(env):
+def test_edit_counter(env):
     env_info = env.reset()
-    assert env.rewrite_counter == 0
-    rewrite_tool = Toolbox.get_tool("rewrite")
-    env.add_tool(rewrite_tool)
+    assert env.edit_counter == 0
+    edit_tool = Toolbox.get_tool("edit")
+    env.add_tool(edit_tool)
 
-    rewrite_call = ToolCall(id="rewrite_id", name="rewrite", arguments={})
-    env_info = env.step(rewrite_call, "let me rewrite the code")
-    assert env.rewrite_counter == 1
-    assert env_info.rewrite_counter == 1
-    rewrite_obs = Observation(
-        source="rewrite",
-        observation="Rewrite failed. Error message:\nFile path is None.\n",
+    edit_call = ToolCall(id="edit_id", name="edit", arguments={})
+    env_info = env.step(edit_call, "let me edit the code")
+    assert env.edit_counter == 1
+    assert env_info.edit_counter == 1
+    edit_obs = Observation(
+        source="edit",
+        observation="Edit failed. Error message:\nFile path is None.\n",
     )
-    assert env_info.step_observation == rewrite_obs
-    assert env_info.all_observations == [rewrite_obs]
+    assert env_info.step_observation == edit_obs
+    assert env_info.all_observations == [edit_obs]
 
-    rewrite_call = ToolCall(
-        id="rewrite_id",
-        name="rewrite",
+    edit_call = ToolCall(
+        id="edit_id",
+        name="edit",
         arguments={
             "path": "file1.txt",
             "new_code": "print('Hello')",
         },
     )
-    env_info = env.step(rewrite_call, "let me rewrite the file1.txt")
-    assert env.rewrite_counter == 2
-    assert env_info.rewrite_counter == 2
-    rewrite_obs = Observation(
-        source="rewrite",
+    env_info = env.step(edit_call, "let me edit the file1.txt")
+    assert env.edit_counter == 2
+    assert env_info.edit_counter == 2
+    edit_obs = Observation(
+        source="edit",
         observation="The file `file1.txt` has been updated successfully.\n\nDiff:\n\n--- original\n+++ current\n@@ -0,0 +1 @@\n+print('Hello')",
     )
-    assert env_info.step_observation == rewrite_obs
-    assert env_info.all_observations == [rewrite_obs]
+    assert env_info.step_observation == edit_obs
+    assert env_info.all_observations == [edit_obs]
     with open(env.working_dir / "file1.txt", "r") as f:
         assert f.read() == "print('Hello')"
 

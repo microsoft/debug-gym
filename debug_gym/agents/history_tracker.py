@@ -65,7 +65,7 @@ class HistoryTracker:
                 "content": None,
                 "action": None,  # env reset
                 "obs": self.env_initial_observation.step_observation.observation,
-                "rewrite_consumed": 0,
+                "edit_consumed": 0,
                 "prompt_response_pairs": None,
                 "system_message": self.system_message,
                 "problem_message": self.problem_message,
@@ -77,7 +77,7 @@ class HistoryTracker:
                 "reasoning": self.env_observations[game_step].action_reasoning,
                 "action": asdict(self.env_observations[game_step].action_tool_call),
                 "obs": self.env_observations[game_step].step_observation.observation,
-                "rewrite_consumed": self.env_observations[game_step].rewrite_counter,
+                "edit_consumed": self.env_observations[game_step].edit_counter,
             }
             # prompt_response_pairs could be empty for the initial state
             if self.llm_responses[game_step]:

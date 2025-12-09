@@ -16,7 +16,7 @@ base:
     # Agent configs
     random_seed: 42
     max_steps: 50
-    max_rewrite_steps: 10
+    max_edit_steps: 10
     memory_size: 20
     save_patch: True
     # Optionally loads a custom system prompt template from a file.
@@ -30,5 +30,5 @@ froggy_agent:
         - grep
         - pdb
         - view
-        - rewrite
+        - edit
         - eval

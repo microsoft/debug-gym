@@ -97,7 +97,7 @@ class MiniNightmareEnv(RepoEnv):
     def instructions(self) -> str:
         return (
             "The program doesn't behave as intended."
-            " Investigate the repository, figure out the root cause, then rewrite the code to fix the issue."
+            " Investigate the repository, figure out the root cause, then edit the code to fix the issue."
             " Beaware that the bug may not be in the code you initially see."
         )
 

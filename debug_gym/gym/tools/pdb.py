@@ -20,7 +20,7 @@ class PDBTool(EnvironmentTool):
     description = (
         "An interface to the Python debugger PDB. Send a command to the PDB terminal. The command should be a valid PDB command."
         + "\nWhen using the breakpoint command (e.g., 'b', 'break', 'cl', 'clear'), make sure you specify the file path and line number in the format `file_path:line_number`."
-        + "\nPDB sessions are restarted upon successful rewrite, or if the entrypoint changes. Breakpoints are persistent across PDB sessions and will be restored automatically."
+        + "\nPDB sessions are restarted after a successful edit, or if the entrypoint changes. Breakpoints are persistent across PDB sessions and will be restored automatically."
         + "\nExamples (for demonstration purposes only, you need to adjust the tool calling format according to your specific syntax):"
         + "\n".join(examples)
     )
@@ -146,7 +146,7 @@ class PDBTool(EnvironmentTool):
         obs = self.start_pdb(environment)
         return Observation(self.name, obs)
 
-    def on_rewrite_success(
+    def on_edit_success(
         self, environment, file, head, tail, length, **kwargs
     ) -> Observation:
         self.breakpoint_modify(environment, file, head, tail, length)
@@ -307,9 +307,9 @@ class PDBTool(EnvironmentTool):
         return list_output
 
     def breakpoint_modify(
-        self, environment, rewrite_file, rewrite_head, rewrite_tail, new_code_length
+        self, environment, edit_file, edit_head, edit_tail, new_code_length
     ):
-        # handle breakpoints line number changes caused by rewriting
+        # handle breakpoint line-number changes caused by editing
         # this is a wrapper that manages the self.breakpoints_state, which does not reset at each pseudo terminal start
         # self.breakpoints_state is a dict, the keys are "|||".join([file_path, str(line_number)]) and values are breakpoint_command
         if len(environment.current_breakpoints_state) == 0:
@@ -317,28 +317,26 @@ class PDBTool(EnvironmentTool):
         current_breakpoints_state_copy = copy.deepcopy(
             environment.current_breakpoints_state
         )
-        rewrite_file = environment.workspace.resolve_path(rewrite_file)
+        edit_file = environment.workspace.resolve_path(edit_file)
         for _key in environment.current_breakpoints_state.keys():
             _file_path, _line_number = _key.split("|||")
             _file_path = environment.workspace.resolve_path(_file_path)
-            if _file_path != rewrite_file:
+            if _file_path != edit_file:
                 # the breakpoints are not in the current file, no need to modify
                 continue
             _line_number = int(_line_number)
-            if rewrite_head is None:
-                # no line number is provided, rewrite the whole code
+            if edit_head is None:
+                # no line number is provided, edit the whole code
                 # we remove all breakpoints in the current file
                 del current_breakpoints_state_copy[_key]
             else:
-                # if a breakpoint was set in between the rewritten code, we need to remove it
-                if rewrite_head <= _line_number <= rewrite_tail:
+                # if a breakpoint was set within the edited section, remove it
+                if edit_head <= _line_number <= edit_tail:
                     del current_breakpoints_state_copy[_key]
-                # if a breakpoint was set after the rewritten code, we need to move it
-                elif _line_number > rewrite_tail:
+                # if a breakpoint was set after the edited section, adjust its line number
+                elif _line_number > edit_tail:
                     new_line_number = (
-                        _line_number
-                        + new_code_length
-                        - (rewrite_tail - rewrite_head + 1)
+                        _line_number + new_code_length - (edit_tail - edit_head + 1)
                     )
                     new_key = "|||".join([str(_file_path), str(new_line_number)])
                     _new_value = environment.current_breakpoints_state[_key].split(":")
@@ -349,7 +347,7 @@ class PDBTool(EnvironmentTool):
                         _new_value
                     ).strip()
                     del current_breakpoints_state_copy[_key]
-                # if a breakpoint was set before the rewritten code, we don't need to do anything
+                # breakpoints before the edited section remain unchanged
                 else:
                     pass
         environment.current_breakpoints_state = current_breakpoints_state_copy

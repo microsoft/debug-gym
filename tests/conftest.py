@@ -145,7 +145,7 @@ def build_env_info():
         max_score=10,
         terminated=False,
         resolved=False,
-        rewrite_counter=0,
+        edit_counter=0,
         tools=[],
     ):
         return EnvInfo(
@@ -161,7 +161,7 @@ def build_env_info():
             max_score=max_score,
             terminated=terminated,
             resolved=resolved,
-            rewrite_counter=rewrite_counter,
+            edit_counter=edit_counter,
             tools=tools if tools is not None else [],
         )
 

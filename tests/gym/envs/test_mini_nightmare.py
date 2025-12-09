@@ -35,7 +35,7 @@ def test_build_docker_image(mock_build_docker_image):
 def test_instructions(mini_nightmare_env):
     expected_instructions = (
         "The program doesn't behave as intended."
-        " Investigate the repository, figure out the root cause, then rewrite the code to fix the issue."
+        " Investigate the repository, figure out the root cause, then edit the code to fix the issue."
         " Beaware that the bug may not be in the code you initially see."
     )
     assert mini_nightmare_env.instructions == expected_instructions

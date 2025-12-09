@@ -7,32 +7,32 @@ from debug_gym.gym.workspace import WorkspaceReadError
 
 
 @Toolbox.register()
-class RewriteTool(EnvironmentTool):
-    name = "rewrite"
+class EditTool(EnvironmentTool):
+    name = "edit"
     examples = [
-        """rewrite(path="code/utils.py", start=None, end=None, new_code="print('hola')") will rewrite the specified file 'code/utils.py' (the entire code) to be print('hola'), because no line number is provided.""",
-        """rewrite(path="code/utils.py", start=10, end=None, new_code="    print('bonjour')") will rewite line number 10 of the specified file 'code/utils.py' to be print('bonjour'), with the indents ahead (in this case, 4 spaces).""",
-        """rewrite(path="code/utils.py", start=10, end=20, new_code="    print('hello')\\n    print('hi again')") will replace the chunk of code between line number 10 and 20 in the specified file 'code/utils.py' by the two lines provided, both with indents ahead (in this case, 4 spaces).""",
-        """rewrite(path='code/utils.py', start=4, end=6, new_code="        print('buongiorno')") will replace the chunk of code between line number 4 and 6 in the specified file 'code/utils.py' by the single line provided, with the indent ahead (in this case, 8 spaces).""",
-        """rewrite(path='code/utils.py', is_new_file=True, new_code="print('greetings')") will generate a new file at the specified path 'code/utils.py' with the content print('greetings').""",
+        """edit(path=\"code/utils.py\", start=None, end=None, new_code=\"print('hola')\") will edit the specified file 'code/utils.py' (the entire code) to be print('hola'), because no line number is provided.""",
+        """edit(path=\"code/utils.py\", start=10, end=None, new_code=\"    print('bonjour')\") will edit line number 10 of the specified file 'code/utils.py' to be print('bonjour'), with the indents ahead (in this case, 4 spaces).""",
+        """edit(path=\"code/utils.py\", start=10, end=20, new_code=\"    print('hello')\\n    print('hi again')\") will replace the chunk of code between line number 10 and 20 in the specified file 'code/utils.py' by the two lines provided, both with indents ahead (in this case, 4 spaces).""",
+        """edit(path='code/utils.py', start=4, end=6, new_code=\"        print('buongiorno')\") will replace the chunk of code between line number 4 and 6 in the specified file 'code/utils.py' by the single line provided, with the indent ahead (in this case, 8 spaces).""",
+        """edit(path='code/utils.py', is_new_file=True, new_code=\"print('greetings')\") will generate a new file at the specified path 'code/utils.py' with the content print('greetings').""",
     ]
     description = (
-        "Rewrite the content of the specified file path, between lines [start, end], with the new code. Line numbers are 1-based. When start is provided and end is None, it's assumed to rewrite a single line (start). When both start and end are None, it's assumed to rewrite the whole file, this is not recommended because most of the time the expected edit is local. When is_new_file is True, a new file will be created at the specified path with the new code. The new code should be valid python code include proper indentation (can be determined from context)."
+        "Edit the content of the specified file path, between lines [start, end], with the new code. Line numbers are 1-based. When start is provided and end is None, it's assumed to edit a single line (start). When both start and end are None, it's assumed to edit the whole file, this is not recommended because most of the time the expected change is local. When is_new_file is True, a new file will be created at the specified path with the new code. The new code should be valid python code include proper indentation (can be determined from context)."
         + "\nExamples (for demonstration purposes only, you need to adjust the tool calling format according to your specific syntax):"
         + "\n".join(examples)
     )
     arguments = {
         "path": {
             "type": ["string"],
-            "description": "A file path to be rewritten.",
+            "description": "A file path to be edited.",
         },
         "start": {
             "type": ["number", "null"],
-            "description": "The starting line number to be rewritten. If None, the whole file will be rewritten.",
+            "description": "The starting line number to be edited. If None, the whole file will be edited.",
         },
         "end": {
             "type": ["number", "null"],
-            "description": "The ending line number to be rewritten. If None, end is the same as start.",
+            "description": "The ending line number to be edited. If None, end is the same as start.",
         },
         "is_new_file": {
             "type": ["boolean", "null"],
@@ -47,7 +47,7 @@ class RewriteTool(EnvironmentTool):
     def _overwrite_file(self, environment, filepath: str, content: str):
         environment.workspace.write_file(filepath, content)
 
-    def _rewrite_file(
+    def _edit_file(
         self, environment, file_path, start, end, new_code, is_new_file=False
     ):
         raise_on_nonexistent_file = not is_new_file
@@ -64,16 +64,16 @@ class RewriteTool(EnvironmentTool):
         new_code_length = len(new_code_lines)
 
         if start is None or is_new_file:
-            # no line number is provided, rewrite the whole code
+            # no line number is provided, edit the whole code
             self._overwrite_file(environment, filepath=file_path, content=new_code)
         else:
-            # rewrite the code given the provided line numbers
+            # edit the code given the provided line numbers
             full_code_lines = original_content.split("\n")
             if start >= len(full_code_lines):
                 # if start exceeds the number of lines in the file, append the new code to the end of the file
                 full_code_lines.extend(new_code_lines)
             else:
-                # rewrite the code
+                # edit the code
                 full_code_lines[start : end + 1] = new_code_lines  # list
             self._overwrite_file(
                 environment, filepath=file_path, content="\n".join(full_code_lines)
@@ -93,11 +93,11 @@ class RewriteTool(EnvironmentTool):
         return diff, new_code_length
 
     def fail(self, environment, message: str) -> Observation:
-        self.rewrite_success = False
-        message = f"Rewrite failed. Error message:\n{message}\n"
+        self.edit_success = False
+        message = f"Edit failed. Error message:\n{message}\n"
         self.queue_event(
             environment=environment,
-            event=Event.REWRITE_FAIL,
+            event=Event.EDIT_FAIL,
             message=message,
         )
         return Observation(self.name, message)
@@ -111,7 +111,7 @@ class RewriteTool(EnvironmentTool):
         is_new_file: bool = False,
         new_code: str = "",
     ) -> Observation:
-        self.rewrite_success = False
+        self.edit_success = False
         if path is None:
             return self.fail(environment, "File path is None.")
 
@@ -135,7 +135,7 @@ class RewriteTool(EnvironmentTool):
                 return self.fail(environment, f"`{path}` is not editable.")
 
         if start is not None:
-            end = end or start  # only start is provided (rewrite that line)
+            end = end or start  # only start is provided (edit that line)
             if start > end:
                 return self.fail(
                     environment,
@@ -147,18 +147,18 @@ class RewriteTool(EnvironmentTool):
                 )
             start, end = start - 1, end - 1  # 1-based to 0-based
         try:
-            diff, new_code_length = self._rewrite_file(
+            diff, new_code_length = self._edit_file(
                 environment, path, start, end, new_code, is_new_file=is_new_file
             )
         except Exception as e:
             return self.fail(environment, str(e))
 
-        self.rewrite_success = True
+        self.edit_success = True
         message = f"The file `{path}` has been updated successfully.\n\nDiff:\n\n{diff}"
 
         self.queue_event(
             environment=environment,
-            event=Event.REWRITE_SUCCESS,
+            event=Event.EDIT_SUCCESS,
             message=message,
             file=path,
             # converting head/tail back to 1-based index for breakpoint management
