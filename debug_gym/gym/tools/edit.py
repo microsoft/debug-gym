@@ -41,11 +41,13 @@ class EditTool(EnvironmentTool):
     }
 
     def _overwrite_file(self, environment, filepath: str, content: str):
+        """Persist the new content to disk using the workspace abstraction."""
         environment.workspace.write_file(filepath, content)
 
     def _edit_file(
         self, environment, file_path, start, end, new_code, file_exists: bool
     ):
+        """Apply the requested edit and return the diff plus line count of the new code."""
         try:
             original_content = (
                 environment.workspace.read_file(file_path) if file_exists else ""
@@ -86,6 +88,7 @@ class EditTool(EnvironmentTool):
         return diff, new_code_length
 
     def fail(self, environment, message: str) -> Observation:
+        """Report the failed edit and emit the corresponding event."""
         self.edit_success = False
         message = f"Edit failed. Error message:\n{message}\n"
         self.queue_event(
@@ -103,10 +106,11 @@ class EditTool(EnvironmentTool):
         end: int = None,
         new_code: str = "",
     ) -> Observation:
+        """Main entrypoint used by LLM tool calls to edit or create files."""
         self.edit_success = False
         if path is None:
             return self.fail(environment, "File path is None.")
-
+        # Resolve the target path to ensure it exists within the workspace and is not ignored.
         try:
             resolved_path = environment.workspace.resolve_path(path, raises="ignore")
         except FileNotFoundError as exc:
