@@ -108,15 +108,6 @@ def load_config():
     with open(args.config_file) as reader:
         config = yaml.safe_load(reader)
 
-    # Parse overriden params.
-    for param in args.params:
-        fqn_key, value = param.split("=")
-        entry_to_change = config
-        keys = fqn_key.split(".")
-        for k in keys[:-1]:
-            entry_to_change = entry_to_change[k]
-        entry_to_change[keys[-1]] = yaml.safe_load(value)
-
     available_agents = [item for item in list(config.keys()) if item != "base"]
 
     if not args.agent:
@@ -130,13 +121,24 @@ def load_config():
     if "base" in config:
         # base config is specified (shared across agents)
         return_config = config["base"]
-        agent_specific_config = config[args.agent]
-        for key in agent_specific_config:
-            # override base config with agent specific config
-            return_config[key] = agent_specific_config[key]
+        # Override base config with agent specific config
+        for key, value in config[args.agent].items():
+            return_config[key] = value
     else:
         # base config is not specified
         return_config = config[args.agent]
+
+    # Parse overriden params.
+    for param in args.params:
+        fqn_key, value = param.split("=")
+        entry_to_change = return_config
+        keys = fqn_key.split(".")
+        for k in keys[:-1]:
+            if k not in entry_to_change:
+                entry_to_change[k] = {}
+
+            entry_to_change = entry_to_change[k]
+        entry_to_change[keys[-1]] = yaml.safe_load(value)
 
     # assume agent type is the key if not specified by the user
     if not return_config.get("agent_type"):
@@ -155,10 +157,10 @@ def save_patch(env, problem_path: Path, logger: DebugGymLogger):
     logger.debug(f"Patch saved in {patch_path}")
 
 
-def save_trajectory(agent, problem: str, problem_path: Path, logger: DebugGymLogger):
+def save_trajectory(agent, problem_path: Path, logger: DebugGymLogger):
     """Persist the agent trajectory to disk."""
     problem_path.mkdir(parents=True, exist_ok=True)
-    trajectory = agent.build_trajectory(task_name=problem)
+    trajectory = agent._build_trajectory()
     json_file = problem_path / "trajectory.json"
     with open(json_file, "w") as f:
         json.dump(trajectory, f, indent=4)

@@ -1,6 +1,3 @@
-from pathlib import Path
-from unittest.mock import MagicMock, patch
-
 import pyarrow as pa
 import pyarrow.parquet as pq
 import pytest
@@ -8,7 +5,6 @@ import pytest
 from debug_gym.agents.solution_agent import AgentSolution
 from debug_gym.gym.entities import Observation
 from debug_gym.gym.envs.r2egym import R2EGymEnv
-from debug_gym.gym.terminals.docker import DockerTerminal
 from debug_gym.gym.tools.tool import ToolCall
 from debug_gym.gym.tools.toolbox import Toolbox
 
@@ -16,14 +12,20 @@ from debug_gym.gym.tools.toolbox import Toolbox
 @pytest.if_docker_running
 def test_load_dataset(get_r2egym_env):
     env = get_r2egym_env()
-    assert env.dataset_id == "R2E-Gym/R2E-Gym-Lite"
-    # check if the dataset contains features that R2EGymEnv expects
-    assert sorted(env.ds.features.keys()) == sorted(
+
+    task_name = "aiohttp_final:d7cd0613472fd4d9940e37f1c55921f6a1515324"
+    dataset = env.load_dataset(problems=[task_name])
+    assert task_name in dataset
+
+    task_data = next(iter(dataset.values()))
+    assert sorted(task_data.keys()) == sorted(
         [
             "commit_hash",
+            "env_type",
             "docker_image",
             "execution_result_content",
             "expected_output_json",
+            "instance_id",
             "modified_entity_summaries",
             "modified_files",
             "num_non_test_files",
@@ -38,20 +40,15 @@ def test_load_dataset(get_r2egym_env):
     )
 
 
-@patch("docker.from_env")
-def test_load_dataset_from_parquet(mock_docker_from_env, tmp_path):
+def test_load_dataset_from_parquet(tmp_path):
     """Test loading R2EGym dataset from a local Parquet file."""
-    # Mock Docker client to avoid trying to pull images
-    mock_docker_client = MagicMock()
-    mock_docker_client.images.list.return_value = []
-    mock_docker_from_env.return_value = mock_docker_client
 
     # Create a minimal test Parquet file with expected schema
     parquet_file = tmp_path / "test_dataset.parquet"
-
+    docker_image = "test_repo:test_hash_123"
     data = {
         "commit_hash": ["test_hash_123"],
-        "docker_image": ["test_repo:test_hash_123"],
+        "docker_image": [docker_image],
         "execution_result_content": ["test execution result"],
         "expected_output_json": ['{"test": "output"}'],
         "modified_entity_summaries": ["test summaries"],
@@ -69,19 +66,19 @@ def test_load_dataset_from_parquet(mock_docker_from_env, tmp_path):
     table = pa.table(data)
     pq.write_table(table, str(parquet_file))
 
-    # Mock the terminal to avoid actual Docker operations
-    mock_terminal = MagicMock(spec=DockerTerminal)
-
     # Load the dataset from the Parquet file
-    env = R2EGymEnv(dataset_id=str(parquet_file), split="train", terminal=mock_terminal)
+    dataset = R2EGymEnv.load_dataset(dataset_id=str(parquet_file), split="train")
+    dataset_entry = next(iter(dataset.values()))
 
     # Verify the dataset contains the expected features
-    assert sorted(env.ds.features.keys()) == sorted(
+    assert sorted(dataset_entry) == sorted(
         [
             "commit_hash",
+            "env_type",
             "docker_image",
             "execution_result_content",
             "expected_output_json",
+            "instance_id",
             "modified_entity_summaries",
             "modified_files",
             "num_non_test_files",
@@ -96,26 +93,26 @@ def test_load_dataset_from_parquet(mock_docker_from_env, tmp_path):
     )
 
     # Verify the dataset has the expected data
-    assert len(env.ds) == 1
-    assert env.ds[0]["docker_image"] == "test_repo:test_hash_123"
-    assert env.ds[0]["commit_hash"] == "test_hash_123"
-    assert "Test problem statement" in env.ds[0]["problem_statement"]
+    assert len(dataset) == 1
+    task_name = docker_image  # For R2EGym, we use docker_image as instance_id
+    assert docker_image in dataset
+    assert dataset[task_name]["docker_image"] == "test_repo:test_hash_123"
+    assert dataset[task_name]["commit_hash"] == "test_hash_123"
+    assert "Test problem statement" in dataset[task_name]["problem_statement"]
 
 
 @pytest.if_docker_running
 def test_instructions(get_r2egym_env):
     env = get_r2egym_env()
-    env.setup_task("aiohttp_final:d7cd0613472fd4d9940e37f1c55921f6a1515324")
     # Instructions might be wrapped by [ISSUE] [/ISSUE]
-    assert env.instructions in env.ds_row["problem_statement"]
+    assert env.instructions in env.task_data["problem_statement"]
 
 
 @pytest.if_docker_running
 def test_setup_task(get_r2egym_env):
     env = get_r2egym_env()
-    task_name = "aiohttp_final:d7cd0613472fd4d9940e37f1c55921f6a1515324"
-    env.setup_task(task_name)
-    assert env.task_name == task_name
+    assert env.task_name == "aiohttp_final:d7cd0613472fd4d9940e37f1c55921f6a1515324"
+    env.setup_task()
     assert (
         env.base_image
         == "namanjain12/aiohttp_final:d7cd0613472fd4d9940e37f1c55921f6a1515324"
@@ -128,8 +125,7 @@ def test_setup_task(get_r2egym_env):
 @pytest.if_docker_running
 def test_setup_terminal(get_r2egym_env):
     env = get_r2egym_env()
-    task_name = "aiohttp_final:d7cd0613472fd4d9940e37f1c55921f6a1515324"
-    env.reset(options={"task_name": task_name})
+    env.reset()
     _, output = env.terminal.run(f"ls -a")
     assert ".git" in output
     assert "r2e_tests" in output
@@ -140,9 +136,7 @@ def test_setup_terminal(get_r2egym_env):
 def test_reset_and_step(get_r2egym_env):
     env = get_r2egym_env()
     env.add_tool(Toolbox.get_tool("eval"))
-    env_info = env.reset(
-        options={"task_name": "aiohttp_final:d7cd0613472fd4d9940e37f1c55921f6a1515324"}
-    )
+    env_info = env.reset()
 
     assert env.instructions == env_info.step_observation.observation
     assert "short test summary info" in env_info.eval_observation.observation
@@ -166,7 +160,6 @@ def test_reset_and_step(get_r2egym_env):
     env_info = env.step(tool_call)
     assert env_info.step_observation.source == "listdir"
     # Verify we can see the tldextract directory structure
-    observation = env_info.step_observation.observation
     listdir_start = f"""{env.working_dir}/
 |-- CHANGES/
 |-- CHANGES.rst
@@ -197,9 +190,7 @@ def test_reset_and_step(get_r2egym_env):
 @pytest.if_docker_running
 def test_readonly_file(get_r2egym_env):
     env = get_r2egym_env()
-    env_info = env.reset(
-        options={"task_name": "aiohttp_final:d7cd0613472fd4d9940e37f1c55921f6a1515324"}
-    )
+    env_info = env.reset()
     assert env.workspace._is_readonly_func("/testbed/r2e_tests/test_1.py")
 
     env.add_tool(Toolbox.get_tool("view"))
@@ -229,10 +220,7 @@ def test_readonly_file(get_r2egym_env):
 def test_apply_gold_patch(get_r2egym_env):
     env = get_r2egym_env()
     env.add_tool(Toolbox.get_tool("eval"))
-    env_info = env.reset(
-        options={"task_name": "aiohttp_final:d7cd0613472fd4d9940e37f1c55921f6a1515324"}
-    )
-
+    env_info = env.reset()
     assert not env_info.terminated
     assert not env_info.resolved
     assert env_info.score == env.score == 0
@@ -247,19 +235,17 @@ def test_apply_gold_patch(get_r2egym_env):
 def test_running_solution_agent(get_r2egym_env, tmp_path):
     """End-to-end SolutionAgent run for R2E-Gym environment, asserting successful resolution after gold patch."""
     env = get_r2egym_env()
-    task_name = "aiohttp_final:d7cd0613472fd4d9940e37f1c55921f6a1515324"
     config = {
         "output_path": str(tmp_path),
         "random_seed": 0,
         "memory_size": 8,
         "max_steps": 1,
         "max_rewrite_steps": 1,
-        "env_kwargs": {},
     }
     for tool_name in ["pdb", "eval", "submit"]:
         env.add_tool(Toolbox.get_tool(tool_name))
     agent = AgentSolution(agent_args=config, llm=None, logger=env.logger)
-    env.reset(options={"task_name": task_name})
+    env.reset()
     success = agent.run(env)
     assert success
 
@@ -268,9 +254,7 @@ def test_running_solution_agent(get_r2egym_env, tmp_path):
 def test_debug_entrypoint_contains_pdb(get_r2egym_env):
     """Ensure the environment's debug_entrypoint includes '-m pdb' for interactive debugging."""
     env = get_r2egym_env()
-    env.reset(
-        options={"task_name": "aiohttp_final:d7cd0613472fd4d9940e37f1c55921f6a1515324"}
-    )
+    env.reset()
     assert (
         "python -m pdb" in env.debug_entrypoint
     ), f"Expected '-m pdb' in debug_entrypoint, got: {env.debug_entrypoint}"

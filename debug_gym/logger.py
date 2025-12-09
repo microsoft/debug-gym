@@ -16,7 +16,14 @@ from rich.logging import RichHandler
 from rich.markup import escape
 from rich.padding import Padding
 from rich.panel import Panel
-from rich.progress import BarColumn, Progress, SpinnerColumn, Task, TextColumn
+from rich.progress import (
+    BarColumn,
+    Progress,
+    SpinnerColumn,
+    Task,
+    TextColumn,
+    TimeElapsedColumn,
+)
 from rich.table import Table
 from rich.text import Text
 
@@ -205,6 +212,7 @@ class TaskProgressManager:
             ScoreColumn(),
             BarColumn(bar_width=None),
             TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+            TimeElapsedColumn(),
             expand=True,
         )
         self._tasks_panel = Panel(
@@ -307,20 +315,26 @@ class TaskProgressManager:
 
     def _visible_tasks(self) -> Dict[str, Dict[str, Any]]:
         """Get visible tasks limited to the maximum display count,
-        showing pending/running tasks first, then completed tasks.
+        showing running tasks first, then pending, then failed ones, then completed tasks.
 
         Returns a dictionary mapping task IDs to their corresponding
         task data for visible tasks only."""
-        # Get task IDs for pending, then completed tasks
+        # Get task IDs for running, pending, failed, and completed tasks
+        running = []
         pending = []
+        failed = []
         completed = []
         for tid, task in self._tasks.items():
-            if task.completed:
-                completed.append(tid)
-            else:
+            if task.status == "running":
+                running.append(tid)
+            elif task.status == "pending":
                 pending.append(tid)
-        # Limit to max_display tasks, showing pending first
-        visible_task_ids = (pending + completed)[: self.max_display]
+            elif task.status in ("error", "unresolved"):
+                failed.append(tid)
+            elif task.completed:
+                completed.append(tid)
+        # Limit to max_display tasks, showing running first, then pending, then failed, then completed
+        visible_task_ids = (running + pending + failed + completed)[: self.max_display]
         # Return the actual task data for the visible tasks
         return {tid: self._tasks[tid] for tid in visible_task_ids}
 
@@ -377,6 +391,7 @@ class OverallProgressContext:
             TextColumn("[progress.description]{task.description}"),
             BarColumn(bar_width=None),
             TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+            TimeElapsedColumn(),
             expand=True,
         )
         self.total = len(problems)
@@ -505,6 +520,7 @@ class DebugGymLogger(logging.Logger):
     LOG_QUEUE = mp.Queue(maxsize=10000)
     PROGRESS_QUEUE = mp.Queue(maxsize=50000)  # Increased from 10000 to 50000
     _is_worker = False
+    _main_process_logger = None
 
     @classmethod
     def is_worker(cls):
@@ -540,7 +556,9 @@ class DebugGymLogger(logging.Logger):
         # Prevent the log messages from being propagated to the root logger
         self.propagate = False
 
-        self.setLevel(level)  # Set logger level, might be overridden by file handler
+        super().setLevel(level)  # Set initial logger level
+        if DebugGymLogger._main_process_logger is not None:
+            self._is_worker = True
 
         # Placeholders for rich live, log listener thread, and stop event
         # Will be initialized if the logger is the main process logger
@@ -548,8 +566,11 @@ class DebugGymLogger(logging.Logger):
         self.no_live = False  # Flag to disable live updates
         self._log_listener_stop_event = None  # Event to stop the log listener thread
         self._log_listener_thread = None  # Thread to process logs from workers
+        self._rich_handler = None  # Handler for Rich console output
         if self.is_main():
             self._initialize_main_logger(level)
+            DebugGymLogger._main_process_logger = self
+
         self.log_file = None  # File handler for logging to a file
         self.log_dir = Path(log_dir) if log_dir else None
         if self.log_dir:  # Directory to store log files
@@ -559,15 +580,17 @@ class DebugGymLogger(logging.Logger):
 
     def _initialize_main_logger(self, level):
         self._live = Live(transient=True, refresh_per_second=2)
-        rich_handler = RichHandler(
+        self._rich_handler = RichHandler(
             console=self._live.console,
             show_time=False,
             rich_tracebacks=True,
             markup=False,
         )
-        rich_handler.setFormatter(logging.Formatter("🐸 [%(name)-12s]: %(message)s"))
-        rich_handler.setLevel(level)
-        self.addHandler(rich_handler)
+        self._rich_handler.setFormatter(
+            logging.Formatter("🐸 [%(name)-12s]: %(message)s")
+        )
+        self._rich_handler.setLevel(level)
+        self.addHandler(self._rich_handler)
 
         # Start log listener thread
         self._log_listener_stop_event = threading.Event()
@@ -577,7 +600,7 @@ class DebugGymLogger(logging.Logger):
         self._log_listener_thread.start()
 
     def _initialize_file_handler(self, name: str, mode: str):
-        self.setLevel(logging.DEBUG)  # Ensure logger operates at DEBUG level
+        super().setLevel(logging.DEBUG)  # Ensure logger operates at DEBUG level
         self.log_file = log_file_path(self.log_dir, "debug_gym")
         fh = logging.FileHandler(self.log_file, mode=mode)
         formatter = StripAnsiFormatter("%(asctime)s %(levelname)-8s %(message)s")
@@ -617,6 +640,24 @@ class DebugGymLogger(logging.Logger):
 
     def __del__(self):
         self.close()
+
+    def setLevel(self, level: int | str) -> None:
+        """Set the logging level for console output.
+
+        When a file handler is configured, the logger's internal level remains at
+        DEBUG to ensure all messages are saved to the log file. This method only
+        changes the level of the rich_handler (console output), allowing users to
+        control what is displayed to stdout without affecting the file logs.
+
+        Args:
+            level: The logging level to set. Can be an integer (e.g., logging.INFO,
+                logging.DEBUG) or a string (e.g., 'INFO', 'DEBUG').
+        """
+        if self._rich_handler is not None:
+            self._rich_handler.setLevel(level)
+        else:
+            # Fallback for when rich_handler is not initialized (e.g., worker process)
+            super().setLevel(level)
 
     def set_no_live(self):
         """Set the logger to not use the Rich Live display."""

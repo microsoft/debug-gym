@@ -1,10 +1,6 @@
-import os
-import tempfile
-from pathlib import Path
-
 import pytest
 
-from debug_gym.gym.envs.env import RepoEnv
+from debug_gym.gym.envs.local import LocalEnv
 from debug_gym.gym.tools.grep import GrepTool
 
 
@@ -35,7 +31,7 @@ def hello_world():
 class TestClass:
     def __init__(self):
         self.value = 42
-        
+
     def method_with_bug(self):
         # TODO: Fix this bug
         return self.value / 0  # This will cause a division by zero error
@@ -62,7 +58,7 @@ def load_config(filename):
 class EmailValidator:
     def __init__(self):
         self.pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
-    
+
     def validate(self, email):
         return re.match(self.pattern, email) is not None
 """
@@ -209,7 +205,7 @@ def setup_grep_repo_env(setup_grep_test_repo):
             with (test_repo / ".debugreadonly").open("w") as f:
                 f.write("\n".join(readonly_patterns))
 
-        env = RepoEnv(path=str(test_repo))
+        env = LocalEnv(path=str(test_repo))
         grep_tool = GrepTool()
         env.reset()
         return grep_tool, env

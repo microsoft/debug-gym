@@ -37,6 +37,9 @@ def _clean_for_kubernetes(name: str) -> str:
     # replace any characters not in the regex with hyphens
     cleaned = "".join(c if c.isalnum() or c in "-." else "-" for c in name).lower()
     # ensure it starts and ends with alphanumeric character
+    cleaned = cleaned.replace("/", "-")
+    cleaned = cleaned.replace(":", "-")
+    cleaned = cleaned.replace(".", "-")
     cleaned = cleaned.strip("-").strip(".")
     # truncate to 253 characters
     return cleaned[:253]
@@ -361,6 +364,9 @@ class Pod:
 
 
 class KubernetesTerminal(Terminal):
+    """
+    Note: reads values of env variables K8S_NAMESPACE, K8S_DOCKER_SECRET, K8S_DOCKER_CONSTRAINT.
+    """
 
     def __init__(
         self,
@@ -372,8 +378,9 @@ class KubernetesTerminal(Terminal):
         setup_commands: list[str] | None = None,
         pod_name: str | None = None,
         base_image: str | None = None,
-        registry: str = "",
-        namespace: str = "default",
+        image_pull_secret: str | None = None,
+        registry: str = "docker.io",
+        namespace: str | None = None,
         kube_config: str | None = None,
         kube_context: str | None = None,
         extra_labels: dict | None = None,
@@ -394,7 +401,11 @@ class KubernetesTerminal(Terminal):
         self.base_image = base_image
         self._task_name = base_image
         self.setup_commands = setup_commands or []
-        self.namespace = namespace
+        self.namespace = namespace or os.environ.get("K8S_NAMESPACE", "default")
+        self.image_pull_secret = image_pull_secret or os.environ.get(
+            "K8S_DOCKER_SECRET"
+        )
+        self.in_node_constraint = os.environ.get("K8S_IN_NODE_CONSTRAINT", False)
         self.kubernetes_kwargs = kwargs  # e.g., nodeSelector, tolerations
         self.registry = registry.rstrip("/") + "/" if registry else ""
         self._pod_name = pod_name
@@ -607,12 +618,36 @@ class KubernetesTerminal(Terminal):
         for attempt in range(max_retries):
             # Generate a new pod name for each attempt to avoid sandbox conflicts
             pod_name = _clean_for_kubernetes(
-                self._pod_name or f"dbg-gym.{self.task_name}.{str(uuid.uuid4())[:8]}"
+                self._pod_name or f"dbg-gym-{self.task_name}-{str(uuid.uuid4())[:8]}"
             )
             self.logger.debug(
                 f"Setting up pod {pod_name} (attempt {attempt + 1}/{max_retries}) "
                 f"with image: {self.registry}{self.base_image}"
             )
+
+            # set image pull secrets, don't override imagePullSecrets
+            if self.image_pull_secret and not "imagePullSecrets" in pod_spec_kwargs:
+                pod_spec_kwargs["imagePullSecrets"] = [{"name": self.image_pull_secret}]
+
+            # set in node constraint, don't override affinity
+            if self.in_node_constraint and not "affinity" in pod_spec_kwargs:
+                pod_spec_kwargs["affinity"] = {
+                    "nodeAffinity": {
+                        "requiredDuringSchedulingIgnoredDuringExecution": {
+                            "nodeSelectorTerms": [
+                                {
+                                    "matchExpressions": [
+                                        {
+                                            "key": "kubernetes.io/hostname",
+                                            "operator": "In",
+                                            "values": [os.environ["HOSTNAME"]],
+                                        }
+                                    ]
+                                }
+                            ]
+                        }
+                    }
+                }
 
             # Create pod specification for Kubernetes.
             pod_body = {
