@@ -24,7 +24,10 @@ class FroggyAgent(BaseAgent):
 
     def should_stop(self, step: int, info: EnvInfo):
         should_stop, reason = super().should_stop(step, info)
-        if info.rewrite_counter > self.args.max_rewrite_steps:
+        if (
+            self.args.max_rewrite_steps >= 0
+            and info.rewrite_counter > self.args.max_rewrite_steps
+        ):
             should_stop = True
             reason = "max_rewrite_steps reached"
         return should_stop, reason

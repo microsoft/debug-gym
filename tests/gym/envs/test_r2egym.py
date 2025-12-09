@@ -238,7 +238,6 @@ def test_running_solution_agent(get_r2egym_env, tmp_path):
     config = {
         "output_path": str(tmp_path),
         "random_seed": 0,
-        "memory_size": 8,
         "max_steps": 1,
         "max_rewrite_steps": 1,
     }
