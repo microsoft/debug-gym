@@ -237,7 +237,6 @@ def test_apply_gold_patch(get_swe_bench_env):
 @pytest.if_docker_running
 def test_running_solution_agent(get_swe_bench_env, tmp_path):
     env = get_swe_bench_env()
-    # AgentArgs requires at least random_seed, max_steps, and max_rewrite_steps.
     # Provide a minimal agent config for the SolutionAgent run.
     config = {
         "output_path": str(tmp_path),
@@ -279,7 +278,6 @@ def test_setup_terminal_debug_mode(get_swe_bench_debug_env):
 @pytest.if_docker_running
 def test_running_solution_agent_in_debug_mode(get_swe_bench_debug_env, tmp_path):
     env = get_swe_bench_debug_env()
-    # AgentArgs requires at least random_seed, max_steps, and max_rewrite_steps.
     # Provide a minimal agent config for the SolutionAgent run.
     config = {
         "output_path": str(tmp_path),
