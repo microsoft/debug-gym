@@ -1,0 +1,197 @@
+name: "Tests from Pypi"
+
+on:
+  workflow_run:
+    workflows: ["PyPI Release"]
+    types:
+      - completed
+  schedule:
+    - cron: '30 8 * * *'
+  workflow_dispatch:
+
+jobs:
+  get-latest-release:
+    name: "Get Latest Release"
+    runs-on: ubuntu-latest
+    outputs:
+      release-tag: ${{ steps.get-release.outputs.result }}
+    steps:
+      - name: Get latest release (including pre-releases)
+        id: get-release
+        uses: actions/github-script@v7
+        with:
+          script: |
+            // Get all releases including pre-releases, sorted by creation date (most recent first)
+            const { data: releases } = await github.rest.repos.listReleases({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              per_page: 100
+            });
+
+            if (releases.length === 0) {
+              throw new Error('No releases found');
+            }
+
+            // The first release is the most recent (including pre-releases)
+            const latestRelease = releases[0];
+            const releaseType = latestRelease.prerelease ? 'pre-release' : 'stable release';
+            console.log(`Latest ${releaseType}: ${latestRelease.tag_name}`);
+            console.log(`Published at: ${latestRelease.published_at}`);
+
+            return latestRelease.tag_name;
+          result-encoding: string
+
+  test-swebench:
+    name: "Testing SWE-Bench"
+    needs: get-latest-release
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [ "python" ]
+        os: [ubuntu-latest]
+
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/test-if-changes
+        with:
+          name: swebench
+          test-files: "tests/gym/envs/test_swe_bench.py"
+          version: ${{ needs.get-latest-release.outputs.release-tag }}
+          changed-files: |
+            debug_gym/gym/envs/swe_bench.py
+            tests/gym/envs/test_swe_bench.py
+
+  test-swesmith:
+    name: "Testing SWE-Smith"
+    needs: get-latest-release
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [ "python" ]
+        os: [ubuntu-latest]
+
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/test-if-changes
+        with:
+          name: swesmith
+          test-files: "tests/gym/envs/test_swe_smith.py"
+          version: ${{ needs.get-latest-release.outputs.release-tag }}
+          changed-files: |
+            debug_gym/gym/envs/swe_smith.py
+            tests/gym/envs/test_swe_smith.py
+
+  test-r2egym:
+    name: "Testing R2E-Gym"
+    needs: get-latest-release
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [ "python" ]
+        os: [ubuntu-latest]
+
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/test-if-changes
+        with:
+          name: r2egym
+          test-files: "tests/gym/envs/test_r2egym.py"
+          version: ${{ needs.get-latest-release.outputs.release-tag }}
+          changed-files: |
+            debug_gym/gym/envs/r2egym.py
+            tests/gym/envs/test_r2egym.py
+
+  test-kubernetes:
+    name: "Testing Kubernetes"
+    needs: get-latest-release
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [ "python" ]
+        os: [ubuntu-latest]
+
+    steps:
+      - uses: actions/checkout@v5
+      - name: start minikube
+        id: minikube
+        uses: medyagh/setup-minikube@latest
+      - name: kubectl
+        run: kubectl get pods -A
+      - uses: ./.github/actions/test-if-changes
+        with:
+          name: kubernetes
+          test-files: "tests/gym/terminals/test_kubernetes.py"
+          version: ${{ needs.get-latest-release.outputs.release-tag }}
+          changed-files: |
+            debug_gym/gym/terminals/kubernetes.py
+            tests/gym/terminals/test_kubernetes.py
+
+  tests:
+    name: Test
+    needs: get-latest-release
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [ "python" ]
+        os: [ubuntu-latest]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install "debug-gym[dev]==${{ needs.get-latest-release.outputs.release-tag }}"
+      - name: Test - PR - Fast
+        env:
+          ALLOW_LOCAL_TERMINAL: true
+          DEBUG_GYM_DEBUG: 1
+        run: |
+          pytest -vv -n 16 -k "not test_swe_bench and not test_swe_smith and not test_r2egym and not test_kubernetes" --timeout=600 --cov=debug_gym --cov-report=term-missing
+      - name: Store coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: .coverage-main
+          path: .coverage
+          if-no-files-found: error
+          include-hidden-files: true
+
+  report-coverage:
+    runs-on: ubuntu-latest
+    needs: [tests, test-swebench, test-swesmith, test-r2egym, test-kubernetes]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+      - name: Install dependencies
+        run: pip install coverage
+      - name: Download coverage reports
+        uses: actions/download-artifact@v4
+      - name: Combine and report coverage.
+        run: |
+          ls -la
+          # The artifacts are downloaded as directories, but coverage combine expects files
+          # Move the .coverage files from directories to the current directory
+          for dir in .coverage-*; do
+            if [ -d "$dir" ] && [ -f "$dir/.coverage" ]; then
+              cp "$dir/.coverage" "${dir}.coverage"
+              echo "Moved coverage file from $dir to ${dir}.coverage"
+            fi
+          done
+          ls -la .*.coverage
+          coverage combine --keep .*.coverage
+          coverage report --fail-under=85

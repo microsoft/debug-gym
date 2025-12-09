@@ -1,3 +1,4 @@
+import json
 import logging
 from unittest.mock import patch
 
@@ -45,8 +46,13 @@ def llm_class_mock():
                 response_token_count=20,
             )
 
-        def tokenize(self, text):
-            return [c for c in text]
+        def tokenize(self, messages):
+            # Return list of token lists, one per message
+            result = []
+            for msg in messages:
+                content = str(msg.get("content", msg.get("tool_calls", msg)))
+                result.append([c for c in content])
+            return result
 
         def define_tools(self, tool_call_list):
             return tool_call_list
@@ -54,8 +60,44 @@ def llm_class_mock():
         def parse_tool_call_response(self, response):
             return response
 
-        def format_tool_call_history(self, history_info, response):
-            return [{"role": "role", "content": history_info.action_tool_call}]
+        def convert_response_to_message(self, response: LLMResponse) -> dict:
+            message = {
+                "role": "assistant",
+                "content": response.response,
+            }
+
+            tool = getattr(response, "tool", None)
+            if isinstance(tool, ToolCall):
+                message["tool_calls"] = [
+                    {
+                        "type": "function",
+                        "id": tool.id,
+                        "function": {
+                            "name": tool.name,
+                            "arguments": json.dumps(tool.arguments),
+                        },
+                    }
+                ]
+
+            return message
+
+        def convert_observation_to_message(
+            self,
+            observation: str,
+            action_tool_call_id: str | None = None,
+            action_tool_call_name: str | None = None,
+        ) -> dict:
+            if action_tool_call_id:
+                return {
+                    "role": "tool",
+                    "tool_call_id": action_tool_call_id,
+                    "name": action_tool_call_name,
+                    "content": observation,
+                }
+            return {
+                "role": "user",
+                "content": observation,
+            }
 
     return LLMMock
 
@@ -94,15 +136,15 @@ def build_env_info():
         step_observation="obs",
         all_observations=[],
         eval_observation="eval_observation",
-        dir_tree="dir_tree",
         current_breakpoints="current_breakpoints",
-        action_tool_call="action",
+        action_tool_call=ToolCall(id="tool_id", name="tool_name", arguments={}),
         action_reasoning="",
         action_content="",
         instructions=None,
         score=5,
         max_score=10,
-        done=False,
+        terminated=False,
+        resolved=False,
         rewrite_counter=0,
         tools=[],
     ):
@@ -110,7 +152,6 @@ def build_env_info():
             step_observation=Observation("tool", step_observation),
             all_observations=all_observations,
             eval_observation=Observation("env", eval_observation),
-            dir_tree=dir_tree,
             current_breakpoints=current_breakpoints,
             action_reasoning=action_reasoning,
             action_content=action_content,
@@ -118,7 +159,8 @@ def build_env_info():
             instructions=instructions if instructions is not None else {},
             score=score,
             max_score=max_score,
-            done=done,
+            terminated=terminated,
+            resolved=resolved,
             rewrite_counter=rewrite_counter,
             tools=tools if tools is not None else [],
         )

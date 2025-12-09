@@ -589,14 +589,16 @@ def test_human_max_retries_exceeded(build_env_info):
 def test_human_tokenize():
     """Test Human tokenization"""
     human = Human()
-    tokens = human.tokenize("hello world test")
-    assert tokens == ["hello", "world", "test"]
+    messages = [{"role": "user", "content": "hello world test"}]
+    tokens = human.tokenize(messages)
+    assert tokens == [["hello", "world", "test"]]
 
 
 def test_human_count_tokens():
     """Test Human token counting"""
     human = Human()
-    count = human.count_tokens("hello world test")
+    messages = [{"role": "user", "content": "hello world test"}]
+    count = human.count_tokens(messages)
     assert count == 3
 
 
@@ -694,29 +696,3 @@ def test_human_with_boolean_arguments(build_env_info):
 
     assert llm_response.tool.name == "toggle"
     assert llm_response.tool.arguments == {"enabled": True}
-
-
-def test_human_format_tool_call_history(build_env_info):
-    """Test Human tool call history formatting"""
-    human = Human()
-
-    # Create mock response
-    tool_call = ToolCall(id="test-123", name="test_tool", arguments={"arg": "value"})
-    mock_response = type("MockResponse", (), {})()
-    mock_response = [type("MockItem", (), {"tool": tool_call})()]
-
-    # Create mock history info
-    history_info = build_env_info(
-        action_tool_call=ToolCall(
-            id="test-123", name="test_tool", arguments={"arg": "value"}
-        ),
-        step_observation=type("MockObs", (), {"observation": "Test observation"})(),
-    )
-
-    formatted = human.format_tool_call_history(history_info, mock_response)
-
-    assert len(formatted) == 2
-    assert formatted[0]["role"] == "assistant"
-    assert formatted[0]["content"][0]["type"] == "tool_use"
-    assert formatted[1]["role"] == "user"
-    assert formatted[1]["content"][0]["type"] == "tool_result"

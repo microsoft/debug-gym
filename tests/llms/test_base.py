@@ -5,7 +5,13 @@ import yaml
 
 from debug_gym.gym.entities import Observation
 from debug_gym.gym.tools.tool import EnvironmentTool
-from debug_gym.llms import AnthropicLLM, AzureOpenAILLM, Human, OpenAILLM
+from debug_gym.llms import (
+    AnthropicLLM,
+    AzureOpenAILLM,
+    HuggingFaceLLM,
+    Human,
+    OpenAILLM,
+)
 from debug_gym.llms.base import (
     LLM,
     ContextLengthExceededError,
@@ -47,6 +53,15 @@ from debug_gym.llms.base import (
                 "api_key": "test-api-key",
                 "tags": ["anthropic", "claude", "claude-3.7"],
             },
+            "qwen-3": {
+                "model": "Qwen/Qwen3-0.6B",
+                "tokenizer": "Qwen/Qwen3-0.6B",
+                "context_limit": 4,
+                "api_key": "test-api-key",
+                "endpoint": "https://test-endpoint",
+                "tags": ["vllm"],
+                "tokenizer_kwargs": {"trust_remote_code": True},
+            },
         }
     ),
 )
@@ -63,6 +78,9 @@ def test_instantiate_llm(mock_open, logger_mock):
 
     llm = LLM.instantiate("claude-3.7", logger=logger_mock)
     assert isinstance(llm, AnthropicLLM)
+
+    llm = LLM.instantiate("qwen-3", logger=logger_mock)
+    assert isinstance(llm, HuggingFaceLLM)
 
     llm = LLM.instantiate("human", logger=logger_mock)
     assert isinstance(llm, Human)
@@ -225,6 +243,7 @@ def test_llm_config_initialization():
     assert config.tokenizer == "llm-mock"  # Default to model when tokenizer is None
     assert config.ignore_kwargs == []  # Default empty list
     assert config.tags == []  # Default empty list
+    assert config.tokenizer_kwargs == {}
 
 
 def test_llm_config_optional_fields(basic_config):
@@ -374,7 +393,7 @@ def test_llm_call_override_generate_kwargs(
     messages = [{"role": "user", "content": "Hello"}]
     llm_mock = llm_class_mock("llm-mock", logger=logger_mock)
     # Override the temperature from config
-    llm_response = llm_mock(messages, tools, temperature=0.2)
+    llm_mock(messages, tools, temperature=0.2)
     # Check that the override worked: 0.2 from kwargs, not 0.7 from config
     assert llm_mock.called_kwargs["temperature"] == 0.2
 
@@ -397,7 +416,7 @@ def test_llm_call_override_generate_kwargs(
 def test_llm_call_ignore_kwargs(mock_llm_config, logger_mock, llm_class_mock):
     messages = [{"role": "user", "content": "Hello"}]
     llm_mock = llm_class_mock("llm-mock", logger=logger_mock)
-    llm_response = llm_mock(messages, tools, temperature=0.7, max_tokens=10)
+    llm_mock(messages, tools, temperature=0.7, max_tokens=10)
     assert "temperature" not in llm_mock.called_kwargs
     assert llm_mock.called_kwargs["max_tokens"] == 10
 
@@ -425,7 +444,7 @@ def test_llm_call_system_prompt_not_supported(
         {"role": "user", "content": "Hello"},
     ]
     llm_mock = llm_class_mock("llm-mock", logger=logger_mock)
-    llm_response = llm_mock(messages, tools)
+    llm_mock(messages, tools)
     assert llm_mock.called_messages == [
         {"role": "user", "content": "You are a helpful assistant"},
         {"role": "user", "content": "Hello"},
@@ -508,7 +527,7 @@ def test_context_length_exceeded_prevents_infinite_recursion(
     messages = [{"role": "user", "content": "Long message"}]
 
     # Mock trim_prompt_messages to return the same messages (no reduction)
-    with patch("debug_gym.agents.utils.trim_prompt_messages") as mock_trim:
+    with patch("debug_gym.llms.utils.trim_prompt_messages") as mock_trim:
         mock_trim.return_value = messages
 
         # Should raise ContextLengthExceededError, not RecursionError
@@ -563,7 +582,7 @@ def test_context_length_exceeded_with_successful_truncation(
     messages = [{"role": "user", "content": "Long message"}]
 
     # Mock trim_prompt_messages to return shorter messages
-    with patch("debug_gym.agents.utils.trim_prompt_messages") as mock_trim:
+    with patch("debug_gym.llms.base.trim_prompt_messages") as mock_trim:
         shorter_messages = [{"role": "user", "content": "Short"}]
         mock_trim.return_value = shorter_messages
 

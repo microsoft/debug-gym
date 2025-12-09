@@ -1,20 +1,13 @@
 import hashlib
 import hmac
-import json
 import time
-from dataclasses import make_dataclass
 from unittest.mock import MagicMock, mock_open, patch
 
 import pytest
 
 from debug_gym.gym.entities import Observation
-from debug_gym.gym.envs.env import EnvInfo
 from debug_gym.gym.tools.tool import EnvironmentTool, ToolCall
-from debug_gym.llms.base import (
-    ContextLengthExceededError,
-    LLMConfigRegistry,
-    LLMResponse,
-)
+from debug_gym.llms.base import ContextLengthExceededError, LLMConfigRegistry
 from debug_gym.llms.copilot import CopilotClaudeLLM, CopilotLLM, CopilotOpenAILLM
 
 
@@ -111,9 +104,11 @@ class TestCopilotLLM:
         mock_encode = MagicMock(return_value=[1, 2, 3, 4])
         with patch("tiktoken.encoding_for_model") as mock_tiktoken:
             mock_tiktoken.return_value.encode = mock_encode
-            tokens = llm.tokenize("test text")
+            messages = [{"role": "user", "content": "test text"}]
+            tokens = llm.tokenize(messages)
 
-        assert tokens == [1, 2, 3, 4]
+        # Should return list of token lists (one per message)
+        assert tokens == [["1", "2", "3", "4"]]
         mock_tiktoken.assert_called_once_with("gpt-4o")
         mock_encode.assert_called_once_with("test text")
 
@@ -125,9 +120,11 @@ class TestCopilotLLM:
         with patch(
             "tiktoken.encoding_for_model", side_effect=KeyError("model not found")
         ):
-            tokens = llm.tokenize("hello world test")
+            messages = [{"role": "user", "content": "hello world test"}]
+            tokens = llm.tokenize(messages)
 
-        assert tokens == ["hello", "world", "test"]
+        # Should return list of token lists (one per message)
+        assert tokens == [["hello", "world", "test"]]
 
     def test_need_to_be_retried_hmac_timestamp_error(self, mock_config, logger_mock):
         """Test retry logic for HMAC timestamp errors"""
@@ -219,7 +216,7 @@ class TestCopilotClaudeLLM:
             type(llm), "client", new_callable=lambda: property(lambda self: mock_client)
         ):
             messages = [{"role": "system", "content": "You are a helpful assistant"}]
-            response = llm.generate(messages, tools)
+            llm.generate(messages, tools)
 
         # Verify the call was made with converted messages
         call_args = mock_client.chat.completions.create.call_args
@@ -471,6 +468,7 @@ class TestCopilotIntegration:
     def test_hmac_secret_loading_priority(self, mock_config, logger_mock):
         """Test HMAC secret loading from environment vs .env file"""
         llm = CopilotLLM("test-model", logger=logger_mock)
+        assert llm.model_name == "test-model"
 
         env_secret = "env_secret_123"
         file_secret = "file_secret_456"
@@ -492,6 +490,7 @@ class TestCopilotIntegration:
         # This is tested in the CopilotClaudeLLM test_generate_with_tool_calls
         # but we can add more specific logic tests here
         llm = CopilotClaudeLLM("test-model", logger=logger_mock)
+        assert isinstance(llm, CopilotClaudeLLM)
 
         # Create mock choices - some with content, some with tool calls
         choice1 = MagicMock()

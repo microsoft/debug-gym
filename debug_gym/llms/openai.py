@@ -4,9 +4,7 @@ import logging
 import openai
 import tiktoken
 from openai import NOT_GIVEN, OpenAI
-from transformers import AutoTokenizer
 
-from debug_gym.gym.envs.env import EnvInfo
 from debug_gym.gym.tools.tool import EnvironmentTool, ToolCall
 from debug_gym.gym.utils import filter_non_utf8
 from debug_gym.llms.base import (
@@ -19,6 +17,10 @@ from debug_gym.llms.constants import LLM_API_KEY_PLACEHOLDER, LLM_ENDPOINT_PLACE
 
 # Set logging level down to WARNING for endpoint queries.
 logging.getLogger("openai").setLevel(logging.WARNING)
+
+
+class OpenAIResponseParsingError(Exception):
+    """Raised when the OpenAI response is missing required fields or cannot be parsed."""
 
 
 class OpenAILLM(LLM):
@@ -62,24 +64,32 @@ class OpenAILLM(LLM):
             )
         return self._client
 
-    def tokenize(self, text: str) -> list[str]:
+    def tokenize(self, messages: list[dict]) -> list[list[str]]:
         if getattr(self, "_tk_func", None) is None:
             try:
-                self._tk_func = tiktoken.encoding_for_model(self.tokenizer_name).encode
+                encoder = tiktoken.encoding_for_model(self.tokenizer_name)
+                # For tiktoken, encode returns list of ints, we need to convert to list of "tokens"
+                self._tk_func = lambda text: [str(t) for t in encoder.encode(text)]
             except KeyError:
-                try:  # Try to load from transformers.
-                    self._tk_func = AutoTokenizer.from_pretrained(
-                        self.tokenizer_name
-                    ).tokenize
-                except OSError:
-                    raise ValueError(
-                        f"Tokenizer `{self.tokenizer_name}` not found for model "
-                        f"{self.model_name}, make sure you have access to "
-                        "the model (e.g., HuggingFace API key is correctly set)."
-                    )
-        return self._tk_func(text)
+                raise ValueError(
+                    f"Tokenizer `{self.tokenizer_name}` not found for model "
+                    f"{self.model_name}. If using Hugging Face models, please "
+                    f"set tag `vllm` to load the HuggingFaceLLM class instead."
+                )
+        # Tokenize each message individually
+        result = []
+        for msg in messages:
+            content = str(msg.get("content", msg.get("tool_calls", msg)))
+            tokens = self._tk_func(content)
+            result.append(tokens)
+        return result
 
     def need_to_be_retried(self, exception) -> bool:
+        if isinstance(exception, OpenAIResponseParsingError):
+            self.logger.warning(
+                "OpenAI chat completion returned an unparsable payload. Retrying..."
+            )
+            return True
         # List of fully qualified names of RateLimitError exceptions from various libraries
         _errors = [
             "openai.APIStatusError",
@@ -91,6 +101,7 @@ class OpenAILLM(LLM):
             "openai.APIError",
             "openai.APIConnectionError",
             "openai.RateLimitError",
+            "openai.InternalServerError",
             "openai.PermissionDeniedError",
             "openai.BadRequestError",
             # Add more as needed
@@ -132,6 +143,16 @@ class OpenAILLM(LLM):
 
         return need_to_retry
 
+    def _perform_chat_completion(self, **kwargs):
+        """Invoke the OpenAI chat completion endpoint.
+
+        Kept as a separate method so subclasses can customize how the client is
+        retrieved per attempt (for example, to refresh authentication headers
+        such as GitHub Copilot HMAC tokens).
+        """
+
+        return self.client.chat.completions.create(**kwargs)
+
     def define_tools(self, tool_call_list: list[EnvironmentTool]) -> list[dict]:
         """Translates the list of tools into a format that is specifically defined by each LLM.
         OpenAI function calling format: https://platform.openai.com/docs/guides/function-calling
@@ -171,72 +192,83 @@ class OpenAILLM(LLM):
                 name="empty_tool_response",
                 arguments={},
             )
+
+        try:
+            function = response.function
+            tool_name = function.name
+        except AttributeError as exc:
+            raise OpenAIResponseParsingError(
+                "OpenAI tool call is missing function metadata"
+            ) from exc
+
+        raw_arguments = function.arguments or "{}"
+        try:
+            parsed_arguments = json.loads(raw_arguments)
+        except (json.JSONDecodeError, TypeError) as exc:
+            raise OpenAIResponseParsingError(
+                "OpenAI tool call arguments are not valid JSON"
+            ) from exc
+        if parsed_arguments is None:
+            parsed_arguments = {}
+        elif not isinstance(parsed_arguments, dict):
+            raise OpenAIResponseParsingError(
+                "OpenAI tool call arguments must decode to a JSON object"
+            )
+
         return ToolCall(
             id=response.id,
-            name=response.function.name,
-            arguments=json.loads(response.function.arguments),
+            name=tool_name,
+            arguments=parsed_arguments,
         )
 
-    def format_tool_call_history(
-        self, history_info: EnvInfo, response: list[LLMResponse]
-    ) -> list[dict]:
-        _messages = []
-        if isinstance(response, list) and len(response) > 0:
-            _response = {
-                "role": "assistant",
-                "tool_calls": [
-                    {
-                        "type": "function",
-                        "id": response[0].tool.id,
-                        "function": {
-                            "name": response[0].tool.name,
-                            "arguments": json.dumps(response[0].tool.arguments),
-                        },
-                    },
-                ],
-                "content": filter_non_utf8(f"{response[0].response}"),
-            }
-            if response[0].reasoning_response:
-                _response["reasoning_content"] = filter_non_utf8(
-                    f"{response[0].reasoning_response}"
-                )
-            _messages.append(_response)
-        if (
-            history_info.action_tool_call is None
-            and history_info.action_content is None
-            and history_info.action_reasoning is None
-        ):
-            # This is the initial state, no action taken yet
-            _messages.append(
+    def convert_response_to_message(self, response: LLMResponse) -> dict:
+        message = {
+            "role": "assistant",
+            "tool_calls": [
                 {
-                    "role": "user",
-                    "content": filter_non_utf8(
-                        history_info.step_observation.observation
-                    ),
-                }
+                    "type": "function",
+                    "id": response.tool.id,
+                    "function": {
+                        "name": response.tool.name,
+                        "arguments": json.dumps(response.tool.arguments),
+                    },
+                },
+            ],
+            "content": filter_non_utf8(f"{response.response}"),
+        }
+        if response.reasoning_response:
+            message["reasoning_content"] = filter_non_utf8(
+                f"{response.reasoning_response}"
             )
+        return message
+
+    def convert_observation_to_message(
+        self, observation: str, action_tool_call_id=None, action_tool_call_name=None
+    ) -> dict:
+        if action_tool_call_id is None:
+            # This is the initial state, no action taken yet
+            return {
+                "role": "user",
+                "content": filter_non_utf8(observation),
+            }
         else:
             # This is a step with an action taken
-            _messages.append(
-                {
-                    "role": "tool",
-                    "tool_call_id": history_info.action_tool_call.id,
-                    "name": history_info.action_tool_call.name,
-                    "content": filter_non_utf8(
-                        history_info.step_observation.observation
-                    ),
-                }
-            )
-
-        return _messages
+            return {
+                "role": "tool",
+                "tool_call_id": action_tool_call_id,
+                "name": action_tool_call_name,
+                "content": filter_non_utf8(observation),
+            }
 
     def generate(self, messages, tools, **kwargs) -> LLMResponse:
         # set max tokens if not provided
         kwargs["max_tokens"] = kwargs.get("max_tokens", NOT_GIVEN)
+        api_call = retry_on_exception(
+            self._perform_chat_completion,
+            self.need_to_be_retried,
+        )
         try:
-            response = retry_on_exception(
-                self.client.chat.completions.create, self.need_to_be_retried
-            )(
+            response = api_call(
                 model=self.config.model,
                 messages=messages,
                 tools=self.define_tools(tools),
@@ -248,28 +280,49 @@ class OpenAILLM(LLM):
             if self.is_context_length_error(e):
                 raise ContextLengthExceededError
             raise e
+        if getattr(response, "choices", None) is None:
+            self.logger.debug(
+                "OpenAI response missing 'choices' key; response type=%s",
+                type(response),
+            )
+            raise OpenAIResponseParsingError(
+                "OpenAI chat completion returned unexpected payload without 'choices'"
+            )
+        try:
+            choice = response.choices[0]
+            message = choice.message
+        except (IndexError, TypeError, AttributeError) as exc:
+            self.logger.debug(
+                "OpenAI response choices could not provide a message: %s", exc
+            )
+            raise OpenAIResponseParsingError(
+                "OpenAI chat completion returned no usable choice message"
+            ) from exc
+
         # LLM may select multiple tool calls, we only care about the first action
-        if not response.choices[0].message.tool_calls:
+        if not getattr(message, "tool_calls", None):
             # LLM failed to call a tool
             tool_call = None
         else:
-            tool_call = response.choices[0].message.tool_calls[0]
+            tool_call = message.tool_calls[0]
             assert tool_call.type == "function"
 
         # In openai call, the content is in response.choices[0].message.content
         # In some models hosted on vllm, e.g., qwen-3, there could be content in both (when reasoning is enabled)
         # response.choices[0].message.content and response.choices[0].message.reasoning_content
         # https://qwen.readthedocs.io/en/latest/deployment/vllm.html#parsing-thinking-content
-        _content = response.choices[0].message.content
+        _content = message.content
         _reasoning_content = None
-        if hasattr(response.choices[0].message, "reasoning_content"):
-            _reasoning_content = response.choices[0].message.reasoning_content
+        if hasattr(message, "reasoning_content"):
+            _reasoning_content = message.reasoning_content
+
+        parsed_tool = self.parse_tool_call_response(tool_call)
 
         llm_response = LLMResponse(
             prompt=messages,
             response=_content,
             reasoning_response=_reasoning_content,
-            tool=self.parse_tool_call_response(tool_call),
+            tool=parsed_tool,
             prompt_token_count=response.usage.prompt_tokens,
             response_token_count=response.usage.completion_tokens,
         )

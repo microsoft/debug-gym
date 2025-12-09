@@ -42,7 +42,7 @@ Then, edit this file with your endpoint and credentials. You can choose one of t
 - For `az login` or Managed Identity authentication on Azure, remove `api_key` and include `scope` instead.
 
 > [!WARNING]
-> When using open-sourced LLMs, e.g., via vLLM, you need to correctly setup `HF_TOKEN` required by the tokenizer.
+> When using open-sourced LLMs, e.g., via vLLM, you need to correctly setup `HF_TOKEN` required by the tokenizer. You can also provide `tokenizer_kwargs` in your `llm.yaml` entry (for example `trust_remote_code: true`) to control how the Hugging Face tokenizer is instantiated.
 
 By default, `debug-gym` looks for the LLM config file at `$HOME/.config/debug_gym/llm.yaml`. You can change this behavior by exporting the environment variable `LLM_CONFIG_FILE_PATH` or by setting `llm_config_file_path` in your script config file (see [Running Baselines](#3-running-baselines)).
 
@@ -55,7 +55,7 @@ The structure of `debug-gym` is as below:
 debug_gym
 ├── gym
 │   ├── envs
-│   ├── terminal
+│   ├── terminals
 │   └── tools
 ├── agents
 └── llms
@@ -65,7 +65,7 @@ debug_gym
 
 `debug_gym.agents` are LLM-based debugging agents that use `debug_gym.gym` to interact with code repositories to seek necessary information and thus fix potential bugs. At an interaction step, the agent takes a text observation that describes the environment states and tool states as input, it is expected to generate a command, subsequently, the environment will provide a new text observation in response, describing the state change caused by that command.
 
-`debug_gym.llms` are the different LLM backends that can be used to instantiate agents. Currently, we support OpenAI, Azure OpenAI, and Anthropic.
+`debug_gym.llms` are the different LLM backends that can be used to instantiate agents. Currently, we support OpenAI, Azure OpenAI, Hugging Face/vLLM deployments (via an OpenAI-compatible endpoint), and Anthropic. For Hugging Face models served through vLLM, the tokenizer's chat template is applied automatically to ensure token counting and truncation match the hosted model.
 
 > [!WARNING]
 > `debug-gym` has limited support on non-Linux platforms. Interactive terminal sessions using PTY (pseudo-terminal) in Docker are not fully supported on macOS or Windows. As a result, the `pdb` tool (see [2.1. Environment and Tools](#21-environment-and-tools)) only works on Linux.
@@ -99,24 +99,51 @@ We provide the below LLM-based agents, they all have minimal design and serve th
 
 | Agent name | Available Tools | Description |
 | :-: | :-: | :----- |
-| `debug_agent` | `pdb`, `rewrite`, `view`, `eval` | A minimal agent that dumps all available information into its prompt and queries the LLM to generate a command. |
-| `rewrite_agent` | `rewrite`, `view`, `eval`  | A `debug_agent` but `pdb` tool is disabled (an agent keeps rewriting). |
-| `debug_5_agent` | `pdb`, `rewrite`, `view`, `eval`  | A `debug_agent`, but `pdb` tool is only enabled after certain amount of rewrites. |
-| `grep_agent` | `grep`, `rewrite`, `view`, `eval`  | A variant of `rewrite_agent` that includes the `grep` tool for searching patterns in the codebase before making changes. |
+| `froggy_agent` | `grep`, `pdb`, `view`, `rewrite`, `eval` (configurable) | Primary debugging agent. Adjust prompts and tool lists in YAML to mimic rewrite-only, grep-heavy, or other workflows. |
 | `solution_agent` | `pdb`, `eval`  | An oracle agent that applies a gold patch (only works with `swebench` and `swesmith` benchmarks for now). The agent checks that tests are failing before applying the patch, and passing after. It also checks that `pdb` tool can be used as expected. |
+| `swe_agent` | `bash`, `rewrite`, `submit` | Baseline agent tailored for the SWE-bench setting that executes bash commands in addition to rewrites. |
 
 ---
 
 #### 2.3. Benchmarks
 
-To demonstrate how to integrate `debug-gym` with coding tasks and repositories, we provide example code importing two widely used benchmarks, namely `aider` and `swebench`, and a small set of minimal buggy code snippets, namely `mini_nightmare`.
+To demonstrate how to integrate `debug-gym` with coding tasks and repositories, we provide example code importing widely used benchmarks, namely `aider`, `swebench`, `swesmith` and `r2egym`, and a small set of minimal buggy code snippets, namely `mini_nightmare`.
 
 | Benchmark name | Link |
 | :-: | :----- |
 | `aider` | [https://github.com/Aider-AI/aider](https://github.com/Aider-AI/aider) |
 | `swebench`| [https://github.com/princeton-nlp/SWE-bench](https://github.com/princeton-nlp/SWE-bench) |
 | `swesmith`| [https://github.com/SWE-bench/SWE-smith](https://github.com/SWE-bench/SWE-smith) |
+| `r2egym`| [https://github.com/R2E-Gym/R2E-Gym](https://github.com/R2E-Gym/R2E-Gym) |
 | `mini_nightmare` | A set of 10 hand-crafted minimal buggy code snippet where rewrite only agents have harder time to tackle. Read details [here](https://github.com/microsoft/debug-gym/blob/main/data/mini_nightmare/mini_nightmare.md). |
+
+> [!NOTE]
+> Since debug-gym focuses on debugging task with the use of a debugger, we provide a customized version of `swebench`, called `swebench-debug`, where each problem's codebase already has the gold test patch applied. This allows us to better simulate real-world debugging scenarios where the buggy code is expected to have failing tests and we can set the debugger's entrypoint accordingly. To use `swebench-debug`, set `benchmark: "swebench-debug"` in your config file (see [Running Baselines](#3-running-baselines)).
+
+---
+
+#### 2.4. Terminals
+
+`debug-gym` supports multiple terminal backends to accommodate different execution environments and deployment scenarios. Each terminal type provides a consistent interface while handling the underlying infrastructure differently.
+
+| Terminal Type | Description |
+| :-: | :----- |
+| `LocalTerminal` | Executes commands directly on the local machine using bash. Ideal for development and testing on local systems. |
+| `DockerTerminal` | Executes commands inside Docker containers running on your machine. Provides isolated execution environments. (Recommended) |
+| `KubernetesTerminal` | Executes commands in Kubernetes pods for scalable deployments. Provides isolated execution environments. Suitable when dealing with large benchmarks like `swebench`, `swesmith`, and `r2egym`. |
+
+All terminals support:
+- Specify custom working directories and session commands
+- Environment variable configuration
+- Command execution with timeout handling
+- Output capturing and error reporting
+- Automatic cleanup and resource management
+- Retry mechanisms for transient errors
+- Provide a way to create persistent interactive shell sessions using pseudo-terminals (PTY). Used internally by interactive debugging tools such as `pdb`.
+> [!WARNING]
+> Interactive shell sessions are not fully compatible with macOS due to their reliance on pty.
+
+Terminal selection is configured through the `terminal_config` in your script configuration file. The framework automatically handles terminal initialization, command execution, and cleanup based on the specified type.
 
 ---
 
@@ -142,27 +169,27 @@ We provide a human mode that enables developers to manually interact with `debug
 
 #### 3.3. Overriding Values in Config
 
-The `-p` flag is a handy way to override values defined in the config file. For example, the command below will run the rewrite_agent agent on Aider with human mode (even if the config file specifies gpt-4o). The command also overrides the default system prompt (see below for more information).
+The `-p` flag is a handy way to override values defined in the config file. For example, the command below will run the `froggy_agent` configuration on Aider with human mode (even if the config file specifies gpt-4o). The command also overrides the default system prompt (see below for more information).
 
     python scripts/run.py scripts/config_aider.yaml \
-        --agent debug_agent \
+        --agent froggy_agent \
         -v \
-        -p debug_agent.llm_name="human" \
-        -p debug_agent.system_prompt_template_file="scripts/templates/human_friendly_system_prompt.jinja"
+        -p froggy_agent.llm_name="human" \
+        -p froggy_agent.system_prompt="scripts/templates/human_friendly_system_prompt.jinja"
 
 
 #### 3.4. Customizing the System Prompt with Jinja Templates
 
 `debug-gym` allows you to fully customize the system prompt by providing a [Jinja](https://jinja.palletsprojects.com/) template file. This enables you to control the format and content of the prompt sent to the LLM, making it easier to adapt the environment to your specific needs or research experiments.
 
-To use a custom system prompt template, specify the path to your Jinja template file in your agent's configuration under `system_prompt_template_file`. For example:
+To use a custom system prompt template, specify the path to your Jinja template file in your agent's configuration under `system_prompt`. For example:
 
 ```yaml
-debug_agent:
-  system_prompt_template_file: scripts/templates/custom_system_prompt.jinja
+froggy_agent:
+    system_prompt: scripts/templates/custom_system_prompt.jinja
 ```
 
-Alternatively, you can provide a custom template from the command line with `-p <agent>.system_prompt_template_file="<path/to/template.jinja>"` (see above).
+Alternatively, you can provide a custom template from the command line with `-p <agent>.system_prompt="<path/to/template.jinja>"` (see above).
 
 Within your Jinja template, you have access to the `agent` and `info` objects, which provide all relevant context about the current environment and agent state.
 
@@ -175,27 +202,24 @@ In addition to all [built-in Jinja filters](https://jinja.palletsprojects.com/en
     {{ info.tools | to_pretty_json }}
     ```
 
-- **`trim_message`**: Trims a string to fit within a token or character limit, also filtering out non-UTF8 characters. This is helpful for ensuring that large outputs (such as directory trees or evaluation results) do not exceed the LLM's context window. The `trim_message` filter accepts the following arguments to control how messages are trimmed:
+    - **`trim_message`**: Trims a string to approximately fit within a token or character limit while filtering non-UTF8 characters. This helps keep large outputs (such as directory trees or evaluation results) within the LLM's context window. The `trim_message` filter accepts the following arguments to control how messages are trimmed:
     - **`max_length`**: The maximum number of tokens to keep in the message. If the message exceeds this length, it will be trimmed.
     - **`max_length_percentage`**: Instead of specifying an absolute number, you can provide a percentage (e.g., `0.1` for 10%) of the LLM's context window. The message will be trimmed to fit within this percentage of the model's maximum context length.
     - **`where`**: Specifies where to trim the message if it exceeds the limit. The default is `"middle"`, which trims from the middle of the message. Other options are `start` or `end`.
 
     ```jinja
-    {{ info.dir_tree | trim_message(max_length_percentage=0.1, where="end") }}
+    {{ info.instructions | trim_message(max_length_percentage=0.1, where="end") }}
     ```
 
 #### Example Template
 
-```jinja
-System Prompt for Debug-Gym
+Here is an example of a custom system prompt template using Jinja:
 
-Task: {{ agent.system_prompt }}
+```jinja
+You are an autonomous debugging agent designed to fix bugs in Python code repositories.
 
 Instructions:
 {{ info.instructions }}
-
-Directory Tree:
-{{ info.dir_tree | trim_message(max_length=1000) }}
 
 Current Breakpoints:
 {{ info.current_breakpoints | to_pretty_json }}

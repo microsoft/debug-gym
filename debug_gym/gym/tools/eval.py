@@ -16,8 +16,3 @@ class EvalTool(EnvironmentTool):
     def on_env_reset(self, environment, **kwargs):
         super().on_env_reset(environment, **kwargs)
         return self(environment)
-
-    def on_rewrite_success(self, environment, **kwargs):
-        if environment.auto_eval_on_rewrite:
-            return self(environment)
-        return None

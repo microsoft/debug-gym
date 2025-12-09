@@ -2,16 +2,14 @@ from pathlib import Path
 
 import pytest
 
-from debug_gym.gym.envs.env import RepoEnv
+from debug_gym.gym.envs.local import LocalEnv
 from debug_gym.gym.utils import (
-    _walk,
     cleanup_pytest_output,
     create_ignore_file,
     extract_max_score_from_pytest_output,
     extract_reward_from_pytest_output,
     filter_non_utf8,
     filter_problems,
-    is_subdirectory,
     make_file_matcher,
     show_line_number,
 )
@@ -45,7 +43,7 @@ def test_show_line_number_no_code_path_no_breakpoints():
 
 
 def test_show_line_number_with_code_path(tmp_path):
-    env = RepoEnv(path=tmp_path)
+    env = LocalEnv(path=tmp_path)
     env.reset()
     code_path = f"{env.working_dir}/code.py"
     breakpoints_state = {f"{code_path}|||2": "b 2"}
@@ -65,7 +63,7 @@ def test_show_line_number_with_code_path(tmp_path):
 
 
 def test_show_line_number_multiple_breakpoints(tmp_path):
-    env = RepoEnv(path=tmp_path)
+    env = LocalEnv(path=tmp_path)
     env.reset()
     code_path = f"{env.working_dir}/code.py"
     breakpoints_state = {
@@ -92,7 +90,7 @@ def test_show_line_number_multiple_breakpoints(tmp_path):
 
 
 def test_show_line_number_multiple_breakpoints_with_start_index(tmp_path):
-    env = RepoEnv(path=tmp_path)
+    env = LocalEnv(path=tmp_path)
     env.reset()
     code_path = f"{env.working_dir}/code.py"
     breakpoints_state = {
@@ -349,19 +347,6 @@ def test_create_ignore_file(tmp_path):
     assert contents == ["*.tmp", "*.bak", ".debugignore"]
 
 
-def test_is_subdirectory():
-
-    assert is_subdirectory("/path/to/file", "/path/to") is True
-    assert is_subdirectory("/path/to/file", "/path/to/") is True
-    assert is_subdirectory("/path/to/file", "/path/to/file") is True
-    assert is_subdirectory("/path/to/file", "/path/too") is False
-    assert is_subdirectory("/path/to/file", "/path/too/file") is False
-    assert is_subdirectory("/some/random/file", "/path/to") is False
-    assert is_subdirectory("some/random/file", "/path/to") is True
-    assert is_subdirectory("file", "/path/to") is True
-    assert is_subdirectory("/path/file", "/path/to") is False
-
-
 def test_extract_max_score_from_pytest_output():
     message_15 = "============================= test session starts ==============================\ncollecting ... collected 15 items\n\ntwelve_days_test.py::TwelveDaysTest::test_eighth_day_eight_maids_a_milking FAILED\ntwelve_days_test.py::TwelveDaysTest::test_eleventh_day_eleven_pipers_piping FAILED\ntwelve_days_test.py::TwelveDaysTest::test_fifth_day_five_gold_rings FAILED\ntwelve_days_test.py::TwelveDaysTest::test_first_day_a_partridge_in_a_pear_tree PASSED\ntwelve_days_test.py::TwelveDaysTest::test_fourth_day_four_calling_birds FAILED\ntwelve_days_test.py::TwelveDaysTest::test_ninth_day_nine_ladies_dancing FAILED\ntwelve_days_test.py::TwelveDaysTest::test_recites_first_three_verses_of_the_song PASSED\ntwelve_days_test.py::TwelveDaysTest::test_recites_the_whole_song PASSED\ntwelve_days_test.py::TwelveDaysTest::test_recites_three_verses_from_the_middle_of_the_song PASSED\ntwelve_days_test.py::TwelveDaysTest::test_second_day_two_turtle_doves FAILED\ntwelve_days_test.py::TwelveDaysTest::test_seventh_day_seven_swans_a_swimming FAILED\ntwelve_days_test.py::TwelveDaysTest::test_sixth_day_six_geese_a_laying FAILED\ntwelve_days_test.py::TwelveDaysTest::test_tenth_day_ten_lords_a_leaping FAILED\ntwelve_days_test.py::TwelveDaysTest::test_third_day_three_french_hens FAILED\ntwelve_days_test.py::TwelveDaysTest::test_twelfth_day_twelve_drummers_drumming FAILED\n\n=================================== FAILURES ===================================\n"
 
@@ -396,166 +381,6 @@ def test_extract_reward_from_pytest_output():
     assert extract_reward_from_pytest_output(message_0) == 0
 
 
-def test_walk():
-    path = "data/mini_nightmare"
-
-    # depth 0
-    path_list = []
-    for p in _walk(path, 0):
-        path_list.append(p)
-    assert path_list == []
-
-    # depth 1
-    path_list = []
-    for p in _walk(path, 1):
-        path_list.append(p)
-    expected = [
-        Path("data/mini_nightmare/config"),
-        Path("data/mini_nightmare/counter"),
-        Path("data/mini_nightmare/grader"),
-        Path("data/mini_nightmare/mini_nightmare.md"),
-        Path("data/mini_nightmare/pandas_dataframe"),
-        Path("data/mini_nightmare/patcher"),
-        Path("data/mini_nightmare/purr"),
-        Path("data/mini_nightmare/scientific_calculator"),
-        Path("data/mini_nightmare/shopping_cart"),
-        Path("data/mini_nightmare/sum_tree"),
-        Path("data/mini_nightmare/tomorrow_date"),
-    ]
-    # sort the list
-    path_list.sort()
-    expected.sort()
-    assert path_list == expected
-
-    # depth 2
-    path_list = []
-    for p in _walk(path, 2):
-        path_list.append(p)
-    expected = [
-        Path("data/mini_nightmare/config"),
-        Path("data/mini_nightmare/config/config_code.py"),
-        Path("data/mini_nightmare/config/test.py"),
-        Path("data/mini_nightmare/config/.debugignore"),
-        Path("data/mini_nightmare/config/.debugreadonly"),
-        Path("data/mini_nightmare/counter"),
-        Path("data/mini_nightmare/counter/counter_code.py"),
-        Path("data/mini_nightmare/counter/test.py"),
-        Path("data/mini_nightmare/counter/.debugignore"),
-        Path("data/mini_nightmare/counter/.debugreadonly"),
-        Path("data/mini_nightmare/grader"),
-        Path("data/mini_nightmare/grader/grader_code.py"),
-        Path("data/mini_nightmare/grader/test.py"),
-        Path("data/mini_nightmare/grader/.debugignore"),
-        Path("data/mini_nightmare/grader/.debugreadonly"),
-        Path("data/mini_nightmare/mini_nightmare.md"),
-        Path("data/mini_nightmare/pandas_dataframe"),
-        Path("data/mini_nightmare/pandas_dataframe/pandas_dataframe_code.py"),
-        Path("data/mini_nightmare/pandas_dataframe/test.py"),
-        Path("data/mini_nightmare/pandas_dataframe/.debugignore"),
-        Path("data/mini_nightmare/pandas_dataframe/.debugreadonly"),
-        Path("data/mini_nightmare/patcher"),
-        Path("data/mini_nightmare/patcher/patcher_code.py"),
-        Path("data/mini_nightmare/patcher/test.py"),
-        Path("data/mini_nightmare/patcher/source_code.txt"),
-        Path("data/mini_nightmare/patcher/.debugignore"),
-        Path("data/mini_nightmare/patcher/.debugreadonly"),
-        Path("data/mini_nightmare/purr"),
-        Path("data/mini_nightmare/purr/purr_code.py"),
-        Path("data/mini_nightmare/purr/test.py"),
-        Path("data/mini_nightmare/purr/.debugignore"),
-        Path("data/mini_nightmare/purr/.debugreadonly"),
-        Path("data/mini_nightmare/scientific_calculator"),
-        Path("data/mini_nightmare/scientific_calculator/scientific_calculator_code.py"),
-        Path("data/mini_nightmare/scientific_calculator/test.py"),
-        Path("data/mini_nightmare/scientific_calculator/scientific_calculator_tool.py"),
-        Path("data/mini_nightmare/scientific_calculator/.debugignore"),
-        Path("data/mini_nightmare/scientific_calculator/.debugreadonly"),
-        Path("data/mini_nightmare/shopping_cart"),
-        Path("data/mini_nightmare/shopping_cart/shopping_cart_code.py"),
-        Path("data/mini_nightmare/shopping_cart/test.py"),
-        Path("data/mini_nightmare/shopping_cart/.debugignore"),
-        Path("data/mini_nightmare/shopping_cart/.debugreadonly"),
-        Path("data/mini_nightmare/sum_tree"),
-        Path("data/mini_nightmare/sum_tree/sum_tree_code.py"),
-        Path("data/mini_nightmare/sum_tree/test.py"),
-        Path("data/mini_nightmare/sum_tree/.debugignore"),
-        Path("data/mini_nightmare/sum_tree/.debugreadonly"),
-        Path("data/mini_nightmare/tomorrow_date"),
-        Path("data/mini_nightmare/tomorrow_date/tomorrow_date_code.py"),
-        Path("data/mini_nightmare/tomorrow_date/test.py"),
-        Path("data/mini_nightmare/tomorrow_date/.debugignore"),
-        Path("data/mini_nightmare/tomorrow_date/.debugreadonly"),
-    ]
-    # sort the list
-    path_list.sort()
-    expected.sort()
-    assert path_list == expected
-
-    # depth is None (max)
-    path_list = []
-    for p in _walk(path, None):
-        path_list.append(p)
-    expected = [
-        Path("data/mini_nightmare/config"),
-        Path("data/mini_nightmare/config/config_code.py"),
-        Path("data/mini_nightmare/config/test.py"),
-        Path("data/mini_nightmare/config/.debugignore"),
-        Path("data/mini_nightmare/config/.debugreadonly"),
-        Path("data/mini_nightmare/counter"),
-        Path("data/mini_nightmare/counter/counter_code.py"),
-        Path("data/mini_nightmare/counter/test.py"),
-        Path("data/mini_nightmare/counter/.debugignore"),
-        Path("data/mini_nightmare/counter/.debugreadonly"),
-        Path("data/mini_nightmare/grader"),
-        Path("data/mini_nightmare/grader/grader_code.py"),
-        Path("data/mini_nightmare/grader/test.py"),
-        Path("data/mini_nightmare/grader/.debugignore"),
-        Path("data/mini_nightmare/grader/.debugreadonly"),
-        Path("data/mini_nightmare/mini_nightmare.md"),
-        Path("data/mini_nightmare/pandas_dataframe"),
-        Path("data/mini_nightmare/pandas_dataframe/pandas_dataframe_code.py"),
-        Path("data/mini_nightmare/pandas_dataframe/test.py"),
-        Path("data/mini_nightmare/pandas_dataframe/.debugignore"),
-        Path("data/mini_nightmare/pandas_dataframe/.debugreadonly"),
-        Path("data/mini_nightmare/patcher"),
-        Path("data/mini_nightmare/patcher/patcher_code.py"),
-        Path("data/mini_nightmare/patcher/test.py"),
-        Path("data/mini_nightmare/patcher/source_code.txt"),
-        Path("data/mini_nightmare/patcher/.debugignore"),
-        Path("data/mini_nightmare/patcher/.debugreadonly"),
-        Path("data/mini_nightmare/purr"),
-        Path("data/mini_nightmare/purr/purr_code.py"),
-        Path("data/mini_nightmare/purr/test.py"),
-        Path("data/mini_nightmare/purr/.debugignore"),
-        Path("data/mini_nightmare/purr/.debugreadonly"),
-        Path("data/mini_nightmare/scientific_calculator"),
-        Path("data/mini_nightmare/scientific_calculator/scientific_calculator_code.py"),
-        Path("data/mini_nightmare/scientific_calculator/test.py"),
-        Path("data/mini_nightmare/scientific_calculator/scientific_calculator_tool.py"),
-        Path("data/mini_nightmare/scientific_calculator/.debugignore"),
-        Path("data/mini_nightmare/scientific_calculator/.debugreadonly"),
-        Path("data/mini_nightmare/shopping_cart"),
-        Path("data/mini_nightmare/shopping_cart/shopping_cart_code.py"),
-        Path("data/mini_nightmare/shopping_cart/test.py"),
-        Path("data/mini_nightmare/shopping_cart/.debugignore"),
-        Path("data/mini_nightmare/shopping_cart/.debugreadonly"),
-        Path("data/mini_nightmare/sum_tree"),
-        Path("data/mini_nightmare/sum_tree/sum_tree_code.py"),
-        Path("data/mini_nightmare/sum_tree/test.py"),
-        Path("data/mini_nightmare/sum_tree/.debugignore"),
-        Path("data/mini_nightmare/sum_tree/.debugreadonly"),
-        Path("data/mini_nightmare/tomorrow_date"),
-        Path("data/mini_nightmare/tomorrow_date/tomorrow_date_code.py"),
-        Path("data/mini_nightmare/tomorrow_date/test.py"),
-        Path("data/mini_nightmare/tomorrow_date/.debugignore"),
-        Path("data/mini_nightmare/tomorrow_date/.debugreadonly"),
-    ]
-    # sort the list
-    path_list.sort()
-    expected.sort()
-    assert path_list == expected
-
-
 def test_filter_non_utf8():
     """Test the filter_non_utf8 function with various inputs."""
 
@@ -576,12 +401,15 @@ def test_filter_non_utf8():
     assert filter_non_utf8(mixed_text) == mixed_text
 
     # Test with empty string
-    assert filter_non_utf8("") == None
+    assert filter_non_utf8("") == ""
 
     # Test with non-string input (should return as-is)
-    assert filter_non_utf8(None) is None
-    assert filter_non_utf8(123) == 123
-    assert filter_non_utf8([1, 2, 3]) == [1, 2, 3]
+    with pytest.raises(AttributeError):
+        filter_non_utf8(None)
+    with pytest.raises(AttributeError):
+        filter_non_utf8(123)
+    with pytest.raises(AttributeError):
+        filter_non_utf8([1, 2, 3])
 
     # Test with newlines and special characters
     text_with_newlines = "line1\nline2\tTabbed\r\nWindows line ending"
@@ -619,19 +447,11 @@ def test_filter_non_utf8_edge_cases():
     result = filter_non_utf8(combining_text)
     assert result == combining_text
 
-    # Test with different types that should pass through
-    test_cases = [
-        (42, 42),
-        (3.14, 3.14),
-        (True, True),
-        (False, None),
-        ([], None),
-        ({}, None),
-        (set(), None),
-    ]
-
-    for input_val, expected in test_cases:
-        assert filter_non_utf8(input_val) == expected
+    # Test with different types that should raise.
+    test_cases = [42, 3.14, True, False, [], {}, set()]
+    for input_val in test_cases:
+        with pytest.raises(AttributeError):
+            filter_non_utf8(input_val)
 
 
 def test_filter_non_utf8_preserves_json_serializable():

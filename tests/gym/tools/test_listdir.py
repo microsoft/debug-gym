@@ -1,6 +1,6 @@
 import pytest
 
-from debug_gym.gym.envs.env import RepoEnv
+from debug_gym.gym.envs.local import LocalEnv
 from debug_gym.gym.tools.listdir import ListdirTool
 
 
@@ -8,7 +8,7 @@ from debug_gym.gym.tools.listdir import ListdirTool
 def setup_listdir_repo_env(setup_test_repo):
     def _setup_listdir_repo_env(base_dir):
         test_repo = setup_test_repo(base_dir)
-        env = RepoEnv(path=str(test_repo))
+        env = LocalEnv(path=str(test_repo))
         listdir_tool = ListdirTool()
         listdir_tool.register(env)
         env.reset()
@@ -24,8 +24,6 @@ def test_listdir_default(tmp_path, setup_listdir_repo_env):
     assert obs.observation == (
         f"{env.working_dir}/\n"
         "|-- .git/\n"
-        "|-- .pytest_cache/\n"
-        "|-- __pycache__/\n"
         "|-- file1.py\n"
         "|-- file2.py\n"
         "|-- test_fail.py\n"

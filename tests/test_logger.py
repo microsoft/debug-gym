@@ -1,12 +1,14 @@
 import json
 import logging
 import multiprocessing as mp
+import os
 import queue
 from dataclasses import asdict
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
+from rich.console import Console
 from rich.markup import escape
 
 from debug_gym.logger import (
@@ -20,6 +22,53 @@ from debug_gym.logger import (
     log_with_color,
     status_json_path,
 )
+
+
+def test_task_progress_manager_score_fallback_and_update():
+    """Ensure max_score fallback ('?') logic works and Rich render doesn't raise.
+
+    Steps:
+    1. Initialize TaskProgressManager with a problem (implicit max_score=None => '?').
+    2. Advance with max_score=5 (numeric appears).
+    3. Advance again with max_score=0 (numeric still appears).
+    4. Advance again with max_score=None (? appears).
+    """
+    problems = ["dummy-problem"]
+    logger = DebugGymLogger("debug-gym-test")
+    pm = TaskProgressManager(problems, max_display=5, logger=logger)
+
+    # Initial fallback state
+    assert len(pm.progress.tasks) == 1
+    task = pm.progress.tasks[0]
+    assert task.fields["max_score"] is None
+    assert task.fields["score"] == 0
+
+    # Check Rich rendering for initial fallback
+    console = Console(record=True)
+    console.print(pm._tasks_panel)
+    rendered = console.export_text()
+    assert "/  ?" in rendered
+
+    # Test updating max_score through 5, 0, None
+    for max_score, expected in [(5, "5"), (0, "0"), (None, "?")]:
+        pm.advance(
+            TaskProgress(
+                problem_id="dummy-problem",
+                step=1,
+                total_steps=3,
+                score=1,
+                max_score=max_score,
+                status="running",
+                logdir="",
+            )
+        )
+        task = pm.progress.tasks[0]
+        assert task.fields["max_score"] == max_score
+        assert task.fields["score"] == 1
+        console = Console(record=True)
+        console.print(pm._tasks_panel)
+        rendered = console.export_text()
+        assert f"/  {expected}" in rendered
 
 
 @pytest.fixture
@@ -173,7 +222,18 @@ def test_task_log_file_path_empty_dir():
     assert task.log_file_path == ""
 
 
-def test_strip_ansi_formatter():
+@pytest.mark.parametrize(
+    "message,expected",
+    [
+        ("\033[31mRed text\033[0m", "Red text"),
+        ("\x1b[31mThis is a test message.\x1b[0m", "This is a test message."),
+        ("\x1b[32mAnother test message.\x1b[0m", "Another test message."),
+        ("No ANSI codes here.", "No ANSI codes here."),
+        ("\x1b[1;34mBold blue text\x1b[0m", "Bold blue text"),
+        ("\x1b[0mReset code only\x1b[0m", "Reset code only"),
+    ],
+)
+def test_strip_ansi_formatter(message, expected):
     # Test that the StripAnsiFormatter removes ANSI color codes
     formatter = StripAnsiFormatter("%(message)s")
 
@@ -183,13 +243,13 @@ def test_strip_ansi_formatter():
         level=logging.INFO,
         pathname="",
         lineno=0,
-        msg="\033[31mRed text\033[0m",
+        msg=message,
         args=(),
         exc_info=None,
     )
 
     result = formatter.format(record)
-    assert result == "Red text"
+    assert result == expected
 
 
 def test_task_progress_manager_initialization(debug_gym_logger):
@@ -585,3 +645,52 @@ def test_log_file_content_worker(tmp_path):
     with open(worker_logger3.log_file, "r") as f:
         content = f.read()
     assert "Worker 3 log message" in content
+
+
+def test_setlevel_only_affects_rich_handler(debug_gym_logger):
+    """Test that calling setLevel only affects the rich_handler,
+    and debug logs are still saved to the log file.
+
+    This test addresses the issue where a user calling:
+        logger.setLevel(logging.INFO)
+    would previously prevent debug information from being saved to the log file.
+    """
+    # Log a debug message before changing the level
+    debug_gym_logger.debug("Debug message before setLevel")
+
+    # User changes the level (this should only affect rich_handler)
+    debug_gym_logger.setLevel(logging.ERROR)
+
+    # Log messages at different levels
+    debug_gym_logger.debug("Debug message after setLevel")
+    debug_gym_logger.info("Info message after setLevel")
+    debug_gym_logger.error("Error message after setLevel")
+
+    # Verify all messages are in the log file (file handler level is DEBUG)
+    with open(debug_gym_logger.log_file, "r") as f:
+        content = f.read()
+
+    assert "Debug message before setLevel" in content
+    assert "Debug message after setLevel" in content
+    assert "Info message after setLevel" in content
+    assert "Error message after setLevel" in content
+
+
+def test_setlevel_changes_rich_handler_level(DebugGymLoggerTest, tmp_path):
+    """Test that setLevel changes the rich_handler's level."""
+    logger = DebugGymLoggerTest("test_rich_handler_level", log_dir=str(tmp_path))
+
+    # Check initial rich_handler level is INFO
+    assert logger._rich_handler is not None
+    if os.environ.get("DEBUG_GYM_DEBUG", "").lower() in ("1", "true", "yes"):
+        assert logger._rich_handler.level == logging.DEBUG
+    else:
+        assert logger._rich_handler.level == logging.INFO
+
+    # Change to ERROR level
+    logger.setLevel(logging.ERROR)
+    assert logger._rich_handler.level == logging.ERROR
+
+    # Change to WARNING level
+    logger.setLevel(logging.WARNING)
+    assert logger._rich_handler.level == logging.WARNING

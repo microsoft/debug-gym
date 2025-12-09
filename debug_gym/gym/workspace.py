@@ -3,9 +3,18 @@ import os
 import tempfile
 from pathlib import Path
 
-from debug_gym.gym.terminal import Terminal
+from debug_gym.gym.terminals.local import LocalTerminal
+from debug_gym.gym.terminals.terminal import Terminal
 from debug_gym.gym.utils import make_file_matcher
 from debug_gym.logger import DebugGymLogger
+
+
+class WorkspaceError(Exception):
+    """Base class for workspace-related errors."""
+
+
+class WorkspaceReadError(WorkspaceError):
+    """Raised when a file exists but cannot be read."""
 
 
 class Workspace:
@@ -30,7 +39,8 @@ class Workspace:
         self.cleanup()
 
         self.working_dir = Path("/testbed")
-        if type(self.terminal) is Terminal:
+        # only create temp dir for local terminal
+        if type(self.terminal) is LocalTerminal:
             self._tempdir = tempfile.TemporaryDirectory(prefix="DebugGym-")
             atexit.register(self._tempdir.cleanup)
             self.working_dir = Path(self._tempdir.name).resolve()
@@ -108,7 +118,7 @@ class Workspace:
         if raises in [True, "ignore"] and abs_filepath != self.working_dir:
             # Check if file exists, is within working_dir and is not ignored.
             check_cmd = (
-                f'abs_path=$(realpath "{abs_filepath_str}"); '
+                f'abs_path=$(realpath -s "{abs_filepath_str}"); '
                 f'test -e "$abs_path" && [[ "$abs_path" == {self.working_dir}* ]]'
             )
             success, result = self.terminal.run(
@@ -131,6 +141,11 @@ class Workspace:
         success, output = self.terminal.run(
             f"cat {abs_filepath}", raises=raises, strip_output=False
         )
+        if not success:
+            message = output.strip() or "Unknown error"
+            raise WorkspaceReadError(
+                f"Failed to read `{filepath}`. Command output:\n{message}"
+            )
         return output
 
     def write_file(self, filepath: str, content: str):
@@ -140,19 +155,31 @@ class Workspace:
         # create parent directories via the terminal if needed
         self.terminal.run(f'mkdir -p "{str(abs_filepath.parent)}"', raises=True)
 
+        # We will split content in chunks of 32kB to avoid hitting command length limits.
+        chunk_size = 32 * 1024  # 32kB
+        first_chunk = content[:chunk_size]
+        rest = content[chunk_size:]
+
         # In the following command we:
         # - use a single-quoted heredoc (cat <<'nDEBUGGYM_EOF' ... nDEBUGGYM_EOF) so the heredoc body is taken literally (no shell expansion)
         # - append a sentinel character DEBUGGYM_DEL inside the heredoc so we can detect/restore trailing newlines later
         # - capture the heredoc output into shell variable CONTENT since command substitution strips trailing newlines
         # - "${CONTENT%DEBUGGYM_DEL}" removes the trailing sentinel DEBUGGYM_DEL (restoring the original trailing-newline state)
         # - echo -n writes the result without adding an extra newline
-        cmd = f"CONTENT=$(cat <<'DEBUGGYM_EOF'\n{content}DEBUGGYM_DEL\nDEBUGGYM_EOF\n); echo -n \"${{CONTENT%DEBUGGYM_DEL}}\" > {abs_filepath}"
+        cmd = f"CONTENT=$(cat <<'DEBUGGYM_EOF'\n{first_chunk}DEBUGGYM_DEL\nDEBUGGYM_EOF\n); echo -n \"${{CONTENT%DEBUGGYM_DEL}}\" > {abs_filepath}"
         self.terminal.run(cmd, raises=True)
+
+        for i in range(0, len(rest), chunk_size):
+            chunk = rest[i : i + chunk_size]
+            cmd = f"CONTENT=$(cat <<'DEBUGGYM_EOF'\n{chunk}DEBUGGYM_DEL\nDEBUGGYM_EOF\n); echo -n \"${{CONTENT%DEBUGGYM_DEL}}\" >> {abs_filepath}"
+            self.terminal.run(cmd, raises=True)
 
     def directory_tree(self, root: str | Path = None, max_depth: int = 1):
         root = self.resolve_path(root or self.working_dir, raises=True)
         # Use the terminal to run a bash command to list files
-        tree_cmd = f"tree --charset=ASCII --noreport -a -v -F -f -L {max_depth} {root} "
+        tree_cmd = (
+            f"tree --charset=ASCII --noreport -a -v -F -f -l -L {max_depth} {root} "
+        )
         success, output = self.terminal.run(tree_cmd, raises=True)
 
         first, *rest = output.splitlines()
@@ -165,7 +192,9 @@ class Workspace:
             if self._is_ignored_func(path):
                 continue
 
-            lines.append(f"{prefix}{os.path.basename(path.rstrip('/'))}")
+            # Remove trailing / and symbolic link details.
+            clean_path = path.split(" -> ")[0].rstrip("/")
+            lines.append(f"{prefix}{os.path.basename(clean_path)}")
 
             if path.endswith("/"):
                 # i.e. a directory

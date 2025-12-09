@@ -2,10 +2,10 @@ import hashlib
 import hmac
 import json
 import logging
+import os
 import subprocess
 import time
 import uuid
-from pathlib import Path
 
 import openai
 import tiktoken
@@ -23,11 +23,15 @@ logging.getLogger("openai").setLevel(logging.WARNING)
 
 
 class CopilotLLM(OpenAILLM):
+    CLIENT_MAX_AGE_SECONDS = 1200  # 20 minutes
+    AUTH_RETRY_DELAY_SECONDS = 5
+
     def __init__(self, model_name, logger=None, llm_config=None, llm_config_file=None):
         super().__init__(model_name, logger, llm_config, llm_config_file)
         self._client = None
         self._token_cache = None
         self._token_expires_at = 0
+        self._client_created_at = 0
 
     def create_request_hmac(self, hmac_secret):
         """Create HMAC for request authentication"""
@@ -39,6 +43,40 @@ class CopilotLLM(OpenAILLM):
         ).hexdigest()
         return f"{current}.{signature}"
 
+    def _resolve_vscode_copilot_dir(self) -> str:
+        """Resolve the path to the vscode-copilot repository."""
+
+        vscode_copilot_dir = os.environ.get(
+            "VSCODE_COPILOT_DIR", os.path.expanduser("~/vscode-copilot")
+        )
+        return os.path.expanduser(vscode_copilot_dir)
+
+    def _get_hmac_secret(self, vscode_copilot_dir: str) -> str:
+        """Load the HMAC secret from environment variables or .env file."""
+
+        hmac_secret = os.environ.get("HMAC_SECRET")
+        if not hmac_secret:
+            env_file_path = os.path.join(vscode_copilot_dir, ".env")
+            if os.path.exists(env_file_path):
+                try:
+                    with open(env_file_path, "r") as env_file:
+                        for line in env_file:
+                            line = line.strip()
+                            if line.startswith("HMAC_SECRET="):
+                                hmac_secret = line.split("=", 1)[1].strip("\"'")
+                                break
+                except Exception as exc:
+                    self.logger.warning(
+                        "Failed to read .env file at %s: %s", env_file_path, exc
+                    )
+
+        if not hmac_secret:
+            raise ValueError(
+                "HMAC_SECRET not found in environment variables or .env file in vscode-copilot directory"
+            )
+
+        return hmac_secret
+
     def fetch_token(self):
         """Fetch GitHub Copilot token using Node.js script"""
         # Cache token for 30 minutes to avoid frequent fetches
@@ -46,22 +84,20 @@ class CopilotLLM(OpenAILLM):
             return self._token_cache
 
         try:
-            # Get the vscode-copilot directory path
-            import os
-
-            vscode_copilot_dir = os.environ.get(
-                "VSCODE_COPILOT_DIR", os.path.expanduser("~/vscode-copilot")
-            )
+            vscode_copilot_dir = self._resolve_vscode_copilot_dir()
             if not os.path.exists(vscode_copilot_dir):
                 raise ValueError(
                     f"vscode-copilot directory not found at: {vscode_copilot_dir}. "
                     "Set VSCODE_COPILOT_DIR environment variable to the correct path."
                 )
 
+            script_path = os.path.join(
+                vscode_copilot_dir, "src", "util", "node", "fetch-token-standalone.js"
+            )
             result = subprocess.run(
                 [
                     "node",
-                    f"{vscode_copilot_dir}/src/util/node/fetch-token-standalone.js",
+                    script_path,
                 ],
                 capture_output=True,
                 text=True,
@@ -84,81 +120,80 @@ class CopilotLLM(OpenAILLM):
             self._token_cache = token
             self._token_expires_at = time.time() + 1800  # 30 minutes
             return token
-        except Exception as e:
-            raise ValueError(f"Failed to get Copilot token: {e}")
+        except Exception as exc:
+            raise ValueError(f"Failed to get Copilot token: {exc}") from exc
 
     @property
     def client(self):
+        now = time.time()
+        reason = None
         if self._client is None:
-            # Get HMAC secret from environment or .env file in vscode-copilot directory
-            import os
+            reason = "initialize"
+        elif now - self._client_created_at >= self.CLIENT_MAX_AGE_SECONDS:
+            reason = f"age>{self.CLIENT_MAX_AGE_SECONDS}s"
 
-            # Get the vscode-copilot directory path
-            vscode_copilot_dir = os.environ.get(
-                "VSCODE_COPILOT_DIR", os.path.expanduser("~/vscode-copilot")
-            )
+        if reason:
+            self.logger.debug("Creating Copilot client (%s)", reason)
+            self._client = self._create_copilot_client()
+            self._client_created_at = time.time()
 
-            # Try to load HMAC_SECRET from .env file in vscode-copilot directory
-            hmac_secret = os.environ.get("HMAC_SECRET")
-            if not hmac_secret:
-                env_file_path = os.path.join(vscode_copilot_dir, ".env")
-                if os.path.exists(env_file_path):
-                    try:
-                        with open(env_file_path, "r") as f:
-                            for line in f:
-                                line = line.strip()
-                                if line.startswith("HMAC_SECRET="):
-                                    hmac_secret = line.split("=", 1)[1].strip("\"'")
-                                    break
-                    except Exception as e:
-                        self.logger.warning(
-                            f"Failed to read .env file at {env_file_path}: {e}"
-                        )
-
-            if not hmac_secret:
-                raise ValueError(
-                    "HMAC_SECRET not found in environment variables or .env file in vscode-copilot directory"
-                )
-
-            bearer_token = self.fetch_token()
-            hmac_value = self.create_request_hmac(hmac_secret)
-
-            if not hmac_value or not bearer_token:
-                raise ValueError(
-                    "Missing HMAC or Bearer token for GitHub Copilot Claude API"
-                )
-
-            # Create OpenAI client with GitHub Copilot endpoint and custom headers
-            self._client = OpenAI(
-                api_key=bearer_token,
-                base_url=self.config.endpoint
-                or "https://api.enterprise.githubcopilot.com",
-                default_headers={
-                    "X-Interaction-Type": "conversation-agent",
-                    "OpenAI-Intent": "conversation-agent",
-                    "X-GitHub-Api-Version": self.config.api_version or "2025-05-01",
-                    "Copilot-Integration-Id": "vscode-chat-dev",
-                    "VScode-SessionId": "debug-gym-session",
-                    "VScode-MachineId": "debug-gym-machine",
-                    "X-Interaction-Id": str(uuid.uuid4()),
-                    "X-Initiator": "agent",
-                    "Editor-Version": "debug-gym/1.0",
-                    "Editor-Plugin-Version": "debug-gym/1.0",
-                    "Request-Hmac": hmac_value,
-                },
-                timeout=None,
-            )
         return self._client
 
-    def tokenize(self, text: str) -> list[str]:
+    def _create_copilot_client(self) -> OpenAI:
+        vscode_copilot_dir = self._resolve_vscode_copilot_dir()
+        hmac_secret = self._get_hmac_secret(vscode_copilot_dir)
+
+        bearer_token = self.fetch_token()
+        hmac_value = self.create_request_hmac(hmac_secret)
+
+        if not hmac_value or not bearer_token:
+            raise ValueError(
+                "Missing HMAC or Bearer token for GitHub Copilot Claude API"
+            )
+
+        timestamp = hmac_value.split(".")[0]
+        self.logger.debug(
+            "Creating client with HMAC timestamp: %s (current time: %s)",
+            timestamp,
+            int(time.time()),
+        )
+
+        return OpenAI(
+            api_key=bearer_token,
+            base_url=self.config.endpoint or "https://api.enterprise.githubcopilot.com",
+            default_headers={
+                "X-Interaction-Type": "conversation-agent",
+                "OpenAI-Intent": "conversation-agent",
+                "X-GitHub-Api-Version": self.config.api_version or "2025-05-01",
+                "Copilot-Integration-Id": "vscode-chat-dev",
+                "VScode-SessionId": "debug-gym-session",
+                "VScode-MachineId": "debug-gym-machine",
+                "X-Interaction-Id": str(uuid.uuid4()),
+                "X-Initiator": "agent",
+                "Editor-Version": "debug-gym/1.0",
+                "Editor-Plugin-Version": "debug-gym/1.0",
+                "Request-Hmac": hmac_value,
+            },
+            timeout=None,
+        )
+
+    def tokenize(self, messages: list[dict]) -> list[list[str]]:
         if getattr(self, "_tk_func", None) is None:
             try:
-                self._tk_func = tiktoken.encoding_for_model("gpt-4o").encode
+                encoder = tiktoken.encoding_for_model("gpt-4o")
+                # For tiktoken, encode returns list of ints, convert to strings
+                self._tk_func = lambda text: [str(t) for t in encoder.encode(text)]
             except KeyError:
                 # Simple word-based tokenization as fallback
-                # For Claude, you might want to use tiktoken or another tokenizer
                 self._tk_func = lambda x: x.split()
-        return self._tk_func(text)
+
+        # Tokenize each message individually
+        result = []
+        for msg in messages:
+            content = str(msg.get("content", msg.get("tool_calls", msg)))
+            tokens = self._tk_func(content)
+            result.append(tokens)
+        return result
 
     def need_to_be_retried(self, exception) -> bool:
         # re-use the need_to_be_retried function from the parent class
@@ -168,18 +203,32 @@ class CopilotLLM(OpenAILLM):
         )
         logger = self.logger.debug
         if exception_full_name == "openai.AuthenticationError":
-            if "HMAC timestamp out of range" in exception.message:
-                # This error indicates that the HMAC timestamp is out of range,
-                # which can happen if the system clock is not synchronized.
-                # We should retry after a short delay to allow for clock synchronization.
+            error_message = getattr(exception, "message", str(exception))
+            if "HMAC timestamp out of range" in error_message:
+                self.logger.info(
+                    "HMAC timestamp out of range, regenerating client with fresh timestamp"
+                )
+                self._invalidate_client_cache()
                 need_to_retry = True
-                time.sleep(5)
+                time.sleep(self.AUTH_RETRY_DELAY_SECONDS)
+            elif "unauthorized" in error_message.lower():
+                self.logger.info("Authentication failure, refreshing token and client")
+                self._invalidate_client_cache()
+                need_to_retry = True
+                time.sleep(self.AUTH_RETRY_DELAY_SECONDS)
         logger(
             f"Error calling {self.model_name}: {exception_full_name!r} {
-                exception.message if hasattr(exception, 'message') else exception
+                getattr(exception, 'message', str(exception))
             }"
         )
         return need_to_retry
+
+    def _invalidate_client_cache(self):
+        """Invalidate both token and client cache to force regeneration"""
+        self._client = None
+        self._token_cache = None
+        self._token_expires_at = 0
+        self._client_created_at = 0
 
 
 class CopilotOpenAILLM(CopilotLLM):
@@ -202,7 +251,7 @@ class CopilotClaudeLLM(CopilotLLM):
         kwargs["max_tokens"] = kwargs.get("max_tokens", NOT_GIVEN)
         try:
             response = retry_on_exception(
-                self.client.chat.completions.create, self.need_to_be_retried
+                self._perform_chat_completion, self.need_to_be_retried
             )(
                 model=self.config.model,
                 messages=messages,

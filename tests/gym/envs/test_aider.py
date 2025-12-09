@@ -1,7 +1,10 @@
+from unittest.mock import patch
+
 import pytest
 
 from debug_gym.gym.envs import AiderBenchmarkEnv
-from debug_gym.gym.terminal import Terminal
+from debug_gym.gym.terminals.docker import DockerTerminal
+from debug_gym.gym.terminals.local import LocalTerminal
 from debug_gym.gym.tools.tool import ToolCall
 from debug_gym.gym.tools.toolbox import Toolbox
 
@@ -33,9 +36,11 @@ def setup_aider_repo(tmp_path_factory):
 
 @pytest.fixture
 def env(setup_aider_repo):
-    terminal = Terminal()
-    env = AiderBenchmarkEnv(terminal=terminal)
-    env.reset(options={"task_name": "clock"})
+    terminal = LocalTerminal()
+    dataset = AiderBenchmarkEnv.load_dataset()
+    task_data = dataset["clock"]
+    env = AiderBenchmarkEnv(task_data=task_data, terminal=terminal)
+    env.reset()
     return env
 
 
@@ -83,8 +88,9 @@ def test_steps(env):
     assert infos.step_observation.observation.startswith(
         "The file `clock.py` has been updated successfully."
     )
-    assert env.auto_eval_on_rewrite is True
-    assert infos.score == 1
+    assert not any(obs.source == "eval" for obs in infos.all_observations)
+    assert "1 failed" in infos.eval_observation.observation
+    assert infos.score == 0
 
     infos = env.step(eval_call)
     assert infos.step_observation.source == "eval"
@@ -95,3 +101,26 @@ def test_steps(env):
 
 def test_instructions(env):
     assert env.instructions == "What time is it?"
+
+
+@patch("debug_gym.gym.envs.aider.build_docker_image")
+def test_build_docker_image(mock_build_docker_image):
+    AiderBenchmarkEnv.load_dataset()
+    mock_build_docker_image.assert_called_once()
+
+
+@pytest.if_docker_running
+def test_reset_with_docker_terminal(setup_aider_repo):
+    dataset = AiderBenchmarkEnv.load_dataset()
+    task_data = dataset["clock"]
+    env = AiderBenchmarkEnv(task_data=task_data)
+    env.add_tool(Toolbox.get_tool("eval"))
+    assert isinstance(env.terminal, DockerTerminal)
+
+    infos = env.reset(options={"task_name": "clock"})
+    assert env.instructions == infos.step_observation.observation
+    assert "1 failed" in infos.eval_observation.observation
+    assert infos.max_score == 1
+    assert infos.score == 0
+    assert not infos.terminated
+    assert not infos.resolved
