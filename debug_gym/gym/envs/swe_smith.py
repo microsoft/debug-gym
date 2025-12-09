@@ -113,7 +113,7 @@ class SWESmithEnv(SWEBenchEnv):
 
     def calculate_score(self, eval_output: EvalOutput) -> int:
         test_status_map = self.log_parser(eval_output.output)
-        score = sum(
+        f2p_score = sum(
             1
             for test in self.fail_to_pass
             # *Do not* assume silent success for now as done in SWE-Smith grading.py
@@ -121,6 +121,15 @@ class SWESmithEnv(SWEBenchEnv):
             if test_status_map.get(test, TestStatus.ERROR.value)
             in (TestStatus.PASSED.value, TestStatus.XFAIL.value)
         )
+        p2p_score = sum(
+            1
+            for test in self.pass_to_pass
+            if test_status_map.get(test, TestStatus.PASSED.value)
+            in (TestStatus.PASSED.value, TestStatus.XFAIL.value)
+        )
+
+        # The final score is f2p_score only if all pass_to_pass tests passed.
+        score = f2p_score if p2p_score == len(self.pass_to_pass) else 0
 
         # Getting not passed tests.
         not_passed_tests = {
@@ -138,6 +147,9 @@ class SWESmithEnv(SWEBenchEnv):
         return score
 
     def eval(self, **kwargs) -> EvalOutput:
+        # Reset any changes made to test_directives files.
+        self.terminal.run(f"git checkout -- {' '.join(self.test_directives)}")
+
         success, output = self.terminal.run(self.entrypoint, timeout=self.run_timeout)
         self.last_eval = EvalOutput(success, output)
         return self.last_eval

@@ -166,13 +166,23 @@ class SWEBenchEnv(RepoEnv):
         )
         self.logger.debug(f"fail_to_pass: {self.fail_to_pass}")
         self.logger.debug(f"Test status map: {test_status_map}")
-        score = sum(
+        f2p_score = sum(
             1
             for test in self.fail_to_pass
             # *Do not* assume silent success for now as done in SWE-Bench grading.py
             if test_status_map.get(test, TestStatus.ERROR.value)
             in (TestStatus.PASSED.value, TestStatus.XFAIL.value)
         )
+        p2p_score = sum(
+            1
+            for test in self.pass_to_pass
+            if test_status_map.get(test, TestStatus.PASSED.value)
+            in (TestStatus.PASSED.value, TestStatus.XFAIL.value)
+        )
+
+        # The final score is f2p_score only if all pass_to_pass tests passed.
+        score = f2p_score if p2p_score == len(self.pass_to_pass) else 0
+
         assert score <= self.max_score
         return score
 
