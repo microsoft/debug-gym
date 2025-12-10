@@ -84,10 +84,7 @@ class BaseAgent:
     name: str = None
     args_class = AgentArgs
     system_prompt: str = ""
-    instance_prompt: str = """\
-{
-  "Instructions": {{ info.instructions }}
-}"""
+    instance_prompt: str = "Instructions: {{ info.instructions }}"
 
     def __init__(
         self,
@@ -96,9 +93,9 @@ class BaseAgent:
         logger: DebugGymLogger | None = None,
     ):
         self.args = self.args_class.make(agent_args or {})
-        self.llm = llm
         self.history = HistoryTracker()
         self.logger = logger or DebugGymLogger("debug-gym")
+        self.llm = None
         self.env = None
 
         # Override prompts if provided in args
@@ -163,7 +160,9 @@ class BaseAgent:
     def build_system_prompt(self, info: EnvInfo | None = None) -> dict:
         """Build system prompt using the default template or one provided in args."""
         system_prompt_template = self._load_prompt_template(self.system_prompt)
+        self.logger.debug(f"Loaded system prompt template:\n{self.system_prompt}")
         system_prompt = system_prompt_template.render(agent=self, info=info)
+        self.logger.debug(f"Rendered system prompt:\n{system_prompt}")
 
         # TODO: should we call self.llm.convert_observation_to_message(system_prompt) ?
         return {"role": "system", "content": filter_non_utf8(system_prompt)}
@@ -171,7 +170,9 @@ class BaseAgent:
     def build_instance_prompt(self, info: EnvInfo | None = None) -> dict:
         """Build instance prompt using the default template or one provided in args."""
         instance_prompt_template = self._load_prompt_template(self.instance_prompt)
+        self.logger.debug(f"Loaded instance prompt template:\n{self.instance_prompt}")
         instance_prompt = instance_prompt_template.render(agent=self, info=info)
+        self.logger.debug(f"Rendered instance prompt:\n{instance_prompt}")
         return self.llm.convert_observation_to_message(instance_prompt)
 
     def build_history_prompt(self) -> list[dict]:
@@ -237,9 +238,10 @@ class BaseAgent:
             reason = "max_steps reached"
         return should_stop, reason
 
-    def run(self, env: RepoEnv, debug=False):
-        info = None
+    def run(self, env: RepoEnv, llm: LLM, debug=False):
         self.env = env
+        self.llm = llm
+        info = None
         step = 0
 
         try:
@@ -251,8 +253,8 @@ class BaseAgent:
             if info.resolved:
                 self.logger.report_progress(
                     problem_id=env.task_name,
-                    step=1,
-                    total_steps=1,
+                    step=0,
+                    total_steps=self.args.max_steps,
                     score=info.score,
                     max_score=info.max_score,
                     status="resolved",
@@ -269,7 +271,7 @@ class BaseAgent:
             step = 1
 
             while not should_stop:
-                self.logger.info(f"\n{'='*20} STEP {step+1} {'='*20}\n")
+                self.logger.info(f"\n{'='*20} STEP {step} {'='*20}\n")
 
                 messages = self.build_prompt(info)
                 llm_response = self.llm(messages, info.tools)
@@ -283,7 +285,7 @@ class BaseAgent:
                     llm_response.reasoning_response,
                 )
                 self.history.step(info, llm_response)
-                should_stop, reason = self.should_stop(step, info)
+                should_stop, reason = self.should_stop(step + 1, info)
                 status = (
                     "resolved"
                     if info.resolved
@@ -338,13 +340,10 @@ class BaseAgent:
         return json_output
 
 
-def create_agent(
-    agent_type: str,
-    *,
-    agent_args: AgentArgs | Dict[str, Any] | None = None,
-    config: Dict[str, Any] | None = None,
-    **agent_kwargs,
-):
+def create_agent(config: Dict[str, Any], **kwargs) -> BaseAgent:
+    """Create an agent from the config dictionary."""
+
+    agent_type = config.pop("agent_type", "froggy")
     if agent_type in AGENT_REGISTRY:
         agent_class = AGENT_REGISTRY[agent_type]
     elif "." in agent_type:
@@ -360,9 +359,5 @@ def create_agent(
     else:
         raise ValueError(f"Unknown agent type: {agent_type}")
 
-    agent_args = agent_args or config
-    if agent_args is None:
-        raise ValueError("Either agent_args or config must be provided.")
-
-    agent = agent_class(agent_args=agent_args, **agent_kwargs)
+    agent = agent_class(agent_args=config, **kwargs)
     return agent

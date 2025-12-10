@@ -95,14 +95,13 @@ def run_agent(args, task_name: str, task_data: dict, config: dict):
         )
 
         agent = create_agent(
-            config["agent_type"],
-            agent_args=config,
-            llm=llm,
+            config["agent"],
+            # llm=llm,
             logger=task_logger,
         )
 
         try:
-            success = agent.run(env, debug=args.debug)
+            success = agent.run(env, llm, debug=args.debug)
         except KeyboardInterrupt:
             task_logger.error("Agent run was interrupted by user.")
             task_logger.report_progress(

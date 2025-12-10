@@ -186,8 +186,7 @@ def run_task(args, problem, config):
 
         agent = create_agent(
             config["agent_type"],
-            config=config,
-            env=env,
+            agent_args=config,
             llm=llm,
             logger=task_logger,
         )

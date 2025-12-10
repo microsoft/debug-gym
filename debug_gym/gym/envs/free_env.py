@@ -33,7 +33,8 @@ class FreeEnv(RepoEnv):
             "image": image,
             "local_path": local_path,
             "workspace_dir": workspace_dir,
-            "setup_commands": setup_commands or [],  # TODO: use setup_commands
+            "setup_commands": setup_commands
+            or ["apt-get update -y && apt-get install -y git tree"],
         }
         super().__init__(
             task_data=task_data,
@@ -64,14 +65,14 @@ class FreeEnv(RepoEnv):
         self.workspace.setup_file_filters()  # Use codebase's .debugignore and .debugreadonly.
 
     def setup_terminal(self) -> None:
-        """Apply FreeEnv tweaks and reuse RepoEnv git bootstrapping when enabled."""
+        """Apply FreeEnv tweaks and reuse RepoEnv git boo? but the agent cantstrapping when enabled."""
 
         self.logger.info(f"Configuring {self.terminal}...")
 
         # Ensure core utilities exist before RepoEnv renders directory listings.
-        self.terminal.run(
-            "apt-get update -y && apt-get install -y git tree", raises=True
-        )
+        for cmd in self.task_data.get("setup_commands", []):
+            self.terminal.run(cmd, raises=True)
+
         # self.terminal.run(
         #     f"mkdir -p {shlex.quote(self._workspace_dir)}",
         #     raises=True,
