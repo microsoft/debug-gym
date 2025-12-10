@@ -20,6 +20,8 @@ def create_env(config: dict, task_data: dict, logger: DebugGymLogger):
         logger=logger,
         **config.get("env", {}),
     )
+
+    add_tools(env, config, logger)
     return env
 
 
@@ -30,6 +32,10 @@ def add_tools(env, config: dict, logger: DebugGymLogger):
         if isinstance(tool, dict):
             assert len(tool) == 1, "Tool dict must have exactly one key"
             tool, tool_config = list(tool.items())[0]
+        if isinstance(config["tools"], dict) and isinstance(
+            config["tools"][tool], dict
+        ):
+            tool_config.update(config["tools"][tool])
 
         tool_instantiated = Toolbox.get_tool(tool, **tool_config)
         env.add_tool(tool_instantiated)

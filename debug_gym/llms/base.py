@@ -2,7 +2,7 @@ import logging
 import os
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 import yaml
 from tenacity import (
@@ -218,7 +218,7 @@ class LLM(ABC):
     @classmethod
     def instantiate(
         cls,
-        llm_name: str,
+        config: Dict[str, Any],
         llm_config_file_path: str | None = None,
         logger: DebugGymLogger | None = None,
     ) -> "LLM":
@@ -232,7 +232,9 @@ class LLM(ABC):
         Returns:
             An instance of the appropriate LLM class.
         """
+
         logger = logger or DebugGymLogger("debug-gym")
+        llm_name = config.get("name")
         if not llm_name:
             return None
 
@@ -242,6 +244,7 @@ class LLM(ABC):
             return Human(llm_name, logger=logger)
 
         llm_config = LLMConfigRegistry.from_file(llm_config_file_path)[llm_name]
+        llm_config.update(config)
 
         tags = llm_config.tags
 

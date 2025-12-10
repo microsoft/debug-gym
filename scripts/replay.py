@@ -34,13 +34,13 @@ def set_signal(timeout_seconds):
         signal.alarm(timeout_seconds)
 
 
-def run_replay_agent(agent, task_name=None, args=None):
+def run_replay_agent(agent, env, llm, task_name=None, args=None):
     step = 0
     info = None
     max_steps = agent.config["max_steps"]
     try:
         agent.history.reset()
-        info = agent.env.reset(options={"task_name": task_name})
+        info = env.reset(options={"task_name": task_name})
         # initial state does not have prompt and response
         agent.history.step(info, None)
 
@@ -57,7 +57,7 @@ def run_replay_agent(agent, task_name=None, args=None):
 
         agent.logger.info(
             "Available tools (in LLM's tool calling format):\n"
-            f"{json.dumps(agent.llm.define_tools(info.tools), indent=4)}\n"
+            f"{json.dumps(llm.define_tools(info.tools), indent=4)}\n"
         )
 
         highscore = info.score
@@ -89,12 +89,12 @@ def run_replay_agent(agent, task_name=None, args=None):
                     f"LLM response - tool call: {llm_response.tool}"
                 )
             else:
-                llm_response = agent.llm(messages, info.tools)
+                llm_response = llm(messages, info.tools)
 
             if args.debug and (args.debug_at is None or step >= args.debug_at):
                 breakpoint()
 
-            info = agent.env.step(
+            info = env.step(
                 llm_response.tool,
                 llm_response.response,
                 llm_response.reasoning_response,
@@ -176,23 +176,11 @@ def run_task(args, problem, config):
         )
 
         env = create_env(config, task_logger)
-        add_tools(env, config, task_logger)
-
-        llm = LLM.instantiate(
-            llm_name=config["llm_name"],
-            llm_config_file_path=config.get("llm_config_file_path"),
-            logger=task_logger,
-        )
-
-        agent = create_agent(
-            config["agent_type"],
-            agent_args=config,
-            llm=llm,
-            logger=task_logger,
-        )
+        llm = LLM.instantiate(config["llm"], logger=task_logger)
+        agent = create_agent(config["agent"], logger=task_logger)
 
         try:
-            success = run_replay_agent(agent, task_name=problem, args=args)
+            success = run_replay_agent(agent, env, llm, task_name=problem, args=args)
         except KeyboardInterrupt:
             task_logger.error("Agent run was interrupted by user.")
             task_logger.report_progress(
@@ -366,11 +354,7 @@ def main():
         len(problems) == 1
     ), "Replay only supports a single problem in the trajectory file."
 
-    llm = LLM.instantiate(
-        llm_name=config["llm_name"],
-        llm_config_file_path=config.get("llm_config_file_path"),
-        logger=logger,
-    )
+    llm = LLM.instantiate(config["llm"], logger=logger)
 
     # Stop live progress display if in Human mode (avoid conflicts with prompt_toolkit)
     if isinstance(llm, Human) or args.debug:

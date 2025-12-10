@@ -131,8 +131,10 @@ def load_config():
         entry_to_change[keys[-1]] = yaml.safe_load(value)
 
     # assume agent type is the key if not specified by the user
-    if not config.get("agent_type"):
-        config["agent_type"] = args.agent
+    if "agent" not in config:
+        config["agent"] = {}
+    if "type" not in config["agent"]:
+        config["agent"]["type"] = args.agent
 
     return config, args
 

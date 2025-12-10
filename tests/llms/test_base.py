@@ -70,23 +70,23 @@ def test_instantiate_llm(mock_open, logger_mock):
     assert llm is None
 
     # tags are used to filter models
-    llm = LLM.instantiate("gpt-4o-mini", logger=logger_mock)
+    llm = LLM.instantiate({"name": "gpt-4o-mini"}, logger=logger_mock)
     assert isinstance(llm, OpenAILLM)
 
-    llm = LLM.instantiate("gpt-4o-mini-azure", logger=logger_mock)
+    llm = LLM.instantiate({"name": "gpt-4o-mini-azure"}, logger=logger_mock)
     assert isinstance(llm, AzureOpenAILLM)
 
-    llm = LLM.instantiate("claude-3.7", logger=logger_mock)
+    llm = LLM.instantiate({"name": "claude-3.7"}, logger=logger_mock)
     assert isinstance(llm, AnthropicLLM)
 
-    llm = LLM.instantiate("qwen-3", logger=logger_mock)
+    llm = LLM.instantiate({"name": "qwen-3"}, logger=logger_mock)
     assert isinstance(llm, HuggingFaceLLM)
 
-    llm = LLM.instantiate("human", logger=logger_mock)
+    llm = LLM.instantiate({"name": "human"}, logger=logger_mock)
     assert isinstance(llm, Human)
 
     with pytest.raises(ValueError, match="Model unknown not found in llm config .+"):
-        LLM.instantiate("unknown", logger=logger_mock)
+        LLM.instantiate({"name": "unknown"}, logger=logger_mock)
 
 
 class Tool1(EnvironmentTool):
