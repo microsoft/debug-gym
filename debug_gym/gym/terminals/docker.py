@@ -6,9 +6,14 @@ from io import BytesIO
 from pathlib import Path
 
 import docker
+from docker import errors as docker_errors
 
 from debug_gym.gym.terminals.shell_session import ShellSession
-from debug_gym.gym.terminals.terminal import DISABLE_ECHO_COMMAND, Terminal
+from debug_gym.gym.terminals.terminal import (
+    DISABLE_ECHO_COMMAND,
+    Terminal,
+    UnrecoverableTerminalError,
+)
 from debug_gym.logger import DebugGymLogger
 
 
@@ -48,6 +53,25 @@ class DockerTerminal(Terminal):
         self.docker_client = docker.from_env(timeout=600)
         self._container = None
 
+    def _ensure_container_running(self):
+        """Verify that the container exists and is running."""
+        container = self.container
+        try:
+            container.reload()
+        except docker_errors.NotFound as exc:
+            raise UnrecoverableTerminalError(
+                "Docker container is not available. It may have been removed."
+            ) from exc
+        except docker_errors.DockerException as exc:
+            raise UnrecoverableTerminalError(
+                "Failed to refresh Docker container state."
+            ) from exc
+
+        if container.status != "running":
+            raise UnrecoverableTerminalError(
+                "Docker container is not running. Cannot continue execution."
+            )
+
     @property
     def working_dir(self):
         """Lazy initialization of the working directory."""
@@ -76,6 +100,7 @@ class DockerTerminal(Terminal):
         return entrypoint
 
     def new_shell_session(self):
+        self._ensure_container_running()
         session = ShellSession(
             shell_command=self.default_shell_command,
             session_commands=[DISABLE_ECHO_COMMAND] + self.session_commands,
@@ -109,14 +134,25 @@ class DockerTerminal(Terminal):
 
         self.logger.debug(f"Exec run: {command}")
 
+        self._ensure_container_running()
+
         # TODO: docker exec_run timeout?
-        status, output = self.container.exec_run(
-            command,
-            workdir=self.working_dir,
-            environment=self.env_vars,
-            stdout=True,
-            stderr=True,
-        )
+        try:
+            status, output = self.container.exec_run(
+                command,
+                workdir=self.working_dir,
+                environment=self.env_vars,
+                stdout=True,
+                stderr=True,
+            )
+        except docker_errors.APIError as exc:
+            raise UnrecoverableTerminalError(
+                "Docker exec encountered an API error."
+            ) from exc
+        except docker_errors.DockerException as exc:
+            raise UnrecoverableTerminalError(
+                "Docker exec failed due to an unexpected container error."
+            ) from exc
         success = status == 0
 
         output = output.decode()
@@ -164,12 +200,23 @@ class DockerTerminal(Terminal):
         if self.setup_commands:
             setup_commands = " && ".join(self.setup_commands)
             self.logger.debug(f"{container} Running setup commands: {setup_commands}")
-            status, output = container.exec_run(
-                ["/bin/bash", "-c", setup_commands],
-                # user="root",  # Run as root to allow installations
-                workdir=self.working_dir,
-                environment=self.env_vars,
-            )
+            try:
+                status, output = container.exec_run(
+                    ["/bin/bash", "-c", setup_commands],
+                    # user="root",  # Run as root to allow installations
+                    workdir=self.working_dir,
+                    environment=self.env_vars,
+                )
+            except docker_errors.APIError as exc:
+                container.stop()
+                raise UnrecoverableTerminalError(
+                    "Docker setup commands failed with an API error."
+                ) from exc
+            except docker_errors.DockerException as exc:
+                container.stop()
+                raise UnrecoverableTerminalError(
+                    "Docker setup commands encountered an unexpected error."
+                ) from exc
             if status != 0:
                 container.stop()
                 raise ValueError(
@@ -183,10 +230,14 @@ class DockerTerminal(Terminal):
         if self._container is not None:
             try:
                 self.container.stop(timeout=1)
-            except docker.errors.NotFound:
+            except docker_errors.NotFound:
                 self.logger.debug(
                     f"Container {self.container.name} not found. "
                     "It might have already been removed."
+                )
+            except docker_errors.DockerException as exc:
+                self.logger.debug(
+                    f"Failed to stop container {self.container.name}: {exc}"
                 )
             self._container = None
 
@@ -221,4 +272,14 @@ class DockerTerminal(Terminal):
         tar_stream.seek(0)
 
         # Get the container object and copy the archive
-        self.container.put_archive(target, tar_stream)
+        self._ensure_container_running()
+        try:
+            self.container.put_archive(target, tar_stream)
+        except docker_errors.APIError as exc:
+            raise UnrecoverableTerminalError(
+                "Docker copy failed with an API error."
+            ) from exc
+        except docker_errors.DockerException as exc:
+            raise UnrecoverableTerminalError(
+                "Docker copy encountered an unexpected error."
+            ) from exc
