@@ -11,7 +11,6 @@ from debug_gym.gym.envs.env import EnvInfo
 
 @dataclass
 class FroggyAgentArgs(AgentArgs):
-    show_directory_tree: int = 0
     show_current_breakpoints: bool = False
 
 
@@ -48,13 +47,6 @@ class FroggyAgent(BaseAgent):
         system_prompt_dict = {
             "Instructions": info.instructions,
         }
-
-        if self.args.show_directory_tree > 0:
-            system_prompt_dict["Repo directory tree"] = self.trim_message(
-                self.env.workspace.display_files(self.args.show_directory_tree),
-                max_length_percentage=0.1,
-                where="end",
-            )
 
         if self.args.show_current_breakpoints:
             system_prompt_dict["Current breakpoints"] = info.current_breakpoints
