@@ -561,7 +561,7 @@ def browse_directory():
                             "is_parent": False,
                         }
                     )
-                elif item.endswith((".jsonl")):
+                elif item.endswith((".json", ".jsonl")):
                     items.append(
                         {
                             "name": item,
@@ -594,7 +594,7 @@ def load_file_from_path():
         if not os.path.exists(filepath) or not os.path.isfile(filepath):
             return jsonify({"error": "File not found"}), 404
 
-        if not filepath.endswith(".jsonl"):
+        if not filepath.endswith((".json", ".jsonl")):
             return jsonify({"error": "Invalid file type"}), 400
 
         with open(filepath, "r") as f:
