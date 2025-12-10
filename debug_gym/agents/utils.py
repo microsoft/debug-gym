@@ -10,10 +10,9 @@ from debug_gym.agents.base_agent import AGENT_REGISTRY
 from debug_gym.logger import DebugGymLogger
 
 
-def load_config():
+def load_config(args=None):
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", help="path to config file")
-    parser.add_argument("--agent", help="agent to use")
     parser.add_argument(
         "--debug",
         action="store_true",
@@ -102,18 +101,12 @@ def load_config():
         help="override params of the config file,"
         " e.g. -p 'edit_only.random_seed=123'",
     )
-    args = parser.parse_args()
+    args = parser.parse_args(args)
     config = {}
     if args.config is not None:
         assert os.path.exists(args.config), "Invalid config file"
         with open(args.config) as reader:
             config = yaml.safe_load(reader)
-
-    args.agent = args.agent or "froggy"
-    if args.agent not in AGENT_REGISTRY:
-        raise ValueError(
-            f"Invalid agent: {args.agent}. Available agents: {sorted(AGENT_REGISTRY)}"
-        )
 
     # Parse overriden params.
     for param in args.params:
@@ -129,12 +122,6 @@ def load_config():
 
             entry_to_change = entry_to_change[k]
         entry_to_change[keys[-1]] = yaml.safe_load(value)
-
-    # assume agent type is the key if not specified by the user
-    if "agent" not in config:
-        config["agent"] = {}
-    if "type" not in config["agent"]:
-        config["agent"]["type"] = args.agent
 
     return config, args
 

@@ -27,7 +27,7 @@ def create_env(config: dict, task_data: dict, logger: DebugGymLogger):
 
 def add_tools(env, config: dict, logger: DebugGymLogger):
     """Add tools to the environment"""
-    for tool in config["tools"]:
+    for tool in config.get("tools", []):
         tool_config = {}
         if isinstance(tool, dict):
             assert len(tool) == 1, "Tool dict must have exactly one key"

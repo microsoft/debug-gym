@@ -343,7 +343,7 @@ class BaseAgent:
 def create_agent(config: Dict[str, Any], **kwargs) -> BaseAgent:
     """Create an agent from the config dictionary."""
 
-    agent_type = config.pop("agent_type", "froggy")
+    agent_type = config.get("type", "froggy")
     if agent_type in AGENT_REGISTRY:
         agent_class = AGENT_REGISTRY[agent_type]
     elif "." in agent_type:
