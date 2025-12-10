@@ -66,9 +66,6 @@ from debug_gym.llms.base import (
     ),
 )
 def test_instantiate_llm(mock_open, logger_mock):
-    llm = LLM.instantiate(None, logger=logger_mock)
-    assert llm is None
-
     # tags are used to filter models
     llm = LLM.instantiate({"name": "gpt-4o-mini"}, logger=logger_mock)
     assert isinstance(llm, OpenAILLM)
@@ -359,7 +356,7 @@ def test_token_usage_initialization():
         }
     ),
 )
-def test_llm_call_with_generate_kwargs(mock_llm_config, logger_mock, llm_class_mock):
+def test_llm_call_with_generate_kwargs(logger_mock, llm_class_mock):
     messages = [{"role": "user", "content": "Hello"}]
     llm_mock = llm_class_mock("llm-mock", logger=logger_mock)
     llm_response = llm_mock(messages, tools)
@@ -387,9 +384,7 @@ def test_llm_call_with_generate_kwargs(mock_llm_config, logger_mock, llm_class_m
         }
     ),
 )
-def test_llm_call_override_generate_kwargs(
-    mock_llm_config, logger_mock, llm_class_mock
-):
+def test_llm_call_override_generate_kwargs(logger_mock, llm_class_mock):
     messages = [{"role": "user", "content": "Hello"}]
     llm_mock = llm_class_mock("llm-mock", logger=logger_mock)
     # Override the temperature from config
@@ -413,7 +408,7 @@ def test_llm_call_override_generate_kwargs(
         }
     ),
 )
-def test_llm_call_ignore_kwargs(mock_llm_config, logger_mock, llm_class_mock):
+def test_llm_call_ignore_kwargs(logger_mock, llm_class_mock):
     messages = [{"role": "user", "content": "Hello"}]
     llm_mock = llm_class_mock("llm-mock", logger=logger_mock)
     llm_mock(messages, tools, temperature=0.7, max_tokens=10)
@@ -509,7 +504,7 @@ def test_llm_init_with_both_config_types(logger_mock, llm_class_mock):
     ),
 )
 def test_context_length_exceeded_prevents_infinite_recursion(
-    mock_llm_config, logger_mock, llm_class_mock
+    llm_mock, logger_mock, llm_class_mock
 ):
     """Test that ContextLengthExceededError handling prevents infinite recursion."""
 

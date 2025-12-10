@@ -225,7 +225,7 @@ class LLM(ABC):
         """Creates an instance of the appropriate LLM class based on the configuration.
 
         Args:
-            llm_name: Name of the LLM model to instantiate.
+            config: Dictionary containing LLM configuration, must include 'name' key.
             llm_config_file_path: Optional path to the LLM configuration file.
             logger: Optional DebugGymLogger for logging.
 
@@ -235,16 +235,12 @@ class LLM(ABC):
 
         logger = logger or DebugGymLogger("debug-gym")
         llm_name = config.get("name")
-        if not llm_name:
-            return None
-
-        elif llm_name == "human":
+        if llm_name == "human":
             from debug_gym.llms import Human
 
             return Human(llm_name, logger=logger)
 
         llm_config = LLMConfigRegistry.from_file(llm_config_file_path)[llm_name]
-        llm_config.update(config)
 
         tags = llm_config.tags
 
