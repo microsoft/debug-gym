@@ -1,6 +1,7 @@
 import shlex
 
 from debug_gym.gym.entities import Observation
+from debug_gym.gym.terminals.terminal import UnrecoverableTerminalError
 from debug_gym.gym.tools.tool import EnvironmentTool
 from debug_gym.gym.tools.toolbox import Toolbox
 
@@ -178,5 +179,7 @@ class GrepTool(EnvironmentTool):
             else:
                 return Observation(self.name, f"Grep command failed: {output}")
 
+        except UnrecoverableTerminalError:
+            raise
         except Exception as e:
             return Observation(self.name, f"Error executing grep: {str(e)}")

@@ -4,6 +4,7 @@ from functools import wraps
 from typing import Any, Dict
 
 from debug_gym.gym.entities import Event, Observation
+from debug_gym.gym.terminals.terminal import UnrecoverableTerminalError
 from debug_gym.gym.workspace import WorkspaceError
 
 
@@ -54,6 +55,9 @@ class EnvironmentTool(ABC):
             return self.use(*args, **kwargs)
         except WorkspaceError as e:
             return Observation(self.name, str(e))
+        except UnrecoverableTerminalError:
+            # Ensure fatal terminal failures propagate so the environment can terminate the episode.
+            raise
         except Exception as e:
             # Handle exceptions and return an observation
             return Observation(

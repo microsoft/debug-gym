@@ -1,6 +1,7 @@
 import difflib
 
 from debug_gym.gym.entities import Event, Observation
+from debug_gym.gym.terminals.terminal import UnrecoverableTerminalError
 from debug_gym.gym.tools.tool import EnvironmentTool
 from debug_gym.gym.tools.toolbox import Toolbox
 from debug_gym.gym.workspace import WorkspaceReadError
@@ -150,6 +151,8 @@ class EditTool(EnvironmentTool):
             diff, new_code_length = self._edit_file(
                 environment, path, start, end, new_code, file_exists=file_exists
             )
+        except UnrecoverableTerminalError:
+            raise
         except Exception as e:
             return self.fail(environment, str(e))
 

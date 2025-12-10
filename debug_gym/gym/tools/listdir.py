@@ -1,4 +1,5 @@
 from debug_gym.gym.entities import Observation
+from debug_gym.gym.terminals.terminal import UnrecoverableTerminalError
 from debug_gym.gym.tools.tool import EnvironmentTool
 from debug_gym.gym.tools.toolbox import Toolbox
 
@@ -36,6 +37,8 @@ class ListdirTool(EnvironmentTool):
             )
         try:
             result = environment.workspace.directory_tree(root=path, max_depth=depth)
+        except UnrecoverableTerminalError:
+            raise
         except Exception as e:
             result = f"Error listing directory '{path}': {str(e)}"
         return Observation(self.name, result)

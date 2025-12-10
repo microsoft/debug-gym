@@ -20,7 +20,11 @@ from tenacity import (
 from yaml import dump, safe_load
 
 from debug_gym.gym.terminals.shell_session import ShellSession
-from debug_gym.gym.terminals.terminal import DISABLE_ECHO_COMMAND, Terminal
+from debug_gym.gym.terminals.terminal import (
+    DISABLE_ECHO_COMMAND,
+    Terminal,
+    UnrecoverableTerminalError,
+)
 from debug_gym.logger import DebugGymLogger
 
 NB_RETRIES_RUN = 50  # Number of retries for running a command
@@ -383,7 +387,9 @@ class KubernetesTerminal(Terminal):
 
     def new_shell_session(self):
         if not self.pod.is_running():
-            raise ValueError("Pod is not running. Cannot create shell session.")
+            raise UnrecoverableTerminalError(
+                "Pod is not running. Cannot create shell session."
+            )
 
         session = ShellSession(
             shell_command=self.default_shell_command,
@@ -428,7 +434,7 @@ class KubernetesTerminal(Terminal):
     ) -> tuple[bool, str]:
         """Run a command in the pod. Return command status and output."""
         if not self.pod.is_running():
-            raise ValueError("Pod is not running. Cannot run commands.")
+            raise UnrecoverableTerminalError("Pod is not running. Cannot run commands.")
 
         command = self.prepare_command(entrypoint)
 
@@ -628,7 +634,7 @@ class KubernetesTerminal(Terminal):
         simplify this to a single command rather than iterating through files.
         """
         if not self.pod.is_running():
-            raise ValueError("Pod is not running. Cannot copy files.")
+            raise UnrecoverableTerminalError("Pod is not running. Cannot copy files.")
 
         src = str(src)
         target = str(target or self.working_dir)

@@ -4,7 +4,7 @@ from pathlib import Path
 import numpy as np
 
 from debug_gym.gym.entities import EvalOutput, Event, Observation
-from debug_gym.gym.terminals.terminal import Terminal
+from debug_gym.gym.terminals.terminal import Terminal, UnrecoverableTerminalError
 from debug_gym.gym.tools.tool import EnvironmentTool, ToolCall
 from debug_gym.gym.workspace import Workspace
 from debug_gym.logger import DebugGymLogger
@@ -428,6 +428,17 @@ class RepoEnv(TooledEnv):
             except KeyboardInterrupt:
                 self.logger.error("Step was interrupted by user.")
                 raise
+            except UnrecoverableTerminalError as e:
+                fatal_message = (
+                    "Fatal terminal error detected. The remote execution pod is no longer "
+                    "available, so the episode will terminate."
+                )
+                details = str(e).strip()
+                if details:
+                    fatal_message += f"\n{details}"
+                self.logger.error(fatal_message)
+                self.step_observation = Observation("env", fatal_message)
+                self.terminated = True
             except BaseException as e:
                 error_message = (
                     f"Error while using tool {triggered_tool.name} "
