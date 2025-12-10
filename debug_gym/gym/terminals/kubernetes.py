@@ -298,7 +298,7 @@ class KubernetesTerminal(Terminal):
         self.registry = registry.rstrip("/") + "/" if registry else ""
         self._pod_name = pod_name
         self.pod_spec_kwargs = pod_spec_kwargs or {}
-        user = _clean_for_kubernetes(os.environ.get("USER", "unknown"))
+        user = _clean_for_kubernetes(os.environ.get("USER", "unknown").split("@")[0])
         self.labels = {"app": "dbg-gym", "user": user} | (extra_labels or {})
         self._pod = None
 
