@@ -71,12 +71,12 @@ def test_steps(env):
     assert "clock_test.py F" in infos.eval_observation.observation
     assert "1 failed" in infos.eval_observation.observation
     assert infos.score == 0
-    rewrite_tool = Toolbox.get_tool("rewrite")
-    env.add_tool(rewrite_tool)
+    edit_tool = Toolbox.get_tool("edit")
+    env.add_tool(edit_tool)
     infos = env.step(
         ToolCall(
-            id="rewrite_id",
-            name="rewrite",
+            id="edit_id",
+            name="edit",
             arguments={
                 "path": "clock.py",
                 "start": 2,
@@ -84,7 +84,7 @@ def test_steps(env):
             },
         )
     )
-    assert infos.step_observation.source == "rewrite"
+    assert infos.step_observation.source == "edit"
     assert infos.step_observation.observation.startswith(
         "The file `clock.py` has been updated successfully."
     )

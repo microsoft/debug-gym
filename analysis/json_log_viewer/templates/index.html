@@ -358,6 +358,12 @@
             gap: 10px;
         }
 
+        .step-index-note {
+            font-size: 0.9rem;
+            font-weight: 500;
+            color: #546e7a;
+        }
+
         .detail-section {
             margin-bottom: 25px;
         }
@@ -412,6 +418,40 @@
             background: white;
             border-radius: 8px;
             margin: 10px;
+        }
+
+        .diff-line {
+            display: block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            white-space: pre;
+            font-family: 'Courier New', monospace;
+        }
+
+        .diff-meta {
+            background: #ecf0f1;
+            color: #2c3e50;
+            font-weight: 600;
+        }
+
+        .diff-hunk {
+            background: #f4ecf7;
+            color: #6c3483;
+            font-weight: 600;
+        }
+
+        .diff-add {
+            background: #e8f6f0;
+            color: #1e8449;
+        }
+
+        .diff-remove {
+            background: #fdecea;
+            color: #c0392b;
+        }
+
+        .diff-context {
+            color: #2c3e50;
         }
 
         .json-key {
@@ -643,6 +683,41 @@
                 .replace(/'/g, '&#39;');
         }
 
+        function formatDiffIfApplicable(text) {
+            if (typeof text !== 'string') {
+                return null;
+            }
+
+            const hasUnifiedHeaders = (text.includes('\n--- ') || text.startsWith('--- ') || text.startsWith('diff --git'))
+                && (text.includes('\n+++ ') || text.includes('\ndiff --git') || text.startsWith('diff --git'));
+            const hasLineMarkers = /\n[+-].+/.test(text);
+
+            if (!hasUnifiedHeaders || !hasLineMarkers) {
+                return null;
+            }
+
+            const lines = text.split('\n');
+            const formatted = lines.map((line) => {
+                let classes = ['diff-line'];
+                if (line.startsWith('@@')) {
+                    classes.push('diff-hunk');
+                } else if (line.startsWith('+++') || line.startsWith('---') || line.startsWith('diff --git')) {
+                    classes.push('diff-meta');
+                } else if (line.startsWith('+')) {
+                    classes.push('diff-add');
+                } else if (line.startsWith('-')) {
+                    classes.push('diff-remove');
+                } else {
+                    classes.push('diff-context');
+                }
+
+                const safeContent = line.length === 0 ? '&nbsp;' : escapeHTML(line);
+                return `<span class="${classes.join(' ')}">${safeContent}</span>`;
+            });
+
+            return formatted.join('');
+        }
+
         // Create collapsible JSON viewer
         function createCollapsibleJSON(obj, container, level = 0) {
             if (typeof obj !== 'object' || obj === null) {
@@ -712,6 +787,26 @@
             container.appendChild(wrapper);
         }
 
+        function initializeJSONElement(elementId) {
+            const element = document.getElementById(elementId);
+            if (!element) {
+                return;
+            }
+
+            const raw = element.textContent.trim();
+            if (!raw) {
+                return;
+            }
+
+            try {
+                const parsed = JSON.parse(raw);
+                element.innerHTML = '';
+                createCollapsibleJSON(parsed, element);
+            } catch (e) {
+                // If parsing fails, fall back to original text representation.
+            }
+        }
+
         function formatJSONValue(value) {
             if (typeof value === 'string') {
                 return `<span class="json-string">"${escapeHTML(value)}"</span>`;
@@ -736,6 +831,27 @@
                 } catch (e) {
                     return 'Unsupported object';
                 }
+            }
+            return escapeHTML(value);
+        }
+
+        function formatObservation(value) {
+            if (value === null || value === undefined || value === '' || value === 'None') {
+                return 'None';
+            }
+            if (typeof value === 'object') {
+                try {
+                    return escapeHTML(JSON.stringify(value, null, 2));
+                } catch (e) {
+                    return 'Unsupported object';
+                }
+            }
+            if (typeof value === 'string') {
+                const diffHtml = formatDiffIfApplicable(value);
+                if (diffHtml !== null) {
+                    return diffHtml;
+                }
+                return escapeHTML(value);
             }
             return escapeHTML(value);
         }
@@ -858,9 +974,38 @@
                 const data = await response.json();
                 
                 if (!data.error) {
+                    const displayStepId = data.step_id ?? stepId;
+                    const indexNote = displayStepId !== stepId
+                        ? ` <span class="step-index-note">(index ${stepId})</span>`
+                        : '';
+                    const systemSection = data.system_message ? `
+                        <div class="detail-section">
+                            <div class="detail-header expanded" onclick="toggleSection('system-message-step')">
+                                <span><i class="fas fa-robot"></i> System Message</span>
+                                <i class="fas fa-chevron-down expand-icon"></i>
+                            </div>
+                            <div class="detail-content expanded" id="system-message-step">
+                                <div class="json-viewer" id="system-message-json"></div>
+                            </div>
+                        </div>
+                    ` : '';
+                    const problemSection = data.problem_message ? `
+                        <div class="detail-section">
+                            <div class="detail-header expanded" onclick="toggleSection('problem-message-step')">
+                                <span><i class="fas fa-exclamation-circle"></i> Problem Message</span>
+                                <i class="fas fa-chevron-down expand-icon"></i>
+                            </div>
+                            <div class="detail-content expanded" id="problem-message-step">
+                                <div class="json-viewer" id="problem-message-json"></div>
+                            </div>
+                        </div>
+                    ` : '';
+
                     detailsContainer.innerHTML = `
-                        <h3><i class="fas fa-search-plus"></i> Step ${stepId}</h3>
-                        
+                        <h3><i class="fas fa-search-plus"></i> Step ${displayStepId}${indexNote}</h3>
+                        ${systemSection}
+                        ${problemSection}
+
                         <div class="detail-section">
                             <div class="detail-header expanded" onclick="toggleSection('reasoning-section')">
                                 <span><i class="fas fa-brain"></i> Reasoning</span>
@@ -897,17 +1042,17 @@
                                 <i class="fas fa-chevron-down expand-icon"></i>
                             </div>
                             <div class="detail-content expanded" id="observation-section">
-                                <div class="json-viewer" style="white-space: pre-wrap;">${formatEmptyValue(data.obs)}</div>
+                                <div class="json-viewer" style="white-space: pre-wrap;">${formatObservation(data.obs)}</div>
                             </div>
                         </div>
 
                         <div class="detail-section">
-                            <div class="detail-header" onclick="toggleSection('rewrite-section')">
-                                <span><i class="fas fa-edit"></i> Rewrite Consumed</span>
+                            <div class="detail-header" onclick="toggleSection('edit-section')">
+                                <span><i class="fas fa-edit"></i> Edit Consumed</span>
                                 <i class="fas fa-chevron-down expand-icon"></i>
                             </div>
-                            <div class="detail-content" id="rewrite-section">
-                                <div class="json-viewer">${formatEmptyValue(data.rewrite_consumed)}</div>
+                            <div class="detail-content" id="edit-section">
+                                <div class="json-viewer">${formatEmptyValue(data.edit_consumed)}</div>
                             </div>
                         </div>
 
@@ -922,17 +1067,40 @@
                         </div>
                     `;
 
-                    // Populate collapsible JSON sections
-                    if (data.action) {
-                        createCollapsibleJSON(data.action, document.getElementById('action-json'));
-                    } else {
-                        document.getElementById('action-json').textContent = 'None';
+                    if (data.system_message) {
+                        const systemContainer = document.getElementById('system-message-json');
+                        if (systemContainer) {
+                            createCollapsibleJSON(data.system_message, systemContainer);
+                        }
                     }
 
-                    if (data.prompt_response_pairs) {
-                        createCollapsibleJSON(data.prompt_response_pairs, document.getElementById('prompt-response-json'));
-                    } else {
-                        document.getElementById('prompt-response-json').textContent = 'None';
+                    if (data.problem_message) {
+                        const problemContainer = document.getElementById('problem-message-json');
+                        if (problemContainer) {
+                            createCollapsibleJSON(data.problem_message, problemContainer);
+                        }
+                    }
+
+                    const actionContainer = document.getElementById('action-json');
+                    if (actionContainer) {
+                        if (data.action) {
+                            createCollapsibleJSON(data.action, actionContainer);
+                        } else {
+                            actionContainer.textContent = 'None';
+                        }
+                    }
+
+                    const promptContainer = document.getElementById('prompt-response-json');
+                    if (promptContainer) {
+                        if (Array.isArray(data.prompt_response_pairs) && data.prompt_response_pairs.length > 0) {
+                            createCollapsibleJSON(data.prompt_response_pairs, promptContainer);
+                        } else if (Array.isArray(data.prompt_response_pairs) && data.prompt_response_pairs.length === 0) {
+                            promptContainer.textContent = '[]';
+                        } else if (data.prompt_response_pairs) {
+                            createCollapsibleJSON(data.prompt_response_pairs, promptContainer);
+                        } else {
+                            promptContainer.textContent = 'None';
+                        }
                     }
                 } else {
                     detailsContainer.innerHTML = `
@@ -1043,16 +1211,7 @@
 
         // Initialize collapsible JSON for config
         document.addEventListener('DOMContentLoaded', () => {
-            const configJson = document.getElementById('config-json');
-            if (configJson && configJson.textContent.trim()) {
-                try {
-                    const configData = JSON.parse(configJson.textContent);
-                    configJson.innerHTML = '';
-                    createCollapsibleJSON(configData, configJson);
-                } catch (e) {
-                    // Keep original content if parsing fails
-                }
-            }
+            initializeJSONElement('config-json');
 
             const bashToggleButton = document.getElementById('bash-toggle');
             if (bashToggleButton) {

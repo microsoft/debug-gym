@@ -225,7 +225,7 @@ def test_register(tmp_path):
     pdb_tool.register(env)
     # every tool listen to ENV_RESET event to track history
     assert pdb_tool in env.event_hooks.event_listeners[Event.ENV_RESET]
-    assert pdb_tool in env.event_hooks.event_listeners[Event.REWRITE_SUCCESS]
+    assert pdb_tool in env.event_hooks.event_listeners[Event.EDIT_SUCCESS]
 
 
 def test_register_invalid_env():
@@ -336,7 +336,7 @@ def test_breakpoint_modify_remove_all(tmp_path, setup_pdb_repo_env):
 def test_breakpoint_modify_no_change(tmp_path, setup_pdb_repo_env):
     pdb_tool, env = setup_pdb_repo_env(tmp_path)
     pdb_tool.breakpoint_modify(env, "file1.py", 25, 35, 5)
-    # Test no change for breakpoints before the rewritten code (change line 30)
+    # Test no change for breakpoints before the edited code (change line 30)
     wd = str(env.working_dir)
     expected_state = {
         f"{wd}/file1.py|||10": f"b {wd}/file1.py:10",
@@ -351,7 +351,7 @@ def test_breakpoint_modify_no_breakpoints(tmp_path, setup_pdb_repo_env):
     env.current_breakpoints_state = {}
     initial_output = pdb_tool.start_pdb(env)
     assert "The pytest entry point." in initial_output
-    pdb_tool.breakpoint_modify(env, "rewrite_file", 1, 3, 1)
+    pdb_tool.breakpoint_modify(env, "edit_file", 1, 3, 1)
     assert env.current_breakpoints_state == {}
 
 
@@ -436,14 +436,14 @@ def test_on_env_reset_calls_start_pdb(tmp_path, setup_pdb_repo_env):
     assert called
 
 
-def test_on_rewrite_success_calls_breakpoint_modify_and_restart_pdb(
+def test_on_edit_success_calls_breakpoint_modify_and_restart_pdb(
     tmp_path, setup_pdb_repo_env
 ):
     pdb_tool, env = setup_pdb_repo_env(tmp_path)
     called = []
     pdb_tool.breakpoint_modify = lambda *a, **k: called.append("modify")
     pdb_tool.restart_pdb = lambda e: "restarted"
-    obs = pdb_tool.on_rewrite_success(env, "file1.py", 1, 2, 3)
+    obs = pdb_tool.on_edit_success(env, "file1.py", 1, 2, 3)
     assert "restarted" in obs.observation
     assert "modify" in called
 

@@ -27,7 +27,7 @@ def analyze_froggy_results(model_name):
     Analyzes froggy.jsonl files for a given model to extract success rates and token usage.
 
     Args:
-        model_name (str): Path to the model directory (e.g. 'exps/swe-bench/rewrite_4o_0')
+        model_name (str): Path to the model directory (e.g. 'exps/swe-bench/edit_4o_0')
 
     Returns:
         pd.DataFrame: DataFrame containing results by task
@@ -93,7 +93,7 @@ def analyze_froggy_results_with_seeds(base_model_name, seeds=[0, 1, 2]):
     Analyzes and averages results across different seeds for a base model name
 
     Args:
-        base_model_name (str): Base path without seed (e.g. '../exps/swe-bench/rewrite_o3-mini')
+        base_model_name (str): Base path without seed (e.g. '../exps/swe-bench/edit_o3-mini')
         seeds (list): List of seeds to average over
 
     Returns:
@@ -117,7 +117,7 @@ def analyze_froggy_results_with_seeds(base_model_name, seeds=[0, 1, 2]):
 
 def plot_episode_response_tokens(df_dict, model_paths, figsize=(12, 7)):
     """
-    Creates a grouped bar chart showing response tokens per step for multiple models, grouped by agent types (rewrite, debug), each bar is averaged over seeds with error bars.
+    Creates a grouped bar chart showing response tokens per step for multiple models, grouped by agent types (edit, debug), each bar is averaged over seeds with error bars.
     Args:
         df_dict (dict): Dictionary mapping model names to their DataFrames with averaged results
         model_paths (list): List of model paths for custom x-tick labels
@@ -130,7 +130,7 @@ def plot_episode_response_tokens(df_dict, model_paths, figsize=(12, 7)):
         # ignore the data points where the agent failed
         if ONLY_SUCCESS:
             df = df[df["success"]]
-        for agent in ["rewrite", "debug"]:
+        for agent in ["edit", "debug"]:
             if agent not in model_name:
                 continue
             response_tokens_mean = df["response_tokens"].mean()

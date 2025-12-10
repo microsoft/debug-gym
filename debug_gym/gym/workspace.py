@@ -14,7 +14,11 @@ class WorkspaceError(Exception):
 
 
 class WorkspaceReadError(WorkspaceError):
-    """Raised when a file exists but cannot be read."""
+    """Raised when a file cannot be read or is missing from the workspace."""
+
+
+class WorkspaceWriteError(WorkspaceError):
+    """Raised when a file cannot be written."""
 
 
 class Workspace:
@@ -102,11 +106,12 @@ class Workspace:
         target = Path(target or self.working_dir).resolve()
         self.terminal.copy_content(src, target)
 
-    def resolve_path(self, filepath: str | Path, raises=False) -> Path:
+    def resolve_path(self, filepath: str | Path, raises: str | bool = False) -> Path:
         """Convert a relative filepath to absolute based on the working_dir.
         If the path is already absolute, it is returned as is.
         If raises is True, raises FileNotFoundError if the file does not exist,
-        is not in the working directory or is ignored by the ignore patterns.
+        or is not in the working directory or is ignored by the ignore patterns.
+        If raises is "ignore", then raises FileNotFoundError only if the file is ignored.
         If raises is False, returns the absolute path regardless of the file existence.
         """
         abs_filepath = Path(filepath)
@@ -114,7 +119,7 @@ class Workspace:
             abs_filepath = Path(self.working_dir) / abs_filepath
         abs_filepath_str = str(abs_filepath)
 
-        if raises and abs_filepath != self.working_dir:
+        if raises in [True, "ignore"] and abs_filepath != self.working_dir:
             # Check if file exists, is within working_dir and is not ignored.
             check_cmd = (
                 f'abs_path=$(realpath -s "{abs_filepath_str}"); '
@@ -123,7 +128,9 @@ class Workspace:
             success, result = self.terminal.run(
                 f"{check_cmd} && echo OK || echo MISSING"
             )
-            if result.strip() != "OK" or self._is_ignored_func(abs_filepath):
+            if (result.strip() != "OK" and raises == True) or self._is_ignored_func(
+                abs_filepath
+            ):
                 raise FileNotFoundError(
                     f"`{filepath}` does not exist or is not in "
                     f"the working directory `{self.working_dir}`."
@@ -131,23 +138,50 @@ class Workspace:
 
         return Path(abs_filepath_str)
 
-    def read_file(self, filepath: str) -> str:
+    def read_file(self, filepath: str, raises: bool = True) -> str:
         """Reads a file from the working directory.
-        Raises value error if the file does not exist"""
-        abs_filepath = self.resolve_path(filepath, raises=True)
-        success, output = self.terminal.run(
+        By default, raises WorkspaceReadError if the file does not exist or cannot be read.
+        """
+        try:
+            abs_filepath = self.resolve_path(filepath, raises=raises)
+        except FileNotFoundError as exc:
+            raise WorkspaceReadError(
+                f"Failed to read `{filepath}` because it does not exist in the working directory `{self.working_dir}`."
+            ) from exc
+
+        success_read, output = self.terminal.run(
             f"cat {abs_filepath}", raises=False, strip_output=False
         )
-        if not success:
+
+        if not success_read:
             message = output.strip() or "Unknown error"
             raise WorkspaceReadError(
                 f"Failed to read `{filepath}`. Command output:\n{message}"
             )
+
         return output
 
     def write_file(self, filepath: str, content: str):
         """Writes `content` to `filepath` exactly as-is, preserving any trailing newlines."""
-        abs_filepath = self.resolve_path(filepath)
+        try:
+            abs_filepath = self.resolve_path(filepath, raises="ignore")
+        except FileNotFoundError as exc:
+            raise WorkspaceWriteError(
+                f"Failed to write `{filepath}` because it is outside the workspace."
+            ) from exc
+
+        def _run_or_raise(command: str):
+            success, output = self.terminal.run(
+                command, raises=False, strip_output=False
+            )
+            if not success:
+                message = output.strip() or "Unknown error"
+                raise WorkspaceWriteError(
+                    f"Failed to write `{filepath}`. Command output:\n{message}"
+                )
+
+        # create parent directories via the terminal if needed
+        _run_or_raise(f'mkdir -p "{str(abs_filepath.parent)}"')
 
         # We will split content in chunks of 32kB to avoid hitting command length limits.
         chunk_size = 32 * 1024  # 32kB
@@ -160,13 +194,23 @@ class Workspace:
         # - capture the heredoc output into shell variable CONTENT since command substitution strips trailing newlines
         # - "${CONTENT%DEBUGGYM_DEL}" removes the trailing sentinel DEBUGGYM_DEL (restoring the original trailing-newline state)
         # - echo -n writes the result without adding an extra newline
-        cmd = f"CONTENT=$(cat <<'DEBUGGYM_EOF'\n{first_chunk}DEBUGGYM_DEL\nDEBUGGYM_EOF\n); echo -n \"${{CONTENT%DEBUGGYM_DEL}}\" > {abs_filepath}"
-        self.terminal.run(cmd, raises=True)
+        cmd = (
+            "CONTENT=$(cat <<'DEBUGGYM_EOF'\n"
+            f"{first_chunk}DEBUGGYM_DEL\nDEBUGGYM_EOF\n); "
+            'echo -n "${CONTENT%DEBUGGYM_DEL}" > '
+            f"{abs_filepath}"
+        )
+        _run_or_raise(cmd)
 
         for i in range(0, len(rest), chunk_size):
             chunk = rest[i : i + chunk_size]
-            cmd = f"CONTENT=$(cat <<'DEBUGGYM_EOF'\n{chunk}DEBUGGYM_DEL\nDEBUGGYM_EOF\n); echo -n \"${{CONTENT%DEBUGGYM_DEL}}\" >> {abs_filepath}"
-            self.terminal.run(cmd, raises=True)
+            cmd = (
+                "CONTENT=$(cat <<'DEBUGGYM_EOF'\n"
+                f"{chunk}DEBUGGYM_DEL\nDEBUGGYM_EOF\n); "
+                'echo -n "${CONTENT%DEBUGGYM_DEL}" >> '
+                f"{abs_filepath}"
+            )
+            _run_or_raise(cmd)
 
     def directory_tree(self, root: str | Path = None, max_depth: int = 1):
         root = self.resolve_path(root or self.working_dir, raises=True)

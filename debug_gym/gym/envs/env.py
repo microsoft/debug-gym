@@ -25,7 +25,6 @@ class EnvInfo:
     max_score: int
     terminated: bool  # Whether the task has finished running
     resolved: bool  # Whether the task was successfully solved
-    rewrite_counter: int
     tools: list[EnvironmentTool]
 
     def __str__(self) -> str:
@@ -38,8 +37,7 @@ class EnvInfo:
         # Status section
         lines.append(
             f"📊 Status: {('✅' if self.resolved else '❌') + ' (TERMINATED)' if self.terminated else '🔄 (IN PROGRESS)'}\t"
-            f"🎯 Score: {self.score}/{self.max_score or '?'}\t"
-            f"✏️ Rewrites: {self.rewrite_counter}"
+            f"🎯 Score: {self.score}/{self.max_score or '?'}"
         )
 
         # Action section
@@ -229,7 +227,6 @@ class RepoEnv(TooledEnv):
         """Reset the environment state to the initial state."""
         # reset all state variables
         self.current_breakpoints_state = {}
-        self.rewrite_counter = 0
         self.last_eval: EvalOutput = None
         self.score = 0
         self.terminated = False
@@ -341,7 +338,6 @@ class RepoEnv(TooledEnv):
             score=self.score,
             max_score=self.max_score,
             instructions=self.instructions,
-            rewrite_counter=self.rewrite_counter,
             tools=self.tools,
         )
         return self.infos
@@ -467,7 +463,6 @@ class RepoEnv(TooledEnv):
             max_score=self.max_score,
             terminated=self.terminated,
             resolved=self.resolved,
-            rewrite_counter=self.rewrite_counter,
             tools=self.tools,
         )
 
@@ -475,8 +470,7 @@ class RepoEnv(TooledEnv):
 
     def post_process_event(self, event: Event, source, kwargs, observations):
         """Post-process the event after it has been handled by the tools."""
-        if event in (Event.REWRITE_SUCCESS, Event.REWRITE_FAIL):
-            self.rewrite_counter += 1
+        return None
 
     def close(self):
         self.workspace.cleanup()

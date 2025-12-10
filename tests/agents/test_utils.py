@@ -25,7 +25,7 @@ def test_load_config():
     config_contents["pdb_agent"] = {
         "llm_name": "gpt2",
     }
-    config_contents["rewrite_only"] = {
+    config_contents["edit_only"] = {
         "cot_style": "standard",
         "llm_name": "gpt20",
     }
@@ -67,7 +67,7 @@ def test_load_config():
             "config_file",
             str(config_file),
             "--agent",
-            "rewrite_only",
+            "edit_only",
             "-p",
             "random_seed=456",
             "-v",
@@ -75,9 +75,9 @@ def test_load_config():
         ],
     ):
         _config, _args = load_config()
-    assert _args.agent == "rewrite_only"
+    assert _args.agent == "edit_only"
     expected_config = {
-        "agent_type": "rewrite_only",
+        "agent_type": "edit_only",
         "random_seed": 456,
         "max_steps": 100,
         "cot_style": "standard",

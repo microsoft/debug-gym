@@ -25,7 +25,10 @@ class LocalEnv(RepoEnv):
 
     @property
     def instructions(self) -> str:
-        return f"Investigate the current repository, run the tests to figure out any issues, then rewrite the code to fix them."
+        return (
+            "Investigate the current repository, run the tests to figure out any issues, "
+            "then edit the code to fix them."
+        )
 
     @property
     def task(self) -> str:

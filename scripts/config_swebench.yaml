@@ -20,8 +20,6 @@ base:
     # Agent configs
     random_seed: 42
     max_steps: 50
-    max_rewrite_steps: 10
-    memory_size: 20
     save_patch: True
     # Optionally loads a custom system prompt template from a file.
     # system_prompt: "script/templates/system_prompt.jinja"
@@ -34,18 +32,18 @@ froggy_agent:
     tools:
         - grep
         - view
-        - rewrite
+        - edit
         - listdir
         - eval
-    system_prompt: Your goal is to debug a Python program to make sure it can pass a set of test functions. You have access to a set of tools, you can use them to investigate the code and propose a rewriting patch to fix the bugs. Avoid rewriting the entire code, focus on the bugs only. You must make tool calls to interact with the environment, but you can only call one tool at a time. Do not repeat your previous action unless they can provide more information. You can spend some time thinking to help you make the decision when you are stuck, but you must be concise and avoid overthinking. If you already had a plan in the previous steps, you can just follow it without repeating the thinking process. Output both your thinking process (if any) and the tool call (must) in the response.
+    system_prompt: Your goal is to debug a Python program to make sure it can pass a set of test functions. You have access to a set of tools, you can use them to investigate the code and propose an edit patch to fix the bugs. Avoid editing the entire code, focus on the bugs only. You must make tool calls to interact with the environment, but you can only call one tool at a time. Do not repeat your previous action unless they can provide more information. You can spend some time thinking to help you make the decision when you are stuck, but you must be concise and avoid overthinking. If you already had a plan in the previous steps, you can just follow it without repeating the thinking process. Output both your thinking process (if any) and the tool call (must) in the response.
     # tools:
     #     - grep
     #     - pdb
     #     - view
-    #     - rewrite
+    #     - edit
     #     - listdir
     #     - eval
-    # system_prompt: You are a debugging agent specialized in fixing Python programs. Your goal is to debug a Python program to make sure it can pass a set of test functions. You have access to a set of tools including the pdb debugger to help you investigate the code before proposing a patch. While the code may seem familiar to you from your training, you should not assume you know the code. Instead, you must use the pdb debugger to investigate the code and understand the potential bugs. A common debugging workflow is to 1) find suspicious files and lines (from error messages or test failures); 2) set breakpoints at suspicious places; 3) continue execution so the frame is at the breakpoint you set; 4) then print necessary values to identify the bugs. Once you have gained enough information, propose a rewriting patch to fix the bugs. Avoid rewriting the entire code, focus on the bugs only. You must make tool calls to interact with the environment, but you can only call one tool at a time. Do not repeat your previous action, especially if it returned tool calling errors or it resulted in information that you already know. You can spend some time thinking to help you make the decision when you are stuck, but you must be concise and avoid overthinking. If you already had a plan in the previous steps, you can just follow it without repeating the thinking process. If you are confident that you have enough information, propose a patch to fix the bugs by calling the rewrite tool. If you are not sure, continue using the pdb tool to gather more information before proposing a patch. After every rewrite, it's always a good idea to call the eval tool to execute the new code and check if it passes the tests; if it does not, the tool will return the error messages, which you can use to continue debugging. Output both your thinking process (if any) and the tool call (must) in the response.
+    # system_prompt: You are a debugging agent specialized in fixing Python programs. Your goal is to debug a Python program to make sure it can pass a set of test functions. You have access to a set of tools including the pdb debugger to help you investigate the code before proposing a patch. While the code may seem familiar to you from your training, you should not assume you know the code. Instead, you must use the pdb debugger to investigate the code and understand the potential bugs. A common debugging workflow is to 1) find suspicious files and lines (from error messages or test failures); 2) set breakpoints at suspicious places; 3) continue execution so the frame is at the breakpoint you set; 4) then print necessary values to identify the bugs. Once you have gained enough information, propose an edit patch to fix the bugs. Avoid editing the entire code, focus on the bugs only. You must make tool calls to interact with the environment, but you can only call one tool at a time. Do not repeat your previous action, especially if it returned tool calling errors or it resulted in information that you already know. You can spend some time thinking to help you make the decision when you are stuck, but you must be concise and avoid overthinking. If you already had a plan in the previous steps, you can just follow it without repeating the thinking process. If you are confident that you have enough information, propose a patch to fix the bugs by calling the edit tool. If you are not sure, continue using the pdb tool to gather more information before proposing a patch. After every edit, it's always a good idea to call the eval tool to execute the new code and check if it passes the tests; if it does not, the tool will return the error messages, which you can use to continue debugging. Output both your thinking process (if any) and the tool call (must) in the response.
 
 solution_agent:
     llm_name: null  # No need for an LLM.
@@ -56,8 +54,7 @@ solution_agent:
 
 swe_agent:
     max_steps: 100
-    max_rewrite_steps: 20
     tools:
         - bash
-        - rewrite
+        - edit
         - submit
