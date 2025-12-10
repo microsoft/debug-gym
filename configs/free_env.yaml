@@ -6,7 +6,7 @@ llm_name: "human"
 
 # Tools to load into the environment toolbox.
 tools:
-  - rewrite
+  - edit
   - bash
   - submit:
       eval_on_submit: False  # Here we only terminate after submission, no auto-eval.
