@@ -245,9 +245,10 @@ def download(url, dst, desc=None, force=False):
         return path
 
     # Download to a temp folder first to avoid corrupting the cache
-    # with incomplete downloads.
+    # with incomplete downloads. Use unique temp file to avoid race conditions
+    # when multiple processes download the same file in parallel.
     temp_dir = mkdirs(pjoin(tempfile.gettempdir(), "tales"))
-    temp_path = pjoin(temp_dir, filename)
+    temp_path = pjoin(temp_dir, f"{filename}.{os.getpid()}.tmp")
     with open(temp_path, "ab") as temp_file:
         headers = {}
         resume_size = temp_file.tell()
@@ -259,7 +260,11 @@ def download(url, dst, desc=None, force=False):
         if r.headers.get("x-ms-error-code") == "InvalidRange" and r.headers[
             "Content-Range"
         ].rsplit("/", 1)[-1] == str(resume_size):
-            shutil.move(temp_path, path)
+            # Download already complete, move to final destination
+            if os.path.isfile(path):
+                os.remove(temp_path)
+            else:
+                shutil.move(temp_path, path)
             return path
 
         r.raise_for_status()  # Bad request.
@@ -279,7 +284,13 @@ def download(url, dst, desc=None, force=False):
                 pbar.update(len(chunk))
                 temp_file.write(chunk)
 
-    shutil.move(temp_path, path)
+    # Handle race condition: another process may have completed the download
+    if os.path.isfile(path):
+        # Another process finished first, clean up our temp file
+        if os.path.isfile(temp_path):
+            os.remove(temp_path)
+    else:
+        shutil.move(temp_path, path)
 
     pbar.close()
     return path
