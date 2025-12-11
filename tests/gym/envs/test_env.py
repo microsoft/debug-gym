@@ -5,8 +5,15 @@ import numpy as np
 import pytest
 
 from debug_gym.gym.entities import EvalOutput, Event, Observation
+from debug_gym.gym.envs import load_dataset, select_env
+from debug_gym.gym.envs.aider import AiderBenchmarkEnv
 from debug_gym.gym.envs.env import EnvInfo, EventHooks, RepoEnv, TooledEnv
 from debug_gym.gym.envs.local import LocalEnv
+from debug_gym.gym.envs.mini_nightmare import MiniNightmareEnv
+from debug_gym.gym.envs.r2egym import R2EGymEnv
+from debug_gym.gym.envs.swe_bench import SWEBenchEnv
+from debug_gym.gym.envs.swe_bench_debug import SWEBenchDebugEnv
+from debug_gym.gym.envs.swe_smith import SWESmithEnv
 from debug_gym.gym.tools.tool import ToolCall
 from debug_gym.gym.tools.toolbox import Toolbox
 
@@ -409,3 +416,71 @@ def test_has_breakpoint_relative_path(tmp_path):
     assert env.has_breakpoint("foo.py", 6) is False
     # Should return False for non-existent file
     assert env.has_breakpoint("bar.py", line_number) is False
+
+
+class TestSelectEnv:
+    """Test cases for select_env function."""
+
+    def test_select_env_local(self):
+        assert select_env("local") == LocalEnv
+
+    def test_select_env_aider(self):
+        assert select_env("aider") == AiderBenchmarkEnv
+
+    def test_select_env_swebench(self):
+        assert select_env("swebench") == SWEBenchEnv
+
+    def test_select_env_swebench_debug(self):
+        assert select_env("swebench-debug") == SWEBenchDebugEnv
+
+    def test_select_env_swesmith(self):
+        assert select_env("swesmith") == SWESmithEnv
+
+    def test_select_env_mini_nightmare(self):
+        assert select_env("mini_nightmare") == MiniNightmareEnv
+
+    def test_select_env_r2egym(self):
+        assert select_env("r2egym") == R2EGymEnv
+
+    def test_select_env_unknown(self):
+        with pytest.raises(ValueError, match="Unknown environment unknown_env"):
+            select_env("unknown_env")
+
+    def test_select_env_none(self):
+        with pytest.raises(ValueError, match="Unknown environment None"):
+            select_env(None)
+
+
+class TestLoadDataset:
+    """Test cases for load_dataset function."""
+
+    def test_load_dataset_missing_type(self):
+        """Test that load_dataset raises error when type is missing."""
+        config = {"dataset_id": "some-dataset"}
+        with pytest.raises(
+            ValueError, match="Dataset config must specify 'type' field"
+        ):
+            load_dataset(config)
+
+    def test_load_dataset_unknown_type(self):
+        """Test that load_dataset raises error for unknown env type."""
+        config = {"type": "unknown_type"}
+        with pytest.raises(ValueError, match="Unknown environment type 'unknown_type'"):
+            load_dataset(config)
+
+    @patch("debug_gym.gym.envs.select_env")
+    def test_load_dataset_calls_env_load_dataset(self, mock_select_env):
+        """Test that load_dataset calls the env's load_dataset method."""
+        # Create a mock env class with a load_dataset classmethod
+        mock_env_class = MagicMock()
+        mock_env_class.load_dataset.return_value = {"task1": {"data": "value"}}
+        mock_select_env.return_value = mock_env_class
+
+        config = {"type": "swebench", "dataset_id": "some-dataset"}
+        result = load_dataset(config, logger=None)
+
+        mock_select_env.assert_called_once_with("swebench")
+        mock_env_class.load_dataset.assert_called_once_with(
+            logger=None, type="swebench", dataset_id="some-dataset"
+        )
+        assert result == {"task1": {"data": "value"}}
