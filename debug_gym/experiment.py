@@ -15,7 +15,7 @@ def create_env(config: dict, task_data: dict, logger: DebugGymLogger):
     terminal = select_terminal(config.get("terminal"), logger)
     env_class = select_env(task_data.get("env_type"))
     env = env_class(
-        **config["env_kwargs"],
+        **config.get("env", {}),
         task_data=task_data,
         problems=config.get("problems", ["custom"]),
         terminal=terminal,
