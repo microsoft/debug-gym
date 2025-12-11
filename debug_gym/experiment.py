@@ -11,11 +11,12 @@ from debug_gym.gym.tools.toolbox import Toolbox
 from debug_gym.logger import DebugGymLogger
 
 
-def create_env(config: dict, logger: DebugGymLogger):
+def create_env(config: dict, task_data: dict, logger: DebugGymLogger):
     terminal = select_terminal(config.get("terminal"), logger)
     env_class = select_env(config.get("benchmark"))
     env = env_class(
         **config["env_kwargs"],
+        task_data=task_data,
         problems=config.get("problems", ["custom"]),
         terminal=terminal,
         logger=logger,
