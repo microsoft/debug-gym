@@ -2,7 +2,8 @@
 task_name: pytorch
 output_path: exps/pytorch
 
-llm_name: gpt-4o
+llm:
+  name: gpt-4o
 
 # Tools to load into the environment toolbox.
 tools:
@@ -12,12 +13,14 @@ tools:
   - edit
   - eval
 
+env:
+  run_timeout: 10
+
 task_data:
   env_type: local
   path: data/pytorch
   entrypoint: python -m pytest -sv test.py
   debug_entrypoint: python -m pdb -m pytest -s test.py
-  run_timeout: 10
 
 terminal:
   type: docker

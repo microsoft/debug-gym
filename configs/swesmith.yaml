@@ -2,7 +2,8 @@
 task_name: swesmith
 output_path: exps/swesmith
 
-llm_name: gpt-4o
+llm:
+  name: gpt-4o
 
 # Tools to load into the environment toolbox.
 tools:
@@ -11,11 +12,13 @@ tools:
   - edit
   - submit
 
-task_data:
+env:
+  run_timeout: 300
+
+dataset:
   type: swesmith
   problems: all  # list of problems, e.g., ["astropy__astropy-12907"], or strings like "test-125", or "all"
   dataset_id: SWE-bench/SWE-smith
-  run_timeout: 300
 
 terminal:
   type: docker

@@ -11,10 +11,12 @@ tools:
   - edit
   - eval
 
-task_data:
+env:
+  run_timeout: 20
+
+dataset:
   type: aider
   problems: all  # list of problems, e.g., ["wordy"], or "all"
-  run_timeout: 20
 
 terminal:
   type: docker

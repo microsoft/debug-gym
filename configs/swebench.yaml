@@ -2,7 +2,8 @@
 task_name: swebench
 output_path: exps/swebench-verified
 
-llm_name: gpt-4o
+llm:
+  name: gpt-4o
 
 # Tools to load into the environment toolbox.
 tools:
@@ -11,12 +12,14 @@ tools:
   - edit
   - submit
 
-task_data:
+env:
+  run_timeout: 300
+
+dataset:
   type: swebench
   problems: all  # list of problems, e.g., ["astropy__astropy-12907"], or "all"
   dataset_id: SWE-bench/SWE-bench_Verified
   dataset_revision: 99450355ca8c611021187a57ffac304b66666738
-  run_timeout: 300
 
 terminal:
   type: docker

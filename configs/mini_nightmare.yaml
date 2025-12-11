@@ -2,7 +2,8 @@
 task_name: mini_nightmare
 output_path: exps/mini_nightmare
 
-llm_name: gpt-4o
+llm:
+  name: gpt-4o
 
 # Tools to load into the environment toolbox.
 tools:
@@ -12,10 +13,12 @@ tools:
   - edit
   - eval
 
-task_data:
+env:
+  run_timeout: 30
+
+dataset:
   type: mini_nightmare
   problems: all  # list of problems, e.g., ["config"], or "all"
-  run_timeout: 30
 
 terminal:
   type: docker
