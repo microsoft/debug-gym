@@ -7,7 +7,7 @@ from unittest.mock import patch
 import pytest
 
 from debug_gym.experiment import add_tools, create_env, dump_experiment_info
-from debug_gym.gym.envs.local import LocalEnv
+from debug_gym.gym.envs.free_env import FreeEnv
 from debug_gym.gym.tools.bash import BashTool
 from debug_gym.gym.tools.view import ViewTool
 from debug_gym.logger import DebugGymLogger
@@ -42,6 +42,9 @@ class TestCreateEnv:
         mock_env_class = mock_select_env.return_value
         mock_env_instance = mock_env_class.return_value
 
+    def test_create_env_basic(self, tmp_path):
+        """Test basic environment creation with FreeEnv"""
+        # Setup logger
         logger = DebugGymLogger("test")
 
         config = {
@@ -127,22 +130,75 @@ class TestLocalEnv:
         repo_path.mkdir()
         (repo_path / "test.py").write_text("# test file")
 
-        env = LocalEnv(path=str(repo_path), logger=logger)
+        # Setup config and task_data for FreeEnv
+        config = {
+            "terminal": {"type": "docker"},
+            "uuid": "test-uuid-123",
+        }
+        task_data = {
+            "env_type": "FreeEnv",
+            "image": "python:3.11",
+            "local_path": str(repo_path),
+        }
 
-        assert isinstance(env, LocalEnv)
-        assert env.logger == logger
+        # Call function
+        result = create_env(config, task_data, logger)
 
-    def test_local_env_with_custom_entrypoint(self, tmp_path):
-        """Test LocalEnv accepts custom entrypoint"""
+        # Assertions - verify we got a real FreeEnv instance
+        assert isinstance(result, FreeEnv)
+        assert result.logger == logger
+
+    def test_create_env_with_env_config(self, tmp_path):
+        """Test environment creation with env config"""
+        # Setup logger
         logger = DebugGymLogger("test")
 
         repo_path = tmp_path / "test_repo"
         repo_path.mkdir()
 
-        custom_entrypoint = "python -m unittest"
-        env = LocalEnv(path=str(repo_path), entrypoint=custom_entrypoint, logger=logger)
+        # Setup config with env config
+        config = {
+            "terminal": {"type": "docker"},
+            "uuid": "test-uuid-456",
+            "env": {"some_option": "value"},
+        }
+        task_data = {
+            "env_type": "FreeEnv",
+            "image": "python:3.11",
+            "local_path": str(repo_path),
+        }
 
-        assert env.entrypoint == custom_entrypoint
+        # Call function
+        result = create_env(config, task_data, logger)
+
+        # Assertions - FreeEnv should be created
+        assert isinstance(result, FreeEnv)
+
+    def test_create_env_with_terminal_none(self, tmp_path):
+        """Test environment creation with no terminal (None)"""
+        # Setup logger
+        logger = DebugGymLogger("test")
+
+        # Create a test repository
+        repo_path = tmp_path / "test_repo"
+        repo_path.mkdir()
+
+        # Setup config with terminal=None
+        config = {
+            "terminal": None,
+            "uuid": "test-uuid-789",
+        }
+        task_data = {
+            "env_type": "FreeEnv",
+            "image": "python:3.11",
+            "local_path": str(repo_path),
+        }
+
+        # Call function
+        result = create_env(config, task_data, logger)
+
+        # Assertions - FreeEnv should be created even with terminal=None
+        assert isinstance(result, FreeEnv)
 
 
 class TestAddTools:
@@ -150,10 +206,16 @@ class TestAddTools:
 
     def test_add_tools_single_tool(self, tmp_path):
         """Test adding a single tool to environment"""
-        # Create a real environment
+        # Create a real environment - use FreeEnv with task_data
         repo_path = tmp_path / "test_repo"
         repo_path.mkdir()
-        env = LocalEnv(path=str(repo_path))
+
+        task_data = {
+            "env_type": "FreeEnv",
+            "image": "python:3.11",
+            "local_path": str(repo_path),
+        }
+        env = FreeEnv(task_data=task_data)
         logger = DebugGymLogger("test")
 
         # Setup config
@@ -171,7 +233,13 @@ class TestAddTools:
         # Create a real environment
         repo_path = tmp_path / "test_repo"
         repo_path.mkdir()
-        env = LocalEnv(path=str(repo_path))
+
+        task_data = {
+            "env_type": "FreeEnv",
+            "image": "python:3.11",
+            "local_path": str(repo_path),
+        }
+        env = FreeEnv(task_data=task_data)
         logger = DebugGymLogger("test")
 
         # Setup config with multiple tools
@@ -191,7 +259,13 @@ class TestAddTools:
         # Create a real environment
         repo_path = tmp_path / "test_repo"
         repo_path.mkdir()
-        env = LocalEnv(path=str(repo_path))
+
+        task_data = {
+            "env_type": "FreeEnv",
+            "image": "python:3.11",
+            "local_path": str(repo_path),
+        }
+        env = FreeEnv(task_data=task_data)
         logger = DebugGymLogger("test")
 
         # Setup config with no tools

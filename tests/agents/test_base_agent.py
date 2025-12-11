@@ -57,8 +57,8 @@ def test_create_agent():
     class TestRegisteredAgent(BaseAgent):
         name = "test_registered"
 
-        def __init__(self, agent_args, env, **kwargs):
-            super().__init__(agent_args, env, **kwargs)
+        def __init__(self, agent_args, **kwargs):
+            super().__init__(agent_args, **kwargs)
 
     # Clear and setup registry
     original_registry = AGENT_REGISTRY.copy()
@@ -68,17 +68,15 @@ def test_create_agent():
     try:
         # Mock the required parameters
         mock_config = {
+            "type": "test_registered",
             "max_steps": 5,
         }
-        agent_args = AgentArgs.from_dict(mock_config)
-        mock_env = MagicMock()
-
-        agent = create_agent("test_registered", agent_args=agent_args, env=mock_env)
+        agent = create_agent(mock_config)
         assert isinstance(agent, TestRegisteredAgent)
 
         # Test unknown agent type
         with pytest.raises(ValueError, match="Unknown agent type: unknown_agent"):
-            create_agent("unknown_agent", agent_args=agent_args, env=mock_env)
+            create_agent({"type": "unknown_agent"})
 
         # Test module import (mock importlib)
         with patch("importlib.import_module") as mock_import:
@@ -86,9 +84,7 @@ def test_create_agent():
             mock_module.TestClass = TestRegisteredAgent
             mock_import.return_value = mock_module
 
-            agent = create_agent(
-                "some.module.TestClass", agent_args=agent_args, env=mock_env
-            )
+            agent = create_agent({"type": "some.module.TestClass"})
             assert isinstance(agent, TestRegisteredAgent)
             mock_import.assert_called_once_with("some.module")
     finally:
@@ -124,10 +120,8 @@ def test_to_pretty_json():
 
 def test_load_prompt_template_with_filters(tmp_path):
     """Test system prompt template loading with custom filters"""
-    llm = MagicMock()
-    llm.context_length = 2000
-    llm.count_tokens = Mock(return_value=500)
-    agent = BaseAgent(llm=llm)
+    agent = BaseAgent()
+    agent.llm = Human()
     agent.system_prompt = "Test task"
 
     # Create template that uses custom filters
@@ -195,7 +189,8 @@ def test_build_system_prompt_with_template_file(tmp_path):
 
 
 def test_build_instance_prompt_with_no_template():
-    agent = BaseAgent(llm=Human())
+    agent = BaseAgent()
+    agent.llm = Human()
 
     mock_info = MagicMock()
     mock_info.instructions = "Test instructions."
@@ -208,7 +203,8 @@ def test_build_instance_prompt_with_no_template():
 
 def test_build_instance_prompt_provided_in_args():
     instance_prompt = "Custom instance prompt"
-    agent = BaseAgent(agent_args={"instance_prompt": instance_prompt}, llm=Human())
+    agent = BaseAgent(agent_args={"instance_prompt": instance_prompt})
+    agent.llm = Human()
     assert agent.instance_prompt == instance_prompt
     instance_message = agent.build_instance_prompt()
     assert sorted(instance_message.keys()) == ["content", "role"]
@@ -218,9 +214,8 @@ def test_build_instance_prompt_provided_in_args():
 
 def test_build_instance_prompt_with_template():
     instance_prompt_template = "Your Mission: {{ info.instructions }}"
-    agent = BaseAgent(
-        agent_args={"instance_prompt": instance_prompt_template}, llm=Human()
-    )
+    agent = BaseAgent(agent_args={"instance_prompt": instance_prompt_template})
+    agent.llm = Human()
 
     mock_info = MagicMock()
     mock_info.instructions = "If you choose to accept it."
@@ -235,9 +230,8 @@ def test_build_instance_prompt_with_template_file(tmp_path):
     instance_prompt_template = "Your Mission: {{ info.instructions }}"
     instance_prompt_template_file = tmp_path / "instance_prompt.jinja"
     instance_prompt_template_file.write_text(instance_prompt_template)
-    agent = BaseAgent(
-        agent_args={"instance_prompt": instance_prompt_template_file}, llm=Human()
-    )
+    agent = BaseAgent(agent_args={"instance_prompt": instance_prompt_template_file})
+    agent.llm = Human()
     mock_info = MagicMock()
     mock_info.instructions = "If you choose to accept it."
 

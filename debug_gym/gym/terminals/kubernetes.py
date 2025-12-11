@@ -302,7 +302,7 @@ class KubernetesTerminal(Terminal):
         self.registry = registry.rstrip("/") + "/" if registry else ""
         self._pod_name = pod_name
         self.pod_spec_kwargs = pod_spec_kwargs or {}
-        user = _clean_for_kubernetes(os.environ.get("USER", "unknown"))
+        user = _clean_for_kubernetes(os.environ.get("USER", "unknown").split("@")[0])
         self.labels = {"app": "dbg-gym", "user": user} | (extra_labels or {})
         self._pod = None
 
@@ -384,6 +384,45 @@ class KubernetesTerminal(Terminal):
         kubeconfig = f"--kubeconfig {self.kube_config} " if self.kube_config else ""
         bash_cmd = "/bin/bash --noprofile --norc --noediting"
         return f"kubectl {kubeconfig}exec -it {self.pod.name} -c main -n {self.pod.namespace} -- {bash_cmd}"
+
+    def _ensure_pod_running(self) -> None:
+        """Ensure the backing pod exists and is in Running phase."""
+        if self._pod is None:
+            self.setup_pod()
+            return
+
+        try:
+            if self._pod.is_running():
+                return
+        except Exception as exc:  # noqa: BLE001 - diagnostics only
+            self.logger.debug(f"{self._pod} status check failed: {exc}")
+
+        self.logger.debug(f"{self._pod} not running anymore.")
+
+        # Check logs and describe for diagnostics
+        try:
+            pod_logs = self.k8s_client.read_namespaced_pod_log(
+                name=self._pod.name, namespace=self._pod.namespace
+            )
+            pod_description = self.k8s_client.read_namespaced_pod(
+                name=self._pod.name, namespace=self._pod.namespace
+            )
+            self.logger.debug(
+                f"[{self._pod.name}] Pod logs before failure:\n{pod_logs}\n"
+                f"Pod description before failure:\n{pod_description}"
+            )
+        except Exception as log_exc:
+            self.logger.debug(
+                f"[{self._pod.name}] Failed to get pod logs/description: {log_exc}"
+            )
+
+        self.logger.debug(f"Cleaning up {self._pod} after failure.")
+        try:
+            self._pod.clean_up()
+        except Exception as exc:  # noqa: BLE001 - best-effort cleanup
+            self.logger.debug(f"Failed to clean up {self._pod}: {exc}")
+
+        raise RuntimeError("Pod is not running anymore.")
 
     def new_shell_session(self):
         if not self.pod.is_running():
@@ -472,8 +511,25 @@ class KubernetesTerminal(Terminal):
             except ApiException as e:
                 success = False
                 self.logger.debug(
-                    f"[{self.pod.name}] Exception during command execution: {e}"
+                    f"[{self.pod.name}] Exception during command `{command}`: {e}"
                 )
+                # Get kubectl logs and describe for diagnostics
+                try:
+                    pod_logs = self.k8s_client.read_namespaced_pod_log(
+                        name=self.pod.name, namespace=self.pod.namespace
+                    )
+                    pod_description = self.k8s_client.read_namespaced_pod(
+                        name=self.pod.name, namespace=self.pod.namespace
+                    )
+                    self.logger.debug(
+                        f"[{self.pod.name}] Pod logs:\n{pod_logs}\n"
+                        f"Pod description:\n{pod_description}"
+                    )
+                except Exception as log_exc:
+                    self.logger.debug(
+                        f"[{self.pod.name}] Failed to get pod logs/description: {log_exc}"
+                    )
+
                 output = f"Command execution failed: {str(e)}"
                 backoff = random.uniform(5, 10)  # seconds
                 time.sleep(backoff)
@@ -504,7 +560,7 @@ class KubernetesTerminal(Terminal):
         for attempt in range(max_retries):
             # Generate a new pod name for each attempt to avoid sandbox conflicts
             pod_name = _clean_for_kubernetes(
-                self._pod_name or f"dbg-gym-{self.task_name}-{str(uuid.uuid4())[:8]}"
+                self._pod_name or f"dbg-gym.{self.task_name}.{str(uuid.uuid4())[:8]}"
             )
             self.logger.debug(
                 f"Setting up pod {pod_name} (attempt {attempt + 1}/{max_retries}) "

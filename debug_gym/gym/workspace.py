@@ -42,7 +42,7 @@ class Workspace:
     ):
         self.cleanup()
 
-        self.working_dir = Path("/testbed")
+        self.working_dir = self.working_dir or Path("/testbed")
         # only create temp dir for local terminal
         if type(self.terminal) is LocalTerminal:
             self._tempdir = tempfile.TemporaryDirectory(prefix="DebugGym-")

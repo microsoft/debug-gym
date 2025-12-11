@@ -13,8 +13,20 @@ def select_terminal(
     if terminal_config is None:
         return None
 
+    if isinstance(terminal_config, Terminal):
+        return terminal_config
+
+    if not isinstance(terminal_config, dict):
+        raise TypeError(
+            "terminal configuration must be a dict, Terminal instance, or None",
+        )
+
+    config = dict(terminal_config)
+    terminal_type = str(config.pop("type", "")).lower()
+    if not terminal_type:
+        raise ValueError("Terminal configuration must include a 'type' key")
+
     logger = logger or DebugGymLogger("debug-gym")
-    terminal_type = terminal_config["type"]
     match terminal_type:
         case "docker":
             terminal_class = DockerTerminal
@@ -25,8 +37,17 @@ def select_terminal(
         case _:
             raise ValueError(f"Unknown terminal {terminal_type}")
 
+    extra_labels = config.pop("extra_labels", {}) or {}
+    if uuid is not None:
+        extra_labels = {**extra_labels, "uuid": uuid}
+
+    if terminal_class is KubernetesTerminal and extra_labels:
+        config["extra_labels"] = extra_labels
+
+    if terminal_class is not KubernetesTerminal:
+        config.pop("extra_labels", None)
+
     return terminal_class(
-        **terminal_config,
         logger=logger,
-        extra_labels={"uuid": uuid},
+        **config,
     )

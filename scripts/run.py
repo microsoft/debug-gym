@@ -86,22 +86,11 @@ def run_agent(args, task_name: str, task_data: dict, config: dict):
         )
 
         env = create_env(config, task_data, task_logger)
-
-        llm = LLM.instantiate(
-            llm_name=config["llm_name"],
-            llm_config_file_path=config.get("llm_config_file_path"),
-            logger=task_logger,
-        )
-
-        agent = create_agent(
-            config["agent_type"],
-            agent_args=config,
-            llm=llm,
-            logger=task_logger,
-        )
+        llm = LLM.instantiate(config.get("llm", {}), logger=task_logger)
+        agent = create_agent(config.get("agent", {}), logger=task_logger)
 
         try:
-            success = agent.run(env, debug=args.debug)
+            success = agent.run(env, llm, debug=args.debug)
         except KeyboardInterrupt:
             task_logger.error("Agent run was interrupted by user.")
             task_logger.report_progress(
@@ -176,14 +165,20 @@ def run_agent(args, task_name: str, task_data: dict, config: dict):
 def main():
     config, args = load_config()
     config["uuid"] = config.get("uuid", str(uuid.uuid4()))
+    config["output_path"] = config.get("output_path", "exps")
     exp_output_path = Path(config["output_path"]) / config["uuid"]
     exp_output_path.mkdir(parents=True, exist_ok=True)
     logger = DebugGymLogger("debug-gym", level=args.logging_level)
+    logger.debug(f"Experiment config: {config}")
     logger.info(f"Experiment log path: {exp_output_path}")
     dump_experiment_info(config, args)
 
     # Load the dataset based on the information found in the config.
-    dataset = load_dataset(config["dataset"], logger=logger)
+    if config.get("task_data") is not None:
+        dataset = {f"custom-task": config["task_data"]}
+    else:
+        dataset = load_dataset(config["dataset"], logger=logger)
+
     problems = sorted(dataset)
 
     if args.list:
@@ -198,11 +193,8 @@ def main():
 
         return
 
-    llm = LLM.instantiate(
-        llm_name=config["llm_name"],
-        llm_config_file_path=config.get("llm_config_file_path"),
-        logger=logger,
-    )
+    # Try to instantiate the LLM once to catch configuration errors early.
+    llm = LLM.instantiate(config=config.get("llm", {}), logger=logger)
 
     # Stop live progress display if --no-live-display is set
     # or in Human mode (avoid conflicts with prompt_toolkit)
