@@ -124,10 +124,7 @@ def run_agent(args, task_name: str, task_data: dict, config: dict):
 
         # save trajectory
         save_trajectory(agent, task_path, task_logger)
-
-        # optionally apply patch
-        if config["save_patch"]:
-            save_patch(env, task_path, task_logger)
+        save_patch(env, task_path, task_logger)
 
     except Exception as e:
         task_logger.error(
