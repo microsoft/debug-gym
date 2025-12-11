@@ -139,7 +139,11 @@ def run_agent(args, task_name: str, task_data: dict, config: dict):
 
         # optionally apply patch
         if config["save_patch"]:
-            save_patch(env, task_path, task_logger)
+            try:
+                save_patch(env, task_path, task_logger)
+            except Exception as patch_error:
+                # Terminal may be unavailable (e.g., pod died), log and continue
+                task_logger.warning(f"Could not save patch: {patch_error!r}")
 
     except Exception as e:
         task_logger.error(
