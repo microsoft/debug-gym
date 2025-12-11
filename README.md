@@ -80,12 +80,14 @@ One of the core designs of `debug-gym` is the notion of tools. Users can dynamic
 
 | Tool name | Description |
 | :-: | :----- |
+| `bash` | Run commands in a bash shell. You have access to common Linux and Python packages via pip. State is persistent across command calls within the same session. |
 | `listdir` | It returns the directory tree at a given subdirectory. This is particularly useful when dealing with a repository with multiple files. |
 | `view` | It is used to change an agent's focus to a particular source code file. This is particularly useful when dealing with a repository with multiple files. |
 | `eval` | It runs the current code repository using the provided entrypoint (e.g., pytest), and returns the terminal's output (e.g., error message). |
-| `pdb` | Interactive debugger wrapping the [Python pdb tool](https://docs.python.org/3/library/pdb.html). In additon, users can choose to maintain a set of persistent breakpoints (as in some programming IDEs), which are not reset after every eval. With such feature, a new pdb debugging session is activated automatically, with all the breakpoints restored. Note such breakpoint can be cleared by pdb commands such as `cl`. |
+| `pdb` | Interactive debugger wrapping the [Python pdb tool](https://docs.python.org/3/library/pdb.html). In addition, users can choose to maintain a set of persistent breakpoints (as in some programming IDEs), which are not reset after every eval. With such feature, a new pdb debugging session is activated automatically, with all the breakpoints restored. Note such breakpoints can be cleared by pdb commands such as `cl`. |
 | `grep` | Search for patterns in files within the repository. Supports both literal string matching and regular expressions. Can search in specific files, directories, or the entire repository. Useful for finding code patterns, function definitions, variable usage, or identifying files containing specific text. |
 | `edit` | It can be used to edit a certain piece of code to fix the bug. The inputs of this tool call include the file path, the start and end line numbers, and the new code. |
+| `submit` | Submit your changes once the task is complete. By default, it runs evaluation before terminating the session, but this can be disabled via `eval_on_submit: false`. |
 
 Upon importing a tool, its action space and observation space will be automatically merged into `debug-gym`'s action space and observation space; its instruction will also be merged into the overall instruction provided to the agent (e.g., as system prompt).
 
@@ -99,9 +101,8 @@ We provide the below LLM-based agents, they all have minimal design and serve th
 
 | Agent name | Available Tools | Description |
 | :-: | :-: | :----- |
-| `froggy_agent` | `grep`, `pdb`, `view`, `edit`, `eval` (configurable) | Primary debugging agent. Adjust prompts and tool lists in YAML to mimic edit-only, grep-heavy, or other workflows. |
-| `solution_agent` | `pdb`, `eval`  | An oracle agent that applies a gold patch (only works with `swebench` and `swesmith` benchmarks for now). The agent checks that tests are failing before applying the patch, and passing after. It also checks that `pdb` tool can be used as expected. |
-| `swe_agent` | `bash`, `edit`, `submit` | Baseline agent tailored for the SWE-bench setting that executes bash commands in addition to edits. |
+| `froggy_agent` | `bash`, `view`, `edit`, `submit` (configurable) | Primary debugging agent. Adjust prompts and tool lists in YAML to customize workflows. |
+| `solution_agent` | `pdb`, `eval`  | An oracle agent that applies a gold patch (works with `swebench`, `swesmith`, and `r2egym` benchmarks). The agent checks that tests are failing before applying the patch, and passing after. It also checks that `pdb` tool can be used as expected (if available). |
 
 ---
 
@@ -118,7 +119,7 @@ To demonstrate how to integrate `debug-gym` with coding tasks and repositories, 
 | `mini_nightmare` | A set of 10 hand-crafted minimal buggy code snippet where edit-only agents have harder time to tackle. Read details [here](https://github.com/microsoft/debug-gym/blob/main/data/mini_nightmare/mini_nightmare.md). |
 
 > [!NOTE]
-> Since debug-gym focuses on debugging task with the use of a debugger, we provide a customized version of `swebench`, called `swebench-debug`, where each problem's codebase already has the gold test patch applied. This allows us to better simulate real-world debugging scenarios where the buggy code is expected to have failing tests and we can set the debugger's entrypoint accordingly. To use `swebench-debug`, set `benchmark: "swebench-debug"` in your config file (see [Running Baselines](#3-running-baselines)).
+> Since debug-gym focuses on debugging tasks with the use of a debugger, we provide a customized version of `swebench`, called `swebench-debug`, where each problem's codebase already has the gold test patch applied. This allows us to better simulate real-world debugging scenarios where the buggy code is expected to have failing tests and we can set the debugger's entrypoint accordingly. To use `swebench-debug`, use `configs/swebench_debug.yaml` or set `task_data.dataset_type: swebench-debug` in your config file.
 
 ---
 
@@ -148,9 +149,9 @@ Terminal selection is configured through the `terminal_config` in your script co
 ---
 
 ## 3. Running Baselines
-We use `.yaml` files to specify configurations. Example config files can be found in `scripts/`. To run an agent:
+We use `.yaml` files to specify configurations. Example config files can be found in `configs/`. To run an agent:
 
-    python scripts/run.py scripts/config_<benchmark name>.yaml --agent <agent name>
+    python scripts/run.py configs/<benchmark name>.yaml
 
 Add `-v`, `--debug` to be verbose, or to enter debug mode.
 > [!WARNING]
@@ -158,24 +159,24 @@ Add `-v`, `--debug` to be verbose, or to enter debug mode.
 
 #### 3.1 Sanity Checks
 
-We can use the `solution_agent` to validate that your `swebench` and `swesmith` instances work as expected. This agent will apply a gold patch to the buggy code and check that the tests are failing before applying the patch, and passing after. It also checks that `pdb` tool can be used as expected.
+We can use the `solution_agent` to validate that your `swebench`, `swesmith`, and `r2egym` instances work as expected. This agent will apply a gold patch to the buggy code and check that the tests are failing before applying the patch, and passing after. It also checks that `pdb` tool can be used as expected (if available).
 
-    python scripts/run.py scripts/config_swebench.yaml --agent solution_agent
-    python scripts/run.py scripts/config_swesmith.yaml --agent solution_agent
+    python scripts/run.py configs/swebench.yaml -p agent.type=solution_agent
+    python scripts/run.py configs/swesmith.yaml -p agent.type=solution_agent
+    python scripts/run.py configs/r2egym.yaml -p agent.type=solution_agent
 
 #### 3.2 Human Mode
 
-We provide a human mode that enables developers to manually interact with `debug-gym`. To activate this mode, change the `llm_name` field in the `config_*.yaml` to be `"human"`. Once activated, at every step, the environment will expect a command input (in tool calling format). One can use the `Tab` key to get a list of tool calling templates and fill in any necessary arguments.
+We provide a human mode that enables developers to manually interact with `debug-gym`. To activate this mode, change the `llm_name` field in your config YAML to `"human"`. Once activated, at every step, the environment will expect a command input (in tool calling format). One can use the `Tab` key to get a list of tool calling templates and fill in any necessary arguments.
 
 #### 3.3. Overriding Values in Config
 
-The `-p` flag is a handy way to override values defined in the config file. For example, the command below will run the `froggy_agent` configuration on Aider with human mode (even if the config file specifies gpt-4o). The command also overrides the default system prompt (see below for more information).
+The `-p` flag is a handy way to override values defined in the config file. For example, the command below will run on Aider with human mode (even if the config file specifies gpt-4o). The command also overrides the default system prompt (see below for more information).
 
-    python scripts/run.py scripts/config_aider.yaml \
-        --agent froggy_agent \
+    python scripts/run.py configs/aider.yaml \
         -v \
-        -p froggy_agent.llm_name="human" \
-        -p froggy_agent.system_prompt="scripts/templates/human_friendly_system_prompt.jinja"
+        -p llm_name="human" \
+        -p agent.system_prompt="scripts/templates/human_friendly_system_prompt.jinja"
 
 
 #### 3.4. Customizing the System Prompt with Jinja Templates
@@ -185,11 +186,12 @@ The `-p` flag is a handy way to override values defined in the config file. For 
 To use a custom system prompt template, specify the path to your Jinja template file in your agent's configuration under `system_prompt`. For example:
 
 ```yaml
-froggy_agent:
-    system_prompt: scripts/templates/custom_system_prompt.jinja
+agent:
+  type: froggy
+  system_prompt: scripts/templates/custom_system_prompt.jinja
 ```
 
-Alternatively, you can provide a custom template from the command line with `-p <agent>.system_prompt="<path/to/template.jinja>"` (see above).
+Alternatively, you can provide a custom template from the command line with `-p agent.system_prompt="<path/to/template.jinja>"` (see above).
 
 Within your Jinja template, you have access to the `agent` and `info` objects, which provide all relevant context about the current environment and agent state.
 
@@ -233,17 +235,17 @@ Shortcut Features:
 
 #### 3.5. Debugging a Custom Repository
 
-Modify `scripts/config.yaml`, especially the `env_kwargs` to set the path and entrypoint of the custom repository. We assume there is a `.debugignore` file and a `.debugreadonly` within the repository that labels files/folders that are not seen or not editable, respectively.
+Modify `configs/config.yaml`, especially the `task_data` section to set the path and entrypoint of the custom repository. We assume there is a `.debugignore` file and a `.debugreadonly` within the repository that labels files/folders that are not seen or not editable, respectively.
 
 As an example, we provide a buggy pytorch code repository in `data/pytorch`.
 
-    python scripts/run.py scripts/config.yaml --agent <agent name>
+    python scripts/run.py configs/config.yaml
 
 #### 3.6. Debugging a Custom SWE-Smith Instance
 
-[SWE-Smith](https://github.com/SWE-bench/SWE-smith) allows to generate new buggy code instances. Give a custom HuggingFace dataset (either local or remote) that has a similar structure as [SWE-bench/SWE-smith](https://huggingface.co/datasets/SWE-bench/SWE-smith), one can override the `-p base.env_kwargs.dataset_id=<dataset_id>` in the command line to run the agent on that dataset. For example, to run on a local dataset:
+[SWE-Smith](https://github.com/SWE-bench/SWE-smith) allows to generate new buggy code instances. Given a custom HuggingFace dataset (either local or remote) that has a similar structure as [SWE-bench/SWE-smith](https://huggingface.co/datasets/SWE-bench/SWE-smith), one can override the `-p task_data.dataset_id=<dataset_id>` in the command line to run the agent on that dataset. For example, to run on a local dataset:
 
-    python scripts/run.py scripts/config_swesmith.yaml --agent <agent name> -p base.env_kwargs.dataset_id="path/to/local/dataset"
+    python scripts/run.py configs/swesmith.yaml -p task_data.dataset_id="path/to/local/dataset"
 
 #### 3.7. Design Your Own Tool
 `debug-gym`'s modular design makes it extensible. Users are encouraged to extend `debug-gym` to their specific usecases, for example by creating new tools that diversify an agent's action and observation spaces. For detailed instruction on designing new tools that are `debug-gym`-compatible, please refer to the [Technical Report](https://arxiv.org/abs/2503.21557).
@@ -253,6 +255,53 @@ As an example, we provide a buggy pytorch code repository in `data/pytorch`.
 We provide a set of scripts to help analyze the log files (e.g., the `.jsonl` files) generated by the agent.
 - In the `analysis` folder, we provide scripts that used to generate the corresponding figures in our technical report.
 - In the `analysis/json_log_viewer` folder, we provide a Flask app to view a `.jsonl` log file in the browser.
+
+#### 3.9. FreeEnv: Open-Ended Agent Development
+
+While `debug-gym` was designed for debugging tasks, the `FreeEnv` environment enables open-ended agent development beyond SWE-bench-style debugging. Use `FreeEnv` to build and test general-purpose coding agents that can perform any task you define—code exploration, refactoring, feature implementation, or custom workflows.
+
+**Key features:**
+- **Custom Docker image**: Specify any Docker image as the execution environment
+- **Flexible tool configuration**: Mix and match tools (`bash`, `edit`, `pdb`, `view`, `grep`, etc.) as needed
+- **Custom system prompts**: Define your agent's behavior and goals
+- **No predefined test harness**: The `submit` tool simply ends the session without running evaluations (configurable via `eval_on_submit`)
+
+**Example configuration** (`configs/free_env.yaml`):
+
+```yaml
+task_name: free-session
+output_path: exps/free_env
+
+llm_name: gpt-4o
+
+tools:
+  - edit
+  - bash
+  - submit:
+      eval_on_submit: false
+
+task_data:
+  env_type: FreeEnv
+  image: ubuntu:22.04
+  local_path: /path/to/your/codebase
+  workspace_dir: /testbed
+
+terminal:
+  type: docker
+
+agent:
+  type: froggy
+  max_steps: 50
+  system_prompt: >-
+    You are a coding assistant. Use the available tools to explore and modify the codebase.
+    When you are done, use the submit tool to end the session.
+```
+
+Run with:
+
+    python scripts/run.py configs/free_env.yaml
+
+This provides a sandbox for developing and evaluating coding agents on arbitrary tasks, making `debug-gym` useful for general agent research beyond debugging.
 
 ## Citation
 ```
