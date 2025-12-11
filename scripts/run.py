@@ -6,8 +6,9 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 
 from debug_gym.agents.base_agent import AGENT_REGISTRY, create_agent
-from debug_gym.agents.utils import load_config
+from debug_gym.agents.utils import load_config, save_patch, save_trajectory
 from debug_gym.experiment import add_tools, create_env, dump_experiment_info
+from debug_gym.gym.envs import load_dataset
 from debug_gym.llms.base import LLM
 from debug_gym.llms.human import Human
 from debug_gym.logger import DebugGymLogger, load_previous_run_status
