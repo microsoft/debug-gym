@@ -12,7 +12,7 @@ tools:
   - submit
 
 task_data:
-  dataset_type: swebench
+  type: swebench
   problems: all  # list of problems, e.g., ["astropy__astropy-12907"], or "all"
   dataset_id: SWE-bench/SWE-bench_Verified
   dataset_revision: 99450355ca8c611021187a57ffac304b66666738

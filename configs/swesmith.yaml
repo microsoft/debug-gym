@@ -12,7 +12,7 @@ tools:
   - submit
 
 task_data:
-  dataset_type: swesmith
+  type: swesmith
   problems: all  # list of problems, e.g., ["astropy__astropy-12907"], or strings like "test-125", or "all"
   dataset_id: SWE-bench/SWE-smith
   run_timeout: 300

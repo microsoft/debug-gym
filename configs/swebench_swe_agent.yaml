@@ -12,14 +12,41 @@ tools:
   - submit
 
 task_data:
-  dataset_type: swebench
+  type: swebench
   problems: all
   dataset_id: SWE-bench/SWE-bench_Verified
   dataset_revision: 99450355ca8c611021187a57ffac304b66666738
   run_timeout: 300
 
-terminal:
-  type: docker
+terminal: {
+  type: "kubernetes",
+        registry: debuggymacr.azurecr.io,  # docker.io,
+        #kube_config: "incluster", # If "incluster", uses in-cluster config. Otherwise, path to kubeconfig file.
+        #kube_context: null,  # If null, uses the current context in the kubeconfig file.
+        namespace: "mtl-eval",
+        pod_spec_kwargs: {
+            tolerations: [
+                {
+                    "key": "node.kubernetes.io/disk-pressure",
+                    "operator": "Exists",
+                    "effect": "NoExecute",
+                    "tolerationSeconds": 10800
+                },
+                {
+                    key: "kubernetes.azure.com/scalesetpriority",
+                    operator: "Equal",
+                    value: "spot",
+                    effect: "NoSchedule",
+                },
+                {
+                    key: "CriticalAddonsOnly",
+                    operator: "Equal",
+                    value: "true",
+                    effect: "NoSchedule",
+                },
+            ]
+        }
+    }
 
 agent:
   type: froggy

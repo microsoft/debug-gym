@@ -235,7 +235,9 @@ class LLM(ABC):
 
         logger = logger or DebugGymLogger("debug-gym")
         llm_name = config.get("name")
-        if llm_name == "human":
+        if llm_name is None:
+            return None
+        elif llm_name == "human":
             from debug_gym.llms import Human
 
             return Human(llm_name, logger=logger)

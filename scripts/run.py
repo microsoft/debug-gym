@@ -190,7 +190,7 @@ def main():
         return
 
     # Try to instantiate the LLM once to catch configuration errors early.
-    llm = LLM.instantiate(config=config["llm"], logger=logger)
+    llm = LLM.instantiate(config=config.get("llm", {}), logger=logger)
 
     # Stop live progress display if --no-live-display is set
     # or in Human mode (avoid conflicts with prompt_toolkit)

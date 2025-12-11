@@ -12,7 +12,7 @@ tools:
   - eval
 
 task_data:
-  dataset_type: aider
+  type: aider
   problems: all  # list of problems, e.g., ["wordy"], or "all"
   run_timeout: 20
 

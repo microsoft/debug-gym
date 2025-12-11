@@ -12,7 +12,7 @@ tools:
   - submit
 
 task_data:
-  dataset_type: r2egym
+  type: r2egym
   problems: all  # list of problems, e.g., ["aiohttp_final:d7cd0613472fd4d9940e37f1c55921f6a1515324"], or strings like "d1-valid", or "all"
   dataset_id: R2E-Gym/R2E-Gym-Lite
   dataset_revision: 8d3163011f01f9393bb3dc7700497a79a8686ae5

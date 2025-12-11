@@ -13,7 +13,7 @@ tools:
   - eval
 
 task_data:
-  dataset_type: mini_nightmare
+  type: mini_nightmare
   problems: all  # list of problems, e.g., ["config"], or "all"
   run_timeout: 30
 
