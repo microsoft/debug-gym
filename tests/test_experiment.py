@@ -42,8 +42,6 @@ class TestCreateEnv:
         mock_env_class = mock_select_env.return_value
         mock_env_instance = mock_env_class.return_value
 
-    def test_create_env_basic(self, tmp_path):
-        """Test basic environment creation with FreeEnv"""
         # Setup logger
         logger = DebugGymLogger("test")
 
@@ -283,7 +281,13 @@ class TestAddTools:
 
         repo_path = tmp_path / "test_repo"
         repo_path.mkdir()
-        env = LocalEnv(path=str(repo_path))
+
+        task_data = {
+            "env_type": "FreeEnv",
+            "image": "python:3.11",
+            "local_path": str(repo_path),
+        }
+        env = FreeEnv(task_data=task_data)
         logger = DebugGymLogger("test")
 
         # Tool specified as dict: {"tool_name": {config}}
@@ -301,7 +305,13 @@ class TestAddTools:
         """Test add_tools when config has no 'tools' key"""
         repo_path = tmp_path / "test_repo"
         repo_path.mkdir()
-        env = LocalEnv(path=str(repo_path))
+
+        task_data = {
+            "env_type": "FreeEnv",
+            "image": "python:3.11",
+            "local_path": str(repo_path),
+        }
+        env = FreeEnv(task_data=task_data)
         logger = DebugGymLogger("test")
 
         # Config without tools key
