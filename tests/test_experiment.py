@@ -41,13 +41,15 @@ class TestCreateEnv:
         # Setup config for LocalEnv
         config = {
             "terminal": {"type": "local"},
-            "benchmark": "local",
-            "env_kwargs": {"path": str(repo_path)},
-            "problems": ["custom"],
+            "uuid": "test-uuid",
+            "env": {"path": str(repo_path)},
         }
 
+        # Setup task_data with env_type
+        task_data = {"env_type": "local"}
+
         # Call function
-        result = create_env(config, logger)
+        result = create_env(config, task_data, logger)
 
         # Assertions - verify we got a real LocalEnv instance
         assert isinstance(result, LocalEnv)
@@ -65,12 +67,15 @@ class TestCreateEnv:
         # Setup config without problems
         config = {
             "terminal": {"type": "local"},
-            "benchmark": "local",
-            "env_kwargs": {"path": str(repo_path)},
+            "uuid": "test-uuid",
+            "env": {"path": str(repo_path)},
         }
 
+        # Setup task_data with env_type
+        task_data = {"env_type": "local"}
+
         # Call function
-        result = create_env(config, logger)
+        result = create_env(config, task_data, logger)
 
         # Assertions - should use default ["custom"]
         assert isinstance(result, LocalEnv)
@@ -87,13 +92,15 @@ class TestCreateEnv:
         # Setup config with terminal=None
         config = {
             "terminal": None,
-            "benchmark": "local",
-            "env_kwargs": {"path": str(repo_path)},
-            "problems": [],
+            "uuid": "test-uuid",
+            "env": {"path": str(repo_path)},
         }
 
+        # Setup task_data with env_type
+        task_data = {"env_type": "local"}
+
         # Call function
-        result = create_env(config, logger)
+        result = create_env(config, task_data, logger)
 
         # Assertions - LocalEnv should be created even with terminal=None
         assert isinstance(result, LocalEnv)
