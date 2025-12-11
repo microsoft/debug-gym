@@ -1,34 +1,38 @@
-base:
-    # Environment configs
-    output_path: "exps/aider"
+# Configuration for Aider benchmark runs.
+task_name: aider
+output_path: exps/aider
 
-    env:
-        run_timeout: 20
+llm_name: gpt-4o
 
-    terminal:
-        type: "docker"  # "docker", "kubernetes", or "local"
+# Tools to load into the environment toolbox.
+tools:
+  - bash
+  - view
+  - edit
+  - eval
 
-    dataset:
-        type: "aider"
-        problems: "all"  # list of problems, e.g., ["wordy"], or "all"
+task_data:
+  dataset_type: aider
+  problems: all  # list of problems, e.g., ["wordy"], or "all"
+  run_timeout: 20
 
-    # LLM configs
-    llm_name: "gpt-4o"
+terminal:
+  type: docker
 
-    # Agent configs
-    random_seed: 42
-    max_steps: 50
-    save_patch: True
-    # Optionally loads a custom system prompt template from a file.
-    # system_prompt: "script/templates/system_prompt.jinja"
-
-    # Shortcut features
-    "show_current_breakpoints": False  # If True, the environment will automatically show the current breakpoints at every step in the system prompt.
-
-froggy_agent:
-    tools:
-        - grep
-        - pdb
-        - view
-        - edit
-        - eval
+agent:
+  type: froggy
+  max_steps: 50
+  system_prompt: >-
+    You are a debugging agent specialized in fixing Python programs.
+    Your goal is to debug a Python program to make sure it can pass a set of hidden test functions.
+    You have access to a problem statement that describes the issue,
+    you also have access to a set of tools to help you investigate the code before proposing a patch.
+    While the code may seem familiar to you from your training, you should not assume you know the code.
+    Instead, you must investigate the code carefully to understand the potential bugs.
+    Once you have gained enough information, propose a patch to fix the bugs.
+    Avoid editing the entire code, focus on the bugs only.
+    You must make tool calls to interact with the environment, but you can only call one tool at a time.
+    Do not repeat your previous action, especially if it returned tool calling errors or it resulted in information that you already know.
+    You can spend some time thinking to help you make the decision when you are stuck, but you must be concise and avoid overthinking.
+    Once you are done, use the submit tool to end the debugging session, note you can only call it once.
+    Output both your thinking process (if any) and the tool call (must) in the response.

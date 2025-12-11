@@ -1,52 +1,40 @@
-base:
-    # Environment configs
-    output_path: "exps/re2gym"
+# Configuration for R2E-Gym benchmark runs.
+task_name: r2egym
+output_path: exps/r2egym
 
-    env:
-        run_timeout: 300
+llm_name: gpt-4o
 
-    dataset:
-        type: "r2egym"
-        problems: "all"  # list of problems, e.g., ["aiohttp_final:d7cd0613472fd4d9940e37f1c55921f6a1515324"], or strings like "d1-valid" (defined in gym/envs/configs), or "all",
-        dataset_id: "R2E-Gym/R2E-Gym-Lite"
-        dataset_revision: "8d3163011f01f9393bb3dc7700497a79a8686ae5"
+# Tools to load into the environment toolbox.
+tools:
+  - bash
+  - view
+  - edit
+  - submit
 
-    terminal:
-        type: "docker"  # "docker", "kubernetes"
+task_data:
+  dataset_type: r2egym
+  problems: all  # list of problems, e.g., ["aiohttp_final:d7cd0613472fd4d9940e37f1c55921f6a1515324"], or strings like "d1-valid", or "all"
+  dataset_id: R2E-Gym/R2E-Gym-Lite
+  dataset_revision: 8d3163011f01f9393bb3dc7700497a79a8686ae5
+  run_timeout: 300
 
-    # LLM configs
-    llm_name: "gpt-4o"
+terminal:
+  type: docker
 
-    # Agent configs
-    random_seed: 42
-    max_steps: 50
-    save_patch: True
-    # Optionally loads a custom system prompt template from a file.
-    # system_prompt: "script/templates/system_prompt.jinja"
-
-    # Shortcut features
-    "show_current_breakpoints": False  # If True, the environment will automatically show the current breakpoints at every step in the system prompt.
-
-froggy_agent:
-    tools:
-        - grep
-        - view
-        - edit
-        - listdir
-        - eval
-    system_prompt: Your goal is to debug a Python program to make sure it can pass a set of test functions. You have access to a set of tools, you can use them to investigate the code and propose an edit patch to fix the bugs. Avoid editing the entire code, focus on the bugs only. You must make tool calls to interact with the environment, but you can only call one tool at a time. Do not repeat your previous action unless they can provide more information. You can spend some time thinking to help you make the decision when you are stuck, but you must be concise and avoid overthinking. If you already had a plan in the previous steps, you can just follow it without repeating the thinking process. Output both your thinking process (if any) and the tool call (must) in the response.
-    # tools:
-    #     - grep
-    #     - pdb
-    #     - view
-    #     - edit
-    #     - listdir
-    #     - eval
-    # system_prompt: You are a debugging agent specialized in fixing Python programs. Your goal is to debug a Python program to make sure it can pass a set of test functions. You have access to a set of tools including the pdb debugger to help you investigate the code before proposing a patch. While the code may seem familiar to you from your training, you should not assume you know the code. Instead, you must use the pdb debugger to investigate the code and understand the potential bugs. A common debugging workflow is to 1) find suspicious files and lines (from error messages or test failures); 2) set breakpoints at suspicious places; 3) continue execution so the frame is at the breakpoint you set; 4) then print necessary values to identify the bugs. Once you have gained enough information, propose an edit patch to fix the bugs. Avoid editing the entire code, focus on the bugs only. You must make tool calls to interact with the environment, but you can only call one tool at a time. Do not repeat your previous action, especially if it returned tool calling errors or it resulted in information that you already know. You can spend some time thinking to help you make the decision when you are stuck, but you must be concise and avoid overthinking. If you already had a plan in the previous steps, you can just follow it without repeating the thinking process. If you are confident that you have enough information, propose a patch to fix the bugs by calling the edit tool. If you are not sure, continue using the pdb tool to gather more information before proposing a patch. After every edit, it's always a good idea to call the eval tool to execute the new code and check if it passes the tests; if it does not, the tool will return the error messages, which you can use to continue debugging. Output both your thinking process (if any) and the tool call (must) in the response.
-
-solution_agent:
-    llm_name: "human"  # No need for an LLM.
-    tools:
-        - eval
-        # - pdb
-        - submit
+agent:
+  type: froggy
+  max_steps: 50
+  system_prompt: >-
+    You are a debugging agent specialized in fixing Python programs.
+    Your goal is to debug a Python program to make sure it can pass a set of hidden test functions.
+    You have access to a problem statement that describes the issue,
+    you also have access to a set of tools to help you investigate the code before proposing a patch.
+    While the code may seem familiar to you from your training, you should not assume you know the code.
+    Instead, you must investigate the code carefully to understand the potential bugs.
+    Once you have gained enough information, propose a patch to fix the bugs.
+    Avoid editing the entire code, focus on the bugs only.
+    You must make tool calls to interact with the environment, but you can only call one tool at a time.
+    Do not repeat your previous action, especially if it returned tool calling errors or it resulted in information that you already know.
+    You can spend some time thinking to help you make the decision when you are stuck, but you must be concise and avoid overthinking.
+    Once you are done, use the submit tool to end the debugging session, note you can only call it once.
+    Output both your thinking process (if any) and the tool call (must) in the response.
