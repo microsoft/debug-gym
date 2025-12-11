@@ -302,14 +302,6 @@ def test_unrecoverable_error_when_pod_stops(tmp_path):
     finally:
         terminal.close()
 
-    assert terminal.pod.is_running()
-    assert terminal._pod is not None
-    terminal.close()
-    assert terminal._pod is None
-
-    # Test that cleanup can be called multiple times safely
-    terminal.close()
-
 
 @if_kubernetes_available
 def test_select_terminal_kubernetes():

@@ -99,6 +99,7 @@ class EventHooks:
         """Notify all tools that are subscribed to the event.
         Returns a list of observations from all tools that are triggered by the event.
         If error occurs while handling the event, an error observation is returned.
+        Unrecoverable terminal errors are re-raised to terminate the episode.
         """
         observations = []
         for tool in self.event_listeners[event]:
@@ -108,6 +109,9 @@ class EventHooks:
                 observation = getattr(tool, event.handler_name)(environment, **kwargs)
                 if observation:
                     observations.append(observation)
+            except UnrecoverableTerminalError:
+                # Re-raise fatal terminal errors so the environment can terminate.
+                raise
             except Exception as e:
                 error_message = f"Error in tool {tool.name} handling {event}:\n{e}"
                 observations.append(Observation(tool.name, error_message))
@@ -436,9 +440,31 @@ class RepoEnv(TooledEnv):
                 details = str(e).strip()
                 if details:
                     fatal_message += f"\n{details}"
-                self.logger.error(fatal_message)
+                self.logger.error(fatal_message, exc_info=True)
                 self.step_observation = Observation("env", fatal_message)
                 self.terminated = True
+                # Return early to avoid overwriting terminated flag from last_eval
+                self.all_observations = [self.step_observation]
+                self.infos = EnvInfo(
+                    step_observation=self.step_observation,
+                    all_observations=self.all_observations,
+                    eval_observation=(
+                        Observation("env", self.last_eval.output)
+                        if self.last_eval
+                        else None
+                    ),
+                    current_breakpoints=self.current_breakpoints(),
+                    action_reasoning=action_reasoning,
+                    action_content=action_content,
+                    action_tool_call=action_tool_call,
+                    instructions=self.instructions,
+                    score=self.score,
+                    max_score=self.max_score,
+                    terminated=self.terminated,
+                    resolved=self.resolved,
+                    tools=self.tools,
+                )
+                return self.infos
             except BaseException as e:
                 error_message = (
                     f"Error while using tool {triggered_tool.name} "
