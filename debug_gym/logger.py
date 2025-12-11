@@ -614,9 +614,14 @@ class DebugGymLogger(logging.Logger):
         log to their own handlers (ex.: a file) and put the
         record into the log queue for the main process to display
         logs through Rich."""
-        if self.is_worker():
-            self.LOG_QUEUE.put(record)
+        # Handle locally first (with full exc_info for file logging)
         super().handle(record)
+        if self.is_worker():
+            # Clear exc_info before putting in queue - traceback objects can't be pickled
+            # The exception info is already handled by the local handler above
+            record.exc_info = None
+            record.exc_text = None
+            self.LOG_QUEUE.put(record)
 
     def _log_listener(self):
         if self.is_main():
