@@ -2,7 +2,7 @@ import logging
 import os
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 import yaml
 from tenacity import (
@@ -218,24 +218,25 @@ class LLM(ABC):
     @classmethod
     def instantiate(
         cls,
-        llm_name: str,
+        config: Dict[str, Any],
         llm_config_file_path: str | None = None,
         logger: DebugGymLogger | None = None,
     ) -> "LLM":
         """Creates an instance of the appropriate LLM class based on the configuration.
 
         Args:
-            llm_name: Name of the LLM model to instantiate.
+            config: Dictionary containing LLM configuration, must include 'name' key.
             llm_config_file_path: Optional path to the LLM configuration file.
             logger: Optional DebugGymLogger for logging.
 
         Returns:
             An instance of the appropriate LLM class.
         """
-        logger = logger or DebugGymLogger("debug-gym")
-        if not llm_name:
-            return None
 
+        logger = logger or DebugGymLogger("debug-gym")
+        llm_name = config.get("name")
+        if llm_name is None:
+            return None
         elif llm_name == "human":
             from debug_gym.llms import Human
 

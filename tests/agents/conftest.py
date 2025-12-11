@@ -27,7 +27,7 @@ def agent_setup(tmp_path, open_data):
     def _length(text):
         return len(text)
 
-    def _agent_setup(agent_class):
+    def _agent_setup(agent_class, *, config_override=None):
         with (
             patch("tiktoken.encoding_for_model") as mock_encoding_for_model,
             patch("os.path.exists", return_value=True),
@@ -43,6 +43,8 @@ def agent_setup(tmp_path, open_data):
                 "use_conversational_prompt": True,
                 "random_seed": 42,
             }
+            if config_override:
+                config_dict.update(config_override)
             env = MagicMock()
             env.task_name = "test_task"
             llm = MagicMock()

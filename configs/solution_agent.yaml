@@ -1,0 +1,24 @@
+uuid: solution_agent
+task_name: swebench-solution-agent
+output_path: exps/
+
+# SWE-agent style tools: bash for exploration, edit for changes, submit to finish.
+tools:
+  - bash
+  - edit
+  - submit
+
+env:
+  run_timeout: 300
+
+dataset:
+  type: swebench
+  problems: all
+  dataset_id: SWE-bench/SWE-bench_Verified
+  dataset_revision: 99450355ca8c611021187a57ffac304b66666738
+
+terminal:
+  type: docker
+
+agent:
+  type: solution_agent

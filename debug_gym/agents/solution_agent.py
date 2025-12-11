@@ -20,7 +20,7 @@ class AgentSolution(BaseAgent):
         """Fail early if the environment does not implement apply_gold_patch."""
         return hasattr(self.env, "apply_gold_patch")
 
-    def run(self, env, debug=False):
+    def run(self, env, llm=None, debug=False):
         self.env = env
         info = None
         try:

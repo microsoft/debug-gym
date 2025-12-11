@@ -1,0 +1,32 @@
+# Configuration for standalone FreeEnv + FreeAgent runs.
+task_name: free-session
+output_path: exps/free_env
+
+llm:
+  name: human
+
+# Tools to load into the environment toolbox.
+tools:
+  - edit
+  - bash
+  - submit:
+      eval_on_submit: False  # Here we only terminate after submission, no auto-eval.
+
+task_data:
+  env_type: FreeEnv
+  image: ubuntu:22.04
+  local_path: /home/macote/src/debug-gym/data/mini_nightmare/pandas_dataframe
+  workspace_dir: /testbed
+
+terminal:
+  type: docker
+
+agent:
+  type: froggy
+  max_steps: 20
+  system_prompt: >-
+    You are assisting in an exploratory codebase understanding session inside an open-ended container.
+    You have access to a set of tools to inspect and modify the codebase.
+    Your goal is to use the tools to gather as much information about the codebase as possible.
+    Output both your thinking process (if any) and the tool call (must) in the response.
+    When you are done exploring, use the submit tool as the final action to end the session.

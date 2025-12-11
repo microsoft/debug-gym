@@ -6,15 +6,13 @@ from pathlib import Path
 
 import yaml
 
+from debug_gym.agents.base_agent import AGENT_REGISTRY
 from debug_gym.logger import DebugGymLogger
 
 
-def load_config():
+def load_config(args=None):
     parser = argparse.ArgumentParser()
-    parser.add_argument("config_file", help="path to config file")
-    parser.add_argument(
-        "--agent",
-    )
+    parser.add_argument("--config", help="path to config file")
     parser.add_argument(
         "--debug",
         action="store_true",
@@ -103,35 +101,20 @@ def load_config():
         help="override params of the config file,"
         " e.g. -p 'edit_only.random_seed=123'",
     )
-    args = parser.parse_args()
-    assert os.path.exists(args.config_file), "Invalid config file"
-    with open(args.config_file) as reader:
-        config = yaml.safe_load(reader)
-
-    available_agents = [item for item in list(config.keys()) if item != "base"]
-
-    if not args.agent:
-        # pick first agent
-        args.agent = available_agents[0]
-    elif args.agent not in available_agents:
-        raise ValueError(
-            f"Invalid agent: {args.agent}. Available agents: {available_agents}"
-        )
-
-    if "base" in config:
-        # base config is specified (shared across agents)
-        return_config = config["base"]
-        # Override base config with agent specific config
-        for key, value in config[args.agent].items():
-            return_config[key] = value
-    else:
-        # base config is not specified
-        return_config = config[args.agent]
+    args = parser.parse_args(args)
+    config = {}
+    if args.config is not None:
+        assert os.path.exists(args.config), "Invalid config file"
+        with open(args.config) as reader:
+            config = yaml.safe_load(reader)
 
     # Parse overriden params.
     for param in args.params:
-        fqn_key, value = param.split("=")
-        entry_to_change = return_config
+        fqn_key, value = param, ""
+        if "=" in param:
+            fqn_key, value = param.split("=")
+
+        entry_to_change = config
         keys = fqn_key.split(".")
         for k in keys[:-1]:
             if k not in entry_to_change:
@@ -140,11 +123,7 @@ def load_config():
             entry_to_change = entry_to_change[k]
         entry_to_change[keys[-1]] = yaml.safe_load(value)
 
-    # assume agent type is the key if not specified by the user
-    if not return_config.get("agent_type"):
-        return_config["agent_type"] = args.agent
-
-    return return_config, args
+    return config, args
 
 
 def save_patch(env, problem_path: Path, logger: DebugGymLogger):
