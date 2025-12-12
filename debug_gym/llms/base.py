@@ -193,18 +193,11 @@ class LLM(ABC):
         model_name: str,
         logger: DebugGymLogger | None = None,
         llm_config: LLMConfig | None = None,
-        llm_config_file: str | None = None,
         runtime_generate_kwargs: dict | None = None,
     ):
         self.model_name = model_name
         self.logger = logger or DebugGymLogger("debug-gym")
-        if llm_config is not None and llm_config_file is not None:
-            logger.warning(
-                "Both llm_config and llm_config_file are provided, using llm_config."
-            )
-        self.config = (
-            llm_config or LLMConfigRegistry.from_file(llm_config_file)[model_name]
-        )
+        self.config = llm_config
         self.tokenizer_name = self.config.tokenizer
         self.context_length = self.config.context_limit * 1000
         self.apply_chat_template = self.config.apply_chat_template

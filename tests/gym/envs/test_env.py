@@ -643,6 +643,85 @@ class TestSelectEnv:
             select_env(None)
 
 
+class TestSoftReset:
+    """Test cases for soft reset (reset_runtime=False) functionality."""
+
+    def test_soft_reset_resets_env_state(self, tmp_path):
+        """Test that soft reset resets environment state."""
+        test_file = tmp_path / "test.py"
+        test_file.write_text("print('hello')")
+
+        env = LocalEnv(path=tmp_path)
+        env.reset()
+
+        # Set some state
+        env.score = 5
+        env.current_breakpoints_state = {"test.py|||10": "b test.py:10"}
+        env.last_eval = EvalOutput(success=True, output="test")
+
+        # Soft reset should reset the state
+        env.reset(options={"reset_runtime": False})
+
+        assert env.score == 0
+        assert env.current_breakpoints_state == {}
+        assert env.last_eval is None
+
+    def test_soft_reset_keeps_terminal_running(self, tmp_path):
+        """Test that soft reset does not restart the terminal."""
+        test_file = tmp_path / "test.py"
+        test_file.write_text("print('hello')")
+
+        env = LocalEnv(path=tmp_path)
+        env.reset()
+
+        # Get a reference to the terminal
+        terminal_before = env.terminal
+
+        # Soft reset
+        env.reset(options={"reset_runtime": False})
+
+        # Terminal should be the same instance
+        assert env.terminal is terminal_before
+
+    def test_soft_reset_preserves_file_changes(self, tmp_path):
+        """Test that soft reset preserves file changes (doesn't touch workspace)."""
+        test_file = tmp_path / "test.py"
+        test_file.write_text("original content")
+
+        env = LocalEnv(path=tmp_path)
+        env.reset()
+
+        # Modify the file
+        (env.working_dir / "test.py").write_text("modified content")
+
+        # Soft reset should NOT revert file changes
+        env.reset(options={"reset_runtime": False})
+
+        # File should still be modified
+        assert (env.working_dir / "test.py").read_text() == "modified content"
+
+    def test_soft_reset_notifies_tools(self, tmp_path):
+        """Test that soft reset still notifies tools of ENV_RESET event."""
+        test_file = tmp_path / "test.py"
+        test_file.write_text("print('hello')")
+
+        env = LocalEnv(path=tmp_path)
+        env.reset()
+
+        # Add a mock tool that listens to ENV_RESET
+        mock_tool = MagicMock()
+        mock_tool.name = "mock_tool"
+        mock_tool.on_env_reset.return_value = Observation("mock_tool", "reset called")
+        env.add_tool(mock_tool)
+        env.event_hooks.subscribe(Event.ENV_RESET, mock_tool)
+
+        # Soft reset
+        env.reset(options={"reset_runtime": False})
+
+        # Tool should have been notified
+        mock_tool.on_env_reset.assert_called_once()
+
+
 class TestLoadDataset:
     """Test cases for load_dataset function."""
 
