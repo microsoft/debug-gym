@@ -5,12 +5,7 @@ from unittest.mock import patch
 
 import pytest
 
-from debug_gym.experiment import (
-    add_tools,
-    collect_tool_setup_commands,
-    create_env,
-    dump_experiment_info,
-)
+from debug_gym.experiment import add_tools, create_env, dump_experiment_info
 from debug_gym.gym.envs.free_env import FreeEnv
 from debug_gym.gym.tools.bash import BashTool
 from debug_gym.gym.tools.view import ViewTool
@@ -233,51 +228,6 @@ class TestAddTools:
 
         # No tools should be added
         assert len(env.tools) == 0
-
-
-class TestCollectToolSetupCommands:
-    """Test cases for collect_tool_setup_commands function"""
-
-    def test_collect_no_tools(self):
-        """Test with no tools configured"""
-        logger = DebugGymLogger("test")
-        config = {}
-        result = collect_tool_setup_commands(config, logger)
-        assert result == []
-
-    def test_collect_tools_without_setup_commands(self):
-        """Test with tools that have no setup_commands"""
-        logger = DebugGymLogger("test")
-        config = {"tools": ["bash", "view"]}
-        result = collect_tool_setup_commands(config, logger)
-        # bash and view don't have setup_commands
-        assert result == []
-
-    def test_collect_tools_with_setup_commands(self):
-        """Test with listdir tool which has setup_commands"""
-        logger = DebugGymLogger("test")
-        config = {"tools": ["listdir"]}
-        result = collect_tool_setup_commands(config, logger)
-        # listdir requires tree to be installed
-        assert len(result) > 0
-        assert any("tree" in cmd for cmd in result)
-
-    def test_collect_avoids_duplicate_commands(self):
-        """Test that duplicate setup commands are not added"""
-        logger = DebugGymLogger("test")
-        # If we had two tools with the same setup command, it should only appear once
-        config = {"tools": ["listdir"]}
-        result = collect_tool_setup_commands(config, logger)
-        # Verify no duplicates
-        assert len(result) == len(set(result))
-
-    def test_collect_tools_with_dict_format(self):
-        """Test with tools specified as dict with config"""
-        logger = DebugGymLogger("test")
-        config = {"tools": [{"listdir": {}}]}
-        result = collect_tool_setup_commands(config, logger)
-        assert len(result) > 0
-        assert any("tree" in cmd for cmd in result)
 
 
 class TestDumpExperimentInfo:

@@ -79,17 +79,17 @@ class EnvironmentTool(ABC):
             if hasattr(self, event.handler_name):
                 environment.event_hooks.subscribe(event, self)
 
-        # Run setup commands if this tool has setup_commands and the environment
-        # has already been reset (workspace is initialized). This handles the case
-        # where tools are added dynamically after reset().
-        # For the normal experiment.py flow, collect_tool_setup_commands() handles
-        # adding setup commands to terminal.setup_commands before the container starts.
+        # Run setup commands if this tool has any and the environment is already
+        # initialized (tool added after reset). Otherwise, they'll run via
+        # on_env_reset when reset() is called (all tools are subscribed to ENV_RESET
+        # because EnvironmentTool defines on_env_reset).
         if self.setup_commands:
             if (
                 hasattr(environment, "workspace")
                 and environment.workspace is not None
                 and environment.workspace.working_dir is not None
             ):
+                # Environment already reset, run setup commands now
                 for cmd in self.setup_commands:
                     environment.terminal.run(cmd, raises=False)
 
@@ -121,6 +121,9 @@ class EnvironmentTool(ABC):
         Please call `super().on_env_reset()` if subclass overrides this method.
         """
         self.history = []
+        # Run setup commands if this tool has any
+        for cmd in self.setup_commands:
+            environment.terminal.run(cmd, raises=False)
         return None
 
     def __str__(self):

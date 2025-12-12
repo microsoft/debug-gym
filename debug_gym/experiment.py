@@ -12,15 +12,7 @@ from debug_gym.logger import DebugGymLogger
 
 
 def create_env(config: dict, task_data: dict, logger: DebugGymLogger):
-    # Collect tool setup commands before creating the terminal
-    tool_setup_commands = collect_tool_setup_commands(config, logger)
-
-    # Create terminal with tool dependencies included in setup_commands
     terminal = select_terminal(config.get("terminal"), logger, uuid=config["uuid"])
-    if terminal is not None and tool_setup_commands:
-        # Prepend tool setup commands to terminal's setup commands
-        terminal.setup_commands = tool_setup_commands + terminal.setup_commands
-        logger.debug(f"Added tool setup commands: {tool_setup_commands}")
 
     env_class = select_env(task_data.get("env_type"))
     env = env_class(
@@ -32,33 +24,6 @@ def create_env(config: dict, task_data: dict, logger: DebugGymLogger):
 
     add_tools(env, config, logger)
     return env
-
-
-def collect_tool_setup_commands(config: dict, logger: DebugGymLogger) -> list[str]:
-    """Collect setup commands from all tools that will be used."""
-    setup_commands = []
-    seen_commands = set()  # Avoid duplicate commands
-
-    for tool in config.get("tools", []):
-        tool_config = {}
-        tool_name = tool
-        if isinstance(tool, dict):
-            assert len(tool) == 1, "Tool dict must have exactly one key"
-            tool_name, tool_config = list(tool.items())[0]
-        if isinstance(config.get("tools"), dict) and isinstance(
-            config["tools"].get(tool_name), dict
-        ):
-            tool_config.update(config["tools"][tool_name])
-
-        # Get the tool class to access its setup_commands
-        tool_instance = Toolbox.get_tool(tool_name, **tool_config)
-        for cmd in tool_instance.setup_commands:
-            if cmd not in seen_commands:
-                setup_commands.append(cmd)
-                seen_commands.add(cmd)
-                logger.debug(f"Tool '{tool_name}' requires setup: {cmd}")
-
-    return setup_commands
 
 
 def add_tools(env, config: dict, logger: DebugGymLogger):
