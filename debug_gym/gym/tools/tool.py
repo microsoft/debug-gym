@@ -79,15 +79,19 @@ class EnvironmentTool(ABC):
             if hasattr(self, event.handler_name):
                 environment.event_hooks.subscribe(event, self)
 
-        # Run setup commands if terminal is available and this tool has setup_commands
+        # Run setup commands if this tool has setup_commands and the environment
+        # has already been reset (workspace is initialized). This handles the case
+        # where tools are added dynamically after reset().
+        # For the normal experiment.py flow, collect_tool_setup_commands() handles
+        # adding setup commands to terminal.setup_commands before the container starts.
         if self.setup_commands:
-            if hasattr(environment, "terminal") and environment.terminal is not None:
-                # Track which setup commands have been run on this terminal
-                setup_key = f"_{self.name}_setup_complete"
-                if not getattr(environment.terminal, setup_key, False):
-                    for cmd in self.setup_commands:
-                        environment.terminal.run(cmd, raises=False)
-                    setattr(environment.terminal, setup_key, True)
+            if (
+                hasattr(environment, "workspace")
+                and environment.workspace is not None
+                and environment.workspace.working_dir is not None
+            ):
+                for cmd in self.setup_commands:
+                    environment.terminal.run(cmd, raises=False)
 
     def unregister(self, environment):
         from debug_gym.gym.envs.env import RepoEnv
