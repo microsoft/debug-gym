@@ -510,8 +510,9 @@ class RepoEnv(TooledEnv):
         return None
 
     def close(self):
-        self.workspace.cleanup()
-        if self.terminal:
+        if hasattr(self, "workspace") and self.workspace:
+            self.workspace.cleanup()
+        if hasattr(self, "terminal") and self.terminal:
             self.terminal.close()
 
     def __del__(self):
