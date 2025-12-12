@@ -126,7 +126,7 @@ def run_agent(args, task_name: str, task_data: dict, config: dict):
         save_trajectory(agent, task_path, task_logger)
 
         # optionally apply patch
-        if config["save_patch"]:
+        if config.get("save_patch", True):
             try:
                 save_patch(env, task_path, task_logger)
             except Exception as patch_error:
