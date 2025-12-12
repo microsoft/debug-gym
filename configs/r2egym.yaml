@@ -1,7 +1,9 @@
 # Configuration for R2E-Gym benchmark runs.
 task_name: r2egym
 output_path: exps/r2egym
-llm_name: gpt-4o
+
+llm:
+  name: gpt-4o
 
 # Tools to load into the environment toolbox.
 tools:

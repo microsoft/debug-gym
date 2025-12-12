@@ -2,7 +2,8 @@
 task_name: aider
 output_path: exps/aider
 
-llm_name: gpt-4o
+llm:
+  name: gpt-4o
 
 # Tools to load into the environment toolbox.
 tools:

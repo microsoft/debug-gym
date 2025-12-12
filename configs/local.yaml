@@ -2,7 +2,8 @@
 task_name: pytorch
 output_path: exps/pytorch
 
-llm_name: gpt-4o
+llm:
+  name: gpt-4o
 
 # Tools to load into the environment toolbox.
 tools:

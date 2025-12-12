@@ -1,7 +1,9 @@
 # Configuration for Mini Nightmare benchmark runs.
 task_name: mini_nightmare
 output_path: exps/mini_nightmare
-llm_name: gpt-4o
+
+llm:
+  name: gpt-4o
 
 # Tools to load into the environment toolbox.
 tools:
