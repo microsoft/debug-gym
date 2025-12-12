@@ -244,10 +244,10 @@ Shortcut Features:
 
 #### 3.5. Debugging a Custom Repository
 
-You can debug a custom repository by using `configs/free_env.yaml` and modifying the `task_data` section to set the path and entrypoint of the custom repository. We assume there is a `.debugignore` file and a `.debugreadonly` within the repository that labels files/folders that are not seen or not editable, respectively.
+You can debug a custom repository by using `configs/local.yaml` and modifying the `task_data` section to set the path and entrypoint of the custom repository. We assume there is a `.debugignore` file and a `.debugreadonly` within the repository that labels files/folders that are not seen or not editable, respectively.
 
-    python scripts/run.py --config configs/free_env.yaml \
-        -p task_data.local_path="/path/to/your/repo" \
+    python scripts/run.py --config configs/local.yaml \
+        -p task_data.path="/path/to/your/repo" \
         -p task_data.entrypoint="pytest tests/"
 
 #### 3.6. Debugging a Custom SWE-Smith Instance
