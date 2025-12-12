@@ -43,6 +43,10 @@ class EnvironmentTool(ABC):
     arguments: Dict[str, Any] = None
     description: str = None
     history: list[Record] = None
+    # Shell commands to run during terminal setup when this tool is used.
+    # These commands will be executed before the environment is ready.
+    # Example: ["apt-get update && apt-get install -y tree"]
+    setup_commands: list[str] = []
 
     def __init__(self):
         self.history = []

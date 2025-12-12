@@ -85,10 +85,13 @@ One of the core designs of `debug-gym` is the notion of tools. Users can dynamic
 | `eval` | It runs the current code repository using the provided entrypoint (e.g., pytest), and returns the terminal's output (e.g., error message). |
 | `pdb` | Interactive debugger wrapping the [Python pdb tool](https://docs.python.org/3/library/pdb.html). In addition, users can choose to maintain a set of persistent breakpoints (as in some programming IDEs), which are not reset after every eval. With such feature, a new pdb debugging session is activated automatically, with all the breakpoints restored. Note such breakpoints can be cleared by pdb commands such as `cl`. |
 | `grep` | Search for patterns in files within the repository. Supports both literal string matching and regular expressions. Can search in specific files, directories, or the entire repository. Useful for finding code patterns, function definitions, variable usage, or identifying files containing specific text. |
+| `listdir` | List the file and folder contents of a directory within the working directory, up to a specified depth. Useful for exploring the repository structure. |
 | `edit` | It can be used to edit a certain piece of code to fix the bug. The inputs of this tool call include the file path, the start and end line numbers, and the new code. |
 | `submit` | Submit your changes once the task is complete. By default, it runs evaluation before terminating the session, but this can be disabled via `eval_on_submit: false`. |
 
 Upon importing a tool, its action space and observation space will be automatically merged into `debug-gym`'s action space and observation space; its instruction will also be merged into the overall instruction provided to the agent (e.g., as system prompt).
+
+**Tool Dependencies:** Some tools require additional packages to be installed in the terminal environment. When a tool is added to the configuration, its required dependencies are automatically installed during terminal setup. For example, the `listdir` tool requires the `tree` package, which is automatically installed when the tool is used. This ensures that tools work out of the box without manual configuration.
 
 Users can include a `.debugignore` file in the repository to specify files and directories that are not visible to `debug-gym`, similarly, they can include a `.debugreadonly` to specify files and directories that are read only by the agents (e.g., the test files). Both files share the same syntax as `.gitignore`.
 
