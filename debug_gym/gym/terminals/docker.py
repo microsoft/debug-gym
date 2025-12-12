@@ -219,7 +219,7 @@ class DockerTerminal(Terminal):
                 ) from exc
             if status != 0:
                 container.stop()
-                raise ValueError(
+                raise UnrecoverableTerminalError(
                     f"Failed to run setup command: {setup_commands}\n"
                     f"Output: {output.decode()}"
                 )

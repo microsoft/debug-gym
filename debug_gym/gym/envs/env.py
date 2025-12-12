@@ -403,7 +403,11 @@ class RepoEnv(TooledEnv):
 
     @property
     def patch(self):
-        success, output = self.terminal.run("git diff", strip_output=False, raises=True)
+        success, output = self.terminal.run(
+            "git diff", strip_output=False, raises=False
+        )
+        if not success:
+            raise RuntimeError(f"Failed to get git diff:\n{output}")
         return output
 
     def apply_gold_patch(self):

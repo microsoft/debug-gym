@@ -171,7 +171,7 @@ def test_run_setup_commands_success(tmp_path):
 def test_run_setup_commands_failure(tmp_path):
     working_dir = str(tmp_path)
     setup_commands = ["echo install", "ls ./non_existent_dir"]
-    with pytest.raises(ValueError, match="Failed to run setup command:*"):
+    with pytest.raises(UnrecoverableTerminalError, match="Failed to run setup command"):
         terminal = DockerTerminal(
             working_dir, setup_commands=setup_commands, base_image="ubuntu:latest"
         )

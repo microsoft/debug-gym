@@ -218,7 +218,11 @@ class Workspace:
         tree_cmd = (
             f"tree --charset=ASCII --noreport -a -v -F -f -l -L {max_depth} {root} "
         )
-        success, output = self.terminal.run(tree_cmd, raises=True)
+        success, output = self.terminal.run(tree_cmd, raises=False)
+        if not success:
+            raise WorkspaceReadError(
+                f"Failed to list directory '{root}'. Command output:\n{output}"
+            )
 
         first, *rest = output.splitlines()
         lines = [first]

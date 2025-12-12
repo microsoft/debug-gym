@@ -663,10 +663,10 @@ class KubernetesTerminal(Terminal):
             return
 
         setup_commands = " && ".join(self.setup_commands)
-        success, output = self.run(setup_commands, raises=True)
+        success, output = self.run(setup_commands, raises=False)
         if not success:
             self.close()
-            raise ValueError(
+            raise UnrecoverableTerminalError(
                 f"Failed to run setup command: {setup_commands}\n" f"Output: {output}"
             )
         self.logger.debug("Setup commands ran successfully.")
