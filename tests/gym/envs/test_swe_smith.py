@@ -126,29 +126,21 @@ def test_reset_and_step(get_swe_smith_env):
     assert not env.terminated
     assert not env.resolved
 
-    tool_call = ToolCall(id="listdir_id", name="listdir", arguments={})
+    tool_call = ToolCall(id="bash_id", name="bash", arguments={"command": "ls"})
     env_info = env.step(tool_call)
     assert env_info.step_observation == Observation(
         source="env",
-        observation="Unregistered tool: listdir",
+        observation="Unregistered tool: bash",
     )
 
-    view_tool = Toolbox.get_tool("listdir")
-    env.add_tool(view_tool)
+    bash_tool = Toolbox.get_tool("bash")
+    env.add_tool(bash_tool)
 
     env_info = env.step(tool_call)
-    assert env_info.step_observation.source == "listdir"
-    # Verify we can see the tldextract directory structure
-    listdir_start = f"""{env.working_dir}/
-|-- CHANGELOG.md
-|-- LICENSE
-|-- README.md
-|-- pyproject.toml
-|-- scripts/
-|-- tests/
-|-- tldextract/
-|-- tox.ini"""
-    assert env_info.step_observation.observation.startswith(listdir_start)
+    assert env_info.step_observation.source == "bash"
+    # Verify some expected files are listed
+    assert "tldextract" in env_info.step_observation.observation
+    assert "pyproject.toml" in env_info.step_observation.observation
 
 
 @pytest.if_docker_running
@@ -157,7 +149,6 @@ def test_readonly_file(get_swe_smith_env):
     env_info = env.reset()
 
     env.add_tool(Toolbox.get_tool("view"))
-    env.add_tool(Toolbox.get_tool("listdir"))
 
     for test_filename in env.test_directives:
         test_filename = Path("/testbed") / test_filename
@@ -174,18 +165,6 @@ def test_readonly_file(get_swe_smith_env):
         assert (
             "The file is read-only."
             in env_info.step_observation.observation.splitlines()[0]
-        )
-
-        tool_call = ToolCall(
-            id="listdir_id",
-            name="listdir",
-            arguments={"path": str(test_filename.parent)},
-        )
-        env_info = env.step(tool_call)
-        assert env_info.step_observation.source == "listdir"
-        assert (
-            f"|-- {test_filename.name} (read-only)"
-            in env_info.step_observation.observation
         )
 
 

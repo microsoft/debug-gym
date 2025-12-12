@@ -28,40 +28,21 @@ def test_reset_and_step(get_swe_bench_env):
     assert not env.terminated
     assert not env.resolved
 
-    tool_call = ToolCall(id="listdir_id", name="listdir", arguments={})
+    tool_call = ToolCall(id="bash_id", name="bash", arguments={"command": "ls"})
     env_info = env.step(tool_call)
     assert env_info.step_observation == Observation(
         source="env",
-        observation="Unregistered tool: listdir",
+        observation="Unregistered tool: bash",
     )
 
-    view_tool = Toolbox.get_tool("listdir")
-    env.add_tool(view_tool)
+    bash_tool = Toolbox.get_tool("bash")
+    env.add_tool(bash_tool)
 
     env_info = env.step(tool_call)
-    assert env_info.step_observation.source == "listdir"
-    listdir_start = f"""{env.working_dir}/
-|-- CHANGES.rst
-|-- CITATION
-|-- CODE_OF_CONDUCT.md
-|-- CONTRIBUTING.md
-|-- GOVERNANCE.md
-|-- LICENSE.rst
-|-- MANIFEST.in
-|-- README.rst
-|-- astropy/
-|-- cextern/
-|-- codecov.yml
-|-- conftest.py
-|-- docs/
-|-- examples/
-|-- licenses/
-|-- pip-requirements
-|-- pyproject.toml
-|-- setup.cfg
-|-- setup.py*
-|-- tox.ini"""
-    assert env_info.step_observation.observation.startswith(listdir_start)
+    assert env_info.step_observation.source == "bash"
+    # Verify some expected files are listed
+    assert "astropy" in env_info.step_observation.observation
+    assert "setup.py" in env_info.step_observation.observation
 
 
 @pytest.if_docker_running
@@ -87,14 +68,6 @@ def test_readonly_file(get_swe_bench_env):
         "The file is read-only."
         in env_info.step_observation.observation.splitlines()[0]
     )
-
-    env.add_tool(Toolbox.get_tool("listdir"))
-    tool_call = ToolCall(
-        id="listdir_id", name="listdir", arguments={"path": str(test_filename.parent)}
-    )
-    env_info = env.step(tool_call)
-    assert env_info.step_observation.source == "listdir"
-    assert "|-- test_sky_coord.py (read-only)" in env_info.step_observation.observation
 
 
 def test_load_dataset(get_swe_bench_env):

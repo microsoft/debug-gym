@@ -34,7 +34,7 @@ class FreeEnv(RepoEnv):
             "local_path": local_path,
             "workspace_dir": workspace_dir,
             "setup_commands": setup_commands
-            or ["apt-get update -y && apt-get install -y git tree"],
+            or ["apt-get update -y && apt-get install -y git"],
         }
         super().__init__(
             task_data=task_data,

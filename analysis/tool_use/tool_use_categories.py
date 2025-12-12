@@ -50,7 +50,6 @@ def analyze_froggy_results(model_name):
 
                 tool_counter = {
                     "view": 0,
-                    "listdir": 0,
                     "pdb": 0,
                     "edit": 0,
                     "eval": 0,
@@ -123,7 +122,6 @@ def plot_tool_use_categories(df_dict, model_paths, figsize=(12, 7)):
         # o1, o3-mini, o1, o3-mini, o1, o3-mini
         tool_category_per_model = {
             "view": 0,
-            "listdir": 0,
             "pdb": 0,
             "edit": 0,
             "eval": 0,
@@ -145,7 +143,6 @@ def plot_tool_use_categories(df_dict, model_paths, figsize=(12, 7)):
                 model_name,
                 model_name.split("_")[1],
                 tool_category_per_model["view"],
-                tool_category_per_model["listdir"],
                 tool_category_per_model["pdb"],
                 tool_category_per_model["edit"],
                 tool_category_per_model["eval"],
@@ -156,16 +153,16 @@ def plot_tool_use_categories(df_dict, model_paths, figsize=(12, 7)):
     # convert to DataFrame
     all_data = pd.DataFrame(
         all_data,
-        columns=["name", "model", "view", "listdir", "pdb", "edit", "eval", "other"],
+        columns=["name", "model", "view", "pdb", "edit", "eval", "other"],
     )
     # nice palette
     palette = sns.color_palette("Set2")
     # set color
     sns.set_palette(palette)
     # stacked bar plot showing the distribution of PDB command categories for each model
-    all_data.set_index("name")[
-        ["view", "listdir", "pdb", "edit", "eval", "other"]
-    ].plot(kind="bar", stacked=True, figsize=figsize)
+    all_data.set_index("name")[["view", "pdb", "edit", "eval", "other"]].plot(
+        kind="bar", stacked=True, figsize=figsize
+    )
     plt.xlabel("Backbone LLM")
     plt.ylabel("Percentage")
     plt.xticks(rotation=90)

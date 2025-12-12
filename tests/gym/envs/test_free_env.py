@@ -84,7 +84,7 @@ class TestFreeEnvInitialization:
 
         assert "setup_commands" in env.task_data
         assert "apt-get update" in env.task_data["setup_commands"][0]
-        assert "git tree" in env.task_data["setup_commands"][0]
+        assert "git" in env.task_data["setup_commands"][0]
 
 
 class TestFreeEnvProperties:

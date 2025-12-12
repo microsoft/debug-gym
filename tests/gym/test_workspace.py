@@ -64,57 +64,6 @@ def test_reset_and_cleanup_workspace():
     assert workspace.working_dir is None
 
 
-def test_display_files(workspace):
-    result = workspace.display_files(dir_tree_depth=2)
-    assert result == (
-        "Listing files in the current working directory. (read-only) indicates read-only files. Max depth: 2.\n"
-        f"{workspace.working_dir}/\n"
-        "|-- .hidden\n"
-        "|-- file1.txt\n"
-        "|-- file2.txt\n"
-        "|-- subdir/\n"
-        "  |-- subfile1.txt"
-    )
-
-
-def test_display_files_read_only(workspace):
-    read_only_path = workspace.working_dir / "read-only-file.txt"
-    read_only_path.touch()
-
-    debugreadonly = workspace.working_dir / ".debugreadonly"
-    debugreadonly.write_text("read-only-file.txt")
-
-    # Reset filters to take into account the .debugreadonly file.
-    workspace.setup_file_filters()
-
-    result = workspace.display_files(dir_tree_depth=2)
-    assert result == (
-        "Listing files in the current working directory. (read-only) indicates read-only files. Max depth: 2.\n"
-        f"{workspace.working_dir}/\n"
-        "|-- .hidden\n"
-        "|-- file1.txt\n"
-        "|-- file2.txt\n"
-        "|-- read-only-file.txt (read-only)\n"
-        "|-- subdir/\n"
-        "  |-- subfile1.txt"
-    )
-
-
-def test_display_files_ignore(workspace):
-    debugignore = workspace.working_dir / ".debugignore"
-    debugignore.write_text(".hidden\nfile1.*\nsubdir/\n")
-
-    # Reset filters to take into account the .debugignore file.
-    workspace.setup_file_filters()
-
-    result = workspace.display_files(dir_tree_depth=2)
-    assert result == (
-        "Listing files in the current working directory. (read-only) indicates read-only files. Max depth: 2.\n"
-        f"{workspace.working_dir}/\n"
-        "|-- file2.txt"
-    )
-
-
 @pytest.mark.parametrize("debugignore", ["", ".?*"])
 def test_resolve_path(workspace, debugignore):
     (workspace.working_dir / ".debugignore").write_text(debugignore)

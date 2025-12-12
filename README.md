@@ -81,7 +81,6 @@ One of the core designs of `debug-gym` is the notion of tools. Users can dynamic
 | Tool name | Description |
 | :-: | :----- |
 | `bash` | Run commands in a bash shell. You have access to common Linux and Python packages via pip. State is persistent across command calls within the same session. |
-| `listdir` | It returns the directory tree at a given subdirectory. This is particularly useful when dealing with a repository with multiple files. |
 | `view` | It is used to change an agent's focus to a particular source code file. This is particularly useful when dealing with a repository with multiple files. |
 | `eval` | It runs the current code repository using the provided entrypoint (e.g., pytest), and returns the terminal's output (e.g., error message). |
 | `pdb` | Interactive debugger wrapping the [Python pdb tool](https://docs.python.org/3/library/pdb.html). In addition, users can choose to maintain a set of persistent breakpoints (as in some programming IDEs), which are not reset after every eval. With such feature, a new pdb debugging session is activated automatically, with all the breakpoints restored. Note such breakpoints can be cleared by pdb commands such as `cl`. |

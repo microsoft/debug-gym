@@ -147,44 +147,21 @@ def test_reset_and_step(get_r2egym_env):
     assert not env.terminated
     assert not env.resolved
 
-    tool_call = ToolCall(id="listdir_id", name="listdir", arguments={})
+    tool_call = ToolCall(id="bash_id", name="bash", arguments={"command": "ls"})
     env_info = env.step(tool_call)
     assert env_info.step_observation == Observation(
         source="env",
-        observation="Unregistered tool: listdir",
+        observation="Unregistered tool: bash",
     )
 
-    view_tool = Toolbox.get_tool("listdir")
-    env.add_tool(view_tool)
+    bash_tool = Toolbox.get_tool("bash")
+    env.add_tool(bash_tool)
 
     env_info = env.step(tool_call)
-    assert env_info.step_observation.source == "listdir"
-    # Verify we can see the tldextract directory structure
-    listdir_start = f"""{env.working_dir}/
-|-- CHANGES/
-|-- CHANGES.rst
-|-- CODE_OF_CONDUCT.md
-|-- CONTRIBUTING.rst
-|-- CONTRIBUTORS.txt
-|-- HISTORY.rst
-|-- LICENSE.txt
-|-- MANIFEST.in
-|-- Makefile
-|-- README.rst
-|-- aiohttp/
-|-- docs/
-|-- examples/
-|-- install.sh
-|-- process_aiohttp_updateasyncio.py
-|-- pyproject.toml
-|-- r2e_tests/
-|-- requirements/
-|-- setup.cfg
-|-- setup.py
-|-- tests/
-|-- tools/
-|-- vendor/"""
-    assert env_info.step_observation.observation.startswith(listdir_start)
+    assert env_info.step_observation.source == "bash"
+    # Verify some expected files are listed
+    assert "aiohttp" in env_info.step_observation.observation
+    assert "setup.py" in env_info.step_observation.observation
 
 
 @pytest.if_docker_running
@@ -194,13 +171,6 @@ def test_readonly_file(get_r2egym_env):
     assert env.workspace._is_readonly_func("/testbed/r2e_tests/test_1.py")
 
     env.add_tool(Toolbox.get_tool("view"))
-    env.add_tool(Toolbox.get_tool("listdir"))
-
-    tool_call = ToolCall(
-        id="listdir_id", name="listdir", arguments={"path": "r2e_tests"}
-    )
-    env_info = env.step(tool_call)
-    assert f"|-- test_1.py (read-only)" in env_info.step_observation.observation
 
     tool_call = ToolCall(
         id="view_id", name="view", arguments={"path": "r2e_tests/test_1.py"}
