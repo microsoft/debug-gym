@@ -14,6 +14,7 @@ from debug_gym.gym.envs.r2egym import R2EGymEnv
 from debug_gym.gym.envs.swe_bench import SWEBenchEnv
 from debug_gym.gym.envs.swe_bench_debug import SWEBenchDebugEnv
 from debug_gym.gym.envs.swe_smith import SWESmithEnv
+from debug_gym.gym.terminals.terminal import UnrecoverableTerminalError
 from debug_gym.gym.tools.tool import ToolCall
 from debug_gym.gym.tools.toolbox import Toolbox
 
@@ -22,6 +23,37 @@ from debug_gym.gym.tools.toolbox import Toolbox
 def env_mock(tmp_path):
     env = LocalEnv(path=tmp_path)
     return env
+
+
+def test_close_handles_missing_attributes():
+    """Test that close() handles missing workspace/terminal attributes gracefully."""
+
+    # Create a minimal RepoEnv subclass that doesn't fully initialize
+    class PartialEnv(RepoEnv):
+        def __init__(self):
+            # Don't call super().__init__() to simulate partial initialization
+            pass
+
+        @property
+        def instructions(self):
+            return ""
+
+        @property
+        def task_name(self):
+            return "test"
+
+        def setup_task(self):
+            pass
+
+        def setup_workspace(self):
+            pass
+
+        def setup_terminal(self):
+            pass
+
+    env = PartialEnv()
+    # This should not raise even though workspace and terminal are not set
+    env.close()
 
 
 def test_seed(env_mock):
@@ -336,6 +368,42 @@ def test_event_hooks_notify():
     observations = event_hooks.notify(env, Event.ENV_START)
     assert observations == [an_observation]
     subscriber.on_env_start.assert_called_once()
+
+
+def test_event_hooks_notify_unrecoverable_terminal_error():
+    """Test that UnrecoverableTerminalError is re-raised by notify()."""
+
+    class FailingSubscriber:
+        name = "failing_tool"
+
+        def on_env_start(self, environment, **kwargs):
+            raise UnrecoverableTerminalError("Terminal died")
+
+    event_hooks = EventHooks()
+    subscriber = FailingSubscriber()
+    event_hooks.subscribe(Event.ENV_START, subscriber)
+
+    with pytest.raises(UnrecoverableTerminalError, match="Terminal died"):
+        event_hooks.notify(None, Event.ENV_START)
+
+
+def test_event_hooks_notify_regular_exception_returns_observation():
+    """Test that regular exceptions are caught and returned as observations."""
+
+    class FailingSubscriber:
+        name = "test_tool"
+
+        def on_env_start(self, environment, **kwargs):
+            raise ValueError("Some error")
+
+    event_hooks = EventHooks()
+    subscriber = FailingSubscriber()
+    event_hooks.subscribe(Event.ENV_START, subscriber)
+
+    observations = event_hooks.notify(None, Event.ENV_START)
+    assert len(observations) == 1
+    assert observations[0].source == "test_tool"
+    assert "Error in tool test_tool" in observations[0].observation
 
 
 def test_current_breakpoints_no_breakpoints(env_mock):
