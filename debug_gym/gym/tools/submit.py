@@ -11,7 +11,6 @@ class SubmitTool(EnvironmentTool):
         "message": {
             "type": ["string"],
             "description": "An optional message to conclude the task, summarizing what was done.",
-            "required": False,
         }
     }
 
