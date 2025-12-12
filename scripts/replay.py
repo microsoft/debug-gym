@@ -176,7 +176,13 @@ def run_task(args, problem, config):
         )
 
         env = create_env(config, task_logger)
-        llm = LLM.instantiate(config["llm"], logger=task_logger)
+        llm_config = config.get("llm", {})
+        llm = LLM.instantiate(
+            llm_config.get("name"),
+            logger=task_logger,
+            temperature=llm_config.get("temperature"),
+            max_tokens=llm_config.get("max_tokens"),
+        )
         agent = create_agent(config["agent"], logger=task_logger)
 
         try:
@@ -354,7 +360,13 @@ def main():
         len(problems) == 1
     ), "Replay only supports a single problem in the trajectory file."
 
-    llm = LLM.instantiate(config["llm"], logger=logger)
+    llm_config = config.get("llm", {})
+    llm = LLM.instantiate(
+        llm_config.get("name"),
+        logger=logger,
+        temperature=llm_config.get("temperature"),
+        max_tokens=llm_config.get("max_tokens"),
+    )
 
     # Stop live progress display if in Human mode (avoid conflicts with prompt_toolkit)
     if isinstance(llm, Human) or args.debug:
