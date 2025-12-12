@@ -2,8 +2,7 @@
 task_name: free-session
 output_path: exps/free_env
 
-llm:
-  name: human
+llm_name: human
 
 # Tools to load into the environment toolbox.
 tools:
