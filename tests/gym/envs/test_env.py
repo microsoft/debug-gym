@@ -486,6 +486,130 @@ def test_has_breakpoint_relative_path(tmp_path):
     assert env.has_breakpoint("bar.py", line_number) is False
 
 
+def test_env_info_str_basic():
+    """Test EnvInfo.__str__() method with basic data."""
+    info = EnvInfo(
+        step_observation=Observation("env", "Test observation"),
+        all_observations=[Observation("env", "Test observation")],
+        eval_observation=None,
+        current_breakpoints="No breakpoints are set.",
+        action_reasoning=None,
+        action_content=None,
+        action_tool_call=None,
+        instructions="Test instructions",
+        score=0,
+        max_score=10,
+        terminated=False,
+        resolved=False,
+        tools=[],
+    )
+    result = str(info)
+    assert "DEBUG GYM ENVIRONMENT INFO" in result
+    assert "IN PROGRESS" in result
+    assert "Score: 0/10" in result
+    assert "Test observation" in result
+    assert "None set" in result
+
+
+def test_env_info_str_with_action():
+    """Test EnvInfo.__str__() with action tool call."""
+    info = EnvInfo(
+        step_observation=Observation("env", "Test observation"),
+        all_observations=[Observation("env", "Test observation")],
+        eval_observation=None,
+        current_breakpoints="line 10 in test.py\nline 20 in test.py",
+        action_reasoning="I need to debug this",
+        action_content="Setting breakpoint",
+        action_tool_call=ToolCall(id="123", name="pdb", arguments={"command": "b 10"}),
+        instructions="Test instructions",
+        score=5,
+        max_score=10,
+        terminated=False,
+        resolved=False,
+        tools=[],
+    )
+    result = str(info)
+    assert "Last Action" in result
+    assert "Tool: pdb" in result
+    assert "Explanation: Setting breakpoint" in result
+    assert "Reasoning: I need to debug this" in result
+    assert "line 10 in test.py" in result
+
+
+def test_env_info_str_terminated_resolved():
+    """Test EnvInfo.__str__() when terminated and resolved."""
+    info = EnvInfo(
+        step_observation=Observation("env", "Success!"),
+        all_observations=[Observation("env", "Success!")],
+        eval_observation=None,
+        current_breakpoints="No breakpoints are set.",
+        action_reasoning=None,
+        action_content=None,
+        action_tool_call=None,
+        instructions="Test instructions",
+        score=10,
+        max_score=10,
+        terminated=True,
+        resolved=True,
+        tools=[],
+    )
+    result = str(info)
+    assert "TERMINATED" in result
+
+
+def test_env_info_str_many_breakpoints():
+    """Test EnvInfo.__str__() with more than 5 breakpoints."""
+    breakpoints = "\n".join([f"line {i} in test.py" for i in range(10)])
+    info = EnvInfo(
+        step_observation=Observation("env", "Test"),
+        all_observations=[],
+        eval_observation=None,
+        current_breakpoints=breakpoints,
+        action_reasoning=None,
+        action_content=None,
+        action_tool_call=None,
+        instructions="Test",
+        score=0,
+        max_score=None,
+        terminated=False,
+        resolved=False,
+        tools=[],
+    )
+    result = str(info)
+    assert "... and 5 more" in result
+
+
+def test_get_triggered_tools_empty_tool_response(tmp_path):
+    """Test get_triggered_tools with empty_tool_response action."""
+    env = LocalEnv(path=tmp_path)
+    action = ToolCall(id="empty", name="empty_tool_response", arguments={})
+    error, tool_info = env.get_triggered_tools(action)
+    assert "No tool call was generated" in error
+    assert tool_info is None
+
+
+def test_prepare_entrypoint_uv():
+    """Test _prepare_entrypoint handles uv run command."""
+    result = RepoEnv._prepare_entrypoint("uv run pytest tests")
+    assert "$(which pytest)" in result
+    assert "python" in result
+
+
+def test_prepare_entrypoint_xvfb():
+    """Test _prepare_entrypoint handles xvfb command."""
+    entrypoint = "xvfb-run --auto-servernum .venv/bin/python -W ignore -m pytest"
+    result = RepoEnv._prepare_entrypoint(entrypoint)
+    # xvfb entrypoints should be returned unchanged
+    assert result == entrypoint
+
+
+def test_prepare_entrypoint_non_python():
+    """Test _prepare_entrypoint handles non-python commands."""
+    result = RepoEnv._prepare_entrypoint("pytest tests")
+    assert "$(which pytest)" in result
+    assert result.startswith("python")
+
+
 class TestSelectEnv:
     """Test cases for select_env function."""
 
