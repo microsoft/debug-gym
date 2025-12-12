@@ -79,6 +79,16 @@ class EnvironmentTool(ABC):
             if hasattr(self, event.handler_name):
                 environment.event_hooks.subscribe(event, self)
 
+        # Run setup commands if terminal is available and this tool has setup_commands
+        if self.setup_commands:
+            if hasattr(environment, "terminal") and environment.terminal is not None:
+                # Track which setup commands have been run on this terminal
+                setup_key = f"_{self.name}_setup_complete"
+                if not getattr(environment.terminal, setup_key, False):
+                    for cmd in self.setup_commands:
+                        environment.terminal.run(cmd, raises=False)
+                    setattr(environment.terminal, setup_key, True)
+
     def unregister(self, environment):
         from debug_gym.gym.envs.env import RepoEnv
 

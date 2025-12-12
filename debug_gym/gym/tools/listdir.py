@@ -10,17 +10,6 @@ class ListdirTool(EnvironmentTool):
     # Tool dependencies: install tree when this tool is used
     setup_commands: list[str] = ["apt-get update && apt-get install -y tree"]
 
-    def register(self, environment):
-        """Register the tool and ensure dependencies are installed."""
-        super().register(environment)
-        # Run setup commands if terminal is available and not yet run for this env
-        if hasattr(environment, "terminal") and environment.terminal is not None:
-            # Track which setup commands have been run on this terminal
-            if not hasattr(environment.terminal, "_listdir_setup_complete"):
-                for cmd in self.setup_commands:
-                    environment.terminal.run(cmd, raises=False)
-                environment.terminal._listdir_setup_complete = True
-
     examples = [
         """listdir(path=None, depth=None) to list the contents of the working directory.""",
         """listdir(path="src/util", depth=None) to list the contents of the 'util' subdirectory within the 'src' subdirectory.""",
