@@ -218,7 +218,7 @@ class LLM(ABC):
     @classmethod
     def instantiate(
         cls,
-        config: Dict[str, Any],
+        llm_name: str,
         llm_config_file_path: str | None = None,
         logger: DebugGymLogger | None = None,
     ) -> "LLM":
@@ -234,10 +234,8 @@ class LLM(ABC):
         """
 
         logger = logger or DebugGymLogger("debug-gym")
-        llm_name = config.get("name")
-        if llm_name is None:
-            return None
-        elif llm_name == "human":
+
+        if llm_name == "human":
             from debug_gym.llms import Human
 
             return Human(llm_name, logger=logger)
