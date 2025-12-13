@@ -315,6 +315,9 @@ class RepoEnv(TooledEnv):
 
         # Notify all tools that the environment is reset and get their observations
         self.queue_event(Event.ENV_RESET, source="env")
+        from ipdb import set_trace
+
+        set_trace()
         self.all_observations = self.process_events()
 
         # First observation always include the task instructions.

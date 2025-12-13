@@ -5,8 +5,7 @@ import pytest
 
 from debug_gym.gym.entities import Observation
 from debug_gym.gym.tools.tool import EnvironmentTool, ToolCall
-from debug_gym.llms import AnthropicLLM
-from debug_gym.llms.base import LLMConfig, LLMConfigRegistry
+from debug_gym.llms.base import LLM, LLMConfig, LLMConfigRegistry
 
 
 class Tool1(EnvironmentTool):
@@ -66,7 +65,7 @@ anthropic_thinking_config = {
     ),
 )
 def test_query_anthropic_model_basic(mock_llm_config, logger_mock):
-    llm = AnthropicLLM("test-anthropic", logger=logger_mock)
+    llm = LLM.instantiate("test-anthropic", logger=logger_mock)
 
     mock_response = MagicMock()
     mock_response.content = [MagicMock()]
@@ -95,11 +94,13 @@ def test_query_anthropic_model_basic(mock_llm_config, logger_mock):
 
 
 def test_query_anthropic_model_with_thinking(logger_mock):
-    llm = AnthropicLLM(
-        "test-anthropic-thinking",
-        logger=logger_mock,
-        llm_config=LLMConfig(**anthropic_thinking_config["test-anthropic-thinking"]),
-    )
+    # Mock the from_file to return our test config
+    with patch.object(
+        LLMConfigRegistry,
+        "from_file",
+        return_value=LLMConfigRegistry.register_all(anthropic_thinking_config),
+    ):
+        llm = LLM.instantiate("test-anthropic-thinking", logger=logger_mock)
 
     mock_response = MagicMock()
     mock_response.content = [MagicMock(), MagicMock()]
@@ -135,7 +136,7 @@ def test_query_anthropic_model_with_thinking(logger_mock):
     return_value=LLMConfigRegistry.register_all(anthropic_config),
 )
 def test_query_anthropic_model_no_user_messages(mock_llm_config, logger_mock):
-    llm = AnthropicLLM("test-anthropic", logger=logger_mock)
+    llm = LLM.instantiate("test-anthropic", logger=logger_mock)
 
     mock_response = MagicMock()
     mock_response.content = [MagicMock()]
@@ -169,7 +170,7 @@ def test_query_anthropic_model_no_user_messages(mock_llm_config, logger_mock):
     return_value=LLMConfigRegistry.register_all(anthropic_config),
 )
 def test_query_anthropic_model_with_system_prompt(mock_llm_config, logger_mock):
-    llm = AnthropicLLM("test-anthropic", logger=logger_mock)
+    llm = LLM.instantiate("test-anthropic", logger=logger_mock)
 
     mock_response = MagicMock()
     mock_response.content = [MagicMock()]
@@ -203,7 +204,7 @@ def test_query_anthropic_model_with_system_prompt(mock_llm_config, logger_mock):
     return_value=LLMConfigRegistry.register_all(anthropic_config),
 )
 def test_query_anthropic_model_with_conversation(mock_llm_config, logger_mock):
-    llm = AnthropicLLM("test-anthropic", logger=logger_mock)
+    llm = LLM.instantiate("test-anthropic", logger=logger_mock)
     mock_response = MagicMock()
     mock_response.content = [MagicMock()]
     tmp_dict = dict(id="1", input={"arg 1": 0}, name="tool 1", type="tool_use")
@@ -243,7 +244,7 @@ def test_query_anthropic_model_with_conversation(mock_llm_config, logger_mock):
     return_value=LLMConfigRegistry.register_all(anthropic_config),
 )
 def test_query_anthropic_model_empty_content(mock_llm_config, logger_mock):
-    llm = AnthropicLLM("test-anthropic", logger=logger_mock)
+    llm = LLM.instantiate("test-anthropic", logger=logger_mock)
     mock_response = MagicMock()
     mock_response.content = [MagicMock()]
     tmp_dict = dict(id="1", input={"arg 1": 0}, name="tool 1", type="tool_use")
@@ -274,7 +275,7 @@ def test_query_anthropic_model_empty_content(mock_llm_config, logger_mock):
     return_value=LLMConfigRegistry.register_all(anthropic_config),
 )
 def test_query_anthropic_model_unknown_role(mock_llm_config, logger_mock):
-    llm = AnthropicLLM("test-anthropic", logger=logger_mock)
+    llm = LLM.instantiate("test-anthropic", logger=logger_mock)
     llm.client.messages.create = MagicMock()
     llm.count_tokens = MagicMock(return_value=10)
     messages = [{"role": "unknown", "content": "This has an unknown role"}]
@@ -293,7 +294,7 @@ def test_query_anthropic_model_unknown_role(mock_llm_config, logger_mock):
     ),
 )
 def test_query_anthropic_model_max_tokens_from_config(mock_llm_config, logger_mock):
-    llm = AnthropicLLM("test-anthropic", logger=logger_mock)
+    llm = LLM.instantiate("test-anthropic", logger=logger_mock)
     mock_response = MagicMock()
     mock_response.content = [MagicMock()]
     tmp_dict = dict(id="1", input={"arg 1": 0}, name="tool 1", type="tool_use")
