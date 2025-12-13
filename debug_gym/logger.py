@@ -518,7 +518,7 @@ class DebugGymLogger(logging.Logger):
     shared queues, which the main process processes and displays in a Rich UI."""
 
     LOG_QUEUE = mp.Queue(maxsize=10000)
-    PROGRESS_QUEUE = mp.Queue(maxsize=50000)  # Increased from 10000 to 50000
+    PROGRESS_QUEUE = mp.Queue(maxsize=30000)  # macOS has semaphore limit ~32767
     _is_worker = False
     _main_process_logger = None
 

@@ -65,21 +65,45 @@ class AnthropicLLM(LLM):
         return 0
 
     def need_to_be_retried(self, exception) -> bool:
-        _errors = [
-            "anthropic.RateLimitError",
-            "anthropic.OverloadedError",
-            "anthropic._exceptions.OverloadedError",
-            "anthropic.InternalServerError",
+        # Errors that are worth retrying (transient issues)
+        # See: https://docs.anthropic.com/en/api/errors
+        # - 429: rate_limit_error - Rate limit exceeded
+        # - 500: api_error - Internal server error
+        # - 529: overloaded_error - API temporarily overloaded
+        # - Connection/timeout errors - Network issues
+        _retryable_errors = [
+            # Rate limit and overload errors
+            "anthropic.RateLimitError",  # 429
+            "anthropic.OverloadedError",  # 529
+            "anthropic._exceptions.OverloadedError",  # 529 (internal path)
+            # Server errors
+            "anthropic.InternalServerError",  # 500
+            # Connection and timeout errors
+            "anthropic.APIConnectionError",
+            "anthropic.APITimeoutError",
+            # Generic API errors (will filter by status code below)
+            "anthropic.APIStatusError",
         ]
+
         exception_full_name = (
             f"{exception.__class__.__module__}.{exception.__class__.__name__}"
         )
-        need_to_retry = exception_full_name in _errors
+        need_to_retry = exception_full_name in _retryable_errors
+        logger = self.logger.debug
 
+        # For generic APIStatusError, only retry on specific status codes
+        if exception_full_name == "anthropic.APIStatusError":
+            status_code = getattr(exception, "status_code", None)
+            # Only retry on server errors (5xx) or rate limits (429)
+            if status_code not in [429, 500, 502, 503, 504, 529]:
+                need_to_retry = False
+                logger = self.logger.warning
+
+        # Never retry context length errors - these require reducing input
         if self.is_context_length_error(exception):
             need_to_retry = False
 
-        self.logger.debug(
+        logger(
             f"Error calling {self.model_name}: {exception_full_name!r} "
             f"{exception.message if hasattr(exception, 'message') else exception}"
         )
@@ -130,14 +154,35 @@ class AnthropicLLM(LLM):
         )
 
     def convert_response_to_message(self, response: LLMResponse) -> dict:
+        """Convert an LLMResponse to an assistant message for the API.
+
+        For thinking blocks, we must preserve the complete block including the
+        signature field for verification when passing back to the API during
+        tool use continuation.
+        """
         content = []
-        if response.reasoning_response:
-            content.append(
-                {
-                    "type": "thinking",
-                    "text": filter_non_utf8(response.reasoning_response),
-                }
-            )
+
+        # Add thinking blocks - preserve complete blocks with signatures
+        # These are stored as raw API response objects in thinking_blocks
+        if response.thinking_blocks:
+            for block in response.thinking_blocks:
+                if block.type == "thinking":
+                    content.append(
+                        {
+                            "type": "thinking",
+                            "thinking": block.thinking,
+                            "signature": block.signature,
+                        }
+                    )
+                elif block.type == "redacted_thinking":
+                    # Redacted thinking blocks have encrypted data
+                    content.append(
+                        {
+                            "type": "redacted_thinking",
+                            "data": block.data,
+                        }
+                    )
+
         if response.response:
             content.append(
                 {
@@ -246,9 +291,19 @@ class AnthropicLLM(LLM):
         # select the first text message if there's any
         text_messages = [r.text for r in response.content if r.type == "text"]
         text_messages = text_messages[0] if text_messages else None
-        # thinking
-        thinking_messages = [r.text for r in response.content if r.type == "thinking"]
-        thinking_messages = thinking_messages[0] if thinking_messages else None
+        # thinking - use .thinking attribute (not .text) for thinking blocks
+        # Also preserve the full blocks for signature verification when passing back to API
+        thinking_blocks = [r for r in response.content if r.type == "thinking"]
+        # Include redacted_thinking blocks as well (safety-flagged content)
+        redacted_thinking_blocks = [
+            r for r in response.content if r.type == "redacted_thinking"
+        ]
+        # Extract text content for reasoning_response (use .thinking, not .text)
+        thinking_messages = thinking_blocks[0].thinking if thinking_blocks else None
+
+        # Combine thinking and redacted_thinking blocks for signature preservation
+        # These need to be passed back to the API for tool use continuation
+        all_thinking_blocks = thinking_blocks + redacted_thinking_blocks
 
         llm_response = LLMResponse(
             prompt=messages,
@@ -257,6 +312,7 @@ class AnthropicLLM(LLM):
             tool=self.parse_tool_call_response(tool_use_block),
             prompt_token_count=response.usage.input_tokens,
             response_token_count=response.usage.output_tokens,
+            thinking_blocks=all_thinking_blocks if all_thinking_blocks else None,
         )
 
         return llm_response
