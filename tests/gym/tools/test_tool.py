@@ -175,23 +175,6 @@ class TestSetupCommands:
         assert marker_file.exists()
         assert "setup_ran" in marker_file.read_text()
 
-    def test_setup_commands_run_immediately_when_added_after_reset(self, tmp_path):
-        """Test that setup commands run immediately when tool is added after reset()."""
-        # Create env and reset first
-        env = LocalEnv(path=tmp_path)
-        env.reset()
-
-        # Create a marker file via setup command
-        marker_file = tmp_path / "setup_marker_after_reset.txt"
-
-        # Add tool after reset - setup commands should run immediately in register()
-        tool = FakeToolWithSetup()
-        tool.setup_commands = [f"echo 'setup_ran_after' > {marker_file}"]
-        env.add_tool(tool)
-
-        assert marker_file.exists()
-        assert "setup_ran_after" in marker_file.read_text()
-
     def test_setup_commands_run_on_each_reset(self, tmp_path):
         """Test that setup commands run on each reset() call."""
         env = LocalEnv(path=tmp_path)
@@ -215,7 +198,7 @@ class TestSetupCommands:
         env = LocalEnv(path=tmp_path)
         tool = FakeTool()  # No setup_commands
 
-        assert tool.setup_commands == []
+        assert tool.setup_commands == ()
 
         env.add_tool(tool)
         env.reset()

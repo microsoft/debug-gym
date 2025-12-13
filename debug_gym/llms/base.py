@@ -197,7 +197,7 @@ class LLM(ABC):
     ):
         self.model_name = model_name
         self.logger = logger or DebugGymLogger("debug-gym")
-        self.config = llm_config
+        self.config = llm_config or LLMConfigRegistry.from_file()[model_name]
         self.tokenizer_name = self.config.tokenizer
         self.context_length = self.config.context_limit * 1000
         self.apply_chat_template = self.config.apply_chat_template
