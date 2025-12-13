@@ -59,6 +59,7 @@ class AgentSolution(BaseAgent):
 
     def execute_action(self, *args, **kwargs):
         self.env.apply_gold_patch()
+        return self.env.infos
 
     def init(self, info: EnvInfo) -> None:
         self._run_pdb_sanity_checks(info)
