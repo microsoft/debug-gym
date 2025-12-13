@@ -54,12 +54,13 @@ class AgentSolution(BaseAgent):
         ), f"PDB command did not return expected continue message.\n{pdb_observation}"
 
     def step(self, info: EnvInfo) -> EnvInfo:
-        action = ToolCall(name="submit", id="submit", arguments={})
-        return LLMResponse([], tool=action)
+        tool_call = ToolCall(name="submit", id="submit", arguments={})
+        return LLMResponse([], tool=tool_call)
 
-    def execute_action(self, *args, **kwargs):
+    def execute_action(self, llm_response, **kwargs):
         self.env.apply_gold_patch()
-        return self.env.infos
+        info = self.env.step(llm_response.tool, None, None)
+        return info
 
     def init(self, info: EnvInfo) -> None:
         self._run_pdb_sanity_checks(info)
