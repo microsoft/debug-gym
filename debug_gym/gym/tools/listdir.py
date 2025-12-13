@@ -8,7 +8,7 @@ from debug_gym.gym.tools.toolbox import Toolbox
 class ListdirTool(EnvironmentTool):
     name: str = "listdir"
     # Tool dependencies: install tree when this tool is used
-    setup_commands: list[str] = ["apt-get update && apt-get install -y tree"]
+    setup_commands: tuple[str, ...] = ("apt-get update && apt-get install -y tree",)
 
     examples = [
         """listdir(path=None, depth=None) to list the contents of the working directory.""",
