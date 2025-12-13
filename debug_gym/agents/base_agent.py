@@ -260,13 +260,13 @@ class BaseAgent:
         return self.llm(messages, info.tools)
 
     def execute_action(self, llm_response: LLMResponse | List[LLMResponse]) -> EnvInfo:
-        info = self.env.step(
+        next_info = self.env.step(
             llm_response.tool,
             llm_response.response,
             llm_response.reasoning_response,
         )
-        self.history.step(info, llm_response)
-        return info
+        self.history.step(next_info, llm_response)
+        return next_info
 
     def build_trajectory(self) -> Dict[str, Any]:
         """Return the trajectory as a JSON-serializable dict without writing it."""
@@ -308,9 +308,6 @@ class BaseAgent:
         # assign the env
         self.env = env
 
-        if self.llm is None:
-            raise ValueError("LLM instance is not set for the agent.")
-
         try:
             if reset_env:
                 info = env.reset()
@@ -337,21 +334,21 @@ class BaseAgent:
             while not should_stop:
                 self.logger.info(f"\n{'='*20} STEP {step} {'='*20}\n")
 
-                llm_response = self.step(info)
-                info = self.execute_action(llm_response)
+                agent_response = self.step(info)
+                next_info = self.execute_action(agent_response)
 
                 if debug:
                     breakpoint()
 
-                should_stop, reason = self.should_stop(step + 1, info)
+                should_stop, reason = self.should_stop(step + 1, next_info)
                 status = (
                     "resolved"
                     if info.resolved
                     else ("unresolved" if should_stop else "running")
                 )
 
-                highscore = max(highscore, info.score)
-                msg = f"[{env.task_name[:10]:<10}] Step {step} | Score: {info.score}/{info.max_score or '-'} [Best: {highscore}]"
+                highscore = max(highscore, next_info.score)
+                msg = f"[{env.task_name[:10]:<10}] Step {step} | Score: {next_info.score}/{next_info.max_score or '-'} [Best: {highscore}]"
                 if should_stop:
                     msg += f" | Stopping Reason: {reason}"
                 self.logger.info(msg)
@@ -361,8 +358,8 @@ class BaseAgent:
                     problem_id=env.task_name,
                     step=step,
                     total_steps=self.args.max_steps,
-                    score=info.score,
-                    max_score=info.max_score,
+                    score=next_info.score,
+                    max_score=next_info.max_score,
                     status=status,
                 )
             return self.build_trajectory()
@@ -371,8 +368,8 @@ class BaseAgent:
                 problem_id=env.task_name,
                 step=step,
                 total_steps=step,
-                score=getattr(info, "score", 0),
-                max_score=getattr(info, "max_score", None),
+                score=getattr(next_info, "score", 0),
+                max_score=getattr(next_info, "max_score", None),
                 status="error",
             )
             raise e
