@@ -25,6 +25,51 @@ def workspace():
     return workspace
 
 
+def test_directory_tree(workspace):
+    result = workspace.directory_tree(max_depth=2)
+    assert result == (
+        f"{workspace.working_dir}/\n"
+        "|-- .hidden\n"
+        "|-- file1.txt\n"
+        "|-- file2.txt\n"
+        "|-- subdir/\n"
+        "  |-- subfile1.txt"
+    )
+
+
+def test_directory_tree_read_only(workspace):
+    read_only_path = workspace.working_dir / "read-only-file.txt"
+    read_only_path.touch()
+
+    debugreadonly = workspace.working_dir / ".debugreadonly"
+    debugreadonly.write_text("read-only-file.txt")
+
+    # Reset filters to take into account the .debugreadonly file.
+    workspace.setup_file_filters()
+
+    result = workspace.directory_tree(max_depth=2)
+    assert result == (
+        f"{workspace.working_dir}/\n"
+        "|-- .hidden\n"
+        "|-- file1.txt\n"
+        "|-- file2.txt\n"
+        "|-- read-only-file.txt (read-only)\n"
+        "|-- subdir/\n"
+        "  |-- subfile1.txt"
+    )
+
+
+def test_directory_tree_ignore(workspace):
+    debugignore = workspace.working_dir / ".debugignore"
+    debugignore.write_text(".hidden\nfile1.*\nsubdir/\n")
+
+    # Reset filters to take into account the .debugignore file.
+    workspace.setup_file_filters()
+
+    result = workspace.directory_tree(max_depth=2)
+    assert result == (f"{workspace.working_dir}/\n" "|-- file2.txt")
+
+
 def test_reset_and_cleanup_workspace():
     # Setup workspace with a native terminal.
     terminal = LocalTerminal()

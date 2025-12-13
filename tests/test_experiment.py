@@ -1,5 +1,4 @@
 import json
-import os
 import tempfile
 from pathlib import Path
 from unittest.mock import patch
@@ -26,102 +25,10 @@ def create_args_object(**kwargs):
 
 
 class TestCreateEnv:
-    """Test cases for create_env function.
+    """Integration tests for create_env function using FreeEnv."""
 
-    Note: create_env is designed for envs that take task_data (SWEBenchEnv, SWESmithEnv, etc.)
-    which require Docker. We use mocks to test the orchestration logic without Docker.
-    For LocalEnv testing, see TestLocalEnv below which tests the env directly.
-    """
-
-    @patch("debug_gym.experiment.select_env")
-    @patch("debug_gym.experiment.select_terminal")
-    def test_create_env_basic(self, mock_select_terminal, mock_select_env):
-        """Test that create_env correctly wires terminal, env class, and config"""
-        # Setup mocks
-        mock_terminal = mock_select_terminal.return_value
-        mock_env_class = mock_select_env.return_value
-        mock_env_instance = mock_env_class.return_value
-
-        # Setup logger
-        logger = DebugGymLogger("test")
-
-        config = {
-            "terminal": {"type": "docker"},
-            "uuid": "test-uuid",
-            "env": {"run_timeout": 300},
-        }
-        task_data = {"env_type": "swebench", "instance_id": "test-123"}
-
-        # Call function
-        result = create_env(config, task_data, logger)
-
-        # Assertions
-        mock_select_terminal.assert_called_once_with(
-            {"type": "docker"}, logger, uuid="test-uuid"
-        )
-        mock_select_env.assert_called_once_with("swebench")
-        mock_env_class.assert_called_once_with(
-            task_data=task_data,
-            terminal=mock_terminal,
-            logger=logger,
-            run_timeout=300,
-        )
-        assert result == mock_env_instance
-
-    @patch("debug_gym.experiment.select_env")
-    @patch("debug_gym.experiment.select_terminal")
-    def test_create_env_empty_env_config(self, mock_select_terminal, mock_select_env):
-        """Test that missing env config defaults to empty dict"""
-        mock_terminal = mock_select_terminal.return_value
-        mock_env_class = mock_select_env.return_value
-        mock_env_instance = mock_env_class.return_value
-
-        logger = DebugGymLogger("test")
-
-        config = {
-            "terminal": {"type": "local"},
-            "uuid": "test-uuid",
-            # No "env" key
-        }
-        task_data = {"env_type": "swesmith"}
-
-        # Call function
-        result = create_env(config, task_data, logger)
-
-        # Assertions - should use empty dict for env kwargs
-        mock_env_class.assert_called_once_with(
-            task_data=task_data,
-            terminal=mock_terminal,
-            logger=logger,
-        )
-        assert result == mock_env_instance
-
-    @patch("debug_gym.experiment.select_env")
-    @patch("debug_gym.experiment.select_terminal")
-    def test_create_env_with_terminal_none(self, mock_select_terminal, mock_select_env):
-        """Test that terminal=None is passed through correctly"""
-        logger = DebugGymLogger("test")
-
-        config = {
-            "terminal": None,
-            "uuid": "test-uuid",
-            "env": {},
-        }
-        task_data = {"env_type": "swebench"}
-
-        # Call function
-        create_env(config, task_data, logger)
-
-        # Assertions - select_terminal should be called with None
-        mock_select_terminal.assert_called_once_with(None, logger, uuid="test-uuid")
-        mock_select_env.assert_called_once_with("swebench")
-
-
-class TestLocalEnv:
-    """Integration tests for LocalEnv - no mocking needed since it doesn't require Docker."""
-
-    def test_local_env_creation(self, tmp_path):
-        """Test LocalEnv can be created with a path"""
+    def test_create_env_with_free_env(self, tmp_path):
+        """Test create_env with FreeEnv"""
         logger = DebugGymLogger("test")
 
         repo_path = tmp_path / "test_repo"

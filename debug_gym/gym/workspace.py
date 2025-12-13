@@ -215,6 +215,48 @@ class Workspace:
     def is_editable(self, filepath):
         return not self._is_readonly_func(self.resolve_path(filepath, raises=True))
 
+    def directory_tree(self, root: str | Path = None, max_depth: int = 1):
+        """List the directory tree using the `tree` command.
+        Requires the `tree` package to be installed in the terminal.
+        """
+        root = self.resolve_path(root or self.working_dir, raises=True)
+        # Use the terminal to run a bash command to list files
+        tree_cmd = (
+            f"tree --charset=ASCII --noreport -a -v -F -f -l -L {max_depth} {root} "
+        )
+        success, output = self.terminal.run(tree_cmd, raises=False)
+        if not success:
+            raise WorkspaceReadError(
+                f"Failed to list directory '{root}'. Command output:\n{output}"
+            )
+
+        first, *rest = output.splitlines()
+        lines = [first]
+        for line in rest:
+            assert "-- " in line
+            prefix, path = line.split("-- ", 1)
+            prefix += "-- "
+
+            if self._is_ignored_func(path):
+                continue
+
+            # Remove trailing / and symbolic link details.
+            clean_path = path.split(" -> ")[0].rstrip("/")
+            lines.append(f"{prefix}{os.path.basename(clean_path)}")
+
+            if path.endswith("/"):
+                # i.e. a directory
+                lines[-1] += "/"
+
+            if self._is_readonly_func(path):
+                lines[-1] += " (read-only)"
+
+        output = "\n".join(lines)
+
+        # To maintain backward compatibility with previous version of debug-gym.
+        output = output.replace("`", "|").replace("    ", "  ")
+        return output
+
     def has_file(self, filepath: str) -> bool:
         """Checks if a file exists in the working directory.
         Shortcut for `resolve_path` with raises=True.
