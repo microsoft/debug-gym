@@ -261,7 +261,7 @@ class BaseAgent:
 
     def execute_action(self, llm_response: LLMResponse | List[LLMResponse]) -> EnvInfo:
         info = self.env.step(
-            llm_response.action,
+            llm_response.tool,
             llm_response.response,
             llm_response.reasoning_response,
         )

@@ -509,9 +509,9 @@ class Human(LLM):
             "content": [
                 {
                     "type": "tool_use",
-                    "id": response.action.id,
-                    "name": response.action.name,
-                    "input": response.action.arguments,
+                    "id": response.tool.id,
+                    "name": response.tool.name,
+                    "input": response.tool.arguments,
                 }
             ],
         }
@@ -614,7 +614,7 @@ class Human(LLM):
         return LLMResponse(
             prompt=messages,
             response=action,
-            action=tool_call,
+            tool=tool_call,
             prompt_token_count=self.count_tokens(messages),
             response_token_count=self.count_tokens([{"tool_calls": action}]),
         )

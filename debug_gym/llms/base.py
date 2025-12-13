@@ -157,7 +157,7 @@ class LLMResponse:
     prompt: list[dict] | str  # either a string or a list of messages.
     response: str | None
     reasoning_response: str | None
-    action: ToolCall
+    tool: ToolCall
     token_usage: TokenUsage | None = None
     # Raw thinking blocks from the API response (for Anthropic extended thinking)
     # These preserve signatures needed when passing back to the API during tool use
@@ -168,7 +168,7 @@ class LLMResponse:
         prompt: list[dict] | str,
         response: str = None,
         reasoning_response: str = None,
-        action: ToolCall = None,
+        tool: ToolCall = None,
         prompt_token_count: int = None,
         response_token_count: int = None,
         token_usage: TokenUsage = None,
@@ -177,7 +177,7 @@ class LLMResponse:
         self.prompt = prompt
         self.response = response
         self.reasoning_response = reasoning_response
-        self.action = action
+        self.tool = tool
         if prompt_token_count is not None and response_token_count is not None:
             self.token_usage = TokenUsage(prompt_token_count, response_token_count)
         else:
@@ -487,14 +487,14 @@ class LLM(ABC):
 
         llm_response = generate_with_drop_message_and_retry(messages, tools, **kwargs)
 
-        if llm_response.action is None:
+        if llm_response.tool is None:
             # for error analysis purposes
-            action = {
+            tool = {
                 "id": "empty_tool_response",
                 "name": "empty_tool_response",
                 "arguments": {},
             }
-            llm_response.action = action
+            llm_response.tool = tool
             self.logger.warning(
                 "Tool response is empty. The model may not have called a tool."
             )
@@ -503,6 +503,6 @@ class LLM(ABC):
         self.logger.info(
             f"LLM response - reasoning: {llm_response.reasoning_response}\n"
             f"LLM response - content: {llm_response.response}\n"
-            f"LLM response - tool call: {llm_response.action}"
+            f"LLM response - tool call: {llm_response.tool}"
         )
         return llm_response

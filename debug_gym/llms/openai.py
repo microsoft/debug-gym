@@ -227,10 +227,10 @@ class OpenAILLM(LLM):
             "tool_calls": [
                 {
                     "type": "function",
-                    "id": response.action.id,
+                    "id": response.tool.id,
                     "function": {
-                        "name": response.action.name,
-                        "arguments": json.dumps(response.action.arguments),
+                        "name": response.tool.name,
+                        "arguments": json.dumps(response.tool.arguments),
                     },
                 },
             ],
@@ -322,7 +322,7 @@ class OpenAILLM(LLM):
             prompt=messages,
             response=_content,
             reasoning_response=_reasoning_content,
-            action=parsed_tool,
+            tool=parsed_tool,
             prompt_token_count=response.usage.prompt_tokens,
             response_token_count=response.usage.completion_tokens,
         )

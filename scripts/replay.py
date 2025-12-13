@@ -78,7 +78,7 @@ def run_replay_agent(agent, env, llm, task_name=None, args=None):
                     reasoning_response=prompt_response.get(
                         "reasoning_response"
                     ),  # TODO: check if that's correct
-                    action=ToolCall(**history_step["action"]),
+                    tool=ToolCall(**history_step["action"]),
                     prompt_token_count=prompt_response["token_usage"]["prompt"],
                     response_token_count=prompt_response["token_usage"]["response"],
                 )
@@ -86,7 +86,7 @@ def run_replay_agent(agent, env, llm, task_name=None, args=None):
                 agent.logger.info(
                     f"LLM response - reasoning: {llm_response.reasoning_response}\n"
                     f"LLM response - content: {llm_response.response}\n"
-                    f"LLM response - tool call: {llm_response.action}"
+                    f"LLM response - tool call: {llm_response.tool}"
                 )
             else:
                 llm_response = llm(messages, info.tools)
@@ -95,7 +95,7 @@ def run_replay_agent(agent, env, llm, task_name=None, args=None):
                 breakpoint()
 
             info = env.step(
-                llm_response.action,
+                llm_response.tool,
                 llm_response.response,
                 llm_response.reasoning_response,
             )

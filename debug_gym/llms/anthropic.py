@@ -190,13 +190,13 @@ class AnthropicLLM(LLM):
                     "text": filter_non_utf8(response.response),
                 }
             )
-        if response.action:
+        if response.tool:
             content.append(
                 {
                     "type": "tool_use",
-                    "id": response.action.id,
-                    "name": response.action.name,
-                    "input": response.action.arguments,
+                    "id": response.tool.id,
+                    "name": response.tool.name,
+                    "input": response.tool.arguments,
                 }
             )
 
@@ -321,7 +321,7 @@ class AnthropicLLM(LLM):
             prompt=messages,
             response=text_messages,
             reasoning_response=thinking_messages,
-            action=self.parse_tool_call_response(tool_use_block),
+            tool=self.parse_tool_call_response(tool_use_block),
             prompt_token_count=response.usage.input_tokens,
             response_token_count=response.usage.output_tokens,
             thinking_blocks=all_thinking_blocks if all_thinking_blocks else None,

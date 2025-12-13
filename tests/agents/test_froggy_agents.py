@@ -146,7 +146,7 @@ def test_run(agent_setup, build_env_info):
     llm.return_value = LLMResponse(
         prompt="Prompt",
         response="Expected answer",
-        action=ToolCall(id="tool_id", name="tool_name", arguments={}),
+        tool=ToolCall(id="tool_id", name="tool_name", arguments={}),
         token_usage=TokenUsage(2, 4),
     )
     result = agent.run(env, debug=False)
@@ -277,7 +277,7 @@ def test_run_stops_at_max_steps(agent_setup, build_env_info):
     llm.return_value = LLMResponse(
         prompt="Prompt",
         response="Expected answer",
-        action=ToolCall(id="tool_id", name="tool_name", arguments={}),
+        tool=ToolCall(id="tool_id", name="tool_name", arguments={}),
         prompt_token_count=2,
         response_token_count=4,
     )

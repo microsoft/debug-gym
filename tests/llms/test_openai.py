@@ -73,9 +73,7 @@ def test_llm(mock_llm_config, mock_openai, logger_mock):
     messages = [{"role": "user", "content": "Hello World"}]
     llm_response = llm(messages, tools)
     assert llm_response.prompt == messages
-    assert llm_response.action == ToolCall(
-        id="1", name="tool 1", arguments={"arg 1": 0}
-    )
+    assert llm_response.tool == ToolCall(id="1", name="tool 1", arguments={"arg 1": 0})
     assert llm_response.token_usage.prompt == 2
     assert llm_response.token_usage.response == 4
 
@@ -235,7 +233,7 @@ def test_llm_with_reasoning_content(
     assert llm_response.response == "Regular response"
     assert llm_response.reasoning_response == "Let me think about this step by step..."
     assert llm_response.prompt == messages
-    assert llm_response.action == ToolCall(
+    assert llm_response.tool == ToolCall(
         id="test_id", name="test_tool", arguments={"arg1": "test"}
     )
 

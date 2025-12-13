@@ -55,7 +55,7 @@ class AgentSolution(BaseAgent):
 
     def step(self, info: EnvInfo) -> EnvInfo:
         action = ToolCall(name="submit", id="submit", arguments={})
-        return LLMResponse([], action=action)
+        return LLMResponse([], tool=action)
 
     def execute_action(self, *args, **kwargs):
         self.env.apply_gold_patch()
