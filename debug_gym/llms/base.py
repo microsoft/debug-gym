@@ -291,8 +291,8 @@ class LLM(ABC):
 
         llm = klass(
             name,
-            logger=logger,
             llm_config=llm_config,
+            logger=logger,
             runtime_generate_kwargs=runtime_generate_kwargs,
         )
         return llm
