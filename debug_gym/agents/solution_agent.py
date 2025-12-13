@@ -12,6 +12,13 @@ class AgentSolution(BaseAgent):
 
     name: str = "solution_agent"
 
+    def __init__(
+        self,
+        llm: LLM | None = None,
+        **kwargs,
+    ):
+        super().__init__(llm=llm, **kwargs)
+
     def _env_implements_apply_gold_patch(self):
         """Fail early if the environment does not implement apply_gold_patch."""
         return hasattr(self.env, "apply_gold_patch")
@@ -50,56 +57,8 @@ class AgentSolution(BaseAgent):
         action = ToolCall(name="submit", id="submit", arguments={})
         return LLMResponse([], tool=action)
 
-    def run(
-        self,
-        env: RepoEnv,
-        llm: LLM | None = None,
-        debug: bool = False,
-        reset_env: bool = True,
-    ) -> Dict[str, Any]:
-        """Run the solution agent: apply gold patch and submit.
-
-        Args:
-            env: The environment to interact with.
-            llm: Not used by SolutionAgent (can be None).
-            debug: Whether to drop into debugger before submit.
-            reset_env: Whether to reset the environment (default True).
-
-        Returns:
-            Result dict with 'success' key.
-        """
-        self.env = env
-        self.llm = llm
-
-        if not self._env_implements_apply_gold_patch():
-            raise NotImplementedError(
-                f"The environment {type(self.env)} is not compatible with SolutionAgent."
-                " Check the README.md to see which environments are compatible."
-            )
-
-        if reset_env:
-            info = self.env.reset()
-        else:
-            info = self.env.info
-
-        self.logger.info(f"Score: {info.score}/{info.max_score or '-'}")
-
-        # Run PDB sanity checks
-        self._run_pdb_sanity_checks(info)
-
-        # Apply gold patch and submit
+    def execute_action(self, *args, **kwargs):
         self.env.apply_gold_patch()
 
-        if debug:
-            breakpoint()
-
-        response = self.step(info)
-        info = self.env.step(response.action, None, None)
-
-        self.logger.info(f"Score: {info.score}/{info.max_score or '-'}")
-        assert info.resolved, (
-            "The task is not done after applying the gold patch.\n"
-            f"{info.step_observation.observation}"
-        )
-
-        return {"success": info.resolved}
+    def init(self, info: EnvInfo) -> None:
+        self._run_pdb_sanity_checks(info)

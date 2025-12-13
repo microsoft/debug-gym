@@ -27,8 +27,8 @@ def register_agent(cls):
 
 @dataclass
 class AgentArgs:
-    system_prompt: str | None = None
-    instance_prompt: str | None = None
+    system_prompt: str = ""
+    instance_prompt: str = "Instructions: {{ info.instructions }}"
     max_steps: int = 100
     max_history_token_cutoff: int = -1
     max_history_steps_cutoff: int = -1
@@ -83,13 +83,11 @@ class AgentArgs:
 class BaseAgent:
     name: str = None
     args_class = AgentArgs
-    system_prompt: str = ""
-    instance_prompt: str = "Instructions: {{ info.instructions }}"
 
     def __init__(
         self,
+        llm: LLM,
         agent_args: AgentArgs | Dict[str, Any] | None = None,
-        llm: LLM | None = None,
         logger: DebugGymLogger | None = None,
     ):
         self.args = self.args_class.make(agent_args or {})
@@ -97,12 +95,8 @@ class BaseAgent:
         self.logger = logger or DebugGymLogger("debug-gym")
         self.llm = llm
         self.env = None
-
-        # Override prompts if provided in args
-        if self.args.system_prompt is not None:
-            self.system_prompt = str(self.args.system_prompt)
-        if self.args.instance_prompt is not None:
-            self.instance_prompt = str(self.args.instance_prompt)
+        self.system_prompt = str(self.args.system_prompt)
+        self.instance_prompt = str(self.args.instance_prompt)
 
     @staticmethod
     def to_pretty_json(value):
@@ -238,15 +232,12 @@ class BaseAgent:
             reason = "max_steps reached"
         return should_stop, reason
 
-    def init(self, env: RepoEnv) -> None:
+    def init(self, info: EnvInfo) -> None:
         """Initialize the agent with environment
 
         Args:
-            env: The environment to interact with.
+            info: The environment info to interact with.
         """
-        self.env = env
-        info = env.info
-
         self.history.init(
             self.build_system_prompt(info), self.build_instance_prompt(info), info
         )
@@ -298,7 +289,6 @@ class BaseAgent:
     def run(
         self,
         env: RepoEnv,
-        llm: LLM,
         debug: bool = False,
         reset_env: bool = True,
     ) -> Dict[str, Any]:
@@ -316,13 +306,16 @@ class BaseAgent:
         info = None
         step = 0
 
+        # assign the env
+        self.env = env
+
         try:
             if reset_env:
                 info = env.reset()
             else:
                 info = env.info
 
-            self.init(env)
+            self.init(info)
 
             if info.resolved:
                 self.logger.report_progress(
@@ -343,11 +336,10 @@ class BaseAgent:
                 self.logger.info(f"\n{'='*20} STEP {step} {'='*20}\n")
 
                 llm_response = self.step(info)
+                info = self.execute_action(llm_response)
 
                 if debug:
                     breakpoint()
-
-               
 
                 should_stop, reason = self.should_stop(step + 1, info)
                 status = (
