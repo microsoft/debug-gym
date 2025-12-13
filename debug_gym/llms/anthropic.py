@@ -236,7 +236,7 @@ class AnthropicLLM(LLM):
     def generate(self, messages, tools, **kwargs) -> LLMResponse:
         import anthropic
 
-        system_prompt = " "  # weird exceptions sometimes if empty
+        system_prompt = None
         user_assistant_prompt = []
         for message in messages:
             if message["content"] == "":
@@ -261,19 +261,31 @@ class AnthropicLLM(LLM):
             ]
 
         try:
+            # Build API call parameters
             # https://docs.anthropic.com/en/docs/agents-and-tools/tool-use/overview
+            api_params = {
+                "model": self.config.model,
+                "messages": user_assistant_prompt,
+                **kwargs,
+            }
+
+            # Only add system prompt if we have one with non-whitespace content
+            if system_prompt and system_prompt.strip():
+                api_params["system"] = system_prompt
+
+            # Only add tools and tool_choice if tools are provided
+            if tools:
+                api_params["tools"] = self.define_tools(tools)
+                # Only force tool choice if not using extended thinking
+                # Extended thinking conflicts with tool_choice="any"
+                if "thinking" not in kwargs:
+                    api_params["tool_choice"] = {
+                        "type": "any",  # has to call a tool, but can be any
+                    }
+
             response = retry_on_exception(
                 self.client.messages.create, self.need_to_be_retried
-            )(
-                model=self.config.model,
-                system=system_prompt,
-                messages=user_assistant_prompt,
-                tools=self.define_tools(tools),
-                tool_choice={
-                    "type": "any",  # has to call a tool, but can be any
-                },
-                **kwargs,
-            )
+            )(**api_params)
         except anthropic.BadRequestError as e:
             # Handle specific error for context length exceeded, otherwise just propagate the error
             if self.is_context_length_error(e):
