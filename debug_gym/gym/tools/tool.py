@@ -79,6 +79,20 @@ class EnvironmentTool(ABC):
             if hasattr(self, event.handler_name):
                 environment.event_hooks.subscribe(event, self)
 
+        # Run setup commands if this tool has any and the environment is already
+        # initialized (tool added after reset). Otherwise, they'll run via
+        # on_env_reset when reset() is called (all tools are subscribed to ENV_RESET
+        # because EnvironmentTool defines on_env_reset).
+        if self.setup_commands:
+            if (
+                hasattr(environment, "workspace")
+                and environment.workspace is not None
+                and environment.workspace.working_dir is not None
+            ):
+                # Environment already reset, run setup commands now
+                for cmd in self.setup_commands:
+                    environment.terminal.run(cmd, raises=False)
+
     def unregister(self, environment):
         from debug_gym.gym.envs.env import RepoEnv
 

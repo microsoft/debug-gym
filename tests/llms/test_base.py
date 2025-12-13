@@ -487,7 +487,8 @@ def test_llm_init_with_config(logger_mock, llm_class_mock):
     assert llm.context_length == 4000
 
 
-def test_llm_init_with_both_config_types(logger_mock, llm_class_mock):
+def test_llm_init_with_runtime_generate_kwargs(logger_mock, llm_class_mock):
+    """Test that runtime_generate_kwargs are properly set during initialization."""
     llm_config = LLMConfig(
         model="llm-mock",
         context_limit=4,
@@ -496,20 +497,18 @@ def test_llm_init_with_both_config_types(logger_mock, llm_class_mock):
         tokenizer="test-tokenizer",
         tags=["test-tag"],
     )
+    runtime_kwargs = {"temperature": 0.5, "max_tokens": 1000}
     llm = llm_class_mock(
         model_name="llm-mock",
         logger=logger_mock,
         llm_config=llm_config,
-        llm_config_file="llm.yaml",
+        runtime_generate_kwargs=runtime_kwargs,
     )
     assert llm.model_name == "llm-mock"
     assert llm.config == llm_config
     assert llm.tokenizer_name == "test-tokenizer"
     assert llm.context_length == 4000
-    assert (
-        "Both llm_config and llm_config_file are provided, using llm_config."
-        in logger_mock._log_history
-    )
+    assert llm.runtime_generate_kwargs == runtime_kwargs
 
 
 @patch.object(

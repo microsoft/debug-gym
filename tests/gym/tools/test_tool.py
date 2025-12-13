@@ -215,7 +215,11 @@ class TestSetupCommands:
         env = LocalEnv(path=tmp_path)
         tool = FakeTool()  # No setup_commands
 
+<<<<<<< HEAD
         assert tool.setup_commands == []
+=======
+        assert tool.setup_commands == ()
+>>>>>>> origin/main
 
         env.add_tool(tool)
         env.reset()

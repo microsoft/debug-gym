@@ -46,6 +46,17 @@ Then, edit this file with your endpoint and credentials. You can choose one of t
 
 By default, `debug-gym` looks for the LLM config file at `$HOME/.config/debug_gym/llm.yaml`. You can change this behavior by exporting the environment variable `LLM_CONFIG_FILE_PATH` or by setting `llm_config_file_path` in your script config file (see [Running Baselines](#3-running-baselines)).
 
+**Overriding LLM parameters in experiment configs**
+
+You can override LLM generation parameters like `temperature` and `max_tokens` directly in your experiment config file under the `llm:` section. These values take precedence over the defaults in `llm.yaml`:
+
+```yaml
+llm:
+  name: gpt-4o
+  temperature: 0.7   # optional, overrides llm.yaml default
+  max_tokens: 4096   # optional, overrides llm.yaml default
+```
+
 ---
 
 ## 2. System Design

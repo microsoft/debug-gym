@@ -159,6 +159,9 @@ class LLMResponse:
     reasoning_response: str | None
     action: ToolCall
     token_usage: TokenUsage | None = None
+    # Raw thinking blocks from the API response (for Anthropic extended thinking)
+    # These preserve signatures needed when passing back to the API during tool use
+    thinking_blocks: list | None = None
 
     def __init__(
         self,
@@ -169,6 +172,7 @@ class LLMResponse:
         prompt_token_count: int = None,
         response_token_count: int = None,
         token_usage: TokenUsage = None,
+        thinking_blocks: list = None,
     ):
         self.prompt = prompt
         self.response = response
@@ -178,6 +182,7 @@ class LLMResponse:
             self.token_usage = TokenUsage(prompt_token_count, response_token_count)
         else:
             self.token_usage = token_usage
+        self.thinking_blocks = thinking_blocks
 
 
 class ContextLengthExceededError(Exception):
@@ -191,8 +196,8 @@ class LLM(ABC):
     def __init__(
         self,
         model_name: str,
+        llm_config: LLMConfig,
         logger: DebugGymLogger | None = None,
-        llm_config: LLMConfig | None = None,
         runtime_generate_kwargs: dict | None = None,
     ):
         self.model_name = model_name

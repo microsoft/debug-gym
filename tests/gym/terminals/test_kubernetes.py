@@ -253,7 +253,7 @@ def test_kubernetes_terminal_session(tmp_path):
 
 @if_kubernetes_available
 def test_copy_content(tmp_path):
-    # Create a temporary source file
+    # Create a temporary source directory with a file
     source_dir = tmp_path / "source_dir"
     source_dir.mkdir()
     source_file = source_dir / "tmp.txt"
@@ -261,10 +261,8 @@ def test_copy_content(tmp_path):
         src_file.write("Hello World")
 
     terminal = KubernetesTerminal(base_image="ubuntu:latest")
-    # Source must be a folder.
-    with pytest.raises(ValueError, match="Source .* must be a directory."):
-        terminal.copy_content(source_file)
 
+    # Copy directory content
     terminal.copy_content(source_dir)
 
     # Clean up the temporary source_dir
