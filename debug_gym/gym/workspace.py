@@ -212,13 +212,23 @@ class Workspace:
             )
             _run_or_raise(cmd)
 
+    def is_editable(self, filepath):
+        return not self._is_readonly_func(self.resolve_path(filepath, raises=True))
+
     def directory_tree(self, root: str | Path = None, max_depth: int = 1):
+        """List the directory tree using the `tree` command.
+        Requires the `tree` package to be installed in the terminal.
+        """
         root = self.resolve_path(root or self.working_dir, raises=True)
         # Use the terminal to run a bash command to list files
         tree_cmd = (
             f"tree --charset=ASCII --noreport -a -v -F -f -l -L {max_depth} {root} "
         )
-        success, output = self.terminal.run(tree_cmd, raises=True)
+        success, output = self.terminal.run(tree_cmd, raises=False)
+        if not success:
+            raise WorkspaceReadError(
+                f"Failed to list directory '{root}'. Command output:\n{output}"
+            )
 
         first, *rest = output.splitlines()
         lines = [first]
@@ -246,18 +256,6 @@ class Workspace:
         # To maintain backward compatibility with previous version of debug-gym.
         output = output.replace("`", "|").replace("    ", "  ")
         return output
-
-    def is_editable(self, filepath):
-        return not self._is_readonly_func(self.resolve_path(filepath, raises=True))
-
-    def display_files(self, dir_tree_depth: int = 1) -> str:
-        msg = (
-            "Listing files in the current working directory."
-            " (read-only) indicates read-only files."
-            f" Max depth: {str(dir_tree_depth)}.\n"
-        )
-        msg += self.directory_tree(max_depth=dir_tree_depth)
-        return msg
 
     def has_file(self, filepath: str) -> bool:
         """Checks if a file exists in the working directory.

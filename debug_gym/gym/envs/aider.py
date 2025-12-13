@@ -38,7 +38,7 @@ def build_docker_image(logger: logging.Logger | None = None):
     # Then install git and the required Python packages
     setup_commands = [
         "apt update",
-        "apt install -y git tree",
+        "apt install -y git",
         "pip install pytest",
     ]
     # Create a temporary Dockerfile

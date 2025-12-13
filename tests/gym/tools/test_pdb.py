@@ -161,7 +161,7 @@ def test_pdb_use_docker_terminal(tmp_path, setup_test_repo):
     tests_path = str(setup_test_repo(tmp_path))
     terminal = DockerTerminal(
         base_image="python:3.12-slim",
-        setup_commands=["apt update", "apt install -y git tree", "pip install pytest"],
+        setup_commands=["apt update", "apt install -y git", "pip install pytest"],
         env_vars={
             "PYTHONDONTWRITEBYTECODE": "1",  # avoid __pycache__
             "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",  # disable plugins that might add escape sequences

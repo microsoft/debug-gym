@@ -7,8 +7,12 @@ import pytest
 
 from debug_gym.gym.entities import Observation
 from debug_gym.gym.tools.tool import EnvironmentTool, ToolCall
-from debug_gym.llms.base import ContextLengthExceededError, LLMConfigRegistry
-from debug_gym.llms.copilot import CopilotClaudeLLM, CopilotLLM, CopilotOpenAILLM
+from debug_gym.llms.base import LLM, ContextLengthExceededError, LLMConfigRegistry
+from debug_gym.llms.copilot import (  # Import for patching in tests
+    CopilotClaudeLLM,
+    CopilotLLM,
+    CopilotOpenAILLM,
+)
 
 
 class MockTool(EnvironmentTool):
@@ -52,7 +56,7 @@ def create_fake_exception(
                 "api_key": "test-key",
                 "endpoint": "https://test-endpoint",
                 "api_version": "2025-05-01",
-                "tags": ["copilot"],
+                "tags": ["copilot openai"],
             }
         }
     ),
@@ -62,14 +66,14 @@ class TestCopilotLLM:
 
     def test_init(self, mock_config, logger_mock):
         """Test CopilotLLM initialization"""
-        llm = CopilotLLM("test-model", logger=logger_mock)
+        llm = LLM.instantiate("test-model", logger=logger_mock)
         assert llm._client is None
         assert llm._token_cache is None
         assert llm._token_expires_at == 0
 
     def test_create_request_hmac_with_secret(self, mock_config):
         """Test HMAC creation with valid secret"""
-        llm = CopilotLLM("test-model")
+        llm = LLM.instantiate("test-model")
         secret = "test_secret"
 
         # Mock time to get predictable results
@@ -92,13 +96,13 @@ class TestCopilotLLM:
 
     def test_create_request_hmac_no_secret(self, mock_config):
         """Test HMAC creation with no secret returns None"""
-        llm = CopilotLLM("test-model")
+        llm = LLM.instantiate("test-model")
         assert llm.create_request_hmac(None) is None
         assert llm.create_request_hmac("") is None
 
     def test_tokenize_with_tiktoken(self, mock_config, logger_mock):
         """Test tokenization using tiktoken"""
-        llm = CopilotLLM("test-model", logger=logger_mock)
+        llm = LLM.instantiate("test-model", logger=logger_mock)
 
         # Mock tiktoken encoding
         mock_encode = MagicMock(return_value=[1, 2, 3, 4])
@@ -114,7 +118,7 @@ class TestCopilotLLM:
 
     def test_tokenize_fallback(self, mock_config, logger_mock):
         """Test tokenization fallback when tiktoken fails"""
-        llm = CopilotLLM("test-model", logger=logger_mock)
+        llm = LLM.instantiate("test-model", logger=logger_mock)
 
         # Mock tiktoken to raise KeyError
         with patch(
@@ -128,7 +132,7 @@ class TestCopilotLLM:
 
     def test_need_to_be_retried_hmac_timestamp_error(self, mock_config, logger_mock):
         """Test retry logic for HMAC timestamp errors"""
-        llm = CopilotLLM("test-model", logger=logger_mock)
+        llm = LLM.instantiate("test-model", logger=logger_mock)
 
         # Create HMAC timestamp error
         exception = create_fake_exception(
@@ -143,7 +147,7 @@ class TestCopilotLLM:
 
     def test_need_to_be_retried_other_auth_error(self, mock_config, logger_mock):
         """Test retry logic for other authentication errors"""
-        llm = CopilotLLM("test-model", logger=logger_mock)
+        llm = LLM.instantiate("test-model", logger=logger_mock)
 
         # Create different auth error
         exception = create_fake_exception(
@@ -160,7 +164,7 @@ class TestCopilotLLM:
 
     def test_need_to_be_retried_non_auth_error(self, mock_config, logger_mock):
         """Test retry logic for non-authentication errors"""
-        llm = CopilotLLM("test-model", logger=logger_mock)
+        llm = LLM.instantiate("test-model", logger=logger_mock)
 
         # Create rate limit error
         exception = create_fake_exception(
@@ -188,7 +192,7 @@ class TestCopilotLLM:
                 "api_key": "test-key",
                 "endpoint": "https://test-endpoint",
                 "api_version": "2025-05-01",
-                "tags": ["copilot"],
+                "tags": ["copilot claude"],  # Fixed tag
             }
         }
     ),
@@ -198,7 +202,7 @@ class TestCopilotClaudeLLM:
 
     def test_generate_system_message_only(self, mock_config, logger_mock):
         """Test generate with only system message converts to user message"""
-        llm = CopilotClaudeLLM("copilot-claude", logger=logger_mock)
+        llm = LLM.instantiate("copilot-claude", logger=logger_mock)
 
         # Mock the client and response
         mock_response = MagicMock()
@@ -229,7 +233,7 @@ class TestCopilotClaudeLLM:
 
     def test_generate_with_tool_calls(self, mock_config, logger_mock):
         """Test generate with tool calls in response"""
-        llm = CopilotClaudeLLM("copilot-claude", logger=logger_mock)
+        llm = LLM.instantiate("copilot-claude", logger=logger_mock)
 
         # Mock response with tool calls
         mock_response = MagicMock()
@@ -276,7 +280,7 @@ class TestCopilotClaudeLLM:
 
     def test_generate_with_thinking_content(self, mock_config, logger_mock):
         """Test generate with thinking content in response"""
-        llm = CopilotClaudeLLM("copilot-claude", logger=logger_mock)
+        llm = LLM.instantiate("copilot-claude", logger=logger_mock)
 
         # Mock response with thinking content
         mock_response = MagicMock()
@@ -308,7 +312,7 @@ class TestCopilotClaudeLLM:
 
     def test_generate_context_length_error(self, mock_config, logger_mock):
         """Test generate raises ContextLengthExceededError for context length issues"""
-        llm = CopilotClaudeLLM("copilot-claude", logger=logger_mock)
+        llm = LLM.instantiate("copilot-claude", logger=logger_mock)
 
         # Mock BadRequestError with context length message
         import openai
@@ -331,7 +335,7 @@ class TestCopilotClaudeLLM:
 
     def test_generate_entity_too_large_error(self, mock_config, logger_mock):
         """Test generate raises ContextLengthExceededError for entity too large"""
-        llm = CopilotClaudeLLM("copilot-claude", logger=logger_mock)
+        llm = LLM.instantiate("copilot-claude", logger=logger_mock)
 
         # Mock APIStatusError with entity too large message
         import openai
@@ -354,7 +358,7 @@ class TestCopilotClaudeLLM:
 
     def test_generate_no_content_no_tool_calls(self, mock_config, logger_mock):
         """Test generate handles response with no content and no tool calls"""
-        llm = CopilotClaudeLLM("copilot-claude", logger=logger_mock)
+        llm = LLM.instantiate("copilot-claude", logger=logger_mock)
 
         # Mock response with no content or tool calls
         mock_response = MagicMock()
@@ -392,7 +396,7 @@ class TestCopilotClaudeLLM:
                 "api_key": "test-key",
                 "endpoint": "https://test-endpoint",
                 "api_version": "2025-05-01",
-                "tags": ["copilot"],
+                "tags": ["copilot openai"],  # Fixed tag for CopilotOpenAILLM
             }
         }
     ),
@@ -402,7 +406,7 @@ class TestCopilotOpenAILLM:
 
     def test_inheritance(self, mock_config, logger_mock):
         """Test CopilotOpenAILLM inherits from CopilotLLM"""
-        llm = CopilotOpenAILLM("test-model", logger=logger_mock)
+        llm = LLM.instantiate("test-model", logger=logger_mock)
         assert isinstance(llm, CopilotLLM)
 
     def test_docstring(self, mock_config):
@@ -423,7 +427,7 @@ class TestCopilotOpenAILLM:
                 "api_key": "test-key",
                 "endpoint": "https://test-endpoint",
                 "api_version": "2025-05-01",
-                "tags": ["copilot"],
+                "tags": ["copilot claude"],  # Fixed tag for integration tests
             }
         }
     ),
@@ -433,7 +437,7 @@ class TestCopilotIntegration:
 
     def test_token_caching_logic(self, mock_config, logger_mock):
         """Test token caching works correctly"""
-        llm = CopilotLLM("test-model", logger=logger_mock)
+        llm = LLM.instantiate("test-model", logger=logger_mock)
 
         # Set up cached token
         test_token = "cached_token_123"
@@ -453,7 +457,7 @@ class TestCopilotIntegration:
 
     def test_token_cache_expiry(self, mock_config, logger_mock):
         """Test expired token cache is not used"""
-        llm = CopilotLLM("test-model", logger=logger_mock)
+        llm = LLM.instantiate("test-model", logger=logger_mock)
 
         # Set up expired cached token
         test_token = "expired_token_123"
@@ -467,7 +471,7 @@ class TestCopilotIntegration:
 
     def test_hmac_secret_loading_priority(self, mock_config, logger_mock):
         """Test HMAC secret loading from environment vs .env file"""
-        llm = CopilotLLM("test-model", logger=logger_mock)
+        llm = LLM.instantiate("test-model", logger=logger_mock)
         assert llm.model_name == "test-model"
 
         env_secret = "env_secret_123"
@@ -489,7 +493,7 @@ class TestCopilotIntegration:
         """Test handling of multiple choices in Claude response"""
         # This is tested in the CopilotClaudeLLM test_generate_with_tool_calls
         # but we can add more specific logic tests here
-        llm = CopilotClaudeLLM("test-model", logger=logger_mock)
+        llm = LLM.instantiate("test-model", logger=logger_mock)
         assert isinstance(llm, CopilotClaudeLLM)
 
         # Create mock choices - some with content, some with tool calls

@@ -14,6 +14,16 @@ class FakeTool(EnvironmentTool):
         return Observation("FakeTool", action)
 
 
+class FakeToolWithSetup(EnvironmentTool):
+    """A fake tool that tracks setup command execution."""
+
+    name: str = "FakeToolWithSetup"
+    setup_commands: list[str] = ["echo setup_command_executed"]
+
+    def use(self, env, action):
+        return Observation("FakeToolWithSetup", action)
+
+
 @pytest.fixture
 def env(tmp_path):
     env = LocalEnv(path=tmp_path)
@@ -143,3 +153,88 @@ def test_unregister_with_multiple_handlers(env):
     # Verify tool is no longer listening to any events
     assert tool not in env.event_hooks.event_listeners[Event.ENV_RESET]
     assert tool not in env.event_hooks.event_listeners[Event.ENV_STEP]
+
+
+class TestSetupCommands:
+    """Test cases for tool setup_commands functionality."""
+
+    def test_setup_commands_run_on_reset(self, tmp_path):
+        """Test that setup commands run when reset() is called after tool registration."""
+        # Create env and add tool before reset
+        env = LocalEnv(path=tmp_path)
+        tool = FakeToolWithSetup()
+        env.add_tool(tool)
+
+        # Create a marker file via setup command to verify it ran
+        marker_file = tmp_path / "setup_marker.txt"
+        tool.setup_commands = [f"echo 'setup_ran' > {marker_file}"]
+
+        # Reset should trigger on_env_reset which runs setup commands
+        env.reset()
+
+        assert marker_file.exists()
+        assert "setup_ran" in marker_file.read_text()
+
+    def test_setup_commands_run_immediately_when_added_after_reset(self, tmp_path):
+        """Test that setup commands run immediately when tool is added after reset()."""
+        # Create env and reset first
+        env = LocalEnv(path=tmp_path)
+        env.reset()
+
+        # Create a marker file via setup command
+        marker_file = tmp_path / "setup_marker_after_reset.txt"
+
+        # Add tool after reset - setup commands should run immediately in register()
+        tool = FakeToolWithSetup()
+        tool.setup_commands = [f"echo 'setup_ran_after' > {marker_file}"]
+        env.add_tool(tool)
+
+        assert marker_file.exists()
+        assert "setup_ran_after" in marker_file.read_text()
+
+    def test_setup_commands_run_on_each_reset(self, tmp_path):
+        """Test that setup commands run on each reset() call."""
+        env = LocalEnv(path=tmp_path)
+        tool = FakeToolWithSetup()
+        env.add_tool(tool)
+
+        # Use a counter file to track how many times setup ran
+        counter_file = tmp_path / "setup_counter.txt"
+        tool.setup_commands = [f"echo 'x' >> {counter_file}"]
+
+        # First reset
+        env.reset()
+        assert counter_file.read_text().count("x") == 1
+
+        # Second reset
+        env.reset()
+        assert counter_file.read_text().count("x") == 2
+
+    def test_tool_without_setup_commands(self, tmp_path):
+        """Test that tools without setup_commands work normally."""
+        env = LocalEnv(path=tmp_path)
+        tool = FakeTool()  # No setup_commands
+
+        assert tool.setup_commands == ()
+
+        env.add_tool(tool)
+        env.reset()
+
+        # Tool should work normally
+        obs = tool(env, action="test")
+        assert obs.observation == "test"
+
+    def test_setup_commands_failure_does_not_raise(self, tmp_path):
+        """Test that failing setup commands don't raise exceptions (raises=False)."""
+        env = LocalEnv(path=tmp_path)
+        tool = FakeToolWithSetup()
+        # Command that will fail
+        tool.setup_commands = ["exit 1"]
+        env.add_tool(tool)
+
+        # Should not raise, even though command fails
+        env.reset()
+
+        # Tool should still work
+        obs = tool(env, action="test")
+        assert obs.observation == "test"

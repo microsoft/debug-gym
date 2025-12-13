@@ -518,7 +518,7 @@ class DebugGymLogger(logging.Logger):
     shared queues, which the main process processes and displays in a Rich UI."""
 
     LOG_QUEUE = mp.Queue(maxsize=10000)
-    PROGRESS_QUEUE = mp.Queue(maxsize=50000)  # Increased from 10000 to 50000
+    PROGRESS_QUEUE = mp.Queue(maxsize=30000)  # macOS has semaphore limit ~32767
     _is_worker = False
     _main_process_logger = None
 
@@ -614,9 +614,14 @@ class DebugGymLogger(logging.Logger):
         log to their own handlers (ex.: a file) and put the
         record into the log queue for the main process to display
         logs through Rich."""
-        if self.is_worker():
-            self.LOG_QUEUE.put(record)
+        # Handle locally first (with full exc_info for file logging)
         super().handle(record)
+        if self.is_worker():
+            # Clear exc_info before putting in queue - traceback objects can't be pickled
+            # The exception info is already handled by the local handler above
+            record.exc_info = None
+            record.exc_text = None
+            self.LOG_QUEUE.put(record)
 
     def _log_listener(self):
         if self.is_main():

@@ -1,5 +1,4 @@
 import json
-import os
 import tempfile
 from pathlib import Path
 from unittest.mock import patch
@@ -26,14 +25,12 @@ def create_args_object(**kwargs):
 
 
 class TestCreateEnv:
-    """Test cases for create_env function"""
+    """Integration tests for create_env function using FreeEnv."""
 
-    def test_create_env_basic(self, tmp_path):
-        """Test basic environment creation with FreeEnv"""
-        # Setup logger
+    def test_create_env_with_free_env(self, tmp_path):
+        """Test create_env with FreeEnv"""
         logger = DebugGymLogger("test")
 
-        # Create a test repository
         repo_path = tmp_path / "test_repo"
         repo_path.mkdir()
         (repo_path / "test.py").write_text("# test file")
@@ -61,7 +58,6 @@ class TestCreateEnv:
         # Setup logger
         logger = DebugGymLogger("test")
 
-        # Create a test repository
         repo_path = tmp_path / "test_repo"
         repo_path.mkdir()
 
@@ -184,6 +180,53 @@ class TestAddTools:
         add_tools(env, config, logger)
 
         # Assertions - no tools should be added
+        assert len(env.tools) == 0
+
+    def test_add_tools_with_tool_as_dict(self, tmp_path):
+        """Test adding a tool specified as a dict with config"""
+        from debug_gym.gym.tools.pdb import PDBTool
+
+        repo_path = tmp_path / "test_repo"
+        repo_path.mkdir()
+
+        task_data = {
+            "env_type": "FreeEnv",
+            "image": "python:3.11",
+            "local_path": str(repo_path),
+        }
+        env = FreeEnv(task_data=task_data)
+        logger = DebugGymLogger("test")
+
+        # Tool specified as dict: {"tool_name": {config}}
+        # PDBTool accepts auto_list parameter in its constructor
+        config = {"tools": [{"pdb": {"auto_list": False}}]}
+
+        add_tools(env, config, logger)
+
+        assert len(env.tools) == 1
+        assert isinstance(env.tools[0], PDBTool)
+        # PDBTool should have auto_list set to False
+        assert env.tools[0].auto_list is False
+
+    def test_add_tools_no_tools_key(self, tmp_path):
+        """Test add_tools when config has no 'tools' key"""
+        repo_path = tmp_path / "test_repo"
+        repo_path.mkdir()
+
+        task_data = {
+            "env_type": "FreeEnv",
+            "image": "python:3.11",
+            "local_path": str(repo_path),
+        }
+        env = FreeEnv(task_data=task_data)
+        logger = DebugGymLogger("test")
+
+        # Config without tools key
+        config = {}
+
+        add_tools(env, config, logger)
+
+        # No tools should be added
         assert len(env.tools) == 0
 
 

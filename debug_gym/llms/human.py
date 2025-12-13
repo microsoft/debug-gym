@@ -464,6 +464,9 @@ class Human(LLM):
         self.logger = logger or DebugGymLogger("debug-gym")
         self.context_length = None
         self.reasoning_end_token = None
+        self.runtime_generate_kwargs = (
+            {}
+        )  # Not used for Human, but needed for consistency
         self._history = None
         self.max_retries = max_retries
         if prompt_toolkit_available:

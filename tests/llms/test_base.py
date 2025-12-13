@@ -66,27 +66,47 @@ from debug_gym.llms.base import (
     ),
 )
 def test_instantiate_llm(mock_open, logger_mock):
-    llm = LLM.instantiate({}, logger=logger_mock)
+    # None/empty name returns None
+    llm = LLM.instantiate(name=None, logger=logger_mock)
+    assert llm is None
+
+    llm = LLM.instantiate(name="", logger=logger_mock)
     assert llm is None
 
     # tags are used to filter models
-    llm = LLM.instantiate({"name": "gpt-4o-mini"}, logger=logger_mock)
+    llm = LLM.instantiate(name="gpt-4o-mini", logger=logger_mock)
     assert isinstance(llm, OpenAILLM)
 
-    llm = LLM.instantiate({"name": "gpt-4o-mini-azure"}, logger=logger_mock)
+    llm = LLM.instantiate(name="gpt-4o-mini-azure", logger=logger_mock)
     assert isinstance(llm, AzureOpenAILLM)
 
-    llm = LLM.instantiate({"name": "claude-3.7"}, logger=logger_mock)
+    llm = LLM.instantiate(name="claude-3.7", logger=logger_mock)
     assert isinstance(llm, AnthropicLLM)
 
-    llm = LLM.instantiate({"name": "qwen-3"}, logger=logger_mock)
+    llm = LLM.instantiate(name="qwen-3", logger=logger_mock)
     assert isinstance(llm, HuggingFaceLLM)
 
-    llm = LLM.instantiate({"name": "human"}, logger=logger_mock)
+    llm = LLM.instantiate(name="human", logger=logger_mock)
     assert isinstance(llm, Human)
 
     with pytest.raises(ValueError, match="Model unknown not found in llm config .+"):
-        LLM.instantiate({"name": "unknown"}, logger=logger_mock)
+        LLM.instantiate(name="unknown", logger=logger_mock)
+
+    # Test with explicit generation kwargs
+    llm = LLM.instantiate(
+        name="gpt-4o-mini",
+        logger=logger_mock,
+        temperature=0.5,
+        max_tokens=1000,
+    )
+    assert isinstance(llm, OpenAILLM)
+    assert llm.runtime_generate_kwargs == {"temperature": 0.5, "max_tokens": 1000}
+
+    # Test with **kwargs unpacking (like config)
+    llm_config = {"name": "gpt-4o-mini", "temperature": 0.7}
+    llm = LLM.instantiate(**llm_config, logger=logger_mock)
+    assert isinstance(llm, OpenAILLM)
+    assert llm.runtime_generate_kwargs == {"temperature": 0.7}
 
 
 class Tool1(EnvironmentTool):
@@ -467,7 +487,8 @@ def test_llm_init_with_config(logger_mock, llm_class_mock):
     assert llm.context_length == 4000
 
 
-def test_llm_init_with_both_config_types(logger_mock, llm_class_mock):
+def test_llm_init_with_runtime_generate_kwargs(logger_mock, llm_class_mock):
+    """Test that runtime_generate_kwargs are properly set during initialization."""
     llm_config = LLMConfig(
         model="llm-mock",
         context_limit=4,
@@ -476,20 +497,18 @@ def test_llm_init_with_both_config_types(logger_mock, llm_class_mock):
         tokenizer="test-tokenizer",
         tags=["test-tag"],
     )
+    runtime_kwargs = {"temperature": 0.5, "max_tokens": 1000}
     llm = llm_class_mock(
         model_name="llm-mock",
         logger=logger_mock,
         llm_config=llm_config,
-        llm_config_file="llm.yaml",
+        runtime_generate_kwargs=runtime_kwargs,
     )
     assert llm.model_name == "llm-mock"
     assert llm.config == llm_config
     assert llm.tokenizer_name == "test-tokenizer"
     assert llm.context_length == 4000
-    assert (
-        "Both llm_config and llm_config_file are provided, using llm_config."
-        in logger_mock._log_history
-    )
+    assert llm.runtime_generate_kwargs == runtime_kwargs
 
 
 @patch.object(

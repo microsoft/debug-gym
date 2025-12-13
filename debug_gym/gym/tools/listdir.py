@@ -1,4 +1,5 @@
 from debug_gym.gym.entities import Observation
+from debug_gym.gym.terminals.terminal import UnrecoverableTerminalError
 from debug_gym.gym.tools.tool import EnvironmentTool
 from debug_gym.gym.tools.toolbox import Toolbox
 
@@ -6,6 +7,9 @@ from debug_gym.gym.tools.toolbox import Toolbox
 @Toolbox.register()
 class ListdirTool(EnvironmentTool):
     name: str = "listdir"
+    # Tool dependencies: install tree when this tool is used
+    setup_commands: tuple[str, ...] = ("apt-get update && apt-get install -y tree",)
+
     examples = [
         """listdir(path=None, depth=None) to list the contents of the working directory.""",
         """listdir(path="src/util", depth=None) to list the contents of the 'util' subdirectory within the 'src' subdirectory.""",
@@ -36,6 +40,8 @@ class ListdirTool(EnvironmentTool):
             )
         try:
             result = environment.workspace.directory_tree(root=path, max_depth=depth)
+        except UnrecoverableTerminalError:
+            raise
         except Exception as e:
             result = f"Error listing directory '{path}': {str(e)}"
         return Observation(self.name, result)
