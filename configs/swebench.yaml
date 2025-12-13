@@ -4,6 +4,8 @@ output_path: exps/swebench-verified
 
 llm:
   name: gpt-4o
+  # temperature: 0.7   # optional, overrides llm.yaml default
+  # max_tokens: 4096   # optional, overrides llm.yaml default
 
 # Tools to load into the environment toolbox.
 tools:

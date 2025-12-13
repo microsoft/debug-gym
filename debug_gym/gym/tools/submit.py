@@ -7,16 +7,26 @@ from debug_gym.gym.tools.toolbox import Toolbox
 class SubmitTool(EnvironmentTool):
     name = "submit"
     description = "Submit your changes once the task is complete."
-    arguments = {}
+    arguments = {
+        "message": {
+            "type": ["string"],
+            "description": "An optional message to conclude the task, summarizing what was done.",
+        }
+    }
 
     def __init__(self, eval_on_submit=True):
         super().__init__()
         self.eval_on_submit = eval_on_submit
 
-    def use(self, environment, **kwargs) -> Observation:
-        output = "The agent terminated the session."
+    def use(self, environment, message: str = None, **kwargs) -> Observation:
+        output = ""
+        if message:
+            output = f"Agent message: {message}\n\n"
+
         if self.eval_on_submit:
-            output = environment.eval().output
+            output += environment.eval().output
+        else:
+            output += "The agent terminated the session."
 
         environment.terminated = True
         return Observation(self.name, output)
