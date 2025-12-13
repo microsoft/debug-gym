@@ -145,9 +145,6 @@ class R2EGymEnv(RepoEnv):
     def setup_terminal(self):
         self.logger.debug(f"Configuring {self.terminal}...")
 
-        # Install tree for listdir.
-        self.terminal.run("apt update && apt install -y tree")
-
         # Follow r2egym setup for non- swe-bench/swe-smith tasks.
         # Ref: https://github.com/R2E-Gym/R2E-Gym/blob/main/src/r2egym/agenthub/runtime/docker.py#L545
 

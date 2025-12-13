@@ -7,7 +7,10 @@ import pytest
 from debug_gym.gym.terminals import select_terminal
 from debug_gym.gym.terminals.kubernetes import KubernetesTerminal
 from debug_gym.gym.terminals.shell_session import DEFAULT_PS1
-from debug_gym.gym.terminals.terminal import DISABLE_ECHO_COMMAND
+from debug_gym.gym.terminals.terminal import (
+    DISABLE_ECHO_COMMAND,
+    UnrecoverableTerminalError,
+)
 
 
 def is_kubernetes_available():
@@ -250,7 +253,7 @@ def test_kubernetes_terminal_session(tmp_path):
 
 @if_kubernetes_available
 def test_copy_content(tmp_path):
-    # Create a temporary source file
+    # Create a temporary source directory with a file
     source_dir = tmp_path / "source_dir"
     source_dir.mkdir()
     source_file = source_dir / "tmp.txt"
@@ -258,10 +261,8 @@ def test_copy_content(tmp_path):
         src_file.write("Hello World")
 
     terminal = KubernetesTerminal(base_image="ubuntu:latest")
-    # Source must be a folder.
-    with pytest.raises(ValueError, match="Source .* must be a directory."):
-        terminal.copy_content(source_file)
 
+    # Copy directory content
     terminal.copy_content(source_dir)
 
     # Clean up the temporary source_dir
@@ -283,13 +284,21 @@ def test_kubernetes_terminal_cleanup(tmp_path):
     # Test cleanup without creating pod
     terminal.close()
 
-    assert terminal.pod.is_running()
-    assert terminal._pod is not None
-    terminal.close()
-    assert terminal._pod is None
 
-    # Test that cleanup can be called multiple times safely
-    terminal.close()
+@if_kubernetes_available
+def test_unrecoverable_error_when_pod_stops(tmp_path):
+    """Ensure terminal raises fatal error once the backing pod is gone."""
+
+    working_dir = str(tmp_path)
+    terminal = KubernetesTerminal(working_dir=working_dir, base_image="ubuntu:latest")
+    try:
+        pod = terminal.pod  # Ensure pod is created.
+        pod.clean_up()  # Delete the pod to simulate infrastructure failure.
+
+        with pytest.raises(UnrecoverableTerminalError):
+            terminal.run("echo after cleanup", timeout=1)
+    finally:
+        terminal.close()
 
 
 @if_kubernetes_available

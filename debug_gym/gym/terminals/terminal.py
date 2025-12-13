@@ -6,6 +6,15 @@ from pathlib import Path
 from debug_gym.gym.terminals.shell_session import DEFAULT_PS1
 from debug_gym.logger import DebugGymLogger
 
+
+class TerminalError(RuntimeError):
+    """Base exception for terminal-related failures."""
+
+
+class UnrecoverableTerminalError(TerminalError):
+    """Raised when the terminal becomes unusable and the episode must stop."""
+
+
 DISABLE_ECHO_COMMAND = "stty -echo"
 
 

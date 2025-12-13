@@ -13,7 +13,8 @@ from debug_gym.logger import DebugGymLogger
 
 def create_env(config: dict, task_data: dict, logger: DebugGymLogger):
     terminal = select_terminal(config.get("terminal"), logger, uuid=config["uuid"])
-    env_class = select_env(task_data["env_type"])
+
+    env_class = select_env(task_data.get("env_type"))
     env = env_class(
         task_data=task_data,
         terminal=terminal,

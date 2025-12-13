@@ -3,8 +3,8 @@ from unittest.mock import patch
 import pytest
 from transformers import AutoTokenizer
 
-from debug_gym.llms import HuggingFaceLLM
-from debug_gym.llms.base import LLMConfig, LLMConfigRegistry
+from debug_gym.llms.base import LLM, LLMConfig, LLMConfigRegistry
+from debug_gym.llms.huggingface import HuggingFaceLLM  # Import for patching in tests
 
 # Run these tests with `pytest tests/llms/test_huggingface.py -m hf_tokenizer`
 # to include the integration case that downloads the real Qwen tokenizer.
@@ -57,7 +57,7 @@ def test_tokenize_uses_hf_tokenizer_with_pad_fallback(mock_llm_config, logger_mo
         "debug_gym.llms.huggingface.AutoTokenizer.from_pretrained"
     ) as mock_auto_tokenizer:
         mock_auto_tokenizer.return_value = tokenizer
-        llm = HuggingFaceLLM(model_name="qwen-3", logger=logger_mock)
+        llm = LLM.instantiate(name="qwen-3", logger=logger_mock)
         messages = [{"role": "user", "content": "hello world"}]
         assert llm.tokenize(messages) == [["hello", "Ġworld"]]
         assert llm.count_tokens(messages) == 2
@@ -71,7 +71,7 @@ def test_tokenize_uses_hf_tokenizer_with_pad_fallback(mock_llm_config, logger_mo
     return_value=LLMConfigRegistry.register_all(MODEL_REGISTRY_WITH_CHAT_TEMPLATE),
 )
 def test_message_token_counts_uses_chat_template(mock_llm_config, logger_mock):
-    llm = HuggingFaceLLM(model_name="qwen-3", logger=logger_mock)
+    llm = LLM.instantiate(name="qwen-3", logger=logger_mock)
 
     messages = [
         {"role": "system", "content": "Instructions"},
@@ -157,7 +157,7 @@ def test_tokenize_and_count_tokens_with_real_tokenizer(
     ),
 )
 def test_hf_tokenize_no_chat_template(mock_llm_config, logger_mock):
-    llm = HuggingFaceLLM(model_name="qwen", logger=logger_mock)
+    llm = LLM.instantiate(name="qwen", logger=logger_mock)
     messages = [{"role": "user", "content": "hello world"}]
     tokens = llm.tokenize(messages)
     assert tokens == [["hello", "Ġworld"]]
@@ -182,7 +182,7 @@ def test_hf_tokenize_no_chat_template(mock_llm_config, logger_mock):
     ),
 )
 def test_hf_tokenize_apply_chat_template(mock_llm_config, logger_mock):
-    llm = HuggingFaceLLM(model_name="qwen", logger=logger_mock)
+    llm = LLM.instantiate(name="qwen", logger=logger_mock)
 
     messages = [{"role": "user", "content": "hello world"}]
     tokens = llm.tokenize(messages)
@@ -228,7 +228,7 @@ def test_hf_tokenize_apply_chat_template(mock_llm_config, logger_mock):
     ),
 )
 def test_hf_tokenize_apply_chat_template_thinking(mock_llm_config, logger_mock):
-    llm = HuggingFaceLLM(model_name="qwen", logger=logger_mock)
+    llm = LLM.instantiate(name="qwen", logger=logger_mock)
 
     messages = [{"role": "user", "content": "hello world"}]
     tokens = llm.tokenize(messages)

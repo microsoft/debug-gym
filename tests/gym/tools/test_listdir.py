@@ -50,3 +50,10 @@ def test_listdir_with_invalid_path(tmp_path, setup_listdir_repo_env):
         f"Error listing directory 'non_existent_path': `non_existent_path` "
         f"does not exist or is not in the working directory `{env.working_dir}`."
     )
+
+
+def test_listdir_has_setup_commands():
+    """Test that ListdirTool has setup_commands for tree installation."""
+    listdir = ListdirTool()
+    assert len(listdir.setup_commands) > 0
+    assert any("tree" in cmd for cmd in listdir.setup_commands)

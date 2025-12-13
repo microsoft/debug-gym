@@ -20,7 +20,11 @@ from tenacity import (
 from yaml import dump, safe_load
 
 from debug_gym.gym.terminals.shell_session import ShellSession
-from debug_gym.gym.terminals.terminal import DISABLE_ECHO_COMMAND, Terminal
+from debug_gym.gym.terminals.terminal import (
+    DISABLE_ECHO_COMMAND,
+    Terminal,
+    UnrecoverableTerminalError,
+)
 from debug_gym.logger import DebugGymLogger
 
 NB_RETRIES_RUN = 50  # Number of retries for running a command
@@ -421,7 +425,10 @@ class KubernetesTerminal(Terminal):
         raise RuntimeError("Pod is not running anymore.")
 
     def new_shell_session(self):
-        self._ensure_pod_running()
+        if not self.pod.is_running():
+            raise UnrecoverableTerminalError(
+                "Pod is not running. Cannot create shell session."
+            )
 
         session = ShellSession(
             shell_command=self.default_shell_command,
@@ -465,7 +472,8 @@ class KubernetesTerminal(Terminal):
         strip_output: bool = True,
     ) -> tuple[bool, str]:
         """Run a command in the pod. Return command status and output."""
-        self._ensure_pod_running()
+        if not self.pod.is_running():
+            raise UnrecoverableTerminalError("Pod is not running. Cannot run commands.")
 
         command = self.prepare_command(entrypoint)
 
@@ -655,10 +663,10 @@ class KubernetesTerminal(Terminal):
             return
 
         setup_commands = " && ".join(self.setup_commands)
-        success, output = self.run(setup_commands, raises=True)
+        success, output = self.run(setup_commands, raises=False)
         if not success:
             self.close()
-            raise ValueError(
+            raise UnrecoverableTerminalError(
                 f"Failed to run setup command: {setup_commands}\n" f"Output: {output}"
             )
         self.logger.debug("Setup commands ran successfully.")
@@ -682,13 +690,10 @@ class KubernetesTerminal(Terminal):
         simplify this to a single command rather than iterating through files.
         """
         if not self.pod.is_running():
-            raise ValueError("Pod is not running. Cannot copy files.")
+            raise UnrecoverableTerminalError("Pod is not running. Cannot copy files.")
 
         src = str(src)
         target = str(target or self.working_dir)
-
-        if not os.path.isdir(src):
-            raise ValueError(f"Source {src} must be a directory.")
 
         self.logger.debug(f"[{self.pod.name}] Copying {src} to {target}.")
 
@@ -698,15 +703,23 @@ class KubernetesTerminal(Terminal):
             # The official Kubernetes Python client does not provide a direct method for file copy.
             # The recommended approach is still to use 'kubectl cp' via subprocess.
             # Alternatives (using tar + exec) are complex and less reliable for directories.
-            result = subprocess.run(
+            cmd = ["kubectl"]
+            if self.kube_config:
+                cmd.extend(["--kubeconfig", self.kube_config])
+
+            # restore previous behavior
+            if os.path.isdir(src):
+                src = f"{src}/."
+
+            cmd.extend(
                 [
-                    "kubectl",
-                    "--kubeconfig",
-                    self.kube_config,
                     "cp",
-                    f"{src}/.",
+                    f"{src}",
                     f"{self.pod.namespace}/{self.pod.name}:{target}",
-                ],
+                ]
+            )
+            result = subprocess.run(
+                cmd,
                 capture_output=True,
                 text=True,
                 timeout=120,  # Increased timeout for directory operations

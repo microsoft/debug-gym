@@ -104,9 +104,6 @@ class SWEBenchEnv(RepoEnv):
     def setup_terminal(self):
         self.logger.debug(f"Configuring {self.terminal}...")
 
-        # Install tree for listdir.
-        self.terminal.run("apt update && apt install -y tree")
-
         self.terminal.session_commands.append("source /opt/miniconda3/bin/activate")
         self.terminal.session_commands.append("conda activate testbed")
 
