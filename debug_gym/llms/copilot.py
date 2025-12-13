@@ -29,11 +29,16 @@ class CopilotLLM(OpenAILLM):
     def __init__(
         self,
         model_name,
+        llm_config,
         logger=None,
-        llm_config=None,
         runtime_generate_kwargs=None,
     ):
-        super().__init__(model_name, logger, llm_config, runtime_generate_kwargs)
+        super().__init__(
+            model_name,
+            llm_config=llm_config,
+            logger=logger,
+            runtime_generate_kwargs=runtime_generate_kwargs,
+        )
         self._client = None
         self._token_cache = None
         self._token_expires_at = 0

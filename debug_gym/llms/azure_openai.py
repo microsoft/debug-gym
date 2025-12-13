@@ -22,8 +22,8 @@ class AzureOpenAILLM(OpenAILLM):
     def __init__(
         self,
         model_name,
+        llm_config,
         logger=None,
-        llm_config=None,
         runtime_generate_kwargs=None,
     ):
         super().__init__(model_name, logger, llm_config, runtime_generate_kwargs)
