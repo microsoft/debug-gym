@@ -238,90 +238,64 @@ class BaseAgent:
             reason = "max_steps reached"
         return should_stop, reason
 
-    def run(self, env: RepoEnv, llm: LLM, debug=False):
+    def init(
+        self, env: RepoEnv, llm: LLM, reset_env: bool = True
+    ) -> EnvInfo:
+        """Initialize the agent with environment and LLM.
+
+        Args:
+            env: The environment to interact with.
+            llm: The language model to use for decision making.
+            reset_env: Whether to reset the environment (default True).
+
+        Returns:
+            The initial EnvInfo after setup.
+        """
         self.env = env
         self.llm = llm
-        info = None
-        step = 0
 
-        try:
+        if reset_env:
             info = self.env.reset()
-            self.history.init(
-                self.build_system_prompt(info), self.build_instance_prompt(info), info
-            )
+        else:
+            info = self.env.info
 
-            if info.resolved:
-                self.logger.report_progress(
-                    problem_id=env.task_name,
-                    step=0,
-                    total_steps=self.args.max_steps,
-                    score=info.score,
-                    max_score=info.max_score,
-                    status="resolved",
-                )
-                return self._build_trajectory()
+        self.history.init(
+            self.build_system_prompt(info), self.build_instance_prompt(info), info
+        )
 
-            self.logger.info(
-                "Available tools (in LLM's tool calling format):\n"
-                f"{json.dumps(self.llm.define_tools(info.tools), indent=4)}\n"
-            )
+        self.logger.info(
+            "Available tools (in LLM's tool calling format):\n"
+            f"{json.dumps(self.llm.define_tools(info.tools), indent=4)}\n"
+        )
 
-            highscore = info.score
-            should_stop = False
-            step = 1
+        return info
 
-            while not should_stop:
-                self.logger.info(f"\n{'='*20} STEP {step} {'='*20}\n")
+    def step(self, info: EnvInfo, debug: bool = False) -> EnvInfo:
+        """Execute a single agent step.
 
-                messages = self.build_prompt(info)
-                llm_response = self.llm(messages, info.tools)
+        Args:
+            info: Current environment info.
+            debug: Whether to drop into debugger after LLM call.
 
-                if debug:
-                    breakpoint()
+        Returns:
+            New EnvInfo after executing the action.
+        """
+        messages = self.build_prompt(info)
+        llm_response = self.llm(messages, info.tools)
 
-                info = self.env.step(
-                    llm_response.tool,
-                    llm_response.response,
-                    llm_response.reasoning_response,
-                )
-                self.history.step(info, llm_response)
-                should_stop, reason = self.should_stop(step + 1, info)
-                status = (
-                    "resolved"
-                    if info.resolved
-                    else ("unresolved" if should_stop else "running")
-                )
+        if debug:
+            breakpoint()
 
-                highscore = max(highscore, info.score)
-                msg = f"[{env.task_name[:10]:<10}] Step {step} | Score: {info.score}/{info.max_score or '-'} [Best: {highscore}]"
-                if should_stop:
-                    msg += f" | Stopping Reason: {reason}"
-                self.logger.info(msg)
-                step += 1
+        new_info = self.env.step(
+            llm_response.tool,
+            llm_response.response,
+            llm_response.reasoning_response,
+        )
+        self.history.step(new_info, llm_response)
 
-                # keep progress bar running until max_steps is reached
-                self.logger.report_progress(
-                    problem_id=env.task_name,
-                    step=step,
-                    total_steps=self.args.max_steps,
-                    score=info.score,
-                    max_score=info.max_score,
-                    status=status,
-                )
-            return self._build_trajectory()
-        except Exception as e:
-            # report any error that happens during the run
-            self.logger.report_progress(
-                problem_id=env.task_name,
-                step=step,
-                total_steps=step,
-                score=getattr(info, "score", 0),
-                max_score=getattr(info, "max_score", None),
-                status="error",
-            )
-            raise e
+        return new_info
 
-    def _build_trajectory(self) -> Dict[str, Any]:
+    def build_trajectory(self) -> Dict[str, Any]:
         """Return the trajectory as a JSON-serializable dict without writing it."""
         tools = [f"{tool.name}({tool.arguments})" for tool in self.env.tools]
         json_output = {
@@ -361,3 +335,85 @@ def create_agent(config: Dict[str, Any], **kwargs) -> BaseAgent:
 
     agent = agent_class(agent_args=config, **kwargs)
     return agent
+
+
+def run_agent(
+    agent: BaseAgent,
+    env: RepoEnv,
+    llm: LLM,
+    debug: bool = False,
+    reset_env: bool = True,
+) -> Dict[str, Any]:
+    """Run the agent loop until termination or max steps.
+
+    Args:
+        agent: The agent to run.
+        env: The environment to interact with.
+        llm: The language model to use for decision making.
+        debug: Whether to drop into debugger after each LLM call.
+        reset_env: Whether to reset the environment (default True).
+
+    Returns:
+        The trajectory as a JSON-serializable dict.
+    """
+    info = None
+    step = 0
+
+    try:
+        info = agent.init(env, llm, reset_env=reset_env)
+
+        if info.resolved:
+            agent.logger.report_progress(
+                problem_id=env.task_name,
+                step=0,
+                total_steps=agent.args.max_steps,
+                score=info.score,
+                max_score=info.max_score,
+                status="resolved",
+            )
+            return agent.build_trajectory()
+
+        highscore = info.score
+        should_stop = False
+        step = 1
+
+        while not should_stop:
+            agent.logger.info(f"\n{'='*20} STEP {step} {'='*20}\n")
+
+            info = agent.step(info, debug=debug)
+
+            should_stop, reason = agent.should_stop(step + 1, info)
+            status = (
+                "resolved"
+                if info.resolved
+                else ("unresolved" if should_stop else "running")
+            )
+
+            highscore = max(highscore, info.score)
+            msg = f"[{env.task_name[:10]:<10}] Step {step} | Score: {info.score}/{info.max_score or '-'} [Best: {highscore}]"
+            if should_stop:
+                msg += f" | Stopping Reason: {reason}"
+            agent.logger.info(msg)
+            step += 1
+
+            # keep progress bar running until max_steps is reached
+            agent.logger.report_progress(
+                problem_id=env.task_name,
+                step=step,
+                total_steps=agent.args.max_steps,
+                score=info.score,
+                max_score=info.max_score,
+                status=status,
+            )
+        return agent.build_trajectory()
+    except Exception as e:
+        # report any error that happens during the run
+        agent.logger.report_progress(
+            problem_id=env.task_name,
+            step=step,
+            total_steps=step,
+            score=getattr(info, "score", 0),
+            max_score=getattr(info, "max_score", None),
+            status="error",
+        )
+        raise e

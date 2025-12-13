@@ -2,6 +2,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 import pytest
 
+from debug_gym.agents.base_agent import run_agent
 from debug_gym.agents.solution_agent import AgentSolution
 from debug_gym.gym.entities import Observation
 from debug_gym.gym.envs.r2egym import R2EGymEnv
@@ -243,9 +244,8 @@ def test_running_solution_agent(get_r2egym_env, tmp_path):
     for tool_name in ["pdb", "eval", "submit"]:
         env.add_tool(Toolbox.get_tool(tool_name))
     agent = AgentSolution(agent_args=config, llm=None, logger=env.logger)
-    env.reset()
-    success = agent.run(env)
-    assert success
+    result = run_agent(agent, env, llm=None)
+    assert result["success"]
 
 
 @pytest.if_docker_running

@@ -5,7 +5,7 @@ import uuid
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 
-from debug_gym.agents.base_agent import AGENT_REGISTRY, create_agent
+from debug_gym.agents.base_agent import AGENT_REGISTRY, create_agent, run_agent
 from debug_gym.agents.utils import load_config, save_patch, save_trajectory
 from debug_gym.experiment import create_env, dump_experiment_info
 from debug_gym.gym.envs import load_dataset
@@ -90,7 +90,7 @@ def run_agent(args, task_name: str, task_data: dict, config: dict):
         agent = create_agent(config.get("agent", {}), logger=task_logger)
 
         try:
-            success = agent.run(env, llm, debug=args.debug)
+            success = run_agent(agent, env, llm, debug=args.debug)
         except KeyboardInterrupt:
             task_logger.error("Agent run was interrupted by user.")
             task_logger.report_progress(
