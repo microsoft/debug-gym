@@ -614,7 +614,7 @@ class Human(LLM):
         return LLMResponse(
             prompt=messages,
             response=action,
-            tool=tool_call,
+            action=tool_call,
             prompt_token_count=self.count_tokens(messages),
             response_token_count=self.count_tokens([{"tool_calls": action}]),
         )

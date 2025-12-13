@@ -182,7 +182,7 @@ def test_convert_response_to_message_with_thinking(logger_mock):
         prompt=[{"role": "user", "content": "test"}],
         response="Here's my answer",
         reasoning_response="My reasoning process...",
-        tool=ToolCall(id="tool1", name="test_tool", arguments={"arg": "val"}),
+        action=ToolCall(id="tool1", name="test_tool", arguments={"arg": "val"}),
     )
     response.thinking_blocks = [thinking_block]
 
@@ -229,7 +229,7 @@ def test_convert_response_to_message_with_redacted_thinking(logger_mock):
     response = LLMResponse(
         prompt=[{"role": "user", "content": "test"}],
         response="Here's my answer",
-        tool=ToolCall(id="tool1", name="test_tool", arguments={}),
+        action=ToolCall(id="tool1", name="test_tool", arguments={}),
     )
     response.thinking_blocks = [redacted_block]
 

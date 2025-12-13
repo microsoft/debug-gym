@@ -245,7 +245,7 @@ def test_running_solution_agent(get_r2egym_env, tmp_path):
     for tool_name in ["pdb", "eval", "submit"]:
         env.add_tool(Toolbox.get_tool(tool_name))
     agent = AgentSolution(agent_args=config, llm=None, logger=env.logger)
-    result = agent.run(env, llm=None)
+    result = agent.run(env)
     assert result["success"]
 
 

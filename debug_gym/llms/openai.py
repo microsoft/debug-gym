@@ -322,7 +322,7 @@ class OpenAILLM(LLM):
             prompt=messages,
             response=_content,
             reasoning_response=_reasoning_content,
-            tool=parsed_tool,
+            action=parsed_tool,
             prompt_token_count=response.usage.prompt_tokens,
             response_token_count=response.usage.completion_tokens,
         )

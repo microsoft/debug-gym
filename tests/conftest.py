@@ -37,7 +37,7 @@ def llm_class_mock():
             return LLMResponse(
                 prompt="Prompt",
                 response="Test response",
-                tool=ToolCall(
+                action=ToolCall(
                     id="tool_id",
                     name="tool_name",
                     arguments={"arg1": "value1", "arg2": "value2"},

@@ -321,7 +321,7 @@ class AnthropicLLM(LLM):
             prompt=messages,
             response=text_messages,
             reasoning_response=thinking_messages,
-            tool=self.parse_tool_call_response(tool_use_block),
+            action=self.parse_tool_call_response(tool_use_block),
             prompt_token_count=response.usage.input_tokens,
             response_token_count=response.usage.output_tokens,
             thinking_blocks=all_thinking_blocks if all_thinking_blocks else None,

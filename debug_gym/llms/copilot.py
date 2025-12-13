@@ -339,7 +339,7 @@ class CopilotClaudeLLM(CopilotLLM):
             prompt=messages,
             response=text_message,
             reasoning_response=thinking_message,
-            tool=self.parse_tool_call_response(tool_call),
+            action=self.parse_tool_call_response(tool_call),
             prompt_token_count=response.usage.prompt_tokens,
             response_token_count=response.usage.completion_tokens,
         )

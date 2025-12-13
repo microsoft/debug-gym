@@ -74,8 +74,8 @@ def test_history_tracker(build_env_info):
     )
 
     # single prompt format
-    llm_response_1 = LLMResponse("prompt_1_1", "response_1_1", tool=tool_1)
-    llm_response_2 = LLMResponse("prompt_2_1", "response_2_1", tool=tool_2)
+    llm_response_1 = LLMResponse("prompt_1_1", "response_1_1", action=tool_1)
+    llm_response_2 = LLMResponse("prompt_2_1", "response_2_1", action=tool_2)
     # list of messages format
     llm_response_3 = LLMResponse(
         prompt=[
@@ -85,12 +85,12 @@ def test_history_tracker(build_env_info):
         ],
         response="content_3_2",
         reasoning_response="reasoning_3_2",
-        tool=tool_3,
+        action=tool_3,
     )
     llm_response_4 = LLMResponse(
         "prompt_4_1",
         "response_4_1",
-        tool=tool_4,
+        action=tool_4,
         prompt_token_count=4321,
         response_token_count=1234,
     )
@@ -102,7 +102,7 @@ def test_history_tracker(build_env_info):
         ],
         response="content_5_2",
         reasoning_response="reasoning_5_2",
-        tool=tool_5,
+        action=tool_5,
     )
 
     # push some steps and prompt-response pairs

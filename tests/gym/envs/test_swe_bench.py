@@ -247,7 +247,7 @@ def test_running_solution_agent(get_swe_bench_env, tmp_path):
     for tool_name in ["pdb", "submit"]:
         env.add_tool(Toolbox.get_tool(tool_name))
     agent = AgentSolution(agent_args=config, llm=None, logger=env.logger)
-    result = agent.run(env, llm=None)
+    result = agent.run(env)
     assert result["success"]
 
 
@@ -287,5 +287,5 @@ def test_running_solution_agent_in_debug_mode(get_swe_bench_debug_env, tmp_path)
     for tool_name in ["pdb", "eval", "submit"]:
         env.add_tool(Toolbox.get_tool(tool_name))
     agent = AgentSolution(agent_args=config, llm=None, logger=env.logger)
-    result = agent.run(env, llm=None)
+    result = agent.run(env)
     assert result["success"]

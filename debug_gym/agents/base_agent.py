@@ -296,7 +296,6 @@ class BaseAgent:
 
         Args:
             env: The environment to interact with.
-            llm: The language model to use for decision making.
             debug: Whether to drop into debugger after each LLM call.
             reset_env: Whether to reset the environment (default True).
 
