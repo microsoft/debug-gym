@@ -1,3 +1,5 @@
+import re
+
 from debug_gym.agents.base_agent import BaseAgent, register_agent
 from debug_gym.gym.envs.env import EnvInfo, RepoEnv
 from debug_gym.gym.tools.tool import ToolCall
@@ -8,8 +10,9 @@ from debug_gym.llms.base import LLM
 class SimpleAgent(BaseAgent):
     name: str = "simple_agent"
 
-    def _parse_tool_call(self, response: str) -> ToolCall:
-        # Extract tool call from LLM response.
+    def _parse_tool_call(self, response: str) -> list[ToolCall]:
+        # Extract tool calls from LLM response.
+        # Supports multiple tool calls in a single response.
         # Assume the following format.
         # <function=example_function_name>
         # <parameter=example_parameter_1>value_1</parameter>
@@ -20,39 +23,39 @@ class SimpleAgent(BaseAgent):
         # </parameter>
         # </function>
         try:
-            tool_call = {}
-            lines = response.splitlines()
-            i = 0
-            while i < len(lines):
-                line = lines[i].strip()
-                if line.startswith("<function=") and line.endswith(">"):
-                    tool_call["name"] = line[len("<function=") : -1]
-                    tool_call["arguments"] = {}
-                    i += 1
-                    while i < len(lines):
-                        line = lines[i].strip()
-                        if line.startswith("<parameter=") and line.endswith(">"):
-                            param_name = line[len("<parameter=") : -1]
-                            param_value_lines = []
-                            i += 1
-                            while i < len(lines):
-                                line = lines[i].strip()
-                                if line == f"</parameter>":
-                                    break
-                                param_value_lines.append(lines[i])
-                                i += 1
-                            param_value = "\n".join(param_value_lines).rstrip()
-                            tool_call["arguments"][param_name] = param_value
-                        elif line == "</function>":
-                            break
-                        i += 1
-                i += 1
+            tool_calls = []
 
-            return ToolCall(
-                id="None",
-                name=tool_call.get("name", "unknown_function"),
-                arguments=tool_call.get("arguments", {}),
-            )
+            # Extract all function blocks with their content
+            func_pattern = r"<function=([^>]+)>(.*?)</function>"
+            for func_match in re.finditer(func_pattern, response, re.DOTALL):
+                function_name = func_match.group(1)
+                function_content = func_match.group(2)
+
+                # Extract all parameters within this function block
+                arguments = {}
+                param_pattern = r"<parameter=([^>]+)>(.*?)</parameter>"
+                for param_match in re.finditer(
+                    param_pattern, function_content, re.DOTALL
+                ):
+                    param_name = param_match.group(1)
+                    param_value = param_match.group(2).rstrip()
+                    arguments[param_name] = param_value
+
+                tool_calls.append(
+                    ToolCall(
+                        id="None",
+                        name=function_name,
+                        arguments=arguments,
+                    )
+                )
+
+            # Return list with unknown_function if no tool calls found
+            if not tool_calls:
+                tool_calls.append(
+                    ToolCall(id="None", name="unknown_function", arguments={})
+                )
+
+            return tool_calls
         except Exception as e:
             self.logger.warning(
                 f"Failed to parse tool call from LLM response: {e!r}. "
@@ -93,7 +96,16 @@ class SimpleAgent(BaseAgent):
 
                 messages = self.build_prompt(info)
                 llm_response = self.llm(messages, tools=None)
-                llm_response.tool_call = self._parse_tool_call(llm_response.response)
+                tool_calls = self._parse_tool_call(llm_response.response)
+
+                # Handle multiple tool calls - use the first one
+                if tool_calls and len(tool_calls) > 1:
+                    self.logger.info(
+                        f"Multiple tool calls detected ({len(tool_calls)}), using the first one."
+                    )
+
+                # TODO: deal with multiple tool calls.
+                llm_response.tool_call = tool_calls[0] if tool_calls else None
 
                 if debug:
                     breakpoint()
