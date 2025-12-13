@@ -1,4 +1,5 @@
 from debug_gym.gym.entities import Observation
+from debug_gym.gym.terminals.terminal import UnrecoverableTerminalError
 from debug_gym.gym.tools.tool import EnvironmentTool
 from debug_gym.gym.tools.toolbox import Toolbox
 
@@ -59,6 +60,9 @@ class BashTool(EnvironmentTool):
             else:
                 result = f"Command failed with output:\n{output}"
 
+        except UnrecoverableTerminalError:
+            # Propagate unrecoverable terminal errors so the environment can terminate.
+            raise
         except Exception as e:
             result = f"Error executing command: {str(e)}"
 

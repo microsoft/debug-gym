@@ -4,6 +4,7 @@ from functools import wraps
 from typing import Any, Dict
 
 from debug_gym.gym.entities import Event, Observation
+from debug_gym.gym.terminals.terminal import UnrecoverableTerminalError
 from debug_gym.gym.workspace import WorkspaceError
 
 
@@ -42,6 +43,10 @@ class EnvironmentTool(ABC):
     arguments: Dict[str, Any] = None
     description: str = None
     history: list[Record] = None
+    # Shell commands to run during terminal setup when this tool is used.
+    # These commands will be executed before the environment is ready.
+    # Example: ["apt-get update && apt-get install -y tree"]
+    setup_commands: tuple[str, ...] = ()
 
     def __init__(self):
         self.history = []
@@ -54,6 +59,9 @@ class EnvironmentTool(ABC):
             return self.use(*args, **kwargs)
         except WorkspaceError as e:
             return Observation(self.name, str(e))
+        except UnrecoverableTerminalError:
+            # Ensure fatal terminal failures propagate so the environment can terminate the episode.
+            raise
         except Exception as e:
             # Handle exceptions and return an observation
             return Observation(
@@ -70,6 +78,20 @@ class EnvironmentTool(ABC):
         for event in Event:
             if hasattr(self, event.handler_name):
                 environment.event_hooks.subscribe(event, self)
+
+        # Run setup commands if this tool has any and the environment is already
+        # initialized (tool added after reset). Otherwise, they'll run via
+        # on_env_reset when reset() is called (all tools are subscribed to ENV_RESET
+        # because EnvironmentTool defines on_env_reset).
+        if self.setup_commands:
+            if (
+                hasattr(environment, "workspace")
+                and environment.workspace is not None
+                and environment.workspace.working_dir is not None
+            ):
+                # Environment already reset, run setup commands now
+                for cmd in self.setup_commands:
+                    environment.terminal.run(cmd, raises=False)
 
     def unregister(self, environment):
         from debug_gym.gym.envs.env import RepoEnv
@@ -99,6 +121,11 @@ class EnvironmentTool(ABC):
         Please call `super().on_env_reset()` if subclass overrides this method.
         """
         self.history = []
+
+        # Run setup commands if this tool has any
+        for cmd in self.setup_commands:
+            environment.terminal.run(cmd, raises=False)
+
         return None
 
     def __str__(self):

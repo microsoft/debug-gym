@@ -37,7 +37,7 @@ def build_docker_image(logger: logging.Logger | None = None):
     # Then install git and the required Python packages
     setup_commands = [
         "apt update",
-        "apt install -y git tree",
+        "apt install -y git",
         "pip install pytest pandas",
     ]
     # Create a temporary Dockerfile
@@ -157,7 +157,10 @@ class MiniNightmareEnv(RepoEnv):
         if build_image:
             build_docker_image(logger)
 
-        if not MiniNightmareEnv.DATA_PATH.exists():
+        # Check if dataset content exists (not just the directory)
+        # The directory may exist but be empty/incomplete from a failed download
+        first_task_marker = cls.DATA_PATH / cls.TASK_NAMES[0] / "test.py"
+        if not first_task_marker.exists():
             zipped_data = utils.download(
                 MiniNightmareEnv.DATA_URL,
                 MiniNightmareEnv.DATA_PATH,
@@ -168,10 +171,21 @@ class MiniNightmareEnv(RepoEnv):
         dataset = {}
         for task_name in cls.TASK_NAMES:
             task_path = cls.DATA_PATH / task_name
-            assert (task_path / "test.py").exists()
-            assert (task_path / f"{task_name}_code.py").exists()
-            assert (task_path / ".debugignore").exists()
-            assert (task_path / ".debugreadonly").exists()
+            # Validate required files exist with helpful error messages
+            required_files = [
+                "test.py",
+                f"{task_name}_code.py",
+                ".debugignore",
+                ".debugreadonly",
+            ]
+            for required_file in required_files:
+                file_path = task_path / required_file
+                if not file_path.exists():
+                    raise FileNotFoundError(
+                        f"Required file '{required_file}' not found in {task_path}. "
+                        f"The mini-nightmare dataset may be corrupted or incomplete. "
+                        f"Try deleting {cls.DATA_PATH} and re-running to re-download."
+                    )
 
             dataset[task_name] = {
                 "task_name": task_name,

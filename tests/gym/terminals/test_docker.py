@@ -3,11 +3,15 @@ import time
 
 import docker
 import pytest
+from docker import errors as docker_errors
 
 from debug_gym.gym.terminals import select_terminal
 from debug_gym.gym.terminals.docker import DockerTerminal
 from debug_gym.gym.terminals.shell_session import DEFAULT_PS1
-from debug_gym.gym.terminals.terminal import DISABLE_ECHO_COMMAND
+from debug_gym.gym.terminals.terminal import (
+    DISABLE_ECHO_COMMAND,
+    UnrecoverableTerminalError,
+)
 
 
 @pytest.if_docker_running
@@ -167,7 +171,7 @@ def test_run_setup_commands_success(tmp_path):
 def test_run_setup_commands_failure(tmp_path):
     working_dir = str(tmp_path)
     setup_commands = ["echo install", "ls ./non_existent_dir"]
-    with pytest.raises(ValueError, match="Failed to run setup command:*"):
+    with pytest.raises(UnrecoverableTerminalError, match="Failed to run setup command"):
         terminal = DockerTerminal(
             working_dir, setup_commands=setup_commands, base_image="ubuntu:latest"
         )
@@ -197,3 +201,24 @@ def test_copy_content(tmp_path):
     # Verify the content was copied correctly
     _, output = terminal.run(f"cat {terminal.working_dir}/tmp.txt", timeout=1)
     assert output == "Hello World"
+
+
+@pytest.if_docker_running
+def test_unrecoverable_error_when_container_stops(tmp_path):
+    working_dir = str(tmp_path)
+    terminal = DockerTerminal(working_dir=working_dir, base_image="ubuntu:latest")
+    try:
+        container = terminal.container
+        try:
+            container.stop(timeout=1)
+        except docker_errors.APIError:
+            pass
+        try:
+            container.wait()
+        except docker_errors.DockerException:
+            pass
+
+        with pytest.raises(UnrecoverableTerminalError):
+            terminal.run("echo after stop", timeout=1)
+    finally:
+        terminal.clean_up()

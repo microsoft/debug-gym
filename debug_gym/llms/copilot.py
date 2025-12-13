@@ -26,8 +26,14 @@ class CopilotLLM(OpenAILLM):
     CLIENT_MAX_AGE_SECONDS = 1200  # 20 minutes
     AUTH_RETRY_DELAY_SECONDS = 5
 
-    def __init__(self, model_name, logger=None, llm_config=None, llm_config_file=None):
-        super().__init__(model_name, logger, llm_config, llm_config_file)
+    def __init__(
+        self,
+        model_name,
+        logger=None,
+        llm_config=None,
+        runtime_generate_kwargs=None,
+    ):
+        super().__init__(model_name, logger, llm_config, runtime_generate_kwargs)
         self._client = None
         self._token_cache = None
         self._token_expires_at = 0

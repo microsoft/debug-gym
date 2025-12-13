@@ -35,8 +35,8 @@ def test_reset_and_step(get_swe_bench_env):
         observation="Unregistered tool: listdir",
     )
 
-    view_tool = Toolbox.get_tool("listdir")
-    env.add_tool(view_tool)
+    listdir_tool = Toolbox.get_tool("listdir")
+    env.add_tool(listdir_tool)
 
     env_info = env.step(tool_call)
     assert env_info.step_observation.source == "listdir"

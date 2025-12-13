@@ -154,12 +154,12 @@ def test_reset_and_step(get_r2egym_env):
         observation="Unregistered tool: listdir",
     )
 
-    view_tool = Toolbox.get_tool("listdir")
-    env.add_tool(view_tool)
+    listdir_tool = Toolbox.get_tool("listdir")
+    env.add_tool(listdir_tool)
 
     env_info = env.step(tool_call)
     assert env_info.step_observation.source == "listdir"
-    # Verify we can see the tldextract directory structure
+    # Verify we can see the aiohttp directory structure
     listdir_start = f"""{env.working_dir}/
 |-- CHANGES/
 |-- CHANGES.rst
@@ -190,17 +190,19 @@ def test_reset_and_step(get_r2egym_env):
 @pytest.if_docker_running
 def test_readonly_file(get_r2egym_env):
     env = get_r2egym_env()
-    env_info = env.reset()
-    assert env.workspace._is_readonly_func("/testbed/r2e_tests/test_1.py")
 
+    # Add view and listdir tools
     env.add_tool(Toolbox.get_tool("view"))
     env.add_tool(Toolbox.get_tool("listdir"))
+
+    env_info = env.reset()
+    assert env.workspace._is_readonly_func("/testbed/r2e_tests/test_1.py")
 
     tool_call = ToolCall(
         id="listdir_id", name="listdir", arguments={"path": "r2e_tests"}
     )
     env_info = env.step(tool_call)
-    assert f"|-- test_1.py (read-only)" in env_info.step_observation.observation
+    assert "|-- test_1.py (read-only)" in env_info.step_observation.observation
 
     tool_call = ToolCall(
         id="view_id", name="view", arguments={"path": "r2e_tests/test_1.py"}

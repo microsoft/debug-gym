@@ -86,7 +86,7 @@ def run_agent(args, task_name: str, task_data: dict, config: dict):
         )
 
         env = create_env(config, task_data, task_logger)
-        llm = LLM.instantiate(config.get("llm", {}), logger=task_logger)
+        llm = LLM.instantiate(**config.get("llm", {}), logger=task_logger)
         agent = create_agent(config.get("agent", {}), logger=task_logger)
 
         try:
@@ -124,7 +124,14 @@ def run_agent(args, task_name: str, task_data: dict, config: dict):
 
         # save trajectory
         save_trajectory(agent, task_path, task_logger)
-        save_patch(env, task_path, task_logger)
+
+        # optionally apply patch
+        if config.get("save_patch", True):
+            try:
+                save_patch(env, task_path, task_logger)
+            except Exception as patch_error:
+                # Terminal may be unavailable (e.g., pod died), log and continue
+                task_logger.warning(f"Could not save patch: {patch_error!r}")
 
     except Exception as e:
         task_logger.error(
@@ -187,7 +194,7 @@ def main():
         return
 
     # Try to instantiate the LLM once to catch configuration errors early.
-    llm = LLM.instantiate(config=config.get("llm", {}), logger=logger)
+    llm = LLM.instantiate(**config.get("llm", {}), logger=logger)
 
     # Stop live progress display if --no-live-display is set
     # or in Human mode (avoid conflicts with prompt_toolkit)

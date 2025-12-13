@@ -198,22 +198,18 @@ class LLM(ABC):
         model_name: str,
         logger: DebugGymLogger | None = None,
         llm_config: LLMConfig | None = None,
-        llm_config_file: str | None = None,
+        runtime_generate_kwargs: dict | None = None,
     ):
         self.model_name = model_name
         self.logger = logger or DebugGymLogger("debug-gym")
-        if llm_config is not None and llm_config_file is not None:
-            logger.warning(
-                "Both llm_config and llm_config_file are provided, using llm_config."
-            )
-        self.config = (
-            llm_config or LLMConfigRegistry.from_file(llm_config_file)[model_name]
-        )
+        self.config = llm_config or LLMConfigRegistry.from_file()[model_name]
         self.tokenizer_name = self.config.tokenizer
         self.context_length = self.config.context_limit * 1000
         self.apply_chat_template = self.config.apply_chat_template
         self.enable_thinking = self.config.enable_thinking
         self.reasoning_end_token = self.config.reasoning_end_token
+        # Runtime generation kwargs from experiment config (temperature, max_tokens, etc.)
+        self.runtime_generate_kwargs = runtime_generate_kwargs or {}
 
         self.logger.debug(
             f"Using {self.model_name} with max context length of {
@@ -223,31 +219,43 @@ class LLM(ABC):
     @classmethod
     def instantiate(
         cls,
-        config: Dict[str, Any],
+        name: str | None = None,
         llm_config_file_path: str | None = None,
         logger: DebugGymLogger | None = None,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
     ) -> "LLM":
         """Creates an instance of the appropriate LLM class based on the configuration.
 
         Args:
-            config: Dictionary containing LLM configuration, must include 'name' key.
+            name: Name of the LLM model (e.g., "gpt-4o", "claude-3.7").
             llm_config_file_path: Optional path to the LLM configuration file.
             logger: Optional DebugGymLogger for logging.
+            temperature: Optional temperature for generation.
+            max_tokens: Optional max tokens for generation.
 
         Returns:
             An instance of the appropriate LLM class.
         """
 
         logger = logger or DebugGymLogger("debug-gym")
-        llm_name = config.get("name")
-        if llm_name is None:
+
+        if not name:
             return None
-        elif llm_name == "human":
+
+        # Build runtime generation kwargs from explicit args
+        runtime_generate_kwargs = {}
+        if temperature is not None:
+            runtime_generate_kwargs["temperature"] = temperature
+        if max_tokens is not None:
+            runtime_generate_kwargs["max_tokens"] = max_tokens
+
+        if name == "human":
             from debug_gym.llms import Human
 
-            return Human(llm_name, logger=logger)
+            return Human(name, logger=logger)
 
-        llm_config = LLMConfigRegistry.from_file(llm_config_file_path)[llm_name]
+        llm_config = LLMConfigRegistry.from_file(llm_config_file_path)[name]
 
         tags = llm_config.tags
 
@@ -281,7 +289,12 @@ class LLM(ABC):
 
             klass = OpenAILLM
 
-        llm = klass(llm_name, logger=logger, llm_config=llm_config)
+        llm = klass(
+            name,
+            logger=logger,
+            llm_config=llm_config,
+            runtime_generate_kwargs=runtime_generate_kwargs,
+        )
         return llm
 
     @abstractmethod
@@ -365,10 +378,19 @@ class LLM(ABC):
         """Prepares messages and kwargs, then call `generate` which
         should be implemented by subclasses. Returns an LLMResponse object
         with the prompt, response and token usage.
+
+        Priority for generation kwargs (highest to lowest):
+        1. kwargs passed directly to this call
+        2. runtime_generate_kwargs from experiment config
+        3. config.generate_kwargs from llm.yaml
         """
-        # Add custom generation parameters from config
+        # Add runtime generation kwargs from experiment config (higher priority)
+        for key, value in self.runtime_generate_kwargs.items():
+            if key not in kwargs:
+                kwargs[key] = value
+
+        # Add custom generation parameters from llm.yaml config (lowest priority)
         for key, value in self.config.generate_kwargs.items():
-            # Only set if not already specified in the call
             if key not in kwargs:
                 kwargs[key] = value
 

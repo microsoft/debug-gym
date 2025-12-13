@@ -3,8 +3,8 @@ from unittest.mock import MagicMock, patch
 
 from debug_gym.gym.entities import Observation
 from debug_gym.gym.tools.tool import EnvironmentTool, ToolCall
-from debug_gym.llms import OpenAILLM
-from debug_gym.llms.base import LLMConfigRegistry
+from debug_gym.llms.base import LLM, LLMConfigRegistry
+from debug_gym.llms.openai import OpenAILLM  # Import for patching in tests
 
 
 class Tool1(EnvironmentTool):
@@ -69,7 +69,7 @@ def test_llm(mock_llm_config, mock_openai, logger_mock):
     )(**tmp_dict)
     mock_openai.return_value = mock_response
 
-    llm = OpenAILLM(model_name="openai", logger=logger_mock)
+    llm = LLM.instantiate(name="openai", logger=logger_mock)
     messages = [{"role": "user", "content": "Hello World"}]
     llm_response = llm(messages, tools)
     assert llm_response.prompt == messages
@@ -103,8 +103,8 @@ def test_llm(mock_llm_config, mock_openai, logger_mock):
     ),
 )
 def test_need_to_be_retried(llm_config_registry_mock, logger_mock):
-    openai_llm = OpenAILLM("openai", logger=logger_mock)
-    qwen_llm = OpenAILLM("qwen", logger=logger_mock)
+    openai_llm = LLM.instantiate("openai", logger=logger_mock)
+    qwen_llm = LLM.instantiate("qwen", logger=logger_mock)
 
     exception = create_fake_exception(
         "openai", "RateLimitError", "Rate limit exceeded", "fake code"
@@ -195,7 +195,7 @@ def test_need_to_be_retried(llm_config_registry_mock, logger_mock):
                 "api_key": "test-api-key",
                 "endpoint": "https://test-endpoint",
                 "api_version": "v1",
-                "tags": ["vllm"],
+                "tags": ["openai"],  # Changed from vllm to openai
             }
         }
     ),
@@ -225,7 +225,7 @@ def test_llm_with_reasoning_content(
     )(**tmp_dict)
     mock_openai.return_value = mock_response
 
-    llm = OpenAILLM(model_name="qwen", logger=logger_mock)
+    llm = LLM.instantiate(name="qwen", logger=logger_mock)
     messages = [{"role": "user", "content": "Test with reasoning"}]
     llm_response = llm(messages, tools)
 
@@ -251,7 +251,7 @@ def test_llm_with_reasoning_content(
                 "api_key": "test-api-key",
                 "endpoint": "https://test-endpoint",
                 "api_version": "v1",
-                "tags": ["vllm"],
+                "tags": ["openai"],  # Changed from vllm to openai
             }
         }
     ),
@@ -279,7 +279,7 @@ def test_llm_with_only_reasoning_content(
     )(**tmp_dict)
     mock_openai.return_value = mock_response
 
-    llm = OpenAILLM(model_name="qwen", logger=logger_mock)
+    llm = LLM.instantiate(name="qwen", logger=logger_mock)
     messages = [{"role": "user", "content": "Test reasoning only"}]
     llm_response = llm(messages, tools)
 
@@ -328,7 +328,7 @@ def test_llm_without_reasoning_content_attribute(
     )(**tmp_dict)
     mock_openai.return_value = mock_response
 
-    llm = OpenAILLM(model_name="openai", logger=logger_mock)
+    llm = LLM.instantiate(name="openai", logger=logger_mock)
     messages = [{"role": "user", "content": "Test without reasoning"}]
     llm_response = llm(messages, tools)
 
@@ -357,7 +357,7 @@ def test_openai_llm_raises_error_for_non_gpt_tokenizer(mock_llm_config, logger_m
     """Test that OpenAILLM raises ValueError when tokenizer is not a GPT model"""
     import pytest
 
-    llm = OpenAILLM(model_name="qwen", logger=logger_mock)
+    llm = LLM.instantiate(name="qwen", logger=logger_mock)
     messages = [{"role": "user", "content": "test"}]
 
     # Should raise ValueError when trying to tokenize with a non-GPT tokenizer

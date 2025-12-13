@@ -5,8 +5,16 @@ import numpy as np
 import pytest
 
 from debug_gym.gym.entities import EvalOutput, Event, Observation
+from debug_gym.gym.envs import load_dataset, select_env
+from debug_gym.gym.envs.aider import AiderBenchmarkEnv
 from debug_gym.gym.envs.env import EnvInfo, EventHooks, RepoEnv, TooledEnv
 from debug_gym.gym.envs.local import LocalEnv
+from debug_gym.gym.envs.mini_nightmare import MiniNightmareEnv
+from debug_gym.gym.envs.r2egym import R2EGymEnv
+from debug_gym.gym.envs.swe_bench import SWEBenchEnv
+from debug_gym.gym.envs.swe_bench_debug import SWEBenchDebugEnv
+from debug_gym.gym.envs.swe_smith import SWESmithEnv
+from debug_gym.gym.terminals.terminal import UnrecoverableTerminalError
 from debug_gym.gym.tools.tool import ToolCall
 from debug_gym.gym.tools.toolbox import Toolbox
 
@@ -15,6 +23,37 @@ from debug_gym.gym.tools.toolbox import Toolbox
 def env_mock(tmp_path):
     env = LocalEnv(path=tmp_path)
     return env
+
+
+def test_close_handles_missing_attributes():
+    """Test that close() handles missing workspace/terminal attributes gracefully."""
+
+    # Create a minimal RepoEnv subclass that doesn't fully initialize
+    class PartialEnv(RepoEnv):
+        def __init__(self):
+            # Don't call super().__init__() to simulate partial initialization
+            pass
+
+        @property
+        def instructions(self):
+            return ""
+
+        @property
+        def task_name(self):
+            return "test"
+
+        def setup_task(self):
+            pass
+
+        def setup_workspace(self):
+            pass
+
+        def setup_terminal(self):
+            pass
+
+    env = PartialEnv()
+    # This should not raise even though workspace and terminal are not set
+    env.close()
 
 
 def test_seed(env_mock):
@@ -331,6 +370,42 @@ def test_event_hooks_notify():
     subscriber.on_env_start.assert_called_once()
 
 
+def test_event_hooks_notify_unrecoverable_terminal_error():
+    """Test that UnrecoverableTerminalError is re-raised by notify()."""
+
+    class FailingSubscriber:
+        name = "failing_tool"
+
+        def on_env_start(self, environment, **kwargs):
+            raise UnrecoverableTerminalError("Terminal died")
+
+    event_hooks = EventHooks()
+    subscriber = FailingSubscriber()
+    event_hooks.subscribe(Event.ENV_START, subscriber)
+
+    with pytest.raises(UnrecoverableTerminalError, match="Terminal died"):
+        event_hooks.notify(None, Event.ENV_START)
+
+
+def test_event_hooks_notify_regular_exception_returns_observation():
+    """Test that regular exceptions are caught and returned as observations."""
+
+    class FailingSubscriber:
+        name = "test_tool"
+
+        def on_env_start(self, environment, **kwargs):
+            raise ValueError("Some error")
+
+    event_hooks = EventHooks()
+    subscriber = FailingSubscriber()
+    event_hooks.subscribe(Event.ENV_START, subscriber)
+
+    observations = event_hooks.notify(None, Event.ENV_START)
+    assert len(observations) == 1
+    assert observations[0].source == "test_tool"
+    assert "Error in tool test_tool" in observations[0].observation
+
+
 def test_current_breakpoints_no_breakpoints(env_mock):
     env_mock.current_breakpoints_state = {}
     result = env_mock.current_breakpoints()
@@ -409,3 +484,274 @@ def test_has_breakpoint_relative_path(tmp_path):
     assert env.has_breakpoint("foo.py", 6) is False
     # Should return False for non-existent file
     assert env.has_breakpoint("bar.py", line_number) is False
+
+
+def test_env_info_str_basic():
+    """Test EnvInfo.__str__() method with basic data."""
+    info = EnvInfo(
+        step_observation=Observation("env", "Test observation"),
+        all_observations=[Observation("env", "Test observation")],
+        eval_observation=None,
+        current_breakpoints="No breakpoints are set.",
+        action_reasoning=None,
+        action_content=None,
+        action_tool_call=None,
+        instructions="Test instructions",
+        score=0,
+        max_score=10,
+        terminated=False,
+        resolved=False,
+        tools=[],
+    )
+    result = str(info)
+    assert "DEBUG GYM ENVIRONMENT INFO" in result
+    assert "IN PROGRESS" in result
+    assert "Score: 0/10" in result
+    assert "Test observation" in result
+    assert "None set" in result
+
+
+def test_env_info_str_with_action():
+    """Test EnvInfo.__str__() with action tool call."""
+    info = EnvInfo(
+        step_observation=Observation("env", "Test observation"),
+        all_observations=[Observation("env", "Test observation")],
+        eval_observation=None,
+        current_breakpoints="line 10 in test.py\nline 20 in test.py",
+        action_reasoning="I need to debug this",
+        action_content="Setting breakpoint",
+        action_tool_call=ToolCall(id="123", name="pdb", arguments={"command": "b 10"}),
+        instructions="Test instructions",
+        score=5,
+        max_score=10,
+        terminated=False,
+        resolved=False,
+        tools=[],
+    )
+    result = str(info)
+    assert "Last Action" in result
+    assert "Tool: pdb" in result
+    assert "Explanation: Setting breakpoint" in result
+    assert "Reasoning: I need to debug this" in result
+    assert "line 10 in test.py" in result
+
+
+def test_env_info_str_terminated_resolved():
+    """Test EnvInfo.__str__() when terminated and resolved."""
+    info = EnvInfo(
+        step_observation=Observation("env", "Success!"),
+        all_observations=[Observation("env", "Success!")],
+        eval_observation=None,
+        current_breakpoints="No breakpoints are set.",
+        action_reasoning=None,
+        action_content=None,
+        action_tool_call=None,
+        instructions="Test instructions",
+        score=10,
+        max_score=10,
+        terminated=True,
+        resolved=True,
+        tools=[],
+    )
+    result = str(info)
+    assert "TERMINATED" in result
+
+
+def test_env_info_str_many_breakpoints():
+    """Test EnvInfo.__str__() with more than 5 breakpoints."""
+    breakpoints = "\n".join([f"line {i} in test.py" for i in range(10)])
+    info = EnvInfo(
+        step_observation=Observation("env", "Test"),
+        all_observations=[],
+        eval_observation=None,
+        current_breakpoints=breakpoints,
+        action_reasoning=None,
+        action_content=None,
+        action_tool_call=None,
+        instructions="Test",
+        score=0,
+        max_score=None,
+        terminated=False,
+        resolved=False,
+        tools=[],
+    )
+    result = str(info)
+    assert "... and 5 more" in result
+
+
+def test_get_triggered_tools_empty_tool_response(tmp_path):
+    """Test get_triggered_tools with empty_tool_response action."""
+    env = LocalEnv(path=tmp_path)
+    action = ToolCall(id="empty", name="empty_tool_response", arguments={})
+    error, tool_info = env.get_triggered_tools(action)
+    assert "No tool call was generated" in error
+    assert tool_info is None
+
+
+def test_prepare_entrypoint_uv():
+    """Test _prepare_entrypoint handles uv run command."""
+    result = RepoEnv._prepare_entrypoint("uv run pytest tests")
+    assert "$(which pytest)" in result
+    assert "python" in result
+
+
+def test_prepare_entrypoint_xvfb():
+    """Test _prepare_entrypoint handles xvfb command."""
+    entrypoint = "xvfb-run --auto-servernum .venv/bin/python -W ignore -m pytest"
+    result = RepoEnv._prepare_entrypoint(entrypoint)
+    # xvfb entrypoints should be returned unchanged
+    assert result == entrypoint
+
+
+def test_prepare_entrypoint_non_python():
+    """Test _prepare_entrypoint handles non-python commands."""
+    result = RepoEnv._prepare_entrypoint("pytest tests")
+    assert "$(which pytest)" in result
+    assert result.startswith("python")
+
+
+class TestSelectEnv:
+    """Test cases for select_env function."""
+
+    def test_select_env_local(self):
+        assert select_env("local") == LocalEnv
+
+    def test_select_env_aider(self):
+        assert select_env("aider") == AiderBenchmarkEnv
+
+    def test_select_env_swebench(self):
+        assert select_env("swebench") == SWEBenchEnv
+
+    def test_select_env_swebench_debug(self):
+        assert select_env("swebench-debug") == SWEBenchDebugEnv
+
+    def test_select_env_swesmith(self):
+        assert select_env("swesmith") == SWESmithEnv
+
+    def test_select_env_mini_nightmare(self):
+        assert select_env("mini_nightmare") == MiniNightmareEnv
+
+    def test_select_env_r2egym(self):
+        assert select_env("r2egym") == R2EGymEnv
+
+    def test_select_env_unknown(self):
+        with pytest.raises(ValueError, match="Unknown environment unknown_env"):
+            select_env("unknown_env")
+
+    def test_select_env_none(self):
+        with pytest.raises(ValueError, match="Unknown environment None"):
+            select_env(None)
+
+
+class TestSoftReset:
+    """Test cases for soft reset (reset_runtime=False) functionality."""
+
+    def test_soft_reset_resets_env_state(self, tmp_path):
+        """Test that soft reset resets environment state."""
+        test_file = tmp_path / "test.py"
+        test_file.write_text("print('hello')")
+
+        env = LocalEnv(path=tmp_path)
+        env.reset()
+
+        # Set some state
+        env.score = 5
+        env.current_breakpoints_state = {"test.py|||10": "b test.py:10"}
+        env.last_eval = EvalOutput(success=True, output="test")
+
+        # Soft reset should reset the state
+        env.reset(options={"reset_runtime": False})
+
+        assert env.score == 0
+        assert env.current_breakpoints_state == {}
+        assert env.last_eval is None
+
+    def test_soft_reset_keeps_terminal_running(self, tmp_path):
+        """Test that soft reset does not restart the terminal."""
+        test_file = tmp_path / "test.py"
+        test_file.write_text("print('hello')")
+
+        env = LocalEnv(path=tmp_path)
+        env.reset()
+
+        # Get a reference to the terminal
+        terminal_before = env.terminal
+
+        # Soft reset
+        env.reset(options={"reset_runtime": False})
+
+        # Terminal should be the same instance
+        assert env.terminal is terminal_before
+
+    def test_soft_reset_preserves_file_changes(self, tmp_path):
+        """Test that soft reset preserves file changes (doesn't touch workspace)."""
+        test_file = tmp_path / "test.py"
+        test_file.write_text("original content")
+
+        env = LocalEnv(path=tmp_path)
+        env.reset()
+
+        # Modify the file
+        (env.working_dir / "test.py").write_text("modified content")
+
+        # Soft reset should NOT revert file changes
+        env.reset(options={"reset_runtime": False})
+
+        # File should still be modified
+        assert (env.working_dir / "test.py").read_text() == "modified content"
+
+    def test_soft_reset_notifies_tools(self, tmp_path):
+        """Test that soft reset still notifies tools of ENV_RESET event."""
+        test_file = tmp_path / "test.py"
+        test_file.write_text("print('hello')")
+
+        env = LocalEnv(path=tmp_path)
+        env.reset()
+
+        # Add a mock tool that listens to ENV_RESET
+        mock_tool = MagicMock()
+        mock_tool.name = "mock_tool"
+        mock_tool.on_env_reset.return_value = Observation("mock_tool", "reset called")
+        env.add_tool(mock_tool)
+        env.event_hooks.subscribe(Event.ENV_RESET, mock_tool)
+
+        # Soft reset
+        env.reset(options={"reset_runtime": False})
+
+        # Tool should have been notified
+        mock_tool.on_env_reset.assert_called_once()
+
+
+class TestLoadDataset:
+    """Test cases for load_dataset function."""
+
+    def test_load_dataset_missing_type(self):
+        """Test that load_dataset raises error when type is missing."""
+        config = {"dataset_id": "some-dataset"}
+        with pytest.raises(
+            ValueError, match="Dataset config must specify 'type' field"
+        ):
+            load_dataset(config)
+
+    def test_load_dataset_unknown_type(self):
+        """Test that load_dataset raises error for unknown env type."""
+        config = {"type": "unknown_type"}
+        with pytest.raises(ValueError, match="Unknown environment type 'unknown_type'"):
+            load_dataset(config)
+
+    @patch("debug_gym.gym.envs.select_env")
+    def test_load_dataset_calls_env_load_dataset(self, mock_select_env):
+        """Test that load_dataset calls the env's load_dataset method."""
+        # Create a mock env class with a load_dataset classmethod
+        mock_env_class = MagicMock()
+        mock_env_class.load_dataset.return_value = {"task1": {"data": "value"}}
+        mock_select_env.return_value = mock_env_class
+
+        config = {"type": "swebench", "dataset_id": "some-dataset"}
+        result = load_dataset(config, logger=None)
+
+        mock_select_env.assert_called_once_with("swebench")
+        mock_env_class.load_dataset.assert_called_once_with(
+            logger=None, type="swebench", dataset_id="some-dataset"
+        )
+        assert result == {"task1": {"data": "value"}}
