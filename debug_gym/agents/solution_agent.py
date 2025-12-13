@@ -49,9 +49,9 @@ class AgentSolution(BaseAgent):
         if reset_observation.splitlines():
             expected_messages.append(reset_observation.splitlines()[-1])
 
-        assert any(msg in pdb_observation for msg in expected_messages), (
-            f"PDB command did not return expected continue message.\n{pdb_observation}"
-        )
+        assert any(
+            msg in pdb_observation for msg in expected_messages
+        ), f"PDB command did not return expected continue message.\n{pdb_observation}"
 
     def step(self, info: EnvInfo) -> EnvInfo:
         action = ToolCall(name="submit", id="submit", arguments={})

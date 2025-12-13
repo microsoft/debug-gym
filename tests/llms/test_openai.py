@@ -73,7 +73,9 @@ def test_llm(mock_llm_config, mock_openai, logger_mock):
     messages = [{"role": "user", "content": "Hello World"}]
     llm_response = llm(messages, tools)
     assert llm_response.prompt == messages
-    assert llm_response.action == ToolCall(id="1", name="tool 1", arguments={"arg 1": 0})
+    assert llm_response.action == ToolCall(
+        id="1", name="tool 1", arguments={"arg 1": 0}
+    )
     assert llm_response.token_usage.prompt == 2
     assert llm_response.token_usage.response == 4
 

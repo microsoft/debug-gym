@@ -99,7 +99,9 @@ def test_query_anthropic_model_basic(mock_llm_config, logger_mock):
     assert llm_response.prompt == [
         {"role": "user", "content": "Write a Hello World program"}
     ]
-    assert llm_response.action == ToolCall(id="1", name="tool 1", arguments={"arg 1": 0})
+    assert llm_response.action == ToolCall(
+        id="1", name="tool 1", arguments={"arg 1": 0}
+    )
     assert llm_response.token_usage.prompt == 10
     assert llm_response.token_usage.response == 10
 
@@ -139,7 +141,9 @@ def test_query_anthropic_model_with_thinking(logger_mock):
     assert llm_response.prompt == [
         {"role": "user", "content": "Write a Hello World program"}
     ]
-    assert llm_response.action == ToolCall(id="1", name="tool 1", arguments={"arg 1": 0})
+    assert llm_response.action == ToolCall(
+        id="1", name="tool 1", arguments={"arg 1": 0}
+    )
     assert llm_response.reasoning_response == "Let me analyze this..."
     assert llm_response.token_usage.prompt == 10
     assert llm_response.token_usage.response == 10
@@ -262,7 +266,9 @@ def test_query_anthropic_model_no_user_messages(mock_llm_config, logger_mock):
     assert llm_response.prompt == [
         {"role": "system", "content": "You are a helpful assistant"}
     ]
-    assert llm_response.action == ToolCall(id="1", name="tool 1", arguments={"arg 1": 0})
+    assert llm_response.action == ToolCall(
+        id="1", name="tool 1", arguments={"arg 1": 0}
+    )
     llm.client.messages.create.assert_called_once()
     assert len(llm.client.messages.create.call_args[1]["messages"]) == 1
     assert llm.client.messages.create.call_args[1]["messages"][0]["role"] == "user"
@@ -296,7 +302,9 @@ def test_query_anthropic_model_with_system_prompt(mock_llm_config, logger_mock):
     llm_response = llm(messages, tools)
 
     assert llm_response.prompt == messages
-    assert llm_response.action == ToolCall(id="1", name="tool 1", arguments={"arg 1": 0})
+    assert llm_response.action == ToolCall(
+        id="1", name="tool 1", arguments={"arg 1": 0}
+    )
     llm.client.messages.create.assert_called_once()
     assert (
         llm.client.messages.create.call_args[1]["system"]
@@ -333,7 +341,9 @@ def test_query_anthropic_model_with_conversation(mock_llm_config, logger_mock):
 
     # Verify conversation handling
     assert mock_response.prompt == messages
-    assert mock_response.action == ToolCall(id="1", name="tool 1", arguments={"arg 1": 0})
+    assert mock_response.action == ToolCall(
+        id="1", name="tool 1", arguments={"arg 1": 0}
+    )
     ToolCall(id="1", name="tool 1", arguments={"arg 1": 0})
     llm.client.messages.create.assert_called_once()
     assert (
