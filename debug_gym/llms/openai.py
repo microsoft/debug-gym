@@ -227,10 +227,10 @@ class OpenAILLM(LLM):
             "tool_calls": [
                 {
                     "type": "function",
-                    "id": response.tool.id,
+                    "id": response.action.id,
                     "function": {
-                        "name": response.tool.name,
-                        "arguments": json.dumps(response.tool.arguments),
+                        "name": response.action.name,
+                        "arguments": json.dumps(response.action.arguments),
                     },
                 },
             ],

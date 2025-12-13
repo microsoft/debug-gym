@@ -3,7 +3,6 @@ from unittest.mock import MagicMock, Mock
 
 import pytest
 
-from debug_gym.agents.base_agent import run_agent
 from debug_gym.agents.froggy_agent import FroggyAgent
 from debug_gym.agents.utils import save_patch, save_trajectory
 from debug_gym.gym.tools.tool import ToolCall
@@ -150,7 +149,7 @@ def test_run(agent_setup, build_env_info):
         tool=ToolCall(id="tool_id", name="tool_name", arguments={}),
         token_usage=TokenUsage(2, 4),
     )
-    result = run_agent(agent, env, llm, debug=False)
+    result = agent.run(env, llm, debug=False)
     assert result
 
 
@@ -244,7 +243,7 @@ def test_run_early_completion(agent_setup, build_env_info):
         step_observation="Test last run obs",
     )
 
-    result = run_agent(agent, env, llm)
+    result = agent.run(env, llm)
     assert result["success"] is True
     env.step.assert_not_called()  # Should not step if already done
 
@@ -283,7 +282,7 @@ def test_run_stops_at_max_steps(agent_setup, build_env_info):
         response_token_count=4,
     )
 
-    result = run_agent(agent, env, llm)
+    result = agent.run(env, llm)
     assert result["success"] is False
     assert env.step.call_count == 1
 
@@ -306,7 +305,7 @@ def test_run_exception_handling(agent_setup, build_env_info):
     llm.side_effect = RuntimeError("Test error")
 
     with pytest.raises(RuntimeError, match="Test error"):
-        run_agent(agent, env, llm)
+        agent.run(env, llm)
 
 
 def test_save_patch(agent_setup, tmp_path):

@@ -269,8 +269,8 @@ class TestCopilotClaudeLLM:
                 response = llm.generate(messages, tools)
 
         assert response.response == "I'll help you with that."
-        assert response.tool.id == "call_123"
-        assert response.tool.name == "test_tool"
+        assert response.action.id == "call_123"
+        assert response.action.name == "test_tool"
         assert response.token_usage.prompt == 15
         assert response.token_usage.response == 25
 
@@ -375,9 +375,9 @@ class TestCopilotClaudeLLM:
             response = llm.generate(messages, tools)
 
         assert response.response is None
-        assert response.tool.id == "empty_tool_response"
-        assert response.tool.name == "empty_tool_response"
-        assert response.tool.arguments == {}
+        assert response.action.id == "empty_tool_response"
+        assert response.action.name == "empty_tool_response"
+        assert response.action.arguments == {}
 
 
 @patch.object(

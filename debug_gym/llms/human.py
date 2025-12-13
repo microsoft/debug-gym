@@ -509,9 +509,9 @@ class Human(LLM):
             "content": [
                 {
                     "type": "tool_use",
-                    "id": response.tool.id,
-                    "name": response.tool.name,
-                    "input": response.tool.arguments,
+                    "id": response.action.id,
+                    "name": response.action.name,
+                    "input": response.action.arguments,
                 }
             ],
         }

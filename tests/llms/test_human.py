@@ -538,8 +538,8 @@ def test_human_integration(build_env_info):
     # Human only uses the messages content
     assert llm_response.prompt == [{"role": "user", "content": "Hello"}]
     assert llm_response.response == 'pdb command="b 10"'
-    assert llm_response.tool.name == "pdb"
-    assert llm_response.tool.arguments == {"command": "b 10"}
+    assert llm_response.action.name == "pdb"
+    assert llm_response.action.arguments == {"command": "b 10"}
 
 
 def test_human_max_retries_proper_behavior(build_env_info):
@@ -561,8 +561,8 @@ def test_human_max_retries_proper_behavior(build_env_info):
         with patch("numpy.random.randint", return_value=np.array([1, 2, 3, 4])):
             llm_response = human(messages, env_info.tools)
             # Should succeed on the third try
-            assert llm_response.tool.name == "pdb"
-            assert llm_response.tool.arguments == {"command": "help"}
+            assert llm_response.action.name == "pdb"
+            assert llm_response.action.arguments == {"command": "help"}
 
 
 def test_human_max_retries_exceeded(build_env_info):
@@ -660,8 +660,8 @@ def test_human_with_number_arguments(build_env_info):
     env_info = build_env_info(tools=[mock_tool])
     llm_response = human(messages, env_info.tools)
 
-    assert llm_response.tool.name == "sum"
-    assert llm_response.tool.arguments == {"a": 5, "b": 10}
+    assert llm_response.action.name == "sum"
+    assert llm_response.action.arguments == {"a": 5, "b": 10}
 
 
 @patch(
@@ -694,5 +694,5 @@ def test_human_with_boolean_arguments(build_env_info):
     env_info = build_env_info(tools=[mock_tool])
     llm_response = human(messages, env_info.tools)
 
-    assert llm_response.tool.name == "toggle"
-    assert llm_response.tool.arguments == {"enabled": True}
+    assert llm_response.action.name == "toggle"
+    assert llm_response.action.arguments == {"enabled": True}

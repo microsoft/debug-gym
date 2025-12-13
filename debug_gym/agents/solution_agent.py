@@ -1,11 +1,15 @@
+from typing import Any, Dict
+
 from debug_gym.agents.base_agent import BaseAgent, register_agent
 from debug_gym.gym.envs.env import EnvInfo, RepoEnv
 from debug_gym.gym.tools.tool import ToolCall
-from debug_gym.llms.base import LLM
+from debug_gym.llms.base import LLM, LLMResponse
 
 
 @register_agent
 class AgentSolution(BaseAgent):
+    """Agent that applies the gold patch and submits - used for testing environments."""
+
     name: str = "solution_agent"
 
     def _env_implements_apply_gold_patch(self):
@@ -42,21 +46,30 @@ class AgentSolution(BaseAgent):
             f"PDB command did not return expected continue message.\n{pdb_observation}"
         )
 
-    def init(
-        self, env: RepoEnv, llm: LLM | None = None, reset_env: bool = True
-    ) -> EnvInfo:
-        """Initialize the solution agent.
+    def step(self, info: EnvInfo) -> EnvInfo:
+        action = ToolCall(name="submit", id="submit", arguments={})
+        return LLMResponse([], tool=action)
+
+    def run(
+        self,
+        env: RepoEnv,
+        llm: LLM | None = None,
+        debug: bool = False,
+        reset_env: bool = True,
+    ) -> Dict[str, Any]:
+        """Run the solution agent: apply gold patch and submit.
 
         Args:
             env: The environment to interact with.
             llm: Not used by SolutionAgent (can be None).
+            debug: Whether to drop into debugger before submit.
             reset_env: Whether to reset the environment (default True).
 
         Returns:
-            The initial EnvInfo after setup.
+            Result dict with 'success' key.
         """
         self.env = env
-        self.llm = llm  # Not used, but stored for compatibility
+        self.llm = llm
 
         if not self._env_implements_apply_gold_patch():
             raise NotImplementedError(
@@ -74,25 +87,14 @@ class AgentSolution(BaseAgent):
         # Run PDB sanity checks
         self._run_pdb_sanity_checks(info)
 
-        return info
-
-    def step(self, info: EnvInfo, debug: bool = False) -> EnvInfo:
-        """Apply the gold patch and submit.
-
-        Args:
-            info: Current environment info.
-            debug: Whether to drop into debugger before submit.
-
-        Returns:
-            New EnvInfo after applying gold patch and submitting.
-        """
+        # Apply gold patch and submit
         self.env.apply_gold_patch()
 
         if debug:
             breakpoint()
 
-        action = ToolCall(name="submit", id="submit", arguments={})
-        info = self.env.step(action, None, None)
+        response = self.step(info)
+        info = self.env.step(response.action, None, None)
 
         self.logger.info(f"Score: {info.score}/{info.max_score or '-'}")
         assert info.resolved, (
@@ -100,4 +102,4 @@ class AgentSolution(BaseAgent):
             f"{info.step_observation.observation}"
         )
 
-        return info
+        return {"success": info.resolved}

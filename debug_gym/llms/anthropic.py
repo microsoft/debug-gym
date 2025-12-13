@@ -145,13 +145,13 @@ class AnthropicLLM(LLM):
                     "text": filter_non_utf8(response.response),
                 }
             )
-        if response.tool:
+        if response.action:
             content.append(
                 {
                     "type": "tool_use",
-                    "id": response.tool.id,
-                    "name": response.tool.name,
-                    "input": response.tool.arguments,
+                    "id": response.action.id,
+                    "name": response.action.name,
+                    "input": response.action.arguments,
                 }
             )
 
