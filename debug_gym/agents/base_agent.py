@@ -335,20 +335,20 @@ class BaseAgent:
                 self.logger.info(f"\n{'='*20} STEP {step} {'='*20}\n")
 
                 agent_response = self.step(info)
-                next_info = self.execute_action(agent_response)
+                info = self.execute_action(agent_response)
 
                 if debug:
                     breakpoint()
 
-                should_stop, reason = self.should_stop(step + 1, next_info)
+                should_stop, reason = self.should_stop(step + 1, info)
                 status = (
                     "resolved"
                     if info.resolved
                     else ("unresolved" if should_stop else "running")
                 )
 
-                highscore = max(highscore, next_info.score)
-                msg = f"[{env.task_name[:10]:<10}] Step {step} | Score: {next_info.score}/{next_info.max_score or '-'} [Best: {highscore}]"
+                highscore = max(highscore, info.score)
+                msg = f"[{env.task_name[:10]:<10}] Step {step} | Score: {info.score}/{info.max_score or '-'} [Best: {highscore}]"
                 if should_stop:
                     msg += f" | Stopping Reason: {reason}"
                 self.logger.info(msg)
@@ -358,8 +358,8 @@ class BaseAgent:
                     problem_id=env.task_name,
                     step=step,
                     total_steps=self.args.max_steps,
-                    score=next_info.score,
-                    max_score=next_info.max_score,
+                    score=info.score,
+                    max_score=info.max_score,
                     status=status,
                 )
             return self.build_trajectory()
@@ -368,8 +368,8 @@ class BaseAgent:
                 problem_id=env.task_name,
                 step=step,
                 total_steps=step,
-                score=getattr(next_info, "score", 0),
-                max_score=getattr(next_info, "max_score", None),
+                score=getattr(info, "score", 0),
+                max_score=getattr(info, "max_score", None),
                 status="error",
             )
             raise e
