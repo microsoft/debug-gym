@@ -214,7 +214,7 @@ class LLM(ABC):
     @classmethod
     def instantiate(
         cls,
-        llm_name: str | None = None,
+        name: str | None = None,
         llm_config_file_path: str | None = None,
         logger: DebugGymLogger | None = None,
         temperature: float | None = None,
@@ -223,7 +223,7 @@ class LLM(ABC):
         """Creates an instance of the appropriate LLM class based on the configuration.
 
         Args:
-            llm_name: Name of the LLM model (e.g., "gpt-4o", "claude-3.7").
+            name: Name of the LLM model (e.g., "gpt-4o", "claude-3.7").
             llm_config_file_path: Optional path to the LLM configuration file.
             logger: Optional DebugGymLogger for logging.
             temperature: Optional temperature for generation.
@@ -235,7 +235,7 @@ class LLM(ABC):
 
         logger = logger or DebugGymLogger("debug-gym")
 
-        if not llm_name:
+        if not name:
             return None
 
         # Build runtime generation kwargs from explicit args
@@ -245,12 +245,12 @@ class LLM(ABC):
         if max_tokens is not None:
             runtime_generate_kwargs["max_tokens"] = max_tokens
 
-        if llm_name == "human":
+        if name == "human":
             from debug_gym.llms import Human
 
-            return Human(llm_name, logger=logger)
+            return Human(name, logger=logger)
 
-        llm_config = LLMConfigRegistry.from_file(llm_config_file_path)[llm_name]
+        llm_config = LLMConfigRegistry.from_file(llm_config_file_path)[name]
 
         tags = llm_config.tags
 
@@ -285,7 +285,7 @@ class LLM(ABC):
             klass = OpenAILLM
 
         llm = klass(
-            llm_name,
+            name,
             logger=logger,
             llm_config=llm_config,
             runtime_generate_kwargs=runtime_generate_kwargs,
