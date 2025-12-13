@@ -308,6 +308,9 @@ class BaseAgent:
         # assign the env
         self.env = env
 
+        if self.llm is None:
+            raise ValueError("LLM instance is not set for the agent.")
+
         try:
             if reset_env:
                 info = env.reset()
