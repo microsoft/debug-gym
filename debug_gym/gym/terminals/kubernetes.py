@@ -695,9 +695,6 @@ class KubernetesTerminal(Terminal):
         src = str(src)
         target = str(target or self.working_dir)
 
-        if not os.path.isdir(src):
-            raise ValueError(f"Source {src} must be a directory.")
-
         self.logger.debug(f"[{self.pod.name}] Copying {src} to {target}.")
 
         try:
@@ -706,15 +703,21 @@ class KubernetesTerminal(Terminal):
             # The official Kubernetes Python client does not provide a direct method for file copy.
             # The recommended approach is still to use 'kubectl cp' via subprocess.
             # Alternatives (using tar + exec) are complex and less reliable for directories.
+            cmd = ["kubectl"]
+            if self.kube_config:
+                cmd.extend(["--kubeconfig", self.kube_config])
+            
+            # restore previous behavior
+            if os.path.isdir(src):
+                src = f"{src}/."
+
+            cmd.extend([
+                "cp",
+                f"{src}",
+                f"{self.pod.namespace}/{self.pod.name}:{target}",
+            ])
             result = subprocess.run(
-                [
-                    "kubectl",
-                    "--kubeconfig",
-                    self.kube_config,
-                    "cp",
-                    f"{src}/.",
-                    f"{self.pod.namespace}/{self.pod.name}:{target}",
-                ],
+                cmd,
                 capture_output=True,
                 text=True,
                 timeout=120,  # Increased timeout for directory operations
