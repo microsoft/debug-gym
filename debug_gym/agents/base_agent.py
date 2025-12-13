@@ -86,8 +86,8 @@ class BaseAgent:
 
     def __init__(
         self,
-        llm: LLM,
         agent_args: AgentArgs | Dict[str, Any] | None = None,
+        llm: LLM | None = None,
         logger: DebugGymLogger | None = None,
     ):
         self.args = self.args_class.make(agent_args or {})
@@ -289,6 +289,7 @@ class BaseAgent:
     def run(
         self,
         env: RepoEnv,
+        llm: LLM | None = None,
         debug: bool = False,
         reset_env: bool = True,
     ) -> Dict[str, Any]:
@@ -307,6 +308,8 @@ class BaseAgent:
 
         # assign the env
         self.env = env
+        if llm is not None:
+            self.llm = llm
 
         try:
             if reset_env:
