@@ -139,7 +139,7 @@ def save_patch(env, problem_path: Path, logger: DebugGymLogger):
 def save_trajectory(agent, problem_path: Path, logger: DebugGymLogger):
     """Persist the agent trajectory to disk."""
     problem_path.mkdir(parents=True, exist_ok=True)
-    trajectory = agent._build_trajectory()
+    trajectory = agent.build_trajectory()
     json_file = problem_path / "trajectory.json"
     with open(json_file, "w") as f:
         json.dump(trajectory, f, indent=4)

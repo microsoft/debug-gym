@@ -706,11 +706,9 @@ class KubernetesTerminal(Terminal):
             cmd = ["kubectl"]
             if self.kube_config:
                 cmd.extend(["--kubeconfig", self.kube_config])
-
             # restore previous behavior
             if os.path.isdir(src):
                 src = f"{src}/."
-
             cmd.extend(
                 [
                     "cp",
