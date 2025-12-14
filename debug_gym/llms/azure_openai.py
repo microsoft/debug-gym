@@ -22,11 +22,11 @@ class AzureOpenAILLM(OpenAILLM):
     def __init__(
         self,
         model_name,
+        llm_config,
         logger=None,
-        llm_config=None,
         runtime_generate_kwargs=None,
     ):
-        super().__init__(model_name, logger, llm_config, runtime_generate_kwargs)
+        super().__init__(model_name, llm_config, logger, runtime_generate_kwargs)
         self._client = None
         self._client_created_at = 0
 

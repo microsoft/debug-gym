@@ -30,6 +30,23 @@ def logger_mock():
 @pytest.fixture
 def llm_class_mock():
     class LLMMock(LLM):
+        def __init__(
+            self,
+            model_name: str,
+            llm_config=None,
+            logger=None,
+            runtime_generate_kwargs=None,
+        ):
+            # If llm_config is not provided, fetch it from the registry
+            if llm_config is None:
+                llm_config = LLMConfigRegistry.from_file()[model_name]
+            super().__init__(
+                model_name,
+                llm_config,
+                logger=logger,
+                runtime_generate_kwargs=runtime_generate_kwargs,
+            )
+
         def generate(self, messages, tools, **kwargs):
             self.called_messages = messages
             self.called_tools = tools
