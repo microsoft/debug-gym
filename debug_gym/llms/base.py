@@ -196,13 +196,13 @@ class LLM(ABC):
     def __init__(
         self,
         model_name: str,
+        llm_config: LLMConfig,
         logger: DebugGymLogger | None = None,
-        llm_config: LLMConfig | None = None,
         runtime_generate_kwargs: dict | None = None,
     ):
         self.model_name = model_name
         self.logger = logger or DebugGymLogger("debug-gym")
-        self.config = llm_config or LLMConfigRegistry.from_file()[model_name]
+        self.config = llm_config
         self.tokenizer_name = self.config.tokenizer
         self.context_length = self.config.context_limit * 1000
         self.apply_chat_template = self.config.apply_chat_template
@@ -291,8 +291,8 @@ class LLM(ABC):
 
         llm = klass(
             name,
-            logger=logger,
             llm_config=llm_config,
+            logger=logger,
             runtime_generate_kwargs=runtime_generate_kwargs,
         )
         return llm
