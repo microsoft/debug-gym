@@ -268,13 +268,20 @@ class OpenAILLM(LLM):
             self.need_to_be_retried,
         )
         try:
-            response = api_call(
-                model=self.config.model,
-                messages=messages,
-                tools=self.define_tools(tools),
-                tool_choice="auto",
-                **kwargs,
-            )
+            if tools:
+                response = api_call(
+                    model=self.config.model,
+                    messages=messages,
+                    tools=self.define_tools(tools),
+                    tool_choice="auto",
+                    **kwargs,
+                )
+            else:
+                response = api_call(
+                    model=self.config.model,
+                    messages=messages,
+                    **kwargs,
+                )
         except openai.BadRequestError as e:
             # Handle specific error for context length exceeded, otherwise just propagate the error
             if self.is_context_length_error(e):

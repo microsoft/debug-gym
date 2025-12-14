@@ -2,14 +2,14 @@ import json
 import os
 import uuid
 from dataclasses import MISSING, asdict, dataclass, field, fields
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 from jinja2 import Environment, Template
 
 from debug_gym.agents.history_tracker import HistoryTracker
 from debug_gym.gym.envs.env import EnvInfo, RepoEnv
 from debug_gym.gym.utils import filter_non_utf8
-from debug_gym.llms.base import LLM
+from debug_gym.llms.base import LLM, LLMResponse
 from debug_gym.llms.utils import trim
 from debug_gym.logger import DebugGymLogger
 
@@ -27,8 +27,8 @@ def register_agent(cls):
 
 @dataclass
 class AgentArgs:
-    system_prompt: str | None = None
-    instance_prompt: str | None = None
+    system_prompt: str = ""
+    instance_prompt: str = "Instructions: {{ info.instructions }}"
     max_steps: int = 100
     max_history_token_cutoff: int = -1
     max_history_steps_cutoff: int = -1
@@ -83,8 +83,6 @@ class AgentArgs:
 class BaseAgent:
     name: str = None
     args_class = AgentArgs
-    system_prompt: str = ""
-    instance_prompt: str = "Instructions: {{ info.instructions }}"
 
     def __init__(
         self,
@@ -95,14 +93,10 @@ class BaseAgent:
         self.args = self.args_class.make(agent_args or {})
         self.history = HistoryTracker()
         self.logger = logger or DebugGymLogger("debug-gym")
-        self.llm = None
+        self.llm = llm
         self.env = None
-
-        # Override prompts if provided in args
-        if self.args.system_prompt is not None:
-            self.system_prompt = str(self.args.system_prompt)
-        if self.args.instance_prompt is not None:
-            self.instance_prompt = str(self.args.instance_prompt)
+        self.system_prompt = str(self.args.system_prompt)
+        self.instance_prompt = str(self.args.instance_prompt)
 
     @staticmethod
     def to_pretty_json(value):
@@ -238,90 +232,43 @@ class BaseAgent:
             reason = "max_steps reached"
         return should_stop, reason
 
-    def run(self, env: RepoEnv, llm: LLM, debug=False):
-        self.env = env
-        self.llm = llm
-        info = None
-        step = 0
+    def init(self, info: EnvInfo) -> None:
+        """Initialize the agent with environment
 
-        try:
-            info = self.env.reset()
-            self.history.init(
-                self.build_system_prompt(info), self.build_instance_prompt(info), info
-            )
+        Args:
+            info: The environment info to interact with.
+        """
+        self.history.init(
+            self.build_system_prompt(info), self.build_instance_prompt(info), info
+        )
 
-            if info.resolved:
-                self.logger.report_progress(
-                    problem_id=env.task_name,
-                    step=0,
-                    total_steps=self.args.max_steps,
-                    score=info.score,
-                    max_score=info.max_score,
-                    status="resolved",
-                )
-                return self._build_trajectory()
+        self.logger.info(
+            "Available tools (in LLM's tool calling format):\n"
+            f"{json.dumps(self.llm.define_tools(info.tools), indent=4)}\n"
+        )
 
-            self.logger.info(
-                "Available tools (in LLM's tool calling format):\n"
-                f"{json.dumps(self.llm.define_tools(info.tools), indent=4)}\n"
-            )
+    def step(self, info: EnvInfo) -> LLMResponse | List[LLMResponse]:
+        """Execute a single agent step (LLM decision only).
 
-            highscore = info.score
-            should_stop = False
-            step = 1
+        Args:
+            info: Current environment info.
 
-            while not should_stop:
-                self.logger.info(f"\n{'='*20} STEP {step} {'='*20}\n")
+        Returns:
+            LLMResponse with the agent's decision.
+        """
+        messages = self.build_prompt(info)
+        return self.llm(messages, info.tools)
 
-                messages = self.build_prompt(info)
-                llm_response = self.llm(messages, info.tools)
+    def execute_action(self, llm_response: LLMResponse | List[LLMResponse]) -> EnvInfo:
+        next_info = self.env.step(
+            llm_response.tool,
+            llm_response.response,
+            llm_response.reasoning_response,
+        )
+        self.history.step(next_info, llm_response)
+        return next_info
 
-                if debug:
-                    breakpoint()
-
-                info = self.env.step(
-                    llm_response.tool,
-                    llm_response.response,
-                    llm_response.reasoning_response,
-                )
-                self.history.step(info, llm_response)
-                should_stop, reason = self.should_stop(step + 1, info)
-                status = (
-                    "resolved"
-                    if info.resolved
-                    else ("unresolved" if should_stop else "running")
-                )
-
-                highscore = max(highscore, info.score)
-                msg = f"[{env.task_name[:10]:<10}] Step {step} | Score: {info.score}/{info.max_score or '-'} [Best: {highscore}]"
-                if should_stop:
-                    msg += f" | Stopping Reason: {reason}"
-                self.logger.info(msg)
-                step += 1
-
-                # keep progress bar running until max_steps is reached
-                self.logger.report_progress(
-                    problem_id=env.task_name,
-                    step=step,
-                    total_steps=self.args.max_steps,
-                    score=info.score,
-                    max_score=info.max_score,
-                    status=status,
-                )
-            return self._build_trajectory()
-        except Exception as e:
-            # report any error that happens during the run
-            self.logger.report_progress(
-                problem_id=env.task_name,
-                step=step,
-                total_steps=step,
-                score=getattr(info, "score", 0),
-                max_score=getattr(info, "max_score", None),
-                status="error",
-            )
-            raise e
-
-    def _build_trajectory(self) -> Dict[str, Any]:
+    def build_trajectory(self) -> Dict[str, Any]:
         """Return the trajectory as a JSON-serializable dict without writing it."""
         tools = [f"{tool.name}({tool.arguments})" for tool in self.env.tools]
         json_output = {
@@ -338,6 +285,94 @@ class BaseAgent:
             step_json = self.history.json(step_id)
             json_output["log"].append(step_json)
         return json_output
+
+    def run(
+        self,
+        env: RepoEnv,
+        debug: bool = False,
+        reset_env: bool = True,
+    ) -> Dict[str, Any]:
+        """Run the agent loop until termination or max steps.
+
+        Args:
+            env: The environment to interact with.
+            debug: Whether to drop into debugger after each LLM call.
+            reset_env: Whether to reset the environment (default True).
+
+        Returns:
+            The trajectory as a JSON-serializable dict.
+        """
+        info = None
+        step = 0
+
+        # assign the env
+        self.env = env
+
+        try:
+            if reset_env:
+                info = env.reset()
+            else:
+                info = env.info
+
+            self.init(info)
+
+            if info.resolved:
+                self.logger.report_progress(
+                    problem_id=env.task_name,
+                    step=0,
+                    total_steps=self.args.max_steps,
+                    score=info.score,
+                    max_score=info.max_score,
+                    status="resolved",
+                )
+                return self.build_trajectory()
+
+            highscore = info.score
+            should_stop = False
+            step = 1
+
+            while not should_stop:
+                self.logger.info(f"\n{'='*20} STEP {step} {'='*20}\n")
+
+                agent_response = self.step(info)
+                info = self.execute_action(agent_response)
+
+                if debug:
+                    breakpoint()
+
+                should_stop, reason = self.should_stop(step + 1, info)
+                status = (
+                    "resolved"
+                    if info.resolved
+                    else ("unresolved" if should_stop else "running")
+                )
+
+                highscore = max(highscore, info.score)
+                msg = f"[{env.task_name[:10]:<10}] Step {step} | Score: {info.score}/{info.max_score or '-'} [Best: {highscore}]"
+                if should_stop:
+                    msg += f" | Stopping Reason: {reason}"
+                self.logger.info(msg)
+                step += 1
+
+                self.logger.report_progress(
+                    problem_id=env.task_name,
+                    step=step,
+                    total_steps=self.args.max_steps,
+                    score=info.score,
+                    max_score=info.max_score,
+                    status=status,
+                )
+            return self.build_trajectory()
+        except Exception as e:
+            self.logger.report_progress(
+                problem_id=env.task_name,
+                step=step,
+                total_steps=step,
+                score=getattr(info, "score", 0),
+                max_score=getattr(info, "max_score", None),
+                status="error",
+            )
+            raise e
 
 
 def create_agent(config: Dict[str, Any], **kwargs) -> BaseAgent:

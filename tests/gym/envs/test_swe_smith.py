@@ -246,14 +246,12 @@ def test_running_solution_agent(get_swe_smith_env, tmp_path):
         "output_path": str(tmp_path),
         "random_seed": 0,
         "max_steps": 1,
-        "env": env,
     }
     for tool_name in ["pdb", "eval", "submit"]:
         env.add_tool(Toolbox.get_tool(tool_name))
     agent = AgentSolution(agent_args=config, llm=None, logger=env.logger)
-    env.reset()
-    success = agent.run(env)
-    assert success
+    result = agent.run(env)
+    assert result["success"]
 
 
 @pytest.if_docker_running

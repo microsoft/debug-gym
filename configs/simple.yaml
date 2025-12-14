@@ -1,0 +1,68 @@
+# Configuration for standalone FreeEnv + FreeAgent runs.
+task_name: free-session
+output_path: exps/free_env
+
+llm:
+  name: frogboss
+
+# Tools to load into the environment toolbox.
+tools:
+  - bash
+  - submit:
+      eval_on_submit: False  # Here we only terminate after submission, no auto-eval.
+
+task_data:
+  env_type: FreeEnv
+  image: ubuntu:22.04
+  local_path: /home/macote/src/debug-gym/data/mini_nightmare/pandas_dataframe
+  workspace_dir: /testbed
+
+terminal:
+  type: docker
+
+agent:
+  type: simple_agent
+  max_steps: 20
+  system_prompt: |-
+    You are a helpful assistant that can interact with a computer to solve tasks.
+    <IMPORTANT>
+    * If user provides a path, you should NOT assume it's relative to the current working directory. Instead, you should explore the file system to find the file before working on it.
+    </IMPORTANT>
+
+    You have access to the following functions:
+
+    ---- BEGIN FUNCTION #1:
+    bash ----
+    Description: Execute a bash command in the terminal.
+
+    Parameters:
+    (1) command (string, required): The bash command to execute. Can be empty to view additional logs when previous exit code is `-1`. Can be `ctrl+c` to interrupt the currently running process.
+    ---- END FUNCTION #1 ----
+
+    ---- BEGIN FUNCTION #2: submit ----
+    Description: Finish the interaction when the task is complete OR if the assistant cannot proceed further with the task.
+    No parameters are required for this function.
+    ---- END FUNCTION #2 ----
+
+    If you choose to call a function ONLY reply in the following format with NO suffix:
+
+    Provide any reasoning for the function call here.
+    <function=example_function_name>
+    <parameter=example_parameter_1>value_1</parameter>
+    <parameter=example_parameter_2>
+    This is the value for the second parameter
+    that can span
+    multiple lines
+    </parameter>
+    </function>
+
+    <IMPORTANT>
+    Reminder:
+    - Function calls MUST follow the specified format, start with <function= and end with </function>
+    - Required parameters MUST be specified
+    - Only call one function at a time
+    - Always provide reasoning for your function call in natural language BEFORE the function call (not after)
+    </IMPORTANT>
+
+  instance_prompt: >-
+    Look at the codebase check that everything is working properly.
