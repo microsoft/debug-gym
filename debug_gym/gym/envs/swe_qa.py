@@ -5,10 +5,9 @@ import datasets
 from debug_gym.constants import DEBUG_GYM_CACHE_DIR
 from debug_gym.gym.envs.env import RepoEnv
 from debug_gym.gym.terminals.docker import DockerTerminal
+from debug_gym.gym.terminals.kubernetes import KubernetesTerminal
 from debug_gym.gym.terminals.terminal import DebugGymLogger, Terminal
 from debug_gym.gym.utils import filter_problems
-
-DOCKER_SWEQA_IMAGE_NAME = "debug-gym:sweqa"
 
 # From https://github.com/peng-weihan/SWE-QA-Bench/blob/e90e5d32c9a7318cafa50c284c43da01768752fe/repos.txt
 SWEQA_REPOS = [
@@ -46,6 +45,11 @@ class SWEQAEnv(RepoEnv):
         **kwargs,
     ):
         terminal = terminal or DockerTerminal(logger=kwargs.get("logger"))
+        if not isinstance(terminal, (DockerTerminal, KubernetesTerminal)):
+            raise ValueError(
+                f"{self.__class__.__name__} only supports DockerTerminal and KubernetesTerminal."
+            )
+
         super().__init__(task_data=task_data, terminal=terminal, **kwargs)
 
     @property
@@ -59,7 +63,7 @@ class SWEQAEnv(RepoEnv):
     def setup_task(self):
         self.repo_name = self.task_data["instance_id"].split("-")[0]
         self.problem_idx = int(self.task_data["instance_id"].split("-")[1])
-        self.base_image = "python:3.12"  # "ubuntu:22.04"
+        self.base_image = "python:3.12"
         self.answer = self.task_data["answer"]
 
     def setup_workspace(self):
@@ -92,11 +96,6 @@ class SWEQAEnv(RepoEnv):
         self.terminal.session_commands.append(
             f"source {self.workspace.working_dir}/.venv/bin/activate"
         )
-
-        # # Configure git.
-        # self.terminal.run("git init")
-        # self.terminal.run("git config user.name 'debug-gym' user.email '<>'")
-        # self.terminal.run("git config user.email '<>'")
 
     @classmethod
     def load_dataset(
