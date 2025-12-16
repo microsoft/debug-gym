@@ -2,12 +2,13 @@ import json
 import os
 import uuid
 from dataclasses import MISSING, asdict, dataclass, field, fields
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Union
 
 from jinja2 import Environment, Template
 
 from debug_gym.agents.history_tracker import HistoryTracker
 from debug_gym.gym.envs.env import EnvInfo, RepoEnv
+from debug_gym.gym.tools.toolbox import Toolbox
 from debug_gym.gym.utils import filter_non_utf8
 from debug_gym.llms.base import LLM, LLMResponse
 from debug_gym.llms.utils import trim
@@ -33,6 +34,7 @@ class AgentArgs:
     max_history_token_cutoff: int = -1
     max_history_steps_cutoff: int = -1
     uuid: str = field(default_factory=lambda: str(uuid.uuid4()))
+    tools: List[Union[str, Dict[str, Any]]] = field(default_factory=list)
     extras: Dict[str, Any] = field(default_factory=dict)
 
     @classmethod
@@ -238,6 +240,22 @@ class BaseAgent:
         Args:
             info: The environment info to interact with.
         """
+        # Add tools specified in agent args to the environment
+        if self.args.tools and self.env is not None:
+            for tool in self.args.tools:
+                tool_config = {}
+                tool_name = tool
+                if isinstance(tool, dict):
+                    assert len(tool) == 1, "Tool dict must have exactly one key"
+                    tool_name, tool_config = list(tool.items())[0]
+                tool_instantiated = Toolbox.get_tool(tool_name, **tool_config)
+                self.env.add_tool(tool_instantiated)
+                self.logger.debug(
+                    f"Adding tool from agent args: {tool_instantiated.__class__.__name__}"
+                )
+            # Update info with new tools
+            info = self.env.info
+
         self.history.init(
             self.build_system_prompt(info), self.build_instance_prompt(info), info
         )
