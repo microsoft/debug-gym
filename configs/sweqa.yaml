@@ -3,18 +3,18 @@
 output_path: exps/sweqa
 
 llm:
-  name: human
+  name: azure-gpt-5.1
 
 # Tools to load into the environment toolbox.
 tools:
   - edit
   - bash
-  - submit:
-      eval_on_submit: False  # Here we only terminate after submission, no auto-eval.
+  - view
+  - submit
 
 dataset:
   type: sweqa
-  problems: "astropy-0"
+  problems: "all"
 
 terminal:
   type: docker
@@ -37,7 +37,8 @@ agent:
     5. Avoid over-analysis: Stop when you have sufficient information, don't seek perfection
     6. Prefer breadth over depth: Get a good overview rather than deep analysis of every detail
 
-    When you have sufficient information to provide a reasonable answer (even if not perfect), provide your final answer in the message of the submit tool.
+    When you have sufficient information to provide a reasonable answer (even if not perfect), provide your final answer in the message of the *submit* tool.
+    For instance, submit(message="The answer is ...").
     Note: Provide the final answer concisely and directly, without code snippets, extra explanations or commentary.
 
   instance_prompt: |-

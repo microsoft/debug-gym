@@ -75,6 +75,6 @@ def dump_experiment_info(config: dict, args: dict):
         "python_version": os.sys.version,
     }
 
-    file = Path(config["output_path"]) / config["uuid"] / "experiment_info.jsonl"
+    file = Path(config["output_path"]) / "experiment_info.jsonl"
     with open(file, "a") as f:
         f.write(f"{json.dumps(version_info)}\n")

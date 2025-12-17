@@ -3,6 +3,7 @@ import subprocess
 import datasets
 
 from debug_gym.constants import DEBUG_GYM_CACHE_DIR
+from debug_gym.gym.entities import EvalOutput
 from debug_gym.gym.envs.env import RepoEnv
 from debug_gym.gym.terminals.docker import DockerTerminal
 from debug_gym.gym.terminals.kubernetes import KubernetesTerminal
@@ -96,6 +97,17 @@ class SWEQAEnv(RepoEnv):
         self.terminal.session_commands.append(
             f"source {self.workspace.working_dir}/.venv/bin/activate"
         )
+
+    def calculate_resolved(self, eval_output: EvalOutput) -> bool:
+        # Actual evaluation should be done using SWE-QA benchmark scripts.
+        return eval_output.success
+
+    def eval(self, **kwargs) -> EvalOutput:
+        # Actual evaluation should be done using SWE-QA benchmark scripts.
+        self.last_eval = EvalOutput(
+            success=True, output="Agent has submitted an answer."
+        )
+        return self.last_eval
 
     @classmethod
     def load_dataset(
