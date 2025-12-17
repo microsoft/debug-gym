@@ -276,6 +276,16 @@ class BaseAgent:
         messages = self.build_prompt(info)
         return self.llm(messages, info.tools)
 
+    def update_rollout_budget(self, llm_response: LLMResponse) -> None:
+        """Update the rollout budget based on the LLM response."""
+        self.rollout_budget.tokens_in_context += self.llm.count_tokens(
+            llm_response.prompt or []
+        )
+        self.rollout_budget.tokens_generated += self.llm.count_tokens(
+            llm_response.response or ""
+        )
+        self.rollout_budget.function_calls += 1 if llm_response.tool else 0
+
     def execute_action(self, llm_response: LLMResponse | List[LLMResponse]) -> EnvInfo:
         next_info = self.env.step(
             llm_response.tool,
@@ -297,6 +307,7 @@ class BaseAgent:
             "log": [],
             "agent_type": self.__class__.__name__,
             "logger": str(self.logger.log_file),
+            "rolllout_budget": asdict(self.rollout_budget),
         }
         for step_id in range(len(self.history)):
             step_json = self.history.json(step_id)
@@ -364,15 +375,7 @@ class BaseAgent:
                     if info.resolved
                     else ("unresolved" if should_stop else "running")
                 )
-
-                self.rollout_budget.tokens_in_context += self.llm.count_tokens(
-                    agent_response.prompt or []
-                )
-                self.rollout_budget.tokens_generated += self.llm.count_tokens(
-                    agent_response.response or ""
-                )
-                self.rollout_budget.function_calls += 1 if agent_response.tool else 0
-                self.rollout_budget.steps_taken += 1
+                self.update_rollout_budget(agent_response)
 
                 highscore = max(highscore, info.score)
                 msg = f"[{env.task_name[:10]:<10}] Step {step} | Score: {info.score}/{info.max_score or '-'} [Best: {highscore}] | {self.rollout_budget}"
