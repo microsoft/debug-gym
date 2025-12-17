@@ -2,7 +2,7 @@ import json
 import os
 import uuid
 from dataclasses import MISSING, asdict, dataclass, field, fields
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from jinja2 import Environment, Template
 
@@ -27,8 +27,9 @@ def register_agent(cls):
 
 @dataclass
 class AgentArgs:
-    system_prompt: str = ""
-    instance_prompt: str = "Instructions: {{ info.instructions }}"
+    # Prompts default to None; if None, BaseAgent will use class-level prompts
+    system_prompt: str | None = None
+    instance_prompt: str | None = None
     max_steps: int = 100
     max_history_token_cutoff: int = -1
     max_history_steps_cutoff: int = -1
@@ -84,6 +85,11 @@ class BaseAgent:
     name: str = None
     args_class = AgentArgs
 
+    # Class-level prompts can be overridden by subclasses
+    # Args prompts take priority if explicitly set (not None)
+    system_prompt: str = ""
+    instance_prompt: str = "Instructions: {{ info.instructions }}"
+
     def __init__(
         self,
         agent_args: AgentArgs | Dict[str, Any] | None = None,
@@ -95,8 +101,11 @@ class BaseAgent:
         self.logger = logger or DebugGymLogger("debug-gym")
         self.llm = llm
         self.env = None
-        self.system_prompt = str(self.args.system_prompt)
-        self.instance_prompt = str(self.args.instance_prompt)
+        # Args prompts take priority over class-level prompts if explicitly set
+        if self.args.system_prompt is not None:
+            self.system_prompt = str(self.args.system_prompt)
+        if self.args.instance_prompt is not None:
+            self.instance_prompt = str(self.args.instance_prompt)
 
     @staticmethod
     def to_pretty_json(value):
