@@ -12,12 +12,12 @@ from debug_gym.gym.envs.env import EnvInfo
 @dataclass
 class FroggyAgentArgs(AgentArgs):
     show_current_breakpoints: bool = False
-    system_prompt: str = "{{ agent._default_system_prompt(info) }}"
 
 
 @register_agent
 class FroggyAgent(BaseAgent):
     name: str = "froggy_agent"
+    system_prompt: str = "{{ agent._default_system_prompt(info) }}"
     args_class = FroggyAgentArgs
 
     def shortcut_features(self):
