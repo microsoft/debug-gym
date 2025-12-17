@@ -81,6 +81,14 @@ class AgentArgs:
         return data
 
 
+@dataclass
+class RolloutBudget:
+    steps_taken: int = 0
+    tokens_in_context: int = 0
+    tokens_generated: int = 0
+    function_calls: int = 0
+
+
 class BaseAgent:
     name: str = None
     args_class = AgentArgs
@@ -316,6 +324,7 @@ class BaseAgent:
 
         # assign the env
         self.env = env
+        self.rollout_budget = RolloutBudget()
 
         try:
             if reset_env:
@@ -356,8 +365,17 @@ class BaseAgent:
                     else ("unresolved" if should_stop else "running")
                 )
 
+                self.rollout_budget.tokens_in_context += self.llm.count_tokens(
+                    agent_response.prompt or []
+                )
+                self.rollout_budget.tokens_generated += self.llm.count_tokens(
+                    agent_response.response or ""
+                )
+                self.rollout_budget.function_calls += 1 if agent_response.tool else 0
+                self.rollout_budget.steps_taken += 1
+
                 highscore = max(highscore, info.score)
-                msg = f"[{env.task_name[:10]:<10}] Step {step} | Score: {info.score}/{info.max_score or '-'} [Best: {highscore}]"
+                msg = f"[{env.task_name[:10]:<10}] Step {step} | Score: {info.score}/{info.max_score or '-'} [Best: {highscore}] | {self.rollout_budget}"
                 if should_stop:
                     msg += f" | Stopping Reason: {reason}"
                 self.logger.info(msg)
