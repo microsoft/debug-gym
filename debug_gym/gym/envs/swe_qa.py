@@ -63,6 +63,9 @@ class SWEQAEnv(RepoEnv):
 
     def setup_task(self):
         self.repo_name = self.task_data["instance_id"].split("-")[0]
+        if self.repo_name == "scikit_learn":
+            self.repo_name = "scikit-learn"
+
         self.problem_idx = int(self.task_data["instance_id"].split("-")[1])
         self.base_image = "python:3.12"
         self.answer = self.task_data["answer"]
