@@ -52,12 +52,10 @@ class HistoryTracker:
         # game_step 0 = initial state (before any action)
         # game_step 1 = 0th action and 0th observation
         # game_step N = N-1 th action and N-1 th observation
-        game_step = (
-            game_step if game_step is not None else len(self.env_observations) - 1
-        )
-        if game_step < 0 or game_step >= len(self.env_observations):
+        game_step = game_step if game_step is not None else len(self.env_observations)
+        if game_step < 0 or game_step > len(self.env_observations):
             raise ValueError(
-                f"Invalid game_step: {game_step}; should be between [0, {len(self.env_observations)-1}]."
+                f"Invalid game_step: {game_step}; should be between [0, {len(self.env_observations)}]."
             )
 
         if game_step == 0:
