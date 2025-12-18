@@ -556,7 +556,7 @@ class DebugGymLogger(logging.Logger):
         # Prevent the log messages from being propagated to the root logger
         self.propagate = False
 
-        super().setLevel(level)  # Set initial logger level
+        super().setLevel(logging.DEBUG)  # Ensure logger operates at DEBUG level
         if DebugGymLogger._main_process_logger is not None:
             self._is_worker = True
 
@@ -577,6 +577,8 @@ class DebugGymLogger(logging.Logger):
             self.log_dir.mkdir(parents=True, exist_ok=True)
             self._initialize_file_handler(name, mode)
             self.info(f"Logging to directory: {self.log_dir}")
+
+        self.setLevel(level)  # Set initial logger level
 
     def _initialize_main_logger(self, level):
         self._live = Live(transient=True, refresh_per_second=2)
@@ -600,7 +602,6 @@ class DebugGymLogger(logging.Logger):
         self._log_listener_thread.start()
 
     def _initialize_file_handler(self, name: str, mode: str):
-        super().setLevel(logging.DEBUG)  # Ensure logger operates at DEBUG level
         self.log_file = log_file_path(self.log_dir, "debug_gym")
         fh = logging.FileHandler(self.log_file, mode=mode)
         formatter = StripAnsiFormatter("%(asctime)s %(levelname)-8s %(message)s")

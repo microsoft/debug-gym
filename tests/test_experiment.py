@@ -246,12 +246,10 @@ class TestDumpExperimentInfo:
 
         # Setup temporary directory
         with tempfile.TemporaryDirectory() as tmpdir:
-            output_path = Path(tmpdir)
-            uuid = "test-uuid-123"
-
             # Create the output directory
-            exp_dir = output_path / uuid
-            exp_dir.mkdir(parents=True)
+            uuid = "test-uuid-123"
+            output_path = Path(tmpdir) / uuid
+            output_path.mkdir(parents=True)
 
             # Setup config and args
             config = {
@@ -268,7 +266,7 @@ class TestDumpExperimentInfo:
             dump_experiment_info(config, args_mock)
 
             # Assertions - check file was created
-            jsonl_file = exp_dir / "experiment_info.jsonl"
+            jsonl_file = output_path / "experiment_info.jsonl"
             assert jsonl_file.exists()
 
             # Read and verify content
@@ -296,12 +294,11 @@ class TestDumpExperimentInfo:
 
         # Setup temporary directory
         with tempfile.TemporaryDirectory() as tmpdir:
-            output_path = Path(tmpdir)
             uuid = "test-uuid-456"
+            output_path = Path(tmpdir) / uuid
 
             # Create the output directory
-            exp_dir = output_path / uuid
-            exp_dir.mkdir(parents=True)
+            output_path.mkdir(parents=True)
 
             # Setup config and args
             config = {
@@ -316,7 +313,7 @@ class TestDumpExperimentInfo:
             dump_experiment_info(config, args_mock)
 
             # Assertions - check file was created
-            jsonl_file = exp_dir / "experiment_info.jsonl"
+            jsonl_file = output_path / "experiment_info.jsonl"
             assert jsonl_file.exists()
 
             # Read and verify content
@@ -342,12 +339,11 @@ class TestDumpExperimentInfo:
 
         # Setup temporary directory
         with tempfile.TemporaryDirectory() as tmpdir:
-            output_path = Path(tmpdir)
             uuid = "test-uuid-789"
+            output_path = Path(tmpdir) / uuid
 
             # Create the output directory
-            exp_dir = output_path / uuid
-            exp_dir.mkdir(parents=True)
+            output_path.mkdir(parents=True)
 
             # Setup config and args
             config = {
@@ -364,7 +360,7 @@ class TestDumpExperimentInfo:
             dump_experiment_info(config, args_mock2)
 
             # Assertions - check file was created
-            jsonl_file = exp_dir / "experiment_info.jsonl"
+            jsonl_file = output_path / "experiment_info.jsonl"
             assert jsonl_file.exists()
 
             # Read and verify content - should have two lines
@@ -388,13 +384,11 @@ class TestDumpExperimentInfo:
 
         # Setup temporary directory
         with tempfile.TemporaryDirectory() as tmpdir:
-            output_path = Path(tmpdir)
             uuid = "test-uuid-complex"
+            output_path = Path(tmpdir) / uuid
 
             # Create the output directory
-            exp_dir = output_path / uuid
-            exp_dir.mkdir(parents=True)
-
+            output_path.mkdir(parents=True)
             # Setup config
             config = {
                 "output_path": str(output_path),
@@ -416,7 +410,7 @@ class TestDumpExperimentInfo:
             dump_experiment_info(config, args_mock)
 
             # Assertions
-            jsonl_file = exp_dir / "experiment_info.jsonl"
+            jsonl_file = output_path / "experiment_info.jsonl"
             assert jsonl_file.exists()
 
             with open(jsonl_file) as f:

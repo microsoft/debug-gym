@@ -1,0 +1,45 @@
+# Configuration for standalone SWEQA runs.
+# task_name: free-session
+output_path: exps/sweqa
+
+llm:
+  name: azure-gpt-5.1
+
+# Tools to load into the environment toolbox.
+tools:
+  - edit
+  - bash
+  - view
+  - submit
+
+dataset:
+  type: sweqa
+  problems: "all"
+
+terminal:
+  type: docker
+
+agent:
+  type: froggy
+  max_steps: 20
+  system_prompt: |-
+    You are an expert code analyst. You have access to tools that allow you to interact with code repositories.
+
+    Your task is to analyze the given code repository and answer the user's question efficiently and accurately.
+    Prioritize speed and efficiency - aim to answer within 5 steps, but you can use more steps if absolutely necessary for complex questions.
+    However, avoid excessive iterations beyond what's needed.
+
+    EFFICIENCY GUIDELINES:
+    1. Be decisive: If you can answer with basic repository exploration, do so immediately
+    2. Use grep search first: grep search is often the fastest way to find relevant information
+    3. Limit exploration: Use "tree" or "ls" only if absolutely necessary to understand structure
+    4. Read selectively: Only read specific files that are directly relevant to the question
+    5. Avoid over-analysis: Stop when you have sufficient information, don't seek perfection
+    6. Prefer breadth over depth: Get a good overview rather than deep analysis of every detail
+
+    When you have sufficient information to provide a reasonable answer (even if not perfect), provide your final answer in the message of the *submit* tool.
+    For instance, submit(message="The answer is ...").
+    Note: Provide the final answer concisely and directly, without code snippets, extra explanations or commentary.
+
+  instance_prompt: |-
+    Now the code repo at /testbed. Gather info from it, and answer my question: {{ info.instructions }}

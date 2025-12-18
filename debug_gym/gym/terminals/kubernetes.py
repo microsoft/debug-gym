@@ -299,6 +299,9 @@ class KubernetesTerminal(Terminal):
         )
         self.in_node_constraint = os.environ.get("K8S_IN_NODE_CONSTRAINT", False)
         self.kubernetes_kwargs = kwargs  # e.g., nodeSelector, tolerations
+        self.critical_addons_only = self.kubernetes_kwargs.get(
+            "critical_addons_only", False
+        )
         self.registry = registry.rstrip("/") + "/" if registry else ""
         self._pod_name = pod_name
         self.pod_spec_kwargs = pod_spec_kwargs or {}
@@ -591,6 +594,18 @@ class KubernetesTerminal(Terminal):
                     }
                 }
 
+            if self.critical_addons_only:
+                pod_spec_kwargs["tolerations"] = pod_spec_kwargs.get(
+                    "tolerations", []
+                ) + [
+                    {
+                        "key": "CriticalAddonsOnly",
+                        "operator": "Equal",
+                        "value": "true",
+                        "effect": "NoSchedule",
+                    },
+                ]
+
             # Create pod specification for Kubernetes.
             pod_body = {
                 "apiVersion": "v1",
@@ -716,15 +731,27 @@ class KubernetesTerminal(Terminal):
                     f"{self.pod.namespace}/{self.pod.name}:{target}",
                 ]
             )
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                timeout=120,  # Increased timeout for directory operations
-            )
 
-            if result.returncode != 0:
-                raise ValueError(f"Failed to copy {src} to {target}: {result.stderr}")
+            for _ in range(NB_RETRIES_RUN):
+                result = subprocess.run(
+                    cmd,
+                    capture_output=True,
+                    text=True,
+                    timeout=120,  # Increased timeout for directory operations
+                )
+
+                if result.returncode != 0:
+                    if "Internal Server Error" in result.stderr:
+                        self.logger.debug(
+                            f"[{self.pod.name}] Transient error during copy, retrying: {result.stderr}"
+                        )
+                        backoff = random.uniform(5, 10)  # seconds
+                        time.sleep(backoff)
+                        continue  # Retry
+
+                    raise ValueError(
+                        f"Failed to copy {src} to {target}: {result.stderr}"
+                    )
 
             self.logger.debug(f"Successfully copied {src} to {target}")
 

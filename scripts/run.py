@@ -1,3 +1,4 @@
+import logging
 import os
 import signal
 import traceback
@@ -44,8 +45,7 @@ def run_agent(args, task_name: str, task_data: dict, config: dict):
     # errors themselves and we want to avoid double reporting.
     report_progress_error = True
 
-    exp_path = Path(config["output_path"]) / config["uuid"]
-    task_path = exp_path / task_name
+    task_path = Path(config["output_path"]) / task_name
 
     task_logger = DebugGymLogger(
         task_name,
@@ -165,8 +165,10 @@ def run_agent(args, task_name: str, task_data: dict, config: dict):
 def main():
     config, args = load_config()
     config["uuid"] = config.get("uuid", str(uuid.uuid4()))
-    config["output_path"] = config.get("output_path", "exps")
-    exp_output_path = Path(config["output_path"]) / config["uuid"]
+    config["output_path"] = str(
+        Path(config.get("output_path", "exps")) / config["uuid"]
+    )
+    exp_output_path = Path(config["output_path"])
     exp_output_path.mkdir(parents=True, exist_ok=True)
     logger = DebugGymLogger("debug-gym", level=args.logging_level)
     logger.debug(f"Experiment config: {config}")
@@ -196,9 +198,15 @@ def main():
     # Try to instantiate the LLM once to catch configuration errors early.
     llm = LLM.instantiate(**config.get("llm", {}), logger=logger)
 
+    if isinstance(llm, Human):
+        args.logging_level = logging.INFO
+        logger.setLevel(logging.INFO)
+        logger.info("Human LLM detected, setting logging level to INFO.")
+
     # Stop live progress display if --no-live-display is set
     # or in Human mode (avoid conflicts with prompt_toolkit)
     if args.no_live_display or isinstance(llm, Human) or args.debug:
+        logger.info("Disabling live progress display.")
         logger.set_no_live()
 
     num_workers = args.num_workers or int(os.environ.get("DEBUG_GYM_WORKERS", 1))

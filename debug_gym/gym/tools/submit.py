@@ -6,7 +6,7 @@ from debug_gym.gym.tools.toolbox import Toolbox
 @Toolbox.register()
 class SubmitTool(EnvironmentTool):
     name = "submit"
-    description = "Submit your changes once the task is complete."
+    description = "Should be called when the task is complete."
     arguments = {
         "message": {
             "type": ["string", "null"],

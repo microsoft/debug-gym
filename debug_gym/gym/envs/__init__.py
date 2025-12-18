@@ -6,6 +6,7 @@ from debug_gym.gym.envs.mini_nightmare import MiniNightmareEnv
 from debug_gym.gym.envs.r2egym import R2EGymEnv
 from debug_gym.gym.envs.swe_bench import SWEBenchEnv
 from debug_gym.gym.envs.swe_bench_debug import SWEBenchDebugEnv
+from debug_gym.gym.envs.swe_qa import SWEQAEnv
 from debug_gym.gym.envs.swe_smith import SWESmithEnv
 from debug_gym.logger import DebugGymLogger
 
@@ -20,6 +21,7 @@ __all__ = [
     "SWEBenchEnv",
     "SWEBenchDebugEnv",
     "SWESmithEnv",
+    "SWEQAEnv",
     "select_env",
     "load_dataset",
 ]
@@ -43,6 +45,8 @@ def select_env(env_type: str = None) -> type[RepoEnv]:
             return R2EGymEnv
         case "FreeEnv":
             return FreeEnv
+        case "sweqa":
+            return SWEQAEnv
         case _:
             raise ValueError(f"Unknown environment {env_type}")
 
