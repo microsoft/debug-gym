@@ -129,7 +129,7 @@ def test_history_tracker(build_env_info):
 
     # json should return the last step by default
     assert ht.json() == {
-        "step_id": 4,
+        "step_id": 5,
         "reasoning": action_reasoning_5,
         "content": action_content_5,
         "action": {"id": "5", "name": "action5", "arguments": {}},
@@ -148,9 +148,9 @@ def test_history_tracker(build_env_info):
         ],
     }
 
-    # json should return the speficied step
-    assert ht.json(2) == {
-        "step_id": 2,
+    # json should return the specified step
+    assert ht.json(3) == {
+        "step_id": 3,
         "reasoning": action_reasoning_3,
         "content": action_content_3,
         "action": {"id": "3", "name": "action3", "arguments": {}},
@@ -170,8 +170,8 @@ def test_history_tracker(build_env_info):
     }
 
     # output token_usage if it exists
-    assert ht.json(3) == {
-        "step_id": 3,
+    assert ht.json(4) == {
+        "step_id": 4,
         "reasoning": action_reasoning_4,
         "content": action_content_4,
         "action": {"id": "4", "name": "action4", "arguments": {"a4_args": "a4_args"}},
@@ -205,8 +205,8 @@ def test_history_tracker(build_env_info):
     # score should return the sum of the scores
     assert ht.score() == 15
 
-    # len should return the number of steps
-    assert len(ht) == 5
+    # len should return the number of steps (initial state + 5 actions)
+    assert len(ht) == 6
 
     # Test cloning
     ht_clone = ht.clone()
