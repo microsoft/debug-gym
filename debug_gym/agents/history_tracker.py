@@ -49,6 +49,9 @@ class HistoryTracker:
             return {}
 
         # Retrieve the most recent step by default.
+        # game_step 0 = initial state (before any action)
+        # game_step 1 = 0th action and 0th observation
+        # game_step N = N-1 th action and N-1 th observation
         game_step = (
             game_step if game_step is not None else len(self.env_observations) - 1
         )
@@ -70,19 +73,21 @@ class HistoryTracker:
                 "problem_message": self.problem_message,
             }
         else:
+            # game_step N corresponds to env_observations[N-1]
+            obs_idx = game_step - 1
             json_out = {
                 "step_id": game_step,
-                "content": self.env_observations[game_step].action_content,
-                "reasoning": self.env_observations[game_step].action_reasoning,
-                "action": asdict(self.env_observations[game_step].action_tool_call),
-                "obs": self.env_observations[game_step].step_observation.observation,
+                "content": self.env_observations[obs_idx].action_content,
+                "reasoning": self.env_observations[obs_idx].action_reasoning,
+                "action": asdict(self.env_observations[obs_idx].action_tool_call),
+                "obs": self.env_observations[obs_idx].step_observation.observation,
             }
             # prompt_response_pairs could be empty for the initial state
-            if self.llm_responses[game_step]:
+            if self.llm_responses[obs_idx]:
                 json_out["prompt_response_pairs"] = [
                     # doesn't include None values
                     asdict(
-                        self.llm_responses[game_step],
+                        self.llm_responses[obs_idx],
                         dict_factory=lambda x: {k: v for (k, v) in x if v is not None},
                     )
                 ]
@@ -92,7 +97,8 @@ class HistoryTracker:
         return sum([obs.score for obs in self.env_observations])
 
     def __len__(self):
-        return len(self.env_observations)
+        # Total trajectory length = initial state (step 0) + number of actions taken
+        return len(self.env_observations) + 1 if self.env_initial_observation else 0
 
     def clone(self):
         return copy.deepcopy(self)
