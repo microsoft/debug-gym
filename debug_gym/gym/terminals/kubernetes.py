@@ -261,6 +261,8 @@ class Pod:
 
 class KubernetesTerminal(Terminal):
     """
+    Kubernetes-based terminal for running commands in pods.
+
     Note: reads values of env variables K8S_NAMESPACE, K8S_DOCKER_SECRET, K8S_DOCKER_CONSTRAINT.
     """
 
@@ -281,8 +283,33 @@ class KubernetesTerminal(Terminal):
         kube_context: str | None = None,
         extra_labels: dict | None = None,
         pod_spec_kwargs: dict = None,
+        command_timeout: int = 300,
         **kwargs,
     ):
+        """
+        Args:
+            working_dir: Working directory inside the pod.
+            session_commands: Commands to run at the start of each session.
+            env_vars: Environment variables to set in the pod.
+            logger: Logger instance.
+            setup_commands: Commands to run once when setting up the pod.
+            pod_name: Custom name for the pod.
+            base_image: Docker image to use for the pod.
+            image_pull_secret: Kubernetes secret for pulling images.
+            registry: Docker registry URL.
+            namespace: Kubernetes namespace.
+            kube_config: Path to kubeconfig or "incluster".
+            kube_context: Kubernetes context to use.
+            extra_labels: Additional labels for the pod.
+            pod_spec_kwargs: Additional pod spec configuration.
+            command_timeout: Default timeout in seconds for individual command execution
+                (default: 300 = 5 minutes). This is NOT the pod lifetime. Commands that
+                exceed this timeout will be killed. Can be configured via YAML:
+                    terminal_config:
+                        type: kubernetes
+                        command_timeout: 60
+            **kwargs: Additional arguments passed to pod spec.
+        """
         super().__init__(
             working_dir=working_dir,
             session_commands=session_commands,
@@ -293,6 +320,7 @@ class KubernetesTerminal(Terminal):
         self.base_image = base_image
         self._task_name = base_image
         self.setup_commands = setup_commands or []
+        self.command_timeout = command_timeout
         self.namespace = namespace or os.environ.get("K8S_NAMESPACE", "default")
         self.image_pull_secret = image_pull_secret or os.environ.get(
             "K8S_DOCKER_SECRET"
@@ -443,9 +471,17 @@ class KubernetesTerminal(Terminal):
         self.sessions.append(session)
         return session
 
-    def prepare_command(self, entrypoint: str | list[str]) -> list[str]:
+    def prepare_command(
+        self, entrypoint: str | list[str], timeout: int | None = None
+    ) -> str:
         """Prepares a shell command by combining session commands and entrypoint commands.
-        Then wraps the command in a shell call."""
+        Then wraps the command in a shell call with optional timeout.
+
+        Args:
+            entrypoint: Command(s) to run.
+            timeout: Optional timeout in seconds. If provided, the command is wrapped
+                with the Unix `timeout` command to ensure it doesn't block forever.
+        """
         if isinstance(entrypoint, str):
             entrypoint = [entrypoint]
         if self.session_commands:
@@ -465,6 +501,12 @@ class KubernetesTerminal(Terminal):
         elif env_prefix:
             command = f"{env_prefix}{command}"
 
+        # Wrap with timeout command if specified
+        if timeout is not None:
+            # Use timeout command to kill the process if it exceeds the limit
+            # Exit code 124 indicates timeout was reached
+            command = f"timeout {timeout} /bin/bash -c {command!r}"
+
         return command
 
     def run(
@@ -474,13 +516,30 @@ class KubernetesTerminal(Terminal):
         raises: bool = False,
         strip_output: bool = True,
     ) -> tuple[bool, str]:
-        """Run a command in the pod. Return command status and output."""
+        """Run a command in the pod. Return command status and output.
+
+        Args:
+            entrypoint: Command(s) to run.
+            timeout: Timeout in seconds for this command. If the command exceeds this
+                time, it will be killed and the method returns (False, timeout_message).
+                If None, uses self.command_timeout.
+            raises: If True, raise ValueError on command failure.
+            strip_output: If True, strip trailing newlines from output.
+
+        Returns:
+            Tuple of (success, output). Success is False if command failed or timed out.
+        """
         if not self.pod.is_running():
             raise UnrecoverableTerminalError("Pod is not running. Cannot run commands.")
 
-        command = self.prepare_command(entrypoint)
+        # Use command_timeout if not specified per-call
+        effective_timeout = timeout if timeout is not None else self.command_timeout
+        command = self.prepare_command(entrypoint, timeout=effective_timeout)
 
-        self.logger.debug(f"[{self.pod.name}] Kubernetes exec run: {command}")
+        self.logger.debug(
+            f"[{self.pod.name}] Kubernetes exec run (timeout={effective_timeout}s): {command}"
+        )
+        exit_code = None
         for _ in range(NB_RETRIES_RUN):
             try:
                 # Execute command using Kubernetes stream API
@@ -508,11 +567,25 @@ class KubernetesTerminal(Terminal):
                 error_channel = resp.read_channel(ERROR_CHANNEL)  # Error channel
                 self.logger.debug(f"[{self.pod.name}] error channel: {error_channel}")
                 status = json.loads(error_channel)
-                success = status["status"] == "Success"
+
+                # Parse exit code from status
+                if status["status"] == "Success":
+                    exit_code = 0
+                    success = True
+                else:
+                    # Try to extract exit code from status details
+                    exit_code = 1  # Default to 1 for failure
+                    if "details" in status and "causes" in status["details"]:
+                        for cause in status["details"]["causes"]:
+                            if cause.get("reason") == "ExitCode":
+                                exit_code = int(cause.get("message", "1"))
+                                break
+                    success = False
                 break  # Command executed successfully, exit the retry loop
 
             except ApiException as e:
                 success = False
+                exit_code = None
                 self.logger.debug(
                     f"[{self.pod.name}] Exception during command `{command}`: {e}"
                 )
@@ -539,6 +612,18 @@ class KubernetesTerminal(Terminal):
 
         if strip_output:
             output = output.strip("\r\n").strip("\n")
+
+        # Check for timeout (exit code 124 from the timeout command)
+        if exit_code == 124:
+            self.logger.warning(
+                f"[{self.pod.name}] Command timed out after {effective_timeout}s: {entrypoint}"
+            )
+            timeout_msg = f"Command timed out after {effective_timeout} seconds"
+            if output:
+                output = f"{timeout_msg}\nPartial output:\n{output}"
+            else:
+                output = timeout_msg
+            return False, output
 
         if raises and not success:
             self.logger.error(f"Failed to run command `{command}`:\n{output}")

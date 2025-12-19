@@ -222,3 +222,53 @@ def test_unrecoverable_error_when_container_stops(tmp_path):
             terminal.run("echo after stop", timeout=1)
     finally:
         terminal.clean_up()
+
+
+@pytest.if_docker_running
+def test_docker_terminal_run_timeout(tmp_path):
+    """Test that commands that exceed the timeout are killed and return failure."""
+    working_dir = str(tmp_path)
+    terminal = DockerTerminal(working_dir=working_dir, base_image="ubuntu:latest")
+    try:
+        # Run a command that takes longer than the timeout
+        entrypoint = "sleep 10 && echo done"
+        success, output = terminal.run(entrypoint, timeout=2)
+        assert success is False
+        assert "timed out" in output.lower()
+        assert "2 seconds" in output
+    finally:
+        terminal.clean_up()
+
+
+@pytest.if_docker_running
+def test_docker_terminal_run_default_timeout(tmp_path):
+    """Test that the default timeout is applied when none is specified."""
+    working_dir = str(tmp_path)
+    terminal = DockerTerminal(working_dir=working_dir, base_image="ubuntu:latest")
+    try:
+        # Run a quick command without specifying timeout
+        entrypoint = "echo 'Hello'"
+        success, output = terminal.run(entrypoint)  # No timeout specified
+        assert success is True
+        assert output == "Hello"
+        # Default command_timeout should be 300 seconds (5 minutes)
+        assert terminal.command_timeout == 300
+    finally:
+        terminal.clean_up()
+
+
+@pytest.if_docker_running
+def test_docker_terminal_custom_command_timeout(tmp_path):
+    """Test that custom command_timeout can be set via constructor."""
+    working_dir = str(tmp_path)
+    terminal = DockerTerminal(
+        working_dir=working_dir, base_image="ubuntu:latest", command_timeout=60
+    )
+    try:
+        assert terminal.command_timeout == 60
+        # Quick command should still work
+        success, output = terminal.run("echo 'test'")
+        assert success is True
+        assert output == "test"
+    finally:
+        terminal.clean_up()

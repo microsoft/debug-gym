@@ -18,8 +18,21 @@ class LocalTerminal(Terminal):
         logger: DebugGymLogger | None = None,
         # Local-specific parameters
         include_os_env_vars: bool = True,
+        command_timeout: int = 300,
         **kwargs,
     ):
+        """
+        Args:
+            working_dir: Working directory for command execution.
+            session_commands: Commands to run at the start of each session.
+            env_vars: Environment variables to set.
+            logger: Logger instance.
+            include_os_env_vars: Whether to include current OS environment variables.
+            command_timeout: Default timeout in seconds for individual command execution
+                (default: 300 = 5 minutes). This is NOT the terminal session lifetime.
+                Commands that exceed this timeout will be killed.
+            **kwargs: Additional arguments (ignored with debug log).
+        """
         env_vars = env_vars or {}
         if include_os_env_vars:
             env_vars = env_vars | dict(os.environ)
@@ -31,6 +44,7 @@ class LocalTerminal(Terminal):
             logger=logger,
             **kwargs,
         )
+        self.command_timeout = command_timeout
 
     @property
     def working_dir(self):
@@ -59,9 +73,25 @@ class LocalTerminal(Terminal):
         raises: bool = False,
         strip_output: bool = True,
     ) -> tuple[bool, str]:
-        """Run a list of commands in the terminal. Return command status and output."""
+        """Run a list of commands in the terminal. Return command status and output.
+
+        Args:
+            entrypoint: Command(s) to run.
+            timeout: Timeout in seconds for this command. If the command exceeds this
+                time, it will be killed and the method returns (False, timeout_message).
+                If None, uses self.command_timeout.
+            raises: If True, raise ValueError on command failure.
+            strip_output: If True, strip trailing newlines from output.
+
+        Returns:
+            Tuple of (success, output). Success is False if command failed or timed out.
+        """
+        # Use command_timeout if not specified per-call
+        effective_timeout = timeout if timeout is not None else self.command_timeout
         command = self.prepare_command(entrypoint)
-        self.logger.debug(f"Running command in terminal: {command}")
+        self.logger.debug(
+            f"Running command in terminal (timeout={effective_timeout}s): {command}"
+        )
         process = subprocess.Popen(
             command,
             env=self.env_vars,
@@ -71,12 +101,21 @@ class LocalTerminal(Terminal):
             text=True,
         )
         try:
-            stdout, stderr = process.communicate(timeout=timeout)
+            stdout, stderr = process.communicate(timeout=effective_timeout)
             success = process.returncode == 0
         except subprocess.TimeoutExpired:
             process.kill()
-            stdout, stderr = "", "Timeout expired."
-            success = False
+            stdout, stderr = process.communicate()  # Collect any partial output
+            self.logger.warning(
+                f"Command timed out after {effective_timeout}s: {entrypoint}"
+            )
+            timeout_msg = f"Command timed out after {effective_timeout} seconds"
+            partial = (stdout + stderr).strip()
+            if partial:
+                output = f"{timeout_msg}\nPartial output:\n{partial}"
+            else:
+                output = timeout_msg
+            return False, output
 
         if raises and not success:
             # Command includes the entrypoint + session commands

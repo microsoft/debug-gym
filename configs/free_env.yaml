@@ -20,6 +20,7 @@ task_data:
 
 terminal:
   type: docker
+  # command_timeout: 300  # Max time (seconds) for a single command (default: 300 = 5 min)
 
 agent:
   type: froggy

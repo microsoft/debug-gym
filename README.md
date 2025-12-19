@@ -161,6 +161,42 @@ Terminal selection is configured through the `terminal_config` in your script co
 
 ---
 
+#### 2.5. Timeouts
+
+`debug-gym` provides several timeout mechanisms to ensure agents don't hang indefinitely:
+
+| Timeout Type | Description | Default | Configuration |
+| :-: | :----- | :-: | :----- |
+| **Command Timeout** | Maximum time for a single command (e.g., `bash`, `eval`) to execute. Prevents blocking commands like `serve_forever()` or infinite loops from hanging the agent. | 300s (5 min) | `terminal.command_timeout` |
+| **Run Timeout** | Maximum time for a single eval/run (e.g., pytest execution). | 300s (5 min) | `env.run_timeout` |
+| **Agent Step Timeout** | Maximum time for the LLM to generate a response. | varies | LLM provider settings |
+| **Session Lifetime** | Total time an agent can interact with the environment. | unlimited | Application-level |
+
+**Command Timeout** is particularly important for exploration agents that might accidentally run blocking scripts. When a command times out, it returns `(False, "Command timed out after X seconds")` with any partial output.
+
+Example terminal configuration with custom timeout:
+
+```yaml
+terminal:
+  type: docker
+  command_timeout: 300  # 5 minutes per command (default: 600)
+```
+
+For Kubernetes deployments:
+
+```yaml
+terminal:
+  type: kubernetes
+  command_timeout: 900  # 15 minutes for longer-running tests
+  namespace: debug-gym
+  base_image: your-image:tag
+```
+
+> [!TIP]
+> If your agent runs `eval` or `submit` tools that execute large test suites, consider increasing `command_timeout` to accommodate longer test runs.
+
+---
+
 ## 3. Running Baselines
 We use `.yaml` files to specify configurations. Example config files can be found in `configs/`. To run an agent:
 

@@ -29,16 +29,25 @@ class DockerTerminal(Terminal):
         base_image: str | None = None,
         registry: str = "",
         setup_commands: list[str] | None = None,
+        command_timeout: int = 300,
         **kwargs,
     ):
         """
-        volumes (dict or list): A dictionary to configure volumes mounted
-                inside the container. The key is either the host path or a
-                volume name, and the value is a dictionary with the keys:
-
-                - ``bind`` The path to mount the volume inside the container
-                - ``mode`` Either ``rw`` to mount the volume read/write, or
-                  ``ro`` to mount it read-only.
+        Args:
+            working_dir: Working directory inside the container.
+            session_commands: Commands to run at the start of each session.
+            env_vars: Environment variables to set in the container.
+            logger: Logger instance.
+            base_image: Docker image to use.
+            registry: Docker registry URL.
+            setup_commands: Commands to run once when setting up the container.
+            command_timeout: Default timeout in seconds for individual command execution
+                (default: 300 = 5 minutes). This is NOT the terminal session lifetime.
+                Commands that exceed this timeout will be killed. Can be configured via YAML:
+                    terminal_config:
+                        type: docker
+                        command_timeout: 60
+            **kwargs: Additional arguments (ignored with debug log).
         """
         super().__init__(
             working_dir=working_dir,
@@ -50,6 +59,7 @@ class DockerTerminal(Terminal):
         self.base_image = base_image
         self.registry = registry.rstrip("/") + "/" if registry else ""
         self.setup_commands = setup_commands or []
+        self.command_timeout = command_timeout
         self.docker_client = docker.from_env(timeout=600)
         self._container = None
 
@@ -111,15 +121,32 @@ class DockerTerminal(Terminal):
         self.sessions.append(session)
         return session
 
-    def prepare_command(self, entrypoint: str | list[str]) -> list[str]:
+    def prepare_command(
+        self, entrypoint: str | list[str], timeout: int | None = None
+    ) -> list[str]:
         """Prepares a shell command by combining session commands and entrypoint commands.
-        Then wraps the command in a shell call."""
+        Then wraps the command in a shell call with optional timeout.
+
+        Args:
+            entrypoint: Command(s) to run.
+            timeout: Optional timeout in seconds. If provided, the command is wrapped
+                with the Unix `timeout` command to ensure it doesn't block forever.
+        """
         if isinstance(entrypoint, str):
             entrypoint = [entrypoint]
         if self.session_commands:
             entrypoint = self.session_commands + entrypoint
-        entrypoint = " && ".join(entrypoint)
-        command = ["/bin/bash", "-c", entrypoint]
+        entrypoint_str = " && ".join(entrypoint)
+
+        # Wrap with timeout command if specified
+        if timeout is not None:
+            # Use timeout command to kill the process if it exceeds the limit
+            # Exit code 124 indicates timeout was reached
+            entrypoint_str = f"timeout {timeout} /bin/bash -c {entrypoint_str!r}"
+            command = ["/bin/bash", "-c", entrypoint_str]
+        else:
+            command = ["/bin/bash", "-c", entrypoint_str]
+
         return command
 
     def run(
@@ -129,14 +156,27 @@ class DockerTerminal(Terminal):
         raises: bool = False,
         strip_output: bool = True,
     ) -> tuple[bool, str]:
-        """Run a command in the terminal. Return command status and output."""
-        command = self.prepare_command(entrypoint)
+        """Run a command in the terminal. Return command status and output.
 
-        self.logger.debug(f"Exec run: {command}")
+        Args:
+            entrypoint: Command(s) to run.
+            timeout: Timeout in seconds for this command. If the command exceeds this
+                time, it will be killed and the method returns (False, timeout_message).
+                If None, uses self.command_timeout.
+            raises: If True, raise ValueError on command failure.
+            strip_output: If True, strip trailing newlines from output.
+
+        Returns:
+            Tuple of (success, output). Success is False if command failed or timed out.
+        """
+        # Use command_timeout if not specified per-call
+        effective_timeout = timeout if timeout is not None else self.command_timeout
+        command = self.prepare_command(entrypoint, timeout=effective_timeout)
+
+        self.logger.debug(f"Exec run (timeout={effective_timeout}s): {command}")
 
         self._ensure_container_running()
 
-        # TODO: docker exec_run timeout?
         try:
             status, output = self.container.exec_run(
                 command,
@@ -153,11 +193,24 @@ class DockerTerminal(Terminal):
             raise UnrecoverableTerminalError(
                 "Docker exec failed due to an unexpected container error."
             ) from exc
-        success = status == 0
 
         output = output.decode()
         if strip_output:
             output = output.strip("\r\n").strip("\n")
+
+        # Check for timeout (exit code 124 from the timeout command)
+        if status == 124:
+            self.logger.warning(
+                f"Command timed out after {effective_timeout}s: {entrypoint}"
+            )
+            timeout_msg = f"Command timed out after {effective_timeout} seconds"
+            if output:
+                output = f"{timeout_msg}\nPartial output:\n{output}"
+            else:
+                output = timeout_msg
+            return False, output
+
+        success = status == 0
 
         if raises and not success:
             # Command includes the entrypoint + session commands
