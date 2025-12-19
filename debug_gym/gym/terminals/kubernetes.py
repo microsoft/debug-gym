@@ -2,6 +2,7 @@ import atexit
 import json
 import os
 import random
+import shlex
 import subprocess
 import time
 import uuid
@@ -505,7 +506,7 @@ class KubernetesTerminal(Terminal):
         if timeout is not None:
             # Use timeout command to kill the process if it exceeds the limit
             # Exit code 124 indicates timeout was reached
-            command = f"timeout {timeout} /bin/bash -c {command!r}"
+            command = f"timeout {timeout} /bin/bash -c {shlex.quote(command)}"
 
         return command
 

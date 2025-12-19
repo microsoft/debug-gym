@@ -1,5 +1,6 @@
 import atexit
 import os
+import shlex
 import tarfile
 import uuid
 from io import BytesIO
@@ -142,7 +143,9 @@ class DockerTerminal(Terminal):
         if timeout is not None:
             # Use timeout command to kill the process if it exceeds the limit
             # Exit code 124 indicates timeout was reached
-            entrypoint_str = f"timeout {timeout} /bin/bash -c {entrypoint_str!r}"
+            entrypoint_str = (
+                f"timeout {timeout} /bin/bash -c {shlex.quote(entrypoint_str)}"
+            )
             command = ["/bin/bash", "-c", entrypoint_str]
         else:
             command = ["/bin/bash", "-c", entrypoint_str]
