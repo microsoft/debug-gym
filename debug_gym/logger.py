@@ -578,8 +578,6 @@ class DebugGymLogger(logging.Logger):
             self._initialize_file_handler(name, mode)
             self.info(f"Logging to directory: {self.log_dir}")
 
-        self.setLevel(level)  # Set initial logger level
-
     def _initialize_main_logger(self, level):
         self._live = Live(transient=True, refresh_per_second=2)
         self._rich_handler = RichHandler(
@@ -661,9 +659,6 @@ class DebugGymLogger(logging.Logger):
         """
         if self._rich_handler is not None:
             self._rich_handler.setLevel(level)
-        else:
-            # Fallback for when rich_handler is not initialized (e.g., worker process)
-            super().setLevel(level)
 
     def set_no_live(self):
         """Set the logger to not use the Rich Live display."""
