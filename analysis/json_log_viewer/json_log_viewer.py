@@ -5,6 +5,7 @@ import re
 import shlex
 
 from flask import Flask, jsonify, redirect, render_template, request, url_for
+from flask_cors import cross_origin
 from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
@@ -581,6 +582,7 @@ def browse_directory():
 
 
 @app.route("/load_file_from_path")
+@cross_origin()  # Allow cross-origin requests (for Gray Tree Frog visualization)
 def load_file_from_path():
     """Load a JSON file from a specific path"""
     global data, current_file
