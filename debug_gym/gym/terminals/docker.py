@@ -61,8 +61,15 @@ class DockerTerminal(Terminal):
         self.registry = registry.rstrip("/") + "/" if registry else ""
         self.setup_commands = setup_commands or []
         self.command_timeout = command_timeout
-        self.docker_client = docker.from_env(timeout=600)
+        self._docker_client = None  # Lazily initialized
         self._container = None
+
+    @property
+    def docker_client(self):
+        """Lazy initialization of Docker client."""
+        if self._docker_client is None:
+            self._docker_client = docker.from_env(timeout=600)
+        return self._docker_client
 
     def _ensure_container_running(self):
         """Verify that the container exists and is running."""
@@ -301,12 +308,12 @@ class DockerTerminal(Terminal):
         super().close()
         self.clean_up()
         # Close the Docker client to release connection pool resources
-        if self.docker_client is not None:
+        if self._docker_client is not None:
             try:
-                self.docker_client.close()
+                self._docker_client.close()
             except Exception as exc:
                 self.logger.debug(f"Failed to close Docker client: {exc}")
-            self.docker_client = None
+            self._docker_client = None
 
     def __str__(self):
         return f"DockerTerminal[{self.container}, {self.working_dir}]"
