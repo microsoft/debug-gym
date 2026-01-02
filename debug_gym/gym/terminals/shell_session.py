@@ -138,6 +138,16 @@ class ShellSession:
 
         if self.process:
             self.process.terminate()
+            try:
+                # Wait for process to actually terminate to avoid zombies
+                self.process.wait(timeout=5)
+            except Exception:
+                # If wait times out or fails, try to kill forcefully
+                try:
+                    self.process.kill()
+                    self.process.wait(timeout=1)
+                except Exception:
+                    pass
             self.process = None
 
     def read(

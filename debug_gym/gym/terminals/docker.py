@@ -300,6 +300,13 @@ class DockerTerminal(Terminal):
     def close(self):
         super().close()
         self.clean_up()
+        # Close the Docker client to release connection pool resources
+        if self.docker_client is not None:
+            try:
+                self.docker_client.close()
+            except Exception as exc:
+                self.logger.debug(f"Failed to close Docker client: {exc}")
+            self.docker_client = None
 
     def __str__(self):
         return f"DockerTerminal[{self.container}, {self.working_dir}]"
