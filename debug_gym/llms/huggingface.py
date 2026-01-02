@@ -1,6 +1,27 @@
+from functools import lru_cache
+
 from transformers import AutoTokenizer
 
 from debug_gym.llms.openai import OpenAILLM
+
+
+@lru_cache(maxsize=5)
+def _get_hf_tokenizer(tokenizer_name: str, tokenizer_kwargs_tuple: tuple):
+    """Cache HuggingFace tokenizers to limit memory usage (max 5 different tokenizers).
+
+    Note: tokenizer_kwargs is converted to a tuple of items for hashability.
+    """
+    tokenizer_kwargs = dict(tokenizer_kwargs_tuple) if tokenizer_kwargs_tuple else {}
+    tokenizer = AutoTokenizer.from_pretrained(tokenizer_name, **tokenizer_kwargs)
+
+    # Ensure we have a pad token to avoid downstream warnings
+    if (
+        getattr(tokenizer, "pad_token", None) is None
+        and getattr(tokenizer, "eos_token", None) is not None
+    ):
+        tokenizer.pad_token = tokenizer.eos_token
+
+    return tokenizer
 
 
 class HuggingFaceLLM(OpenAILLM):
@@ -13,9 +34,11 @@ class HuggingFaceLLM(OpenAILLM):
     def _load_tokenizer(self):
         if self._hf_tokenizer is None:
             tokenizer_kwargs = getattr(self.config, "tokenizer_kwargs", None) or {}
+            # Convert dict to tuple of items for hashability in lru_cache
+            tokenizer_kwargs_tuple = tuple(sorted(tokenizer_kwargs.items()))
             try:
-                self._hf_tokenizer = AutoTokenizer.from_pretrained(
-                    self.tokenizer_name, **tokenizer_kwargs
+                self._hf_tokenizer = _get_hf_tokenizer(
+                    self.tokenizer_name, tokenizer_kwargs_tuple
                 )
             except OSError:
                 raise ValueError(
@@ -23,14 +46,6 @@ class HuggingFaceLLM(OpenAILLM):
                     f"{self.model_name}, make sure you have access to "
                     "the model (e.g., HuggingFace API key is correctly set)."
                 )
-
-            # Ensure we have a pad token to avoid downstream warnings when invoking
-            # the tokenizer in encode mode.
-            if (
-                getattr(self._hf_tokenizer, "pad_token", None) is None
-                and getattr(self._hf_tokenizer, "eos_token", None) is not None
-            ):
-                self._hf_tokenizer.pad_token = self._hf_tokenizer.eos_token
         return self._hf_tokenizer
 
     def tokenize(self, messages: list[dict]) -> list[list[str]]:

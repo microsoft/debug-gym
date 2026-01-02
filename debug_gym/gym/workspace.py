@@ -1,5 +1,6 @@
 import atexit
 import os
+import shlex
 import tempfile
 from pathlib import Path
 
@@ -121,14 +122,16 @@ class Workspace:
 
         if raises in [True, "ignore"] and abs_filepath != self.working_dir:
             # Check if file exists, is within working_dir and is not ignored.
+            # Use trailing slash in path comparison to prevent /testbed_evil matching /testbed
+            working_dir_quoted = shlex.quote(str(self.working_dir))
             check_cmd = (
-                f'abs_path=$(realpath -s "{abs_filepath_str}"); '
-                f'test -e "$abs_path" && [[ "$abs_path" == {self.working_dir}* ]]'
+                f"abs_path=$(realpath -s {shlex.quote(abs_filepath_str)}); "
+                f'test -e "$abs_path" && [[ "$abs_path" == {working_dir_quoted}/* || "$abs_path" == {working_dir_quoted} ]]'
             )
             success, result = self.terminal.run(
                 f"{check_cmd} && echo OK || echo MISSING"
             )
-            if (result.strip() != "OK" and raises == True) or self._is_ignored_func(
+            if (result.strip() != "OK" and raises is True) or self._is_ignored_func(
                 abs_filepath
             ):
                 raise FileNotFoundError(
@@ -150,7 +153,7 @@ class Workspace:
             ) from exc
 
         success_read, output = self.terminal.run(
-            f"cat {abs_filepath}", raises=False, strip_output=False
+            f"cat {shlex.quote(str(abs_filepath))}", raises=False, strip_output=False
         )
 
         if not success_read:
@@ -181,7 +184,7 @@ class Workspace:
                 )
 
         # create parent directories via the terminal if needed
-        _run_or_raise(f'mkdir -p "{str(abs_filepath.parent)}"')
+        _run_or_raise(f"mkdir -p {shlex.quote(str(abs_filepath.parent))}")
 
         # We will split content in chunks of 32kB to avoid hitting command length limits.
         chunk_size = 32 * 1024  # 32kB
@@ -194,11 +197,12 @@ class Workspace:
         # - capture the heredoc output into shell variable CONTENT since command substitution strips trailing newlines
         # - "${CONTENT%DEBUGGYM_DEL}" removes the trailing sentinel DEBUGGYM_DEL (restoring the original trailing-newline state)
         # - echo -n writes the result without adding an extra newline
+        quoted_filepath = shlex.quote(str(abs_filepath))
         cmd = (
             "CONTENT=$(cat <<'DEBUGGYM_EOF'\n"
             f"{first_chunk}DEBUGGYM_DEL\nDEBUGGYM_EOF\n); "
             'echo -n "${CONTENT%DEBUGGYM_DEL}" > '
-            f"{abs_filepath}"
+            f"{quoted_filepath}"
         )
         _run_or_raise(cmd)
 
@@ -208,7 +212,7 @@ class Workspace:
                 "CONTENT=$(cat <<'DEBUGGYM_EOF'\n"
                 f"{chunk}DEBUGGYM_DEL\nDEBUGGYM_EOF\n); "
                 'echo -n "${CONTENT%DEBUGGYM_DEL}" >> '
-                f"{abs_filepath}"
+                f"{quoted_filepath}"
             )
             _run_or_raise(cmd)
 
@@ -220,10 +224,10 @@ class Workspace:
         Requires the `tree` package to be installed in the terminal.
         """
         root = self.resolve_path(root or self.working_dir, raises=True)
+        # Validate max_depth to prevent abuse
+        max_depth = max(1, min(int(max_depth), 20))
         # Use the terminal to run a bash command to list files
-        tree_cmd = (
-            f"tree --charset=ASCII --noreport -a -v -F -f -l -L {max_depth} {root} "
-        )
+        tree_cmd = f"tree --charset=ASCII --noreport -a -v -F -f -l -L {max_depth} {shlex.quote(str(root))} "
         success, output = self.terminal.run(tree_cmd, raises=False)
         if not success:
             raise WorkspaceReadError(

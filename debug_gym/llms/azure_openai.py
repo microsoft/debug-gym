@@ -118,3 +118,8 @@ class AzureOpenAILLM(OpenAILLM):
     def _invalidate_client_cache(self):
         self._client = None
         self._client_created_at = 0
+
+    def close(self):
+        """Clean up HTTP client resources."""
+        super().close()  # Clean up the HTTP client
+        self._invalidate_client_cache()  # Reset cache timestamps

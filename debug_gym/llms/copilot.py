@@ -62,6 +62,26 @@ class CopilotLLM(OpenAILLM):
         )
         return os.path.expanduser(vscode_copilot_dir)
 
+    def _parse_env_value(self, value: str) -> str:
+        """Parse a .env file value, handling quotes properly.
+
+        Supports:
+        - Unquoted values: HMAC_SECRET=abc123
+        - Single quoted: HMAC_SECRET='abc123'
+        - Double quoted: HMAC_SECRET="abc123"
+        """
+        value = value.strip()
+        if not value:
+            return value
+
+        # Handle quoted values - must start and end with same quote type
+        if (value.startswith('"') and value.endswith('"')) or (
+            value.startswith("'") and value.endswith("'")
+        ):
+            return value[1:-1]
+
+        return value
+
     def _get_hmac_secret(self, vscode_copilot_dir: str) -> str:
         """Load the HMAC secret from environment variables or .env file."""
 
@@ -70,11 +90,15 @@ class CopilotLLM(OpenAILLM):
             env_file_path = os.path.join(vscode_copilot_dir, ".env")
             if os.path.exists(env_file_path):
                 try:
-                    with open(env_file_path, "r") as env_file:
+                    with open(env_file_path, "r", encoding="utf-8") as env_file:
                         for line in env_file:
                             line = line.strip()
+                            # Skip empty lines and comments
+                            if not line or line.startswith("#"):
+                                continue
                             if line.startswith("HMAC_SECRET="):
-                                hmac_secret = line.split("=", 1)[1].strip("\"'")
+                                raw_value = line.split("=", 1)[1]
+                                hmac_secret = self._parse_env_value(raw_value)
                                 break
                 except Exception as exc:
                     self.logger.warning(
@@ -113,6 +137,7 @@ class CopilotLLM(OpenAILLM):
                 capture_output=True,
                 text=True,
                 check=True,
+                timeout=30,  # 30 second timeout to prevent indefinite hangs
             )
 
             if result.returncode != 0:
@@ -185,7 +210,7 @@ class CopilotLLM(OpenAILLM):
                 "Editor-Plugin-Version": "debug-gym/1.0",
                 "Request-Hmac": hmac_value,
             },
-            timeout=None,
+            timeout=300.0,  # 5 minute timeout to prevent indefinite hangs
         )
 
     def tokenize(self, messages: list[dict]) -> list[list[str]]:
@@ -240,6 +265,11 @@ class CopilotLLM(OpenAILLM):
         self._token_cache = None
         self._token_expires_at = 0
         self._client_created_at = 0
+
+    def close(self):
+        """Clean up HTTP client resources and caches."""
+        super().close()  # Clean up the HTTP client
+        self._invalidate_client_cache()  # Also clear token caches
 
 
 class CopilotOpenAILLM(CopilotLLM):
