@@ -89,9 +89,23 @@ class SimpleAgent(BaseAgent):
         """
         tool_calls = []
         func_pattern = r"<function=([^>]+)>(.*?)</function>"
+
+        # Get valid tool names from environment if available
+        valid_tool_names = None
+        if self.env is not None and hasattr(self.env, "tools"):
+            valid_tool_names = {tool.name for tool in self.env.tools}
+
         for func_match in re.finditer(func_pattern, tool_call, re.DOTALL):
-            function_name = func_match.group(1)
+            function_name = func_match.group(1).strip()
             function_content = func_match.group(2)
+
+            # Validate tool name if we have access to valid tools
+            if valid_tool_names is not None and function_name not in valid_tool_names:
+                self.logger.warning(
+                    f"Unknown tool '{function_name}' requested. "
+                    f"Valid tools are: {sorted(valid_tool_names)}"
+                )
+                continue  # Skip invalid tools
 
             pattern = r"<parameter\s*=\s*([^>]+)>(.*?)</parameter>"
             param_matches = re.findall(pattern, function_content, flags=re.DOTALL)

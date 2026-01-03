@@ -374,6 +374,10 @@ class LLM(ABC):
             "The convert_observation_to_message method should be overridden by subclasses."
         )
 
+    def close(self):
+        """Clean up resources (HTTP clients, etc.). Override in subclasses."""
+        pass
+
     def __call__(self, messages, tools, *args, **kwargs) -> LLMResponse:
         """Prepares messages and kwargs, then call `generate` which
         should be implemented by subclasses. Returns an LLMResponse object

@@ -1,9 +1,17 @@
 import json
 import logging
+from functools import lru_cache
 
 import openai
 import tiktoken
 from openai import NOT_GIVEN, OpenAI
+
+
+@lru_cache(maxsize=10)
+def _get_tiktoken_encoder(model_name: str):
+    """Cache tiktoken encoders to limit memory usage (max 10 different encoders)."""
+    return tiktoken.encoding_for_model(model_name)
+
 
 from debug_gym.gym.tools.tool import EnvironmentTool, ToolCall
 from debug_gym.gym.utils import filter_non_utf8
@@ -60,14 +68,23 @@ class OpenAILLM(LLM):
             self._client = OpenAI(
                 api_key=self.config.api_key,
                 base_url=self.config.endpoint,
-                timeout=None,
+                timeout=300.0,  # 5 minute timeout to prevent indefinite hangs
             )
         return self._client
+
+    def close(self):
+        """Clean up HTTP client resources."""
+        if getattr(self, "_client", None) is not None:
+            try:
+                self._client.close()
+            except Exception:
+                pass  # Ignore errors during cleanup
+            self._client = None
 
     def tokenize(self, messages: list[dict]) -> list[list[str]]:
         if getattr(self, "_tk_func", None) is None:
             try:
-                encoder = tiktoken.encoding_for_model(self.tokenizer_name)
+                encoder = _get_tiktoken_encoder(self.tokenizer_name)
                 # For tiktoken, encode returns list of ints, we need to convert to list of "tokens"
                 self._tk_func = lambda text: [str(t) for t in encoder.encode(text)]
             except KeyError:
@@ -202,6 +219,12 @@ class OpenAILLM(LLM):
             ) from exc
 
         raw_arguments = function.arguments or "{}"
+        # Limit JSON payload size to prevent memory issues (1MB limit)
+        max_json_size = 1_000_000
+        if len(raw_arguments) > max_json_size:
+            raise OpenAIResponseParsingError(
+                f"OpenAI tool call arguments exceed maximum size ({len(raw_arguments)} > {max_json_size} bytes)"
+            )
         try:
             parsed_arguments = json.loads(raw_arguments)
         except (json.JSONDecodeError, TypeError) as exc:

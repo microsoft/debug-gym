@@ -60,7 +60,7 @@ class AzureOpenAILLM(OpenAILLM):
         kwargs = {
             "azure_endpoint": self.config.endpoint,
             "api_version": self.config.api_version,
-            "timeout": None,
+            "timeout": 300.0,  # 5 minute timeout to prevent CLOSE_WAIT hangs
         }
         if api_key not in [LLM_API_KEY_PLACEHOLDER, None]:  # api key
             kwargs["api_key"] = api_key
@@ -118,3 +118,8 @@ class AzureOpenAILLM(OpenAILLM):
     def _invalidate_client_cache(self):
         self._client = None
         self._client_created_at = 0
+
+    def close(self):
+        """Clean up HTTP client resources."""
+        super().close()  # Clean up the HTTP client
+        self._invalidate_client_cache()  # Reset cache timestamps

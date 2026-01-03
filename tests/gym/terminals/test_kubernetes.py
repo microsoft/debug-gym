@@ -311,6 +311,56 @@ def test_select_terminal_kubernetes():
     terminal.close()
 
 
+@if_kubernetes_available
+def test_kubernetes_terminal_run_timeout(tmp_path):
+    """Test that commands that exceed the timeout are killed and return failure."""
+    working_dir = str(tmp_path)
+    terminal = KubernetesTerminal(working_dir=working_dir, base_image="ubuntu:latest")
+    try:
+        # Run a command that takes longer than the timeout
+        entrypoint = "sleep 10 && echo done"
+        success, output = terminal.run(entrypoint, timeout=2)
+        assert success is False
+        assert "timed out" in output.lower()
+        assert "2 seconds" in output
+    finally:
+        terminal.close()
+
+
+@if_kubernetes_available
+def test_kubernetes_terminal_run_default_timeout(tmp_path):
+    """Test that the default timeout is applied when none is specified."""
+    working_dir = str(tmp_path)
+    terminal = KubernetesTerminal(working_dir=working_dir, base_image="ubuntu:latest")
+    try:
+        # Run a quick command without specifying timeout
+        entrypoint = "echo 'Hello'"
+        success, output = terminal.run(entrypoint)  # No timeout specified
+        assert success is True
+        assert output == "Hello"
+        # Default command_timeout should be 300 seconds (5 minutes)
+        assert terminal.command_timeout == 300
+    finally:
+        terminal.close()
+
+
+@if_kubernetes_available
+def test_kubernetes_terminal_custom_command_timeout(tmp_path):
+    """Test that custom command_timeout can be set via constructor."""
+    working_dir = str(tmp_path)
+    terminal = KubernetesTerminal(
+        working_dir=working_dir, base_image="ubuntu:latest", command_timeout=120
+    )
+    try:
+        assert terminal.command_timeout == 120
+        # Quick command should still work
+        success, output = terminal.run("echo 'test'")
+        assert success is True
+        assert output == "test"
+    finally:
+        terminal.close()
+
+
 def test_kubernetes_terminal_readonly_properties_after_pod_creation():
     """Test that working directory cannot be changed after pod creation."""
     terminal = KubernetesTerminal(base_image="ubuntu:latest")

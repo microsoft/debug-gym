@@ -300,7 +300,9 @@ def test_eval_timeout(tmp_path):
     env = LocalEnv(path=working_dir, entrypoint="python file.py", run_timeout=1)
     env.reset()
     output = env.eval()
-    assert output == EvalOutput(success=False, output="Timeout expired.")
+    assert output == EvalOutput(
+        success=False, output="Command timed out after 1 seconds"
+    )
 
 
 def test_event_hooks_initialization():

@@ -1,3 +1,5 @@
+import shlex
+
 from debug_gym.gym.entities import EvalOutput
 from debug_gym.gym.envs.swe_bench import SWEBenchEnv
 
@@ -9,7 +11,9 @@ class SWEBenchDebugEnv(SWEBenchEnv):
 
         # Apply official test patch since this is a debugging task.
         self.terminal.run(f"git apply - <<'EOF'\n{self.test_patch}\nEOF")
-        self.terminal.run(f"git commit -am 'Applying test patch for {self.task_name}'")
+        self.terminal.run(
+            f"git commit -am {shlex.quote(f'Applying test patch for {self.task_name}')}"
+        )
 
     def eval(self, **kwargs) -> EvalOutput:
         success, output = self.terminal.run(self.entrypoint, timeout=self.run_timeout)
