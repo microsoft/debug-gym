@@ -641,6 +641,11 @@ class DebugGymLogger(logging.Logger):
         if self._log_listener_thread is not None:
             self._log_listener_stop_event.set()
             self._log_listener_thread.join()
+        # Close all file handlers to release file handles
+        for handler in self.handlers[:]:
+            if isinstance(handler, logging.FileHandler):
+                handler.close()
+                self.removeHandler(handler)
 
     def __del__(self):
         self.close()
