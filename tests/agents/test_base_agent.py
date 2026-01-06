@@ -303,3 +303,35 @@ def test_load_prompt_template_nested_include(tmp_path):
     assert "Base: B" in rendered
     assert "Intermediate: I" in rendered
     assert "Main: M" in rendered
+
+
+def test_load_prompt_template_with_custom_loader_root(tmp_path):
+    """Test prompt_loader_root allows includes across sibling directories"""
+    # Create modular prompt structure:
+    # prompts/
+    # ├── common/
+    # │   └── header.jinja
+    # └── exploration/
+    #     └── main.jinja (includes common/header.jinja)
+    prompts_dir = tmp_path / "prompts"
+    common_dir = prompts_dir / "common"
+    exploration_dir = prompts_dir / "exploration"
+    common_dir.mkdir(parents=True)
+    exploration_dir.mkdir(parents=True)
+
+    # Create shared component
+    header_template = common_dir / "header.jinja"
+    header_template.write_text("=== {{ title }} ===")
+
+    # Create main template that includes from sibling directory
+    main_template = exploration_dir / "main.jinja"
+    main_template.write_text('{% include "common/header.jinja" %}\nBody content.')
+
+    # Without custom root, this would fail (can't use .. paths in Jinja2)
+    # With custom root set to prompts/, it works
+    agent = BaseAgent(agent_args={"prompt_loader_root": str(prompts_dir)})
+    template = agent._load_prompt_template(str(main_template))
+    rendered = template.render(title="Explorer")
+
+    assert "=== Explorer ===" in rendered
+    assert "Body content." in rendered

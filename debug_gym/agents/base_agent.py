@@ -30,6 +30,7 @@ class AgentArgs:
     # Prompts default to None; if None, BaseAgent will use class-level prompts
     system_prompt: str | None = None
     instance_prompt: str | None = None
+    prompt_loader_root: str | None = None  # Custom root for Jinja2 FileSystemLoader
     max_steps: int = 100
     max_history_token_cutoff: int = -1
     max_history_steps_cutoff: int = -1
@@ -157,8 +158,14 @@ class BaseAgent:
             # Use template's directory for FileSystemLoader
             # This enables {% include %} and {% from %} directives
             template_path = os.path.abspath(template)
-            template_dir = os.path.dirname(template_path)
-            template_name = os.path.basename(template_path)
+
+            # Use custom loader root if specified, otherwise use template's parent
+            if self.args.prompt_loader_root:
+                template_dir = os.path.abspath(self.args.prompt_loader_root)
+                template_name = os.path.relpath(template_path, template_dir)
+            else:
+                template_dir = os.path.dirname(template_path)
+                template_name = os.path.basename(template_path)
 
         # Create environment with FileSystemLoader if we have a template directory
         if template_dir:
