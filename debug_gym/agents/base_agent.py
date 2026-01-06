@@ -4,7 +4,7 @@ import uuid
 from dataclasses import MISSING, asdict, dataclass, field, fields
 from typing import Any, Dict, List, Optional
 
-from jinja2 import Environment, Template
+from jinja2 import Environment, FileSystemLoader, Template
 
 from debug_gym.agents.history_tracker import HistoryTracker
 from debug_gym.gym.envs.env import EnvInfo, RepoEnv
@@ -145,20 +145,37 @@ class BaseAgent:
             template (str): The prompt template as a string or
                             a Jinja file path with a `.jinja` extension.
         """
+        template_dir = None
+        template_name = None
+
         if template.endswith(".jinja"):
             if not os.path.isfile(template):
                 error_msg = f"Prompt template file `{template}` not found."
                 self.logger.error(error_msg)
                 raise FileNotFoundError(error_msg)
 
-            with open(template, "r") as f:
-                template = f.read()
+            # Use template's directory for FileSystemLoader
+            # This enables {% include %} and {% from %} directives
+            template_path = os.path.abspath(template)
+            template_dir = os.path.dirname(template_path)
+            template_name = os.path.basename(template_path)
 
-        # Add custom filter to Jinja2 environment
-        env = Environment()
-        env.filters["to_pretty_json"] = self.to_pretty_json
-        env.filters["trim_message"] = self.trim_message
-        return env.from_string(template)
+        # Create environment with FileSystemLoader if we have a template directory
+        if template_dir:
+            env = Environment(
+                loader=FileSystemLoader(template_dir),
+                trim_blocks=True,
+                lstrip_blocks=True,
+            )
+            env.filters["to_pretty_json"] = self.to_pretty_json
+            env.filters["trim_message"] = self.trim_message
+            return env.get_template(template_name)
+        else:
+            # Fallback for inline templates (no file path)
+            env = Environment()
+            env.filters["to_pretty_json"] = self.to_pretty_json
+            env.filters["trim_message"] = self.trim_message
+            return env.from_string(template)
 
     def build_system_prompt(self, info: EnvInfo | None = None) -> dict:
         """Build system prompt using the default template or one provided in args."""
