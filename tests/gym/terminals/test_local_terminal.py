@@ -50,6 +50,42 @@ def test_terminal_run_failure(tmp_path):
     assert re.search(pattern, output)
 
 
+def test_terminal_run_timeout(tmp_path):
+    """Test that commands that exceed the timeout are killed and return failure."""
+    working_dir = str(tmp_path)
+    terminal = LocalTerminal(working_dir=working_dir)
+    # Run a command that takes longer than the timeout
+    entrypoint = "sleep 10 && echo done"
+    success, output = terminal.run(entrypoint, timeout=1)
+    assert success is False
+    assert "timed out" in output.lower()
+    assert "1 seconds" in output
+
+
+def test_terminal_run_default_timeout(tmp_path):
+    """Test that the default timeout is applied when none is specified."""
+    working_dir = str(tmp_path)
+    terminal = LocalTerminal(working_dir=working_dir)
+    # Run a quick command without specifying timeout
+    entrypoint = "echo 'Hello'"
+    success, output = terminal.run(entrypoint)  # No timeout specified
+    assert success is True
+    assert output == "Hello"
+    # Default command_timeout should be 300 seconds (5 minutes)
+    assert terminal.command_timeout == 300
+
+
+def test_terminal_run_custom_command_timeout(tmp_path):
+    """Test that custom command_timeout can be set via constructor."""
+    working_dir = str(tmp_path)
+    terminal = LocalTerminal(working_dir=working_dir, command_timeout=60)
+    assert terminal.command_timeout == 60
+    # Quick command should still work
+    success, output = terminal.run("echo 'test'")
+    assert success is True
+    assert output == "test"
+
+
 def test_terminal_session(tmp_path):
     working_dir = str(tmp_path)
     command = "echo Hello World"
