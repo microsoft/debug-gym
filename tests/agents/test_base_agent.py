@@ -239,3 +239,99 @@ def test_build_instance_prompt_with_template_file(tmp_path):
     assert sorted(instance_message.keys()) == ["content", "role"]
     assert instance_message["role"] == "user"
     assert instance_message["content"] == "Your Mission: If you choose to accept it."
+
+
+def test_load_prompt_template_with_include(tmp_path):
+    """Test that Jinja2 {% include %} directive works with FileSystemLoader"""
+    # Create a partial template in the same directory
+    partial_template = tmp_path / "header.jinja"
+    partial_template.write_text("=== Header: {{ title }} ===")
+
+    # Create a main template that includes the partial
+    main_template = tmp_path / "main.jinja"
+    main_template.write_text('{% include "header.jinja" %}\nBody content here.')
+
+    agent = BaseAgent()
+    template = agent._load_prompt_template(str(main_template))
+    rendered = template.render(title="Test Title")
+
+    assert "=== Header: Test Title ===" in rendered
+    assert "Body content here." in rendered
+
+
+def test_load_prompt_template_with_from_import(tmp_path):
+    """Test that Jinja2 {% from %} directive works with FileSystemLoader"""
+    # Create a macro template in the same directory
+    macro_template = tmp_path / "macros.jinja"
+    macro_template.write_text("{% macro greet(name) %}Hello, {{ name }}!{% endmacro %}")
+
+    # Create a main template that imports and uses the macro
+    main_template = tmp_path / "main.jinja"
+    main_template.write_text(
+        '{% from "macros.jinja" import greet %}\n{{ greet("World") }}'
+    )
+
+    agent = BaseAgent()
+    template = agent._load_prompt_template(str(main_template))
+    rendered = template.render()
+
+    assert "Hello, World!" in rendered
+
+
+def test_load_prompt_template_nested_include(tmp_path):
+    """Test nested includes work correctly"""
+    # Create base partial
+    base_partial = tmp_path / "base.jinja"
+    base_partial.write_text("Base: {{ base_content }}")
+
+    # Create intermediate partial that includes base
+    intermediate_partial = tmp_path / "intermediate.jinja"
+    intermediate_partial.write_text(
+        '{% include "base.jinja" %} | Intermediate: {{ inter_content }}'
+    )
+
+    # Create main template that includes intermediate
+    main_template = tmp_path / "main.jinja"
+    main_template.write_text(
+        '{% include "intermediate.jinja" %} | Main: {{ main_content }}'
+    )
+
+    agent = BaseAgent()
+    template = agent._load_prompt_template(str(main_template))
+    rendered = template.render(base_content="B", inter_content="I", main_content="M")
+
+    assert "Base: B" in rendered
+    assert "Intermediate: I" in rendered
+    assert "Main: M" in rendered
+
+
+def test_load_prompt_template_with_custom_loader_root(tmp_path):
+    """Test prompt_loader_root allows includes across sibling directories"""
+    # Create modular prompt structure:
+    # prompts/
+    # ├── common/
+    # │   └── header.jinja
+    # └── exploration/
+    #     └── main.jinja (includes common/header.jinja)
+    prompts_dir = tmp_path / "prompts"
+    common_dir = prompts_dir / "common"
+    exploration_dir = prompts_dir / "exploration"
+    common_dir.mkdir(parents=True)
+    exploration_dir.mkdir(parents=True)
+
+    # Create shared component
+    header_template = common_dir / "header.jinja"
+    header_template.write_text("=== {{ title }} ===")
+
+    # Create main template that includes from sibling directory
+    main_template = exploration_dir / "main.jinja"
+    main_template.write_text('{% include "common/header.jinja" %}\nBody content.')
+
+    # Without custom root, this would fail (can't use .. paths in Jinja2)
+    # With custom root set to prompts/, it works
+    agent = BaseAgent(agent_args={"prompt_loader_root": str(prompts_dir)})
+    template = agent._load_prompt_template(str(main_template))
+    rendered = template.render(title="Explorer")
+
+    assert "=== Explorer ===" in rendered
+    assert "Body content." in rendered

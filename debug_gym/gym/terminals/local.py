@@ -172,4 +172,4 @@ class LocalTerminal(Terminal):
 
         self.logger.debug(f"[{self}] Copying {src} to {target}.")
         # Use cp to copy files, including hidden files (dotfiles)
-        self.run(f"cp -r {src}/. {target}", raises=True)
+        self.run(f"cp -r {shlex.quote(src)}/. {shlex.quote(target)}", raises=True)

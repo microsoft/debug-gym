@@ -166,11 +166,6 @@ cython_debug/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 
-# Games
-games/
-train_[0-9]*/
-test/
-valid/
 *.zip
 wandb/
 logs/
@@ -180,10 +175,7 @@ logs/
 
 /data
 
-vscode/out
-vscode/node_modules
-vscode/package-lock.json
 .vscode
 debug_gym/llms/copilot.py
-
+*.code-workspace
 .kube/

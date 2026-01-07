@@ -40,6 +40,15 @@ class AnthropicLLM(LLM):
             self._client = Anthropic(api_key=self.config.api_key)
         return self._client
 
+    def close(self):
+        """Clean up HTTP client resources."""
+        if getattr(self, "_client", None) is not None:
+            try:
+                self._client.close()
+            except Exception:
+                pass  # Ignore errors during cleanup
+            self._client = None
+
     def tokenize(self, messages: list[dict]) -> list[list[str]]:
         """Tokenization is not directly supported by Anthropic.
         This method returns empty token lists as a placeholder."""
@@ -147,6 +156,19 @@ class AnthropicLLM(LLM):
                 name="empty_tool_response",
                 arguments={},
             )
+
+        # Validate required attributes exist before accessing them
+        if (
+            not hasattr(response, "id")
+            or not hasattr(response, "name")
+            or not hasattr(response, "input")
+        ):
+            raise ValueError(
+                f"Invalid Anthropic tool response structure: missing required attributes. "
+                f"Expected 'id', 'name', and 'input' but got: {type(response).__name__} with "
+                f"attributes {[attr for attr in dir(response) if not attr.startswith('_')]}"
+            )
+
         return ToolCall(
             id=response.id,
             name=response.name,

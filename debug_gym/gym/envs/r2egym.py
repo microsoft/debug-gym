@@ -1,5 +1,6 @@
 import json
 import re
+import shlex
 from importlib.resources import files as importlib_files
 from pathlib import Path
 
@@ -151,17 +152,21 @@ class R2EGymEnv(RepoEnv):
         self.repo_path = "/testbed"
         self.alt_path = "/root"
 
+        # Quote paths for shell safety
+        repo_path_q = shlex.quote(self.repo_path)
+        alt_path_q = shlex.quote(self.alt_path)
+
         # create a symlink from repo_path/.venv to /root/.venv
-        self.terminal.run(f"ln -s {self.repo_path}/.venv {self.alt_path}/.venv")
+        self.terminal.run(f"ln -s {repo_path_q}/.venv {alt_path_q}/.venv")
 
         self.terminal.run(
-            f"ln -s {self.repo_path}/.venv/bin/python {self.alt_path}/.local/bin/python"
+            f"ln -s {repo_path_q}/.venv/bin/python {alt_path_q}/.local/bin/python"
         )
         self.terminal.run(
-            f"ln -s {self.repo_path}/.venv/bin/python {self.alt_path}/.local/bin/python3"
+            f"ln -s {repo_path_q}/.venv/bin/python {alt_path_q}/.local/bin/python3"
         )
         self.terminal.run(
-            f"find {self.repo_path}/.venv/bin -type f -executable -exec ln -sf {{}} {self.alt_path}/.local/bin/ \\;"
+            f"find {repo_path_q}/.venv/bin -type f -executable -exec ln -sf {{}} {alt_path_q}/.local/bin/ \\;"
         )
 
         self.terminal.run("uv pip install chardet")
@@ -179,15 +184,16 @@ class R2EGymEnv(RepoEnv):
             "r2e_tests",
         ]
         for skip_file in SKIP_FILES_NEW:
+            skip_file_q = shlex.quote(skip_file)
             self.terminal.run(
-                f"mv {self.repo_path}/{skip_file} {self.alt_path}/{skip_file}"
+                f"mv {repo_path_q}/{skip_file_q} {alt_path_q}/{skip_file_q}"
             )
 
         # r2e_tests are in the / directory, move them to /root
-        self.terminal.run(f"mv /r2e_tests {self.alt_path}/r2e_tests")
+        self.terminal.run(f"mv /r2e_tests {alt_path_q}/r2e_tests")
 
         # make a softlink for /root/r2e_tests (if present)
-        self.terminal.run(f"ln -s {self.alt_path}/r2e_tests {self.repo_path}/r2e_tests")
+        self.terminal.run(f"ln -s {alt_path_q}/r2e_tests {repo_path_q}/r2e_tests")
 
         self.terminal.session_commands.append("source .venv/bin/activate")
 
