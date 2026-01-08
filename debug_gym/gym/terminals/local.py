@@ -72,6 +72,7 @@ class LocalTerminal(Terminal):
         timeout: int = None,
         raises: bool = False,
         strip_output: bool = True,
+        background: bool = False,
     ) -> tuple[bool, str]:
         """Run a list of commands in the terminal. Return command status and output.
 
@@ -82,6 +83,7 @@ class LocalTerminal(Terminal):
                 If None, uses self.command_timeout.
             raises: If True, raise ValueError on command failure.
             strip_output: If True, strip trailing newlines from output.
+            background: If True, run the command in the background.
 
         Returns:
             Tuple of (success, output). Success is False if command failed or timed out.
@@ -101,6 +103,9 @@ class LocalTerminal(Terminal):
             text=True,
         )
         try:
+            assert (
+                background is False
+            ), "TODO: Background execution is not yet supported for LocalTerminal."
             stdout, stderr = process.communicate(timeout=effective_timeout)
             success = process.returncode == 0
         except subprocess.TimeoutExpired:

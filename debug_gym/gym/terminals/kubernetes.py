@@ -503,7 +503,7 @@ class KubernetesTerminal(Terminal):
             command = f"{env_prefix}{command}"
 
         # Wrap with timeout command if specified
-        if timeout is not None:
+        if timeout:
             # Use timeout command to kill the process if it exceeds the limit
             # Exit code 124 indicates timeout was reached
             command = f"timeout {timeout} /bin/bash -c {shlex.quote(command)}"
@@ -516,6 +516,7 @@ class KubernetesTerminal(Terminal):
         timeout: int = None,
         raises: bool = False,
         strip_output: bool = True,
+        background: bool = False,
     ) -> tuple[bool, str]:
         """Run a command in the pod. Return command status and output.
 
@@ -524,9 +525,10 @@ class KubernetesTerminal(Terminal):
             timeout: Timeout in seconds for this command. If the command exceeds this
                 time, it will be killed and the method returns (False, timeout_message).
                 If None, uses self.command_timeout.
+                If explicitly set to 0 it will disable the timeout.
             raises: If True, raise ValueError on command failure.
             strip_output: If True, strip trailing newlines from output.
-
+            background: If True, run the command in the background.
         Returns:
             Tuple of (success, output). Success is False if command failed or timed out.
         """
@@ -563,6 +565,16 @@ class KubernetesTerminal(Terminal):
                         output += resp.read_stdout()
                     if resp.peek_stderr():
                         output += resp.read_stderr()
+
+                    if background:
+                        # In background mode, we don't wait for command completion
+                        self.logger.debug(
+                            f"[{self.pod.name}] Command running in background."
+                        )
+                        return (
+                            True,
+                            f"Command running in background. Initial output: {output}",
+                        )
 
                 # Get the exit code
                 error_channel = resp.read_channel(ERROR_CHANNEL)  # Error channel

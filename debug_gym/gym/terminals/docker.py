@@ -147,7 +147,7 @@ class DockerTerminal(Terminal):
         entrypoint_str = " && ".join(entrypoint)
 
         # Wrap with timeout command if specified
-        if timeout is not None:
+        if timeout:
             # Use timeout command to kill the process if it exceeds the limit
             # Exit code 124 indicates timeout was reached
             entrypoint_str = (
@@ -165,6 +165,7 @@ class DockerTerminal(Terminal):
         timeout: int = None,
         raises: bool = False,
         strip_output: bool = True,
+        background: bool = False,
     ) -> tuple[bool, str]:
         """Run a command in the terminal. Return command status and output.
 
@@ -173,8 +174,10 @@ class DockerTerminal(Terminal):
             timeout: Timeout in seconds for this command. If the command exceeds this
                 time, it will be killed and the method returns (False, timeout_message).
                 If None, uses self.command_timeout.
+                If explicitly set to 0 it will disable the timeout.
             raises: If True, raise ValueError on command failure.
             strip_output: If True, strip trailing newlines from output.
+            background: If True, run the command in the background.
 
         Returns:
             Tuple of (success, output). Success is False if command failed or timed out.
@@ -207,6 +210,11 @@ class DockerTerminal(Terminal):
         output = output.decode()
         if strip_output:
             output = output.strip("\r\n").strip("\n")
+
+        if background:
+            # In background mode, we don't wait for command completion
+            self.logger.debug(f"[{self.container.name}] Command running in background.")
+            return True, f"Command running in background. Initial output: {output}"
 
         # Check for timeout (exit code 124 from the timeout command)
         if status == 124:
