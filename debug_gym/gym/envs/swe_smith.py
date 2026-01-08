@@ -20,9 +20,7 @@ from debug_gym.gym.utils import filter_problems
 
 class SWESmithEnv(SWEBenchEnv):
     CACHE = DEBUG_GYM_CACHE_DIR / "swe-smith"
-    CONFIG = (
-        importlib_files("debug_gym") / "gym" / "envs" / "configs" / "swe_smith.yaml"
-    )
+    CONFIG = Path(__file__).parent / "configs" / "swe_smith.yaml"
 
     def setup_task(self):
         self.base_commit = (
