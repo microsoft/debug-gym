@@ -1,6 +1,7 @@
 import os
 import platform
 import subprocess
+import time
 
 import pytest
 
@@ -357,6 +358,67 @@ def test_kubernetes_terminal_custom_command_timeout(tmp_path):
         success, output = terminal.run("echo 'test'")
         assert success is True
         assert output == "test"
+    finally:
+        terminal.close()
+
+
+@if_kubernetes_available
+def test_kubernetes_terminal_nohup_with_redirection_returns_immediately(tmp_path):
+    """Test that nohup commands with proper redirection return immediately.
+
+    This test verifies the fix for issue #325 where nohup commands without
+    output redirection would cause the timeout wrapper to wait for the full
+    timeout period instead of returning immediately.
+    """
+    working_dir = str(tmp_path)
+    terminal = KubernetesTerminal(
+        working_dir=working_dir, base_image="ubuntu:latest", command_timeout=10
+    )
+    try:
+        # Test that nohup with proper redirection returns immediately
+        start_time = time.time()
+        success, output = terminal.run("nohup sleep 100 > /dev/null 2>&1 &")
+        elapsed = time.time() - start_time
+
+        # Should return almost immediately (within 2 seconds)
+        assert success is True
+        assert elapsed < 2, f"nohup command took {elapsed:.2f}s, expected < 2s"
+
+        # Verify the background process is actually running
+        success, output = terminal.run("pgrep -f 'sleep 100'")
+        assert success is True
+        assert output.strip().isdigit(), "Expected to find sleep process PID"
+
+        # Clean up the background process
+        terminal.run("pkill -f 'sleep 100'")
+    finally:
+        terminal.close()
+
+
+@if_kubernetes_available
+def test_kubernetes_terminal_nohup_without_redirection_may_timeout(tmp_path):
+    """Test that nohup commands without redirection may not return immediately.
+
+    This test demonstrates the problem that was fixed: without output redirection,
+    the timeout command waits for file descriptors to close.
+    """
+    working_dir = str(tmp_path)
+    terminal = KubernetesTerminal(
+        working_dir=working_dir, base_image="ubuntu:latest", command_timeout=3
+    )
+    try:
+        # Test that nohup WITHOUT redirection may hit the timeout
+        start_time = time.time()
+        success, output = terminal.run("nohup sleep 100 &")
+        elapsed = time.time() - start_time
+
+        # This will likely timeout after 3 seconds
+        # The exact behavior depends on the shell, but it should take longer
+        # than the properly redirected version
+        assert elapsed >= 2, f"Expected command to take longer, took {elapsed:.2f}s"
+
+        # Clean up any background processes
+        terminal.run("pkill -f 'sleep 100'")
     finally:
         terminal.close()
 
