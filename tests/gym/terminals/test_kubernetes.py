@@ -363,21 +363,21 @@ def test_kubernetes_terminal_custom_command_timeout(tmp_path):
 
 
 @if_kubernetes_available
-def test_kubernetes_terminal_nohup_with_redirection_returns_immediately(tmp_path):
-    """Test that nohup commands with proper redirection return immediately.
+def test_kubernetes_terminal_nohup_with_setsid_returns_immediately(tmp_path):
+    """Test that nohup commands with setsid return immediately in non-TTY mode.
 
-    This test verifies the fix for issue #325 where nohup commands without
-    output redirection would cause the timeout wrapper to wait for the full
-    timeout period instead of returning immediately.
+    This test verifies the fix for issue #325 where nohup commands would cause
+    the timeout wrapper to wait in non-TTY mode. Using setsid creates a new
+    session, detaching the process from timeout's process group.
     """
     working_dir = str(tmp_path)
     terminal = KubernetesTerminal(
         working_dir=working_dir, base_image="ubuntu:latest", command_timeout=10
     )
     try:
-        # Test that nohup with proper redirection returns immediately
+        # Test that setsid + nohup returns immediately
         start_time = time.time()
-        success, output = terminal.run("nohup sleep 100 > /dev/null 2>&1 &")
+        success, output = terminal.run("setsid nohup sleep 100 > /dev/null 2>&1 &")
         elapsed = time.time() - start_time
 
         # Should return almost immediately (within 2 seconds)
