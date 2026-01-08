@@ -275,21 +275,21 @@ def test_docker_terminal_custom_command_timeout(tmp_path):
 
 
 @pytest.if_docker_running
-def test_docker_terminal_nohup_with_setsid_returns_immediately(tmp_path):
-    """Test that nohup commands with setsid return immediately in non-TTY mode.
+def test_docker_terminal_nohup_with_nested_shell_returns_immediately(tmp_path):
+    """Test that nohup commands with nested shell return immediately in non-TTY mode.
 
     This test verifies the fix for issue #325 where nohup commands would cause
-    the timeout wrapper to wait in non-TTY mode. Using setsid creates a new
-    session, detaching the process from timeout's process group.
+    the timeout wrapper to wait in non-TTY mode. Using sh -c creates a nested
+    shell that exits immediately after backgrounding the process.
     """
     working_dir = str(tmp_path)
     terminal = DockerTerminal(
         working_dir=working_dir, base_image="ubuntu:latest", command_timeout=10
     )
     try:
-        # Test that setsid + nohup returns immediately
+        # Test that sh -c with nohup returns immediately
         start_time = time.time()
-        success, output = terminal.run("setsid nohup sleep 100 > /dev/null 2>&1 &")
+        success, output = terminal.run("sh -c 'nohup sleep 100 > /dev/null 2>&1 &'")
         elapsed = time.time() - start_time
 
         # Should return almost immediately (within 2 seconds)
