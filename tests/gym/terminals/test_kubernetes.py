@@ -387,7 +387,14 @@ def test_kubernetes_terminal_nohup_with_setsid_returns_immediately(tmp_path):
         # Verify the background process is actually running
         success, output = terminal.run("pgrep -f 'sleep 100'")
         assert success is True
-        assert output.strip().isdigit(), "Expected to find sleep process PID"
+        # Should have at least one PID (may have multiple due to process hierarchy)
+        pids = [line.strip() for line in output.strip().split("\n") if line.strip()]
+        assert (
+            len(pids) >= 1
+        ), f"Expected to find at least one sleep process, got: {output}"
+        assert all(
+            pid.isdigit() for pid in pids
+        ), f"Expected PIDs to be digits, got: {pids}"
 
         # Clean up the background process
         terminal.run("pkill -f 'sleep 100'")
