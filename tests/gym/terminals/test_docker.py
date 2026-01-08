@@ -275,24 +275,27 @@ def test_docker_terminal_custom_command_timeout(tmp_path):
 
 
 @pytest.if_docker_running
-def test_docker_terminal_nohup_with_nested_shell_returns_immediately(tmp_path):
-    """Test that nohup commands with nested shell return immediately in non-TTY mode.
+def test_docker_terminal_nohup_with_subshell_returns_immediately(tmp_path):
+    """Test that nohup commands with subshell return immediately in non-TTY mode.
 
     This test verifies the fix for issue #325 where nohup commands would cause
-    the timeout wrapper to wait in non-TTY mode. Using sh -c creates a nested
-    shell that exits immediately after backgrounding the process.
+    the timeout wrapper to wait in non-TTY mode. Using (...) subshell creates
+    a subprocess that exits immediately after backgrounding.
     """
     working_dir = str(tmp_path)
     terminal = DockerTerminal(
         working_dir=working_dir, base_image="ubuntu:latest", command_timeout=10
     )
     try:
-        # Test that sh -c with nohup returns immediately
+        # Warm up the terminal with a dummy command to exclude container startup time
+        terminal.run("echo 'warming up'")
+
+        # Test that subshell with nohup returns immediately
         start_time = time.time()
-        success, output = terminal.run("sh -c 'nohup sleep 100 > /dev/null 2>&1 &'")
+        success, output = terminal.run("(nohup sleep 100 > /dev/null 2>&1 &)")
         elapsed = time.time() - start_time
 
-        # Should return almost immediately (within 2 seconds)
+        # Should return almost immediately (within 2 seconds, excluding container startup)
         assert success is True
         assert elapsed < 2, f"nohup command took {elapsed:.2f}s, expected < 2s"
 
