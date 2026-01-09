@@ -1,1 +1,2 @@
 include debug_gym/gym/envs/configs/*.yaml
+include configs/templates/*.jinja
