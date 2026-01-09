@@ -272,3 +272,74 @@ def test_docker_terminal_custom_command_timeout(tmp_path):
         assert output == "test"
     finally:
         terminal.clean_up()
+
+
+@pytest.if_docker_running
+def test_docker_terminal_nohup_with_subshell_returns_immediately(tmp_path):
+    """Test that nohup commands with subshell return immediately in non-TTY mode.
+
+    This test verifies the fix for issue #325 where nohup commands would cause
+    the timeout wrapper to wait in non-TTY mode. Using (...) subshell creates
+    a subprocess that exits immediately after backgrounding.
+    """
+    working_dir = str(tmp_path)
+    terminal = DockerTerminal(
+        working_dir=working_dir, base_image="ubuntu:latest", command_timeout=10
+    )
+    try:
+        # Warm up the terminal with a dummy command to exclude container startup time
+        terminal.run("echo 'warming up'")
+
+        # Test that subshell with nohup returns immediately
+        start_time = time.time()
+        success, output = terminal.run("(nohup sleep 100 > /dev/null 2>&1 &)")
+        elapsed = time.time() - start_time
+
+        # Should return almost immediately (within 2 seconds, excluding container startup)
+        assert success is True
+        assert elapsed < 2, f"nohup command took {elapsed:.2f}s, expected < 2s"
+
+        # Verify the background process is actually running
+        success, output = terminal.run("pgrep -f 'sleep 100'")
+        assert success is True
+        # Should have at least one PID (may have multiple due to process hierarchy)
+        pids = [line.strip() for line in output.strip().split("\n") if line.strip()]
+        assert (
+            len(pids) >= 1
+        ), f"Expected to find at least one sleep process, got: {output}"
+        assert all(
+            pid.isdigit() for pid in pids
+        ), f"Expected PIDs to be digits, got: {pids}"
+
+        # Clean up the background process
+        terminal.run("pkill -f 'sleep 100'")
+    finally:
+        terminal.clean_up()
+
+
+@pytest.if_docker_running
+def test_docker_terminal_nohup_without_redirection_may_timeout(tmp_path):
+    """Test that nohup commands without redirection may not return immediately.
+
+    This test demonstrates the problem that was fixed: without output redirection,
+    the timeout command waits for file descriptors to close.
+    """
+    working_dir = str(tmp_path)
+    terminal = DockerTerminal(
+        working_dir=working_dir, base_image="ubuntu:latest", command_timeout=3
+    )
+    try:
+        # Test that nohup WITHOUT redirection may hit the timeout
+        start_time = time.time()
+        success, output = terminal.run("nohup sleep 100 &")
+        elapsed = time.time() - start_time
+
+        # This will likely timeout after 3 seconds
+        # The exact behavior depends on the shell, but it should take longer
+        # than the properly redirected version
+        assert elapsed >= 2, f"Expected command to take longer, took {elapsed:.2f}s"
+
+        # Clean up any background processes
+        terminal.run("pkill -f 'sleep 100'")
+    finally:
+        terminal.clean_up()

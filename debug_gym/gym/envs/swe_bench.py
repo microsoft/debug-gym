@@ -114,9 +114,13 @@ class SWEBenchEnv(RepoEnv):
             self.terminal.run(
                 "pip install httpbin[mainapp]==0.10.2 pytest-httpbin==2.1.0"
             )
-            self.terminal.run("nohup gunicorn -b 127.0.0.1:80 -k gevent httpbin:app &")
+            # Use subshell () with background to properly detach in non-TTY mode
+            # The subshell exits immediately after launching the background process
             self.terminal.run(
-                "nohup gunicorn -b 127.0.0.1:443 --certfile=/opt/miniconda3/envs/testbed/lib/python3.9/site-packages/pytest_httpbin/certs/server.pem --keyfile=/opt/miniconda3/envs/testbed/lib/python3.9/site-packages/pytest_httpbin/certs/server.key -k gevent httpbin:app &"
+                "(nohup gunicorn -b 127.0.0.1:80 -k gevent httpbin:app > /dev/null 2>&1 &)"
+            )
+            self.terminal.run(
+                "(nohup gunicorn -b 127.0.0.1:443 --certfile=/opt/miniconda3/envs/testbed/lib/python3.9/site-packages/pytest_httpbin/certs/server.pem --keyfile=/opt/miniconda3/envs/testbed/lib/python3.9/site-packages/pytest_httpbin/certs/server.key -k gevent httpbin:app > /dev/null 2>&1 &)"
             )
             self.terminal.run('echo "127.0.0.1    httpbin.org" >> /etc/hosts')
         elif self.task_name == "pylint-dev__pylint-4661":
