@@ -62,7 +62,7 @@ def parse_log_pytest(log: str | None) -> dict[str, str]:
 
 class R2EGymEnv(RepoEnv):
     CACHE = DEBUG_GYM_CACHE_DIR / "r2e-gym"
-    CONFIG = Path(__file__).parent / "configs" / "r2egym.yaml"
+    CONFIG = importlib_files("debug_gym") / "gym" / "envs" / "configs" / "r2egym.yaml"
 
     def __init__(
         self,
