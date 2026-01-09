@@ -27,9 +27,6 @@ version = {attr = "debug_gym.__version__"}
 [tool.setuptools.packages.find]
 exclude = [".*tests.*", "exps/*", "output_*"]
 
-[tool.setuptools.package-data]
-debug_gym = ["gym/envs/configs/*.yaml"]
-
 [project.optional-dependencies]
 dev = [
     "pytest",
