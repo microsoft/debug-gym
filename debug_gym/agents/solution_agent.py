@@ -63,4 +63,14 @@ class AgentSolution(BaseAgent):
         return info
 
     def init(self, info: EnvInfo) -> None:
+        if self.env.has_tool("eval"):
+            tool_call = ToolCall(name="eval", id="eval", arguments={})
+            info = self.env.step(tool_call, None, None)
+            assert (
+                info.resolved is False
+            ), "Eval tool should not resolve before applying the gold patch."
+            assert (
+                info.score < info.max_score
+            ), "Score should be less than max score before applying the gold patch."
+
         self._run_pdb_sanity_checks(info)
