@@ -71,3 +71,78 @@ class HuggingFaceLLM(OpenAILLM):
                 tokens = tokenizer.tokenize(content)
                 result.append(tokens)
             return result
+
+    def generate(self, messages, tools, **kwargs) -> LLMResponse:
+        # set max tokens if not provided
+        kwargs["max_tokens"] = kwargs.get("max_tokens", NOT_GIVEN)
+        api_call = retry_on_exception(
+            self._perform_chat_completion,
+            self.need_to_be_retried,
+        )
+        try:
+            if tools:
+                response = api_call(
+                    model=self.config.model,
+                    messages=messages,
+                    tools=self.define_tools(tools),
+                    tool_choice="required",
+                    **kwargs,
+                )
+            else:
+                response = api_call(
+                    model=self.config.model,
+                    messages=messages,
+                    **kwargs,
+                )
+        except openai.BadRequestError as e:
+            # Handle specific error for context length exceeded, otherwise just propagate the error
+            if self.is_context_length_error(e):
+                raise ContextLengthExceededError
+            raise e
+        if getattr(response, "choices", None) is None:
+            self.logger.debug(
+                "OpenAI response missing 'choices' key; response type=%s",
+                type(response),
+            )
+            raise OpenAIResponseParsingError(
+                "OpenAI chat completion returned unexpected payload without 'choices'"
+            )
+        try:
+            choice = response.choices[0]
+            message = choice.message
+        except (IndexError, TypeError, AttributeError) as exc:
+            self.logger.debug(
+                "OpenAI response choices could not provide a message: %s", exc
+            )
+            raise OpenAIResponseParsingError(
+                "OpenAI chat completion returned no usable choice message"
+            ) from exc
+
+        # LLM may select multiple tool calls, we only care about the first action
+        if not getattr(message, "tool_calls", None):
+            # LLM failed to call a tool
+            tool_call = None
+        else:
+            tool_call = message.tool_calls[0]
+            assert tool_call.type == "function"
+
+        # In openai call, the content is in response.choices[0].message.content
+        # In some models hosted on vllm, e.g., qwen-3, there could be content in both (when reasoning is enabled)
+        # response.choices[0].message.content and response.choices[0].message.reasoning_content
+        # https://qwen.readthedocs.io/en/latest/deployment/vllm.html#parsing-thinking-content
+        _content = message.content
+        _reasoning_content = None
+        if hasattr(message, "reasoning_content"):
+            _reasoning_content = message.reasoning_content
+
+        parsed_tool = self.parse_tool_call_response(tool_call)
+
+        llm_response = LLMResponse(
+            prompt=messages,
+            response=_content,
+            reasoning_response=_reasoning_content,
+            tool=parsed_tool,
+            prompt_token_count=response.usage.prompt_tokens,
+            response_token_count=response.usage.completion_tokens,
+        )
+        return llm_response
