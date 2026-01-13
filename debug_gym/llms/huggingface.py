@@ -4,6 +4,25 @@ from transformers import AutoTokenizer
 
 from debug_gym.llms.openai import OpenAILLM
 
+import json
+import logging
+from functools import lru_cache
+
+import openai
+import tiktoken
+from openai import NOT_GIVEN, OpenAI
+
+
+from debug_gym.gym.tools.tool import EnvironmentTool, ToolCall
+from debug_gym.gym.utils import filter_non_utf8
+from debug_gym.llms.base import (
+    LLM,
+    ContextLengthExceededError,
+    LLMResponse,
+    retry_on_exception,
+)
+from debug_gym.llms.constants import LLM_API_KEY_PLACEHOLDER, LLM_ENDPOINT_PLACEHOLDER
+
 
 @lru_cache(maxsize=5)
 def _get_hf_tokenizer(tokenizer_name: str, tokenizer_kwargs_tuple: tuple):
