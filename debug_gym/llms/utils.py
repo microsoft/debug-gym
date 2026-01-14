@@ -2,61 +2,74 @@ from debug_gym.logger import DebugGymLogger, log_with_color
 
 
 def trim(text: str, max_tokens: int, count_tokens: callable, where: str = "middle"):
-    """Trim text to fit within max_tokens by working directly at the token level."""
+    """
+    Trim text to fit within max_tokens, adding ellipsis where content was removed.
+
+    Since we don't have direct access to tokenizers for all LLMs, this uses binary
+    search on character positions to find approximately where to cut the text.
+
+    Args:
+        text: The text to trim
+        max_tokens: Maximum tokens allowed (must reserve 1 for ellipsis)
+        count_tokens: Function that returns token count for a string
+        where: Where to trim - "start" (keep end), "end" (keep start), "middle" (keep both ends)
+
+    Returns:
+        Trimmed text with ellipsis, or original if it fits
+    """
     if max_tokens <= 0:
         return ""
 
-    nb_tokens = count_tokens(text)
-    if nb_tokens <= max_tokens:
+    if count_tokens(text) <= max_tokens:
         return text
 
     ellipsis = "…"  # assume ellipsis is a single token
-    available_tokens = max_tokens - 1  # account for ellipsis
+    available_tokens = max_tokens - 1
 
-    def find_char_position_for_tokens(
-        target_tokens: int, from_start: bool = True
-    ) -> int:
-        """Binary search to find character position that gives approximately target_tokens."""
-        left, right = 0, len(text)
-        best_pos = left if from_start else right
-
-        while left <= right:
-            mid = (left + right) // 2
-            test_text = text[:mid] if from_start else text[mid:]
-            test_tokens = count_tokens(test_text)
-            if test_tokens <= target_tokens:
-                best_pos = mid
-                if from_start:
-                    left = mid + 1
-                else:
-                    right = mid - 1
+    def find_max_prefix_length(target_tokens: int) -> int:
+        """Binary search for the longest prefix of text that fits in target_tokens."""
+        lo, hi = 0, len(text)
+        best = 0
+        while lo <= hi:
+            mid = (lo + hi) // 2
+            if count_tokens(text[:mid]) <= target_tokens:
+                best = mid
+                lo = mid + 1  # try longer prefix
             else:
-                if from_start:
-                    right = mid - 1
-                else:
-                    left = mid + 1
-        return best_pos
+                hi = mid - 1  # too long, try shorter
+        return best
+
+    def find_min_suffix_start(target_tokens: int) -> int:
+        """Binary search for the earliest start position where suffix fits in target_tokens."""
+        lo, hi = 0, len(text)
+        best = len(text)
+        while lo <= hi:
+            mid = (lo + hi) // 2
+            if count_tokens(text[mid:]) <= target_tokens:
+                best = mid
+                hi = mid - 1  # try earlier start (longer suffix)
+            else:
+                lo = mid + 1  # suffix too long, start later
+        return best
 
     if where == "end":
-        # Keep the beginning, trim the end
-        trim_point = find_char_position_for_tokens(available_tokens, from_start=True)
-        return text[:trim_point] + ellipsis
+        # Keep beginning, trim end: "Hello world" -> "Hello…"
+        prefix_len = find_max_prefix_length(available_tokens)
+        return text[:prefix_len] + ellipsis
+
     elif where == "start":
-        # Keep the end, trim the beginning
-        trim_point = find_char_position_for_tokens(available_tokens, from_start=False)
-        return ellipsis + text[trim_point:]
+        # Keep end, trim beginning: "Hello world" -> "…world"
+        suffix_start = find_min_suffix_start(available_tokens)
+        return ellipsis + text[suffix_start:]
+
     elif where == "middle":
-        # Keep both ends, trim the middle
+        # Keep both ends, trim middle: "Hello world" -> "Hel…rld"
         half_tokens = available_tokens // 2
+        prefix_len = find_max_prefix_length(half_tokens)
+        remaining_tokens = available_tokens - count_tokens(text[:prefix_len])
+        suffix_start = find_min_suffix_start(remaining_tokens)
+        return text[:prefix_len] + ellipsis + text[suffix_start:]
 
-        # Find how much we can keep from the start
-        start_chars = find_char_position_for_tokens(half_tokens, from_start=True)
-
-        # Find how much we can keep from the end with remaining tokens
-        remaining_tokens = available_tokens - count_tokens(text[:start_chars])
-        end_chars = find_char_position_for_tokens(remaining_tokens, from_start=False)
-
-        return text[:start_chars] + ellipsis + text[end_chars:]
     else:
         raise ValueError(f"Invalid value for `where`: {where!r}.")
 
