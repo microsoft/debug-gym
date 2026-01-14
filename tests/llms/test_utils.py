@@ -44,178 +44,292 @@ def test_print_messages_unknown_role(logger_mock):
         assert False, "ValueError not raised for unknown role"
 
 
-def test_trim_prompt_messages():
-    def count_tokens(messages):
-        return sum(len(msg.get("content", msg.get("tool_calls"))) for msg in messages)
+class TestTrimPromptMessagesValidation:
+    """Test input validation for trim_prompt_messages."""
 
-    # Test basic validation
-    with pytest.raises(AssertionError, match="messages should not be empty"):
-        trim_prompt_messages([], 5, count_tokens)
+    def count_tokens(self, messages):
+        return sum(
+            len(msg.get("content", msg.get("tool_calls", ""))) for msg in messages
+        )
 
-    with pytest.raises(
-        AssertionError, match="the last message should be from the user or the tool"
-    ):
+    def test_empty_messages_raises(self):
+        with pytest.raises(AssertionError, match="messages should not be empty"):
+            trim_prompt_messages([], 5, self.count_tokens)
+
+    def test_last_message_not_user_or_tool_raises(self):
         messages = [
-            {"role": "system", "content": "System message"},
-            {"role": "assistant", "content": "Assistant message"},
+            {"role": "system", "content": "System"},
+            {"role": "assistant", "content": "Assistant"},
         ]
-        trim_prompt_messages(messages, 20, count_tokens)
+        with pytest.raises(
+            AssertionError, match="the last message should be from the user or the tool"
+        ):
+            trim_prompt_messages(messages, 20, self.count_tokens)
 
-    with pytest.raises(AssertionError, match="context_length should be non-negative"):
-        messages = [{"role": "user", "content": "User message"}]
-        trim_prompt_messages(messages, -1, count_tokens)
+    def test_negative_context_length_raises(self):
+        messages = [{"role": "user", "content": "Hi"}]
+        with pytest.raises(
+            AssertionError, match="context_length should be non-negative"
+        ):
+            trim_prompt_messages(messages, -1, self.count_tokens)
 
-    # Test system message too long
-    with pytest.raises(
-        AssertionError, match="System message tokens exceed context length"
-    ):
+    def test_system_message_too_long_raises(self):
         messages = [
             {"role": "system", "content": "Very long system message"},
             {"role": "user", "content": "Hi"},
         ]
-        trim_prompt_messages(messages, 10, count_tokens)
+        with pytest.raises(
+            AssertionError, match="System message tokens exceed context length"
+        ):
+            trim_prompt_messages(messages, 10, self.count_tokens)
 
-    # Test simple case: just user message
-    messages = [{"role": "user", "content": "Hello"}]
-    result = trim_prompt_messages(messages, 10, count_tokens)
-    assert result == messages
 
-    # Test case: system + user, fits completely
-    messages = [
-        {"role": "system", "content": "Sys"},  # 3 tokens
-        {"role": "user", "content": "Hi"},  # 2 tokens
-    ]
-    result = trim_prompt_messages(messages, 10, count_tokens)
-    assert result == messages
+class TestTrimPromptMessagesToolBased:
+    """Test trim_prompt_messages with tool-based conversations."""
 
-    # Test case: system + user + assistant + tool, fits completely
-    messages = [
-        {"role": "system", "content": "Sys"},  # 3 tokens
-        {"role": "user", "content": "Hi"},  # 2 tokens
-        {"role": "assistant", "content": "Hello"},  # 5 tokens
-        {"role": "tool", "content": "Result"},  # 6 tokens
-    ]
-    result = trim_prompt_messages(messages, 20, count_tokens)
-    assert result == messages
+    def count_tokens(self, messages):
+        return sum(
+            len(msg.get("content", msg.get("tool_calls", ""))) for msg in messages
+        )
 
-    # Test case: Keep system + most recent assistant-tool pair, drop user
-    messages = [
-        {"role": "system", "content": "Sys"},  # 3 tokens
-        {"role": "user", "content": "Hi"},  # 2 tokens
-        {"role": "assistant", "content": "Hello"},  # 5 tokens
-        {"role": "tool", "content": "Result"},  # 6 tokens
-    ]
-    expected = [
-        {"role": "system", "content": "Sys"},
-        {"role": "assistant", "content": "Hello"},
-        {"role": "tool", "content": "Result"},
-    ]
-    result = trim_prompt_messages(
-        messages, 14, count_tokens
-    )  # Just enough for sys + assistant + tool
-    assert result == expected
+    def test_all_messages_fit_returns_unchanged(self):
+        """When all messages fit, return as-is."""
+        messages = [
+            {"role": "system", "content": "Sys"},  # 3
+            {"role": "user", "content": "Hi"},  # 2
+            {"role": "assistant", "content": "Hello"},  # 5
+            {"role": "tool", "content": "Result"},  # 6
+        ]
+        result = trim_prompt_messages(messages, 50, self.count_tokens)
+        assert result == messages
 
-    # Test case: Multiple assistant-tool pairs, keep most recent ones
-    messages = [
-        {"role": "system", "content": "Sys"},  # 3 tokens
-        {"role": "user", "content": "Hi"},  # 2 tokens
-        {"role": "assistant", "content": "Hello1"},  # 6 tokens
-        {"role": "tool", "content": "Result1"},  # 7 tokens
-        {"role": "assistant", "content": "Hello2"},  # 6 tokens
-        {"role": "tool", "content": "Result2"},  # 7 tokens
-    ]
-    # Keep system + most recent assistant-tool pair only
-    expected = [
-        {"role": "system", "content": "Sys"},
-        {"role": "assistant", "content": "Hello2"},
-        {"role": "tool", "content": "Result2"},
-    ]
-    result = trim_prompt_messages(
-        messages, 16, count_tokens
-    )  # sys(3) + hello2(6) + result2(7) = 16
-    assert result == expected
+    def test_drop_pair_keep_system_user(self):
+        """When context is tight, drop pairs but keep system + user."""
+        messages = [
+            {"role": "system", "content": "Sys"},  # 3
+            {"role": "user", "content": "Hi"},  # 2
+            {"role": "assistant", "content": "Hello"},  # 5
+            {"role": "tool", "content": "Result"},  # 6
+        ]
+        expected = [
+            {"role": "system", "content": "Sys"},
+            {"role": "user", "content": "Hi"},
+        ]
+        # Context = 6: only fits system(3) + user(2) = 5
+        result = trim_prompt_messages(messages, 6, self.count_tokens)
+        assert result == expected
 
-    # Test case: Can fit all assistant-tool pairs + user message
-    messages = [
-        {"role": "system", "content": "Sys"},  # 3 tokens
-        {"role": "user", "content": "Hi"},  # 2 tokens
-        {"role": "assistant", "content": "Hello1"},  # 6 tokens
-        {"role": "tool", "content": "Result1"},  # 7 tokens
-        {"role": "assistant", "content": "Hello2"},  # 6 tokens
-        {"role": "tool", "content": "Result2"},  # 7 tokens
-    ]
-    # All pairs fit, so include user message too
-    result = trim_prompt_messages(messages, 50, count_tokens)
-    assert result == messages
+    def test_multiple_pairs_keep_most_recent(self):
+        """With multiple pairs, keep the most recent ones that fit."""
+        messages = [
+            {"role": "system", "content": "Sys"},  # 3
+            {"role": "user", "content": "Hi"},  # 2
+            {"role": "assistant", "content": "Hello1"},  # 6
+            {"role": "tool", "content": "Result1"},  # 7
+            {"role": "assistant", "content": "Hello2"},  # 6
+            {"role": "tool", "content": "Result2"},  # 7
+        ]
+        expected = [
+            {"role": "system", "content": "Sys"},
+            {"role": "user", "content": "Hi"},
+            {"role": "assistant", "content": "Hello2"},
+            {"role": "tool", "content": "Result2"},
+        ]
+        # Context = 18: sys(3) + user(2) + pair2(13) = 18
+        result = trim_prompt_messages(messages, 18, self.count_tokens)
+        assert result == expected
 
-    # Test case: Can fit all assistant-tool pairs but not user message
-    messages = [
-        {"role": "system", "content": "Sys"},  # 3 tokens
-        {"role": "user", "content": "Hi"},  # 2 tokens
-        {"role": "assistant", "content": "Hello1"},  # 6 tokens
-        {"role": "tool", "content": "Result1"},  # 7 tokens
-        {"role": "assistant", "content": "Hello2"},  # 6 tokens
-        {"role": "tool", "content": "Result2"},  # 7 tokens
-    ]
-    expected = [
-        {"role": "system", "content": "Sys"},
-        {"role": "assistant", "content": "Hello1"},
-        {"role": "tool", "content": "Result1"},
-        {"role": "assistant", "content": "Hello2"},
-        {"role": "tool", "content": "Result2"},
-    ]
-    result = trim_prompt_messages(
-        messages, 29, count_tokens
-    )  # sys(3) + all pairs(26) = 29, no room for user(2)
-    assert result == expected
+    def test_no_system_message(self):
+        """Works without system message."""
+        messages = [
+            {"role": "user", "content": "Hi"},  # 2
+            {"role": "assistant", "content": "Hello"},  # 5
+            {"role": "tool", "content": "Result"},  # 6
+        ]
+        result = trim_prompt_messages(messages, 20, self.count_tokens)
+        assert result == messages
 
-    # Test case: No system message
-    messages = [
-        {"role": "user", "content": "Hi"},  # 2 tokens
-        {"role": "assistant", "content": "Hello"},  # 5 tokens
-        {"role": "tool", "content": "Result"},  # 6 tokens
-    ]
-    result = trim_prompt_messages(messages, 20, count_tokens)
-    assert result == messages
+    def test_orphan_tool_message_dropped(self):
+        """Tool message without preceding assistant is dropped during trimming."""
+        messages = [
+            {"role": "system", "content": "Sys"},  # 3
+            {"role": "user", "content": "Hi"},  # 2
+            {"role": "tool", "content": "Result"},  # 6 - orphan!
+        ]
+        expected = [
+            {"role": "system", "content": "Sys"},
+            {"role": "user", "content": "Hi"},
+        ]
+        # Context = 10: forces trimming (total is 11), orphan tool is dropped since it's not paired
+        result = trim_prompt_messages(messages, 10, self.count_tokens)
+        assert result == expected
 
-    # Test case: No assistant-tool pairs, just system and user
-    messages = [
-        {"role": "system", "content": "Sys"},  # 3 tokens
-        {"role": "user", "content": "Hi"},  # 2 tokens
-    ]
-    result = trim_prompt_messages(messages, 10, count_tokens)
-    assert result == messages
+    def test_assistant_with_tool_calls_attribute(self):
+        """Handles assistant messages with tool_calls instead of content."""
+        messages = [
+            {"role": "system", "content": "Sys"},
+            {"role": "user", "content": "Hi"},
+            {"role": "assistant", "tool_calls": [{"function": {"name": "test"}}]},
+            {"role": "tool", "content": "Result"},
+        ]
+        result = trim_prompt_messages(messages, 100, self.count_tokens)
+        assert len(result) == 4
 
-    # Test case: No system, no assistant-tool pairs, just user
-    messages = [{"role": "user", "content": "Hi"}]  # 2 tokens
-    result = trim_prompt_messages(messages, 10, count_tokens)
-    assert result == messages
 
-    # Test case: Tool message without preceding assistant (edge case)
-    messages = [
-        {"role": "system", "content": "Sys"},  # 3 tokens
-        {"role": "user", "content": "Hi"},  # 2 tokens
-        {"role": "tool", "content": "Result"},  # 6 tokens
-    ]
-    expected = [
-        {"role": "system", "content": "Sys"},
-        {"role": "user", "content": "Hi"},
-    ]
-    result = trim_prompt_messages(messages, 10, count_tokens)
-    assert result == expected
+class TestTrimPromptMessagesSimpleConversation:
+    """Test trim_prompt_messages with simple conversations (no tools)."""
 
-    # Test case: Message with tool_calls instead of content
-    messages = [
-        {"role": "system", "content": "Sys"},  # 3 tokens
-        {"role": "user", "content": "Hi"},  # 2 tokens
-        {
-            "role": "assistant",
-            "tool_calls": [{"function": {"name": "test"}}],
-        },  # ~30 tokens (str representation)
-        {"role": "tool", "content": "Result"},  # 6 tokens
-    ]
-    result = trim_prompt_messages(messages, 100, count_tokens)
-    assert len(result) == 4  # Should keep all messages if context is large enough
+    def count_tokens(self, messages):
+        return sum(len(msg.get("content", "")) for msg in messages)
+
+    def test_all_messages_fit_returns_unchanged(self):
+        """When all messages fit, return as-is."""
+        messages = [
+            {"role": "system", "content": "Sys"},  # 3
+            {"role": "user", "content": "Hi"},  # 2
+            {"role": "assistant", "content": "Hello"},  # 5
+            {"role": "user", "content": "Bye"},  # 3
+        ]
+        result = trim_prompt_messages(messages, 50, self.count_tokens)
+        assert result == messages
+
+    def test_keep_system_user_and_recent_pair(self):
+        """Keep system, first user (task), and most recent (assistant, user) pair."""
+        messages = [
+            {"role": "system", "content": "Sys"},  # 3
+            {"role": "user", "content": "Hi"},  # 2
+            {"role": "assistant", "content": "Hello"},  # 5
+            {"role": "user", "content": "Bye"},  # 3
+        ]
+        # Context = 13: system(3) + user(2) + pair(5+3=8) = 13
+        expected = [
+            {"role": "system", "content": "Sys"},
+            {"role": "user", "content": "Hi"},
+            {"role": "assistant", "content": "Hello"},
+            {"role": "user", "content": "Bye"},
+        ]
+        result = trim_prompt_messages(messages, 13, self.count_tokens)
+        assert result == expected
+
+    def test_drop_pair_if_too_large(self):
+        """Drop (assistant, user) pair if it doesn't fit."""
+        messages = [
+            {"role": "system", "content": "Sys"},  # 3
+            {"role": "user", "content": "Hi"},  # 2
+            {"role": "assistant", "content": "Hello"},  # 5
+            {"role": "user", "content": "Bye"},  # 3
+        ]
+        # Context = 10: system(3) + user(2) = 5, remaining = 5
+        # Pair (5+3=8) doesn't fit
+        expected = [
+            {"role": "system", "content": "Sys"},
+            {"role": "user", "content": "Hi"},
+        ]
+        result = trim_prompt_messages(messages, 10, self.count_tokens)
+        assert result == expected
+
+    def test_no_system_keep_user_and_recent_pair(self):
+        """Without system, keep first user (task) and most recent (assistant, user) pair."""
+        messages = [
+            {"role": "user", "content": "First"},  # 5
+            {"role": "assistant", "content": "Response1"},  # 9
+            {"role": "user", "content": "Second"},  # 6
+            {"role": "assistant", "content": "Response2"},  # 9
+            {"role": "user", "content": "Third"},  # 5
+        ]
+        # Context = 20: First(5) + pair2(9+5=14) = 19
+        # Pairs: (Response1, Second)=15, (Response2, Third)=14
+        expected = [
+            {"role": "user", "content": "First"},
+            {"role": "assistant", "content": "Response2"},
+            {"role": "user", "content": "Third"},
+        ]
+        result = trim_prompt_messages(messages, 20, self.count_tokens)
+        assert result == expected
+
+    def test_single_user_message(self):
+        """Single user message works."""
+        messages = [{"role": "user", "content": "Hi"}]
+        result = trim_prompt_messages(messages, 10, self.count_tokens)
+        assert result == messages
+
+    def test_system_and_user_only(self):
+        """System + user only, no assistant messages."""
+        messages = [
+            {"role": "system", "content": "Sys"},
+            {"role": "user", "content": "Hi"},
+        ]
+        result = trim_prompt_messages(messages, 10, self.count_tokens)
+        assert result == messages
+
+
+class TestTrimPromptMessagesAnthropicFormat:
+    """Test trim_prompt_messages with Anthropic-style tool results."""
+
+    def count_tokens(self, messages):
+        return sum(
+            len(str(msg.get("content", msg.get("tool_calls", "")))) for msg in messages
+        )
+
+    def test_anthropic_tool_result_recognized(self):
+        """Anthropic tool_result format is recognized as tool message."""
+        messages = [
+            {"role": "system", "content": "Sys"},
+            {"role": "user", "content": "Hi"},
+            {
+                "role": "assistant",
+                "content": [
+                    {"type": "tool_use", "id": "123", "name": "test", "input": {}}
+                ],
+            },
+            {
+                "role": "user",
+                "content": [
+                    {"type": "tool_result", "tool_use_id": "123", "content": "Result"}
+                ],
+            },
+        ]
+        result = trim_prompt_messages(messages, 500, self.count_tokens)
+        assert len(result) == 4
+
+    def test_anthropic_format_keeps_user_and_recent_pair(self):
+        """With Anthropic format, keeps user message and most recent pair."""
+        messages = [
+            {"role": "system", "content": "Sys"},  # 3
+            {"role": "user", "content": "Hi"},  # 2
+            {
+                "role": "assistant",
+                "content": [
+                    {"type": "tool_use", "id": "1", "name": "old", "input": {}}
+                ],
+            },  # ~61
+            {
+                "role": "user",
+                "content": [
+                    {"type": "tool_result", "tool_use_id": "1", "content": "OldResult"}
+                ],
+            },  # ~69
+            {
+                "role": "assistant",
+                "content": [
+                    {"type": "tool_use", "id": "2", "name": "new", "input": {}}
+                ],
+            },  # ~61
+            {
+                "role": "user",
+                "content": [
+                    {"type": "tool_result", "tool_use_id": "2", "content": "NewResult"}
+                ],
+            },  # ~69
+        ]
+        # System(3) + user(2) + pair2(~130) = ~135
+        result = trim_prompt_messages(messages, 140, self.count_tokens)
+        assert len(result) == 4  # system + user + most recent pair
+        assert result[0]["role"] == "system"
+        assert result[1]["role"] == "user"
+        assert result[1]["content"] == "Hi"  # task description, not tool_result
+        assert result[2]["role"] == "assistant"
+        assert "2" in str(result[2]["content"])  # most recent pair
 
 
 def test_trim():
