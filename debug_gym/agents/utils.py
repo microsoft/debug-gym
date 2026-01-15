@@ -6,7 +6,6 @@ from pathlib import Path
 
 import yaml
 
-from debug_gym.agents.base_agent import AGENT_REGISTRY
 from debug_gym.logger import DebugGymLogger
 
 
