@@ -103,21 +103,10 @@ def test_instantiate_llm(mock_open, logger_mock):
     assert llm.runtime_generate_kwargs == {"temperature": 0.5, "max_tokens": 1000}
 
     # Test with **kwargs unpacking (like config)
-    llm_config = {"name": "gpt-4o-mini", "temperature": 0.7}
+    llm_config = {"name": "gpt-4o-mini", "temperature": 0.7, "tool_choice": "auto"}
     llm = LLM.instantiate(**llm_config, logger=logger_mock)
     assert isinstance(llm, OpenAILLM)
-    assert llm.runtime_generate_kwargs == {"temperature": 0.7}
-
-    # Test with additional **runtime_generate_kwargs unpacking (like config)
-    llm_config = {"name": "gpt-4o-mini", "temperature": 0.7}
-    runtime_kwargs = {"max_tokens": 500, "tool_choice": "auto"}
-    llm = LLM.instantiate(**llm_config, logger=logger_mock, **runtime_kwargs)
-    assert isinstance(llm, OpenAILLM)
-    assert llm.runtime_generate_kwargs == {
-        "temperature": 0.7,
-        "max_tokens": 500,
-        "tool_choice": "auto",
-    }
+    assert llm.runtime_generate_kwargs == {"temperature": 0.7, "tool_choice": "auto"}
 
 
 class Tool1(EnvironmentTool):

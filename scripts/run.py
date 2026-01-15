@@ -86,11 +86,7 @@ def run_agent(args, task_name: str, task_data: dict, config: dict):
         )
 
         env = create_env(config, task_data, task_logger)
-        llm = LLM.instantiate(
-            **config.get("llm", {}),
-            logger=task_logger,
-            runtime_generate_kwargs=config.get("generate_kwargs", {}),
-        )
+        llm = LLM.instantiate(**config.get("llm", {}), logger=task_logger)
         agent = create_agent(config.get("agent", {}), llm=llm, logger=task_logger)
 
         try:
