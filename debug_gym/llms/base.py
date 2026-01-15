@@ -222,8 +222,7 @@ class LLM(ABC):
         name: str | None = None,
         llm_config_file_path: str | None = None,
         logger: DebugGymLogger | None = None,
-        temperature: float | None = None,
-        max_tokens: int | None = None,
+        **runtime_generate_kwargs,
     ) -> "LLM":
         """Creates an instance of the appropriate LLM class based on the configuration.
 
@@ -231,8 +230,8 @@ class LLM(ABC):
             name: Name of the LLM model (e.g., "gpt-4o", "claude-3.7").
             llm_config_file_path: Optional path to the LLM configuration file.
             logger: Optional DebugGymLogger for logging.
-            temperature: Optional temperature for generation.
-            max_tokens: Optional max tokens for generation.
+            **runtime_generate_kwargs: Additional generation kwargs to pass to the LLM.
+                e.g. temperature, max_tokens, tool_choice ("auto", "required", "none")
 
         Returns:
             An instance of the appropriate LLM class.
@@ -242,13 +241,6 @@ class LLM(ABC):
 
         if not name:
             return None
-
-        # Build runtime generation kwargs from explicit args
-        runtime_generate_kwargs = {}
-        if temperature is not None:
-            runtime_generate_kwargs["temperature"] = temperature
-        if max_tokens is not None:
-            runtime_generate_kwargs["max_tokens"] = max_tokens
 
         if name == "human":
             from debug_gym.llms import Human

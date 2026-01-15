@@ -283,7 +283,7 @@ class OpenAILLM(LLM):
                 "content": filter_non_utf8(observation),
             }
 
-    def generate(self, messages, tools, **kwargs) -> LLMResponse:
+    def generate(self, messages, tools, tool_choice="auto", **kwargs) -> LLMResponse:
         # set max tokens if not provided
         kwargs["max_tokens"] = kwargs.get("max_tokens", NOT_GIVEN)
         api_call = retry_on_exception(
@@ -296,7 +296,7 @@ class OpenAILLM(LLM):
                     model=self.config.model,
                     messages=messages,
                     tools=self.define_tools(tools),
-                    tool_choice="auto",
+                    tool_choice=tool_choice,
                     **kwargs,
                 )
             else:
