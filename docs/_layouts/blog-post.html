@@ -74,6 +74,20 @@ layout: default
         <span>View paper</span>
       </a>
       {% endif %}
+
+      {% if page.frogboss_url %}
+      <a href="{{ page.frogboss_url }}" class="blog-hero__link" target="_blank" rel="noopener noreferrer">
+        <span class="blog-hero__link-icon"><i class="fas fa-frog"></i></span>
+        <span>FrogBoss-32B</span>
+      </a>
+      {% endif %}
+
+      {% if page.frogmini_url %}
+      <a href="{{ page.frogmini_url }}" class="blog-hero__link" target="_blank" rel="noopener noreferrer">
+        <span class="blog-hero__link-icon"><i class="fas fa-frog"></i></span>
+        <span>FrogMini-14B</span>
+      </a>
+      {% endif %}
     </div>
     {% endif %}
   </div>

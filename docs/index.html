@@ -130,6 +130,18 @@ title: "MSR Montréal - Froggy Team"
                 <span>Code</span>
                 </a>
                 {% endif %}
+                {% if post.frogboss_url %}
+                <a href="{{ post.frogboss_url }}" target="_blank" class="button is-success">
+                <span class="icon"><i class="fas fa-frog"></i></span>
+                <span>FrogBoss-32B</span>
+                </a>
+                {% endif %}
+                {% if post.frogmini_url %}
+                <a href="{{ post.frogmini_url }}" target="_blank" class="button is-success">
+                <span class="icon"><i class="fas fa-frog"></i></span>
+                <span>FrogMini-14B</span>
+                </a>
+                {% endif %}
               </a>
             </div>
           </div>
