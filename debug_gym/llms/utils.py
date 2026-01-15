@@ -1,75 +1,75 @@
 from debug_gym.logger import DebugGymLogger, log_with_color
 
 
-def get_message_tokens(message, count_tokens):
-    """Count tokens in a single message.
+def trim(text: str, max_tokens: int, count_tokens: callable, where: str = "middle"):
+    """
+    Trim text to fit within max_tokens, adding ellipsis where content was removed.
+
+    Since we don't have direct access to tokenizers for all LLMs, this uses binary
+    search on character positions to find approximately where to cut the text.
 
     Args:
-        message: A single message dict
-        count_tokens: Function that takes a list of messages and returns total token count
+        text: The text to trim
+        max_tokens: Maximum tokens allowed (must reserve 1 for ellipsis)
+        count_tokens: Function that returns token count for a string
+        where: Where to trim - "start" (keep end), "end" (keep start), "middle" (keep both ends)
 
     Returns:
-        Token count for this message
+        Trimmed text with ellipsis, or original if it fits
     """
-    return count_tokens([message])
-
-
-def trim(text: str, max_tokens: int, count_tokens: callable, where: str = "middle"):
-    """Trim text to fit within max_tokens by working directly at the token level."""
     if max_tokens <= 0:
         return ""
 
-    nb_tokens = count_tokens(text)
-    if nb_tokens <= max_tokens:
+    if count_tokens(text) <= max_tokens:
         return text
 
     ellipsis = "…"  # assume ellipsis is a single token
-    available_tokens = max_tokens - 1  # account for ellipsis
+    available_tokens = max_tokens - 1
 
-    def find_char_position_for_tokens(
-        target_tokens: int, from_start: bool = True
-    ) -> int:
-        """Binary search to find character position that gives approximately target_tokens."""
-        left, right = 0, len(text)
-        best_pos = left if from_start else right
-
-        while left <= right:
-            mid = (left + right) // 2
-            test_text = text[:mid] if from_start else text[mid:]
-            test_tokens = count_tokens(test_text)
-            if test_tokens <= target_tokens:
-                best_pos = mid
-                if from_start:
-                    left = mid + 1
-                else:
-                    right = mid - 1
+    def find_max_prefix_length(target_tokens: int) -> int:
+        """Binary search for the longest prefix of text that fits in target_tokens."""
+        lo, hi = 0, len(text)
+        best = 0
+        while lo <= hi:
+            mid = (lo + hi) // 2
+            if count_tokens(text[:mid]) <= target_tokens:
+                best = mid
+                lo = mid + 1  # try longer prefix
             else:
-                if from_start:
-                    right = mid - 1
-                else:
-                    left = mid + 1
-        return best_pos
+                hi = mid - 1  # too long, try shorter
+        return best
+
+    def find_min_suffix_start(target_tokens: int) -> int:
+        """Binary search for the earliest start position where suffix fits in target_tokens."""
+        lo, hi = 0, len(text)
+        best = len(text)
+        while lo <= hi:
+            mid = (lo + hi) // 2
+            if count_tokens(text[mid:]) <= target_tokens:
+                best = mid
+                hi = mid - 1  # try earlier start (longer suffix)
+            else:
+                lo = mid + 1  # suffix too long, start later
+        return best
 
     if where == "end":
-        # Keep the beginning, trim the end
-        trim_point = find_char_position_for_tokens(available_tokens, from_start=True)
-        return text[:trim_point] + ellipsis
+        # Keep beginning, trim end: "Hello world" -> "Hello…"
+        prefix_len = find_max_prefix_length(available_tokens)
+        return text[:prefix_len] + ellipsis
+
     elif where == "start":
-        # Keep the end, trim the beginning
-        trim_point = find_char_position_for_tokens(available_tokens, from_start=False)
-        return ellipsis + text[trim_point:]
+        # Keep end, trim beginning: "Hello world" -> "…world"
+        suffix_start = find_min_suffix_start(available_tokens)
+        return ellipsis + text[suffix_start:]
+
     elif where == "middle":
-        # Keep both ends, trim the middle
+        # Keep both ends, trim middle: "Hello world" -> "Hel…rld"
         half_tokens = available_tokens // 2
+        prefix_len = find_max_prefix_length(half_tokens)
+        remaining_tokens = available_tokens - count_tokens(text[:prefix_len])
+        suffix_start = find_min_suffix_start(remaining_tokens)
+        return text[:prefix_len] + ellipsis + text[suffix_start:]
 
-        # Find how much we can keep from the start
-        start_chars = find_char_position_for_tokens(half_tokens, from_start=True)
-
-        # Find how much we can keep from the end with remaining tokens
-        remaining_tokens = available_tokens - count_tokens(text[:start_chars])
-        end_chars = find_char_position_for_tokens(remaining_tokens, from_start=False)
-
-        return text[:start_chars] + ellipsis + text[end_chars:]
     else:
         raise ValueError(f"Invalid value for `where`: {where!r}.")
 
@@ -78,21 +78,24 @@ def trim_prompt_messages(
     messages: list[dict], context_length: int, count_tokens: callable
 ):
     """
-    Trim message on the assistant-tool pair level to fit context length.
+    Trim messages to fit within context length.
 
-    Strategy:
-    1. Keep the system message (assert if system itself is too long)
-    2. Keep as many most recent (assistant, tool) pairs as possible
-    3. Only when we can keep all (assistant, tool) pairs, keep the user message
+    Priority:
+    1. System message (always kept if present)
+    2. First user message (task description)
+    3. Most recent (assistant, user/tool) pairs
+
+    Orphan messages (without proper pairing) are dropped.
 
     Args:
         messages: List of message dicts with 'role' and 'content'/'tool_calls' keys
         context_length: Maximum number of tokens allowed
-        count_tokens: Function to count tokens in a string
+        count_tokens: Function to count tokens in messages
 
     Returns:
         Trimmed list of messages that fit within context_length
     """
+    # Validation
     assert len(messages) > 0, "messages should not be empty"
     assert messages[-1]["role"] in [
         "user",
@@ -100,88 +103,71 @@ def trim_prompt_messages(
     ], "the last message should be from the user or the tool"
     assert context_length >= 0, "context_length should be non-negative"
 
-    # Calculate token count for all messages
-    message_tokens = [get_message_tokens(msg, count_tokens) for msg in messages]
-    total_tokens = sum(message_tokens)
+    # Calculate token counts upfront
+    tokens = [count_tokens([msg]) for msg in messages]
 
-    # If we're already within limit, return as-is
-    if total_tokens <= context_length:
+    # Early exit if already within limit
+    if sum(tokens) <= context_length:
         return messages
 
-    # Find system message
-    system_msg_idx = 0 if messages[0]["role"] == "system" else None
-    system_tokens = message_tokens[0] if system_msg_idx is not None else 0
+    # Extract system message (always at index 0 if present)
+    has_system = messages[0]["role"] == "system"
+    system_msg, system_tokens = (messages[0], tokens[0]) if has_system else (None, 0)
 
-    # Assert system message fits within context
     assert (
         system_tokens <= context_length
     ), f"System message tokens exceed context length: {system_tokens} > {context_length}!"
 
-    # Find user message
-    user_msg_idx = None
-    for i, msg in enumerate(messages):
-        if msg["role"] == "user":
-            user_msg_idx = i
-            break
+    # Extract first user message (task description)
+    # It's at index 1 if system exists, else index 0
+    user_idx = 1 if has_system else 0
+    has_user = user_idx < len(messages) and messages[user_idx]["role"] == "user"
+    user_msg, user_tokens = (
+        (messages[user_idx], tokens[user_idx]) if has_user else (None, 0)
+    )
 
-    # Find all (assistant, tool) pairs by going backwards
-    assistant_tool_pairs = []
-    i = len(messages) - 1
-    while i >= 0:
-        if (
-            messages[i]["role"] == "tool"
-            and i > 0
-            and messages[i - 1]["role"] == "assistant"
-        ):
-            assistant_tool_pairs.append((i - 1, i))  # (assistant_idx, tool_idx)
-            i -= 2
-        else:
-            i -= 1
+    # Find (assistant, response) pairs where response is user or tool
+    pairs = []
+    start_idx = (1 if has_system else 0) + (1 if has_user else 0)
+    for i in range(start_idx, len(messages) - 1):
+        if messages[i]["role"] != "assistant":
+            continue
+        next_msg = messages[i + 1]
+        if next_msg["role"] in ["user", "tool"]:
+            pairs.append((messages[i], next_msg, tokens[i] + tokens[i + 1]))
 
-    # Start building result with system message
+    # Build result
     result = []
-    remaining_tokens = context_length
+    remaining = context_length
 
-    if system_msg_idx is not None:
-        result.append(messages[system_msg_idx])
-        remaining_tokens -= system_tokens
+    # 1. Always include system message first
+    if system_msg:
+        result.append(system_msg)
+        remaining -= system_tokens
 
-    # Add as many recent (assistant, tool) pairs as possible
-    included_pairs = []
-    for assistant_idx, tool_idx in assistant_tool_pairs:
-        pair_tokens = message_tokens[assistant_idx] + message_tokens[tool_idx]
-        if pair_tokens <= remaining_tokens:
-            included_pairs.append((assistant_idx, tool_idx))
-            remaining_tokens -= pair_tokens
+    # 2. Always include user message (task description) if it fits
+    if user_msg and user_tokens <= remaining:
+        result.append(user_msg)
+        remaining -= user_tokens
+
+    # Add most recent pairs that fit
+    selected_pairs = []
+    for pair in reversed(pairs):
+        assistant_msg, response_msg, pair_tokens = pair
+        if pair_tokens <= remaining:
+            selected_pairs.append((assistant_msg, response_msg))
+            remaining -= pair_tokens
         else:
             break
 
-    # Only include user message if we can fit all (assistant, tool) pairs
-    include_user = False
-    if len(included_pairs) == len(assistant_tool_pairs) and user_msg_idx is not None:
-        user_tokens = message_tokens[user_msg_idx]
-        if user_tokens <= remaining_tokens:
-            include_user = True
-
-    # Build final result
-    if include_user:
-        result.append(messages[user_msg_idx])
-
-    # Sort by assistant index to maintain chronological order
-    included_pairs.sort(key=lambda pair: pair[0])
-    for assistant_idx, tool_idx in included_pairs:
-        result.append(messages[assistant_idx])
-        result.append(messages[tool_idx])
+    # Add in chronological order
+    for assistant_msg, response_msg in reversed(selected_pairs):
+        result.append(assistant_msg)
+        result.append(response_msg)
 
     assert (
         len(result) > 0
     ), f"After trimming, no messages fit within context length: {context_length}!"
-
-    # Verify final token count
-    final_tokens = sum(get_message_tokens(msg, count_tokens) for msg in result)
-    assert (
-        final_tokens <= context_length
-    ), f"After trimming, the message length still exceeds: {final_tokens} > {context_length}!"
 
     return result
 
