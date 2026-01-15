@@ -528,7 +528,7 @@ def test_llm_init_with_runtime_generate_kwargs(logger_mock, llm_class_mock):
 def test_context_length_exceeded_prevents_infinite_recursion(
     llm_mock, logger_mock, llm_class_mock
 ):
-    """Test that ContextLengthExceededError handling prevents infinite recursion."""
+    """Test that ContextLengthExceededError stops after max retries."""
 
     class ContextErrorLLM(llm_class_mock):
         def __init__(self, *args, **kwargs):
@@ -543,24 +543,22 @@ def test_context_length_exceeded_prevents_infinite_recursion(
     llm = ContextErrorLLM("llm-mock", logger=logger_mock)
     messages = [{"role": "user", "content": "Long message"}]
 
-    # Mock trim_prompt_messages to return the same messages (no reduction)
-    with patch("debug_gym.llms.utils.trim_prompt_messages") as mock_trim:
-        mock_trim.return_value = messages
+    # Should raise ContextLengthExceededError after max retries, not RecursionError
+    with pytest.raises(
+        ContextLengthExceededError, match="Unable to fit messages within context limit"
+    ):
+        llm(messages, tools)
 
-        # Should raise ContextLengthExceededError, not RecursionError
-        with pytest.raises(
-            ContextLengthExceededError, match="Unable to reduce prompt size"
-        ):
-            llm(messages, tools)
+    # Should try 4 times: 1 initial + 3 retries
+    assert llm.generate_call_count == 4
 
-    # Should only try once due to no improvement in trimming
-    assert llm.generate_call_count == 1
-
-    # Should log the "Prompt is too long" message
-    prompt_too_long_calls = [
-        msg for msg in logger_mock._log_history if "Prompt is too long" in msg
+    # Should log retry messages
+    retry_calls = [
+        msg
+        for msg in logger_mock._log_history
+        if "API reported context exceeded" in msg
     ]
-    assert len(prompt_too_long_calls) == 1
+    assert len(retry_calls) == 3  # 3 retries logged
 
 
 @patch.object(
@@ -580,7 +578,7 @@ def test_context_length_exceeded_prevents_infinite_recursion(
 def test_context_length_exceeded_with_successful_truncation(
     mock_llm_config, logger_mock, llm_class_mock
 ):
-    """Test that successful truncation logs both messages correctly."""
+    """Test that successful retry after trimming works."""
 
     class ContextErrorThenSuccessLLM(llm_class_mock):
         def __init__(self, *args, **kwargs):
@@ -598,29 +596,17 @@ def test_context_length_exceeded_with_successful_truncation(
     llm = ContextErrorThenSuccessLLM("llm-mock", logger=logger_mock)
     messages = [{"role": "user", "content": "Long message"}]
 
-    # Mock trim_prompt_messages to return shorter messages
-    with patch("debug_gym.llms.base.trim_prompt_messages") as mock_trim:
-        shorter_messages = [{"role": "user", "content": "Short"}]
-        mock_trim.return_value = shorter_messages
-
-        # Should succeed
-        response = llm(messages, tools)
-        assert response.response == "Test response"
+    # Should succeed
+    response = llm(messages, tools)
+    assert response.response == "Test response"
 
     # Should try twice: fail once, then succeed
     assert llm.generate_call_count == 2
 
-    # Should log both "Prompt is too long" and "Prompt truncated" messages
-    prompt_too_long_calls = [
-        msg for msg in logger_mock._log_history if "Prompt is too long" in msg
+    # Should log retry message
+    retry_calls = [
+        msg
+        for msg in logger_mock._log_history
+        if "API reported context exceeded" in msg
     ]
-    prompt_truncated_calls = [
-        msg for msg in logger_mock._log_history if "Prompt truncated" in msg
-    ]
-
-    assert (
-        len(prompt_too_long_calls) == 1
-    ), f"Expected 1 'Prompt is too long' call, got {len(prompt_too_long_calls)}"
-    assert (
-        len(prompt_truncated_calls) == 1
-    ), f"Expected 1 'Prompt truncated' call, got {len(prompt_truncated_calls)}"
+    assert len(retry_calls) == 1
