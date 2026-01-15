@@ -2,6 +2,7 @@ from functools import lru_cache
 
 from transformers import AutoTokenizer
 
+from debug_gym.llms.base import LLMResponse
 from debug_gym.llms.openai import OpenAILLM
 
 
@@ -71,3 +72,12 @@ class HuggingFaceLLM(OpenAILLM):
                 tokens = tokenizer.tokenize(content)
                 result.append(tokens)
             return result
+
+    def generate(
+        self, messages, tools, tool_choice="required", **kwargs
+    ) -> LLMResponse:
+        """Override default tool_choice parameter to "required"."""
+        llm_response = super().generate(
+            messages, tools, tool_choice=tool_choice, **kwargs
+        )
+        return llm_response
