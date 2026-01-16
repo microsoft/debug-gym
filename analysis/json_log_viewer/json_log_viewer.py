@@ -3,6 +3,7 @@ import json
 import os
 import re
 import shlex
+import logging
 
 from flask import Flask, jsonify, redirect, render_template, request, url_for
 from flask_cors import cross_origin
@@ -11,7 +12,6 @@ from werkzeug.utils import secure_filename
 app = Flask(__name__)
 app.config["UPLOAD_FOLDER"] = "uploads"
 app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024  # 16MB max file size
-
 # Define a safe root directory for browsing
 SAFE_ROOT = os.getcwd()
 
@@ -578,7 +578,8 @@ def browse_directory():
         return jsonify({"current_path": path, "items": items})
 
     except (OSError, PermissionError) as e:
-        return jsonify({"error": f"Permission denied: {str(e)}"}), 403
+        logging.exception("Error while browsing directory")
+        return jsonify({"error": "Permission denied"}), 403
 
 
 @app.route("/load_file_from_path")
