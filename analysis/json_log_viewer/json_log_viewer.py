@@ -1,9 +1,9 @@
 import hashlib
 import json
+import logging
 import os
 import re
 import shlex
-import logging
 
 from flask import Flask, jsonify, redirect, render_template, request, url_for
 from flask_cors import cross_origin
