@@ -530,9 +530,6 @@ class TestBaseAgentRunReplayActions:
         # Set up env to terminate after 2 steps
         step_count = {"count": 0}
 
-        def mock_reset():
-            return mock_env_info
-
         def mock_step(tool, response, reasoning):
             step_count["count"] += 1
             info = MagicMock()
@@ -583,9 +580,6 @@ class TestBaseAgentRunReplayActions:
         ]
 
         step_count = {"count": 0}
-
-        def mock_reset():
-            return mock_env_info
 
         def mock_env_step(tool, response, reasoning):
             step_count["count"] += 1
