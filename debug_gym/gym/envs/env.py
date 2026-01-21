@@ -51,7 +51,7 @@ class EnvInfo:
             lines.append("")
 
         # Observations section
-        lines.append(f"👁️ Observation:")
+        lines.append("👁️ Observation:")
         lines.append(f"```\n{self.step_observation}\n```")
         lines.append("")
 
@@ -468,7 +468,9 @@ class RepoEnv(TooledEnv):
                     resolved=self.resolved,
                     tools=self.tools,
                 )
-                return self.infos
+                # Attach env_info to exception and re-raise to allow retry logic
+                e.env_info = self.infos
+                raise
             except BaseException as e:
                 error_message = (
                     f"Error while using tool {triggered_tool.name} "

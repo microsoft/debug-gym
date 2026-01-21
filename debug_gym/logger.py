@@ -395,7 +395,7 @@ class OverallProgressContext:
             expand=True,
         )
         self.total = len(problems)
-        self.completed = 0
+        self._completed_task_ids = set()
         self._overall_task = self.overall_progress.add_task(
             "Overall",  # Placeholder description, will be set by _refresh
             total=self.total,
@@ -424,6 +424,10 @@ class OverallProgressContext:
         )
         self._listener_thread.start()
 
+    @property
+    def completed(self) -> int:
+        return len(self._completed_task_ids)
+
     def advance(self, progress_update: TaskProgress):
         """Advance the progress for a specific task based on the provided update. Sets
         task as completed if its status is completed (e.g. early stopping)."""
@@ -434,7 +438,8 @@ class OverallProgressContext:
         # Update the task progress
         self.tasks_progress.advance(progress_update)
         # Update overall progress completion
-        self.completed += 1 if progress_update.completed else 0
+        if progress_update.completed:
+            self._completed_task_ids.add(progress_update.problem_id)
 
     def close(self):
         """Stop the listener thread and wait until it exits."""
