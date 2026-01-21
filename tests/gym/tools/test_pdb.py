@@ -852,8 +852,7 @@ def test_pdb_changing_entrypoint(tmp_path, setup_pdb_repo_env):
 
     # Create a simple Python script to debug
     with (wd / "simple_script.py").open("w") as f:
-        f.write(
-            """
+        f.write("""
 def main():
     x = 42
     print(f"Value is {x}")
@@ -861,8 +860,7 @@ def main():
 
 if __name__ == "__main__":
     main()
-"""
-        )
+""")
 
     # Use entrypoint to debug the simple script instead of pytest
     script_entrypoint = "python -m pdb simple_script.py"

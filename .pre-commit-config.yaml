@@ -1,12 +1,12 @@
 repos:
 - repo: https://github.com/pycqa/isort
-  rev: 5.13.2
+  rev: 7.0.0
   hooks:
   - id: isort
     args: ["--profile", "black", "--filter-files"]
 
 - repo: https://github.com/psf/black
-  rev: 24.4.2
+  rev: 26.1.0
   hooks:
   - id: black
     args: ["--line-length", "88", "--force-exclude", "data/*"]
