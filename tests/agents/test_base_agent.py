@@ -1,16 +1,18 @@
 import json
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from jinja2 import Template
 
 from debug_gym.agents.base_agent import (
     AGENT_REGISTRY,
-    AgentArgs,
     BaseAgent,
     create_agent,
     register_agent,
 )
+from debug_gym.gym.terminals.terminal import UnrecoverableTerminalError
+from debug_gym.gym.tools.tool import ToolCall
+from debug_gym.llms.base import LLMResponse
 from debug_gym.llms.human import Human
 
 
@@ -335,3 +337,124 @@ def test_load_prompt_template_with_custom_loader_root(tmp_path):
 
     assert "=== Explorer ===" in rendered
     assert "Body content." in rendered
+
+
+class TestExecuteAction:
+    """Tests for BaseAgent.execute_action method."""
+
+    @pytest.fixture
+    def agent_with_mocks(self):
+        """Create a BaseAgent with mocked env and llm."""
+        agent = BaseAgent()
+        agent.env = MagicMock()
+        agent.llm = MagicMock()
+        # Initialize history with mock data
+        mock_info = MagicMock()
+        mock_info.instructions = "Test instructions"
+        agent.history.init(
+            {"role": "system", "content": "system"},
+            {"role": "user", "content": "instance"},
+            mock_info,
+        )
+        return agent
+
+    @pytest.fixture
+    def mock_llm_response(self):
+        """Create a mock LLMResponse."""
+        tool_call = ToolCall(
+            id="call_123",
+            name="test_tool",
+            arguments={"arg1": "value1"},
+        )
+        return LLMResponse(
+            prompt=[{"role": "user", "content": "test"}],
+            response="test response",
+            reasoning_response="test reasoning",
+            tool=tool_call,
+        )
+
+    def test_execute_action_success(self, agent_with_mocks, mock_llm_response):
+        """Test that execute_action updates history on successful step."""
+        agent = agent_with_mocks
+        mock_env_info = MagicMock()
+        agent.env.step.return_value = mock_env_info
+
+        # Initial history should have 1 entry (from init)
+        initial_history_len = len(agent.history)
+
+        result = agent.execute_action(mock_llm_response)
+
+        assert result == mock_env_info
+        assert len(agent.history) == initial_history_len + 1
+        agent.env.step.assert_called_once_with(
+            mock_llm_response.tool,
+            mock_llm_response.response,
+            mock_llm_response.reasoning_response,
+        )
+
+    def test_execute_action_unrecoverable_error_with_env_info(
+        self, agent_with_mocks, mock_llm_response
+    ):
+        """Test that history is updated when UnrecoverableTerminalError has env_info."""
+        agent = agent_with_mocks
+        mock_env_info = MagicMock()
+        mock_env_info.step_observation = MagicMock()
+        mock_env_info.step_observation.observation = "error observation"
+
+        error = UnrecoverableTerminalError("Terminal died", env_info=mock_env_info)
+        agent.env.step.side_effect = error
+
+        initial_history_len = len(agent.history)
+
+        with pytest.raises(UnrecoverableTerminalError) as exc_info:
+            agent.execute_action(mock_llm_response)
+
+        assert exc_info.value is error
+        # History should be updated with the failed step
+        assert len(agent.history) == initial_history_len + 1
+        # Verify the last llm_response in history is our mock
+        assert agent.history.llm_responses[-1] == mock_llm_response
+        # Verify the last env_observation in history is from the error
+        assert agent.history.env_observations[-1] == mock_env_info
+
+    def test_execute_action_unrecoverable_error_without_env_info(
+        self, agent_with_mocks, mock_llm_response
+    ):
+        """Test that history is NOT updated when UnrecoverableTerminalError has no env_info."""
+        agent = agent_with_mocks
+
+        error = UnrecoverableTerminalError("Terminal died", env_info=None)
+        agent.env.step.side_effect = error
+
+        initial_history_len = len(agent.history)
+
+        with pytest.raises(UnrecoverableTerminalError) as exc_info:
+            agent.execute_action(mock_llm_response)
+
+        assert exc_info.value is error
+        # History should NOT be updated since env_info is None
+        assert len(agent.history) == initial_history_len
+
+    def test_execute_action_history_contains_correct_data(
+        self, agent_with_mocks, mock_llm_response
+    ):
+        """Test that history contains the correct tool call data after execute_action."""
+        agent = agent_with_mocks
+        mock_env_info = MagicMock()
+        mock_env_info.step_observation = MagicMock()
+        mock_env_info.step_observation.observation = "tool output"
+        agent.env.step.return_value = mock_env_info
+
+        agent.execute_action(mock_llm_response)
+
+        # Verify the history contains correct llm_response data
+        last_llm_response = agent.history.llm_responses[-1]
+        assert last_llm_response.tool.id == "call_123"
+        assert last_llm_response.tool.name == "test_tool"
+        assert last_llm_response.tool.arguments == {"arg1": "value1"}
+        assert last_llm_response.response == "test response"
+        assert last_llm_response.reasoning_response == "test reasoning"
+
+        # Verify the history contains correct env_observation
+        last_env_obs = agent.history.env_observations[-1]
+        assert last_env_obs == mock_env_info
