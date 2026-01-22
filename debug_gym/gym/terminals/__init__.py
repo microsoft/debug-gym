@@ -41,11 +41,9 @@ def select_terminal(
     if uuid is not None:
         extra_labels = {**extra_labels, "uuid": uuid}
 
-    if terminal_class is KubernetesTerminal and extra_labels:
+    # Pass extra_labels to terminals that support it (Kubernetes and Docker)
+    if terminal_class in (KubernetesTerminal, DockerTerminal) and extra_labels:
         config["extra_labels"] = extra_labels
-
-    if terminal_class is not KubernetesTerminal:
-        config.pop("extra_labels", None)
 
     return terminal_class(
         logger=logger,
