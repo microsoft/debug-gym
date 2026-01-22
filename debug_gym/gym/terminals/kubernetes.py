@@ -52,18 +52,24 @@ def _clean_for_kubernetes(name: str) -> str:
 
 class Pod:
     def __init__(
-        self, k8s_client: client.CoreV1Api, pod_body: dict, logger: DebugGymLogger
+        self,
+        k8s_client: client.CoreV1Api,
+        pod_body: dict,
+        logger: DebugGymLogger,
+        image_pull_backoff_timeout: int = 600,
     ):
         self.k8s_client = k8s_client
         self.pod_body = pod_body
         self.name = self.pod_body["metadata"]["name"]
         self.namespace = self.pod_body["metadata"]["namespace"]
         self.logger = logger
+        self.image_pull_backoff_timeout = image_pull_backoff_timeout
         self._last_pending_reason = None  # Track to avoid duplicate pending logs
+        self._image_pull_backoff_since = None  # Track when ImagePullBackOff started
 
         self.create_pod()
         atexit.register(self.clean_up)
-        self.wait_for_pod_ready()
+        self.wait_for_pod_ready(image_pull_backoff_timeout=image_pull_backoff_timeout)
 
     @retry(
         retry=retry_if_exception_type(ApiException),
@@ -103,14 +109,24 @@ class Pod:
             # Non-ApiException errors are not retriable
             raise ValueError(f"Failed to create pod: {e}")
 
-    def wait_for_pod_ready(self, timeout: int = 3600 * 2):
-        """Wait for the pod to be in Running state using Kubernetes watch."""
+    def wait_for_pod_ready(
+        self, timeout: int = 3600 * 2, image_pull_backoff_timeout: int = 600
+    ):
+        """Wait for the pod to be in Running state using Kubernetes watch.
+
+        Args:
+            timeout: Overall timeout in seconds (default: 2 hours)
+            image_pull_backoff_timeout: How long to wait before failing on persistent
+                ImagePullBackOff (default: 600 = 10 minutes). Set to 0 to disable.
+                This gives time for transient issues (registry rate limiting,
+                network blips) to resolve before giving up.
+        """
         self.logger.debug(f"{self} Waiting to be ready...")
 
         w = watch.Watch()
         start_time = time.time()
-        sandbox_check_interval = 30  # Check for sandbox errors every 30 seconds
-        last_sandbox_check = 0
+        check_interval = 30  # Check for errors every 30 seconds
+        last_check_time = 0
 
         try:
             for event in w.stream(
@@ -137,14 +153,41 @@ class Pod:
                         # Only log pending status on initial ADDED event or when reason changes
                         self._log_pending_status(pod)
 
-                    # Periodically check for sandbox reservation errors while pending
+                    # Periodically check for errors while pending
                     elapsed = time.time() - start_time
-                    if elapsed - last_sandbox_check >= sandbox_check_interval:
-                        last_sandbox_check = elapsed
+                    if elapsed - last_check_time >= check_interval:
+                        last_check_time = elapsed
+
+                        # Check for sandbox reservation errors
                         if self._has_sandbox_reservation_error():
                             raise SandboxReservationError(
                                 f"{self} has sandbox reservation conflict"
                             )
+
+                        # Check for persistent image pull failures
+                        if image_pull_backoff_timeout > 0:
+                            has_backoff, message = self._check_image_pull_status()
+                            if has_backoff:
+                                if self._image_pull_backoff_since is None:
+                                    self._image_pull_backoff_since = time.time()
+                                    self.logger.debug(
+                                        f"{self} ImagePullBackOff detected: {message}"
+                                    )
+                                else:
+                                    backoff_duration = (
+                                        time.time() - self._image_pull_backoff_since
+                                    )
+                                    if backoff_duration >= image_pull_backoff_timeout:
+                                        raise ValueError(
+                                            f"{self} image pull failed after {backoff_duration:.0f}s: {message}"
+                                        )
+                            else:
+                                # Reset if backoff resolved (e.g., pull succeeded after retry)
+                                if self._image_pull_backoff_since is not None:
+                                    self.logger.debug(
+                                        f"{self} ImagePullBackOff resolved"
+                                    )
+                                    self._image_pull_backoff_since = None
 
         except SandboxReservationError:
             raise  # Re-raise sandbox errors without wrapping
@@ -176,6 +219,26 @@ class Pod:
         except ApiException as e:
             self.logger.debug(f"{self} Error checking pod events: {e}")
         return False
+
+    def _check_image_pull_status(self) -> tuple[bool, str | None]:
+        """Check container status for image pull failures.
+
+        Returns:
+            Tuple of (has_backoff, message). has_backoff is True if ImagePullBackOff detected.
+        """
+        try:
+            pod = self.k8s_client.read_namespaced_pod(
+                name=self.name, namespace=self.namespace
+            )
+            for cs in pod.status.container_statuses or []:
+                if cs.state and cs.state.waiting:
+                    reason = cs.state.waiting.reason
+                    if reason == "ImagePullBackOff":
+                        return True, cs.state.waiting.message
+            return False, None
+        except ApiException as e:
+            self.logger.debug(f"{self} Error checking container status: {e}")
+            return False, None
 
     def _log_pending_status(self, pod):
         """Log pending status only if it's different from the last one."""
@@ -285,6 +348,7 @@ class KubernetesTerminal(Terminal):
         extra_labels: dict | None = None,
         pod_spec_kwargs: dict = None,
         command_timeout: int = 300,
+        image_pull_backoff_timeout: int = 600,
         **kwargs,
     ):
         """
@@ -305,10 +369,11 @@ class KubernetesTerminal(Terminal):
             pod_spec_kwargs: Additional pod spec configuration.
             command_timeout: Default timeout in seconds for individual command execution
                 (default: 300 = 5 minutes). This is NOT the pod lifetime. Commands that
-                exceed this timeout will be killed. Can be configured via YAML:
-                    terminal_config:
-                        type: kubernetes
-                        command_timeout: 60
+                exceed this timeout will be killed.
+            image_pull_backoff_timeout: How long to wait before failing on persistent
+                ImagePullBackOff (default: 600 = 10 minutes). Set to 0 to disable.
+                This gives time for transient issues (registry rate limiting,
+                network blips) to resolve before giving up.
             **kwargs: Additional arguments passed to pod spec.
         """
         super().__init__(
@@ -322,6 +387,7 @@ class KubernetesTerminal(Terminal):
         self._task_name = base_image
         self.setup_commands = setup_commands or []
         self.command_timeout = command_timeout
+        self.image_pull_backoff_timeout = image_pull_backoff_timeout
         self.namespace = namespace or os.environ.get("K8S_NAMESPACE", "default")
         self.image_pull_secret = image_pull_secret or os.environ.get(
             "K8S_DOCKER_SECRET"
@@ -730,7 +796,12 @@ class KubernetesTerminal(Terminal):
             }
 
             try:
-                self._pod = Pod(self.k8s_client, pod_body, logger=self.logger)
+                self._pod = Pod(
+                    self.k8s_client,
+                    pod_body,
+                    logger=self.logger,
+                    image_pull_backoff_timeout=self.image_pull_backoff_timeout,
+                )
 
                 # Run setup commands
                 self._run_setup_commands()

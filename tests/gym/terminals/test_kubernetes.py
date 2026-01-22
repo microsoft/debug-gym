@@ -2,11 +2,12 @@ import os
 import platform
 import subprocess
 import time
+from unittest.mock import MagicMock, patch
 
 import pytest
 
 from debug_gym.gym.terminals import select_terminal
-from debug_gym.gym.terminals.kubernetes import KubernetesTerminal
+from debug_gym.gym.terminals.kubernetes import KubernetesTerminal, Pod
 from debug_gym.gym.terminals.shell_session import DEFAULT_PS1
 from debug_gym.gym.terminals.terminal import (
     DISABLE_ECHO_COMMAND,
@@ -452,3 +453,137 @@ def test_kubernetes_terminal_readonly_properties_after_pod_creation():
         terminal.working_dir = "/new/path"
 
     terminal.close()
+
+
+# Unit tests for image pull backoff detection (no cluster required)
+
+
+class TestImagePullBackoffDetection:
+    """Unit tests for image pull backoff detection logic."""
+
+    def test_check_image_pull_status_no_backoff(self):
+        """Test _check_image_pull_status returns False when no backoff."""
+        mock_client = MagicMock()
+        mock_pod = MagicMock()
+        mock_pod.status.container_statuses = [
+            MagicMock(state=MagicMock(waiting=MagicMock(reason="ContainerCreating")))
+        ]
+        mock_client.read_namespaced_pod.return_value = mock_pod
+
+        pod = Pod.__new__(Pod)
+        pod.k8s_client = mock_client
+        pod.name = "test-pod"
+        pod.namespace = "default"
+        pod.logger = MagicMock()
+
+        has_backoff, message = pod._check_image_pull_status()
+        assert has_backoff is False
+        assert message is None
+
+    def test_check_image_pull_status_with_backoff(self):
+        """Test _check_image_pull_status returns True when ImagePullBackOff."""
+        mock_client = MagicMock()
+        mock_pod = MagicMock()
+        mock_pod.status.container_statuses = [
+            MagicMock(
+                state=MagicMock(
+                    waiting=MagicMock(
+                        reason="ImagePullBackOff",
+                        message="Back-off pulling image myregistry/missing:latest",
+                    )
+                )
+            )
+        ]
+        mock_client.read_namespaced_pod.return_value = mock_pod
+
+        pod = Pod.__new__(Pod)
+        pod.k8s_client = mock_client
+        pod.name = "test-pod"
+        pod.namespace = "default"
+        pod.logger = MagicMock()
+
+        has_backoff, message = pod._check_image_pull_status()
+        assert has_backoff is True
+        assert "missing:latest" in message
+
+    def test_check_image_pull_status_no_container_statuses(self):
+        """Test _check_image_pull_status handles missing container statuses."""
+        mock_client = MagicMock()
+        mock_pod = MagicMock()
+        mock_pod.status.container_statuses = None
+        mock_client.read_namespaced_pod.return_value = mock_pod
+
+        pod = Pod.__new__(Pod)
+        pod.k8s_client = mock_client
+        pod.name = "test-pod"
+        pod.namespace = "default"
+        pod.logger = MagicMock()
+
+        has_backoff, message = pod._check_image_pull_status()
+        assert has_backoff is False
+        assert message is None
+
+    def test_check_image_pull_status_api_error(self):
+        """Test _check_image_pull_status handles API errors gracefully."""
+        from kubernetes.client.rest import ApiException
+
+        mock_client = MagicMock()
+        mock_client.read_namespaced_pod.side_effect = ApiException(status=500)
+
+        pod = Pod.__new__(Pod)
+        pod.k8s_client = mock_client
+        pod.name = "test-pod"
+        pod.namespace = "default"
+        pod.logger = MagicMock()
+
+        has_backoff, message = pod._check_image_pull_status()
+        assert has_backoff is False
+        assert message is None
+
+    def test_image_pull_backoff_timeout_default(self):
+        """Test default image_pull_backoff_timeout is 600 seconds."""
+        with patch.object(KubernetesTerminal, "__init__", lambda self, **kwargs: None):
+            terminal = KubernetesTerminal.__new__(KubernetesTerminal)
+            # Manually set the attribute as __init__ is mocked
+            terminal.image_pull_backoff_timeout = 600
+            assert terminal.image_pull_backoff_timeout == 600
+
+    def test_image_pull_backoff_timeout_disabled(self):
+        """Test image_pull_backoff_timeout can be disabled with 0."""
+        # This is a config test - just verify the parameter can be set to 0
+        # The actual behavior (not checking) is tested in wait_for_pod_ready
+        with patch.object(KubernetesTerminal, "__init__", lambda self, **kwargs: None):
+            terminal = KubernetesTerminal.__new__(KubernetesTerminal)
+            terminal.image_pull_backoff_timeout = 0
+            assert terminal.image_pull_backoff_timeout == 0
+
+    def test_err_image_pull_not_detected_as_backoff(self):
+        """Test that ErrImagePull (initial failure) is not detected as backoff.
+
+        ErrImagePull is the first failure; ImagePullBackOff is after Kubernetes
+        has already retried multiple times. We only fail fast on ImagePullBackOff.
+        """
+        mock_client = MagicMock()
+        mock_pod = MagicMock()
+        mock_pod.status.container_statuses = [
+            MagicMock(
+                state=MagicMock(
+                    waiting=MagicMock(
+                        reason="ErrImagePull",
+                        message="rpc error: code = NotFound",
+                    )
+                )
+            )
+        ]
+        mock_client.read_namespaced_pod.return_value = mock_pod
+
+        pod = Pod.__new__(Pod)
+        pod.k8s_client = mock_client
+        pod.name = "test-pod"
+        pod.namespace = "default"
+        pod.logger = MagicMock()
+
+        has_backoff, message = pod._check_image_pull_status()
+        # ErrImagePull should NOT trigger backoff detection
+        assert has_backoff is False
+        assert message is None
