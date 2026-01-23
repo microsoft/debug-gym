@@ -188,3 +188,36 @@ def test_select_terminal_kubernetes_extra_labels(monkeypatch):
         "extra_labels": {"foo": "bar"},
         "pod_spec_kwargs": {"tolerations": []},
     }
+
+
+def test_select_terminal_docker_extra_labels(monkeypatch):
+    """Test that extra_labels are passed to DockerTerminal."""
+    captured = {}
+
+    class DummyDocker:
+        def __init__(self, **kwargs):
+            captured.update(kwargs)
+
+    monkeypatch.setattr(
+        "debug_gym.gym.terminals.DockerTerminal",
+        DummyDocker,
+    )
+
+    config = {
+        "type": "docker",
+        "base_image": "ubuntu:latest",
+        "extra_labels": {"run-id": "my-run"},
+    }
+
+    terminal = select_terminal(config, uuid="1234")
+
+    assert isinstance(terminal, DummyDocker)
+    assert captured["base_image"] == "ubuntu:latest"
+    assert captured["extra_labels"] == {"run-id": "my-run", "uuid": "1234"}
+    assert "logger" in captured
+    # Original config should not be modified
+    assert config == {
+        "type": "docker",
+        "base_image": "ubuntu:latest",
+        "extra_labels": {"run-id": "my-run"},
+    }

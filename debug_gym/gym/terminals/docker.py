@@ -31,6 +31,7 @@ class DockerTerminal(Terminal):
         registry: str = "",
         setup_commands: list[str] | None = None,
         command_timeout: int = 300,
+        extra_labels: dict[str, str] | None = None,
         **kwargs,
     ):
         """
@@ -48,6 +49,8 @@ class DockerTerminal(Terminal):
                     terminal_config:
                         type: docker
                         command_timeout: 60
+            extra_labels: Additional labels to add to the container (e.g., {"run-id": "my-run"}).
+                Useful for identifying containers during cleanup.
             **kwargs: Additional arguments (ignored with debug log).
         """
         super().__init__(
@@ -61,6 +64,7 @@ class DockerTerminal(Terminal):
         self.registry = registry.rstrip("/") + "/" if registry else ""
         self.setup_commands = setup_commands or []
         self.command_timeout = command_timeout
+        self.extra_labels = extra_labels or {}
         self._docker_client = None  # Lazily initialized
         self._container = None
 
@@ -238,12 +242,19 @@ class DockerTerminal(Terminal):
 
         # Generate a unique container name
         container_name = f"debug_gym_{uuid.uuid4()}"
+
+        # Build labels: always include app=debug-gym for identification
+        labels = {"app": "debug-gym"}
+        if self.extra_labels:
+            labels.update(self.extra_labels)
+
         container = self.docker_client.containers.run(
             name=container_name,
             image=f"{self.registry}{self.base_image}",
             command="sleep infinity",  # Keep the container running
             working_dir=self.working_dir,
             environment=self.env_vars,
+            labels=labels,
             detach=True,
             auto_remove=True,
             remove=True,
