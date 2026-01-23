@@ -45,6 +45,9 @@ def select_terminal(
     if terminal_class in (KubernetesTerminal, DockerTerminal) and extra_labels:
         config["extra_labels"] = extra_labels
 
+    if terminal_class not in (KubernetesTerminal, DockerTerminal):
+        config.pop("extra_labels", None)
+
     return terminal_class(
         logger=logger,
         **config,
