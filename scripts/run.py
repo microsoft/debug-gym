@@ -120,30 +120,19 @@ def run_agent(args, task_name: str, task_data: dict, config: dict):
                 )
                 break  # Exit retry loop
             except (UnrecoverableTerminalError, AgentTimeoutException) as e:
-                # Save trajectory before retry so we can replay actions
-                try:
-                    save_trajectory(agent, task_path, task_logger)
-                except Exception as save_error:
-                    task_logger.error(
-                        f"Could not save trajectory for replay: {save_error!r}"
-                    )
-                    raise
-
-                task_logger.warning(
-                    f"Terminal lost (attempt {attempt + 1}/{max_retries}): {e}"
-                )
                 # Close the failed environment
                 if env is not None:
                     env.close()
                     env = None
 
                 if attempt < max_retries - 1:
+                    # Save trajectory before retry so we can replay actions
+                    save_trajectory(agent, task_path, task_logger)
                     task_logger.info(f"Retrying task {task_name}...")
                 else:
                     task_logger.error(
                         f"Task {task_name} failed after {max_retries} attempts."
                     )
-
                     task_logger.report_progress(
                         problem_id=task_name,
                         step=1,
@@ -166,18 +155,6 @@ def run_agent(args, task_name: str, task_data: dict, config: dict):
                 )
                 success = False
                 raise
-
-        # save trajectory
-        save_trajectory(agent, task_path, task_logger)
-
-        # optionally apply patch
-        if config.get("save_patch", True):
-            try:
-                save_patch(env, task_path, task_logger)
-            except Exception as patch_error:
-                # Terminal may be unavailable (e.g., pod died), log and continue
-                task_logger.warning(f"Could not save patch: {patch_error!r}")
-
     except Exception as e:
         task_logger.error(
             f"Task Error: {task_name} - {e!r}. Run with --very-verbose "
@@ -199,10 +176,14 @@ def run_agent(args, task_name: str, task_data: dict, config: dict):
 
         success = False
     finally:
-        # Close env and cancel any pending alarm
-        signal.alarm(0)
+        # Save trajectory and patch, close env and cancel any pending alarm
+        if agent is not None:
+            save_trajectory(agent, task_path, task_logger)
         if env:
+            if config.get("save_patch", True):  # optionally apply patch
+                save_patch(env, task_path, task_logger)
             env.close()
+        signal.alarm(0)
     return success
 
 

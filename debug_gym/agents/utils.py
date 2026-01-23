@@ -138,23 +138,29 @@ def load_config(args=None):
 
 def save_patch(env, problem_path: Path, logger: DebugGymLogger):
     """Persist the current environment patch to disk."""
-    problem_path.mkdir(parents=True, exist_ok=True)
-    patch_path = problem_path / "debug_gym.patch"
-    with open(patch_path, "w") as f:
-        f.write(env.patch)
-
-    logger.debug(f"Patch saved in {patch_path}")
+    try:
+        problem_path.mkdir(parents=True, exist_ok=True)
+        patch_path = problem_path / "debug_gym.patch"
+        with open(patch_path, "w") as f:
+            f.write(env.patch)
+        logger.debug(f"Patch saved in {patch_path}")
+    except Exception as patch_error:
+        # Terminal may be unavailable (e.g., pod died), log and continue
+        logger.warning(f"Could not save patch: {patch_error!r}")
 
 
 def save_trajectory(agent, problem_path: Path, logger: DebugGymLogger):
     """Persist the agent trajectory to disk."""
-    problem_path.mkdir(parents=True, exist_ok=True)
-    trajectory = agent.build_trajectory()
-    json_file = problem_path / "trajectory.json"
-    with open(json_file, "w") as f:
-        json.dump(trajectory, f, indent=4)
-
-    logger.debug(f"Trajectory saved in {json_file}")
+    try:
+        problem_path.mkdir(parents=True, exist_ok=True)
+        trajectory = agent.build_trajectory()
+        json_file = problem_path / "trajectory.json"
+        with open(json_file, "w") as f:
+            json.dump(trajectory, f, indent=4)
+        logger.debug(f"Trajectory saved in {json_file}")
+    except Exception as save_error:
+        logger.error(f"Could not save trajectory for replay: {save_error!r}")
+        raise
 
 
 def load_trajectory(
