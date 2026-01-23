@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from debug_gym.agents.utils import load_config, load_trajectory
+from debug_gym.agents.utils import load_config, load_trajectory, save_trajectory
 from debug_gym.llms.base import LLMResponse
 
 
@@ -84,6 +84,91 @@ def mock_logger():
     """Create a mock logger for testing."""
     logger = MagicMock()
     return logger
+
+
+@pytest.fixture
+def mock_agent():
+    """Create a mock agent with a trajectory for testing."""
+    agent = MagicMock()
+    agent.build_trajectory.return_value = {
+        "log": [
+            {"step_id": 0, "action": None, "content": "initial state"},
+            {
+                "step_id": 1,
+                "action": {
+                    "id": "call_1",
+                    "name": "view",
+                    "arguments": {"file": "test.py"},
+                },
+                "content": "viewed file",
+                "reasoning": "need to see the code",
+                "prompt_response_pairs": [
+                    {
+                        "prompt": [{"role": "user", "content": "test"}],
+                        "response": "viewed file",
+                        "reasoning_response": "need to see the code",
+                        "token_usage": {"prompt": 100, "response": 50},
+                    }
+                ],
+            },
+        ]
+    }
+    return agent
+
+
+class TestSaveTrajectory:
+    """Tests for the save_trajectory function."""
+
+    def test_save_trajectory_creates_directory(self, mock_agent, mock_logger, tmp_path):
+        """Test that save_trajectory creates the directory if it doesn't exist."""
+        problem_path = tmp_path / "new_dir" / "problem1"
+        save_trajectory(mock_agent, problem_path, mock_logger)
+
+        assert problem_path.exists()
+        assert (problem_path / "trajectory.json").exists()
+
+    def test_save_trajectory_writes_json(self, mock_agent, mock_logger, tmp_path):
+        """Test that save_trajectory writes valid JSON to disk."""
+        problem_path = tmp_path / "problem1"
+        save_trajectory(mock_agent, problem_path, mock_logger)
+
+        json_file = problem_path / "trajectory.json"
+        with open(json_file) as f:
+            data = json.load(f)
+
+        assert "log" in data
+        assert len(data["log"]) == 2
+
+    def test_save_trajectory_raises_on_error(self, mock_agent, mock_logger, tmp_path):
+        """Test that save_trajectory raises and logs error on failure."""
+        mock_agent.build_trajectory.side_effect = RuntimeError("test error")
+        problem_path = tmp_path / "problem1"
+
+        with pytest.raises(RuntimeError):
+            save_trajectory(mock_agent, problem_path, mock_logger)
+
+        mock_logger.error.assert_called_once()
+
+    def test_save_trajectory_overwrites_existing(
+        self, mock_agent, mock_logger, tmp_path
+    ):
+        """Test that save_trajectory overwrites an existing trajectory file."""
+        problem_path = tmp_path / "problem1"
+        problem_path.mkdir(parents=True)
+
+        # Write initial file
+        json_file = problem_path / "trajectory.json"
+        with open(json_file, "w") as f:
+            json.dump({"log": [{"step_id": 0}]}, f)
+
+        # Save new trajectory
+        save_trajectory(mock_agent, problem_path, mock_logger)
+
+        with open(json_file) as f:
+            data = json.load(f)
+
+        # Should have the new trajectory with 2 steps
+        assert len(data["log"]) == 2
 
 
 class TestLoadTrajectory:
