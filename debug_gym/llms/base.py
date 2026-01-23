@@ -211,10 +211,8 @@ class LLM(ABC):
         # Runtime generation kwargs from experiment config (temperature, max_tokens, etc.)
         self.runtime_generate_kwargs = runtime_generate_kwargs or {}
 
-        self.logger.debug(
-            f"Using {self.model_name} with max context length of {
-                self.context_length:,} tokens."
-        )
+        self.logger.debug(f"Using {self.model_name} with max context length of {
+                self.context_length:,} tokens.")
 
     @classmethod
     def instantiate(

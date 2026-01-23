@@ -19,8 +19,7 @@ def setup_grep_test_repo():
 
         # Python files with various content
         with (working_dir / "main.py").open("w") as f:
-            f.write(
-                """#!/usr/bin/env python3
+            f.write("""#!/usr/bin/env python3
 import os
 import sys
 
@@ -38,12 +37,10 @@ class TestClass:
 
 if __name__ == "__main__":
     hello_world()
-"""
-            )
+""")
 
         with (working_dir / "src" / "utils.py").open("w") as f:
-            f.write(
-                """import re
+            f.write("""import re
 import json
 
 def validate_email(email):
@@ -61,12 +58,10 @@ class EmailValidator:
 
     def validate(self, email):
         return re.match(self.pattern, email) is not None
-"""
-            )
+""")
 
         with (working_dir / "tests" / "test_utils.py").open("w") as f:
-            f.write(
-                """import pytest
+            f.write("""import pytest
 from src.utils import validate_email, EmailValidator
 
 def test_validate_email():
@@ -82,33 +77,27 @@ def test_email_validator_class():
 def test_broken_function():
     # This test needs to be fixed
     assert False  # This should pass
-"""
-            )
+""")
 
         # Configuration files
         with (working_dir / "config.json").open("w") as f:
-            f.write(
-                """{
+            f.write("""{
     "name": "test_project",
     "version": "1.0.0",
     "debug": true,
     "database_url": "sqlite:///test.db"
-}"""
-            )
+}""")
 
         with (working_dir / "requirements.txt").open("w") as f:
-            f.write(
-                """pytest>=6.0.0
+            f.write("""pytest>=6.0.0
 requests>=2.25.0
 flask>=2.0.0
 sqlalchemy>=1.4.0
-"""
-            )
+""")
 
         # Documentation
         with (working_dir / "README.md").open("w") as f:
-            f.write(
-                """# Test Project
+            f.write("""# Test Project
 
 This is a test project for grep functionality.
 
@@ -126,12 +115,10 @@ This is a test project for grep functionality.
 ```bash
 pip install -r requirements.txt
 ```
-"""
-            )
+""")
 
         with (working_dir / "docs" / "api.md").open("w") as f:
-            f.write(
-                """# API Documentation
+            f.write("""# API Documentation
 
 ## EmailValidator Class
 
@@ -153,8 +140,7 @@ The EmailValidator class provides email validation functionality.
 validator = EmailValidator()
 result = validator.validate("user@example.com")
 ```
-"""
-            )
+""")
 
         # Binary file (should be ignored)
         with (working_dir / "binary.bin").open("wb") as f:
@@ -162,19 +148,16 @@ result = validator.validate("user@example.com")
 
         # Log file
         with (working_dir / "app.log").open("w") as f:
-            f.write(
-                """2024-01-01 10:00:00 INFO Starting application
+            f.write("""2024-01-01 10:00:00 INFO Starting application
 2024-01-01 10:00:01 DEBUG Loading configuration
 2024-01-01 10:00:02 ERROR Failed to connect to database
 2024-01-01 10:00:03 WARNING Retrying connection
 2024-01-01 10:00:04 INFO Application started successfully
-"""
-            )
+""")
 
         # Hidden files
         with (working_dir / ".gitignore").open("w") as f:
-            f.write(
-                """__pycache__/
+            f.write("""__pycache__/
 *.pyc
 *.pyo
 *.pyd
@@ -182,8 +165,7 @@ result = validator.validate("user@example.com")
 .venv
 venv/
 env/
-"""
-            )
+""")
 
         return working_dir
 
