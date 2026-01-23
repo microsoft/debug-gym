@@ -415,7 +415,7 @@ class RepoEnv(TooledEnv):
             f"apply_gold_patch is not implemented for {self.__class__.__name__}."
         )
 
-    def _handle_error(
+    def _handle_fatal_error(
         self,
         exception: BaseException,
         message: str,
@@ -423,7 +423,7 @@ class RepoEnv(TooledEnv):
         action_content: str | None,
         action_reasoning: str | None,
     ) -> None:
-        """Handle errors by setting up the environment state and attaching env_info."""
+        """Handle fatal errors by setting up the environment state and attaching env_info."""
         self.logger.error(message, exc_info=True)
         self.step_observation = Observation("env", message)
         self.terminated = True
@@ -445,7 +445,9 @@ class RepoEnv(TooledEnv):
             resolved=self.resolved,
             tools=self.tools,
         )
+        # Attach env_info to exception and re-raise to allow retry logic
         exception.env_info = self.infos
+        raise
 
     def step(
         self,
@@ -467,14 +469,13 @@ class RepoEnv(TooledEnv):
                 self.step_observation = triggered_tool(self, **tool_kwargs)
             except KeyboardInterrupt as e:
                 error_message = "Step was interrupted by user."
-                self._handle_error(
+                self._handle_fatal_error(
                     e,
                     error_message,
                     action_tool_call,
                     action_content,
                     action_reasoning,
                 )
-                raise
             except UnrecoverableTerminalError as e:
                 error_message = (
                     "Fatal terminal error detected. The remote execution "
@@ -483,14 +484,13 @@ class RepoEnv(TooledEnv):
                 details = str(e).strip()
                 if details:
                     error_message += f"\n{details}"
-                self._handle_error(
+                self._handle_fatal_error(
                     e,
                     error_message,
                     action_tool_call,
                     action_content,
                     action_reasoning,
                 )
-                raise
             except BaseException as e:
                 error_message = (
                     f"Error while using tool {triggered_tool.name} "
