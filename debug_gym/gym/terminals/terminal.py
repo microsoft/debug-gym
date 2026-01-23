@@ -14,6 +14,10 @@ class TerminalError(RuntimeError):
 class UnrecoverableTerminalError(TerminalError):
     """Raised when the terminal becomes unusable and the episode must stop."""
 
+    def __init__(self, message: str, env_info=None):
+        super().__init__(message)
+        self.env_info = env_info
+
 
 DISABLE_ECHO_COMMAND = "stty -echo"
 

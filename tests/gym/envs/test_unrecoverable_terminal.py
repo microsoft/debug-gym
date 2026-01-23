@@ -73,7 +73,10 @@ def fatal_env():
 def test_env_terminates_after_unrecoverable_terminal_error(fatal_env):
     tool_call = ToolCall(id="bash-1", name="bash", arguments={"command": "ls"})
 
-    info = fatal_env.step(tool_call)
+    with pytest.raises(UnrecoverableTerminalError) as exc_info:
+        fatal_env.step(tool_call)
+
+    info = exc_info.value.env_info
 
     assert info.terminated is True
     assert fatal_env.terminated is True

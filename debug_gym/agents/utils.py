@@ -6,6 +6,8 @@ from pathlib import Path
 
 import yaml
 
+from debug_gym.gym.tools.tool import ToolCall
+from debug_gym.llms.base import LLMResponse
 from debug_gym.logger import DebugGymLogger
 
 
@@ -91,6 +93,15 @@ def load_config(args=None):
         help="Maximum number of tasks to display in the progress bar.",
     )
     parser.add_argument(
+        "--max-retries",
+        type=int,
+        default=3,
+        help="Maximum number of retries for terminal or timeout failures"
+        " (e.g., spot instance eviction, container deletion). "
+        "Steps are replayed, including the step that failed, "
+        "after which new steps are generated. Default: 3.",
+    )
+    parser.add_argument(
         "-p",
         "--params",
         nargs="+",
@@ -127,20 +138,100 @@ def load_config(args=None):
 
 def save_patch(env, problem_path: Path, logger: DebugGymLogger):
     """Persist the current environment patch to disk."""
-    problem_path.mkdir(parents=True, exist_ok=True)
-    patch_path = problem_path / "debug_gym.patch"
-    with open(patch_path, "w") as f:
-        f.write(env.patch)
-
-    logger.debug(f"Patch saved in {patch_path}")
+    try:
+        problem_path.mkdir(parents=True, exist_ok=True)
+        patch_path = problem_path / "debug_gym.patch"
+        with open(patch_path, "w") as f:
+            f.write(env.patch)
+        logger.debug(f"Patch saved in {patch_path}")
+    except Exception as patch_error:
+        # Terminal may be unavailable (e.g., pod died), log and continue
+        logger.warning(f"Could not save patch: {patch_error!r}")
 
 
 def save_trajectory(agent, problem_path: Path, logger: DebugGymLogger):
     """Persist the agent trajectory to disk."""
-    problem_path.mkdir(parents=True, exist_ok=True)
-    trajectory = agent.build_trajectory()
-    json_file = problem_path / "trajectory.json"
-    with open(json_file, "w") as f:
-        json.dump(trajectory, f, indent=4)
+    try:
+        problem_path.mkdir(parents=True, exist_ok=True)
+        trajectory = agent.build_trajectory()
+        json_file = problem_path / "trajectory.json"
+        with open(json_file, "w") as f:
+            json.dump(trajectory, f, indent=4)
+        logger.debug(f"Trajectory saved in {json_file}")
+    except Exception as save_error:
+        logger.error(f"Could not save trajectory for replay: {save_error!r}")
+        raise
 
-    logger.debug(f"Trajectory saved in {json_file}")
+
+def load_trajectory(
+    problem_path: Path, logger: DebugGymLogger
+) -> list[LLMResponse] | None:
+    """Load a previous trajectory and reconstruct LLMResponse objects for replay.
+
+    Follows the same approach as replay.py for accurate reconstruction of LLMResponse
+    objects, including token counts and original prompt data from prompt_response_pairs.
+
+    Returns a list of LLMResponse objects that can be passed to agent.execute_action(),
+    or None if no trajectory exists.
+    """
+    json_file = problem_path / "trajectory.json"
+    if not json_file.exists():
+        return None
+
+    try:
+        with open(json_file, "r") as f:
+            trajectory = json.load(f)
+    except (json.JSONDecodeError, IOError) as e:
+        logger.warning(f"Failed to load trajectory from {json_file}: {e}")
+        return None
+
+    log = trajectory.get("log", [])
+    if not log:
+        return None
+
+    llm_responses = []
+    for step in log:
+        # Skip step 0 (initial state with no action)
+        if step.get("step_id") == 0 or step.get("action") is None:
+            continue
+
+        # Reconstruct ToolCall from saved action
+        action_data = step.get("action", {})
+        if not action_data:
+            continue
+
+        tool_call = ToolCall(
+            id=action_data.get("id", ""),
+            name=action_data.get("name", ""),
+            arguments=action_data.get("arguments", {}),
+        )
+
+        # Extract data from prompt_response_pairs if available (like replay.py does)
+        prompt_response_pairs = step.get("prompt_response_pairs", [])
+        if prompt_response_pairs and len(prompt_response_pairs) > 0:
+            prompt_response = prompt_response_pairs[0]
+            token_usage = prompt_response.get("token_usage", {})
+            llm_response = LLMResponse(
+                prompt=prompt_response.get("prompt", []),
+                response=prompt_response.get("response"),
+                reasoning_response=prompt_response.get("reasoning_response"),
+                tool=tool_call,
+                prompt_token_count=token_usage.get("prompt", 0),
+                response_token_count=token_usage.get("response", 0),
+            )
+        else:
+            # Fallback to step-level data if prompt_response_pairs not available
+            llm_response = LLMResponse(
+                prompt=[],
+                response=step.get("content"),
+                reasoning_response=step.get("reasoning"),
+                tool=tool_call,
+            )
+        llm_responses.append(llm_response)
+
+    if llm_responses:
+        logger.info(
+            f"Loaded {len(llm_responses)} steps from previous trajectory for replay"
+        )
+
+    return llm_responses if llm_responses else None

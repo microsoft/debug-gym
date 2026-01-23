@@ -51,7 +51,7 @@ class EnvInfo:
             lines.append("")
 
         # Observations section
-        lines.append(f"👁️ Observation:")
+        lines.append("👁️ Observation:")
         lines.append(f"```\n{self.step_observation}\n```")
         lines.append("")
 
@@ -415,6 +415,40 @@ class RepoEnv(TooledEnv):
             f"apply_gold_patch is not implemented for {self.__class__.__name__}."
         )
 
+    def _handle_fatal_error(
+        self,
+        exception: BaseException,
+        message: str,
+        action_tool_call: ToolCall,
+        action_content: str | None,
+        action_reasoning: str | None,
+    ) -> None:
+        """Handle fatal errors by setting up the environment state and attaching env_info."""
+        self.logger.error(message, exc_info=True)
+        self.step_observation = Observation("env", message)
+        self.terminated = True
+        self.all_observations = [self.step_observation]
+        self.infos = EnvInfo(
+            step_observation=self.step_observation,
+            all_observations=self.all_observations,
+            eval_observation=(
+                Observation("env", self.last_eval.output) if self.last_eval else None
+            ),
+            current_breakpoints=self.current_breakpoints(),
+            action_reasoning=action_reasoning,
+            action_content=action_content,
+            action_tool_call=action_tool_call,
+            instructions=self.instructions,
+            score=self.score,
+            max_score=self.max_score,
+            terminated=self.terminated,
+            resolved=self.resolved,
+            tools=self.tools,
+        )
+        # Attach env_info to exception and re-raise to allow retry logic
+        exception.env_info = self.infos
+        raise
+
     def step(
         self,
         action_tool_call: ToolCall,
@@ -433,42 +467,30 @@ class RepoEnv(TooledEnv):
             try:
                 # tool_kwargs is a dict, so we need to unpack it
                 self.step_observation = triggered_tool(self, **tool_kwargs)
-            except KeyboardInterrupt:
-                self.logger.error("Step was interrupted by user.")
-                raise
+            except KeyboardInterrupt as e:
+                error_message = "Step was interrupted by user."
+                self._handle_fatal_error(
+                    e,
+                    error_message,
+                    action_tool_call,
+                    action_content,
+                    action_reasoning,
+                )
             except UnrecoverableTerminalError as e:
-                fatal_message = (
-                    "Fatal terminal error detected. The remote execution pod is no longer "
-                    "available, so the episode will terminate."
+                error_message = (
+                    "Fatal terminal error detected. The remote execution "
+                    "pod is no longer available, so the episode will terminate."
                 )
                 details = str(e).strip()
                 if details:
-                    fatal_message += f"\n{details}"
-                self.logger.error(fatal_message, exc_info=True)
-                self.step_observation = Observation("env", fatal_message)
-                self.terminated = True
-                # Return early to avoid overwriting terminated flag from last_eval
-                self.all_observations = [self.step_observation]
-                self.infos = EnvInfo(
-                    step_observation=self.step_observation,
-                    all_observations=self.all_observations,
-                    eval_observation=(
-                        Observation("env", self.last_eval.output)
-                        if self.last_eval
-                        else None
-                    ),
-                    current_breakpoints=self.current_breakpoints(),
-                    action_reasoning=action_reasoning,
-                    action_content=action_content,
-                    action_tool_call=action_tool_call,
-                    instructions=self.instructions,
-                    score=self.score,
-                    max_score=self.max_score,
-                    terminated=self.terminated,
-                    resolved=self.resolved,
-                    tools=self.tools,
+                    error_message += f"\n{details}"
+                self._handle_fatal_error(
+                    e,
+                    error_message,
+                    action_tool_call,
+                    action_content,
+                    action_reasoning,
                 )
-                return self.infos
             except BaseException as e:
                 error_message = (
                     f"Error while using tool {triggered_tool.name} "

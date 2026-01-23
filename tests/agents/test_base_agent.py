@@ -1,16 +1,18 @@
 import json
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from jinja2 import Template
 
 from debug_gym.agents.base_agent import (
     AGENT_REGISTRY,
-    AgentArgs,
     BaseAgent,
     create_agent,
     register_agent,
 )
+from debug_gym.gym.terminals.terminal import UnrecoverableTerminalError
+from debug_gym.gym.tools.tool import ToolCall
+from debug_gym.llms.base import LLMResponse
 from debug_gym.llms.human import Human
 
 
@@ -335,3 +337,428 @@ def test_load_prompt_template_with_custom_loader_root(tmp_path):
 
     assert "=== Explorer ===" in rendered
     assert "Body content." in rendered
+
+
+class TestExecuteAction:
+    """Tests for BaseAgent.execute_action method."""
+
+    @pytest.fixture
+    def agent_with_mocks(self):
+        """Create a BaseAgent with mocked env and llm."""
+        agent = BaseAgent()
+        agent.env = MagicMock()
+        agent.llm = MagicMock()
+        # Initialize history with mock data
+        mock_info = MagicMock()
+        mock_info.instructions = "Test instructions"
+        agent.history.init(
+            {"role": "system", "content": "system"},
+            {"role": "user", "content": "instance"},
+            mock_info,
+        )
+        return agent
+
+    @pytest.fixture
+    def mock_llm_response(self):
+        """Create a mock LLMResponse."""
+        tool_call = ToolCall(
+            id="call_123",
+            name="test_tool",
+            arguments={"arg1": "value1"},
+        )
+        return LLMResponse(
+            prompt=[{"role": "user", "content": "test"}],
+            response="test response",
+            reasoning_response="test reasoning",
+            tool=tool_call,
+        )
+
+    def test_execute_action_success(self, agent_with_mocks, mock_llm_response):
+        """Test that execute_action updates history on successful step."""
+        agent = agent_with_mocks
+        mock_env_info = MagicMock()
+        agent.env.step.return_value = mock_env_info
+
+        # Initial history should have 1 entry (from init)
+        initial_history_len = len(agent.history)
+
+        result = agent.execute_action(mock_llm_response)
+
+        assert result == mock_env_info
+        assert len(agent.history) == initial_history_len + 1
+        agent.env.step.assert_called_once_with(
+            mock_llm_response.tool,
+            mock_llm_response.response,
+            mock_llm_response.reasoning_response,
+        )
+
+    def test_execute_action_unrecoverable_error_with_env_info(
+        self, agent_with_mocks, mock_llm_response
+    ):
+        """Test that history is updated when UnrecoverableTerminalError has env_info."""
+        agent = agent_with_mocks
+        mock_env_info = MagicMock()
+        mock_env_info.step_observation = MagicMock()
+        mock_env_info.step_observation.observation = "error observation"
+
+        error = UnrecoverableTerminalError("Terminal died", env_info=mock_env_info)
+        agent.env.step.side_effect = error
+
+        initial_history_len = len(agent.history)
+
+        with pytest.raises(UnrecoverableTerminalError) as exc_info:
+            agent.execute_action(mock_llm_response)
+
+        assert exc_info.value is error
+        # History should be updated with the failed step
+        assert len(agent.history) == initial_history_len + 1
+        # Verify the last llm_response in history is our mock
+        assert agent.history.llm_responses[-1] == mock_llm_response
+        # Verify the last env_observation in history is from the error
+        assert agent.history.env_observations[-1] == mock_env_info
+
+    def test_execute_action_unrecoverable_error_without_env_info(
+        self, agent_with_mocks, mock_llm_response
+    ):
+        """Test that history is NOT updated when UnrecoverableTerminalError has no env_info."""
+        agent = agent_with_mocks
+
+        error = UnrecoverableTerminalError("Terminal died", env_info=None)
+        agent.env.step.side_effect = error
+
+        initial_history_len = len(agent.history)
+
+        with pytest.raises(UnrecoverableTerminalError) as exc_info:
+            agent.execute_action(mock_llm_response)
+
+        assert exc_info.value is error
+        # History should NOT be updated since env_info is None
+        assert len(agent.history) == initial_history_len
+
+    def test_execute_action_history_contains_correct_data(
+        self, agent_with_mocks, mock_llm_response
+    ):
+        """Test that history contains the correct tool call data after execute_action."""
+        agent = agent_with_mocks
+        mock_env_info = MagicMock()
+        mock_env_info.step_observation = MagicMock()
+        mock_env_info.step_observation.observation = "tool output"
+        agent.env.step.return_value = mock_env_info
+
+        agent.execute_action(mock_llm_response)
+
+        # Verify the history contains correct llm_response data
+        last_llm_response = agent.history.llm_responses[-1]
+        assert last_llm_response.tool.id == "call_123"
+        assert last_llm_response.tool.name == "test_tool"
+        assert last_llm_response.tool.arguments == {"arg1": "value1"}
+        assert last_llm_response.response == "test response"
+        assert last_llm_response.reasoning_response == "test reasoning"
+
+        # Verify the history contains correct env_observation
+        last_env_obs = agent.history.env_observations[-1]
+        assert last_env_obs == mock_env_info
+
+
+class TestBaseAgentRunReplayActions:
+    """Tests for replay_actions parameter in BaseAgent.run()."""
+
+    @pytest.fixture
+    def mock_env(self):
+        """Create a mock environment."""
+        env = MagicMock()
+        env.task_name = "test_task"
+        env.tools = []
+        env.resolved = False
+        return env
+
+    @pytest.fixture
+    def mock_env_info(self):
+        """Create a mock EnvInfo."""
+        info = MagicMock()
+        info.instructions = "Test instructions"
+        info.tools = []
+        info.resolved = False
+        info.terminated = False
+        info.score = 0
+        info.max_score = 10
+        info.step_observation = MagicMock()
+        info.step_observation.observation = "observation"
+        info.action_tool_call = None
+        return info
+
+    @pytest.fixture
+    def mock_llm(self):
+        """Create a mock LLM."""
+        llm = MagicMock()
+        llm.context_length = 4096
+        llm.count_tokens = lambda x: len(str(x))
+        llm.define_tools = lambda x: []
+        llm.convert_observation_to_message = lambda obs, **kwargs: {
+            "role": "user",
+            "content": obs if isinstance(obs, str) else str(obs),
+        }
+        llm.convert_response_to_message = lambda resp: {
+            "role": "assistant",
+            "content": resp.response,
+        }
+        return llm
+
+    def test_run_uses_replay_actions_instead_of_step(
+        self, mock_env, mock_env_info, mock_llm
+    ):
+        """Test that replay_actions are used instead of calling step()."""
+        agent = BaseAgent(agent_args={"max_steps": 5})
+        agent.llm = mock_llm
+
+        # Create replay actions
+        replay_actions = [
+            LLMResponse(
+                prompt=[],
+                response="replay response 1",
+                reasoning_response="replay reasoning 1",
+                tool=ToolCall(id="replay_1", name="tool_1", arguments={}),
+            ),
+            LLMResponse(
+                prompt=[],
+                response="replay response 2",
+                reasoning_response="replay reasoning 2",
+                tool=ToolCall(id="replay_2", name="tool_2", arguments={}),
+            ),
+        ]
+
+        # Set up env to terminate after 2 steps
+        step_count = {"count": 0}
+
+        def mock_step(tool, response, reasoning):
+            step_count["count"] += 1
+            info = MagicMock()
+            info.instructions = "Test"
+            info.tools = []
+            info.resolved = step_count["count"] >= 2
+            info.terminated = step_count["count"] >= 2
+            info.score = step_count["count"]
+            info.max_score = 10
+            info.step_observation = MagicMock()
+            info.step_observation.observation = f"observation {step_count['count']}"
+            info.action_tool_call = tool
+            return info
+
+        mock_env.reset.return_value = mock_env_info
+        mock_env.step.side_effect = mock_step
+        mock_env.info = mock_env_info
+
+        # Mock the step method to track if it's called
+        agent.step = MagicMock()
+
+        agent.run(mock_env, replay_actions=replay_actions)
+
+        # step() should NOT have been called since we had replay actions
+        agent.step.assert_not_called()
+
+        # env.step should have been called with replay action tools
+        assert mock_env.step.call_count == 2
+        calls = mock_env.step.call_args_list
+        assert calls[0][0][0].id == "replay_1"
+        assert calls[1][0][0].id == "replay_2"
+
+    def test_run_switches_to_step_after_replay_exhausted(
+        self, mock_env, mock_env_info, mock_llm
+    ):
+        """Test that run() switches to calling step() after replay_actions are exhausted."""
+        agent = BaseAgent(agent_args={"max_steps": 5})
+        agent.llm = mock_llm
+
+        # Create only 1 replay action
+        replay_actions = [
+            LLMResponse(
+                prompt=[],
+                response="replay response",
+                reasoning_response="replay reasoning",
+                tool=ToolCall(id="replay_1", name="replay_tool", arguments={}),
+            ),
+        ]
+
+        step_count = {"count": 0}
+
+        def mock_env_step(tool, response, reasoning):
+            step_count["count"] += 1
+            info = MagicMock()
+            info.instructions = "Test"
+            info.tools = []
+            info.resolved = step_count["count"] >= 3
+            info.terminated = step_count["count"] >= 3
+            info.score = step_count["count"]
+            info.max_score = 10
+            info.step_observation = MagicMock()
+            info.step_observation.observation = f"observation {step_count['count']}"
+            info.action_tool_call = tool
+            return info
+
+        mock_env.reset.return_value = mock_env_info
+        mock_env.step.side_effect = mock_env_step
+        mock_env.info = mock_env_info
+
+        # Create new LLM responses for step() calls
+        new_llm_responses = [
+            LLMResponse(
+                prompt=[],
+                response="new response 1",
+                reasoning_response="new reasoning 1",
+                tool=ToolCall(id="new_1", name="new_tool_1", arguments={}),
+            ),
+            LLMResponse(
+                prompt=[],
+                response="new response 2",
+                reasoning_response="new reasoning 2",
+                tool=ToolCall(id="new_2", name="new_tool_2", arguments={}),
+            ),
+        ]
+        agent.step = MagicMock(side_effect=new_llm_responses)
+
+        agent.run(mock_env, replay_actions=replay_actions)
+
+        # step() should have been called 2 times (after replay action exhausted)
+        assert agent.step.call_count == 2
+
+        # env.step should have been called 3 times total
+        assert mock_env.step.call_count == 3
+        calls = mock_env.step.call_args_list
+        # First call: replay action
+        assert calls[0][0][0].id == "replay_1"
+        # Second and third calls: from step()
+        assert calls[1][0][0].id == "new_1"
+        assert calls[2][0][0].id == "new_2"
+
+    def test_run_with_empty_replay_actions(self, mock_env, mock_env_info, mock_llm):
+        """Test that empty replay_actions list behaves normally."""
+        agent = BaseAgent(agent_args={"max_steps": 3})
+        agent.llm = mock_llm
+
+        step_count = {"count": 0}
+
+        def mock_env_step(tool, response, reasoning):
+            step_count["count"] += 1
+            info = MagicMock()
+            info.instructions = "Test"
+            info.tools = []
+            info.resolved = step_count["count"] >= 2
+            info.terminated = step_count["count"] >= 2
+            info.score = step_count["count"]
+            info.max_score = 10
+            info.step_observation = MagicMock()
+            info.step_observation.observation = f"observation {step_count['count']}"
+            info.action_tool_call = tool
+            return info
+
+        mock_env.reset.return_value = mock_env_info
+        mock_env.step.side_effect = mock_env_step
+        mock_env.info = mock_env_info
+
+        llm_responses = [
+            LLMResponse(
+                prompt=[],
+                response="response 1",
+                reasoning_response="reasoning 1",
+                tool=ToolCall(id="call_1", name="tool_1", arguments={}),
+            ),
+            LLMResponse(
+                prompt=[],
+                response="response 2",
+                reasoning_response="reasoning 2",
+                tool=ToolCall(id="call_2", name="tool_2", arguments={}),
+            ),
+        ]
+        agent.step = MagicMock(side_effect=llm_responses)
+
+        # Pass empty list
+        agent.run(mock_env, replay_actions=[])
+
+        # step() should be called for all actions
+        assert agent.step.call_count == 2
+
+    def test_run_with_none_replay_actions(self, mock_env, mock_env_info, mock_llm):
+        """Test that None replay_actions behaves normally."""
+        agent = BaseAgent(agent_args={"max_steps": 3})
+        agent.llm = mock_llm
+
+        step_count = {"count": 0}
+
+        def mock_env_step(tool, response, reasoning):
+            step_count["count"] += 1
+            info = MagicMock()
+            info.instructions = "Test"
+            info.tools = []
+            info.resolved = step_count["count"] >= 1
+            info.terminated = step_count["count"] >= 1
+            info.score = step_count["count"]
+            info.max_score = 10
+            info.step_observation = MagicMock()
+            info.step_observation.observation = f"observation {step_count['count']}"
+            info.action_tool_call = tool
+            return info
+
+        mock_env.reset.return_value = mock_env_info
+        mock_env.step.side_effect = mock_env_step
+        mock_env.info = mock_env_info
+
+        llm_response = LLMResponse(
+            prompt=[],
+            response="response",
+            reasoning_response="reasoning",
+            tool=ToolCall(id="call_1", name="tool_1", arguments={}),
+        )
+        agent.step = MagicMock(return_value=llm_response)
+
+        # Pass None (default)
+        agent.run(mock_env, replay_actions=None)
+
+        # step() should be called
+        assert agent.step.call_count == 1
+
+    def test_replay_actions_order_preserved(self, mock_env, mock_env_info, mock_llm):
+        """Test that replay actions are executed in the correct order."""
+        agent = BaseAgent(agent_args={"max_steps": 10})
+        agent.llm = mock_llm
+
+        # Create 5 replay actions with distinct IDs
+        replay_actions = [
+            LLMResponse(
+                prompt=[],
+                response=f"response {i}",
+                reasoning_response=f"reasoning {i}",
+                tool=ToolCall(
+                    id=f"action_{i}", name=f"tool_{i}", arguments={"order": i}
+                ),
+            )
+            for i in range(5)
+        ]
+
+        step_count = {"count": 0}
+
+        def mock_env_step(tool, response, reasoning):
+            step_count["count"] += 1
+            info = MagicMock()
+            info.instructions = "Test"
+            info.tools = []
+            info.resolved = step_count["count"] >= 5
+            info.terminated = step_count["count"] >= 5
+            info.score = step_count["count"]
+            info.max_score = 10
+            info.step_observation = MagicMock()
+            info.step_observation.observation = f"observation {step_count['count']}"
+            info.action_tool_call = tool
+            return info
+
+        mock_env.reset.return_value = mock_env_info
+        mock_env.step.side_effect = mock_env_step
+        mock_env.info = mock_env_info
+
+        agent.run(mock_env, replay_actions=replay_actions)
+
+        # Verify all 5 actions were executed in order
+        assert mock_env.step.call_count == 5
+        calls = mock_env.step.call_args_list
+        for i, call in enumerate(calls):
+            assert call[0][0].id == f"action_{i}"
+            assert call[0][0].arguments == {"order": i}

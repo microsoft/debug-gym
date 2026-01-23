@@ -2,12 +2,13 @@ import json
 import os
 import uuid
 from dataclasses import MISSING, asdict, dataclass, field, fields
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from jinja2 import Environment, FileSystemLoader, Template
 
 from debug_gym.agents.history_tracker import HistoryTracker
 from debug_gym.gym.envs.env import EnvInfo, RepoEnv
+from debug_gym.gym.terminals.terminal import UnrecoverableTerminalError
 from debug_gym.gym.utils import filter_non_utf8
 from debug_gym.llms.base import LLM, LLMResponse
 from debug_gym.llms.utils import trim
@@ -293,11 +294,17 @@ class BaseAgent:
         return self.llm(messages, info.tools)
 
     def execute_action(self, llm_response: LLMResponse | List[LLMResponse]) -> EnvInfo:
-        next_info = self.env.step(
-            llm_response.tool,
-            llm_response.response,
-            llm_response.reasoning_response,
-        )
+        try:
+            next_info = self.env.step(
+                llm_response.tool,
+                llm_response.response,
+                llm_response.reasoning_response,
+            )
+        except UnrecoverableTerminalError as e:
+            # Record the failed step in history if env_info is available
+            if e.env_info is not None:
+                self.history.step(e.env_info, llm_response)
+            raise
         self.history.step(next_info, llm_response)
         return next_info
 
@@ -324,6 +331,7 @@ class BaseAgent:
         env: RepoEnv,
         debug: bool = False,
         reset_env: bool = True,
+        replay_actions: list = None,
     ) -> Dict[str, Any]:
         """Run the agent loop until termination or max steps.
 
@@ -331,81 +339,88 @@ class BaseAgent:
             env: The environment to interact with.
             debug: Whether to drop into debugger after each LLM call.
             reset_env: Whether to reset the environment (default True).
+            replay_actions: List of LLMResponse objects to replay before continuing
+                with new LLM calls. Used for retry after terminal failures.
 
         Returns:
             The trajectory as a JSON-serializable dict.
         """
         info = None
         step = 0
+        replay_actions = replay_actions or []
+        replay_index = 0
 
         # assign the env
         self.env = env
 
-        try:
-            if reset_env:
-                info = env.reset()
-            else:
-                info = env.info
+        if reset_env:
+            info = env.reset()
+        else:
+            info = env.info
 
-            self.init(info)
+        self.init(info)
 
-            if info.resolved:
-                self.logger.report_progress(
-                    problem_id=env.task_name,
-                    step=0,
-                    total_steps=self.args.max_steps,
-                    score=info.score,
-                    max_score=info.max_score,
-                    status="resolved",
-                )
-                return self.build_trajectory()
-
-            highscore = info.score
-            should_stop = False
-            step = 1
-
-            while not should_stop:
-                self.logger.info(f"\n{'='*20} STEP {step} {'='*20}\n")
-
-                agent_response = self.step(info)
-                info = self.execute_action(agent_response)
-
-                if debug:
-                    breakpoint()
-
-                should_stop, reason = self.should_stop(step + 1, info)
-                status = (
-                    "resolved"
-                    if info.resolved
-                    else ("unresolved" if should_stop else "running")
-                )
-
-                highscore = max(highscore, info.score)
-                msg = f"[{env.task_name[:10]:<10}] Step {step} | Score: {info.score}/{info.max_score or '-'} [Best: {highscore}]"
-                if should_stop:
-                    msg += f" | Stopping Reason: {reason}"
-                self.logger.info(msg)
-                step += 1
-
-                self.logger.report_progress(
-                    problem_id=env.task_name,
-                    step=step,
-                    total_steps=self.args.max_steps,
-                    score=info.score,
-                    max_score=info.max_score,
-                    status=status,
-                )
+        if info.resolved:
+            self.logger.report_progress(
+                problem_id=env.task_name,
+                step=0,
+                total_steps=self.args.max_steps,
+                score=info.score,
+                max_score=info.max_score,
+                status="resolved",
+            )
             return self.build_trajectory()
-        except Exception as e:
+
+        highscore = info.score
+        should_stop = False
+        step = 1
+
+        while not should_stop:
+            self.logger.info(f"\n{'='*20} STEP {step} {'='*20}\n")
+
+            # Check if we should replay a previous action or generate a new one
+            if replay_index < len(replay_actions):
+                agent_response = replay_actions[replay_index]
+                replay_index += 1
+                # Log replay details similar to replay.py
+                self.logger.info(
+                    f"[REPLAY] Replaying step {replay_index} from previous attempt:\n"
+                    f"  Tool: {agent_response.tool.name}\n"
+                    f"  Args: {agent_response.tool.arguments}\n"
+                    f"  Reasoning: {agent_response.reasoning_response[:100] if agent_response.reasoning_response else None}...\n"
+                    f"  Content: {agent_response.response[:100] if agent_response.response else None}..."
+                )
+            else:
+                agent_response = self.step(info)
+
+            info = self.execute_action(agent_response)
+
+            if debug:
+                breakpoint()
+
+            should_stop, reason = self.should_stop(step + 1, info)
+            status = (
+                "resolved"
+                if info.resolved
+                else ("unresolved" if should_stop else "running")
+            )
+
+            highscore = max(highscore, info.score)
+            msg = f"[{env.task_name[:10]:<10}] Step {step} | Score: {info.score}/{info.max_score or '-'} [Best: {highscore}]"
+            if should_stop:
+                msg += f" | Stopping Reason: {reason}"
+            self.logger.info(msg)
+            step += 1
+
             self.logger.report_progress(
                 problem_id=env.task_name,
                 step=step,
-                total_steps=step,
-                score=getattr(info, "score", 0),
-                max_score=getattr(info, "max_score", None),
-                status="error",
+                total_steps=self.args.max_steps,
+                score=info.score,
+                max_score=info.max_score,
+                status=status,
             )
-            raise e
+        return self.build_trajectory()
 
 
 def create_agent(config: Dict[str, Any], **kwargs) -> BaseAgent:

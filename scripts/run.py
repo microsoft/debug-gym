@@ -7,9 +7,15 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 
 from debug_gym.agents.base_agent import AGENT_REGISTRY, create_agent
-from debug_gym.agents.utils import load_config, save_patch, save_trajectory
+from debug_gym.agents.utils import (
+    load_config,
+    load_trajectory,
+    save_patch,
+    save_trajectory,
+)
 from debug_gym.experiment import create_env, dump_experiment_info
 from debug_gym.gym.envs import load_dataset
+from debug_gym.gym.terminals.terminal import UnrecoverableTerminalError
 from debug_gym.llms.base import LLM
 from debug_gym.llms.human import Human
 from debug_gym.logger import DebugGymLogger, load_previous_run_status
@@ -40,10 +46,6 @@ def run_agent(args, task_name: str, task_data: dict, config: dict):
     set_signal(args.timeout)
     success = True
     env = None
-
-    # Flag to not report errors from the agent, since they report
-    # errors themselves and we want to avoid double reporting.
-    report_progress_error = True
 
     task_path = Path(config["output_path"]) / task_name
 
@@ -76,6 +78,8 @@ def run_agent(args, task_name: str, task_data: dict, config: dict):
                 task_logger.debug(f"Skipping {task_name}, already done.")
                 return success
 
+        max_retries = args.max_retries
+
         task_logger.report_progress(
             problem_id=task_name,
             step=0,
@@ -85,54 +89,72 @@ def run_agent(args, task_name: str, task_data: dict, config: dict):
             status="running",
         )
 
-        env = create_env(config, task_data, task_logger)
-        llm = LLM.instantiate(**config.get("llm", {}), logger=task_logger)
-        agent = create_agent(config.get("agent", {}), llm=llm, logger=task_logger)
-
-        try:
-            success = agent.run(env, debug=args.debug)
-        except KeyboardInterrupt:
-            task_logger.error("Agent run was interrupted by user.")
-            task_logger.report_progress(
-                problem_id=task_name,
-                step=1,
-                total_steps=1,
-                score=0,
-                max_score=None,
-                status="error",
-            )
-            success = False
-            raise
-        except AgentTimeoutException:
-            task_logger.error(
-                f"Timeout: Problem `{task_name}` exceeded "
-                f"the time limit of {args.timeout} seconds."
-            )
-            task_logger.report_progress(
-                problem_id=task_name,
-                step=1,
-                total_steps=1,
-                score=0,
-                max_score=None,
-                status="error",
-            )
-            success = False
-            raise
-        except:
-            report_progress_error = False
-            raise
-
-        # save trajectory
-        save_trajectory(agent, task_path, task_logger)
-
-        # optionally apply patch
-        if config.get("save_patch", True):
+        # Track actions from previous attempts for replay
+        replay_actions = None
+        for attempt in range(max_retries):
             try:
-                save_patch(env, task_path, task_logger)
-            except Exception as patch_error:
-                # Terminal may be unavailable (e.g., pod died), log and continue
-                task_logger.warning(f"Could not save patch: {patch_error!r}")
+                # Load actions from previous attempt for replay on retry
+                if attempt > 0:
+                    task_logger.info(f"Replaying actions from attempt {attempt}")
+                    # Load actions from previous attempt for replay
+                    replay_actions = load_trajectory(task_path, task_logger)
+                    task_logger.report_progress(
+                        problem_id=task_name,
+                        step=0,
+                        total_steps=1,
+                        score=0,
+                        max_score=None,
+                        status="running",
+                    )
 
+                env = create_env(config, task_data, task_logger)
+                llm = LLM.instantiate(**config.get("llm", {}), logger=task_logger)
+                agent = create_agent(
+                    config.get("agent", {}), llm=llm, logger=task_logger
+                )
+
+                success = agent.run(
+                    env,
+                    debug=args.debug,
+                    replay_actions=replay_actions,
+                )
+                break  # Exit retry loop
+            except (UnrecoverableTerminalError, AgentTimeoutException) as e:
+                # Close the failed environment
+                if env is not None:
+                    env.close()
+                    env = None
+
+                if attempt < max_retries - 1:
+                    # Save trajectory before retry so we can replay actions
+                    save_trajectory(agent, task_path, task_logger)
+                    task_logger.info(f"Retrying task {task_name}...")
+                else:
+                    task_logger.error(
+                        f"Task {task_name} failed after {max_retries} attempts."
+                    )
+                    task_logger.report_progress(
+                        problem_id=task_name,
+                        step=1,
+                        total_steps=1,
+                        score=0,
+                        max_score=None,
+                        status="error",
+                    )
+                    success = False
+                    raise
+            except KeyboardInterrupt:
+                task_logger.error("Agent run was interrupted by user.")
+                task_logger.report_progress(
+                    problem_id=task_name,
+                    step=1,
+                    total_steps=1,
+                    score=0,
+                    max_score=None,
+                    status="error",
+                )
+                success = False
+                raise
     except Exception as e:
         task_logger.error(
             f"Task Error: {task_name} - {e!r}. Run with --very-verbose "
@@ -141,24 +163,27 @@ def run_agent(args, task_name: str, task_data: dict, config: dict):
         task_logger.debug(
             f"Task {task_name} generated an exception: {e!r}. Traceback: {traceback.format_exc()}"
         )
-        if report_progress_error:
-            task_logger.report_progress(
-                problem_id=task_name,
-                step=1,
-                total_steps=1,
-                score=0,
-                max_score=None,
-                status="error",
-            )
+        task_logger.report_progress(
+            problem_id=task_name,
+            step=1,
+            total_steps=1,
+            score=0,
+            max_score=None,
+            status="error",
+        )
         if args.debug:
-            raise e
+            raise
 
         success = False
     finally:
-        # Close env and cancel any pending alarm
-        signal.alarm(0)
+        # Save trajectory and patch, close env and cancel any pending alarm
+        if agent is not None:
+            save_trajectory(agent, task_path, task_logger)
         if env:
+            if config.get("save_patch", True):  # optionally apply patch
+                save_patch(env, task_path, task_logger)
             env.close()
+        signal.alarm(0)
     return success
 
 
@@ -177,7 +202,7 @@ def main():
 
     # Load the dataset based on the information found in the config.
     if config.get("task_data") is not None:
-        dataset = {f"custom-task": config["task_data"]}
+        dataset = {"custom-task": config["task_data"]}
     else:
         dataset = load_dataset(config["dataset"], logger=logger)
 
@@ -222,8 +247,6 @@ def main():
             for problem in problems:
                 try:
                     run_agent(args, problem, dataset[problem], config)
-                except AgentTimeoutException:
-                    pass  # Handled in run_agent, just continue
                 except (KeyboardInterrupt, Exception) as e:
                     raise e
         else:
@@ -242,8 +265,6 @@ def main():
                     try:
                         problem = futures[future]
                         future.result()
-                    except AgentTimeoutException:
-                        pass  # Handled in run_agent, just continue
                     except (KeyboardInterrupt, Exception) as e:
                         executor.shutdown(wait=True, cancel_futures=True)
                         raise e
