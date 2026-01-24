@@ -1,3 +1,4 @@
+import atexit
 import json
 import logging
 import multiprocessing as mp
@@ -526,6 +527,7 @@ class DebugGymLogger(logging.Logger):
     PROGRESS_QUEUE = mp.Queue(maxsize=30000)  # macOS has semaphore limit ~32767
     _is_worker = False
     _main_process_logger = None
+    _cleanup_registered = False
 
     @classmethod
     def is_worker(cls):
@@ -604,6 +606,12 @@ class DebugGymLogger(logging.Logger):
         )
         self._log_listener_thread.start()
 
+        # Register atexit handler to ensure cleanup on exit
+        # This prevents multiprocessing._exit_function from hanging
+        if not DebugGymLogger._cleanup_registered:
+            atexit.register(DebugGymLogger._cleanup_queues)
+            DebugGymLogger._cleanup_registered = True
+
     def _initialize_file_handler(self, name: str, mode: str):
         self.log_file = log_file_path(self.log_dir, "debug_gym")
         fh = logging.FileHandler(self.log_file, mode=mode)
@@ -645,7 +653,9 @@ class DebugGymLogger(logging.Logger):
     def close(self):
         if self._log_listener_thread is not None:
             self._log_listener_stop_event.set()
-            self._log_listener_thread.join()
+            # Only join if we're not in the same thread (can happen during __del__)
+            if threading.current_thread() != self._log_listener_thread:
+                self._log_listener_thread.join(timeout=1.0)
         # Close all file handlers to release file handles
         for handler in self.handlers[:]:
             if isinstance(handler, logging.FileHandler):
@@ -654,6 +664,30 @@ class DebugGymLogger(logging.Logger):
 
     def __del__(self):
         self.close()
+
+    @classmethod
+    def _cleanup_queues(cls):
+        """Clean up multiprocessing queues to prevent hanging on exit.
+
+        This is registered as an atexit handler to ensure the queue feeder
+        threads don't block multiprocessing._exit_function during shutdown.
+        """
+        # Signal listener thread to stop if main logger exists
+        if cls._main_process_logger is not None:
+            logger = cls._main_process_logger
+            if logger._log_listener_stop_event is not None:
+                logger._log_listener_stop_event.set()
+
+        # Cancel join on queue feeder threads to prevent blocking on exit
+        # This tells Python not to wait for the feeder threads during shutdown
+        try:
+            cls.LOG_QUEUE.cancel_join_thread()
+        except Exception:
+            pass
+        try:
+            cls.PROGRESS_QUEUE.cancel_join_thread()
+        except Exception:
+            pass
 
     def setLevel(self, level: int | str) -> None:
         """Set the logging level for console output.
