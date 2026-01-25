@@ -49,6 +49,10 @@ class HuggingFaceLLM(OpenAILLM):
                 )
         return self._hf_tokenizer
 
+    # Maximum content size to attempt tokenization (500KB)
+    # Very large content can cause tokenization failures
+    MAX_TOKENIZE_CHARS = 500_000
+
     def tokenize(self, messages: list[dict]) -> list[list[str]]:
         tokenizer = self._load_tokenizer()
 
@@ -61,7 +65,7 @@ class HuggingFaceLLM(OpenAILLM):
                 add_generation_prompt=True,
                 enable_thinking=self.enable_thinking,
             )
-            tokens = tokenizer.tokenize(text)
+            tokens = self._safe_tokenize(tokenizer, text)
             # Return as list with single element (all tokens together)
             return [tokens]
         else:
@@ -69,9 +73,28 @@ class HuggingFaceLLM(OpenAILLM):
             result = []
             for msg in messages:
                 content = str(msg["content"])
-                tokens = tokenizer.tokenize(content)
+                tokens = self._safe_tokenize(tokenizer, content)
                 result.append(tokens)
             return result
+
+    def _safe_tokenize(self, tokenizer, content: str) -> list[str]:
+        """Safely tokenize content with fallback for large or problematic inputs."""
+        # Skip tokenization for very large content
+        if len(content) > self.MAX_TOKENIZE_CHARS:
+            self.logger.debug(
+                f"Content too large for tokenization ({len(content):,} chars), "
+                "using character-based estimate"
+            )
+            return self._estimate_tokens(content)
+
+        try:
+            return tokenizer.tokenize(content)
+        except Exception as e:
+            self.logger.warning(
+                f"Tokenization failed ({type(e).__name__}: {e}), "
+                "using character-based estimate"
+            )
+            return self._estimate_tokens(content)
 
     def generate(
         self, messages, tools, tool_choice="required", **kwargs

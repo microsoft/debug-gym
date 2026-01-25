@@ -320,6 +320,18 @@ class LLM(ABC):
         tokenized = self.tokenize(messages)
         return sum(len(tokens) for tokens in tokenized)
 
+    def _estimate_tokens(self, content: str) -> list[str]:
+        """Estimate token count using character-based heuristic.
+
+        Uses ~4 characters per token as a conservative estimate for English/code.
+        Returns placeholder tokens to maintain the expected return type.
+
+        This is useful as a fallback when tokenization fails (e.g., stack overflow
+        on very large inputs) or when a tokenizer is not available.
+        """
+        estimated_count = max(1, len(content) // 4)
+        return ["_"] * estimated_count
+
     @abstractmethod
     def define_tools(self, tool_call_list: list[EnvironmentTool]) -> list[dict]:
         """Translates the list of tools into a format that is specifically defined by each LLM.
