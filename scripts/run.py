@@ -46,6 +46,7 @@ def run_agent(args, task_name: str, task_data: dict, config: dict):
     set_signal(args.timeout)
     success = True
     env = None
+    agent = None
 
     task_path = Path(config["output_path"]) / task_name
 

@@ -610,3 +610,22 @@ def test_context_length_exceeded_with_successful_truncation(
         if "API reported context exceeded" in msg
     ]
     assert len(retry_calls) == 1
+
+
+def test_estimate_tokens_minimum_one(llm_class_mock, logger_mock):
+    """Test that _estimate_tokens returns at least 1 token for small content."""
+    llm_config = LLMConfig(model="test", context_limit=4)
+    llm = llm_class_mock(model_name="test", llm_config=llm_config, logger=logger_mock)
+
+    # Content with only 2 characters (2 // 4 = 0, but should return at least 1)
+    result = llm._estimate_tokens("ab")
+    assert len(result) >= 1
+
+    # Empty content should also return at least 1
+    result = llm._estimate_tokens("")
+    assert len(result) >= 1
+
+    # Normal content should return approximately len/4 tokens
+    content = "Hello, world! This is a test."
+    result = llm._estimate_tokens(content)
+    assert len(result) == len(content) // 4

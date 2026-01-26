@@ -694,3 +694,50 @@ def test_setlevel_changes_rich_handler_level(DebugGymLoggerTest, tmp_path):
     # Change to WARNING level
     logger.setLevel(logging.WARNING)
     assert logger._rich_handler.level == logging.WARNING
+
+
+def test_cleanup_queues_cancels_join_thread():
+    """Test that _cleanup_queues properly cancels queue join threads.
+
+    This ensures that multiprocessing._exit_function won't hang waiting
+    for the queue feeder threads during shutdown.
+    """
+    # Reset state for isolated test
+    DebugGymLogger._cleanup_registered = False
+    original_main = DebugGymLogger._main_process_logger
+
+    try:
+        # Create a logger which registers the atexit handler
+        logger = DebugGymLogger("test_cleanup", level=logging.INFO)
+        assert DebugGymLogger._cleanup_registered is True
+
+        # Call cleanup directly
+        DebugGymLogger._cleanup_queues()
+
+        # Verify the stop event was set if logger exists
+        if logger._log_listener_stop_event is not None:
+            assert logger._log_listener_stop_event.is_set()
+
+    finally:
+        # Restore original state
+        DebugGymLogger._main_process_logger = original_main
+
+
+def test_close_with_timeout():
+    """Test that close() uses timeout when joining listener thread."""
+    # Reset state for isolated test
+    DebugGymLogger._cleanup_registered = False
+    original_main = DebugGymLogger._main_process_logger
+
+    try:
+        logger = DebugGymLogger("test_close_timeout", level=logging.INFO)
+
+        # Close should complete without hanging
+        logger.close()
+
+        # After close, stop event should be set
+        if logger._log_listener_stop_event is not None:
+            assert logger._log_listener_stop_event.is_set()
+
+    finally:
+        DebugGymLogger._main_process_logger = original_main

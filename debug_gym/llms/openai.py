@@ -81,12 +81,19 @@ class OpenAILLM(LLM):
                 pass  # Ignore errors during cleanup
             self._client = None
 
+    # Maximum content size to attempt tokenization (500KB)
+    # Larger content can cause tiktoken's Rust BPE encoder to stack overflow
+    MAX_TOKENIZE_CHARS = 500_000
+
     def tokenize(self, messages: list[dict]) -> list[list[str]]:
         if getattr(self, "_tk_func", None) is None:
             try:
                 encoder = _get_tiktoken_encoder(self.tokenizer_name)
                 # For tiktoken, encode returns list of ints, we need to convert to list of "tokens"
-                self._tk_func = lambda text: [str(t) for t in encoder.encode(text)]
+                # disallowed_special=() allows special tokens like <|endoftext|> in content
+                self._tk_func = lambda text: [
+                    str(t) for t in encoder.encode(text, disallowed_special=())
+                ]
             except KeyError:
                 raise ValueError(
                     f"Tokenizer `{self.tokenizer_name}` not found for model "
@@ -97,9 +104,37 @@ class OpenAILLM(LLM):
         result = []
         for msg in messages:
             content = str(msg.get("content", msg.get("tool_calls", msg)))
-            tokens = self._tk_func(content)
+            tokens = self._tokenize_content(content)
             result.append(tokens)
         return result
+
+    def _tokenize_content(self, content: str) -> list[str]:
+        """Safely tokenize content with fallback for large or problematic inputs.
+
+        Tiktoken's Rust-based BPE encoder can cause stack overflow on very large
+        inputs. This method:
+        1. Skips tokenization for content exceeding MAX_TOKENIZE_CHARS
+        2. Catches any tokenization errors and falls back to character estimate
+        """
+        # Skip tokenization for very large content to avoid stack overflow
+        if len(content) > self.MAX_TOKENIZE_CHARS:
+            self.logger.debug(
+                f"Content too large for tokenization ({len(content):,} chars), "
+                "using character-based estimate"
+            )
+            return self._estimate_tokens(content)
+
+        try:
+            return self._tk_func(content)
+        except Exception as e:
+            # Fallback for any tokenization errors (including Rust panics)
+            self.logger.warning(
+                f"Tokenization failed ({type(e).__name__}: {e}), "
+                "using character-based estimate"
+            )
+            return self._estimate_tokens(content)
+
+    # _estimate_tokens is inherited from base LLM class
 
     def need_to_be_retried(self, exception) -> bool:
         if isinstance(exception, OpenAIResponseParsingError):

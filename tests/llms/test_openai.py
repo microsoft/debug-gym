@@ -366,3 +366,135 @@ def test_openai_llm_raises_error_for_non_gpt_tokenizer(mock_llm_config, logger_m
 
     assert "Tokenizer `Qwen/Qwen3-0.6B` not found" in str(exc_info.value)
     assert "set tag `vllm`" in str(exc_info.value)
+
+
+class TestTokenizationSafety:
+    """Tests for tiktoken stack overflow protection."""
+
+    @patch.object(
+        LLMConfigRegistry,
+        "from_file",
+        return_value=LLMConfigRegistry.register_all(
+            {
+                "gpt4": {
+                    "model": "gpt-4",
+                    "tokenizer": "gpt-4",
+                    "context_limit": 128,
+                    "api_key": "test-api-key",
+                    "endpoint": "https://test-endpoint",
+                    "tags": ["openai"],
+                }
+            }
+        ),
+    )
+    def test_large_content_uses_character_estimate(self, mock_config, logger_mock):
+        """Test that content exceeding MAX_TOKENIZE_CHARS uses character-based estimate."""
+        llm = LLM.instantiate(name="gpt4", logger=logger_mock)
+
+        # Create content larger than MAX_TOKENIZE_CHARS
+        large_content = "x" * (OpenAILLM.MAX_TOKENIZE_CHARS + 1000)
+        messages = [{"role": "user", "content": large_content}]
+
+        result = llm.tokenize(messages)
+
+        # Should return estimated tokens (content_length // 4)
+        expected_estimate = len(large_content) // 4
+        assert len(result) == 1
+        assert len(result[0]) == expected_estimate
+        assert all(t == "_" for t in result[0])  # Placeholder tokens
+
+    @patch.object(
+        LLMConfigRegistry,
+        "from_file",
+        return_value=LLMConfigRegistry.register_all(
+            {
+                "gpt4": {
+                    "model": "gpt-4",
+                    "tokenizer": "gpt-4",
+                    "context_limit": 128,
+                    "api_key": "test-api-key",
+                    "endpoint": "https://test-endpoint",
+                    "tags": ["openai"],
+                }
+            }
+        ),
+    )
+    def test_tokenization_error_fallback(self, mock_config, logger_mock):
+        """Test that tokenization errors fall back to character estimate."""
+        llm = LLM.instantiate(name="gpt4", logger=logger_mock)
+
+        # Force initialization of _tk_func
+        llm.tokenize([{"role": "user", "content": "init"}])
+
+        # Replace _tk_func with one that raises an error
+        llm._tk_func = MagicMock(side_effect=RuntimeError("Simulated Rust panic"))
+
+        content = "Test content for fallback"
+        messages = [{"role": "user", "content": content}]
+
+        result = llm.tokenize(messages)
+
+        # Should fall back to character estimate
+        expected_estimate = len(content) // 4
+        assert len(result) == 1
+        assert len(result[0]) == expected_estimate
+        assert all(t == "_" for t in result[0])
+
+    @patch.object(
+        LLMConfigRegistry,
+        "from_file",
+        return_value=LLMConfigRegistry.register_all(
+            {
+                "gpt4": {
+                    "model": "gpt-4",
+                    "tokenizer": "gpt-4",
+                    "context_limit": 128,
+                    "api_key": "test-api-key",
+                    "endpoint": "https://test-endpoint",
+                    "tags": ["openai"],
+                }
+            }
+        ),
+    )
+    def test_normal_tokenization_still_works(self, mock_config, logger_mock):
+        """Test that normal-sized content is still tokenized properly."""
+        llm = LLM.instantiate(name="gpt4", logger=logger_mock)
+
+        messages = [{"role": "user", "content": "Hello, world!"}]
+        result = llm.tokenize(messages)
+
+        # Should return actual tokens (not placeholder "_")
+        assert len(result) == 1
+        assert len(result[0]) > 0
+        assert not all(t == "_" for t in result[0])  # Real tokens, not placeholders
+
+    @patch.object(
+        LLMConfigRegistry,
+        "from_file",
+        return_value=LLMConfigRegistry.register_all(
+            {
+                "gpt4": {
+                    "model": "gpt-4",
+                    "tokenizer": "gpt-4",
+                    "context_limit": 128,
+                    "api_key": "test-api-key",
+                    "endpoint": "https://test-endpoint",
+                    "tags": ["openai"],
+                }
+            }
+        ),
+    )
+    def test_special_tokens_in_content(self, mock_config, logger_mock):
+        """Test that special tokens like <|endoftext|> are handled correctly."""
+        llm = LLM.instantiate(name="gpt4", logger=logger_mock)
+
+        # Content containing special tokens that would normally cause tiktoken to raise
+        content_with_special = "Hello <|endoftext|> world"
+        messages = [{"role": "user", "content": content_with_special}]
+
+        # Should not raise an exception
+        result = llm.tokenize(messages)
+
+        # Should return tokens without error
+        assert len(result) == 1
+        assert len(result[0]) > 0
