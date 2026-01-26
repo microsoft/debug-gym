@@ -387,3 +387,22 @@ def test_view_unexpected_exception(env):
     )
     assert "RuntimeError" in env_info.step_observation.observation
     assert "Unexpected terminal error" in env_info.step_observation.observation
+
+
+def test_view_unrecoverable_terminal_error_is_reraised(env):
+    """Test that UnrecoverableTerminalError is re-raised for agent replay."""
+    from unittest.mock import patch
+
+    from debug_gym.gym.terminals.terminal import UnrecoverableTerminalError
+    from debug_gym.gym.tools.toolbox import Toolbox
+
+    view_tool = Toolbox.get_tool("view")
+
+    # Mock workspace.read_file to raise UnrecoverableTerminalError
+    with patch.object(
+        env.workspace,
+        "read_file",
+        side_effect=UnrecoverableTerminalError("Pod is not running"),
+    ):
+        with pytest.raises(UnrecoverableTerminalError):
+            view_tool.use(env, path="main.py")

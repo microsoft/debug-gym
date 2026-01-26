@@ -3,6 +3,7 @@ import re
 
 from debug_gym.gym.entities import Observation
 from debug_gym.gym.terminals.shell_session import ProcessNotRunningError, ShellSession
+from debug_gym.gym.terminals.terminal import UnrecoverableTerminalError
 from debug_gym.gym.tools.tool import EnvironmentTool
 from debug_gym.gym.tools.toolbox import Toolbox
 
@@ -231,6 +232,9 @@ class PDBTool(EnvironmentTool):
                 else:
                     output += f"Pdb command output:\n{pdb_out}"
                 self.update_breakpoints(environment)
+            except UnrecoverableTerminalError:
+                # Re-raise terminal errors for agent replay mechanism
+                raise
             except Exception:
                 success = False
 
