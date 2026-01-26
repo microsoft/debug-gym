@@ -59,6 +59,12 @@ class ViewTool(EnvironmentTool):
             file_content = environment.workspace.read_file(new_file)
         except WorkspaceReadError as e:
             return Observation(self.name, f"View failed. Error message:\n{str(e)}")
+        except Exception as e:
+            # Catch other exceptions (e.g., terminal errors) and return a user-friendly message
+            return Observation(
+                self.name,
+                f"View failed due to an unexpected error: {type(e).__name__}: {str(e)}",
+            )
         file_lines = file_content.splitlines()
 
         if not file_lines:

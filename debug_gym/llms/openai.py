@@ -90,7 +90,10 @@ class OpenAILLM(LLM):
             try:
                 encoder = _get_tiktoken_encoder(self.tokenizer_name)
                 # For tiktoken, encode returns list of ints, we need to convert to list of "tokens"
-                self._tk_func = lambda text: [str(t) for t in encoder.encode(text)]
+                # disallowed_special=() allows special tokens like <|endoftext|> in content
+                self._tk_func = lambda text: [
+                    str(t) for t in encoder.encode(text, disallowed_special=())
+                ]
             except KeyError:
                 raise ValueError(
                     f"Tokenizer `{self.tokenizer_name}` not found for model "

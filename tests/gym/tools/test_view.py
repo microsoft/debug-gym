@@ -360,3 +360,30 @@ def test_view_empty_file(env):
     )
     env_info = env.step(view_call)
     assert env_info.step_observation.observation == "The file `empty.py` is empty."
+
+
+def test_view_unexpected_exception(env):
+    """Test that unexpected exceptions are handled gracefully."""
+    from unittest.mock import patch
+
+    view_call = ToolCall(
+        id="view_id",
+        name="view",
+        arguments={"path": "main.py"},
+    )
+
+    # Mock workspace.read_file to raise an unexpected exception
+    with patch.object(
+        env.workspace,
+        "read_file",
+        side_effect=RuntimeError("Unexpected terminal error"),
+    ):
+        env_info = env.step(view_call)
+
+    assert env_info.step_observation.source == "view"
+    assert (
+        "View failed due to an unexpected error"
+        in env_info.step_observation.observation
+    )
+    assert "RuntimeError" in env_info.step_observation.observation
+    assert "Unexpected terminal error" in env_info.step_observation.observation

@@ -467,3 +467,34 @@ class TestTokenizationSafety:
         assert len(result) == 1
         assert len(result[0]) > 0
         assert not all(t == "_" for t in result[0])  # Real tokens, not placeholders
+
+    @patch.object(
+        LLMConfigRegistry,
+        "from_file",
+        return_value=LLMConfigRegistry.register_all(
+            {
+                "gpt4": {
+                    "model": "gpt-4",
+                    "tokenizer": "gpt-4",
+                    "context_limit": 128,
+                    "api_key": "test-api-key",
+                    "endpoint": "https://test-endpoint",
+                    "tags": ["openai"],
+                }
+            }
+        ),
+    )
+    def test_special_tokens_in_content(self, mock_config, logger_mock):
+        """Test that special tokens like <|endoftext|> are handled correctly."""
+        llm = LLM.instantiate(name="gpt4", logger=logger_mock)
+
+        # Content containing special tokens that would normally cause tiktoken to raise
+        content_with_special = "Hello <|endoftext|> world"
+        messages = [{"role": "user", "content": content_with_special}]
+
+        # Should not raise an exception
+        result = llm.tokenize(messages)
+
+        # Should return tokens without error
+        assert len(result) == 1
+        assert len(result[0]) > 0
