@@ -70,22 +70,21 @@ class Workspace:
         # Ignore debug gym hidden files
         ignore_patterns += [".debugignore", ".debugreadonly"]
 
-        ignore_patterns += (
-            self.read_file(".gitignore").splitlines()
-            if self.has_file(".gitignore")
-            else []
-        )
-        ignore_patterns += (
-            self.read_file(".debugignore").splitlines()
-            if self.has_file(".debugignore")
-            else []
-        )
+        # Read optional config files, gracefully handling missing files
+        # (the has_file check may pass but read_file can still fail due to
+        # race conditions or terminal errors)
+        for config_file in [".gitignore", ".debugignore"]:
+            try:
+                if self.has_file(config_file):
+                    ignore_patterns += self.read_file(config_file).splitlines()
+            except WorkspaceReadError:
+                pass  # File is optional, ignore if reading fails
 
-        readonly_patterns += (
-            self.read_file(".debugreadonly").splitlines()
-            if self.has_file(".debugreadonly")
-            else []
-        )
+        try:
+            if self.has_file(".debugreadonly"):
+                readonly_patterns += self.read_file(".debugreadonly").splitlines()
+        except WorkspaceReadError:
+            pass  # File is optional, ignore if reading fails
 
         # create a matcher function for ignored files, .debugignore has precedence over .gitignore
         self._is_ignored_func = make_file_matcher(
