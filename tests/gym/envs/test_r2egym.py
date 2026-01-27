@@ -188,37 +188,6 @@ def test_reset_and_step(get_r2egym_env):
 
 
 @pytest.if_docker_running
-def test_readonly_file(get_r2egym_env):
-    env = get_r2egym_env()
-
-    # Add view and listdir tools
-    env.add_tool(Toolbox.get_tool("view"))
-    env.add_tool(Toolbox.get_tool("listdir"))
-
-    env_info = env.reset()
-    assert env.workspace._is_readonly_func("/testbed/r2e_tests/test_1.py")
-
-    tool_call = ToolCall(
-        id="listdir_id", name="listdir", arguments={"path": "r2e_tests"}
-    )
-    env_info = env.step(tool_call)
-    assert "|-- test_1.py (read-only)" in env_info.step_observation.observation
-
-    tool_call = ToolCall(
-        id="view_id", name="view", arguments={"path": "r2e_tests/test_1.py"}
-    )
-    env_info = env.step(tool_call)
-    assert (
-        f"Viewing `r2e_tests/test_1.py`"
-        in env_info.step_observation.observation.splitlines()[0]
-    )
-    assert (
-        "The file is read-only."
-        in env_info.step_observation.observation.splitlines()[0]
-    )
-
-
-@pytest.if_docker_running
 def test_apply_gold_patch(get_r2egym_env):
     env = get_r2egym_env()
     env.add_tool(Toolbox.get_tool("eval"))

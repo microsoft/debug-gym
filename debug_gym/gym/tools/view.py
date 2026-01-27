@@ -116,13 +116,8 @@ class ViewTool(EnvironmentTool):
             if len(file_lines) > 0
             else ""
         )
-        read_only = (
-            " The file is read-only."
-            if not environment.workspace.is_editable(new_file)
-            else ""
-        )
         obs = (
-            f"Viewing `{new_file}`,{line_numbers}{read_only}{breakpoints_message}"
+            f"Viewing `{new_file}`,{line_numbers}{breakpoints_message}"
             f"\n\n```\n{display_content}\n```\n\n"
         )
         return Observation(self.name, obs)
