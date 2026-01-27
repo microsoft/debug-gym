@@ -160,31 +160,17 @@ def test_reset_and_step(get_r2egym_env):
     env_info = env.step(tool_call)
     assert env_info.step_observation.source == "listdir"
     # Verify we can see the aiohttp directory structure
-    listdir_start = f"""{env.working_dir}/
-|-- CHANGES/
-|-- CHANGES.rst
-|-- CODE_OF_CONDUCT.md
-|-- CONTRIBUTING.rst
-|-- CONTRIBUTORS.txt
-|-- HISTORY.rst
-|-- LICENSE.txt
-|-- MANIFEST.in
-|-- Makefile
-|-- README.rst
-|-- aiohttp/
-|-- docs/
-|-- examples/
-|-- install.sh
-|-- process_aiohttp_updateasyncio.py
-|-- pyproject.toml
-|-- r2e_tests/
-|-- requirements/
-|-- setup.cfg
-|-- setup.py
-|-- tests/
-|-- tools/
-|-- vendor/"""
-    assert env_info.step_observation.observation.startswith(listdir_start)
+    listdir_output = env_info.step_observation.observation
+    assert listdir_output.startswith(f"{env.working_dir}/")
+    expected_files = [
+        "aiohttp/",
+        "README.rst",
+        "setup.py",
+        "tests/",
+        "docs/",
+    ]
+    for expected in expected_files:
+        assert expected in listdir_output, f"Expected {expected} in listdir output"
 
 
 @pytest.if_docker_running

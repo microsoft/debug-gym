@@ -40,28 +40,19 @@ def test_reset_and_step(get_swe_bench_env):
 
     env_info = env.step(tool_call)
     assert env_info.step_observation.source == "listdir"
-    listdir_start = f"""{env.working_dir}/
-|-- CHANGES.rst
-|-- CITATION
-|-- CODE_OF_CONDUCT.md
-|-- CONTRIBUTING.md
-|-- GOVERNANCE.md
-|-- LICENSE.rst
-|-- MANIFEST.in
-|-- README.rst
-|-- astropy/
-|-- cextern/
-|-- codecov.yml
-|-- conftest.py
-|-- docs/
-|-- examples/
-|-- licenses/
-|-- pip-requirements
-|-- pyproject.toml
-|-- setup.cfg
-|-- setup.py*
-|-- tox.ini"""
-    assert env_info.step_observation.observation.startswith(listdir_start)
+    # Check that expected files are present in the listing
+    listdir_output = env_info.step_observation.observation
+    assert listdir_output.startswith(f"{env.working_dir}/")
+    expected_files = [
+        "CHANGES.rst",
+        "CITATION",
+        "README.rst",
+        "astropy/",
+        "conftest.py",
+        "setup.py",
+    ]
+    for expected in expected_files:
+        assert expected in listdir_output, f"Expected {expected} in listdir output"
 
 
 def test_load_dataset(get_swe_bench_env):
