@@ -139,54 +139,17 @@ def test_reset_and_step(get_swe_smith_env):
     env_info = env.step(tool_call)
     assert env_info.step_observation.source == "listdir"
     # Verify we can see the tldextract directory structure
-    listdir_start = f"""{env.working_dir}/
-|-- CHANGELOG.md
-|-- LICENSE
-|-- README.md
-|-- pyproject.toml
-|-- scripts/
-|-- tests/
-|-- tldextract/
-|-- tox.ini"""
-    assert env_info.step_observation.observation.startswith(listdir_start)
-
-
-@pytest.if_docker_running
-def test_readonly_file(get_swe_smith_env):
-    env = get_swe_smith_env()
-    env_info = env.reset()
-
-    env.add_tool(Toolbox.get_tool("view"))
-    env.add_tool(Toolbox.get_tool("listdir"))
-
-    for test_filename in env.test_directives:
-        test_filename = Path("/testbed") / test_filename
-        assert env.workspace._is_readonly_func(test_filename)
-
-        tool_call = ToolCall(
-            id="view_id", name="view", arguments={"path": str(test_filename)}
-        )
-        env_info = env.step(tool_call)
-        assert (
-            f"Viewing `{test_filename}`"
-            in env_info.step_observation.observation.splitlines()[0]
-        )
-        assert (
-            "The file is read-only."
-            in env_info.step_observation.observation.splitlines()[0]
-        )
-
-        tool_call = ToolCall(
-            id="listdir_id",
-            name="listdir",
-            arguments={"path": str(test_filename.parent)},
-        )
-        env_info = env.step(tool_call)
-        assert env_info.step_observation.source == "listdir"
-        assert (
-            f"|-- {test_filename.name} (read-only)"
-            in env_info.step_observation.observation
-        )
+    listdir_output = env_info.step_observation.observation
+    assert listdir_output.startswith(f"{env.working_dir}/")
+    expected_files = [
+        "CHANGELOG.md",
+        "LICENSE",
+        "README.md",
+        "tldextract/",
+        "tests/",
+    ]
+    for expected in expected_files:
+        assert expected in listdir_output, f"Expected {expected} in listdir output"
 
 
 @pytest.if_docker_running

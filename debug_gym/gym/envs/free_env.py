@@ -62,10 +62,8 @@ class FreeEnv(RepoEnv):
                 src=self.task_data["local_path"], target=self.workspace.working_dir
             )
 
-        self.workspace.setup_file_filters()  # Use codebase's .debugignore and .debugreadonly.
-
     def setup_terminal(self) -> None:
-        """Apply FreeEnv tweaks and reuse RepoEnv git boo? but the agent cantstrapping when enabled."""
+        """Apply FreeEnv tweaks and reuse RepoEnv git bootstrapping when enabled."""
 
         self.logger.info(f"Configuring {self.terminal}...")
 
@@ -73,25 +71,10 @@ class FreeEnv(RepoEnv):
         for cmd in self.task_data.get("setup_commands", []):
             self.terminal.run(cmd, raises=True)
 
-        # self.terminal.run(
-        #     f"mkdir -p {shlex.quote(self._workspace_dir)}",
-        #     raises=True,
-        # )
-
         if self._git_available():
             self.terminal.run("git init")
             self.terminal.run("git config user.name 'debug-gym'")
             self.terminal.run("git config user.email '<>'")
-
-            # self.terminal.run(
-            #     "git add *.py *.txt"
-            # )  # Aider tasks only have Python and text files.
-            # self.terminal.run("git commit -am 'Init'")
-
-            # self.terminal.run(
-            #     "git add .debugignore .debugreadonly"
-            # )  # Aider tasks come with those.
-            # self.terminal.run("git commit -am 'Add debug-gym ignore and read-only files'")
 
     def _git_available(self) -> bool:
         """Check for git presence before attempting repository initialization."""

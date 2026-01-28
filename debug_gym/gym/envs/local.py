@@ -42,7 +42,6 @@ class LocalEnv(RepoEnv):
         """Setup the workspace. Called once at reset."""
         self.workspace.reset()
         self.workspace.copy_content(self.path)
-        self.workspace.setup_file_filters()
 
     def setup_terminal(self) -> None:
         """Setup the terminal. Called once at reset."""
@@ -55,6 +54,3 @@ class LocalEnv(RepoEnv):
 
         self.terminal.run("git add *")
         self.terminal.run("git commit -am 'Init'")
-
-        self.terminal.run("git add .debugignore .debugreadonly")
-        self.terminal.run("git commit -am 'Add debug-gym ignore and read-only files'")

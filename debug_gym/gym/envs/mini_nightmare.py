@@ -127,7 +127,6 @@ class MiniNightmareEnv(RepoEnv):
         self.workspace.copy_content(
             src=self.current_task["codebase"], target=self.workspace.working_dir
         )
-        self.workspace.setup_file_filters()  # Use codebase's .debugignore and .debugreadonly.
 
     def setup_terminal(self):
         self.logger.debug(f"Configuring {self.terminal}...")
@@ -140,11 +139,6 @@ class MiniNightmareEnv(RepoEnv):
             "git add *.py *.txt"
         )  # Mini-nightmare tasks only have Python and text files.
         self.terminal.run("git commit -am 'Init'")
-
-        self.terminal.run(
-            "git add .debugignore .debugreadonly"
-        )  # Mini-nightmare tasks come with those.
-        self.terminal.run("git commit -am 'Add debug-gym ignore and read-only files'")
 
     @classmethod
     def load_dataset(
@@ -175,8 +169,6 @@ class MiniNightmareEnv(RepoEnv):
             required_files = [
                 "test.py",
                 f"{task_name}_code.py",
-                ".debugignore",
-                ".debugreadonly",
             ]
             for required_file in required_files:
                 file_path = task_path / required_file

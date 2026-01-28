@@ -160,62 +160,17 @@ def test_reset_and_step(get_r2egym_env):
     env_info = env.step(tool_call)
     assert env_info.step_observation.source == "listdir"
     # Verify we can see the aiohttp directory structure
-    listdir_start = f"""{env.working_dir}/
-|-- CHANGES/
-|-- CHANGES.rst
-|-- CODE_OF_CONDUCT.md
-|-- CONTRIBUTING.rst
-|-- CONTRIBUTORS.txt
-|-- HISTORY.rst
-|-- LICENSE.txt
-|-- MANIFEST.in
-|-- Makefile
-|-- README.rst
-|-- aiohttp/
-|-- docs/
-|-- examples/
-|-- install.sh
-|-- process_aiohttp_updateasyncio.py
-|-- pyproject.toml
-|-- r2e_tests/
-|-- requirements/
-|-- setup.cfg
-|-- setup.py
-|-- tests/
-|-- tools/
-|-- vendor/"""
-    assert env_info.step_observation.observation.startswith(listdir_start)
-
-
-@pytest.if_docker_running
-def test_readonly_file(get_r2egym_env):
-    env = get_r2egym_env()
-
-    # Add view and listdir tools
-    env.add_tool(Toolbox.get_tool("view"))
-    env.add_tool(Toolbox.get_tool("listdir"))
-
-    env_info = env.reset()
-    assert env.workspace._is_readonly_func("/testbed/r2e_tests/test_1.py")
-
-    tool_call = ToolCall(
-        id="listdir_id", name="listdir", arguments={"path": "r2e_tests"}
-    )
-    env_info = env.step(tool_call)
-    assert "|-- test_1.py (read-only)" in env_info.step_observation.observation
-
-    tool_call = ToolCall(
-        id="view_id", name="view", arguments={"path": "r2e_tests/test_1.py"}
-    )
-    env_info = env.step(tool_call)
-    assert (
-        f"Viewing `r2e_tests/test_1.py`"
-        in env_info.step_observation.observation.splitlines()[0]
-    )
-    assert (
-        "The file is read-only."
-        in env_info.step_observation.observation.splitlines()[0]
-    )
+    listdir_output = env_info.step_observation.observation
+    assert listdir_output.startswith(f"{env.working_dir}/")
+    expected_files = [
+        "aiohttp/",
+        "README.rst",
+        "setup.py",
+        "tests/",
+        "docs/",
+    ]
+    for expected in expected_files:
+        assert expected in listdir_output, f"Expected {expected} in listdir output"
 
 
 @pytest.if_docker_running

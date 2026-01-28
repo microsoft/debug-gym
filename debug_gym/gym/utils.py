@@ -5,7 +5,7 @@ import tempfile
 import zipfile
 from os.path import join as pjoin
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 import requests
 from tqdm import tqdm
@@ -47,84 +47,6 @@ def show_line_number(code_string, code_path=None, environment=None, start_index=
         _tmp = "{:<2}{:>{}} {}".format(_tmp, line_number, line_number_digit, line)
         output.append(_tmp)
     return "\n".join(output)
-
-
-def make_file_matcher(
-    base_dir: str | Path,
-    pattern_files: list[str | Path] | str | Path,
-    patterns: list[str] | None = None,
-) -> Callable[[str | Path], bool]:
-    """
-    Creates a file matcher function based on ignore patterns from files and additional patterns.
-
-    Args:
-        base_dir (str | Path): The base directory to normalize the patterns against.
-        pattern_files (list[str | Path] | str | Path): Path(s) to file(s) containing gitignore-like patterns.
-        patterns (list[str]): Additional patterns to include. Defaults to an empty list.
-
-    Returns:
-        function: A function that takes a file path as input and returns True if the file matches any of the patterns, False otherwise.
-    """
-    # Ref: gitignore_parser.parse_gitignore
-    from gitignore_parser import _normalize_path, handle_negation, rule_from_pattern
-
-    if patterns is None:
-        patterns = []
-
-    if isinstance(pattern_files, (str, Path)):
-        pattern_files = [pattern_files]
-
-    # iterate over all pattern files and read their contents
-    lines = []
-    for pattern_file in pattern_files:
-        pattern_file = Path(pattern_file)
-        if pattern_file.is_file():
-            with open(pattern_file) as ignore_file:
-                lines.extend(ignore_file.readlines())
-
-    # concatenate the additional patterns
-    lines += patterns
-
-    base_dir = _normalize_path(str(Path(base_dir)))
-    rules = []
-    for i, line in enumerate(lines):
-        line = line.rstrip("\n")
-        rule = rule_from_pattern(line.rstrip("\n"), base_dir, ("multiple_files", i))
-        if rule:
-            rules.append(rule)
-
-    if not any(r.negation for r in rules):
-        return lambda file_path: any(r.match(file_path) for r in rules)
-    else:
-        # We have negation rules. We can't use a simple "any" to evaluate them.
-        # Later rules override earlier rules.
-        return lambda file_path: handle_negation(file_path, rules)
-
-
-def create_ignore_file(
-    filepath: str | Path, patterns: list[str] = [], include_gitignore: bool = True
-):
-    """
-    Creates a file at the specified `filepath` containing gitignore-like patterns.
-
-    Files and directories matching the patterns in that file will be treated differently.
-    E.g., Files in a `.debugignore` file will be ignored by the environment.
-          Files in a `.debugreadonly` file will be marked as readonly.
-
-    Args:
-        filepath (str): The file path where to create the ignore file.
-        patterns (list[str]): A list of patterns to include in the ignore file.
-        include_gitignore (bool): If True, includes the contents of an existing .gitignore file
-                                  in the ignore file. Default is True.
-    """
-    path = Path(filepath)
-    gitignore_file = path.parent / ".gitignore"
-    if include_gitignore and gitignore_file.exists():
-        with open(gitignore_file) as f:
-            patterns = patterns + f.read().splitlines()
-
-    with open(path, "w") as f:
-        f.write("\n".join(patterns + [path.name]))
 
 
 def cleanup_pytest_output(output):

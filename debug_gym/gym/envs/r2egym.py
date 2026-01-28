@@ -137,10 +137,7 @@ class R2EGymEnv(RepoEnv):
     def setup_workspace(self):
         self.terminal.task_name = self.task_name
         self.terminal.base_image = self.base_image
-        # Ignore hidden files (dotfiles) and any contents under hidden directories
-        self.workspace.reset(
-            ignore_patterns=["**/.*"], readonly_patterns=["r2e_tests/**"]
-        )
+        self.workspace.reset()
         self.set_entrypoints(self.entrypoint, self.debug_entrypoint)
 
     def setup_terminal(self):

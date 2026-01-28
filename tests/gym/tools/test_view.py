@@ -24,9 +24,6 @@ def env(tmp_path):
     with open(repo_path / "test_1.py", "w") as f:
         f.write("def test_1():\n  assert False")
 
-    with open(repo_path / ".debugreadonly", "w") as f:
-        f.write("test_1.py")
-
     (repo_path / "empty.py").touch()  # Create an empty file
 
     env = LocalEnv(path=repo_path)
@@ -130,7 +127,7 @@ def test_view_valid_file_with_line_numbers_and_breakpoints(env):
     )
 
 
-def test_view_valid_read_only_file(env):
+def test_view_test_file(env):
     view_call = ToolCall(
         id="view_id",
         name="view",
@@ -140,7 +137,7 @@ def test_view_valid_read_only_file(env):
 
     assert env_info.step_observation.source == "view"
     assert env_info.step_observation.observation == (
-        "Viewing `test_1.py`, lines 1-2 of 2 total lines. The file is read-only.\n"
+        "Viewing `test_1.py`, lines 1-2 of 2 total lines.\n"
         "\n"
         "```\n"
         "def test_1():\n"
@@ -150,12 +147,12 @@ def test_view_valid_read_only_file(env):
     )
 
 
-def test_view_valid_read_only_file_with_line_numbers_no_breakpoints(env):
+def test_view_test_file_with_line_numbers_no_breakpoints(env):
     view_call = ToolCall(id="view_id", name="view", arguments={"path": "test_1.py"})
     env_info = env.step(view_call)
     assert env_info.step_observation.source == "view"
     assert env_info.step_observation.observation == (
-        "Viewing `test_1.py`, lines 1-2 of 2 total lines. The file is read-only.\n"
+        "Viewing `test_1.py`, lines 1-2 of 2 total lines.\n"
         "\n"
         "```\n"
         "     1 def test_1():\n"
@@ -165,7 +162,7 @@ def test_view_valid_read_only_file_with_line_numbers_no_breakpoints(env):
     )
 
 
-def test_view_valid_read_only_file_with_line_numbers_and_breakpoints(env):
+def test_view_test_file_with_line_numbers_and_breakpoints(env):
     # set a breakpoint at line 2 of test_1.py
     env.current_breakpoints_state[f"{env.working_dir}/test_1.py|||2"] = (
         "b test_1.py|||2"
@@ -175,7 +172,7 @@ def test_view_valid_read_only_file_with_line_numbers_and_breakpoints(env):
 
     assert env_info.step_observation.source == "view"
     assert env_info.step_observation.observation == (
-        "Viewing `test_1.py`, lines 1-2 of 2 total lines. The file is read-only. B indicates breakpoint before a certain line of code.\n"
+        "Viewing `test_1.py`, lines 1-2 of 2 total lines. B indicates breakpoint before a certain line of code.\n"
         "\n"
         "```\n"
         "     1 def test_1():\n"

@@ -112,7 +112,6 @@ class AiderBenchmarkEnv(RepoEnv):
         self.workspace.copy_content(
             src=self.current_task["codebase"], target=self.workspace.working_dir
         )
-        self.workspace.setup_file_filters()  # Use codebase's .debugignore and .debugreadonly.
 
     def setup_terminal(self):
         self.logger.info(f"Configuring {self.terminal}...")
@@ -125,11 +124,6 @@ class AiderBenchmarkEnv(RepoEnv):
             "git add *.py *.txt"
         )  # Aider tasks only have Python and text files.
         self.terminal.run("git commit -am 'Init'")
-
-        self.terminal.run(
-            "git add .debugignore .debugreadonly"
-        )  # Aider tasks come with those.
-        self.terminal.run("git commit -am 'Add debug-gym ignore and read-only files'")
 
     @classmethod
     def load_dataset(
@@ -160,20 +154,6 @@ class AiderBenchmarkEnv(RepoEnv):
             instructions += intro_md.read_text() if intro_md.exists() else ""
             instructions += instr_md.read_text() if instr_md.exists() else ""
             instructions += instr_more_md.read_text() if instr_more_md.exists() else ""
-
-            # Add .debugignore so all files are ignored except Python files.
-            utils.create_ignore_file(
-                directory / ".debugignore",
-                patterns=[
-                    ".?*",  # Ignore hidden files and directories but not current dir "."
-                    "__pycache__/",
-                    "*.pyc",
-                ],
-            )
-            # Add .debugreadonly so tests are readonly.
-            utils.create_ignore_file(
-                directory / ".debugreadonly", patterns=["*test*.py"]
-            )
 
             dataset[task_name] = {
                 "task_name": task_name,
