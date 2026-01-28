@@ -362,7 +362,7 @@ This provides a sandbox for developing and evaluating coding agents on arbitrary
 ```
 @article{yuan2025debuggym,
   title={debug-gym: A Text-Based Environment for Interactive Debugging},
-  author={Xingdi Yuan, Morgane M Moss, Charbel El Feghali, Chinmay Singh, Darya Moldavskaya, Drew MacPhee, Lucas Caccia, Matheus Pereira, Minseon Kim, Alessandro Sordoni, Marc-Alexandre C\^ot\'e},
+  author={Yuan, Xingdi and Moss, Morgane M and Feghali, Charbel El and Singh, Chinmay and Moldavskaya, Darya and MacPhee, Drew and Caccia, Lucas and Pereira, Matheus and Kim, Minseon and Sordoni, Alessandro and C\^ot\'e, Marc-Alexandre},
   journal={arXiv preprint arXiv:2503.21557},
   year={2025},
   url={https://arxiv.org/abs/2503.21557}
