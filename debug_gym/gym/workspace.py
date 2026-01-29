@@ -123,10 +123,7 @@ class Workspace:
 
     def write_file(self, filepath: str, content: str):
         """Writes `content` to `filepath` exactly as-is, preserving any trailing newlines."""
-        try:
-            abs_filepath = self.resolve_path(filepath, raises=False)
-        except Exception as exc:
-            raise WorkspaceWriteError(f"Failed to write `{filepath}`: {exc}") from exc
+        abs_filepath = self.resolve_path(filepath, raises=False)
 
         # Security check: ensure path is within workspace
         try:

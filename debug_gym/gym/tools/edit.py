@@ -112,10 +112,7 @@ class EditTool(EnvironmentTool):
         if path is None:
             return self.fail(environment, "File path is None.")
         # Resolve the target path to get absolute path (without checking existence).
-        try:
-            resolved_path = environment.workspace.resolve_path(path, raises=False)
-        except Exception as exc:
-            return self.fail(environment, f"Invalid path `{path}`: {exc}")
+        resolved_path = environment.workspace.resolve_path(path, raises=False)
 
         workspace_root = environment.workspace.working_dir
         try:
