@@ -256,3 +256,29 @@ def test_edit_new_file(env):
     with open(env.working_dir / filename, "r") as f:
         content = f.read()
     assert content == "def added():\n    return 'created'\n"
+
+
+def test_edit_path_outside_workspace_relative(env):
+    """Ensure path traversal attacks are blocked."""
+    edit_tool = env.get_tool("edit")
+    patch = {
+        "path": "../outside.py",
+        "new_code": "print('should not be created')",
+    }
+    obs = edit_tool.use(env, **patch)
+
+    assert not edit_tool.edit_success
+    assert "not within the workspace directory" in obs.observation
+
+
+def test_edit_path_outside_workspace_absolute(env):
+    """Ensure absolute paths outside workspace are blocked."""
+    edit_tool = env.get_tool("edit")
+    patch = {
+        "path": "/tmp/outside.py",
+        "new_code": "print('should not be created')",
+    }
+    obs = edit_tool.use(env, **patch)
+
+    assert not edit_tool.edit_success
+    assert "not within the workspace directory" in obs.observation

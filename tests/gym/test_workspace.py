@@ -5,7 +5,7 @@ import pytest
 
 from debug_gym.gym.terminals.docker import DockerTerminal
 from debug_gym.gym.terminals.local import LocalTerminal
-from debug_gym.gym.workspace import Workspace, WorkspaceReadError
+from debug_gym.gym.workspace import Workspace, WorkspaceReadError, WorkspaceWriteError
 
 
 @pytest.fixture
@@ -194,3 +194,17 @@ def test_write_file_exceeding_max_command_length(workspace):
     file_content_exceeding_max_command_length = "A" * (2 * 1024**2)  # 2MB of 'A's
     workspace.write_file("test.txt", file_content_exceeding_max_command_length)
     assert file_path.read_text() == file_content_exceeding_max_command_length
+
+
+def test_write_file_path_outside_workspace_relative(workspace):
+    """Ensure path traversal attacks are blocked."""
+    with pytest.raises(WorkspaceWriteError) as exc_info:
+        workspace.write_file("../outside.txt", "should not be created")
+    assert "outside the workspace" in str(exc_info.value)
+
+
+def test_write_file_path_outside_workspace_absolute(workspace):
+    """Ensure absolute paths outside workspace are blocked."""
+    with pytest.raises(WorkspaceWriteError) as exc_info:
+        workspace.write_file("/tmp/outside.txt", "should not be created")
+    assert "outside the workspace" in str(exc_info.value)
