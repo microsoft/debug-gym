@@ -30,12 +30,12 @@ def create_env(config: dict, task_data: dict, logger: DebugGymLogger):
 
 
 def register_mcp_servers(env, config: dict, logger: DebugGymLogger):
-    """Register MCP servers from config and add tools to env. Must be called per-process."""
+    """Register MCP servers from config and add tools to env."""
     mcp_servers = config.get("mcp_servers", {})
     if not mcp_servers:
         return
 
-    from debug_gym.gym.tools.mcp_proxy import register_mcp_server_sse
+    from debug_gym.gym.tools.mcp_proxy import discover_mcp_tools
 
     for server_id, server_config in mcp_servers.items():
         url = server_config.get("url")
@@ -44,16 +44,15 @@ def register_mcp_servers(env, config: dict, logger: DebugGymLogger):
             continue
 
         try:
-            tools = register_mcp_server_sse(
-                server_id=server_id,
+            tools = discover_mcp_tools(
                 url=url,
                 headers=server_config.get("headers"),
                 tool_prefix=server_config.get("tool_prefix", ""),
+                tool_filter=server_config.get("tools"),
             )
-            for tool_class in tools:
-                tool_instance = tool_class()
-                env.add_tool(tool_instance)
-                logger.debug(f"Adding MCP tool to toolbox: {tool_instance.name}")
+            for tool in tools:
+                env.add_tool(tool)
+                logger.debug(f"Adding MCP tool: {tool.name}")
         except Exception as e:
             logger.error(f"Failed to register MCP server '{server_id}': {e}")
 

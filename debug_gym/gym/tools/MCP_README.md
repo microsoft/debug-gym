@@ -1,18 +1,21 @@
 # MCP Proxy Tool
 
-Dynamically register tools from any MCP (Model Context Protocol) server as native `EnvironmentTool` instances. Uses the official MCP Python SDK for HTTP+SSE transport.
+Dynamically register tools from any MCP (Model Context Protocol) server as native `EnvironmentTool` instances. Each tool manages its own session to the MCP server.
 
 ## Usage
 
 ### Via Config (Recommended)
 
-Add MCP servers to your experiment config. This is **multi-process safe** - each worker creates its own connection.
+Add MCP servers to your experiment config:
 
 ```yaml
 mcp_servers:
   my-server:
     url: "http://localhost:8000/sse"
     tool_prefix: "mcp_"
+    tools:  # optional: list of tool names to include (omit to include all)
+      - query
+      - search
   another-server:
     url: "http://localhost:9000/sse"
     headers:
@@ -23,23 +26,57 @@ tools:
   - bash
   - view
   - edit
-  - mcp_query      # MCP tools available after registration
-  - mcp_search
+  # MCP tools are added automatically from mcp_servers config
 ```
+
+#### Config Options
+
+| Option | Required | Description |
+|--------|----------|-------------|
+| `url` | Yes | The SSE endpoint URL (e.g., `http://localhost:8000/sse`) |
+| `tool_prefix` | No | Prefix to add to tool names (e.g., `mcp_` → `mcp_query`) |
+| `headers` | No | HTTP headers for authentication |
+| `tools` | No | List of tool names to include. If omitted, all tools from the server are registered |
 
 ### Programmatic Registration
 
 ```python
-from debug_gym.gym.tools.mcp_proxy import register_mcp_server_sse
+from debug_gym.gym.tools.mcp_proxy import discover_mcp_tools
 
-tools = register_mcp_server_sse(
-    server_id="my-server",
-    url="http://127.0.0.1:8000/sse",
-    tool_prefix="mcp_"
+# Discover all tools from a server
+tools = discover_mcp_tools(
+    url="http://localhost:8000/sse",
+    tool_prefix="mcp_",
 )
 
 for tool in tools:
+    env.add_tool(tool)
     print(f"  - {tool.name}: {tool.description}")
+
+# Or filter specific tools
+tools = discover_mcp_tools(
+    url="http://localhost:8000/sse",
+    tool_filter=["query", "search"],
+)
+```
+
+### Direct Tool Creation
+
+```python
+from debug_gym.gym.tools.mcp_proxy import MCPTool
+
+# Create a single tool directly
+tool = MCPTool(
+    url="http://localhost:8000/sse",
+    mcp_tool_name="query",
+    tool_name="my_query",  # optional custom name
+    description="Query the database",
+    input_schema={
+        "properties": {"sql": {"type": "string"}},
+        "required": ["sql"],
+    },
+)
+env.add_tool(tool)
 ```
 
 ## Architecture
@@ -48,44 +85,18 @@ for tool in tools:
 MCP Server (Python/Node.js/etc.)
        │ HTTP + SSE
        ▼
-MCPClientSSE (uses official MCP SDK)
+MCPTool (each tool has its own session)
        │
        ▼
-MCPToolFactory (creates EnvironmentTool classes)
-       │
-       ▼
-Toolbox (bash, view, edit, mcp_tool1, mcp_tool2, ...)
+Environment (bash, view, edit, mcp_tool1, mcp_tool2, ...)
 ```
 
 ## Key Components
 
 | Component | Description |
 |-----------|-------------|
-| `MCPClientSSE` | Connects via HTTP+SSE using official MCP SDK |
-| `MCPToolFactory` | Converts MCP tool definitions to EnvironmentTool classes |
-| `MCPToolRegistry` | Manages multiple server connections |
-| `register_mcp_server_sse()` | Sync convenience function for registration |
-
-## Troubleshooting
-
-```python
-# Test connection
-import asyncio
-from debug_gym.gym.tools.mcp_proxy import MCPClientSSE
-
-async def test():
-    client = MCPClientSSE("http://localhost:8000/sse")
-    try:
-        await client.start()
-        result = await client.initialize()
-        print(f"Server: {result['serverInfo']['name']}")
-        tools = await client.list_tools()
-        print(f"Tools: {[t['name'] for t in tools]}")
-    finally:
-        await client.stop()
-
-asyncio.run(test())
-```
+| `MCPTool` | Tool that manages its own MCP session (lazy-initialized) |
+| `discover_mcp_tools()` | Discovers and creates tools from an MCP server |
 
 ## Resources
 
