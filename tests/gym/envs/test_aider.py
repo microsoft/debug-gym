@@ -44,22 +44,9 @@ def env(setup_aider_repo):
     return env
 
 
-def test_ignored_files(env):
+def test_files(env):
     assert env.workspace.has_file("clock_test.py")
     assert env.workspace.has_file("clock.py")
-    assert not env.workspace.has_file(".gitignore")
-    assert not env.workspace.has_file(".debugignore")
-    assert not env.workspace.has_file(".debugreadonly")
-    assert not env.workspace.has_file("nested/file.py")
-
-
-def test_is_editable_files(env):
-    assert env.workspace.is_editable("clock.py")
-    assert not env.workspace.is_editable("clock_test.py")
-    with pytest.raises(FileNotFoundError):
-        assert not env.workspace.is_editable("nested/file.py")
-    with pytest.raises(FileNotFoundError):
-        assert not env.workspace.is_editable(".debugignore")
 
 
 def test_steps(env):

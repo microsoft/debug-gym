@@ -174,19 +174,8 @@ env/
 
 @pytest.fixture
 def setup_grep_repo_env(setup_grep_test_repo):
-    def _setup_grep_repo_env(base_dir, ignore_patterns=None, readonly_patterns=None):
+    def _setup_grep_repo_env(base_dir):
         test_repo = setup_grep_test_repo(base_dir)
-
-        # Create ignore patterns file if specified
-        if ignore_patterns:
-            with (test_repo / ".debugignore").open("w") as f:
-                f.write("\n".join(ignore_patterns))
-
-        # Create readonly patterns file if specified
-        if readonly_patterns:
-            with (test_repo / ".debugreadonly").open("w") as f:
-                f.write("\n".join(readonly_patterns))
-
         env = LocalEnv(path=str(test_repo))
         grep_tool = GrepTool()
         env.reset()
