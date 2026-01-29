@@ -141,12 +141,21 @@ def test_reset_and_step(get_swe_smith_env):
     # Verify we can see the tldextract directory structure
     listdir_output = env_info.step_observation.observation
     assert listdir_output.startswith(f"{env.working_dir}/")
+    # Verify hidden files are now visible (new behavior after removing ignore patterns)
+    hidden_files = [".git/", ".gitignore"]
+    for hidden in hidden_files:
+        assert (
+            hidden in listdir_output
+        ), f"Expected hidden file {hidden} in listdir output"
+    # Verify project-specific files are present
     expected_files = [
         "CHANGELOG.md",
         "LICENSE",
         "README.md",
+        "pyproject.toml",
         "tldextract/",
         "tests/",
+        "tox.ini",
     ]
     for expected in expected_files:
         assert expected in listdir_output, f"Expected {expected} in listdir output"

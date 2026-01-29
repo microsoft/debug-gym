@@ -43,12 +43,23 @@ def test_reset_and_step(get_swe_bench_env):
     # Check that expected files are present in the listing
     listdir_output = env_info.step_observation.observation
     assert listdir_output.startswith(f"{env.working_dir}/")
+    # Verify hidden files are now visible (new behavior after removing ignore patterns)
+    hidden_files = [".git/", ".gitignore"]
+    for hidden in hidden_files:
+        assert (
+            hidden in listdir_output
+        ), f"Expected hidden file {hidden} in listdir output"
+    # Verify project-specific files are present
     expected_files = [
         "CHANGES.rst",
         "CITATION",
+        "CODE_OF_CONDUCT.md",
+        "CONTRIBUTING.md",
+        "LICENSE.rst",
         "README.rst",
         "astropy/",
         "conftest.py",
+        "docs/",
         "setup.py",
     ]
     for expected in expected_files:

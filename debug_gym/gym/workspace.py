@@ -123,7 +123,23 @@ class Workspace:
 
     def write_file(self, filepath: str, content: str):
         """Writes `content` to `filepath` exactly as-is, preserving any trailing newlines."""
-        abs_filepath = self.resolve_path(filepath, raises=False)
+        try:
+            abs_filepath = self.resolve_path(filepath, raises=False)
+        except Exception as exc:
+            raise WorkspaceWriteError(f"Failed to write `{filepath}`: {exc}") from exc
+
+        # Security check: ensure path is within workspace
+        try:
+            common = os.path.commonpath([str(self.working_dir), str(abs_filepath)])
+            if common != str(self.working_dir):
+                raise WorkspaceWriteError(
+                    f"Failed to write `{filepath}` because it is outside the workspace."
+                )
+        except ValueError:
+            # commonpath raises ValueError for paths on different drives (Windows)
+            raise WorkspaceWriteError(
+                f"Failed to write `{filepath}` because it is outside the workspace."
+            )
 
         def _run_or_raise(command: str):
             success, output = self.terminal.run(
