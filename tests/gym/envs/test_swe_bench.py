@@ -57,6 +57,7 @@ def test_reset_and_step(get_swe_bench_env):
 |-- MANIFEST.in
 |-- README.rst
 |-- astropy/
+|-- astropy.egg-info/
 |-- cextern/
 |-- codecov.yml
 |-- conftest.py

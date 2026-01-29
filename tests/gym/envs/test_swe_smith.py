@@ -153,6 +153,7 @@ def test_reset_and_step(get_swe_smith_env):
 |-- scripts/
 |-- tests/
 |-- tldextract/
+|-- tldextract.egg-info/
 |-- tox.ini"""
     assert listdir_expected in listdir_output
 
