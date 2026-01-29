@@ -106,11 +106,8 @@ class MCPTool(EnvironmentTool):
         if self._session is not None:
             return
 
-        try:
-            from mcp import ClientSession
-            from mcp.client.sse import sse_client
-        except ImportError:
-            raise RuntimeError("mcp package required. Install with: pip install mcp")
+        from mcp import ClientSession
+        from mcp.client.sse import sse_client
 
         self._context_stack = AsyncExitStack()
         read_stream, write_stream = await self._context_stack.enter_async_context(
@@ -170,11 +167,9 @@ def discover_mcp_tools(
     """
 
     async def _discover():
-        try:
-            from mcp import ClientSession
-            from mcp.client.sse import sse_client
-        except ImportError:
-            raise RuntimeError("mcp package required. Install with: pip install mcp")
+
+        from mcp import ClientSession
+        from mcp.client.sse import sse_client
 
         async with AsyncExitStack() as stack:
             read_stream, write_stream = await stack.enter_async_context(
