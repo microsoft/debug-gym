@@ -310,15 +310,15 @@ class TestRegisterMcpServers:
         from debug_gym.experiment import register_mcp_servers
 
         config = {
-            "mcp_servers": [
-                {
-                    "server_id": "test-server",
+            "mcp_servers": {
+                "test-server": {
                     "url": "http://localhost:19876/sse",
                     "tool_prefix": "test_",
                 }
-            ]
+            }
         }
 
+        mock_env = MagicMock()
         mock_logger = MagicMock()
 
         with patch(
@@ -326,7 +326,7 @@ class TestRegisterMcpServers:
         ) as mock_register:
             mock_register.return_value = []
 
-            register_mcp_servers(config, mock_logger)
+            register_mcp_servers(mock_env, config, mock_logger)
 
             mock_register.assert_called_once_with(
                 server_id="test-server",
@@ -340,16 +340,16 @@ class TestRegisterMcpServers:
         from debug_gym.experiment import register_mcp_servers
 
         config = {
-            "mcp_servers": [
-                {
-                    "server_id": "auth-server",
+            "mcp_servers": {
+                "auth-server": {
                     "url": "http://localhost:19876/sse",
                     "headers": {"Authorization": "Bearer token"},
                     "tool_prefix": "auth_",
                 }
-            ]
+            }
         }
 
+        mock_env = MagicMock()
         mock_logger = MagicMock()
 
         with patch(
@@ -357,7 +357,7 @@ class TestRegisterMcpServers:
         ) as mock_register:
             mock_register.return_value = []
 
-            register_mcp_servers(config, mock_logger)
+            register_mcp_servers(mock_env, config, mock_logger)
 
             mock_register.assert_called_once_with(
                 server_id="auth-server",
@@ -371,20 +371,19 @@ class TestRegisterMcpServers:
         from debug_gym.experiment import register_mcp_servers
 
         config = {
-            "mcp_servers": [
-                {
-                    "server_id": "server1",
+            "mcp_servers": {
+                "server1": {
                     "url": "http://localhost:8001/sse",
                     "tool_prefix": "s1_",
                 },
-                {
-                    "server_id": "server2",
+                "server2": {
                     "url": "http://localhost:8002/sse",
                     "tool_prefix": "s2_",
                 },
-            ]
+            }
         }
 
+        mock_env = MagicMock()
         mock_logger = MagicMock()
 
         with patch(
@@ -392,7 +391,7 @@ class TestRegisterMcpServers:
         ) as mock_register:
             mock_register.return_value = []
 
-            register_mcp_servers(config, mock_logger)
+            register_mcp_servers(mock_env, config, mock_logger)
 
             assert mock_register.call_count == 2
 
@@ -401,27 +400,28 @@ class TestRegisterMcpServers:
         from debug_gym.experiment import register_mcp_servers
 
         config = {}
+        mock_env = MagicMock()
         mock_logger = MagicMock()
 
         with patch(
             "debug_gym.gym.tools.mcp_proxy.register_mcp_server_sse"
         ) as mock_register:
-            register_mcp_servers(config, mock_logger)
+            register_mcp_servers(mock_env, config, mock_logger)
 
             mock_register.assert_not_called()
 
     def test_register_mcp_servers_invalid_config(self, clean_toolbox):
-        """Test with invalid MCP server config (missing required fields)."""
+        """Test with invalid MCP server config (missing url)."""
         from debug_gym.experiment import register_mcp_servers
 
         config = {
-            "mcp_servers": [
-                {"server_id": "no-url"},  # Missing url
-                {"url": "http://localhost:8000/sse"},  # Missing server_id
-                {"server_id": "valid", "url": "http://localhost:8000/sse"},  # Valid
-            ]
+            "mcp_servers": {
+                "no-url": {},  # Missing url
+                "valid": {"url": "http://localhost:8000/sse"},  # Valid
+            }
         }
 
+        mock_env = MagicMock()
         mock_logger = MagicMock()
 
         with patch(
@@ -429,24 +429,25 @@ class TestRegisterMcpServers:
         ) as mock_register:
             mock_register.return_value = []
 
-            register_mcp_servers(config, mock_logger)
+            register_mcp_servers(mock_env, config, mock_logger)
 
             # Only valid config should be registered
             mock_register.assert_called_once()
-            # Should log warnings for invalid configs
-            assert mock_logger.warning.call_count == 2
+            # Should log warning for invalid config
+            assert mock_logger.warning.call_count == 1
 
     def test_register_mcp_servers_handles_errors(self, clean_toolbox):
         """Test that registration errors are logged but don't stop other registrations."""
         from debug_gym.experiment import register_mcp_servers
 
         config = {
-            "mcp_servers": [
-                {"server_id": "failing", "url": "http://localhost:8001/sse"},
-                {"server_id": "working", "url": "http://localhost:8002/sse"},
-            ]
+            "mcp_servers": {
+                "failing": {"url": "http://localhost:8001/sse"},
+                "working": {"url": "http://localhost:8002/sse"},
+            }
         }
 
+        mock_env = MagicMock()
         mock_logger = MagicMock()
 
         with patch(
@@ -455,7 +456,38 @@ class TestRegisterMcpServers:
             # First call fails, second succeeds
             mock_register.side_effect = [Exception("Connection failed"), []]
 
-            register_mcp_servers(config, mock_logger)
+            register_mcp_servers(mock_env, config, mock_logger)
 
             assert mock_register.call_count == 2
             mock_logger.error.assert_called_once()
+
+    def test_register_mcp_servers_adds_tools_to_env(self, clean_toolbox):
+        """Test that tools are added to the environment."""
+        from debug_gym.experiment import register_mcp_servers
+
+        config = {
+            "mcp_servers": {
+                "test-server": {
+                    "url": "http://localhost:19876/sse",
+                }
+            }
+        }
+
+        mock_env = MagicMock()
+        mock_logger = MagicMock()
+
+        # Create mock tool classes that return instances
+        mock_tool_instance = MagicMock()
+        mock_tool_instance.name = "test_tool"
+        mock_tool_class = MagicMock(return_value=mock_tool_instance)
+
+        with patch(
+            "debug_gym.gym.tools.mcp_proxy.register_mcp_server_sse"
+        ) as mock_register:
+            mock_register.return_value = [mock_tool_class]
+
+            register_mcp_servers(mock_env, config, mock_logger)
+
+            # Verify tool was instantiated and added to env
+            mock_tool_class.assert_called_once()
+            mock_env.add_tool.assert_called_once_with(mock_tool_instance)

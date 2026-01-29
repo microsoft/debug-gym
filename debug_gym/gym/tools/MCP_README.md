@@ -10,10 +10,10 @@ Add MCP servers to your experiment config. This is **multi-process safe** - each
 
 ```yaml
 mcp_servers:
-  - server_id: "my-server"
+  my-server:
     url: "http://localhost:8000/sse"
     tool_prefix: "mcp_"
-  - server_id: "another-server"
+  another-server:
     url: "http://localhost:9000/sse"
     headers:
       Authorization: "Bearer token"
