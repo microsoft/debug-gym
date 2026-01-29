@@ -160,42 +160,37 @@ def test_reset_and_step(get_r2egym_env):
     env_info = env.step(tool_call)
     assert env_info.step_observation.source == "listdir"
     # Verify we can see the aiohttp directory structure
+    # Hidden files (like .git/) now appear first, followed by the original expected files
     listdir_output = env_info.step_observation.observation
     assert listdir_output.startswith(f"{env.working_dir}/")
-    # Verify hidden files are now visible (new behavior after removing ignore patterns)
-    hidden_files = [".git/"]
-    for hidden in hidden_files:
-        assert (
-            hidden in listdir_output
-        ), f"Expected hidden file {hidden} in listdir output"
-    # Verify all project-specific files are present (original list from before ignore removal)
-    expected_files = [
-        "CHANGES/",
-        "CHANGES.rst",
-        "CODE_OF_CONDUCT.md",
-        "CONTRIBUTING.rst",
-        "CONTRIBUTORS.txt",
-        "HISTORY.rst",
-        "LICENSE.txt",
-        "MANIFEST.in",
-        "Makefile",
-        "README.rst",
-        "aiohttp/",
-        "docs/",
-        "examples/",
-        "install.sh",
-        "process_aiohttp_updateasyncio.py",
-        "pyproject.toml",
-        "r2e_tests/",
-        "requirements/",
-        "setup.cfg",
-        "setup.py",
-        "tests/",
-        "tools/",
-        "vendor/",
-    ]
-    for expected in expected_files:
-        assert expected in listdir_output, f"Expected {expected} in listdir output"
+    assert (
+        ".git/" in listdir_output
+    ), "Expected hidden .git/ directory in listdir output"
+    # Verify the expected file listing format (after hidden files)
+    listdir_expected = """|-- CHANGES/
+|-- CHANGES.rst
+|-- CODE_OF_CONDUCT.md
+|-- CONTRIBUTING.rst
+|-- CONTRIBUTORS.txt
+|-- HISTORY.rst
+|-- LICENSE.txt
+|-- MANIFEST.in
+|-- Makefile
+|-- README.rst
+|-- aiohttp/
+|-- docs/
+|-- examples/
+|-- install.sh
+|-- process_aiohttp_updateasyncio.py
+|-- pyproject.toml
+|-- r2e_tests/
+|-- requirements/
+|-- setup.cfg
+|-- setup.py
+|-- tests/
+|-- tools/
+|-- vendor/"""
+    assert listdir_expected in listdir_output
 
 
 @pytest.if_docker_running

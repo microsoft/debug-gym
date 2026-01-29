@@ -139,27 +139,22 @@ def test_reset_and_step(get_swe_smith_env):
     env_info = env.step(tool_call)
     assert env_info.step_observation.source == "listdir"
     # Verify we can see the tldextract directory structure
+    # Hidden files (like .git/) now appear first, followed by the original expected files
     listdir_output = env_info.step_observation.observation
     assert listdir_output.startswith(f"{env.working_dir}/")
-    # Verify hidden files are now visible (new behavior after removing ignore patterns)
-    hidden_files = [".git/", ".gitignore"]
-    for hidden in hidden_files:
-        assert (
-            hidden in listdir_output
-        ), f"Expected hidden file {hidden} in listdir output"
-    # Verify all project-specific files are present (original list from before ignore removal)
-    expected_files = [
-        "CHANGELOG.md",
-        "LICENSE",
-        "README.md",
-        "pyproject.toml",
-        "scripts/",
-        "tests/",
-        "tldextract/",
-        "tox.ini",
-    ]
-    for expected in expected_files:
-        assert expected in listdir_output, f"Expected {expected} in listdir output"
+    assert (
+        ".git/" in listdir_output
+    ), "Expected hidden .git/ directory in listdir output"
+    # Verify the expected file listing format (after hidden files)
+    listdir_expected = """|-- CHANGELOG.md
+|-- LICENSE
+|-- README.md
+|-- pyproject.toml
+|-- scripts/
+|-- tests/
+|-- tldextract/
+|-- tox.ini"""
+    assert listdir_expected in listdir_output
 
 
 @pytest.if_docker_running

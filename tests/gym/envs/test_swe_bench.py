@@ -41,39 +41,34 @@ def test_reset_and_step(get_swe_bench_env):
     env_info = env.step(tool_call)
     assert env_info.step_observation.source == "listdir"
     # Check that expected files are present in the listing
+    # Hidden files (like .git/) now appear first, followed by the original expected files
     listdir_output = env_info.step_observation.observation
     assert listdir_output.startswith(f"{env.working_dir}/")
-    # Verify hidden files are now visible (new behavior after removing ignore patterns)
-    hidden_files = [".git/", ".gitignore"]
-    for hidden in hidden_files:
-        assert (
-            hidden in listdir_output
-        ), f"Expected hidden file {hidden} in listdir output"
-    # Verify all project-specific files are present (original list from before ignore removal)
-    expected_files = [
-        "CHANGES.rst",
-        "CITATION",
-        "CODE_OF_CONDUCT.md",
-        "CONTRIBUTING.md",
-        "GOVERNANCE.md",
-        "LICENSE.rst",
-        "MANIFEST.in",
-        "README.rst",
-        "astropy/",
-        "cextern/",
-        "codecov.yml",
-        "conftest.py",
-        "docs/",
-        "examples/",
-        "licenses/",
-        "pip-requirements",
-        "pyproject.toml",
-        "setup.cfg",
-        "setup.py",
-        "tox.ini",
-    ]
-    for expected in expected_files:
-        assert expected in listdir_output, f"Expected {expected} in listdir output"
+    assert (
+        ".git/" in listdir_output
+    ), "Expected hidden .git/ directory in listdir output"
+    # Verify the expected file listing format (after hidden files)
+    listdir_expected = """|-- CHANGES.rst
+|-- CITATION
+|-- CODE_OF_CONDUCT.md
+|-- CONTRIBUTING.md
+|-- GOVERNANCE.md
+|-- LICENSE.rst
+|-- MANIFEST.in
+|-- README.rst
+|-- astropy/
+|-- cextern/
+|-- codecov.yml
+|-- conftest.py
+|-- docs/
+|-- examples/
+|-- licenses/
+|-- pip-requirements
+|-- pyproject.toml
+|-- setup.cfg
+|-- setup.py*
+|-- tox.ini"""
+    assert listdir_expected in listdir_output
 
 
 def test_load_dataset(get_swe_bench_env):
