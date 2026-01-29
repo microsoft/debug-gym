@@ -147,14 +147,15 @@ def test_reset_and_step(get_swe_smith_env):
         assert (
             hidden in listdir_output
         ), f"Expected hidden file {hidden} in listdir output"
-    # Verify project-specific files are present
+    # Verify all project-specific files are present (original list from before ignore removal)
     expected_files = [
         "CHANGELOG.md",
         "LICENSE",
         "README.md",
         "pyproject.toml",
-        "tldextract/",
+        "scripts/",
         "tests/",
+        "tldextract/",
         "tox.ini",
     ]
     for expected in expected_files:

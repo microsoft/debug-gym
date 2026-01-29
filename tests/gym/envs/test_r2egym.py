@@ -168,15 +168,31 @@ def test_reset_and_step(get_r2egym_env):
         assert (
             hidden in listdir_output
         ), f"Expected hidden file {hidden} in listdir output"
-    # Verify project-specific files are present
+    # Verify all project-specific files are present (original list from before ignore removal)
     expected_files = [
-        "aiohttp/",
+        "CHANGES/",
+        "CHANGES.rst",
+        "CODE_OF_CONDUCT.md",
+        "CONTRIBUTING.rst",
+        "CONTRIBUTORS.txt",
+        "HISTORY.rst",
+        "LICENSE.txt",
+        "MANIFEST.in",
+        "Makefile",
         "README.rst",
-        "setup.py",
-        "setup.cfg",
-        "tests/",
+        "aiohttp/",
         "docs/",
+        "examples/",
+        "install.sh",
+        "process_aiohttp_updateasyncio.py",
+        "pyproject.toml",
+        "r2e_tests/",
         "requirements/",
+        "setup.cfg",
+        "setup.py",
+        "tests/",
+        "tools/",
+        "vendor/",
     ]
     for expected in expected_files:
         assert expected in listdir_output, f"Expected {expected} in listdir output"

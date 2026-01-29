@@ -49,18 +49,28 @@ def test_reset_and_step(get_swe_bench_env):
         assert (
             hidden in listdir_output
         ), f"Expected hidden file {hidden} in listdir output"
-    # Verify project-specific files are present
+    # Verify all project-specific files are present (original list from before ignore removal)
     expected_files = [
         "CHANGES.rst",
         "CITATION",
         "CODE_OF_CONDUCT.md",
         "CONTRIBUTING.md",
+        "GOVERNANCE.md",
         "LICENSE.rst",
+        "MANIFEST.in",
         "README.rst",
         "astropy/",
+        "cextern/",
+        "codecov.yml",
         "conftest.py",
         "docs/",
+        "examples/",
+        "licenses/",
+        "pip-requirements",
+        "pyproject.toml",
+        "setup.cfg",
         "setup.py",
+        "tox.ini",
     ]
     for expected in expected_files:
         assert expected in listdir_output, f"Expected {expected} in listdir output"
