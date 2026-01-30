@@ -141,11 +141,8 @@ class MCPTool(EnvironmentTool):
 
     def use(self, environment, **kwargs) -> Observation:
         """Execute the MCP tool."""
-        try:
-            output = _run_async(self._call_tool_async(kwargs))
-            return Observation(self.name, output)
-        except Exception as e:
-            return Observation(self.name, f"Error calling '{self._mcp_tool_name}': {e}")
+        output = _run_async(self._call_tool_async(kwargs))
+        return Observation(self.name, output)
 
 
 def discover_mcp_tools(
