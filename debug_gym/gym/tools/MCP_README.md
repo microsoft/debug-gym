@@ -2,6 +2,12 @@
 
 Dynamically register tools from any MCP (Model Context Protocol) server as native `EnvironmentTool` instances. Each tool manages its own session to the MCP server.
 
+| Component | Description |
+|-----------|-------------|
+| `MCPTool` | Tool that manages its own MCP session |
+| `discover_mcp_tools()` | Discovers and creates tools from an MCP server |
+
+
 ## Usage
 
 ### Via Config (Recommended)
@@ -10,17 +16,20 @@ Add MCP servers to your experiment config:
 
 ```yaml
 mcp_servers:
+  # SSE transport (default) - for servers with /sse endpoints
   my-server:
     url: "http://localhost:8000/sse"
     tool_prefix: "mcp_"
     tools:  # optional: list of tool names to include (omit to include all)
       - query
       - search
-  another-server:
-    url: "http://localhost:9000/sse"
-    headers:
-      Authorization: "Bearer token"
-    tool_prefix: "other_"
+    # transport defaults to "sse"
+
+  # Streamable HTTP transport - for REST-style MCP endpoints
+  rest-api:
+    url: "https://api.example.com/mcp"
+    tool_prefix: "api_"
+    transport: "streamable_http"
 
 tools:
   - bash
@@ -31,29 +40,42 @@ tools:
 
 #### Config Options
 
-| Option | Required | Description |
-|--------|----------|-------------|
-| `url` | Yes | The SSE endpoint URL (e.g., `http://localhost:8000/sse`) |
-| `tool_prefix` | No | Prefix to add to tool names (e.g., `mcp_` → `mcp_query`) |
-| `headers` | No | HTTP headers for authentication |
-| `tools` | No | List of tool names to include. If omitted, all tools from the server are registered |
+| Option | Required | Default | Description |
+|--------|----------|---------|-------------|
+| `url` | Yes | - | The MCP endpoint URL |
+| `transport` | No | `sse` | Transport type: `sse` or `streamable_http` |
+| `tool_prefix` | No | `""` | Prefix to add to tool names (e.g., `mcp_` → `mcp_query`) |
+| `headers` | No | `{}` | HTTP headers for authentication |
+| `tools` | No | all | List of tool names to include. If omitted, all tools from the server are registered |
+
+#### Transport Types
+
+- **`sse`** (default): Server-Sent Events transport. Use for servers with `/sse` endpoints.
+- **`streamable_http`**: HTTP-based transport. Use for REST-style MCP APIs.
 
 ### Programmatic Registration
 
 ```python
 from debug_gym.gym.tools.mcp_proxy import discover_mcp_tools
 
-# Discover all tools from a server
+# SSE transport (default)
 tools = discover_mcp_tools(
     url="http://localhost:8000/sse",
     tool_prefix="mcp_",
+)
+
+# Streamable HTTP transport
+tools = discover_mcp_tools(
+    url="https://api.example.com/mcp",
+    tool_prefix="api_",
+    transport="streamable_http",
 )
 
 for tool in tools:
     env.add_tool(tool)
     print(f"  - {tool.name}: {tool.description}")
 
-# Or filter specific tools
+# Filter specific tools
 tools = discover_mcp_tools(
     url="http://localhost:8000/sse",
     tool_filter=["query", "search"],
@@ -75,28 +97,10 @@ tool = MCPTool(
         "properties": {"sql": {"type": "string"}},
         "required": ["sql"],
     },
+    transport="sse",  # or "streamable_http"
 )
 env.add_tool(tool)
 ```
-
-## Architecture
-
-```
-MCP Server (Python/Node.js/etc.)
-       │ HTTP + SSE
-       ▼
-MCPTool (each tool has its own session)
-       │
-       ▼
-Environment (bash, view, edit, mcp_tool1, mcp_tool2, ...)
-```
-
-## Key Components
-
-| Component | Description |
-|-----------|-------------|
-| `MCPTool` | Tool that manages its own MCP session (lazy-initialized) |
-| `discover_mcp_tools()` | Discovers and creates tools from an MCP server |
 
 ## Resources
 
