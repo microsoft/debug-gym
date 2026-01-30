@@ -31,6 +31,12 @@ mcp_servers:
     tool_prefix: "api_"
     transport: "streamable_http"
 
+  # Long-running operations with custom timeout
+  slow-server:
+    url: "http://localhost:9000/sse"
+    tool_prefix: "slow_"
+    timeout: 300  # 5 minutes for long-running operations
+
 tools:
   - bash
   - view
@@ -47,6 +53,7 @@ tools:
 | `tool_prefix` | No | `""` | Prefix to add to tool names (e.g., `mcp_` → `mcp_query`) |
 | `headers` | No | `{}` | HTTP headers for authentication |
 | `tools` | No | all | List of tool names to include. If omitted, all tools from the server are registered |
+| `timeout` | No | `60` | Timeout in seconds for MCP operations |
 
 #### Transport Types
 
@@ -69,6 +76,13 @@ tools = discover_mcp_tools(
     url="https://api.example.com/mcp",
     tool_prefix="api_",
     transport="streamable_http",
+)
+
+# Long-running operations with custom timeout
+tools = discover_mcp_tools(
+    url="http://localhost:9000/sse",
+    tool_prefix="slow_",
+    timeout=300,  # 5 minutes for long-running operations
 )
 
 for tool in tools:
@@ -98,6 +112,7 @@ tool = MCPTool(
         "required": ["sql"],
     },
     transport="sse",  # or "streamable_http"
+    timeout=120,  # optional: custom timeout in seconds (default: 60)
 )
 env.add_tool(tool)
 ```

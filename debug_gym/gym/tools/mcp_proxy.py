@@ -101,6 +101,7 @@ class MCPTool(EnvironmentTool):
         input_schema: Dict[str, Any] = None,
         headers: Dict[str, str] = None,
         transport: str = "sse",
+        timeout: int = 60,
     ):
         """Initialize an MCP tool.
 
@@ -112,12 +113,14 @@ class MCPTool(EnvironmentTool):
             input_schema: Tool input schema (fetched from server if not provided)
             headers: Optional HTTP headers for requests
             transport: Transport type: 'sse' (default) or 'streamable_http'
+            timeout: Timeout in seconds for MCP operations (default: 60)
         """
         super().__init__()
         self._url = url
         self._mcp_tool_name = mcp_tool_name
         self._headers = headers or {}
         self._transport = transport
+        self._timeout = timeout
 
         # Set tool metadata (will be updated from server if not provided)
         self.name = tool_name or mcp_tool_name
@@ -126,7 +129,7 @@ class MCPTool(EnvironmentTool):
 
     def use(self, environment, **kwargs) -> Observation:
         """Execute the MCP tool."""
-        output = _run_async(self._call_tool_async(kwargs))
+        output = _run_async(self._call_tool_async(kwargs), timeout=self._timeout)
         return Observation(self.name, output)
 
     def _convert_schema(self, json_schema: Dict[str, Any]) -> Dict[str, Any]:
@@ -177,6 +180,7 @@ def discover_mcp_tools(
     tool_prefix: str = "",
     tool_filter: List[str] = None,
     transport: str = "sse",
+    timeout: int = 60,
 ) -> List[MCPTool]:
     """Discover and create MCPTool instances for all tools on a server.
 
@@ -186,6 +190,7 @@ def discover_mcp_tools(
         tool_prefix: Prefix to add to tool names
         tool_filter: Optional list of tool names to include (None = all tools)
         transport: Transport type: 'sse' (default) or 'streamable_http'
+        timeout: Timeout in seconds for MCP operations (default: 60)
 
     Returns:
         List of MCPTool instances ready to be added to an environment
@@ -216,8 +221,9 @@ def discover_mcp_tools(
                             input_schema=tool.inputSchema or {},
                             headers=headers,
                             transport=transport,
+                            timeout=timeout,
                         )
                     )
                 return tools
 
-    return _run_async(_discover())
+    return _run_async(_discover(), timeout=timeout)

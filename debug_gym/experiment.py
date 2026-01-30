@@ -50,6 +50,7 @@ def register_mcp_servers(env, config: dict, logger: DebugGymLogger):
                 tool_prefix=server_config.get("tool_prefix", ""),
                 tool_filter=server_config.get("tools"),
                 transport=server_config.get("transport", "sse"),
+                timeout=server_config.get("timeout", 60),
             )
             for tool in tools:
                 env.add_tool(tool)
