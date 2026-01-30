@@ -22,8 +22,41 @@ def create_env(config: dict, task_data: dict, logger: DebugGymLogger):
         **config.get("env", {}),
     )
 
+    # First add standard tools, then register MCP servers per-process so that
+    # any name conflicts with existing tools are detected during MCP registration.
     add_tools(env, config, logger)
+    register_mcp_servers(env, config, logger)
     return env
+
+
+def register_mcp_servers(env, config: dict, logger: DebugGymLogger):
+    """Register MCP servers from config and add their tools to env after standard tools."""
+    mcp_servers = config.get("mcp_servers", {})
+    if not mcp_servers:
+        return
+
+    from debug_gym.gym.tools.mcp_proxy import discover_mcp_tools
+
+    for server_id, server_config in mcp_servers.items():
+        url = server_config.get("url")
+        if not url:
+            logger.warning(f"Skipping MCP server '{server_id}': missing url")
+            continue
+
+        try:
+            tools = discover_mcp_tools(
+                url=url,
+                headers=server_config.get("headers"),
+                tool_prefix=server_config.get("tool_prefix", ""),
+                tool_filter=server_config.get("tools"),
+                transport=server_config.get("transport", "sse"),
+                timeout=server_config.get("timeout", 60),
+            )
+            for tool in tools:
+                env.add_tool(tool)
+                logger.info(f"Adding MCP tool: {tool.name}")
+        except Exception as e:
+            logger.error(f"Failed to register MCP server '{server_id}': {e}")
 
 
 def add_tools(env, config: dict, logger: DebugGymLogger):

@@ -99,6 +99,7 @@ One of the core designs of `debug-gym` is the notion of tools. Users can dynamic
 | `listdir` | List the file and folder contents of a directory within the working directory, up to a specified depth. Useful for exploring the repository structure. |
 | `edit` | It can be used to edit a certain piece of code to fix the bug. The inputs of this tool call include the file path, the start and end line numbers, and the new code. |
 | `submit` | Submit your changes once the task is complete. By default, it runs evaluation before terminating the session, but this can be disabled via `eval_on_submit: false`. |
+| MCP tools | Dynamically register tools from external MCP servers. See [MCP Proxy Tool](debug_gym/gym/tools/MCP_README.md) for details. |
 
 Upon importing a tool, its action space and observation space will be automatically merged into `debug-gym`'s action space and observation space; its instruction will also be merged into the overall instruction provided to the agent (e.g., as system prompt).
 
