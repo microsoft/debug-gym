@@ -7,7 +7,7 @@ to the MCP server, simplifying lifecycle management.
 import asyncio
 import threading
 import time
-from contextlib import AsyncExitStack, asynccontextmanager
+from contextlib import asynccontextmanager
 from typing import Any, Dict, List, Optional
 
 from debug_gym.gym.entities import Observation
@@ -118,9 +118,6 @@ class MCPTool(EnvironmentTool):
         self._mcp_tool_name = mcp_tool_name
         self._headers = headers or {}
         self._transport = transport
-        self._session = None
-        self._context_stack = None
-        self._initialized = False
 
         # Set tool metadata (will be updated from server if not provided)
         self.name = tool_name or mcp_tool_name
@@ -131,13 +128,6 @@ class MCPTool(EnvironmentTool):
         """Execute the MCP tool."""
         output = _run_async(self._call_tool_async(kwargs))
         return Observation(self.name, output)
-
-    def on_env_reset(self, environment, **kwargs) -> Observation:
-        """Reset MCP session on environment reset."""
-        super().on_env_reset(environment, **kwargs)
-        if self._session is not None:
-            _run_async(self._disconnect())
-        return None
 
     def _convert_schema(self, json_schema: Dict[str, Any]) -> Dict[str, Any]:
         """Convert MCP JSON Schema to EnvironmentTool arguments format."""
@@ -157,74 +147,28 @@ class MCPTool(EnvironmentTool):
 
         return arguments
 
-    async def _connect(self):
-        """Connect to the MCP server and initialize session."""
-        if self._session is not None:
-            return
+    async def _call_tool_async(self, arguments: Dict[str, Any]) -> str:
+        """Call the MCP tool asynchronously.
 
+        Creates a fresh connection for each call to avoid cross-task context
+        manager issues with anyio task groups used by the MCP SDK.
+        """
         from mcp import ClientSession
 
-        self._context_stack = AsyncExitStack()
-        read_stream, write_stream = await self._context_stack.enter_async_context(
-            _create_mcp_transport(self._url, self._transport, self._headers)
-        )
-        self._session = await self._context_stack.enter_async_context(
-            ClientSession(read_stream, write_stream)
-        )
-        await self._session.initialize()
-        self._initialized = True
+        async with _create_mcp_transport(self._url, self._transport, self._headers) as (
+            read_stream,
+            write_stream,
+        ):
+            async with ClientSession(read_stream, write_stream) as session:
+                await session.initialize()
+                result = await session.call_tool(self._mcp_tool_name, arguments)
 
-    async def _disconnect(self):
-        """Disconnect from the MCP server."""
-        if self._context_stack:
-            await self._context_stack.aclose()
-            self._context_stack = None
-            self._session = None
-            self._initialized = False
-
-    async def _call_tool_async(self, arguments: Dict[str, Any]) -> str:
-        """Call the MCP tool asynchronously."""
-        await self._connect()
-        result = await self._session.call_tool(self._mcp_tool_name, arguments)
-
-        # Extract text content from result
-        texts = []
-        for item in result.content:
-            if hasattr(item, "text"):
-                texts.append(item.text)
-        return "\n".join(texts) if texts else str(result)
-
-    def __getstate__(self):
-        """Handle serialization by excluding unpicklable async objects."""
-        state = self.__dict__.copy()
-        # Remove unpicklable async session objects
-        state["_session"] = None
-        state["_context_stack"] = None
-        state["_initialized"] = False
-        return state
-
-    def __setstate__(self, state):
-        """Handle deserialization by restoring state without async objects."""
-        self.__dict__.update(state)
-        # Ensure async objects are reset
-        self._session = None
-        self._context_stack = None
-        self._initialized = False
-
-    def __deepcopy__(self, memo):
-        """Create a deep copy without unpicklable async objects."""
-        import copy
-
-        result = type(self).__new__(self.__class__)
-        memo[id(self)] = result
-        for k, v in self.__dict__.items():
-            if k in ("_session", "_context_stack"):
-                setattr(result, k, None)
-            elif k == "_initialized":
-                setattr(result, k, False)
-            else:
-                setattr(result, k, copy.deepcopy(v, memo))
-        return result
+                # Extract text content from result
+                texts = []
+                for item in result.content:
+                    if hasattr(item, "text"):
+                        texts.append(item.text)
+                return "\n".join(texts) if texts else str(result)
 
 
 def discover_mcp_tools(
@@ -251,31 +195,29 @@ def discover_mcp_tools(
 
         from mcp import ClientSession
 
-        async with AsyncExitStack() as stack:
-            read_stream, write_stream = await stack.enter_async_context(
-                _create_mcp_transport(url, transport, headers)
-            )
-            session = await stack.enter_async_context(
-                ClientSession(read_stream, write_stream)
-            )
-            await session.initialize()
-            result = await session.list_tools()
+        async with _create_mcp_transport(url, transport, headers) as (
+            read_stream,
+            write_stream,
+        ):
+            async with ClientSession(read_stream, write_stream) as session:
+                await session.initialize()
+                result = await session.list_tools()
 
-            tools = []
-            for tool in result.tools:
-                if tool_filter and tool.name not in tool_filter:
-                    continue
-                tools.append(
-                    MCPTool(
-                        url=url,
-                        mcp_tool_name=tool.name,
-                        tool_name=f"{tool_prefix}{tool.name}",
-                        description=tool.description or f"MCP tool: {tool.name}",
-                        input_schema=tool.inputSchema or {},
-                        headers=headers,
-                        transport=transport,
+                tools = []
+                for tool in result.tools:
+                    if tool_filter and tool.name not in tool_filter:
+                        continue
+                    tools.append(
+                        MCPTool(
+                            url=url,
+                            mcp_tool_name=tool.name,
+                            tool_name=f"{tool_prefix}{tool.name}",
+                            description=tool.description or f"MCP tool: {tool.name}",
+                            input_schema=tool.inputSchema or {},
+                            headers=headers,
+                            transport=transport,
+                        )
                     )
-                )
-            return tools
+                return tools
 
     return _run_async(_discover())
