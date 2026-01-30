@@ -83,6 +83,18 @@ class MCPTool(EnvironmentTool):
         self.description = description or f"MCP tool: {mcp_tool_name}"
         self.arguments = self._convert_schema(input_schema or {})
 
+    def use(self, environment, **kwargs) -> Observation:
+        """Execute the MCP tool."""
+        output = _run_async(self._call_tool_async(kwargs))
+        return Observation(self.name, output)
+
+    def on_env_reset(self, environment, **kwargs) -> Observation:
+        """Reset MCP session on environment reset."""
+        super().on_env_reset(environment, **kwargs)
+        if self._session is not None:
+            _run_async(self._disconnect())
+        return None
+
     def _convert_schema(self, json_schema: Dict[str, Any]) -> Dict[str, Any]:
         """Convert MCP JSON Schema to EnvironmentTool arguments format."""
         arguments = {}
@@ -139,10 +151,37 @@ class MCPTool(EnvironmentTool):
                 texts.append(item.text)
         return "\n".join(texts) if texts else str(result)
 
-    def use(self, environment, **kwargs) -> Observation:
-        """Execute the MCP tool."""
-        output = _run_async(self._call_tool_async(kwargs))
-        return Observation(self.name, output)
+    def __getstate__(self):
+        """Handle serialization by excluding unpicklable async objects."""
+        state = self.__dict__.copy()
+        # Remove unpicklable async session objects
+        state["_session"] = None
+        state["_context_stack"] = None
+        state["_initialized"] = False
+        return state
+
+    def __setstate__(self, state):
+        """Handle deserialization by restoring state without async objects."""
+        self.__dict__.update(state)
+        # Ensure async objects are reset
+        self._session = None
+        self._context_stack = None
+        self._initialized = False
+
+    def __deepcopy__(self, memo):
+        """Create a deep copy without unpicklable async objects."""
+        import copy
+
+        result = type(self).__new__(self.__class__)
+        memo[id(self)] = result
+        for k, v in self.__dict__.items():
+            if k in ("_session", "_context_stack"):
+                setattr(result, k, None)
+            elif k == "_initialized":
+                setattr(result, k, False)
+            else:
+                setattr(result, k, copy.deepcopy(v, memo))
+        return result
 
 
 def discover_mcp_tools(

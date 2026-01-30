@@ -199,6 +199,193 @@ class TestMCPTool:
         assert "8" in result.observation
 
 
+class TestMCPToolSerialization:
+    """Tests for MCPTool serialization (pickle, deepcopy)."""
+
+    def test_pickle_roundtrip(self):
+        """Test MCPTool can be pickled and unpickled."""
+        import pickle
+
+        tool = MCPTool(
+            url="http://localhost:8000/sse",
+            mcp_tool_name="echo",
+            tool_name="test_echo",
+            description="Test echo tool",
+            input_schema={
+                "properties": {"message": {"type": "string", "description": "Msg"}},
+                "required": ["message"],
+            },
+            headers={"Authorization": "Bearer token"},
+        )
+
+        # Pickle and unpickle
+        pickled = pickle.dumps(tool)
+        restored = pickle.loads(pickled)
+
+        # Verify attributes are preserved
+        assert restored.name == "test_echo"
+        assert restored.description == "Test echo tool"
+        assert restored._url == "http://localhost:8000/sse"
+        assert restored._mcp_tool_name == "echo"
+        assert restored._headers == {"Authorization": "Bearer token"}
+        assert "message" in restored.arguments
+
+        # Verify async objects are reset
+        assert restored._session is None
+        assert restored._context_stack is None
+        assert restored._initialized is False
+
+    def test_pickle_with_active_session(self, mock_mcp_server):
+        """Test MCPTool with active session can be pickled (session excluded)."""
+        import pickle
+
+        tool = MCPTool(
+            url="http://localhost:8000/sse",
+            mcp_tool_name="echo",
+        )
+        mock_env = MagicMock()
+
+        # Execute to establish session
+        tool.use(mock_env, message="test")
+
+        # Pickle should succeed even with active session
+        pickled = pickle.dumps(tool)
+        restored = pickle.loads(pickled)
+
+        # Session should be reset after unpickle
+        assert restored._session is None
+        assert restored._context_stack is None
+        assert restored._initialized is False
+
+    def test_deepcopy(self):
+        """Test MCPTool can be deep copied."""
+        import copy
+
+        tool = MCPTool(
+            url="http://localhost:8000/sse",
+            mcp_tool_name="add",
+            tool_name="test_add",
+            description="Add numbers",
+            input_schema={
+                "properties": {
+                    "a": {"type": "number", "description": "First"},
+                    "b": {"type": "number", "description": "Second"},
+                },
+                "required": ["a", "b"],
+            },
+            headers={"X-Custom": "header"},
+        )
+
+        # Deep copy
+        copied = copy.deepcopy(tool)
+
+        # Verify it's a different object
+        assert copied is not tool
+
+        # Verify attributes are preserved
+        assert copied.name == "test_add"
+        assert copied.description == "Add numbers"
+        assert copied._url == "http://localhost:8000/sse"
+        assert copied._mcp_tool_name == "add"
+        assert copied._headers == {"X-Custom": "header"}
+        assert copied.arguments == tool.arguments
+
+        # Verify async objects are reset
+        assert copied._session is None
+        assert copied._context_stack is None
+        assert copied._initialized is False
+
+    def test_deepcopy_with_active_session(self, mock_mcp_server):
+        """Test MCPTool with active session can be deep copied (session excluded)."""
+        import copy
+
+        tool = MCPTool(
+            url="http://localhost:8000/sse",
+            mcp_tool_name="echo",
+        )
+        mock_env = MagicMock()
+
+        # Execute to establish session
+        tool.use(mock_env, message="test")
+
+        # Deep copy should succeed
+        copied = copy.deepcopy(tool)
+
+        # Session should be reset in copy
+        assert copied._session is None
+        assert copied._context_stack is None
+        assert copied._initialized is False
+
+    def test_deepcopy_preserves_history(self):
+        """Test that deepcopy preserves history list."""
+        import copy
+
+        tool = MCPTool(
+            url="http://localhost:8000/sse",
+            mcp_tool_name="echo",
+        )
+        # Add some mock history
+        tool.history = [{"action": "test1"}, {"action": "test2"}]
+
+        copied = copy.deepcopy(tool)
+
+        # History should be copied
+        assert copied.history == [{"action": "test1"}, {"action": "test2"}]
+        # But should be independent
+        assert copied.history is not tool.history
+
+    def test_getstate_excludes_async_objects(self):
+        """Test __getstate__ properly excludes unpicklable objects."""
+        tool = MCPTool(
+            url="http://localhost:8000/sse",
+            mcp_tool_name="echo",
+        )
+        # Simulate having an active session
+        tool._session = MagicMock()
+        tool._context_stack = MagicMock()
+        tool._initialized = True
+
+        state = tool.__getstate__()
+
+        # Async objects should be None in state
+        assert state["_session"] is None
+        assert state["_context_stack"] is None
+        assert state["_initialized"] is False
+
+        # Other attributes should be preserved
+        assert state["_url"] == "http://localhost:8000/sse"
+        assert state["_mcp_tool_name"] == "echo"
+
+    def test_setstate_restores_properly(self):
+        """Test __setstate__ properly restores tool state."""
+        tool = MCPTool(
+            url="http://localhost:8000/sse",
+            mcp_tool_name="echo",
+        )
+
+        state = {
+            "_url": "http://other:9000/sse",
+            "_mcp_tool_name": "other_tool",
+            "_headers": {"Auth": "test"},
+            "_session": None,
+            "_context_stack": None,
+            "_initialized": False,
+            "name": "restored_tool",
+            "description": "Restored description",
+            "arguments": {"arg1": {"type": ["string"]}},
+            "history": [],
+        }
+
+        tool.__setstate__(state)
+
+        assert tool._url == "http://other:9000/sse"
+        assert tool._mcp_tool_name == "other_tool"
+        assert tool._headers == {"Auth": "test"}
+        assert tool.name == "restored_tool"
+        assert tool._session is None
+        assert tool._initialized is False
+
+
 class TestDiscoverMcpTools:
     """Tests for discover_mcp_tools function."""
 

@@ -52,7 +52,7 @@ def register_mcp_servers(env, config: dict, logger: DebugGymLogger):
             )
             for tool in tools:
                 env.add_tool(tool)
-                logger.debug(f"Adding MCP tool: {tool.name}")
+                logger.info(f"Adding MCP tool: {tool.name}")
         except Exception as e:
             logger.error(f"Failed to register MCP server '{server_id}': {e}")
 
