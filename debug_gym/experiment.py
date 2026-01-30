@@ -22,15 +22,15 @@ def create_env(config: dict, task_data: dict, logger: DebugGymLogger):
         **config.get("env", {}),
     )
 
-    # Register MCP servers and add their tools to env (must happen per-process)
-    register_mcp_servers(env, config, logger)
-
+    # First add standard tools, then register MCP servers per-process so that
+    # any name conflicts with existing tools are detected during MCP registration.
     add_tools(env, config, logger)
+    register_mcp_servers(env, config, logger)
     return env
 
 
 def register_mcp_servers(env, config: dict, logger: DebugGymLogger):
-    """Register MCP servers from config and add tools to env."""
+    """Register MCP servers from config and add their tools to env after standard tools."""
     mcp_servers = config.get("mcp_servers", {})
     if not mcp_servers:
         return
