@@ -49,6 +49,7 @@ def register_mcp_servers(env, config: dict, logger: DebugGymLogger):
                 headers=server_config.get("headers"),
                 tool_prefix=server_config.get("tool_prefix", ""),
                 tool_filter=server_config.get("tools"),
+                transport=server_config.get("transport", "sse"),
             )
             for tool in tools:
                 env.add_tool(tool)

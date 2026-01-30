@@ -72,6 +72,12 @@ def mock_mcp_server():
         yield (AsyncMock(), AsyncMock())
 
     @asynccontextmanager
+    async def mock_streamable_http_client(
+        url, http_client=None, terminate_on_close=True
+    ):
+        yield (AsyncMock(), AsyncMock(), AsyncMock())
+
+    @asynccontextmanager
     async def mock_client_session(read_stream, write_stream):
         yield session
 
@@ -80,6 +86,8 @@ def mock_mcp_server():
     mock_mcp.ClientSession = mock_client_session
     mock_mcp_client_sse = MagicMock()
     mock_mcp_client_sse.sse_client = mock_sse_client
+    mock_mcp_client_streamable_http = MagicMock()
+    mock_mcp_client_streamable_http.streamable_http_client = mock_streamable_http_client
 
     with patch.dict(
         sys.modules,
@@ -87,6 +95,7 @@ def mock_mcp_server():
             "mcp": mock_mcp,
             "mcp.client": MagicMock(),
             "mcp.client.sse": mock_mcp_client_sse,
+            "mcp.client.streamable_http": mock_mcp_client_streamable_http,
         },
     ):
         yield session
@@ -118,6 +127,29 @@ class TestMCPTool:
         tool = MCPTool(url="http://localhost:8000/sse", mcp_tool_name="my_tool")
         assert tool.name == "my_tool"
         assert tool.description == "MCP tool: my_tool"
+
+    def test_tool_default_transport_is_sse(self):
+        """Test that default transport is SSE."""
+        tool = MCPTool(url="http://localhost:8000/sse", mcp_tool_name="test")
+        assert tool._transport == "sse"
+
+    def test_tool_transport_sse(self):
+        """Test MCPTool with SSE transport."""
+        tool = MCPTool(
+            url="http://localhost:8000/sse",
+            mcp_tool_name="test",
+            transport="sse",
+        )
+        assert tool._transport == "sse"
+
+    def test_tool_transport_streamable_http(self):
+        """Test MCPTool with streamable_http transport."""
+        tool = MCPTool(
+            url="https://api.example.com/mcp",
+            mcp_tool_name="test",
+            transport="streamable_http",
+        )
+        assert tool._transport == "streamable_http"
 
     def test_convert_schema_simple(self):
         """Test JSON Schema conversion to EnvironmentTool format."""
@@ -424,6 +456,35 @@ class TestDiscoverMcpTools:
         # Headers should be stored in each tool
         assert tools[0]._headers == {"Authorization": "Bearer token"}
 
+    def test_discover_with_transport_sse(self, mock_mcp_server):
+        """Test discover_mcp_tools with SSE transport."""
+        tools = discover_mcp_tools(
+            url="http://localhost:8000/sse",
+            transport="sse",
+        )
+
+        assert len(tools) == 2
+        assert tools[0]._transport == "sse"
+        assert tools[1]._transport == "sse"
+
+    def test_discover_with_transport_streamable_http(self, mock_mcp_server):
+        """Test discover_mcp_tools with streamable_http transport."""
+        tools = discover_mcp_tools(
+            url="http://localhost:8000/mcp",
+            transport="streamable_http",
+        )
+
+        assert len(tools) == 2
+        assert tools[0]._transport == "streamable_http"
+        assert tools[1]._transport == "streamable_http"
+
+    def test_discover_default_transport_is_sse(self, mock_mcp_server):
+        """Test that default transport is SSE."""
+        tools = discover_mcp_tools(url="http://localhost:8000/sse")
+
+        assert len(tools) == 2
+        assert tools[0]._transport == "sse"
+
 
 class TestDiscoveredToolExecution:
     """Test that discovered tools can execute against mock server."""
@@ -474,6 +535,74 @@ class TestRegisterMcpServers:
 
         # Should have added 2 tools (echo and add)
         assert mock_env.add_tool.call_count == 2
+
+    def test_register_mcp_servers_with_transport(self, mock_mcp_server):
+        """Test registering MCP servers with explicit transport."""
+        from debug_gym.experiment import register_mcp_servers
+
+        config = {
+            "mcp_servers": {
+                "sse-server": {
+                    "url": "http://localhost:8000/sse",
+                    "transport": "sse",
+                },
+            }
+        }
+
+        mock_env = MagicMock()
+        mock_logger = MagicMock()
+
+        register_mcp_servers(mock_env, config, mock_logger)
+
+        # Should have added 2 tools (echo and add)
+        assert mock_env.add_tool.call_count == 2
+        added_tool = mock_env.add_tool.call_args_list[0][0][0]
+        assert added_tool._transport == "sse"
+
+    def test_register_mcp_servers_with_streamable_http_transport(self, mock_mcp_server):
+        """Test registering MCP servers with streamable_http transport."""
+        from debug_gym.experiment import register_mcp_servers
+
+        config = {
+            "mcp_servers": {
+                "http-server": {
+                    "url": "https://api.example.com/mcp",
+                    "transport": "streamable_http",
+                },
+            }
+        }
+
+        mock_env = MagicMock()
+        mock_logger = MagicMock()
+
+        register_mcp_servers(mock_env, config, mock_logger)
+
+        # Should have added 2 tools (echo and add)
+        assert mock_env.add_tool.call_count == 2
+        added_tool = mock_env.add_tool.call_args_list[0][0][0]
+        assert added_tool._transport == "streamable_http"
+
+    def test_register_mcp_servers_default_transport_is_sse(self, mock_mcp_server):
+        """Test that default transport is SSE when not specified in config."""
+        from debug_gym.experiment import register_mcp_servers
+
+        config = {
+            "mcp_servers": {
+                "default-server": {
+                    "url": "http://localhost:8000/sse",
+                    # no transport specified
+                },
+            }
+        }
+
+        mock_env = MagicMock()
+        mock_logger = MagicMock()
+
+        register_mcp_servers(mock_env, config, mock_logger)
+
+        assert mock_env.add_tool.call_count == 2
+        added_tool = mock_env.add_tool.call_args_list[0][0][0]
+        assert added_tool._transport == "sse"
 
     def test_register_mcp_servers_with_tool_filter(self, mock_mcp_server):
         """Test registering MCP servers with tool filter."""

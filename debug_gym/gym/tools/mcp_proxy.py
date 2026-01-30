@@ -7,7 +7,7 @@ to the MCP server, simplifying lifecycle management.
 import asyncio
 import threading
 import time
-from contextlib import AsyncExitStack
+from contextlib import AsyncExitStack, asynccontextmanager
 from typing import Any, Dict, List, Optional
 
 from debug_gym.gym.entities import Observation
@@ -44,6 +44,47 @@ def _run_async(coro, timeout: int = 60):
     return future.result(timeout=timeout)
 
 
+@asynccontextmanager
+async def _create_mcp_transport(
+    url: str, transport: str, headers: Dict[str, str] = None
+):
+    """Create an MCP transport connection.
+
+    Args:
+        url: The MCP endpoint URL
+        transport: Transport type: 'sse' or 'streamable_http'
+        headers: Optional HTTP headers for requests
+
+    Yields:
+        Tuple of (read_stream, write_stream)
+    """
+    if transport == "sse":
+        from mcp.client.sse import sse_client
+
+        async with sse_client(url, headers=headers or None) as (
+            read_stream,
+            write_stream,
+        ):
+            yield read_stream, write_stream
+    elif transport == "streamable_http":
+        import httpx
+        from mcp.client.streamable_http import streamable_http_client
+
+        # streamable_http_client doesn't accept headers directly,
+        # so we create a custom httpx client with headers configured
+        http_client = httpx.AsyncClient(headers=headers) if headers else None
+        async with streamable_http_client(url, http_client=http_client) as (
+            read_stream,
+            write_stream,
+            _,
+        ):
+            yield read_stream, write_stream
+    else:
+        raise ValueError(
+            f"Unknown MCP transport: {transport}. Use 'sse' or 'streamable_http'."
+        )
+
+
 class MCPTool(EnvironmentTool):
     """MCP Tool that manages its own session to an MCP server.
 
@@ -59,21 +100,24 @@ class MCPTool(EnvironmentTool):
         description: str = None,
         input_schema: Dict[str, Any] = None,
         headers: Dict[str, str] = None,
+        transport: str = "sse",
     ):
         """Initialize an MCP tool.
 
         Args:
-            url: The SSE endpoint URL (e.g., 'http://localhost:8000/sse')
+            url: The MCP endpoint URL (e.g., 'http://localhost:8000/sse' or 'https://api.example.com/mcp')
             mcp_tool_name: Name of the tool on the MCP server
             tool_name: Name to expose this tool as (defaults to mcp_tool_name)
             description: Tool description (fetched from server if not provided)
             input_schema: Tool input schema (fetched from server if not provided)
             headers: Optional HTTP headers for requests
+            transport: Transport type: 'sse' (default) or 'streamable_http'
         """
         super().__init__()
         self._url = url
         self._mcp_tool_name = mcp_tool_name
         self._headers = headers or {}
+        self._transport = transport
         self._session = None
         self._context_stack = None
         self._initialized = False
@@ -119,11 +163,10 @@ class MCPTool(EnvironmentTool):
             return
 
         from mcp import ClientSession
-        from mcp.client.sse import sse_client
 
         self._context_stack = AsyncExitStack()
         read_stream, write_stream = await self._context_stack.enter_async_context(
-            sse_client(self._url, headers=self._headers or None)
+            _create_mcp_transport(self._url, self._transport, self._headers)
         )
         self._session = await self._context_stack.enter_async_context(
             ClientSession(read_stream, write_stream)
@@ -189,14 +232,16 @@ def discover_mcp_tools(
     headers: Dict[str, str] = None,
     tool_prefix: str = "",
     tool_filter: List[str] = None,
+    transport: str = "sse",
 ) -> List[MCPTool]:
     """Discover and create MCPTool instances for all tools on a server.
 
     Args:
-        url: The SSE endpoint URL
+        url: The MCP endpoint URL
         headers: Optional HTTP headers
         tool_prefix: Prefix to add to tool names
         tool_filter: Optional list of tool names to include (None = all tools)
+        transport: Transport type: 'sse' (default) or 'streamable_http'
 
     Returns:
         List of MCPTool instances ready to be added to an environment
@@ -205,11 +250,10 @@ def discover_mcp_tools(
     async def _discover():
 
         from mcp import ClientSession
-        from mcp.client.sse import sse_client
 
         async with AsyncExitStack() as stack:
             read_stream, write_stream = await stack.enter_async_context(
-                sse_client(url, headers=headers or None)
+                _create_mcp_transport(url, transport, headers)
             )
             session = await stack.enter_async_context(
                 ClientSession(read_stream, write_stream)
@@ -229,6 +273,7 @@ def discover_mcp_tools(
                         description=tool.description or f"MCP tool: {tool.name}",
                         input_schema=tool.inputSchema or {},
                         headers=headers,
+                        transport=transport,
                     )
                 )
             return tools
