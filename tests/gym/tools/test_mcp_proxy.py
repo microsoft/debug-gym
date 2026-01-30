@@ -217,6 +217,49 @@ class TestMCPTool:
         )
         assert tool.arguments["mode"]["enum"] == ["read", "write"]
 
+    def test_convert_schema_with_array_type(self):
+        """Test schema conversion with array type (e.g., ["string", "number"])."""
+        tool = MCPTool(
+            url="http://localhost:8000/sse",
+            mcp_tool_name="test",
+            input_schema={
+                "properties": {
+                    "flexible_field": {
+                        "type": ["string", "number"],
+                        "description": "Can be string or number",
+                    }
+                },
+                "required": ["flexible_field"],
+            },
+        )
+        assert "string" in tool.arguments["flexible_field"]["type"]
+        assert "number" in tool.arguments["flexible_field"]["type"]
+        # Should not add null since it's required
+        assert "null" not in tool.arguments["flexible_field"]["type"]
+
+    def test_convert_schema_with_array_type_optional(self):
+        """Test schema conversion with array type for optional field."""
+        tool = MCPTool(
+            url="http://localhost:8000/sse",
+            mcp_tool_name="test",
+            input_schema={
+                "properties": {
+                    "flexible_field": {
+                        "type": ["string", "number"],
+                        "description": "Can be string or number",
+                    }
+                },
+                "required": [],
+            },
+        )
+        assert "string" in tool.arguments["flexible_field"]["type"]
+        assert "number" in tool.arguments["flexible_field"]["type"]
+        # Should add null once since it's optional
+        assert "null" in tool.arguments["flexible_field"]["type"]
+        # Verify null appears only once
+        assert tool.arguments["flexible_field"]["type"].count("null") == 1
+
+
     def test_tool_execution(self, mock_mcp_server):
         """Test tool executes and returns result from server."""
         tool = MCPTool(
@@ -692,7 +735,8 @@ class TestRegisterMcpServers:
 
         # Only valid config should add tools
         assert mock_env.add_tool.call_count == 2  # echo and add from valid server
-        assert mock_logger.warning.call_count == 1
+        # 2 warnings: 1 for missing url, 1 for localhost address
+        assert mock_logger.warning.call_count == 2
 
     def test_register_mcp_servers_handles_errors(self):
         """Test that registration errors are logged but don't stop other registrations."""
