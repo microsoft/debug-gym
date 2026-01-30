@@ -297,6 +297,7 @@ class TestMCPToolSerialization:
         # Verify attributes are preserved
         assert restored._url == tool._url
         assert restored._mcp_tool_name == tool._mcp_tool_name
+        assert restored._timeout == 60  # default timeout
 
     def test_pickle_with_custom_timeout(self):
         """Test MCPTool with custom timeout can be pickled."""
@@ -346,6 +347,7 @@ class TestMCPToolSerialization:
         assert copied._url == "http://localhost:8000/sse"
         assert copied._mcp_tool_name == "add"
         assert copied._headers == {"X-Custom": "header"}
+        assert copied._timeout == 60  # default timeout
         assert copied.arguments == tool.arguments
 
     def test_deepcopy_with_used_tool(self, mock_mcp_server):
@@ -367,6 +369,7 @@ class TestMCPToolSerialization:
         # Verify copy has same attributes
         assert copied._url == tool._url
         assert copied._mcp_tool_name == tool._mcp_tool_name
+        assert copied._timeout == tool._timeout
 
     def test_deepcopy_preserves_history(self):
         """Test that deepcopy preserves history list."""
