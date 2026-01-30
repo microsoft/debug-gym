@@ -121,3 +121,42 @@ env.add_tool(tool)
 
 - [MCP Specification](https://modelcontextprotocol.io/)
 - [MCP Python SDK](https://github.com/modelcontextprotocol/python-sdk)
+
+## Security Considerations
+
+**Important:** MCP tools connect to external servers and execute operations based on their responses. Consider the following security implications:
+
+### URL Validation
+
+The system performs basic validation to detect common security risks:
+
+- **SSRF Protection**: Warns when URLs point to localhost, internal IP ranges (192.168.x.x, 10.x.x.x, 172.x.x.x), or cloud metadata endpoints (169.254.169.254)
+- **Protocol Checking**: Warns about non-HTTP(S) schemes
+- **Hostname Validation**: Ensures URLs can be properly parsed
+
+### Best Practices
+
+1. **Trust**: Only connect to MCP servers you control or explicitly trust
+2. **Authentication**: Use `headers` config to provide authentication tokens when needed
+3. **Network Isolation**: Consider running untrusted MCP servers in isolated network environments
+4. **Input Validation**: Be aware that MCP tools receive and process data from external servers
+5. **Logging**: Monitor MCP tool execution logs for unexpected behavior
+6. **Timeouts**: Set appropriate timeouts to prevent indefinite waiting on malicious servers
+
+### Configuration Security
+
+- **Avoid Secrets in Config**: Don't store sensitive tokens directly in configuration files
+- **Environment Variables**: Use environment variable substitution for sensitive headers
+- **Access Control**: Restrict who can modify MCP server configurations
+- **Audit Trail**: Track changes to MCP server registrations
+
+### Risks
+
+Connecting to malicious or compromised MCP servers could:
+- Expose sensitive data through tool arguments
+- Execute unintended operations via tool responses
+- Exploit vulnerabilities in the MCP client library
+- Perform SSRF attacks against internal services
+- Inject malicious content into tool outputs
+
+**Recommendation**: In production environments, implement additional security measures such as allowlisting trusted MCP server hosts, network segmentation, and regular security audits.
