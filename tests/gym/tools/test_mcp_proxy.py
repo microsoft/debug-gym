@@ -151,6 +151,20 @@ class TestMCPTool:
         )
         assert tool._transport == "streamable_http"
 
+    def test_tool_default_timeout(self):
+        """Test that default timeout is 60 seconds."""
+        tool = MCPTool(url="http://localhost:8000/sse", mcp_tool_name="test")
+        assert tool._timeout == 60
+
+    def test_tool_custom_timeout(self):
+        """Test MCPTool with custom timeout."""
+        tool = MCPTool(
+            url="http://localhost:8000/sse",
+            mcp_tool_name="test",
+            timeout=300,
+        )
+        assert tool._timeout == 300
+
     def test_convert_schema_simple(self):
         """Test JSON Schema conversion to EnvironmentTool format."""
         tool = MCPTool(
@@ -260,6 +274,7 @@ class TestMCPToolSerialization:
         assert restored._url == "http://localhost:8000/sse"
         assert restored._mcp_tool_name == "echo"
         assert restored._headers == {"Authorization": "Bearer token"}
+        assert restored._timeout == 60  # default timeout
         assert "message" in restored.arguments
 
     def test_pickle_with_used_tool(self, mock_mcp_server):
@@ -282,6 +297,23 @@ class TestMCPToolSerialization:
         # Verify attributes are preserved
         assert restored._url == tool._url
         assert restored._mcp_tool_name == tool._mcp_tool_name
+
+    def test_pickle_with_custom_timeout(self):
+        """Test MCPTool with custom timeout can be pickled."""
+        import pickle
+
+        tool = MCPTool(
+            url="http://localhost:8000/sse",
+            mcp_tool_name="echo",
+            timeout=300,
+        )
+
+        # Pickle and unpickle
+        pickled = pickle.dumps(tool)
+        restored = pickle.loads(pickled)
+
+        # Verify timeout is preserved
+        assert restored._timeout == 300
 
     def test_deepcopy(self):
         """Test MCPTool can be deep copied."""
@@ -421,6 +453,25 @@ class TestDiscoverMcpTools:
 
         assert len(tools) == 2
         assert tools[0]._transport == "sse"
+
+    def test_discover_default_timeout(self, mock_mcp_server):
+        """Test that default timeout is 60 seconds."""
+        tools = discover_mcp_tools(url="http://localhost:8000/sse")
+
+        assert len(tools) == 2
+        assert tools[0]._timeout == 60
+        assert tools[1]._timeout == 60
+
+    def test_discover_custom_timeout(self, mock_mcp_server):
+        """Test discover_mcp_tools with custom timeout."""
+        tools = discover_mcp_tools(
+            url="http://localhost:8000/sse",
+            timeout=300,
+        )
+
+        assert len(tools) == 2
+        assert tools[0]._timeout == 300
+        assert tools[1]._timeout == 300
 
 
 class TestDiscoveredToolExecution:
@@ -563,6 +614,50 @@ class TestRegisterMcpServers:
         assert mock_env.add_tool.call_count == 1
         added_tool = mock_env.add_tool.call_args[0][0]
         assert added_tool.name == "echo"
+
+    def test_register_mcp_servers_default_timeout(self, mock_mcp_server):
+        """Test that default timeout is 60 seconds when not specified in config."""
+        from debug_gym.experiment import register_mcp_servers
+
+        config = {
+            "mcp_servers": {
+                "default-server": {
+                    "url": "http://localhost:8000/sse",
+                    # no timeout specified
+                },
+            }
+        }
+
+        mock_env = MagicMock()
+        mock_logger = MagicMock()
+
+        register_mcp_servers(mock_env, config, mock_logger)
+
+        assert mock_env.add_tool.call_count == 2
+        added_tool = mock_env.add_tool.call_args_list[0][0][0]
+        assert added_tool._timeout == 60
+
+    def test_register_mcp_servers_custom_timeout(self, mock_mcp_server):
+        """Test registering MCP servers with custom timeout."""
+        from debug_gym.experiment import register_mcp_servers
+
+        config = {
+            "mcp_servers": {
+                "slow-server": {
+                    "url": "http://localhost:8000/sse",
+                    "timeout": 300,
+                }
+            }
+        }
+
+        mock_env = MagicMock()
+        mock_logger = MagicMock()
+
+        register_mcp_servers(mock_env, config, mock_logger)
+
+        assert mock_env.add_tool.call_count == 2
+        added_tool = mock_env.add_tool.call_args_list[0][0][0]
+        assert added_tool._timeout == 300
 
     def test_register_mcp_servers_empty_config(self):
         """Test with no MCP servers in config."""
