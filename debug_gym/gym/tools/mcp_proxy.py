@@ -141,8 +141,13 @@ class MCPTool(EnvironmentTool):
         for prop_name, prop_def in properties.items():
             prop_type = prop_def.get("type", "string")
             prop_desc = prop_def.get("description", f"Parameter {prop_name}")
-            type_list = [prop_type]
-            if prop_name not in required_fields:
+            # Normalize type to a flat list of JSON Schema types
+            if isinstance(prop_type, list):
+                type_list = list(prop_type)
+            else:
+                type_list = [prop_type]
+            # For optional fields, ensure "null" is included once
+            if prop_name not in required_fields and "null" not in type_list:
                 type_list.append("null")
             arguments[prop_name] = {"type": type_list, "description": prop_desc}
             if "enum" in prop_def:
