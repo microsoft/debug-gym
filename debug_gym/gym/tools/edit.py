@@ -111,11 +111,8 @@ class EditTool(EnvironmentTool):
         self.edit_success = False
         if path is None:
             return self.fail(environment, "File path is None.")
-        # Resolve the target path to ensure it exists within the workspace and is not ignored.
-        try:
-            resolved_path = environment.workspace.resolve_path(path, raises="ignore")
-        except FileNotFoundError as exc:
-            return self.fail(environment, f"Invalid path `{path}`: {exc}")
+        # Resolve the target path to get absolute path (without checking existence).
+        resolved_path = environment.workspace.resolve_path(path, raises=False)
 
         workspace_root = environment.workspace.working_dir
         try:
@@ -128,8 +125,6 @@ class EditTool(EnvironmentTool):
             )
 
         file_exists = environment.workspace.has_file(path)
-        if file_exists and not environment.workspace.is_editable(path):
-            return self.fail(environment, f"`{path}` is not editable.")
 
         # When creating a new file, ignore start/end positions and treat as full file write.
         if file_exists and start is not None:

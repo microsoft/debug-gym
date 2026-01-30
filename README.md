@@ -105,8 +105,6 @@ Upon importing a tool, its action space and observation space will be automatica
 
 **Tool Dependencies:** Some tools require additional packages to be installed in the terminal environment. When a tool is added to the configuration, its required dependencies are automatically installed during terminal setup. For example, the `listdir` tool requires the `tree` package, which is automatically installed when the tool is used. This ensures that tools work out of the box without manual configuration.
 
-Users can include a `.debugignore` file in the repository to specify files and directories that are not visible to `debug-gym`, similarly, they can include a `.debugreadonly` to specify files and directories that are read only by the agents (e.g., the test files). Both files share the same syntax as `.gitignore`.
-
 ---
 
 #### 2.2. Agents
@@ -292,7 +290,7 @@ Shortcut Features:
 
 #### 3.5. Debugging a Custom Repository
 
-You can debug a custom repository by using `configs/local.yaml` and modifying the `task_data` section to set the path and entrypoint of the custom repository. We assume there is a `.debugignore` file and a `.debugreadonly` within the repository that labels files/folders that are not seen or not editable, respectively.
+You can debug a custom repository by using `configs/local.yaml` and modifying the `task_data` section to set the path and entrypoint of the custom repository.
 
     python scripts/run.py --config configs/local.yaml \
         -p task_data.path="/path/to/your/repo" \
@@ -365,7 +363,7 @@ This provides a sandbox for developing and evaluating coding agents on arbitrary
 ```
 @article{yuan2025debuggym,
   title={debug-gym: A Text-Based Environment for Interactive Debugging},
-  author={Xingdi Yuan, Morgane M Moss, Charbel El Feghali, Chinmay Singh, Darya Moldavskaya, Drew MacPhee, Lucas Caccia, Matheus Pereira, Minseon Kim, Alessandro Sordoni, Marc-Alexandre C\^ot\'e},
+  author={Yuan, Xingdi and Moss, Morgane M and Feghali, Charbel El and Singh, Chinmay and Moldavskaya, Darya and MacPhee, Drew and Caccia, Lucas and Pereira, Matheus and Kim, Minseon and Sordoni, Alessandro and C\^ot\'e, Marc-Alexandre},
   journal={arXiv preprint arXiv:2503.21557},
   year={2025},
   url={https://arxiv.org/abs/2503.21557}

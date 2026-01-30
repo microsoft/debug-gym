@@ -247,7 +247,6 @@ def test_step(
 
 def test_reset(tmp_path):
     (tmp_path / "test.py").write_text("def test_1():\n  assert False\n")
-    (tmp_path / ".debugignore").write_text("__pycache__/\n.git/\n.pytest_cache/\n")
 
     env = LocalEnv(path=tmp_path, entrypoint="pytest test.py")
     infos = env.reset()
@@ -273,7 +272,6 @@ def test_reset(tmp_path):
 
 def test_eval(tmp_path):
     (tmp_path / "test.py").write_text("def test_1():\n  assert False\n")
-    (tmp_path / ".debugignore").write_text("__pycache__/\n.git/\n.pytest_cache/\n")
 
     env = LocalEnv(path=tmp_path, entrypoint="pytest test.py")
     env.reset()

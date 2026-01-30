@@ -6,7 +6,6 @@ from pathlib import Path
 
 from debug_gym.gym.terminals.local import LocalTerminal
 from debug_gym.gym.terminals.terminal import Terminal
-from debug_gym.gym.utils import make_file_matcher
 from debug_gym.logger import DebugGymLogger
 
 
@@ -36,11 +35,7 @@ class Workspace:
             self._tempdir.cleanup()
             self._tempdir = None
 
-    def reset(
-        self,
-        readonly_patterns: list[str] | None = None,
-        ignore_patterns: list[str] | None = None,
-    ):
+    def reset(self):
         self.cleanup()
 
         self.working_dir = self.working_dir or Path("/testbed")
@@ -52,54 +47,6 @@ class Workspace:
 
         self.logger.debug(f"Working directory: {self.working_dir}")
         self.terminal.working_dir = str(self.working_dir)
-        self.setup_file_filters(readonly_patterns, ignore_patterns)
-
-    def setup_file_filters(
-        self,
-        readonly_patterns: list[str] | None = None,
-        ignore_patterns: list[str] | None = None,
-    ):
-        """Indexes files and subdir in the working
-        directory, applying ignore and readonly patterns."""
-        self._is_readonly_func = lambda f: False
-        self._is_ignored_func = lambda f: False
-
-        readonly_patterns = readonly_patterns or []
-        ignore_patterns = ignore_patterns or []
-
-        # Ignore debug gym hidden files
-        ignore_patterns += [".debugignore", ".debugreadonly"]
-
-        ignore_patterns += (
-            self.read_file(".gitignore").splitlines()
-            if self.has_file(".gitignore")
-            else []
-        )
-        ignore_patterns += (
-            self.read_file(".debugignore").splitlines()
-            if self.has_file(".debugignore")
-            else []
-        )
-
-        readonly_patterns += (
-            self.read_file(".debugreadonly").splitlines()
-            if self.has_file(".debugreadonly")
-            else []
-        )
-
-        # create a matcher function for ignored files, .debugignore has precedence over .gitignore
-        self._is_ignored_func = make_file_matcher(
-            base_dir=self.working_dir,
-            pattern_files=[],
-            patterns=ignore_patterns,
-        )
-
-        # create a matcher function for readonly files
-        self._is_readonly_func = make_file_matcher(
-            base_dir=self.working_dir,
-            pattern_files=[],
-            patterns=readonly_patterns,
-        )
 
     def copy_content(self, src: str | Path, target: str | Path | None = None):
         """Copy files contained in src to a target directory."""
@@ -107,33 +54,43 @@ class Workspace:
         target = Path(target or self.working_dir).resolve()
         self.terminal.copy_content(src, target)
 
-    def resolve_path(self, filepath: str | Path, raises: str | bool = False) -> Path:
+    def resolve_path(self, filepath: str | Path, raises: bool = False) -> Path:
         """Convert a relative filepath to absolute based on the working_dir.
         If the path is already absolute, it is returned as is.
-        If raises is True, raises FileNotFoundError if the file does not exist,
-        or is not in the working directory or is ignored by the ignore patterns.
-        If raises is "ignore", then raises FileNotFoundError only if the file is ignored.
+        If raises is True, raises FileNotFoundError if the file does not exist
+        or is not in the working directory.
         If raises is False, returns the absolute path regardless of the file existence.
         """
         abs_filepath = Path(filepath)
         if not abs_filepath.is_absolute():
             abs_filepath = Path(self.working_dir) / abs_filepath
+
+        # Normalize the path (resolve .., . without resolving symlinks)
+        # This is done in Python for cross-platform compatibility
+        abs_filepath = Path(os.path.normpath(abs_filepath))
         abs_filepath_str = str(abs_filepath)
 
-        if raises in [True, "ignore"] and abs_filepath != self.working_dir:
-            # Check if file exists, is within working_dir and is not ignored.
-            # Use trailing slash in path comparison to prevent /testbed_evil matching /testbed
-            working_dir_quoted = shlex.quote(str(self.working_dir))
-            check_cmd = (
-                f"abs_path=$(realpath -s {shlex.quote(abs_filepath_str)}); "
-                f'test -e "$abs_path" && [[ "$abs_path" == {working_dir_quoted}/* || "$abs_path" == {working_dir_quoted} ]]'
-            )
-            success, result = self.terminal.run(
-                f"{check_cmd} && echo OK || echo MISSING"
-            )
-            if (result.strip() != "OK" and raises is True) or self._is_ignored_func(
-                abs_filepath
-            ):
+        if raises and abs_filepath != self.working_dir:
+            # Check if file is within working_dir (security check)
+            # Use os.path.commonpath to safely check if path is under working_dir
+            try:
+                common = os.path.commonpath([str(self.working_dir), abs_filepath_str])
+                if common != str(self.working_dir):
+                    raise FileNotFoundError(
+                        f"`{filepath}` does not exist or is not in "
+                        f"the working directory `{self.working_dir}`."
+                    )
+            except ValueError:
+                # commonpath raises ValueError for paths on different drives (Windows)
+                raise FileNotFoundError(
+                    f"`{filepath}` does not exist or is not in "
+                    f"the working directory `{self.working_dir}`."
+                )
+
+            # Check if file exists via terminal
+            check_cmd = f"test -e {shlex.quote(abs_filepath_str)}"
+            success, _ = self.terminal.run(check_cmd, raises=False)
+            if not success:
                 raise FileNotFoundError(
                     f"`{filepath}` does not exist or is not in "
                     f"the working directory `{self.working_dir}`."
@@ -166,12 +123,20 @@ class Workspace:
 
     def write_file(self, filepath: str, content: str):
         """Writes `content` to `filepath` exactly as-is, preserving any trailing newlines."""
+        abs_filepath = self.resolve_path(filepath, raises=False)
+
+        # Security check: ensure path is within workspace
         try:
-            abs_filepath = self.resolve_path(filepath, raises="ignore")
-        except FileNotFoundError as exc:
+            common = os.path.commonpath([str(self.working_dir), str(abs_filepath)])
+            if common != str(self.working_dir):
+                raise WorkspaceWriteError(
+                    f"Failed to write `{filepath}` because it is outside the workspace."
+                )
+        except ValueError:
+            # commonpath raises ValueError for paths on different drives (Windows)
             raise WorkspaceWriteError(
                 f"Failed to write `{filepath}` because it is outside the workspace."
-            ) from exc
+            )
 
         def _run_or_raise(command: str):
             success, output = self.terminal.run(
@@ -216,9 +181,6 @@ class Workspace:
             )
             _run_or_raise(cmd)
 
-    def is_editable(self, filepath):
-        return not self._is_readonly_func(self.resolve_path(filepath, raises=True))
-
     def directory_tree(self, root: str | Path = None, max_depth: int = 1):
         """List the directory tree using the `tree` command.
         Requires the `tree` package to be installed in the terminal.
@@ -241,9 +203,6 @@ class Workspace:
             prefix, path = line.split("-- ", 1)
             prefix += "-- "
 
-            if self._is_ignored_func(path):
-                continue
-
             # Remove trailing / and symbolic link details.
             clean_path = path.split(" -> ")[0].rstrip("/")
             lines.append(f"{prefix}{os.path.basename(clean_path)}")
@@ -251,9 +210,6 @@ class Workspace:
             if path.endswith("/"):
                 # i.e. a directory
                 lines[-1] += "/"
-
-            if self._is_readonly_func(path):
-                lines[-1] += " (read-only)"
 
         output = "\n".join(lines)
 

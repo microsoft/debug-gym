@@ -157,15 +157,6 @@ def test_edit_invalid_file(env):
     assert (env.working_dir / "another_file.py").exists()
     assert env.workspace.read_file("another_file.py") == "    print(f'Hello, {name}!')"
 
-    # overwrite the is_editable method to simulate a read-only existing file
-    env.workspace.is_editable = lambda x: x != "read_only.py"
-    (env.working_dir / "read_only.py").write_text("print('original')\n")
-    patch["path"] = "read_only.py"
-    obs = edit_tool.use(env, **patch)
-    assert obs.observation == (
-        "Edit failed. Error message:\n`read_only.py` is not editable.\n"
-    )
-
 
 def test_edit_invalid_line_number(env):
     edit_tool = env.get_tool("edit")
@@ -265,3 +256,29 @@ def test_edit_new_file(env):
     with open(env.working_dir / filename, "r") as f:
         content = f.read()
     assert content == "def added():\n    return 'created'\n"
+
+
+def test_edit_path_outside_workspace_relative(env):
+    """Ensure path traversal attacks are blocked."""
+    edit_tool = env.get_tool("edit")
+    patch = {
+        "path": "../outside.py",
+        "new_code": "print('should not be created')",
+    }
+    obs = edit_tool.use(env, **patch)
+
+    assert not edit_tool.edit_success
+    assert "not within the workspace directory" in obs.observation
+
+
+def test_edit_path_outside_workspace_absolute(env):
+    """Ensure absolute paths outside workspace are blocked."""
+    edit_tool = env.get_tool("edit")
+    patch = {
+        "path": "/tmp/outside.py",
+        "new_code": "print('should not be created')",
+    }
+    obs = edit_tool.use(env, **patch)
+
+    assert not edit_tool.edit_success
+    assert "not within the workspace directory" in obs.observation

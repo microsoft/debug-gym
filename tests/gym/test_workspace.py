@@ -5,7 +5,7 @@ import pytest
 
 from debug_gym.gym.terminals.docker import DockerTerminal
 from debug_gym.gym.terminals.local import LocalTerminal
-from debug_gym.gym.workspace import Workspace, WorkspaceReadError
+from debug_gym.gym.workspace import Workspace, WorkspaceReadError, WorkspaceWriteError
 
 
 @pytest.fixture
@@ -35,39 +35,6 @@ def test_directory_tree(workspace):
         "|-- subdir/\n"
         "  |-- subfile1.txt"
     )
-
-
-def test_directory_tree_read_only(workspace):
-    read_only_path = workspace.working_dir / "read-only-file.txt"
-    read_only_path.touch()
-
-    debugreadonly = workspace.working_dir / ".debugreadonly"
-    debugreadonly.write_text("read-only-file.txt")
-
-    # Reset filters to take into account the .debugreadonly file.
-    workspace.setup_file_filters()
-
-    result = workspace.directory_tree(max_depth=2)
-    assert result == (
-        f"{workspace.working_dir}/\n"
-        "|-- .hidden\n"
-        "|-- file1.txt\n"
-        "|-- file2.txt\n"
-        "|-- read-only-file.txt (read-only)\n"
-        "|-- subdir/\n"
-        "  |-- subfile1.txt"
-    )
-
-
-def test_directory_tree_ignore(workspace):
-    debugignore = workspace.working_dir / ".debugignore"
-    debugignore.write_text(".hidden\nfile1.*\nsubdir/\n")
-
-    # Reset filters to take into account the .debugignore file.
-    workspace.setup_file_filters()
-
-    result = workspace.directory_tree(max_depth=2)
-    assert result == (f"{workspace.working_dir}/\n" "|-- file2.txt")
 
 
 def test_reset_and_cleanup_workspace():
@@ -109,11 +76,7 @@ def test_reset_and_cleanup_workspace():
     assert workspace.working_dir is None
 
 
-@pytest.mark.parametrize("debugignore", ["", ".?*"])
-def test_resolve_path(workspace, debugignore):
-    (workspace.working_dir / ".debugignore").write_text(debugignore)
-    workspace.setup_file_filters()  # Reset filters.
-
+def test_resolve_path(workspace):
     abs_path = (workspace.working_dir / "file.txt").resolve()
     (abs_path).touch()
 
@@ -162,106 +125,11 @@ def test_resolve_path_raises(workspace):
 
 
 def test_resolve_path_do_not_raise_working_dir(workspace):
-    # Do not raise for working directory even if the ignore patterns match
-    (workspace.working_dir / ".debugignore").write_text(".*")
-    workspace.setup_file_filters()  # Reset filters.
+    # Do not raise for working directory
     assert (
         workspace.resolve_path(workspace.working_dir, raises=True)
         == workspace.working_dir
     )
-
-
-def test_setup_file_filters_basic(workspace):
-    # Setup a fake repo structure
-    subdir = workspace.working_dir / "subdir"
-    files = [
-        workspace.working_dir / ".hidden",
-        workspace.working_dir / "file1.txt",
-        workspace.working_dir / "file2.txt",
-        workspace.working_dir / "ignored.txt",
-        workspace.working_dir / "readonly.txt",
-        workspace.working_dir / "subdir/subfile1.txt",
-    ]
-    [f.touch() for f in files]
-    files.append(subdir)
-    workspace.setup_file_filters()
-    # All files should be indexed
-    assert all(workspace.has_file(f) for f in files)
-    # All files should be editable if no readonly patterns
-    assert all(workspace.is_editable(f) for f in files)
-
-
-def test_setup_file_filters_with_ignore_patterns(workspace):
-    (workspace.working_dir / "file1.txt").touch()
-    (workspace.working_dir / "file2.txt").touch()
-    (workspace.working_dir / "ignoreme.txt").touch()
-    (workspace.working_dir / "subdir" / "file3.txt").touch()
-
-    # Ignore files matching "ignoreme.txt"
-    workspace.setup_file_filters(ignore_patterns=["ignoreme.txt"])
-    assert not workspace.has_file("ignoreme.txt")
-    assert workspace.has_file("file1.txt")
-    assert workspace.has_file("file2.txt")
-    assert workspace.has_file("subdir/file3.txt")
-
-
-def test_setup_file_filters_with_readonly_patterns(workspace):
-    (workspace.working_dir / "file1.txt").touch()
-    (workspace.working_dir / "readonly.txt").touch()
-
-    # Mark "readonly.txt" as read-only
-    workspace.setup_file_filters(readonly_patterns=["readonly.txt"])
-    assert workspace.is_editable("file1.txt")
-    assert not workspace.is_editable("readonly.txt")
-
-
-def test_setup_file_filters_with_debugignore_and_debugreadonly(workspace):
-    (workspace.working_dir / "file1.txt").touch()
-    (workspace.working_dir / "file2.txt").touch()
-    (workspace.working_dir / "ignoreme.txt").touch()
-    (workspace.working_dir / "readonly.txt").touch()
-    # Write .debugignore and .debugreadonly
-    (workspace.working_dir / ".debugignore").write_text("ignoreme.txt\n")
-    (workspace.working_dir / ".debugreadonly").write_text("readonly.txt\n")
-
-    workspace.setup_file_filters()  # Reset filters.
-    assert not workspace.has_file("ignoreme.txt")
-    assert workspace.has_file("file1.txt")
-    assert workspace.has_file("file2.txt")
-    assert workspace.has_file("readonly.txt")
-    # Check that readonly.txt is not editable
-    assert not workspace.is_editable("readonly.txt")
-    # Check that file1.txt and file2.txt are editable
-    assert workspace.is_editable("file1.txt")
-    assert workspace.is_editable("file2.txt")
-    with pytest.raises(FileNotFoundError):
-        workspace.is_editable("ignoreme.txt")
-
-
-def test_setup_file_filters_combined_patterns(workspace):
-    (workspace.working_dir / "file1.txt").touch()
-    (workspace.working_dir / "file2.txt").touch()
-    (workspace.working_dir / "ignoreme.txt").touch()
-    (workspace.working_dir / "readonly.txt").touch()
-    (workspace.working_dir / ".debugignore").write_text("ignoreme.txt\n")
-    (workspace.working_dir / ".debugreadonly").write_text("readonly.txt\n")
-
-    # Also ignore file2.txt and mark file1.txt as readonly via patterns
-    workspace.setup_file_filters(
-        ignore_patterns=["file2.txt"],
-        readonly_patterns=["file1.txt"],
-    )
-    assert not workspace.has_file("ignoreme.txt")
-    assert not workspace.has_file("file2.txt")
-    assert workspace.has_file("file1.txt")
-    assert workspace.has_file("readonly.txt")
-    # Both file1.txt and readonly.txt should be readonly
-    assert not workspace.is_editable("file1.txt")
-    assert not workspace.is_editable("readonly.txt")
-    with pytest.raises(FileNotFoundError):
-        assert not workspace.is_editable("ignoreme.txt")
-    with pytest.raises(FileNotFoundError):
-        assert not workspace.is_editable("file2.txt")
 
 
 def test_read_file_reads_existing_file(workspace):
@@ -326,3 +194,17 @@ def test_write_file_exceeding_max_command_length(workspace):
     file_content_exceeding_max_command_length = "A" * (2 * 1024**2)  # 2MB of 'A's
     workspace.write_file("test.txt", file_content_exceeding_max_command_length)
     assert file_path.read_text() == file_content_exceeding_max_command_length
+
+
+def test_write_file_path_outside_workspace_relative(workspace):
+    """Ensure path traversal attacks are blocked."""
+    with pytest.raises(WorkspaceWriteError) as exc_info:
+        workspace.write_file("../outside.txt", "should not be created")
+    assert "outside the workspace" in str(exc_info.value)
+
+
+def test_write_file_path_outside_workspace_absolute(workspace):
+    """Ensure absolute paths outside workspace are blocked."""
+    with pytest.raises(WorkspaceWriteError) as exc_info:
+        workspace.write_file("/tmp/outside.txt", "should not be created")
+    assert "outside the workspace" in str(exc_info.value)
