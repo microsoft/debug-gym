@@ -27,13 +27,20 @@ def _get_background_loop() -> asyncio.AbstractEventLoop:
     def run_loop():
         """Background thread target that creates and runs the event loop."""
         global _background_loop, _background_loop_initializing
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        with _loop_lock:
-            _background_loop = loop
-            _background_loop_initializing = False
-            _background_loop_ready.set()
-        loop.run_forever()
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            with _loop_lock:
+                _background_loop = loop
+                _background_loop_initializing = False
+                _background_loop_ready.set()
+            loop.run_forever()
+        except Exception as e:
+            # Ensure the event is set even if initialization fails
+            with _loop_lock:
+                _background_loop_initializing = False
+                _background_loop_ready.set()
+            raise RuntimeError(f"Background event loop failed: {e}") from e
 
     with _loop_lock:
         if _background_loop is None or not _background_loop.is_running():
@@ -42,8 +49,14 @@ def _get_background_loop() -> asyncio.AbstractEventLoop:
                 _background_loop_ready.clear()
                 thread = threading.Thread(target=run_loop, daemon=True)
                 thread.start()
-    # Wait until the background loop is fully initialized
-    _background_loop_ready.wait()
+    
+    # Wait with timeout to prevent indefinite blocking
+    if not _background_loop_ready.wait(timeout=10):
+        raise RuntimeError("Timeout waiting for background event loop to initialize")
+    
+    if _background_loop is None:
+        raise RuntimeError("Background event loop failed to initialize")
+    
     return _background_loop
 
 

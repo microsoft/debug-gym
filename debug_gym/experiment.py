@@ -25,7 +25,6 @@ def _validate_mcp_url(url: str, logger: DebugGymLogger) -> bool:
     Security checks:
     - Validates URL can be parsed
     - Warns about localhost/internal IPs (potential SSRF)
-    - Warns about non-standard ports
     - Warns about non-HTTP(S) schemes
     """
     try:
@@ -40,11 +39,32 @@ def _validate_mcp_url(url: str, logger: DebugGymLogger) -> bool:
             
         # Check for localhost/internal addresses (SSRF risk)
         hostname = parsed.hostname or ""
-        if hostname in ("localhost", "127.0.0.1", "0.0.0.0") or hostname.startswith("192.168.") or hostname.startswith("10.") or hostname.startswith("172."):
+        
+        # Check for localhost
+        if hostname in ("localhost", "127.0.0.1", "0.0.0.0", "::1"):
             logger.warning(
-                f"MCP server URL points to internal/localhost address: {url}. "
+                f"MCP server URL points to localhost address: {url}. "
                 "Ensure this is intentional and the server is trusted."
             )
+        
+        # Check for private IP ranges
+        # 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16
+        if hostname.startswith("10.") or hostname.startswith("192.168."):
+            logger.warning(
+                f"MCP server URL points to internal/private IP address: {url}. "
+                "Ensure this is intentional and the server is trusted."
+            )
+        
+        # Check for 172.16.0.0/12 range (172.16.0.0 to 172.31.255.255)
+        if hostname.startswith("172."):
+            parts = hostname.split(".")
+            if len(parts) >= 2 and parts[1].isdigit():
+                second_octet = int(parts[1])
+                if 16 <= second_octet <= 31:
+                    logger.warning(
+                        f"MCP server URL points to internal/private IP address: {url}. "
+                        "Ensure this is intentional and the server is trusted."
+                    )
             
         # Check for common cloud metadata endpoints (SSRF risk)
         if "169.254.169.254" in hostname:
