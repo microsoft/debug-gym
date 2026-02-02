@@ -9,12 +9,9 @@ from debug_gym.gym.tools.tool import ToolCall
 from debug_gym.gym.tools.toolbox import Toolbox
 
 
-@pytest.if_docker_running
-def test_load_dataset(get_r2egym_env):
-    env = get_r2egym_env()
-
+def test_load_dataset():
     task_name = "aiohttp_final:d7cd0613472fd4d9940e37f1c55921f6a1515324"
-    dataset = env.load_dataset(problems=[task_name])
+    dataset = R2EGymEnv.load_dataset(problems=[task_name])
     assert task_name in dataset
 
     task_data = next(iter(dataset.values()))

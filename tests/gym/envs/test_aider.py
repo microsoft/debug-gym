@@ -37,7 +37,7 @@ def setup_aider_repo(tmp_path_factory):
 @pytest.fixture
 def env(setup_aider_repo):
     terminal = LocalTerminal()
-    dataset = AiderBenchmarkEnv.load_dataset()
+    dataset = AiderBenchmarkEnv.load_dataset(build_image=False)
     task_data = dataset["clock"]
     env = AiderBenchmarkEnv(task_data=task_data, terminal=terminal)
     env.reset()

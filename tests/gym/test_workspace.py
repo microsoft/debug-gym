@@ -37,6 +37,7 @@ def test_directory_tree(workspace):
     )
 
 
+@pytest.if_docker_running
 def test_reset_and_cleanup_workspace():
     # Setup workspace with a native terminal.
     terminal = LocalTerminal()

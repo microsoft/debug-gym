@@ -11,12 +11,9 @@ from debug_gym.gym.tools.tool import ToolCall
 from debug_gym.gym.tools.toolbox import Toolbox
 
 
-@pytest.if_docker_running
-def test_load_dataset(get_swe_smith_env):
-    env = get_swe_smith_env()
-
+def test_load_dataset():
     task_name = "john-kurkowski__tldextract.3d1bf184.combine_file__1vnuqpt4"
-    dataset = env.load_dataset(problems=[task_name])
+    dataset = SWESmithEnv.load_dataset(problems=[task_name])
     assert task_name in dataset
 
     # check if the dataset contains features that SWESmithEnv expects
@@ -81,11 +78,13 @@ def test_load_dataset_from_parquet(tmp_path):
     assert sorted(dataset.keys()) == ["test-instance-1", "test-instance-2"]
 
 
+@pytest.if_docker_running
 def test_instructions(get_swe_smith_env):
     env = get_swe_smith_env()
     assert env.instructions == env.task_data["problem_statement"]
 
 
+@pytest.if_docker_running
 def test_setup_task(get_swe_smith_env):
     env = get_swe_smith_env()
     task_name = "john-kurkowski__tldextract.3d1bf184.combine_file__1vnuqpt4"
