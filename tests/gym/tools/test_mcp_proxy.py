@@ -259,7 +259,6 @@ class TestMCPTool:
         # Verify null appears only once
         assert tool.arguments["flexible_field"]["type"].count("null") == 1
 
-
     def test_tool_execution(self, mock_mcp_server):
         """Test tool executes and returns result from server."""
         tool = MCPTool(

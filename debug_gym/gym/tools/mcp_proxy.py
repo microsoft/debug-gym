@@ -49,14 +49,14 @@ def _get_background_loop() -> asyncio.AbstractEventLoop:
                 _background_loop_ready.clear()
                 thread = threading.Thread(target=run_loop, daemon=True)
                 thread.start()
-    
+
     # Wait with timeout to prevent indefinite blocking
     if not _background_loop_ready.wait(timeout=10):
         raise RuntimeError("Timeout waiting for background event loop to initialize")
-    
+
     if _background_loop is None:
         raise RuntimeError("Background event loop failed to initialize")
-    
+
     return _background_loop
 
 
