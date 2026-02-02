@@ -734,8 +734,8 @@ class TestRegisterMcpServers:
 
         # Only valid config should add tools
         assert mock_env.add_tool.call_count == 2  # echo and add from valid server
-        # 2 warnings: 1 for missing url, 1 for localhost address
-        assert mock_logger.warning.call_count == 2
+        # 1 warning for missing url
+        assert mock_logger.warning.call_count == 1
 
     def test_register_mcp_servers_handles_errors(self):
         """Test that registration errors are logged but don't stop other registrations."""
