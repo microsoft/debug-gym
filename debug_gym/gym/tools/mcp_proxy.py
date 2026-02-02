@@ -16,24 +16,47 @@ from debug_gym.gym.tools.tool import EnvironmentTool
 # Background event loop for async MCP operations
 _background_loop: Optional[asyncio.AbstractEventLoop] = None
 _loop_lock = threading.Lock()
+_background_loop_initializing = False
+_background_loop_ready = threading.Event()
 
 
 def _get_background_loop() -> asyncio.AbstractEventLoop:
     """Get or create a background event loop for MCP operations."""
-    global _background_loop
+    global _background_loop, _background_loop_initializing
+
+    def run_loop():
+        """Background thread target that creates and runs the event loop."""
+        global _background_loop, _background_loop_initializing
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            with _loop_lock:
+                _background_loop = loop
+                _background_loop_initializing = False
+                _background_loop_ready.set()
+            loop.run_forever()
+        except Exception as e:
+            # Ensure the event is set even if initialization fails
+            with _loop_lock:
+                _background_loop_initializing = False
+                _background_loop_ready.set()
+            raise RuntimeError(f"Background event loop failed: {e}") from e
+
     with _loop_lock:
         if _background_loop is None or not _background_loop.is_running():
-
-            def run_loop():
-                global _background_loop
-                _background_loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(_background_loop)
-                _background_loop.run_forever()
-
-            thread = threading.Thread(target=run_loop, daemon=True)
-            thread.start()
-            while _background_loop is None:
-                time.sleep(0.01)
+            if not _background_loop_initializing:
+                _background_loop_initializing = True
+                _background_loop_ready.clear()
+                thread = threading.Thread(target=run_loop, daemon=True)
+                thread.start()
+    
+    # Wait with timeout to prevent indefinite blocking
+    if not _background_loop_ready.wait(timeout=10):
+        raise RuntimeError("Timeout waiting for background event loop to initialize")
+    
+    if _background_loop is None:
+        raise RuntimeError("Background event loop failed to initialize")
+    
     return _background_loop
 
 
@@ -72,13 +95,21 @@ async def _create_mcp_transport(
 
         # streamable_http_client doesn't accept headers directly,
         # so we create a custom httpx client with headers configured
-        http_client = httpx.AsyncClient(headers=headers) if headers else None
-        async with streamable_http_client(url, http_client=http_client) as (
-            read_stream,
-            write_stream,
-            _,
-        ):
-            yield read_stream, write_stream
+        if headers:
+            async with httpx.AsyncClient(headers=headers) as http_client:
+                async with streamable_http_client(url, http_client=http_client) as (
+                    read_stream,
+                    write_stream,
+                    _,
+                ):
+                    yield read_stream, write_stream
+        else:
+            async with streamable_http_client(url) as (
+                read_stream,
+                write_stream,
+                _,
+            ):
+                yield read_stream, write_stream
     else:
         raise ValueError(
             f"Unknown MCP transport: {transport}. Use 'sse' or 'streamable_http'."

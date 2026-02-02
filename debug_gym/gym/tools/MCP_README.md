@@ -117,6 +117,10 @@ tool = MCPTool(
 env.add_tool(tool)
 ```
 
+## Security Considerations
+
+MCP tools connect to external servers and execute operations based on their responses. Only connect to MCP servers you control or explicitly trust.
+
 ## Resources
 
 - [MCP Specification](https://modelcontextprotocol.io/)
