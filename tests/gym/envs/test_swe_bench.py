@@ -3,6 +3,7 @@ from anyio import Path
 
 from debug_gym.agents.solution_agent import AgentSolution
 from debug_gym.gym.entities import Observation
+from debug_gym.gym.envs.swe_bench import SWEBenchEnv
 from debug_gym.gym.tools.tool import ToolCall
 from debug_gym.gym.tools.toolbox import Toolbox
 
@@ -72,11 +73,8 @@ def test_reset_and_step(get_swe_bench_env):
     assert listdir_expected in listdir_output
 
 
-@pytest.if_docker_running
-def test_load_dataset(get_swe_bench_env):
-    env = get_swe_bench_env()
-
-    dataset = env.load_dataset()
+def test_load_dataset():
+    dataset = SWEBenchEnv.load_dataset()
     task_name = "astropy__astropy-14096"
     assert task_name in dataset
 

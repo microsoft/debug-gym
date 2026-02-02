@@ -11,12 +11,9 @@ from debug_gym.gym.tools.tool import ToolCall
 from debug_gym.gym.tools.toolbox import Toolbox
 
 
-@pytest.if_docker_running
-def test_load_dataset(get_swe_smith_env):
-    env = get_swe_smith_env()
-
+def test_load_dataset():
     task_name = "john-kurkowski__tldextract.3d1bf184.combine_file__1vnuqpt4"
-    dataset = env.load_dataset(problems=[task_name])
+    dataset = SWESmithEnv.load_dataset(problems=[task_name])
     assert task_name in dataset
 
     # check if the dataset contains features that SWESmithEnv expects
