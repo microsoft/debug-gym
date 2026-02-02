@@ -81,11 +81,13 @@ def test_load_dataset_from_parquet(tmp_path):
     assert sorted(dataset.keys()) == ["test-instance-1", "test-instance-2"]
 
 
+@pytest.if_docker_running
 def test_instructions(get_swe_smith_env):
     env = get_swe_smith_env()
     assert env.instructions == env.task_data["problem_statement"]
 
 
+@pytest.if_docker_running
 def test_setup_task(get_swe_smith_env):
     env = get_swe_smith_env()
     task_name = "john-kurkowski__tldextract.3d1bf184.combine_file__1vnuqpt4"

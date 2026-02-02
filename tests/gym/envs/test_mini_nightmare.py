@@ -12,7 +12,7 @@ from debug_gym.gym.tools.toolbox import Toolbox
 def mini_nightmare_env():
     # Initialize the MiniNightmareEnv with LocalTerminal
     terminal = LocalTerminal()
-    dataset = MiniNightmareEnv.load_dataset()
+    dataset = MiniNightmareEnv.load_dataset(build_image=False)
     task_data = dataset["config"]
     env = MiniNightmareEnv(task_data=task_data, terminal=terminal)
     env.add_tool(Toolbox.get_tool("eval"))
@@ -20,9 +20,9 @@ def mini_nightmare_env():
 
 
 def test_load_dataset(mini_nightmare_env):
-    dataset = MiniNightmareEnv.load_dataset()
+    dataset = MiniNightmareEnv.load_dataset(build_image=False)
     subproblems = list(dataset.keys())[::2]
-    subset = MiniNightmareEnv.load_dataset(problems=subproblems)
+    subset = MiniNightmareEnv.load_dataset(problems=subproblems, build_image=False)
     assert list(subset.keys()) == subproblems
 
 

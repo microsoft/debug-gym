@@ -72,6 +72,7 @@ def test_reset_and_step(get_swe_bench_env):
     assert listdir_expected in listdir_output
 
 
+@pytest.if_docker_running
 def test_load_dataset(get_swe_bench_env):
     env = get_swe_bench_env()
 
@@ -100,6 +101,7 @@ def test_load_dataset(get_swe_bench_env):
     )
 
 
+@pytest.if_docker_running
 def test_setup_task(get_swe_bench_env):
     env = get_swe_bench_env()
     task_name = "astropy__astropy-14096"
