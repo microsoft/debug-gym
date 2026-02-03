@@ -1,13 +1,14 @@
 """Tests for MCP Proxy Tool functionality."""
 
+import asyncio
 import sys
-from contextlib import asynccontextmanager
+import threading
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from debug_gym.gym.entities import Observation
-from debug_gym.gym.tools.mcp_proxy import MCPTool, discover_mcp_tools
+from debug_gym.gym.tools.mcp_proxy import MCPTool, _run_async, discover_mcp_tools
 
 
 def create_mock_mcp_session(tool_responses=None):
@@ -62,24 +63,88 @@ def create_mock_mcp_session(tool_responses=None):
     return mock_session
 
 
+class MockAsyncContextManager:
+    """A mock async context manager that works with direct __aenter__/__aexit__ calls."""
+
+    def __init__(self, enter_result):
+        self._enter_result = enter_result
+
+    async def __aenter__(self):
+        return self._enter_result
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        pass
+
+
+class TestRunAsync:
+    """Tests for _run_async helper."""
+
+    def test_run_async_with_explicit_loop(self):
+        loop = asyncio.new_event_loop()
+
+        async def coro():
+            return "ok"
+
+        try:
+            result = _run_async(coro(), loop=loop)
+        finally:
+            loop.close()
+
+        assert result == "ok"
+
+    def test_run_async_with_closed_loop_raises(self):
+        loop = asyncio.new_event_loop()
+        loop.close()
+
+        async def coro():
+            return "ok"
+
+        with pytest.raises(RuntimeError, match="Event loop is closed"):
+            _run_async(coro(), loop=loop)
+
+    def test_run_async_with_running_loop_raises(self):
+        loop = asyncio.new_event_loop()
+        started = threading.Event()
+
+        def run_loop():
+            asyncio.set_event_loop(loop)
+            started.set()
+            loop.run_forever()
+
+        thread = threading.Thread(target=run_loop, daemon=True)
+        thread.start()
+        started.wait(timeout=2)
+
+        async def coro():
+            return "ok"
+
+        try:
+            with pytest.raises(RuntimeError, match="already running"):
+                _run_async(coro(), loop=loop)
+        finally:
+            loop.call_soon_threadsafe(loop.stop)
+            thread.join(timeout=2)
+            loop.close()
+
+
 @pytest.fixture
 def mock_mcp_server():
     """Fixture that mocks the MCP server connection at the SDK level."""
     session = create_mock_mcp_session()
 
-    @asynccontextmanager
-    async def mock_sse_client(url, headers=None):
-        yield (AsyncMock(), AsyncMock())
+    def mock_sse_client(url, headers=None):
+        return MockAsyncContextManager((AsyncMock(), AsyncMock()))
 
-    @asynccontextmanager
-    async def mock_streamable_http_client(
-        url, http_client=None, terminate_on_close=True
-    ):
-        yield (AsyncMock(), AsyncMock(), AsyncMock())
+    def mock_streamable_http_client(url, http_client=None, terminate_on_close=True):
+        return MockAsyncContextManager((AsyncMock(), AsyncMock(), AsyncMock()))
 
-    @asynccontextmanager
-    async def mock_client_session(read_stream, write_stream):
-        yield session
+    def mock_client_session(read_stream, write_stream):
+        # Return a mock that supports direct __aenter__/__aexit__ and has initialize
+        mock = MockAsyncContextManager(session)
+        mock.initialize = session.initialize
+        mock.call_tool = session.call_tool
+        mock.list_tools = session.list_tools
+        return mock
 
     # Create mock modules
     mock_mcp = MagicMock()
@@ -285,6 +350,53 @@ class TestMCPTool:
 
         assert isinstance(result, Observation)
         assert "8" in result.observation
+
+    def test_session_is_running(self, mock_mcp_server):
+        """Test session_is_running property."""
+        tool = MCPTool(
+            url="http://localhost:8000/sse",
+            mcp_tool_name="echo",
+        )
+        assert not tool.session_is_running
+
+        # Use the tool to start a session
+        mock_env = MagicMock()
+        tool.use(mock_env, message="test")
+        assert tool.session_is_running
+
+    def test_on_env_reset_restarts_session(self, mock_mcp_server):
+        """Test on_env_reset restarts the MCP session."""
+        tool = MCPTool(
+            url="http://localhost:8000/sse",
+            mcp_tool_name="echo",
+        )
+        mock_env = MagicMock()
+
+        # First use creates a session
+        tool.use(mock_env, message="first")
+        assert tool.session_is_running
+
+        # on_env_reset should restart the session
+        result = tool.on_env_reset(mock_env)
+        assert isinstance(result, Observation)
+        assert tool.session_is_running
+        assert "started" in result.observation.lower()
+
+    def test_stop_session(self, mock_mcp_server):
+        """Test stop_session cleans up the session."""
+        tool = MCPTool(
+            url="http://localhost:8000/sse",
+            mcp_tool_name="echo",
+        )
+        mock_env = MagicMock()
+
+        # Start a session
+        tool.use(mock_env, message="test")
+        assert tool.session_is_running
+
+        # Stop the session
+        tool.stop_session()
+        assert not tool.session_is_running
 
 
 class TestMCPToolSerialization:
