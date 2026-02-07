@@ -284,17 +284,7 @@ class LLM(ABC):
 
         tags = llm_config.tags
 
-        if "github openai" in tags:
-            from debug_gym.llms.github import GitHubOpenAILLM
-
-            klass = GitHubOpenAILLM
-
-        elif "github claude" in tags:
-            from debug_gym.llms.github import GitHubClaudeLLM
-
-            klass = GitHubClaudeLLM
-
-        elif "copilot openai" in tags:
+        if "copilot openai" in tags:
             from debug_gym.llms.copilot import CopilotOpenAILLM
 
             klass = CopilotOpenAILLM
