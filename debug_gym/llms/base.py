@@ -24,7 +24,9 @@ logging.getLogger("httpx").setLevel(logging.WARNING)
 
 # Module-level counter for round-robin endpoint selection, shared across
 # all LLMConfig instances and safe across forked worker processes.
-_endpoint_counter = multiprocessing.Value("i", 0)
+# Initialized with a random offset so independent Python processes
+# (e.g., separate `python run.py` invocations) start at different endpoints.
+_endpoint_counter = multiprocessing.Value("i", os.getpid())
 
 
 def retry_on_exception(
