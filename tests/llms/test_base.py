@@ -264,6 +264,77 @@ def test_llm_config_initialization():
     assert config.ignore_kwargs == []  # Default empty list
     assert config.tags == []  # Default empty list
     assert config.tokenizer_kwargs == {}
+    assert config.endpoints == []  # Default empty list
+
+
+def test_llm_config_single_endpoint_backward_compat():
+    config = LLMConfig(model="llm-mock", context_limit=4, endpoint="https://endpoint-1")
+    assert config.endpoint == "https://endpoint-1"
+    assert config.endpoints == ["https://endpoint-1"]
+    assert config.select_endpoint() == "https://endpoint-1"
+
+
+def test_llm_config_multiple_endpoints():
+    config = LLMConfig(
+        model="llm-mock",
+        context_limit=4,
+        endpoints=["https://ep-1", "https://ep-2", "https://ep-3"],
+    )
+    assert config.endpoints == ["https://ep-1", "https://ep-2", "https://ep-3"]
+    # Round-robin cycles through all endpoints
+    results = [config.select_endpoint() for _ in range(6)]
+    # Each consecutive pair of 3 should contain all 3 endpoints
+    assert set(results[:3]) == {"https://ep-1", "https://ep-2", "https://ep-3"}
+    # Verify cycling: pattern repeats
+    assert results[0] == results[3]
+    assert results[1] == results[4]
+    assert results[2] == results[5]
+
+
+def test_llm_config_endpoints_takes_precedence_over_endpoint():
+    config = LLMConfig(
+        model="llm-mock",
+        context_limit=4,
+        endpoint="https://ignored",
+        endpoints=["https://ep-1", "https://ep-2"],
+    )
+    assert config.endpoints == ["https://ep-1", "https://ep-2"]
+    selected = config.select_endpoint()
+    assert selected in ["https://ep-1", "https://ep-2"]
+
+
+def test_llm_config_no_endpoint():
+    config = LLMConfig(model="llm-mock", context_limit=4)
+    assert config.select_endpoint() is None
+
+
+def test_llm_config_endpoints_from_yaml(tmp_path):
+    config_file = tmp_path / "llm.yaml"
+    config_file.write_text(
+        yaml.dump(
+            {
+                "multi-ep-model": {
+                    "model": "test-model",
+                    "context_limit": 4,
+                    "api_key": "EMPTY",
+                    "endpoints": [
+                        "http://host-1:8000/v1",
+                        "http://host-2:8000/v1",
+                    ],
+                    "tags": ["vllm"],
+                }
+            }
+        )
+    )
+    registry = LLMConfigRegistry.from_file(str(config_file))
+    config = registry.get("multi-ep-model")
+    assert config.endpoints == ["http://host-1:8000/v1", "http://host-2:8000/v1"]
+    selected = config.select_endpoint()
+    assert selected in ["http://host-1:8000/v1", "http://host-2:8000/v1"]
+    # Next call returns the other endpoint
+    selected2 = config.select_endpoint()
+    assert selected2 in ["http://host-1:8000/v1", "http://host-2:8000/v1"]
+    assert selected != selected2
 
 
 def test_llm_config_optional_fields(basic_config):
