@@ -58,6 +58,7 @@ class LLMConfig:
     tokenizer: Optional[str] = None
     apply_chat_template: Optional[bool] = False
     enable_thinking: Optional[bool] = False
+    thinking_param_name: Optional[str] = "enable_thinking"
     reasoning_end_token: Optional[str] = None
     system_prompt_support: bool = True
     ignore_kwargs: List[str] = None
