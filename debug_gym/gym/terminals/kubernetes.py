@@ -367,10 +367,10 @@ class KubernetesTerminal(Terminal):
 
     @property
     def pod_name(self):
-        if self._pod is None:
-            raise ValueError("Pod not created yet; pod_name is not available.")
+        # if self._pod is None:
+        #     raise ValueError("Pod not created yet; pod_name is not available.")
 
-        return self._pod.name
+        return self.pod.name
 
     @pod_name.setter
     def pod_name(self, value):
