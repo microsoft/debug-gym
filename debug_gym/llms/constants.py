@@ -6,6 +6,12 @@ LLM_ENDPOINT_PLACEHOLDER = "[YOUR_ENDPOINT]"
 LLM_SCOPE_PLACEHOLDER = "[YOUR_SCOPE]"
 
 LLM_CONFIG_TEMPLATE = f"""# Please edit this file replacing the placeholders with your own values.
+# Tip: use "endpoints" (list) instead of "endpoint" to load-balance across
+# multiple replicas of the same model. Each worker picks the next endpoint
+# in round-robin order.
+#   endpoints:
+#     - http://host-1:8000/v1
+#     - http://host-2:8000/v1
 gpt-4o:
   model: gpt-4o
   tokenizer: gpt-4o

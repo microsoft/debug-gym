@@ -177,5 +177,6 @@ logs/
 
 .vscode
 debug_gym/llms/copilot.py
+debug_gym/llms/github.py
 *.code-workspace
 .kube/

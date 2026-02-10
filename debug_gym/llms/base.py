@@ -1,4 +1,5 @@
 import logging
+import multiprocessing
 import os
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
@@ -20,6 +21,12 @@ from debug_gym.logger import DebugGymLogger
 
 # Set logging level down to WARNING for endpoint queries.
 logging.getLogger("httpx").setLevel(logging.WARNING)
+
+# Module-level counter for round-robin endpoint selection, shared across
+# all LLMConfig instances and safe across forked worker processes.
+# Initialized with a random offset so independent Python processes
+# (e.g., separate `python run.py` invocations) start at different endpoints.
+_endpoint_counter = multiprocessing.Value("i", os.getpid())
 
 
 def retry_on_exception(
@@ -55,6 +62,7 @@ class LLMConfig:
     # Optional fields
     api_key: Optional[str] = None
     endpoint: Optional[str] = None
+    endpoints: Optional[List[str]] = None
     tokenizer: Optional[str] = None
     apply_chat_template: Optional[bool] = False
     enable_thinking: Optional[bool] = False
@@ -83,6 +91,28 @@ class LLMConfig:
             self.generate_kwargs = {}
         if self.tokenizer_kwargs is None:
             self.tokenizer_kwargs = {}
+        # Reconcile endpoint/endpoints: build a unified endpoints list
+        if self.endpoints and self.endpoint:
+            # Both provided — prefer endpoints list, ignore singular
+            pass
+        elif self.endpoint and not self.endpoints:
+            self.endpoints = [self.endpoint]
+        elif not self.endpoints:
+            self.endpoints = []
+
+    def select_endpoint(self) -> Optional[str]:
+        """Select the next endpoint using round-robin.
+
+        Uses a process-safe counter so that workers spawned via
+        ProcessPoolExecutor each get a different endpoint.
+        Returns None if no endpoints are configured.
+        """
+        if not self.endpoints:
+            return self.endpoint  # original behavior (None)
+        with _endpoint_counter.get_lock():
+            idx = _endpoint_counter.value % len(self.endpoints)
+            _endpoint_counter.value += 1
+        return self.endpoints[idx]
 
 
 @dataclass
@@ -203,6 +233,11 @@ class LLM(ABC):
         self.model_name = model_name
         self.logger = logger or DebugGymLogger("debug-gym")
         self.config = llm_config
+        # Select endpoint via round-robin when multiple endpoints are configured
+        selected = self.config.select_endpoint()
+        if selected:
+            self.config.endpoint = selected
+            self.logger.debug(f"Selected endpoint: {selected}")
         self.tokenizer_name = self.config.tokenizer
         self.context_length = self.config.context_limit * 1000
         self.apply_chat_template = self.config.apply_chat_template
