@@ -31,6 +31,13 @@ class HuggingFaceLLM(OpenAILLM):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._hf_tokenizer = None
+        # Auto-inject chat_template_kwargs from enable_thinking so users
+        # don't need to specify the same intent in two places.
+        if self.config.enable_thinking is not None:
+            extra_body = self.config.generate_kwargs.setdefault("extra_body", {})
+            ctk = extra_body.setdefault("chat_template_kwargs", {})
+            param_name = self.config.thinking_param_name or "enable_thinking"
+            ctk.setdefault(param_name, self.config.enable_thinking)
 
     def _load_tokenizer(self):
         if self._hf_tokenizer is None:

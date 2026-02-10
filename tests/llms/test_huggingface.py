@@ -248,3 +248,75 @@ def test_hf_tokenize_apply_chat_template_thinking(mock_llm_config, logger_mock):
             "Ċ",
         ]
     ]
+
+
+def test_hf_auto_injects_chat_template_kwargs_from_enable_thinking(logger_mock):
+    """enable_thinking should auto-populate extra_body.chat_template_kwargs."""
+    config = LLMConfig(
+        model=HF_MODEL_ID,
+        tokenizer=HF_MODEL_ID,
+        context_limit=4,
+        api_key="fake",
+        endpoint="http://localhost",
+        tags=["vllm"],
+        enable_thinking=True,
+    )
+    llm = HuggingFaceLLM(model_name="qwen-3", logger=logger_mock, llm_config=config)
+    extra_body = llm.config.generate_kwargs["extra_body"]
+    assert extra_body["chat_template_kwargs"]["enable_thinking"] is True
+
+
+def test_hf_auto_injects_thinking_false(logger_mock):
+    """enable_thinking=False should inject the param as False."""
+    config = LLMConfig(
+        model=HF_MODEL_ID,
+        tokenizer=HF_MODEL_ID,
+        context_limit=4,
+        api_key="fake",
+        endpoint="http://localhost",
+        tags=["vllm"],
+        enable_thinking=False,
+    )
+    llm = HuggingFaceLLM(model_name="qwen-3", logger=logger_mock, llm_config=config)
+    extra_body = llm.config.generate_kwargs["extra_body"]
+    assert extra_body["chat_template_kwargs"]["enable_thinking"] is False
+
+
+def test_hf_custom_thinking_param_name(logger_mock):
+    """Models like Kimi-K2 use 'thinking' instead of 'enable_thinking'."""
+    config = LLMConfig(
+        model="moonshotai/Kimi-K2-Instruct",
+        tokenizer="moonshotai/Kimi-K2-Instruct",
+        context_limit=4,
+        api_key="fake",
+        endpoint="http://localhost",
+        tags=["vllm"],
+        enable_thinking=True,
+        thinking_param_name="thinking",
+    )
+    llm = HuggingFaceLLM(model_name="kimi-k2", logger=logger_mock, llm_config=config)
+    extra_body = llm.config.generate_kwargs["extra_body"]
+    assert extra_body["chat_template_kwargs"]["thinking"] is True
+    assert "enable_thinking" not in extra_body["chat_template_kwargs"]
+
+
+def test_hf_explicit_chat_template_kwargs_not_overridden(logger_mock):
+    """User-specified chat_template_kwargs should not be overridden."""
+    config = LLMConfig(
+        model=HF_MODEL_ID,
+        tokenizer=HF_MODEL_ID,
+        context_limit=4,
+        api_key="fake",
+        endpoint="http://localhost",
+        tags=["vllm"],
+        enable_thinking=True,
+        generate_kwargs={
+            "extra_body": {
+                "chat_template_kwargs": {"enable_thinking": False},
+            }
+        },
+    )
+    llm = HuggingFaceLLM(model_name="qwen-3", logger=logger_mock, llm_config=config)
+    # User explicitly set False — should not be overridden to True
+    extra_body = llm.config.generate_kwargs["extra_body"]
+    assert extra_body["chat_template_kwargs"]["enable_thinking"] is False
