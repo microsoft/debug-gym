@@ -264,16 +264,17 @@ class TaskProgressManager:
             task.max_score = progress_update.max_score
             task.status = progress_update.status
             task.logdir = progress_update.logdir
-            # Log and dump final status
-            if progress_update.completed:
-                log_with_color(
-                    self.logger,
-                    f"{TaskProgress.marker(task.status)} {task.status}: "
-                    f" task {task.problem_id}.",
-                    TaskProgress.color(task.status),
-                )
-                if task.status not in ["skip-resolved", "skip-unresolved"]:
-                    self.dump_task_status(task)
+
+            # Log and dump current status
+            log_with_color(
+                self.logger,
+                f"{TaskProgress.marker(task.status)} {task.status}: "
+                f" task {task.problem_id}.",
+                TaskProgress.color(task.status),
+            )
+            if task.status not in ["skip-resolved", "skip-unresolved"]:
+                self.dump_task_status(task)
+
             # Update the Rich task
             pid = self._progress_task_ids.get(task.problem_id)
             if pid is not None:
