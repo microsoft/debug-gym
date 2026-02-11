@@ -44,7 +44,6 @@ def set_signal(timeout_seconds):
 
 def run_agent(args, task_name: str, task_data: dict, config: dict):
     set_signal(args.timeout)
-    success = True
     env = None
     agent = None
 
@@ -77,7 +76,6 @@ def run_agent(args, task_name: str, task_data: dict, config: dict):
                     status=status,
                 )
                 task_logger.debug(f"Skipping {task_name}, already done.")
-                return success
 
         max_retries = args.max_retries
 
@@ -114,7 +112,7 @@ def run_agent(args, task_name: str, task_data: dict, config: dict):
                     config.get("agent", {}), llm=llm, logger=task_logger
                 )
 
-                success = agent.run(
+                agent.run(
                     env,
                     debug=args.debug,
                     replay_actions=replay_actions,
@@ -142,7 +140,6 @@ def run_agent(args, task_name: str, task_data: dict, config: dict):
                         max_score=None,
                         status="error",
                     )
-                    success = False
                     raise
             except KeyboardInterrupt:
                 task_logger.error("Agent run was interrupted by user.")
@@ -154,7 +151,6 @@ def run_agent(args, task_name: str, task_data: dict, config: dict):
                     max_score=None,
                     status="error",
                 )
-                success = False
                 raise
     except Exception as e:
         task_logger.error(
@@ -175,7 +171,6 @@ def run_agent(args, task_name: str, task_data: dict, config: dict):
         if args.debug:
             raise
 
-        success = False
     finally:
         # Save trajectory and patch, close env and cancel any pending alarm
         if agent is not None:
@@ -185,7 +180,6 @@ def run_agent(args, task_name: str, task_data: dict, config: dict):
                 save_patch(env, task_path, task_logger)
             env.close()
         signal.alarm(0)
-    return success
 
 
 def main():
