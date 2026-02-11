@@ -342,10 +342,10 @@ def test_group_tasks_by_status_with_unknown_status(debug_gym_logger):
             assert grouped[status] == []
 
 
-def test_group_tasks_by_status_multiple_tasks_same_status():
+def test_group_tasks_by_status_multiple_tasks_same_status(debug_gym_logger):
     # Test that multiple tasks with the same status are grouped together
     problems = ["p1", "p2", "p3"]
-    manager = TaskProgressManager(problems)
+    manager = TaskProgressManager(problems, logger=debug_gym_logger)
     updates = [
         TaskProgress("p1", 1, 10, 10, 100, "running"),
         TaskProgress("p2", 2, 10, 20, 100, "running"),

@@ -257,7 +257,7 @@ class BaseAgent:
 
     def should_stop(self, step: int, info: EnvInfo):
         should_stop, reason = False, None
-        max_steps_reached = step > self.args.max_steps
+        max_steps_reached = step >= self.args.max_steps
         if info.terminated:
             should_stop = True
             reason = "terminated"
