@@ -86,6 +86,61 @@ def test_terminal_run_custom_command_timeout(tmp_path):
     assert output == "test"
 
 
+def test_terminal_output_truncation(tmp_path):
+    """Test that command output exceeding max_output_bytes is truncated."""
+    working_dir = str(tmp_path)
+    # Set a small limit to make testing easy
+    terminal = LocalTerminal(working_dir=working_dir, max_output_bytes=50)
+    # Generate output larger than the limit
+    success, output = terminal.run("python3 -c \"print('A' * 200)\"", timeout=5)
+    assert success is True
+    assert "[OUTPUT TRUNCATED:" in output
+    assert "-> 50 bytes]" in output
+    assert len(output) < 200
+
+
+def test_terminal_output_no_truncation_when_under_limit(tmp_path):
+    """Test that output under max_output_bytes is not truncated."""
+    working_dir = str(tmp_path)
+    terminal = LocalTerminal(working_dir=working_dir, max_output_bytes=1000)
+    success, output = terminal.run("echo 'short output'", timeout=5)
+    assert success is True
+    assert output == "short output"
+    assert "[OUTPUT TRUNCATED:" not in output
+
+
+def test_terminal_output_truncation_disabled(tmp_path):
+    """Test that truncation can be disabled with max_output_bytes=0."""
+    working_dir = str(tmp_path)
+    terminal = LocalTerminal(working_dir=working_dir, max_output_bytes=0)
+    success, output = terminal.run("python3 -c \"print('A' * 200)\"", timeout=5)
+    assert success is True
+    assert "[OUTPUT TRUNCATED:" not in output
+    assert len(output) == 200
+
+
+def test_terminal_output_truncation_on_timeout(tmp_path):
+    """Test that partial output from timed-out commands is also truncated."""
+    working_dir = str(tmp_path)
+    terminal = LocalTerminal(working_dir=working_dir, max_output_bytes=50)
+    # Command that produces output before sleeping — flush to ensure output is captured
+    success, output = terminal.run(
+        "python3 -c \"import sys; sys.stdout.write('B' * 200); sys.stdout.flush(); import time; time.sleep(10)\"",
+        timeout=2,
+    )
+    assert success is False
+    assert "timed out" in output.lower()
+    # If partial output was captured, it should be truncated
+    if "Partial output" in output:
+        assert "[OUTPUT TRUNCATED:" in output
+
+
+def test_terminal_default_max_output_bytes(tmp_path):
+    """Test that the default max_output_bytes is set."""
+    terminal = LocalTerminal(working_dir=str(tmp_path))
+    assert terminal.max_output_bytes == 1_000_000
+
+
 def test_terminal_session(tmp_path):
     working_dir = str(tmp_path)
     command = "echo Hello World"
