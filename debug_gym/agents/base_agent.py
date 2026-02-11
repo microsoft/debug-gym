@@ -373,9 +373,9 @@ class BaseAgent:
 
         highscore = info.score
         should_stop = False
-        step = 1
 
         while not should_stop:
+            step += 1  # Starting a new step.
             self.logger.info(f"\n{'='*20} STEP {step} {'='*20}\n")
 
             # Check if we should replay a previous action or generate a new one
@@ -398,7 +398,7 @@ class BaseAgent:
             if debug:
                 breakpoint()
 
-            should_stop, reason = self.should_stop(step + 1, info)
+            should_stop, reason = self.should_stop(step, info)
             status = (
                 "resolved"
                 if info.resolved
@@ -410,7 +410,6 @@ class BaseAgent:
             if should_stop:
                 msg += f" | Stopping Reason: {reason}"
             self.logger.info(msg)
-            step += 1
 
             self.logger.report_progress(
                 problem_id=env.task_name,
@@ -420,6 +419,7 @@ class BaseAgent:
                 max_score=info.max_score,
                 status=status,
             )
+
         return self.build_trajectory()
 
 
