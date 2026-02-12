@@ -3,7 +3,7 @@ import os
 import shlex
 import tarfile
 import uuid
-from contextlib import closing
+from contextlib import contextmanager
 from io import BytesIO
 from pathlib import Path
 
@@ -17,6 +17,23 @@ from debug_gym.gym.terminals.terminal import (
     UnrecoverableTerminalError,
 )
 from debug_gym.logger import DebugGymLogger
+
+
+@contextmanager
+def _safe_closing(stream):
+    """Like contextlib.closing() but suppresses errors during close().
+
+    When a Docker container is killed externally, the underlying socket dies
+    before the stream can be closed cleanly. The urllib3 HTTPResponse.close()
+    then raises ValueError ("I/O operation on closed file") during flush.
+    """
+    try:
+        yield stream
+    finally:
+        try:
+            stream.close()
+        except (ValueError, OSError):
+            pass
 
 
 class DockerTerminal(Terminal):
@@ -208,7 +225,7 @@ class DockerTerminal(Terminal):
             # Read chunks with byte limit to prevent OOM
             chunks = []
             total_bytes = 0
-            with closing(output_gen):
+            with _safe_closing(output_gen):
                 for chunk in output_gen:
                     total_bytes += len(chunk)
                     if (
