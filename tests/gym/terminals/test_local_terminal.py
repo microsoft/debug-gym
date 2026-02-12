@@ -3,6 +3,7 @@ import re
 import pytest
 
 from debug_gym.gym.terminals.local import LocalTerminal
+from debug_gym.gym.terminals.terminal import UnrecoverableTerminalError
 
 
 def test_terminal_run(tmp_path):
@@ -86,59 +87,63 @@ def test_terminal_run_custom_command_timeout(tmp_path):
     assert output == "test"
 
 
-def test_terminal_output_truncation(tmp_path):
-    """Test that command output exceeding max_output_bytes is truncated."""
+def test_terminal_output_limit_raises_error(tmp_path):
+    """Test that command output exceeding max_output_bytes raises UnrecoverableTerminalError."""
     working_dir = str(tmp_path)
     # Set a small limit to make testing easy
     terminal = LocalTerminal(working_dir=working_dir, max_output_bytes=50)
     # Generate output larger than the limit
-    success, output = terminal.run("python3 -c \"print('A' * 200)\"", timeout=5)
-    assert success is True
-    assert "[OUTPUT TRUNCATED:" in output
-    assert "-> 50 bytes]" in output
-    assert len(output) < 200
+    with pytest.raises(UnrecoverableTerminalError, match="exceeded the maximum limit"):
+        terminal.run("python3 -c \"print('A' * 200)\"", timeout=5)
 
 
-def test_terminal_output_no_truncation_when_under_limit(tmp_path):
-    """Test that output under max_output_bytes is not truncated."""
+def test_terminal_output_no_error_when_under_limit(tmp_path):
+    """Test that output under max_output_bytes returns normally."""
     working_dir = str(tmp_path)
     terminal = LocalTerminal(working_dir=working_dir, max_output_bytes=1000)
     success, output = terminal.run("echo 'short output'", timeout=5)
     assert success is True
     assert output == "short output"
-    assert "[OUTPUT TRUNCATED:" not in output
 
 
-def test_terminal_output_truncation_disabled(tmp_path):
-    """Test that truncation can be disabled with max_output_bytes=0."""
+def test_terminal_output_limit_disabled(tmp_path):
+    """Test that output limit can be disabled with max_output_bytes=0."""
     working_dir = str(tmp_path)
     terminal = LocalTerminal(working_dir=working_dir, max_output_bytes=0)
     success, output = terminal.run("python3 -c \"print('A' * 200)\"", timeout=5)
     assert success is True
-    assert "[OUTPUT TRUNCATED:" not in output
     assert len(output) == 200
 
 
-def test_terminal_output_truncation_on_timeout(tmp_path):
-    """Test that partial output from timed-out commands is also truncated."""
+def test_terminal_output_limit_on_timeout(tmp_path):
+    """Test that partial output from timed-out commands also raises error if over limit."""
     working_dir = str(tmp_path)
     terminal = LocalTerminal(working_dir=working_dir, max_output_bytes=50)
     # Command that produces output before sleeping — flush to ensure output is captured
-    success, output = terminal.run(
-        "python3 -c \"import sys; sys.stdout.write('B' * 200); sys.stdout.flush(); import time; time.sleep(10)\"",
-        timeout=2,
-    )
-    assert success is False
-    assert "timed out" in output.lower()
-    # If partial output was captured, it should be truncated
-    if "Partial output" in output:
-        assert "[OUTPUT TRUNCATED:" in output
+    with pytest.raises(UnrecoverableTerminalError, match="exceeded the maximum limit"):
+        terminal.run(
+            "python3 -c \"import sys; sys.stdout.write('B' * 200); sys.stdout.flush(); import time; time.sleep(10)\"",
+            timeout=2,
+        )
+
+
+def test_terminal_output_limit_error_includes_preview(tmp_path):
+    """Test that the error message includes a preview of the output."""
+    working_dir = str(tmp_path)
+    terminal = LocalTerminal(working_dir=working_dir, max_output_bytes=50)
+    with pytest.raises(UnrecoverableTerminalError) as exc_info:
+        terminal.run("python3 -c \"print('X' * 200)\"", timeout=5)
+    error_msg = str(exc_info.value)
+    assert "exceeded the maximum limit" in error_msg
+    assert "50 bytes" in error_msg
+    assert "Output preview" in error_msg
+    assert "XXX" in error_msg  # preview should contain part of the output
 
 
 def test_terminal_default_max_output_bytes(tmp_path):
     """Test that the default max_output_bytes is set."""
     terminal = LocalTerminal(working_dir=str(tmp_path))
-    assert terminal.max_output_bytes == 1_000_000
+    assert terminal.max_output_bytes == 100_000_000
 
 
 def test_terminal_session(tmp_path):

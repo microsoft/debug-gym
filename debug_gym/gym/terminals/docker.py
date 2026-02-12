@@ -192,13 +192,37 @@ class DockerTerminal(Terminal):
         self._ensure_container_running()
 
         try:
-            status, output = self.container.exec_run(
+            # Use low-level API for streaming to avoid buffering entire output in memory
+            exec_id = self.container.client.api.exec_create(
+                self.container.id,
                 command,
                 workdir=self.working_dir,
                 environment=self.env_vars,
                 stdout=True,
                 stderr=True,
-            )
+            )["Id"]
+
+            output_gen = self.container.client.api.exec_start(exec_id, stream=True)
+
+            # Read chunks with byte limit to prevent OOM
+            chunks = []
+            total_bytes = 0
+            for chunk in output_gen:
+                total_bytes += len(chunk)
+                if self.max_output_bytes > 0 and total_bytes > self.max_output_bytes:
+                    # Keep only up to the limit for the error preview
+                    overshoot = total_bytes - self.max_output_bytes
+                    chunks.append(chunk[: len(chunk) - overshoot])
+                    collected = b"".join(chunks)
+                    preview = collected[:2000].decode(errors="replace")
+                    self._raise_output_limit_exceeded(total_bytes, preview)
+                chunks.append(chunk)
+
+            output = b"".join(chunks)
+
+            # Get exit code now that the exec has completed
+            exec_info = self.container.client.api.exec_inspect(exec_id)
+            status = exec_info["ExitCode"]
         except docker_errors.APIError as exc:
             raise UnrecoverableTerminalError(
                 "Docker exec encountered an API error."
@@ -207,12 +231,6 @@ class DockerTerminal(Terminal):
             raise UnrecoverableTerminalError(
                 "Docker exec failed due to an unexpected container error."
             ) from exc
-
-        # Truncate raw bytes before decoding to prevent OOM on large outputs
-        if self.max_output_bytes > 0 and len(output) > self.max_output_bytes:
-            original_len = len(output)
-            truncated_msg = f"\n\n[OUTPUT TRUNCATED: {original_len} bytes -> {self.max_output_bytes} bytes]"
-            output = output[: self.max_output_bytes] + truncated_msg.encode()
 
         output = output.decode()
         if strip_output:

@@ -23,7 +23,7 @@ DISABLE_ECHO_COMMAND = "stty -echo"
 
 # Default cap on command output to prevent unbounded memory/disk usage.
 # Commands producing more output than this will have their output truncated.
-DEFAULT_MAX_OUTPUT_BYTES = 1_000_000  # 1 MB
+DEFAULT_MAX_OUTPUT_BYTES = 100_000_000  # 100 MB
 
 
 class Terminal(ABC):
@@ -112,6 +112,18 @@ class Terminal(ABC):
                 + f"\n\n[OUTPUT TRUNCATED: {original_len} bytes -> {self.max_output_bytes} bytes]"
             )
         return output
+
+    def _raise_output_limit_exceeded(self, total_bytes: int, preview: str = "") -> None:
+        """Raise UnrecoverableTerminalError when command output exceeds the limit."""
+        truncated_preview = preview[:2000] if preview else ""
+        msg = (
+            f"Command output exceeded the maximum limit of "
+            f"{self.max_output_bytes} bytes (got at least {total_bytes} bytes). "
+            f"Terminating to prevent resource exhaustion."
+        )
+        if truncated_preview:
+            msg += f"\nOutput preview (first 2000 chars):\n{truncated_preview}"
+        raise UnrecoverableTerminalError(msg)
 
     def __str__(self):
         return f"Terminal[{self.working_dir}]"
