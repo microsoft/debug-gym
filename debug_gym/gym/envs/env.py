@@ -325,7 +325,6 @@ class RepoEnv(TooledEnv):
             self.max_score = self.calculate_max_score(self.last_eval)
             self.score = self.calculate_score(self.last_eval)
             self.resolved = self.calculate_resolved(self.last_eval)
-            self.terminated = self.calculate_terminated(self.last_eval)
 
         self.infos = EnvInfo(
             step_observation=self.step_observation,
@@ -364,11 +363,6 @@ class RepoEnv(TooledEnv):
         """Determine if the task has been resolved.
         Override in subclasses for different behavior."""
         return self.score == self.max_score
-
-    def calculate_terminated(self, eval_output: EvalOutput) -> bool:
-        """Determine if the task is terminated.
-        Override in subclasses for different behavior."""
-        return self.calculate_resolved(eval_output)
 
     def eval(self, **kwargs) -> EvalOutput:
         """Evaluates the current code using the provided entrypoint.
@@ -508,7 +502,6 @@ class RepoEnv(TooledEnv):
         if self.last_eval:
             self.max_score = self.calculate_max_score(self.last_eval)
             self.score = self.calculate_score(self.last_eval)
-            self.terminated = self.calculate_terminated(self.last_eval)
             self.resolved = self.calculate_resolved(self.last_eval)
 
         self.infos = EnvInfo(
