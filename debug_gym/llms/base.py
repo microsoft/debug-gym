@@ -512,9 +512,25 @@ class LLM(ABC):
             )
 
         print_messages(messages, self.logger)
-        self.logger.info(
-            f"LLM response - reasoning: {llm_response.reasoning_response}\n"
-            f"LLM response - content: {llm_response.response}\n"
-            f"LLM response - tool call: {llm_response.tool}"
-        )
+        response_parts = []
+        if llm_response.reasoning_response:
+            response_parts.append(
+                f"LLM response - reasoning: {llm_response.reasoning_response}"
+            )
+        if llm_response.response:
+            response_parts.append(f"LLM response - content: {llm_response.response}")
+        if llm_response.tool:
+            tool_name = (
+                llm_response.tool.get("name")
+                if isinstance(llm_response.tool, dict)
+                else getattr(llm_response.tool, "name", None)
+            )
+            if tool_name != "empty_tool_response":
+                response_parts.append(f"LLM response - tool call: {llm_response.tool}")
+        if response_parts:
+            self.logger.info("\n".join(response_parts))
+        else:
+            self.logger.info(
+                "LLM response - empty (no content, reasoning, or tool call)"
+            )
         return llm_response

@@ -83,11 +83,21 @@ def run_replay_agent(agent, env, llm, task_name=None, args=None):
                     response_token_count=prompt_response["token_usage"]["response"],
                 )
                 print_messages(messages, agent.logger)
-                agent.logger.info(
-                    f"LLM response - reasoning: {llm_response.reasoning_response}\n"
-                    f"LLM response - content: {llm_response.response}\n"
-                    f"LLM response - tool call: {llm_response.tool}"
-                )
+                response_parts = []
+                if llm_response.reasoning_response:
+                    response_parts.append(
+                        f"LLM response - reasoning: {llm_response.reasoning_response}"
+                    )
+                if llm_response.response:
+                    response_parts.append(
+                        f"LLM response - content: {llm_response.response}"
+                    )
+                if llm_response.tool:
+                    response_parts.append(
+                        f"LLM response - tool call: {llm_response.tool}"
+                    )
+                if response_parts:
+                    agent.logger.info("\n".join(response_parts))
             else:
                 llm_response = llm(messages, info.tools)
 

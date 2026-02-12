@@ -21,6 +21,10 @@ class UnrecoverableTerminalError(TerminalError):
 
 DISABLE_ECHO_COMMAND = "stty -echo"
 
+# Default cap on command output to prevent unbounded memory/disk usage.
+# Commands producing more output than this will have their output truncated.
+DEFAULT_MAX_OUTPUT_BYTES = 100_000_000  # 100 MB
+
 
 class Terminal(ABC):
 
@@ -30,6 +34,7 @@ class Terminal(ABC):
         session_commands: list[str] | None = None,
         env_vars: dict[str, str] | None = None,
         logger: DebugGymLogger | None = None,
+        max_output_bytes: int = DEFAULT_MAX_OUTPUT_BYTES,
         **kwargs,
     ):
         self.logger = logger or DebugGymLogger("debug-gym")
@@ -43,6 +48,7 @@ class Terminal(ABC):
         self.env_vars["PYTHONDONTWRITEBYTECODE"] = "1"  # prevent creation of .pyc files
 
         self._working_dir = working_dir
+        self.max_output_bytes = max_output_bytes
         self.sessions = []
 
         kwargs.pop("type", None)  # remove 'type' if present
@@ -96,6 +102,28 @@ class Terminal(ABC):
     def close(self):
         for session in self.sessions:
             self.close_shell_session(session)
+
+    def _truncate_output(self, output: str) -> str:
+        """Truncate command output to max_output_bytes to prevent unbounded memory/disk usage."""
+        if self.max_output_bytes > 0 and len(output) > self.max_output_bytes:
+            original_len = len(output)
+            output = (
+                output[: self.max_output_bytes]
+                + f"\n\n[OUTPUT TRUNCATED: {original_len} bytes -> {self.max_output_bytes} bytes]"
+            )
+        return output
+
+    def _raise_output_limit_exceeded(self, total_bytes: int, preview: str = "") -> None:
+        """Raise UnrecoverableTerminalError when command output exceeds the limit."""
+        truncated_preview = preview[:2000] if preview else ""
+        msg = (
+            f"Command output exceeded the maximum limit of "
+            f"{self.max_output_bytes} bytes (got at least {total_bytes} bytes). "
+            f"Terminating to prevent resource exhaustion."
+        )
+        if truncated_preview:
+            msg += f"\nOutput preview (first 2000 chars):\n{truncated_preview}"
+        raise UnrecoverableTerminalError(msg)
 
     def __str__(self):
         return f"Terminal[{self.working_dir}]"
