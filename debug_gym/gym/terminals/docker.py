@@ -3,6 +3,7 @@ import os
 import shlex
 import tarfile
 import uuid
+from contextlib import closing
 from io import BytesIO
 from pathlib import Path
 
@@ -207,16 +208,20 @@ class DockerTerminal(Terminal):
             # Read chunks with byte limit to prevent OOM
             chunks = []
             total_bytes = 0
-            for chunk in output_gen:
-                total_bytes += len(chunk)
-                if self.max_output_bytes > 0 and total_bytes > self.max_output_bytes:
-                    # Keep only up to the limit for the error preview
-                    overshoot = total_bytes - self.max_output_bytes
-                    chunks.append(chunk[: len(chunk) - overshoot])
-                    collected = b"".join(chunks)
-                    preview = collected[:2000].decode(errors="replace")
-                    self._raise_output_limit_exceeded(total_bytes, preview)
-                chunks.append(chunk)
+            with closing(output_gen):
+                for chunk in output_gen:
+                    total_bytes += len(chunk)
+                    if (
+                        self.max_output_bytes > 0
+                        and total_bytes > self.max_output_bytes
+                    ):
+                        # Keep only up to the limit for the error preview
+                        overshoot = total_bytes - self.max_output_bytes
+                        chunks.append(chunk[: len(chunk) - overshoot])
+                        collected = b"".join(chunks)
+                        preview = collected[:2000].decode(errors="replace")
+                        self._raise_output_limit_exceeded(total_bytes, preview)
+                    chunks.append(chunk)
 
             output = b"".join(chunks)
 
