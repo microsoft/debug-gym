@@ -563,6 +563,14 @@ class KubernetesTerminal(Terminal):
                         output += resp.read_stdout()
                     if resp.peek_stderr():
                         output += resp.read_stderr()
+                    # Stop buffering and raise error if output exceeds the limit
+                    if (
+                        self.max_output_bytes > 0
+                        and len(output) > self.max_output_bytes
+                    ):
+                        resp.close()
+                        preview = output[:2000]
+                        self._raise_output_limit_exceeded(len(output), preview)
 
                 # Get the exit code
                 error_channel = resp.read_channel(ERROR_CHANNEL)  # Error channel
