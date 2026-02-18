@@ -9,8 +9,49 @@ from debug_gym.agents.base_agent import (
     register_agent,
 )
 from debug_gym.gym.envs.env import EnvInfo, RepoEnv
-from debug_gym.gym.tools.tool import ToolCall
+from debug_gym.gym.tools.tool import EnvironmentTool, ToolCall
 from debug_gym.llms.base import LLM
+
+# Templates for generating tool descriptions dynamically
+TOOL_TEMPLATE = """---- BEGIN FUNCTION #{index}: {tool_name} ----
+Description: {description}
+
+Parameters:
+{parameters}
+---- END FUNCTION #{index} ----"""
+
+PARAMETER_TEMPLATE = (
+    """({index}) {param_name} ({param_type}, {required}): {param_description}"""
+)
+
+
+def describe_tools(tools: list[EnvironmentTool]) -> str:
+    """Generates a description of available tools for the system prompt."""
+    descriptions = []
+    for i, tool in enumerate(tools, start=1):
+        if tool.arguments:
+            param_descriptions = [
+                PARAMETER_TEMPLATE.format(
+                    index=j + 1,
+                    param_name=param_name,
+                    param_type=", ".join(param["type"]),
+                    required="optional" if "null" in param["type"] else "required",
+                    param_description=param["description"],
+                )
+                for j, (param_name, param) in enumerate(tool.arguments.items())
+            ]
+            parameters = "\n".join(param_descriptions)
+        else:
+            parameters = "No parameters are required for this function."
+
+        tool_description = TOOL_TEMPLATE.format(
+            index=i,
+            tool_name=tool.name,
+            description=tool.description,
+            parameters=parameters,
+        )
+        descriptions.append(tool_description)
+    return "\n\n".join(descriptions)
 
 
 @dataclass
@@ -22,17 +63,7 @@ class SimpleAgentArgs(AgentArgs):
 
 You have access to the following functions:
 
----- BEGIN FUNCTION #1: bash ----
-Description: Execute a bash command in the terminal.
-
-Parameters:
-(1) command (string, required): The bash command to execute. Can be empty to view additional logs when previous exit code is `-1`. Can be `ctrl+c` to interrupt the currently running process.
----- END FUNCTION #1 ----
-
----- BEGIN FUNCTION #2: submit ----
-Description: Finish the interaction when the task is complete OR if the assistant cannot proceed further with the task.
-No parameters are required for this function.
----- END FUNCTION #2 ----
+{tools_description}
 
 If you choose to call a function ONLY reply in the following format with NO suffix:
 
@@ -68,6 +99,20 @@ Can you help me solve the issue?
 @register_agent
 class SimpleAgent(BaseAgent):
     name: str = "simple_agent"
+    _system_prompt_generated: bool = False
+
+    def build_prompt(self, info: EnvInfo) -> list:
+        """Build the prompt with dynamically generated tool descriptions."""
+        # Generate system prompt with tools on first call (lazy initialization)
+        if not self._system_prompt_generated and self.env is not None:
+            tools_desc = describe_tools(self.env.tools)
+            # Replace placeholder with actual tool descriptions
+            self.system_prompt = self.args.system_prompt.format(
+                tools_description=tools_desc
+            )
+            self._system_prompt_generated = True
+
+        return super().build_prompt(info)
 
     def parse_tool_call(self, tool_call: str) -> List[ToolCall]:
         """
