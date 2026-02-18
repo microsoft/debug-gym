@@ -208,6 +208,11 @@ class DockerTerminal(Terminal):
                 "Docker exec failed due to an unexpected container error."
             ) from exc
 
+        # Check raw byte length before decoding to prevent OOM during string allocation
+        if self.max_output_bytes > 0 and len(output) > self.max_output_bytes:
+            preview = output[:2000].decode(errors="replace")
+            self._raise_output_limit_exceeded(len(output), preview)
+
         output = output.decode()
         if strip_output:
             output = output.strip("\r\n").strip("\n")

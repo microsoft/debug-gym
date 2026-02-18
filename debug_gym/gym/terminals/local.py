@@ -111,6 +111,9 @@ class LocalTerminal(Terminal):
             )
             timeout_msg = f"Command timed out after {effective_timeout} seconds"
             partial = (stdout + stderr).strip()
+            if self.max_output_bytes > 0 and len(partial) > self.max_output_bytes:
+                preview = partial[:2000]
+                self._raise_output_limit_exceeded(len(partial), preview)
             if partial:
                 output = f"{timeout_msg}\nPartial output:\n{partial}"
             else:
@@ -123,6 +126,9 @@ class LocalTerminal(Terminal):
             raise ValueError(f"Failed to run command: {entrypoint}")
 
         output = stdout + stderr
+        if self.max_output_bytes > 0 and len(output) > self.max_output_bytes:
+            preview = output[:2000]
+            self._raise_output_limit_exceeded(len(output), preview)
         if strip_output:
             output = output.strip("\r\n").strip("\n")
 
