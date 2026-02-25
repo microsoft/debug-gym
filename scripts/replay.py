@@ -186,7 +186,11 @@ def run_task(args, problem, config):
         )
 
         env = create_env(config, task_logger)
-        llm = LLM.instantiate(**config.get("llm", {}), logger=task_logger)
+        llm = LLM.instantiate(
+            **config.get("llm", {}),
+            logger=task_logger,
+            extra_headers={"X-Session-ID": problem},
+        )
         agent = create_agent(config["agent"], logger=task_logger)
 
         try:
