@@ -107,7 +107,12 @@ def run_agent(args, task_name: str, task_data: dict, config: dict):
                     )
 
                 env = create_env(config, task_data, task_logger)
-                llm = LLM.instantiate(**config.get("llm", {}), logger=task_logger)
+                # X-Session-ID enables consistent-hash routing in vllm-router
+                llm = LLM.instantiate(
+                    **config.get("llm", {}),
+                    logger=task_logger,
+                    extra_headers={"X-Session-ID": task_name},
+                )
                 agent = create_agent(
                     config.get("agent", {}), llm=llm, logger=task_logger
                 )

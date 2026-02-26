@@ -108,6 +108,15 @@ def test_instantiate_llm(mock_open, logger_mock):
     assert isinstance(llm, OpenAILLM)
     assert llm.runtime_generate_kwargs == {"temperature": 0.7, "tool_choice": "auto"}
 
+    # Test with extra_headers for X-Session-ID (used by run.py and replay.py)
+    llm = LLM.instantiate(
+        name="gpt-4o-mini",
+        logger=logger_mock,
+        extra_headers={"X-Session-ID": "my-task"},
+    )
+    assert isinstance(llm, OpenAILLM)
+    assert llm.runtime_generate_kwargs == {"extra_headers": {"X-Session-ID": "my-task"}}
+
 
 class Tool1(EnvironmentTool):
     name = "tool 1"
@@ -461,6 +470,27 @@ def test_llm_call_with_generate_kwargs(logger_mock, llm_class_mock):
     assert llm_mock.called_kwargs["thinking"]["type"] == "enabled"
     assert llm_mock.called_kwargs["thinking"]["budget_tokens"] == 10
     assert llm_response.response == "Test response"
+
+
+def test_llm_call_extra_headers_passed_to_generate(logger_mock, llm_class_mock):
+    """Test that extra_headers from runtime_generate_kwargs are passed to generate."""
+    llm_config = LLMConfig(
+        model="llm-mock",
+        context_limit=4,
+        tokenizer="test-tokenizer",
+        tags=[],
+    )
+    runtime_kwargs = {"extra_headers": {"X-Session-ID": "task-123"}}
+    llm_mock = llm_class_mock(
+        model_name="llm-mock",
+        logger=logger_mock,
+        llm_config=llm_config,
+        runtime_generate_kwargs=runtime_kwargs,
+    )
+    messages = [{"role": "user", "content": "Hello"}]
+    llm_mock(messages, tools)
+
+    assert llm_mock.called_kwargs["extra_headers"] == {"X-Session-ID": "task-123"}
 
 
 @patch.object(
