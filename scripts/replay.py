@@ -186,6 +186,7 @@ def run_task(args, problem, config):
         )
 
         env = create_env(config, task_logger)
+        # X-Session-ID enables consistent-hash routing in vllm-router
         llm = LLM.instantiate(
             **config.get("llm", {}),
             logger=task_logger,
