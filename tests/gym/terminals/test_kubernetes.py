@@ -63,17 +63,10 @@ def test_kubernetes_terminal_init():
 
     # Pod should not be created until accessed
     assert terminal._pod is None
-    with pytest.raises(
-        ValueError, match="Pod not created yet; pod_name is not available."
-    ):
-        terminal.pod_name  # Accessing pod_name before pod creation should raise an error.
 
-    # Assessing the `pod` property will create it.
-    assert terminal.pod
-    assert terminal._pod is not None
-
-    # Pod name should be automatically generated when not provided at initialization.
+    # Accessing pod_name triggers lazy pod creation.
     assert terminal.pod_name.startswith("dbg-gym-")
+    assert terminal._pod is not None
     assert terminal.pod.is_running()
     assert terminal.pod.exists()
 
