@@ -77,7 +77,11 @@ class HistoryTracker:
                 "step_id": game_step,
                 "content": self.env_observations[obs_idx].action_content,
                 "reasoning": self.env_observations[obs_idx].action_reasoning,
-                "action": asdict(self.env_observations[obs_idx].action_tool_call),
+                "action": (
+                    asdict(self.env_observations[obs_idx].action_tool_call)
+                    if self.env_observations[obs_idx].action_tool_call is not None
+                    else None
+                ),
                 "obs": self.env_observations[obs_idx].step_observation.observation,
             }
             # prompt_response_pairs could be empty for the initial state

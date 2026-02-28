@@ -42,6 +42,8 @@ class AgentArgs:
     def make(cls, config: Dict[str, Any] | "AgentArgs") -> "AgentArgs":
         if isinstance(config, cls):
             return config
+        if isinstance(config, AgentArgs):
+            config = config.to_dict()
         return cls.from_dict(config)
 
     @classmethod

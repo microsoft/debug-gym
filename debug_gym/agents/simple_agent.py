@@ -99,6 +99,7 @@ Can you help me solve the issue?
 @register_agent
 class SimpleAgent(BaseAgent):
     name: str = "simple_agent"
+    args_class = SimpleAgentArgs
     _system_prompt_generated: bool = False
 
     def build_prompt(self, info: EnvInfo) -> list:

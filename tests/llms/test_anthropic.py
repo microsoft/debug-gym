@@ -205,6 +205,30 @@ def test_convert_response_to_message_with_thinking(logger_mock):
     assert tool_content["id"] == "tool1"
 
 
+def test_convert_response_to_message_without_tool(logger_mock):
+    """Test that convert_response_to_message omits tool_use when tool is None."""
+    from debug_gym.llms.base import LLMResponse
+
+    llm = AnthropicLLM(
+        "test-anthropic-thinking",
+        logger=logger_mock,
+        llm_config=LLMConfig(**anthropic_thinking_config["test-anthropic-thinking"]),
+    )
+
+    response = LLMResponse(
+        prompt=[{"role": "user", "content": "test"}],
+        response="Here's my answer",
+        tool=None,
+    )
+
+    message = llm.convert_response_to_message(response)
+
+    assert message["role"] == "assistant"
+    assert len(message["content"]) == 1  # text only
+    assert message["content"][0]["type"] == "text"
+    assert message["content"][0]["text"] == "Here's my answer"
+
+
 def test_convert_response_to_message_with_redacted_thinking(logger_mock):
     """Test that redacted_thinking blocks are properly handled."""
     from debug_gym.llms.base import LLMResponse
