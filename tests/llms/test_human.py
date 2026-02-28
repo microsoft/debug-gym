@@ -8,6 +8,7 @@ import pytest
 from debug_gym.gym.tools.tool import ToolCall
 from debug_gym.gym.tools.toolbox import Toolbox
 from debug_gym.llms import Human
+from debug_gym.llms.base import LLMResponse
 from debug_gym.llms.human import (
     CommandParser,
     DynamicToolCommandCompleter,
@@ -696,3 +697,60 @@ def test_human_with_boolean_arguments(build_env_info):
 
     assert llm_response.tool.name == "toggle"
     assert llm_response.tool.arguments == {"enabled": True}
+
+
+def test_convert_response_to_message_with_tool():
+    """Test that convert_response_to_message includes tool_use when tool is present."""
+    human = Human()
+
+    response = LLMResponse(
+        prompt=[{"role": "user", "content": "test"}],
+        response="Here's my answer",
+        tool=ToolCall(id="tool1", name="test_tool", arguments={"arg": "val"}),
+    )
+
+    message = human.convert_response_to_message(response)
+
+    assert message["role"] == "assistant"
+    # Should contain text and tool_use blocks
+    assert len(message["content"]) == 2
+    assert message["content"][0]["type"] == "text"
+    assert message["content"][0]["text"] == "Here's my answer"
+    assert message["content"][1]["type"] == "tool_use"
+    assert message["content"][1]["id"] == "tool1"
+    assert message["content"][1]["name"] == "test_tool"
+    assert message["content"][1]["input"] == {"arg": "val"}
+
+
+def test_convert_response_to_message_without_tool():
+    """Test that convert_response_to_message omits tool_use when tool is None."""
+    human = Human()
+
+    response = LLMResponse(
+        prompt=[{"role": "user", "content": "test"}],
+        response="Here's my answer",
+        tool=None,
+    )
+
+    message = human.convert_response_to_message(response)
+
+    assert message["role"] == "assistant"
+    assert len(message["content"]) == 1
+    assert message["content"][0]["type"] == "text"
+    assert message["content"][0]["text"] == "Here's my answer"
+
+
+def test_convert_response_to_message_no_response_no_tool():
+    """Test that convert_response_to_message handles no response and no tool."""
+    human = Human()
+
+    response = LLMResponse(
+        prompt=[{"role": "user", "content": "test"}],
+        response=None,
+        tool=None,
+    )
+
+    message = human.convert_response_to_message(response)
+
+    assert message["role"] == "assistant"
+    assert message["content"] == []

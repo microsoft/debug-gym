@@ -504,16 +504,26 @@ class Human(LLM):
         return available_commands
 
     def convert_response_to_message(self, response: LLMResponse) -> dict:
-        return {
-            "role": "assistant",
-            "content": [
+        content = []
+        if response.response:
+            content.append(
+                {
+                    "type": "text",
+                    "text": filter_non_utf8(response.response),
+                }
+            )
+        if response.tool is not None:
+            content.append(
                 {
                     "type": "tool_use",
                     "id": response.tool.id,
                     "name": response.tool.name,
                     "input": response.tool.arguments,
                 }
-            ],
+            )
+        return {
+            "role": "assistant",
+            "content": content,
         }
 
     def convert_observation_to_message(
