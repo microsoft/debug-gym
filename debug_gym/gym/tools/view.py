@@ -44,8 +44,8 @@ class ViewTool(EnvironmentTool):
         self,
         environment,
         path: str,
-        start: int = None,
-        end: int = None,
+        start: int | str | None = None,
+        end: int | str | None = None,
         include_line_numbers_and_breakpoints: bool = True,
     ) -> Observation:
         new_file = path.strip()
@@ -73,6 +73,16 @@ class ViewTool(EnvironmentTool):
 
         if not file_lines:
             return Observation(self.name, f"The file `{new_file}` is empty.")
+
+        # Cast start and end to integers if they are strings
+        try:
+            start = int(start) if start is not None else None
+            end = int(end) if end is not None else None
+        except ValueError:
+            return Observation(
+                self.name,
+                "Invalid line number. Start and end line numbers should be integers.",
+            )
 
         # Convert 1-based line numbers to 0-based indices
         s = (start - 1) if start is not None else 0
