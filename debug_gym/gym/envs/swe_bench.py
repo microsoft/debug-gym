@@ -139,10 +139,25 @@ class SWEBenchEnv(RepoEnv):
         self.terminal.run(command, raises=True)
         self.logger.debug("Patch applied successfully.")
 
+    @staticmethod
+    def _extract_files_from_patch(patch: str) -> list[str]:
+        """Extract unique file paths from a unified diff patch."""
+        files = []
+        for line in patch.splitlines():
+            if line.startswith("diff --git"):
+                # e.g. "diff --git a/tests/foo.py b/tests/foo.py"
+                parts = line.split()
+                if len(parts) >= 4:
+                    path = parts[-1].removeprefix("b/")
+                    if path not in files:
+                        files.append(path)
+        return files
+
     def eval(self, **kwargs) -> EvalOutput:
         # We need to apply the test patch before running any evaluation.
-        # Reset any changes made to test_directives files.
-        self.terminal.run(f"git checkout -- {' '.join(self.test_directives)}")
+        # Reset any changes made to test patch files.
+        test_files = self._extract_files_from_patch(self.test_patch)
+        self.terminal.run(f"git checkout -- {' '.join(test_files)}")
 
         # Apply official test patch (hidden until now)
         self.terminal.run(f"git apply - <<'EOF'\n{self.test_patch}\nEOF")
@@ -150,8 +165,8 @@ class SWEBenchEnv(RepoEnv):
         success, output = self.terminal.run(self.entrypoint, timeout=self.run_timeout)
         self.last_eval = EvalOutput(success, output)
 
-        # Reset any changes made to test_directives files.
-        self.terminal.run(f"git checkout -- {' '.join(self.test_directives)}")
+        # Reset any changes made to test patch files.
+        self.terminal.run(f"git checkout -- {' '.join(test_files)}")
 
         return self.last_eval
 
