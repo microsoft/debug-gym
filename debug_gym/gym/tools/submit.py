@@ -6,7 +6,15 @@ from debug_gym.gym.tools.toolbox import Toolbox
 @Toolbox.register()
 class SubmitTool(EnvironmentTool):
     name = "submit"
-    description = "Should be called when the task is complete."
+    examples = [
+        """Use submit with `message`: "Fixed the off-by-one error in the loop condition" to submit the solution with a summary of the changes made.""",
+        """Use submit with `message`: null to submit without a message.""",
+    ]
+    description = (
+        "Should be called when the task is complete."
+        + "\nExamples (for demonstration purposes only, you need to adjust the tool calling format according to your specific syntax):\n"
+        + "\n".join(examples)
+    )
     arguments = {
         "message": {
             "type": ["string", "null"],
