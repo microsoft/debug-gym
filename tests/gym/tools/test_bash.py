@@ -55,7 +55,9 @@ def test_bash_tool_metadata(bash_tool):
     assert bash_tool.name == "bash"
     assert "Run commands in a bash shell" in bash_tool.description
     assert "command" in bash_tool.arguments
+    assert "timeout" in bash_tool.arguments
     assert bash_tool.arguments["command"]["type"] == ["string"]
+    assert bash_tool.arguments["timeout"]["type"] == ["integer", "null"]
     assert len(bash_tool.examples) > 0
 
 
@@ -222,7 +224,7 @@ def test_bash_terminal_success(mock_run, bash_tool):
     assert result.source == "bash"
     assert result.observation == "Success output"
 
-    # Verify terminal.run was called with correct parameters
+    # Verify terminal.run was called with correct parameters (default timeout)
     mock_run.assert_called_once_with("echo hello", timeout=30)
 
 
@@ -489,3 +491,50 @@ def test_bash_file_creation_unicode_content(env):
     assert "世界" in observation
     assert "Привет мир" in observation
     assert "🎉" in observation
+
+
+@patch("debug_gym.gym.terminals.LocalTerminal.run")
+def test_bash_custom_timeout(mock_run, bash_tool):
+    """Test that a custom timeout is passed to terminal.run."""
+    mock_run.return_value = (True, "output")
+    mock_env = MagicMock()
+    mock_env.terminal = MagicMock()
+    mock_env.terminal.run = mock_run
+
+    bash_tool.use(mock_env, "pytest tests/", timeout=600)
+    mock_run.assert_called_once_with("pytest tests/", timeout=600)
+
+
+@patch("debug_gym.gym.terminals.LocalTerminal.run")
+def test_bash_timeout_clamped_to_max(mock_run, bash_tool):
+    """Test that timeout exceeding MAX_TIMEOUT is clamped."""
+    mock_run.return_value = (True, "output")
+    mock_env = MagicMock()
+    mock_env.terminal = MagicMock()
+    mock_env.terminal.run = mock_run
+
+    bash_tool.use(mock_env, "long_command", timeout=9999)
+    mock_run.assert_called_once_with("long_command", timeout=BashTool.MAX_TIMEOUT)
+
+
+@patch("debug_gym.gym.terminals.LocalTerminal.run")
+def test_bash_timeout_none_uses_default(mock_run, bash_tool):
+    """Test that timeout=None uses the default timeout."""
+    mock_run.return_value = (True, "output")
+    mock_env = MagicMock()
+    mock_env.terminal = MagicMock()
+    mock_env.terminal.run = mock_run
+
+    bash_tool.use(mock_env, "echo hi", timeout=None)
+    mock_run.assert_called_once_with("echo hi", timeout=BashTool.DEFAULT_TIMEOUT)
+
+
+def test_bash_with_timeout_via_env_step(env):
+    """Test passing timeout through env.step tool call."""
+    bash_call = ToolCall(
+        id="bash_test",
+        name="bash",
+        arguments={"command": "echo 'quick'", "timeout": 10},
+    )
+    env_info = env.step(bash_call)
+    assert "quick" in env_info.step_observation.observation
