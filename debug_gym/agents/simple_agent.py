@@ -115,6 +115,28 @@ class SimpleAgent(BaseAgent):
 
         return super().build_prompt(info)
 
+    @staticmethod
+    def _cast_param(value: str, arg_schema: dict | None):
+        """Cast a string parameter value based on the tool's argument schema."""
+        if arg_schema is None:
+            return value
+        types = arg_schema.get("type", [])
+        if not isinstance(types, list):
+            types = [types]
+        for t in types:
+            if t == "number":
+                try:
+                    # Prefer int if the value has no decimal point
+                    return int(value) if "." not in value else float(value)
+                except (ValueError, TypeError):
+                    continue
+            if t == "boolean":
+                if value.lower() in ("true", "1"):
+                    return True
+                if value.lower() in ("false", "0"):
+                    return False
+        return value
+
     def parse_tool_call(self, tool_call: str) -> List[ToolCall]:
         """
         Parses a string of the form:
@@ -156,11 +178,24 @@ class SimpleAgent(BaseAgent):
             pattern = r"<parameter\s*=\s*([^>]+)>(.*?)</parameter>"
             param_matches = re.findall(pattern, function_content, flags=re.DOTALL)
 
+            # Get the tool's argument schema for type casting
+            tool_arg_schema = {}
+            if (
+                self.env is not None
+                and hasattr(self.env, "_tools")
+                and function_name in self.env._tools
+            ):
+                tool = self.env._tools[function_name]
+                if hasattr(tool, "arguments") and tool.arguments:
+                    tool_arg_schema = tool.arguments
+
             params = {}
             for param_key, param_value in param_matches:
                 param_key = param_key.strip()
                 param_value = param_value.strip()
-                params[param_key] = param_value
+                params[param_key] = self._cast_param(
+                    param_value, tool_arg_schema.get(param_key)
+                )
 
             tool_calls.append(ToolCall(id="None", name=function_name, arguments=params))
         return tool_calls
