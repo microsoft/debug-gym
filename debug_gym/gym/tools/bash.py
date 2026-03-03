@@ -11,13 +11,13 @@ class BashTool(EnvironmentTool):
     MAX_TIMEOUT = 3600  # 1 hour
 
     examples = [
-        """bash(command="ls -la") to list all files and directories with detailed information.""",
-        """bash(command="grep -r 'function_name' .") to search for 'function_name' in all files recursively.""",
-        """bash(command="find . -name '*.py' | head -10") to find Python files in the current directory.""",
-        """bash(command="cat file.txt | head -20") to show the first 20 lines of a file.""",
-        """bash(command="sed -n 10,25p path/to/file") to show lines 10 to 25 of a file at relative path.""",
-        """bash(command="pip list") to show installed Python packages.""",
-        """bash(command="python -m pytest tests/ -x", timeout=600) to run tests with a 10-minute timeout.""",
+        """Use bash with `command`: "ls -la" to list all files and directories with detailed information.""",
+        """Use bash with `command`: "grep -r 'function_name' ." to search for 'function_name' in all files recursively.""",
+        """Use bash with `command`: "find . -name '*.py' | head -10" to find Python files in the current directory.""",
+        """Use bash with `command`: "cat file.txt | head -20" to show the first 20 lines of a file.""",
+        """Use bash with `command`: "sed -n 10,25p path/to/file" to show lines 10 to 25 of a file at relative path.""",
+        """Use bash with `command`: "pip list" to show installed Python packages.""",
+        """Use bash with `command`: "python -m pytest tests/ -x" and `timeout`: 600 to run tests with a 10-minute timeout.""",
     ]
     description = (
         "Run commands in a bash shell. "

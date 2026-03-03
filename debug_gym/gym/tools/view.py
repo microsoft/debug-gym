@@ -10,11 +10,11 @@ from debug_gym.gym.workspace import WorkspaceReadError
 class ViewTool(EnvironmentTool):
     name: str = "view"
     examples = [
-        """view(path="main.py") to show the content of a file called 'main.py' in the root. The content will be annotated with line numbers and current breakpoints because include_line_numbers_and_breakpoints is True by default.""",
-        """view(path="utils/vector.py", include_line_numbers_and_breakpoints=True) to show the content of a file called 'vector.py' in a subdirectory called 'utils'. The content will be annotated with line numbers and current breakpoints.""",
-        """view(path="src/util.py", include_line_numbers_and_breakpoints=False) to show the content of a file called 'util.py' in a subdirectory called 'src'. The line numbers and breakpoints will not be included in the output.""",
-        """view(path="funcs/helper.py", start=6, end=24) to show the content of a file called 'helper.py' in a subdirectory called 'funcs', starting from line 6 to line 24. The content will be annotated with line numbers and current breakpoints.""",
-        """view(path="src/main.py", start=514) to show the content of a file called 'main.py' in a subdirectory called 'src', starting from line 514 to the end of the file. The content will be annotated with line numbers and current breakpoints.""",
+        """Use view with `path`: "main.py" to show the content of 'main.py' in the root. The content will be annotated with line numbers and current breakpoints because include_line_numbers_and_breakpoints is true by default.""",
+        """Use view with `path`: "utils/vector.py" and `include_line_numbers_and_breakpoints`: true to show the content of 'vector.py' in the 'utils' subdirectory, annotated with line numbers and current breakpoints.""",
+        """Use view with `path`: "src/util.py" and `include_line_numbers_and_breakpoints`: false to show the content of 'util.py' without line numbers or breakpoints.""",
+        """Use view with `path`: "funcs/helper.py", `start`: 6, and `end`: 24 to show lines 6 to 24 of 'helper.py', annotated with line numbers and current breakpoints.""",
+        """Use view with `path`: "src/main.py" and `start`: 514 to show the content of 'main.py' starting from line 514 to the end of the file.""",
     ]
     description = (
         "Specify a file path to view its content. The file path should be relative to the root directory of the repository."

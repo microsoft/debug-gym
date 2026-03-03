@@ -11,11 +11,11 @@ from debug_gym.gym.workspace import WorkspaceReadError
 class EditTool(EnvironmentTool):
     name = "edit"
     examples = [
-        """edit(path=\"code/utils.py\", start=None, end=None, new_code=\"print('hola')\") will edit the specified file 'code/utils.py' (the entire code) to be print('hola'), because no line number is provided.""",
-        """edit(path=\"code/utils.py\", start=10, end=None, new_code=\"    print('bonjour')\") will edit line number 10 of the specified file 'code/utils.py' to be print('bonjour'), with the indents ahead (in this case, 4 spaces).""",
-        """edit(path=\"code/utils.py\", start=10, end=20, new_code=\"    print('hello')\\n    print('hi again')\") will replace the chunk of code between line number 10 and 20 in the specified file 'code/utils.py' by the two lines provided, both with indents ahead (in this case, 4 spaces).""",
-        """edit(path='code/utils.py', start=4, end=6, new_code=\"        print('buongiorno')\") will replace the chunk of code between line number 4 and 6 in the specified file 'code/utils.py' by the single line provided, with the indent ahead (in this case, 8 spaces).""",
-        """edit(path='code/new_utils.py', new_code=\"print('hello new file')\") will create 'code/new_utils.py' with the provided content when the file does not already exist.""",
+        """Use edit with `path`: "code/utils.py", `start`: null, `end`: null, and `new_code`: "print('hola')" to replace the entire content of 'code/utils.py' with print('hola'), because no line number is provided.""",
+        """Use edit with `path`: "code/utils.py", `start`: 10, `end`: null, and `new_code`: "    print('bonjour')" to replace line 10 of 'code/utils.py' with print('bonjour'), with 4 spaces of indentation.""",
+        """Use edit with `path`: "code/utils.py", `start`: 10, `end`: 20, and `new_code`: "    print('hello')\\n    print('hi again')" to replace lines 10-20 of 'code/utils.py' with the two lines provided, both with 4 spaces of indentation.""",
+        """Use edit with `path`: "code/utils.py", `start`: 4, `end`: 6, and `new_code`: "        print('buongiorno')" to replace lines 4-6 of 'code/utils.py' with a single line with 8 spaces of indentation.""",
+        """Use edit with `path`: "code/new_utils.py" and `new_code`: "print('hello new file')" to create a new file 'code/new_utils.py' with the provided content when the file does not already exist.""",
     ]
     description = (
         "Edit the content of the specified file path, between lines [start, end], with the new code. Line numbers are 1-based. When start is provided and end is None, it's assumed to edit a single line (start). When both start and end are None, it's assumed to edit the whole file, this is not recommended because most of the time the expected change is local. If the file does not exist yet, it will be created with the provided content. The new code should be valid python code include proper indentation (can be determined from context)."
