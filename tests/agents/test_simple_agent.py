@@ -253,3 +253,42 @@ def test_simple_agent_with_no_env():
     # System prompt should still have placeholder
     assert "{tools_description}" in agent.args.system_prompt
     assert not agent._system_prompt_generated
+
+
+def test_instance_prompt_replaces_info_instructions():
+    """Test that {{ info.instructions }} in the instance prompt is replaced with
+    the actual instructions from EnvInfo."""
+    from debug_gym.agents.simple_agent import SimpleAgentArgs
+    from debug_gym.gym.envs.env import EnvInfo
+
+    agent = SimpleAgent(agent_args=SimpleAgentArgs(max_steps=10))
+    agent.logger = Mock()
+    agent.llm = Mock()
+
+    # Capture the rendered prompt passed to convert_observation_to_message
+    captured = {}
+    agent.llm.convert_observation_to_message = Mock(
+        side_effect=lambda text: (
+            captured.update(rendered=text),
+            {"role": "user", "content": text},
+        )[1]
+    )
+
+    # Create mock environment with tools
+    mock_env = Mock()
+    mock_env.tools = []
+    agent.env = mock_env
+
+    # Create mock info with specific instructions
+    mock_info = Mock(spec=EnvInfo)
+    mock_info.instructions = "Fix the bug in module foo by handling the ValueError."
+    mock_info.current_breakpoints = ""
+    mock_info.eval_observation = None
+
+    agent.build_prompt(mock_info)
+
+    # The rendered instance prompt should contain the actual instructions
+    rendered = captured["rendered"]
+    assert "Fix the bug in module foo by handling the ValueError." in rendered
+    # The Jinja2 placeholder should NOT be present
+    assert "{{ info.instructions }}" not in rendered
