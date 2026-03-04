@@ -342,17 +342,19 @@ class LLM(ABC):
         """
         pass
 
-    def count_tokens(self, messages: list[dict] | str) -> int:
+    def count_tokens(self, messages: list[dict] | dict | str) -> int:
         """Count the total number of tokens across all messages.
 
         Args:
-            messages: List of message dicts
+            messages: List of message dicts, a single message dict, or a string
 
         Returns:
             Total token count across all messages
         """
         if isinstance(messages, str):
             messages = [{"role": "user", "content": messages}]
+        elif isinstance(messages, dict):
+            messages = [messages]
         tokenized = self.tokenize(messages)
         return sum(len(tokens) for tokens in tokenized)
 

@@ -3,7 +3,7 @@ from unittest.mock import MagicMock, patch
 
 from debug_gym.gym.entities import Observation
 from debug_gym.gym.tools.tool import EnvironmentTool, ToolCall
-from debug_gym.llms.base import LLM, LLMConfigRegistry
+from debug_gym.llms.base import LLM, LLMConfig, LLMConfigRegistry, LLMResponse
 from debug_gym.llms.openai import OpenAILLM  # Import for patching in tests
 
 
@@ -498,3 +498,83 @@ class TestTokenizationSafety:
         # Should return tokens without error
         assert len(result) == 1
         assert len(result[0]) > 0
+
+
+openai_config = {
+    "model": "gpt-4o",
+    "tokenizer": "gpt-4o",
+    "context_limit": 128,
+    "api_key": "test-api-key",
+    "endpoint": "https://test-endpoint",
+    "tags": ["openai"],
+}
+
+
+def test_convert_response_to_message_with_tool(logger_mock):
+    """Test that convert_response_to_message includes tool_calls when tool is present."""
+    llm = OpenAILLM(
+        "test-openai",
+        logger=logger_mock,
+        llm_config=LLMConfig(**openai_config),
+    )
+
+    response = LLMResponse(
+        prompt=[{"role": "user", "content": "test"}],
+        response="Here's my answer",
+        tool=ToolCall(id="call_123", name="test_tool", arguments={"arg": "val"}),
+    )
+
+    message = llm.convert_response_to_message(response)
+
+    assert message["role"] == "assistant"
+    assert message["content"] == "Here's my answer"
+    assert "tool_calls" in message
+    assert len(message["tool_calls"]) == 1
+    assert message["tool_calls"][0]["type"] == "function"
+    assert message["tool_calls"][0]["id"] == "call_123"
+    assert message["tool_calls"][0]["function"]["name"] == "test_tool"
+    assert message["tool_calls"][0]["function"]["arguments"] == '{"arg": "val"}'
+
+
+def test_convert_response_to_message_without_tool(logger_mock):
+    """Test that convert_response_to_message omits tool_calls when tool is None."""
+    llm = OpenAILLM(
+        "test-openai",
+        logger=logger_mock,
+        llm_config=LLMConfig(**openai_config),
+    )
+
+    response = LLMResponse(
+        prompt=[{"role": "user", "content": "test"}],
+        response="Here's my answer",
+        tool=None,
+    )
+
+    message = llm.convert_response_to_message(response)
+
+    assert message["role"] == "assistant"
+    assert message["content"] == "Here's my answer"
+    assert "tool_calls" not in message
+
+
+def test_convert_response_to_message_with_reasoning(logger_mock):
+    """Test that convert_response_to_message includes reasoning_content when present."""
+    llm = OpenAILLM(
+        "test-openai",
+        logger=logger_mock,
+        llm_config=LLMConfig(**openai_config),
+    )
+
+    response = LLMResponse(
+        prompt=[{"role": "user", "content": "test"}],
+        response="Here's my answer",
+        reasoning_response="My reasoning process...",
+        tool=None,
+    )
+
+    message = llm.convert_response_to_message(response)
+
+    assert message["role"] == "assistant"
+    assert message["content"] == "Here's my answer"
+    assert "tool_calls" not in message
+    assert message["reasoning_content"] == "My reasoning process..."
