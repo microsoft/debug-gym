@@ -11,9 +11,9 @@ class ListdirTool(EnvironmentTool):
     setup_commands: tuple[str, ...] = ("apt-get update && apt-get install -y tree",)
 
     examples = [
-        """listdir(path=None, depth=None) to list the contents of the working directory.""",
-        """listdir(path="src/util", depth=None) to list the contents of the 'util' subdirectory within the 'src' subdirectory.""",
-        """listdir(path="src", depth=2) to list the contents of the 'src' subdirectory up to a depth of 2.""",
+        """Use listdir with `path`: null and `depth`: null to list the contents of the working directory.""",
+        """Use listdir with `path`: "src/util" and `depth`: null to list the contents of the 'util' subdirectory within the 'src' subdirectory.""",
+        """Use listdir with `path`: "src" and `depth`: 2 to list the contents of the 'src' subdirectory up to a depth of 2.""",
     ]
     description = (
         "List the file and folder contents of a subdirectory within the working directory, up to a specified 'depth' (default depth is 1). "

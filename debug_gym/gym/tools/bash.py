@@ -7,13 +7,17 @@ from debug_gym.gym.tools.toolbox import Toolbox
 @Toolbox.register()
 class BashTool(EnvironmentTool):
     name: str = "bash"
+    DEFAULT_TIMEOUT = 30  # seconds
+    MAX_TIMEOUT = 3600  # 1 hour
+
     examples = [
-        """bash(command="ls -la") to list all files and directories with detailed information.""",
-        """bash(command="grep -r 'function_name' .") to search for 'function_name' in all files recursively.""",
-        """bash(command="find . -name '*.py' | head -10") to find Python files in the current directory.""",
-        """bash(command="cat file.txt | head -20") to show the first 20 lines of a file.""",
-        """bash(command="sed -n 10,25p path/to/file") to show lines 10 to 25 of a file at relative path.""",
-        """bash(command="pip list") to show installed Python packages.""",
+        """Use bash with `command`: "ls -la" to list all files and directories with detailed information.""",
+        """Use bash with `command`: "grep -r 'function_name' ." to search for 'function_name' in all files recursively.""",
+        """Use bash with `command`: "find . -name '*.py' | head -10" to find Python files in the current directory.""",
+        """Use bash with `command`: "cat file.txt | head -20" to show the first 20 lines of a file.""",
+        """Use bash with `command`: "sed -n 10,25p path/to/file" to show lines 10 to 25 of a file at relative path.""",
+        """Use bash with `command`: "pip list" to show installed Python packages.""",
+        """Use bash with `command`: "python -m pytest tests/ -x" and `timeout`: 600 to run tests with a 10-minute timeout.""",
     ]
     description = (
         "Run commands in a bash shell. "
@@ -27,9 +31,18 @@ class BashTool(EnvironmentTool):
             "type": ["string"],
             "description": "The bash command to execute. The command will be run in the current working directory of the environment.",
         },
+        "timeout": {
+            "type": ["integer", "null"],
+            "description": (
+                f"Maximum time in seconds for the command to run. "
+                f"Defaults to {DEFAULT_TIMEOUT}s if not specified. "
+                f"Maximum allowed value is {MAX_TIMEOUT}s (1 hour). "
+                f"Use longer timeouts for commands like test suites or builds."
+            ),
+        },
     }
 
-    def use(self, environment, command: str) -> Observation:
+    def use(self, environment, command: str, timeout: int = None) -> Observation:
         """Execute a bash command in the environment's terminal and return the result."""
         try:
             # Assert that the terminal is not a local terminal (only in production)
@@ -47,9 +60,13 @@ class BashTool(EnvironmentTool):
                     "Error: bash tool requires a non-local terminal. Current terminal type is not supported.",
                 )
 
-            # Use the environment's terminal to run the command
-            # Set a reasonable timeout (30 seconds) to prevent hanging
-            success, output = environment.terminal.run(command, timeout=30)
+            # Resolve timeout: use provided value, clamp to max, or fall back to default
+            if timeout is not None:
+                timeout = max(1, min(int(timeout), self.MAX_TIMEOUT))
+            else:
+                timeout = self.DEFAULT_TIMEOUT
+
+            success, output = environment.terminal.run(command, timeout=timeout)
 
             if success:
                 result = (

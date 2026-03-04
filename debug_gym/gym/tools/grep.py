@@ -11,11 +11,11 @@ class GrepTool(EnvironmentTool):
     name: str = "grep"
 
     examples = [
-        """grep(pattern="function", path=None) to search for the word "function" in all files in the repository.""",
-        """grep(pattern="class.*Test", path="*.py") to search for lines matching the regex pattern "class.*Test" in all files under the 'tests/' directory.""",
-        """grep(pattern="import numpy", path="src/main.py") to search for "import numpy" in the specific file 'src/main.py'.""",
-        """grep(pattern="TODO") to search for "TODO".""",
-        """grep(pattern="bug", max_results=10) to search for "bug" and limit results to 10 matches.""",
+        """Use grep with `pattern`: "function" to search for the word "function" in all files in the repository.""",
+        """Use grep with `pattern`: "class.*Test" and `path`: "*.py" to search for lines matching the regex pattern "class.*Test" in all Python files.""",
+        """Use grep with `pattern`: "import numpy" and `path`: "src/main.py" to search for "import numpy" in the specific file 'src/main.py'.""",
+        """Use grep with `pattern`: "TODO" to search for "TODO" in all files.""",
+        """Use grep with `pattern`: "bug" and `max_results`: 10 to search for "bug" and limit results to 10 matches.""",
     ]
     description = (
         "Search for a pattern in files within the repository. Can search in specific files, directories, or the entire repository. "
