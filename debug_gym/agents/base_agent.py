@@ -358,7 +358,7 @@ class BaseAgent:
         if reset_env:
             info = env.reset()
         else:
-            info = env.info
+            info = env.infos
 
         self.init(info)
 

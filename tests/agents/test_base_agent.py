@@ -546,7 +546,7 @@ class TestBaseAgentRunReplayActions:
 
         mock_env.reset.return_value = mock_env_info
         mock_env.step.side_effect = mock_step
-        mock_env.info = mock_env_info
+        mock_env.infos = mock_env_info
 
         # Mock the step method to track if it's called
         agent.step = MagicMock()
@@ -597,7 +597,7 @@ class TestBaseAgentRunReplayActions:
 
         mock_env.reset.return_value = mock_env_info
         mock_env.step.side_effect = mock_env_step
-        mock_env.info = mock_env_info
+        mock_env.infos = mock_env_info
 
         # Create new LLM responses for step() calls
         new_llm_responses = [
@@ -653,7 +653,7 @@ class TestBaseAgentRunReplayActions:
 
         mock_env.reset.return_value = mock_env_info
         mock_env.step.side_effect = mock_env_step
-        mock_env.info = mock_env_info
+        mock_env.infos = mock_env_info
 
         llm_responses = [
             LLMResponse(
@@ -700,7 +700,7 @@ class TestBaseAgentRunReplayActions:
 
         mock_env.reset.return_value = mock_env_info
         mock_env.step.side_effect = mock_env_step
-        mock_env.info = mock_env_info
+        mock_env.infos = mock_env_info
 
         llm_response = LLMResponse(
             prompt=[],
@@ -752,7 +752,7 @@ class TestBaseAgentRunReplayActions:
 
         mock_env.reset.return_value = mock_env_info
         mock_env.step.side_effect = mock_env_step
-        mock_env.info = mock_env_info
+        mock_env.infos = mock_env_info
 
         agent.run(mock_env, replay_actions=replay_actions)
 
