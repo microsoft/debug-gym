@@ -90,7 +90,7 @@ I have uploaded a python code repository in the /testbed directory.
 
 Now consider the following instructions:
 
-\n\n{info.instructions}\n\n
+\n\n{{ info.instructions }}\n\n
 
 Can you help me solve the issue?
 """
