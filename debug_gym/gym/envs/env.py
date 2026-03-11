@@ -164,7 +164,10 @@ class TooledEnv:
             )
         if tool_name not in self._tools:
             # failed to find tool
-            return f"Unregistered tool: {tool_name}", None
+            msg = f"Tool '{tool_name}' not found among available tools: {self.tool_names}."
+            self.logger.warning(msg)
+            return msg, None
+
         tool = self._tools[tool_name]
         return None, [tool, tool_kwargs]
 
