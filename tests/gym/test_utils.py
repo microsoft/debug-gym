@@ -1,3 +1,6 @@
+import os
+import tempfile
+import zipfile
 from pathlib import Path
 
 import pytest
@@ -10,6 +13,7 @@ from debug_gym.gym.utils import (
     filter_non_utf8,
     filter_problems,
     show_line_number,
+    unzip,
 )
 
 
@@ -400,3 +404,29 @@ def test_filter_problems():
         "problem2",
         "problem3",
     ]  # excluded_ids doesn't affect custom splits
+
+
+def test_unzip_handles_preexisting_directories():
+    """Test that unzip doesn't crash when directories already exist.
+
+    This simulates the race condition that occurs during parallel test execution
+    where multiple processes try to extract the same zip file concurrently.
+    """
+    with tempfile.TemporaryDirectory() as tmp:
+        # Create a zip file with a directory structure
+        zip_path = os.path.join(tmp, "test.zip")
+        with zipfile.ZipFile(zip_path, "w") as zf:
+            zf.writestr("subdir/file.txt", "hello")
+
+        dst = os.path.join(tmp, "output")
+        os.makedirs(dst)
+
+        # Pre-create the directory that the zip will try to create,
+        # simulating another process having already extracted it.
+        os.makedirs(os.path.join(dst, "subdir"))
+
+        # This should not raise FileExistsError
+        unzip(zip_path, dst=dst)
+
+        # Verify the file was still extracted correctly
+        assert os.path.isfile(os.path.join(dst, "subdir", "file.txt"))

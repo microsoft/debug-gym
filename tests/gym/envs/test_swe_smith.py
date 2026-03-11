@@ -129,7 +129,7 @@ def test_reset_and_step(get_swe_smith_env):
     env_info = env.step(tool_call)
     assert env_info.step_observation == Observation(
         source="env",
-        observation="Unregistered tool: listdir",
+        observation="Tool 'listdir' not found among available tools: eval.",
     )
 
     listdir_tool = Toolbox.get_tool("listdir")
