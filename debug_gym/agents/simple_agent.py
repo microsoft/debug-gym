@@ -137,7 +137,7 @@ class SimpleAgent(BaseAgent):
                     return False
         return value
 
-    def parse_tool_call(self, tool_call: str) -> List[ToolCall]:
+    def parse_tool_calls(self, text: str) -> List[ToolCall]:
         """
         Parses a string of the form:
 
@@ -146,7 +146,7 @@ class SimpleAgent(BaseAgent):
             ...
           </function>
 
-        and returns a ToolCall object.
+        and returns a list of ToolCall objects.
 
         For example:
           <function=file_editor>
@@ -158,22 +158,9 @@ class SimpleAgent(BaseAgent):
         tool_calls = []
         func_pattern = r"<function=([^>]+)>(.*?)</function>"
 
-        # Get valid tool names from environment if available
-        valid_tool_names = None
-        if self.env is not None and hasattr(self.env, "tools"):
-            valid_tool_names = {tool.name for tool in self.env.tools}
-
-        for func_match in re.finditer(func_pattern, tool_call, re.DOTALL):
+        for func_match in re.finditer(func_pattern, text, re.DOTALL):
             function_name = func_match.group(1).strip()
             function_content = func_match.group(2)
-
-            # Validate tool name if we have access to valid tools
-            if valid_tool_names is not None and function_name not in valid_tool_names:
-                self.logger.warning(
-                    f"Unknown tool '{function_name}' requested. "
-                    f"Valid tools are: {sorted(valid_tool_names)}"
-                )
-                continue  # Skip invalid tools
 
             pattern = r"<parameter\s*=\s*([^>]+)>(.*?)</parameter>"
             param_matches = re.findall(pattern, function_content, flags=re.DOTALL)
@@ -198,9 +185,10 @@ class SimpleAgent(BaseAgent):
                 )
 
             tool_calls.append(ToolCall(id="None", name=function_name, arguments=params))
+
         return tool_calls
 
-    def parse_response(self, response_text: str) -> Tuple[str, List[ToolCall]]:
+    def parse_thought_and_tool(self, response_text: str) -> Tuple[str, ToolCall]:
         """
         Extracts:
         - thought: everything before the first <function=...> block
@@ -211,22 +199,33 @@ class SimpleAgent(BaseAgent):
         pattern = re.compile(r"(?s)(<function=.*?</function>)")
         match = pattern.search(response_text)
 
-        if match:
-            action = match.group(1)  # The entire <function=...></function> block
-            thought = response_text[: match.start()]  # Everything before the block
-        else:
+        if not match:
             # If no match, treat entire text as "thought"
-            thought = response_text
-            action = ""
+            thought = response_text.strip()
+            action = ToolCall(
+                id="empty_tool_response",
+                name="empty_tool_response",
+                arguments={},
+            )
+            return thought, [action]
+
+        # Following R2EGym's assumption of using any text coming before any tool call as the thought.
+        action = match.group(1)  # The entire <function=...></function> block
+        thought = response_text[: match.start()]  # Everything before the block
 
         # Strip leading/trailing whitespace
         thought = thought.strip()
         action = action.strip()
 
-        tool_calls = self.parse_tool_call(action)
-        return thought, tool_calls
+        tool_calls = self.parse_tool_calls(action)
+        if len(tool_calls) > 1:
+            self.logger.warning(
+                f"Multiple tool calls detected ({len(tool_calls)}), using the first one."
+            )
 
-    def step(self, info: EnvInfo) -> LLMResponse | List[LLMResponse]:
+        return thought, tool_calls[0]
+
+    def step(self, info: EnvInfo) -> LLMResponse:
         """Execute a single agent step (LLM decision only).
 
         Args:
@@ -237,11 +236,7 @@ class SimpleAgent(BaseAgent):
         """
         messages = self.build_prompt(info)
         response = self.llm(messages, tools=None)
-        thought, tool_calls = self.parse_response(response.response)
-        if tool_calls and len(tool_calls) > 1:
-            self.logger.info(
-                f"Multiple tool calls detected ({len(tool_calls)}), using the first one."
-            )
-        response.response = thought
-        response.tool = tool_calls[0] if tool_calls else None
+        response.response, response.tool = self.parse_thought_and_tool(
+            response.response
+        )
         return response

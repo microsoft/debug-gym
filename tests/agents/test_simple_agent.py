@@ -25,7 +25,7 @@ def hello():
 </parameter>
 </function>
 """
-    tool_calls = agent.parse_tool_call(response)
+    tool_calls = agent.parse_tool_calls(response)
     assert len(tool_calls) == 1
     assert tool_calls[0].name == "test"
     assert tool_calls[0].arguments["x"] == "1"
@@ -37,7 +37,7 @@ def test_parse_multiple_and_empty(agent):
     response = (
         "<function=a><parameter=x>1</parameter></function><function=b></function>"
     )
-    tool_calls = agent.parse_tool_call(response)
+    tool_calls = agent.parse_tool_calls(response)
     assert len(tool_calls) == 2
     assert tool_calls[0].arguments == {"x": "1"}
     assert tool_calls[1].arguments == {}
@@ -46,7 +46,7 @@ def test_parse_multiple_and_empty(agent):
 def test_parse_fallback_and_exception(agent):
     """Covers no-match fallback and exception handling"""
     # No match fallback
-    tool_calls = agent.parse_tool_call("text")
+    tool_calls = agent.parse_tool_calls("text")
     assert not tool_calls
 
 

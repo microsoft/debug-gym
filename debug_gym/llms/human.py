@@ -1,3 +1,4 @@
+import os
 import re
 import sys
 from typing import Any, Dict, List, Optional, Tuple
@@ -569,7 +570,9 @@ class Human(LLM):
         action = ""
 
         while tool_call is None and retry_count < self.max_retries:
-            if prompt_toolkit_available:
+            if prompt_toolkit_available and not os.environ.get(
+                "DEBUG_GYM_NO_PROMPT_TOOLKIT"
+            ):
                 # Create a prompt session with completion and validation
                 session = PromptSession(
                     completer=DynamicToolCommandCompleter(tools=all_tools),
@@ -590,7 +593,7 @@ class Human(LLM):
                     )
                 console.print(
                     "\n[bold green]Provide the command and its arguments in the following format:[/bold green]"
-                    "[italic]command argument1=value1 argument2=value2[/italic]"
+                    " [italic]command argument1=value1 argument2=value2[/italic]"
                 )
                 action = console.input("[bold]> [/bold]")
 

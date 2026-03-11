@@ -283,7 +283,7 @@ class BaseAgent:
             f"{json.dumps(self.llm.define_tools(info.tools), indent=4)}\n"
         )
 
-    def step(self, info: EnvInfo) -> LLMResponse | List[LLMResponse]:
+    def step(self, info: EnvInfo) -> LLMResponse:
         """Execute a single agent step (LLM decision only).
 
         Args:
@@ -295,7 +295,7 @@ class BaseAgent:
         messages = self.build_prompt(info)
         return self.llm(messages, info.tools)
 
-    def execute_action(self, llm_response: LLMResponse | List[LLMResponse]) -> EnvInfo:
+    def execute_action(self, llm_response: LLMResponse) -> EnvInfo:
         try:
             next_info = self.env.step(
                 llm_response.tool,
