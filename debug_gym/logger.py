@@ -564,6 +564,8 @@ class DebugGymLogger(logging.Logger):
         # Prevent the log messages from being propagated to the root logger
         self.propagate = False
 
+        self._logged_messages = set()  # To track already logged messages for debug_once
+
         super().setLevel(logging.DEBUG)  # Ensure logger operates at DEBUG level
         if DebugGymLogger._main_process_logger is not None:
             self._is_worker = True
@@ -772,6 +774,12 @@ class DebugGymLogger(logging.Logger):
         self.warning(
             f"Failed to report progress for {problem_id} after {max_attempts} attempts"
         )
+
+    def debug_once(self, message: str, *args, **kwargs):
+        """Log a debug message only once per unique message content."""
+        if message not in self._logged_messages:
+            self._logged_messages.add(message)
+            self.debug(message, *args, **kwargs)
 
 
 def log_with_color(

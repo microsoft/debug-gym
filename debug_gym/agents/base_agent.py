@@ -190,9 +190,9 @@ class BaseAgent:
     def build_system_prompt(self, info: EnvInfo | None = None) -> dict:
         """Build system prompt using the default template or one provided in args."""
         system_prompt_template = self._load_prompt_template(self.system_prompt)
-        self.logger.debug(f"Loaded system prompt template:\n{self.system_prompt}")
+        self.logger.debug_once(f"Loaded system prompt template:\n{self.system_prompt}")
         system_prompt = system_prompt_template.render(agent=self, info=info)
-        self.logger.debug(f"Rendered system prompt:\n{system_prompt}")
+        self.logger.debug_once(f"Rendered system prompt:\n{system_prompt}")
 
         # TODO: should we call self.llm.convert_observation_to_message(system_prompt) ?
         return {"role": "system", "content": filter_non_utf8(system_prompt)}
@@ -200,9 +200,11 @@ class BaseAgent:
     def build_instance_prompt(self, info: EnvInfo | None = None) -> dict:
         """Build instance prompt using the default template or one provided in args."""
         instance_prompt_template = self._load_prompt_template(self.instance_prompt)
-        self.logger.debug(f"Loaded instance prompt template:\n{self.instance_prompt}")
+        self.logger.debug_once(
+            f"Loaded instance prompt template:\n{self.instance_prompt}"
+        )
         instance_prompt = instance_prompt_template.render(agent=self, info=info)
-        self.logger.debug(f"Rendered instance prompt:\n{instance_prompt}")
+        self.logger.debug_once(f"Rendered instance prompt:\n{instance_prompt}")
         return self.llm.convert_observation_to_message(instance_prompt)
 
     def build_history_prompt(self) -> list[dict]:
