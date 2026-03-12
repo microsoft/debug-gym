@@ -707,7 +707,7 @@ class KubernetesTerminal(Terminal):
                     "labels": self.labels,
                 },
                 "spec": {
-                    "activeDeadlineSeconds": 3600 * 24,  # a day
+                    "activeDeadlineSeconds": 3600 * 6,  # 6 hours
                     "restartPolicy": "Never",
                     "containers": [
                         {
@@ -726,7 +726,7 @@ class KubernetesTerminal(Terminal):
                             ],
                             "resources": {
                                 "requests": {"cpu": "0.5", "memory": "1Gi"},
-                                "limits": {"cpu": "2", "memory": "8Gi"},
+                                "limits": {"memory": "4Gi"},
                             },
                         }
                     ],

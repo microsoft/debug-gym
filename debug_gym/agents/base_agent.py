@@ -187,6 +187,21 @@ class BaseAgent:
             env.filters["trim_message"] = self.trim_message
             return env.from_string(template)
 
+    def convert_observation_to_message(
+        self,
+        observation: str,
+        action_tool_call_id: int = None,
+        action_tool_call_name: str = None,
+    ) -> dict:
+        """Convert an observation string to a message dict."""
+        return self.llm.convert_observation_to_message(
+            observation, action_tool_call_id, action_tool_call_name
+        )
+
+    def convert_response_to_message(self, response: LLMResponse) -> dict:
+        """Convert a response string to a message dict."""
+        return self.llm.convert_response_to_message(response)
+
     def build_system_prompt(self, info: EnvInfo | None = None) -> dict:
         """Build system prompt using the default template or one provided in args."""
         system_prompt_template = self._load_prompt_template(self.system_prompt)
@@ -205,7 +220,7 @@ class BaseAgent:
         )
         instance_prompt = instance_prompt_template.render(agent=self, info=info)
         self.logger.debug_once(f"Rendered instance prompt:\n{instance_prompt}")
-        return self.llm.convert_observation_to_message(instance_prompt)
+        return self.convert_observation_to_message(instance_prompt)
 
     def build_history_prompt(self) -> list[dict]:
         """Here, we rebuild the history prompt from scratch at each time."""
@@ -214,7 +229,7 @@ class BaseAgent:
             self.history.llm_responses, self.history.env_observations, strict=True
         ):
             # llm response
-            messages.append(self.llm.convert_response_to_message(llm_response))
+            messages.append(self.convert_response_to_message(llm_response))
             # next environment observation
             kwargs = {
                 "observation": next_observation.step_observation.observation,
@@ -222,7 +237,7 @@ class BaseAgent:
             if next_observation.action_tool_call:
                 kwargs["action_tool_call_id"] = next_observation.action_tool_call.id
                 kwargs["action_tool_call_name"] = next_observation.action_tool_call.name
-            messages.append(self.llm.convert_observation_to_message(**kwargs))
+            messages.append(self.convert_observation_to_message(**kwargs))
         return messages
 
     def build_prompt(self, info: EnvInfo = None):
