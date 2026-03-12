@@ -268,7 +268,7 @@ def test_instance_prompt_replaces_info_instructions():
     # Capture the rendered prompt passed to convert_observation_to_message
     captured = {}
     agent.llm.convert_observation_to_message = Mock(
-        side_effect=lambda text: (
+        side_effect=lambda text, *args, **kwargs: (
             captured.update(rendered=text),
             {"role": "user", "content": text},
         )[1]

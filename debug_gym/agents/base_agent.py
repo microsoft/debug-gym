@@ -391,11 +391,12 @@ class BaseAgent:
             return self.build_trajectory()
 
         highscore = info.score
+        total_input_tokens = 0
+        total_output_tokens = 0
         should_stop = False
 
         while not should_stop:
             step += 1  # Starting a new step.
-            self.logger.info(f"\n{'='*20} STEP {step} {'='*20}\n")
 
             # Check if we should replay a previous action or generate a new one
             if replay_index < len(replay_actions):
@@ -412,6 +413,10 @@ class BaseAgent:
             else:
                 agent_response = self.step(info)
 
+            if agent_response.token_usage:
+                total_input_tokens += agent_response.token_usage.prompt
+                total_output_tokens += agent_response.token_usage.response
+
             info = self.execute_action(agent_response)
 
             if debug:
@@ -425,7 +430,8 @@ class BaseAgent:
             )
 
             highscore = max(highscore, info.score)
-            msg = f"[{env.task_name[:10]:<10}] Step {step} | Score: {info.score}/{info.max_score or '-'} [Best: {highscore}]"
+            msg = f"Step {step} | Score: {info.score}/{info.max_score or '-'} [Best: {highscore}]"
+            msg += f" | Tokens: {total_input_tokens} in / {total_output_tokens} out"
             if should_stop:
                 msg += f" | Stopping Reason: {reason}"
             self.logger.info(msg)

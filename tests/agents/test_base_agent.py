@@ -494,7 +494,7 @@ class TestBaseAgentRunReplayActions:
         llm.context_length = 4096
         llm.count_tokens = lambda x: len(str(x))
         llm.define_tools = lambda x: []
-        llm.convert_observation_to_message = lambda obs, **kwargs: {
+        llm.convert_observation_to_message = lambda obs, *args, **kwargs: {
             "role": "user",
             "content": obs if isinstance(obs, str) else str(obs),
         }
