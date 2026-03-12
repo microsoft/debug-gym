@@ -187,12 +187,27 @@ class BaseAgent:
             env.filters["trim_message"] = self.trim_message
             return env.from_string(template)
 
+    def convert_observation_to_message(
+        self,
+        observation: str,
+        action_tool_call_id: int = None,
+        action_tool_call_name: str = None,
+    ) -> dict:
+        """Convert an observation string to a message dict."""
+        return self.llm.convert_observation_to_message(
+            observation, action_tool_call_id, action_tool_call_name
+        )
+
+    def convert_response_to_message(self, response: LLMResponse) -> dict:
+        """Convert a response string to a message dict."""
+        return self.llm.convert_response_to_message(response)
+
     def build_system_prompt(self, info: EnvInfo | None = None) -> dict:
         """Build system prompt using the default template or one provided in args."""
         system_prompt_template = self._load_prompt_template(self.system_prompt)
-        self.logger.debug(f"Loaded system prompt template:\n{self.system_prompt}")
+        self.logger.debug_once(f"Loaded system prompt template:\n{self.system_prompt}")
         system_prompt = system_prompt_template.render(agent=self, info=info)
-        self.logger.debug(f"Rendered system prompt:\n{system_prompt}")
+        self.logger.debug_once(f"Rendered system prompt:\n{system_prompt}")
 
         # TODO: should we call self.llm.convert_observation_to_message(system_prompt) ?
         return {"role": "system", "content": filter_non_utf8(system_prompt)}
@@ -200,10 +215,12 @@ class BaseAgent:
     def build_instance_prompt(self, info: EnvInfo | None = None) -> dict:
         """Build instance prompt using the default template or one provided in args."""
         instance_prompt_template = self._load_prompt_template(self.instance_prompt)
-        self.logger.debug(f"Loaded instance prompt template:\n{self.instance_prompt}")
+        self.logger.debug_once(
+            f"Loaded instance prompt template:\n{self.instance_prompt}"
+        )
         instance_prompt = instance_prompt_template.render(agent=self, info=info)
-        self.logger.debug(f"Rendered instance prompt:\n{instance_prompt}")
-        return self.llm.convert_observation_to_message(instance_prompt)
+        self.logger.debug_once(f"Rendered instance prompt:\n{instance_prompt}")
+        return self.convert_observation_to_message(instance_prompt)
 
     def build_history_prompt(self) -> list[dict]:
         """Here, we rebuild the history prompt from scratch at each time."""
@@ -212,7 +229,7 @@ class BaseAgent:
             self.history.llm_responses, self.history.env_observations, strict=True
         ):
             # llm response
-            messages.append(self.llm.convert_response_to_message(llm_response))
+            messages.append(self.convert_response_to_message(llm_response))
             # next environment observation
             kwargs = {
                 "observation": next_observation.step_observation.observation,
@@ -220,7 +237,7 @@ class BaseAgent:
             if next_observation.action_tool_call:
                 kwargs["action_tool_call_id"] = next_observation.action_tool_call.id
                 kwargs["action_tool_call_name"] = next_observation.action_tool_call.name
-            messages.append(self.llm.convert_observation_to_message(**kwargs))
+            messages.append(self.convert_observation_to_message(**kwargs))
         return messages
 
     def build_prompt(self, info: EnvInfo = None):
@@ -283,7 +300,7 @@ class BaseAgent:
             f"{json.dumps(self.llm.define_tools(info.tools), indent=4)}\n"
         )
 
-    def step(self, info: EnvInfo) -> LLMResponse | List[LLMResponse]:
+    def step(self, info: EnvInfo) -> LLMResponse:
         """Execute a single agent step (LLM decision only).
 
         Args:
@@ -295,7 +312,7 @@ class BaseAgent:
         messages = self.build_prompt(info)
         return self.llm(messages, info.tools)
 
-    def execute_action(self, llm_response: LLMResponse | List[LLMResponse]) -> EnvInfo:
+    def execute_action(self, llm_response: LLMResponse) -> EnvInfo:
         try:
             next_info = self.env.step(
                 llm_response.tool,
@@ -374,11 +391,12 @@ class BaseAgent:
             return self.build_trajectory()
 
         highscore = info.score
+        total_input_tokens = 0
+        total_output_tokens = 0
         should_stop = False
 
         while not should_stop:
             step += 1  # Starting a new step.
-            self.logger.info(f"\n{'='*20} STEP {step} {'='*20}\n")
 
             # Check if we should replay a previous action or generate a new one
             if replay_index < len(replay_actions):
@@ -395,6 +413,10 @@ class BaseAgent:
             else:
                 agent_response = self.step(info)
 
+            if agent_response.token_usage:
+                total_input_tokens += agent_response.token_usage.prompt
+                total_output_tokens += agent_response.token_usage.response
+
             info = self.execute_action(agent_response)
 
             if debug:
@@ -408,7 +430,8 @@ class BaseAgent:
             )
 
             highscore = max(highscore, info.score)
-            msg = f"[{env.task_name[:10]:<10}] Step {step} | Score: {info.score}/{info.max_score or '-'} [Best: {highscore}]"
+            msg = f"Step {step} | Score: {info.score}/{info.max_score or '-'} [Best: {highscore}]"
+            msg += f" | Tokens: {total_input_tokens} in / {total_output_tokens} out"
             if should_stop:
                 msg += f" | Stopping Reason: {reason}"
             self.logger.info(msg)
