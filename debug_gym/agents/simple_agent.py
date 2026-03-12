@@ -24,6 +24,12 @@ PARAMETER_TEMPLATE = (
     """({index}) {param_name} ({param_type}, {required}): {param_description}"""
 )
 
+XML_TOOL_CALL_TEMPLATE = """<function={tool_name}>
+{parameters}
+</function>"""
+
+XML_PARAMETER_TEMPLATE = """<parameter={param_name}>{param_value}</parameter>"""
+
 
 def describe_tools(tools: list[EnvironmentTool]) -> str:
     """Generates a description of available tools for the system prompt."""
@@ -101,6 +107,34 @@ class SimpleAgent(BaseAgent):
     name: str = "simple_agent"
     args_class = SimpleAgentArgs
     _system_prompt_generated: bool = False
+
+    def convert_observation_to_message(
+        self,
+        observation: str,
+        action_tool_call_id: int = None,
+        action_tool_call_name: str = None,
+    ) -> dict:
+        """Convert an observation string to a message dict."""
+        return self.llm.convert_observation_to_message(
+            observation, action_tool_call_id, action_tool_call_name
+        )
+
+    def convert_response_to_message(self, response: LLMResponse) -> dict:
+        """Convert a response string to a message dict."""
+        # Role should be "assistant" for LLM responses with the tool call dump in the xml-like format.
+        content = response.response
+        if response.tool and response.tool.name != "empty_tool_response":
+            content += "\n" + XML_TOOL_CALL_TEMPLATE.format(
+                tool_name=response.tool.name,
+                parameters="\n".join(
+                    XML_PARAMETER_TEMPLATE.format(param_name=key, param_value=value)
+                    for key, value in response.tool.arguments.items()
+                ),
+            )
+        return {
+            "role": "assistant",
+            "content": content,
+        }
 
     def build_prompt(self, info: EnvInfo) -> list:
         """Build the prompt with dynamically generated tool descriptions."""
@@ -207,7 +241,7 @@ class SimpleAgent(BaseAgent):
                 name="empty_tool_response",
                 arguments={},
             )
-            return thought, [action]
+            return thought, action
 
         # Following R2EGym's assumption of using any text coming before any tool call as the thought.
         action = match.group(1)  # The entire <function=...></function> block

@@ -562,8 +562,7 @@ class Human(LLM):
         # Human does not parse tool calls from response, it generates them directly.
         pass
 
-    def __call__(self, messages, tools, *args, **kwargs) -> LLMResponse:
-        print_messages(messages, self.logger)
+    def _generate_with_tools(self, messages, tools, **kwargs) -> LLMResponse:
         all_tools = self.define_tools(tools)
         tool_call = None
         retry_count = 0
@@ -631,3 +630,33 @@ class Human(LLM):
             prompt_token_count=self.count_tokens(messages),
             response_token_count=self.count_tokens([{"tool_calls": action}]),
         )
+
+    def _generate_no_tools(self, messages, **kwargs) -> LLMResponse:
+        if prompt_toolkit_available and not os.environ.get(
+            "DEBUG_GYM_NO_PROMPT_TOOLKIT"
+        ):
+            # Create a prompt session without completion or validation
+            session = PromptSession(
+                style=get_prompt_style(),
+                history=self._history,
+                enable_history_search=True,
+            )
+            action = session.prompt("\n> ")
+        else:
+            console = Console()
+            action = console.input("[bold]> [/bold]")
+
+        return LLMResponse(
+            prompt=messages,
+            response=action,
+            tool=None,
+            prompt_token_count=self.count_tokens(messages),
+            response_token_count=self.count_tokens([{"tool_calls": action}]),
+        )
+
+    def __call__(self, messages, tools, *args, **kwargs) -> LLMResponse:
+        print_messages(messages, self.logger)
+        if tools:
+            return self._generate_with_tools(messages, tools, **kwargs)
+
+        return self._generate_no_tools(messages, **kwargs)
