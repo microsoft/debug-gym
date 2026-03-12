@@ -182,42 +182,33 @@ def print_messages(messages: list[dict], logger: DebugGymLogger):
         cyan: user messages
         yellow: system message
     """
-    level = logging.DEBUG
-    for i, m in enumerate(messages):
-        if i >= len(messages) - 2:
-            level = (
-                logging.INFO
-            )  # last two messages are most relevant, print at INFO level
-
+    # Only print the last two messages (assume single tool call per turn, so last two messages are most relevant).
+    for m in messages[-2:]:
         role = m["role"]
         if role == "tool":
-            log_with_color(logger, m["content"], "green", level=level)
+            log_with_color(logger, m["content"], "green")
         elif role == "user":
             if isinstance(m["content"], list):
                 for item in m["content"]:
                     if item["type"] == "tool_result":
-                        log_with_color(
-                            logger, str(item["content"]), "magenta", level=level
-                        )
+                        log_with_color(logger, str(item["content"]), "magenta")
                     else:
-                        log_with_color(logger, str(item), "magenta", level=level)
+                        log_with_color(logger, str(item), "magenta")
             else:
-                log_with_color(logger, str(m["content"]), "magenta", level=level)
+                log_with_color(logger, str(m["content"]), "magenta")
         elif role == "assistant":
             content = m.get("content")
             if content:
                 if isinstance(content, list):
                     for item in content:
-                        log_with_color(logger, str(item), "cyan", level=level)
+                        log_with_color(logger, str(item), "cyan")
                 else:
-                    log_with_color(logger, str(content), "cyan", level=level)
+                    log_with_color(logger, str(content), "cyan")
             tool_calls = m.get("tool_calls")
             if tool_calls:
                 for tool_call in tool_calls:
-                    log_with_color(
-                        logger, f"Tool call: {tool_call}", "cyan", level=level
-                    )
+                    log_with_color(logger, f"Tool call: {tool_call}", "cyan")
         elif role == "system":
-            log_with_color(logger, str(m["content"]), "yellow", level=level)
+            log_with_color(logger, str(m["content"]), "yellow")
         else:
             raise ValueError(f"Unknown role: {m['content']}")

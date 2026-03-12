@@ -265,13 +265,13 @@ class TaskProgressManager:
             task.status = progress_update.status
             task.logdir = progress_update.logdir
 
-            # Log and dump current status
-            log_with_color(
-                self.logger,
-                f"{TaskProgress.marker(task.status)} {task.status}: "
-                f" task {task.problem_id}.",
-                TaskProgress.color(task.status),
-            )
+            # # Log and dump current status
+            # log_with_color(
+            #     self.logger,
+            #     f"{TaskProgress.marker(task.status)} {task.status}: "
+            #     f" task {task.problem_id}.",
+            #     TaskProgress.color(task.status),
+            # )
             if task.status not in ["skip-resolved", "skip-unresolved"]:
                 self.dump_task_status(task)
 
