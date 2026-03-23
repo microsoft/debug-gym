@@ -32,6 +32,10 @@ class DockerTerminal(Terminal):
         setup_commands: list[str] | None = None,
         command_timeout: int = 300,
         extra_labels: dict[str, str] | None = None,
+        # Container resource limits
+        mem_limit: str = "16G",
+        pids_limit: int | None = 4096,
+        cpu_limit: float | None = None,
         **kwargs,
     ):
         """
@@ -51,6 +55,12 @@ class DockerTerminal(Terminal):
                         command_timeout: 60
             extra_labels: Additional labels to add to the container (e.g., {"run-id": "my-run"}).
                 Useful for identifying containers during cleanup.
+            mem_limit: Container memory limit (default: "16G"). Uses Docker's memory limit
+                format (e.g., "8G", "32G", "512M").
+            pids_limit: Maximum number of PIDs in the container (default: 4096).
+                Prevents fork bombs and runaway thread creation. Set to None for unlimited.
+            cpu_limit: Maximum number of CPU cores the container can use (e.g., 4.0).
+                Default is None (unlimited). Passed to Docker as nano_cpus.
             **kwargs: Additional arguments (ignored with debug log).
         """
         super().__init__(
@@ -65,6 +75,9 @@ class DockerTerminal(Terminal):
         self.setup_commands = setup_commands or []
         self.command_timeout = command_timeout
         self.extra_labels = extra_labels or {}
+        self.mem_limit = mem_limit
+        self.pids_limit = pids_limit
+        self.cpu_limit = cpu_limit
         self._docker_client = None  # Lazily initialized
         self._container = None
 
@@ -253,7 +266,7 @@ class DockerTerminal(Terminal):
         if self.extra_labels:
             labels.update(self.extra_labels)
 
-        container = self.docker_client.containers.run(
+        container_kwargs = dict(
             name=container_name,
             image=f"{self.registry}{self.base_image}",
             command="sleep infinity",  # Keep the container running
@@ -266,8 +279,14 @@ class DockerTerminal(Terminal):
             tty=True,
             stdin_open=True,
             network_mode="host",
-            mem_limit="16G",
+            mem_limit=self.mem_limit,
         )
+        if self.pids_limit is not None:
+            container_kwargs["pids_limit"] = self.pids_limit
+        if self.cpu_limit is not None:
+            container_kwargs["nano_cpus"] = int(self.cpu_limit * 1e9)
+
+        container = self.docker_client.containers.run(**container_kwargs)
         container.reload()  # Refresh container attributes (e.g., status="running")
         self._run_setup_commands(container)
         self.logger.debug(f"{container} ({container_name}) started successfully.")
