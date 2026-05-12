@@ -135,7 +135,7 @@ def test_get_triggered_tools(env_mock):
     error, triggered_tool = env_mock.get_triggered_tools(
         ToolCall(id="345", name="tool3", arguments={})
     )
-    assert error == "Unregistered tool: tool3"
+    assert error == "Tool 'tool3' not found among available tools: tool1, tool2."
     assert triggered_tool is None
 
 

@@ -227,7 +227,12 @@ def unzip(filename, dst=None, force=False):
     skipped = 0
     for f in tqdm(filenames_to_extract, desc=desc, leave=False, unit="file"):
         if not os.path.isfile(pjoin(dst, f)) or force:
-            zipped_file.extract(f, dst)
+            try:
+                zipped_file.extract(f, dst)
+            except FileExistsError:
+                # Another process already created this directory entry;
+                # safe to ignore in parallel extraction scenarios.
+                pass
         else:
             skipped += 1
 
