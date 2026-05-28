@@ -1788,7 +1788,7 @@ h1 { color: #e8eef7; }
 .stat .label { color: #8d9bbb; }
 a { color: #90caf9; }
 
-.layout { display: grid; grid-template-columns: 1fr 320px; gap: 18px; align-items: start; }
+.layout { display: grid; grid-template-columns: 1fr 260px; gap: 14px; align-items: start; }
 .viz-wrap { background: linear-gradient(135deg, #1a1a2e, #16213e); border: 1px solid #2a3760;
             border-radius: 10px; padding: 4px; overflow: hidden; }
 
@@ -1880,14 +1880,9 @@ a { color: #90caf9; }
 .side-panel &gt; div::-webkit-scrollbar-thumb { background: #2a3760; border-radius: 3px; }
 .side-panel &gt; div::-webkit-scrollbar-thumb:hover { background: #3a4a80; }
 
-@media (max-width: 1100px) {
+@media (max-width: 520px) {
   .layout { grid-template-columns: 1fr; }
-  .side-panel { position: static; min-height: auto; }
-}
-
-@media (max-width: 600px) {
-  .layout { gap: 8px !important; }
-  .side-panel { font-size: 11px; padding: 10px !important; }
+  .side-panel { position: static; min-height: auto; font-size: 11px; padding: 10px; }
 }
 
 &lt;/style&gt;
