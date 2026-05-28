@@ -1750,7 +1750,8 @@ code {
       max-height: 70vh !important;
     }
     .post-figure iframe[title*="Three-panel"] {
-      height: 520px !important;
+      height: 680px !important;
+      max-height: none !important;
     }
   }
 </style>
@@ -2370,8 +2371,9 @@ body {
   border: 1px solid #e2e8f0;
 }
 @media (max-width: 700px) {
+  body { overflow: visible; align-items: flex-start; }
   .strip { grid-template-columns: 1fr; }
-  .panel { min-height: 140px; padding: 14px 14px 12px; }
+  .panel { min-height: auto; padding: 14px 14px 12px; }
 }
 .panel {
   background: #ffffff;
