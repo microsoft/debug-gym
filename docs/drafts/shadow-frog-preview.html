@@ -2762,7 +2762,7 @@ body {
     &lt;div class=&quot;snippet active&quot; data-pane=&quot;src&quot; data-file=&quot;cart&quot;&gt;
       &lt;div class=&quot;filename-bar&quot;&gt;cart.py  (excerpt)&lt;/div&gt;
 &lt;pre&gt;&lt;code&gt;&lt;span class=&quot;py-kw&quot;&gt;def&lt;/span&gt; &lt;span class=&quot;py-fn&quot;&gt;calculate_total&lt;/span&gt;(items, coupon_code=&lt;span class=&quot;py-bool&quot;&gt;None&lt;/span&gt;):
-    subtotal = &lt;span class=&quot;py-fn&quot;&gt;sum&lt;/span&gt;(it[&lt;span class=&quot;py-str&quot;&gt;&quot;price&quot;&lt;/span&gt;] * it[&lt;span class=&quot;py-str&quot;&gt;&quot;qty&quot;&lt;/span&gt;] &lt;span class=&quot;py-kw&quot;&gt;for&lt;/span&gt; it &lt;span class=&quot;py-kw&quot;&gt;in&lt;/span&gt; items)
+    subtotal = &lt;span class=&quot;py-fn&quot;&gt;sum&lt;/span&gt;(item[&lt;span class=&quot;py-str&quot;&gt;&quot;price&quot;&lt;/span&gt;] * item[&lt;span class=&quot;py-str&quot;&gt;&quot;qty&quot;&lt;/span&gt;] &lt;span class=&quot;py-kw&quot;&gt;for&lt;/span&gt; item &lt;span class=&quot;py-kw&quot;&gt;in&lt;/span&gt; items)
 
     &lt;span class=&quot;py-kw&quot;&gt;if&lt;/span&gt; coupon_code:
 &lt;span class=&quot;hl&quot;&gt;        coupon = &lt;span class=&quot;py-fn&quot;&gt;get_coupon&lt;/span&gt;(coupon_code)   &lt;span class=&quot;py-cmt&quot;&gt;# no .upper()&lt;/span&gt;&lt;/span&gt;
@@ -2866,11 +2866,12 @@ body {
 &lt;span class=&quot;md-bold&quot;&gt;**Refs**:&lt;/span&gt;
 - &lt;span class=&quot;xref&quot; data-file=&quot;inventory&quot; data-flash=&quot;src&quot;&gt;&lt;span class=&quot;md-code&quot;&gt;`inventory.py::validate_coupon`&lt;/span&gt;&lt;/span&gt;&lt;span class=&quot;xref-arrow&quot;&gt;↗ click to jump&lt;/span&gt;
 - &lt;span class=&quot;xref&quot; data-file=&quot;cart&quot; data-flash=&quot;src&quot;&gt;&lt;span class=&quot;md-code&quot;&gt;`cart.py::calculate_total`&lt;/span&gt;&lt;/span&gt;&lt;span class=&quot;xref-arrow&quot;&gt;↗ click to jump&lt;/span&gt;
+- &lt;span class=&quot;xref&quot; data-file=&quot;cart&quot; data-flash=&quot;src&quot;&gt;&lt;span class=&quot;md-code&quot;&gt;`cart.py::load_coupon`&lt;/span&gt;&lt;/span&gt;&lt;span class=&quot;xref-arrow&quot;&gt;↗ click to jump&lt;/span&gt;
 
 &lt;span class=&quot;md-bold&quot;&gt;**Discovery**:&lt;/span&gt; &lt;span class=&quot;md-code&quot;&gt;`validate_coupon`&lt;/span&gt; normalizes codes to uppercase via &lt;span class=&quot;md-code&quot;&gt;`.upper()`&lt;/span&gt;,
 but &lt;span class=&quot;md-code&quot;&gt;`calculate_total`&lt;/span&gt; passes &lt;span class=&quot;md-code&quot;&gt;`coupon_code`&lt;/span&gt; through without normalization. A user
 who validates &lt;span class=&quot;md-code&quot;&gt;`&quot;save20&quot;`&lt;/span&gt; (returns True) and then calls &lt;span class=&quot;md-code&quot;&gt;`calculate_total(&quot;save20&quot;)`&lt;/span&gt;
-gets no discount — the coupon silently fails. &lt;span class=&quot;md-it&quot;&gt;_(verified, labels: [bug])_&lt;/span&gt;
+gets no discount — the coupon silently fails because &lt;span class=&quot;md-code&quot;&gt;`load_coupon`&lt;/span&gt;'s keys are uppercase. &lt;span class=&quot;md-it&quot;&gt;_(verified, source: exploration, labels: [bug])_&lt;/span&gt;
 &lt;/code&gt;&lt;/pre&gt;
 &lt;/div&gt;
 
@@ -2882,11 +2883,11 @@ gets no discount — the coupon silently fails. &lt;span class=&quot;md-it&quot;
 
 &lt;script&gt;
   function activate(file) {
-    document.querySelectorAll(&#x27;.tree-item[data-file]&#x27;).forEach(el =&gt; {
-      el.classList.toggle(&#x27;active&#x27;, el.dataset.file === file);
+    document.querySelectorAll('.tree-item[data-file]').forEach(el =&gt; {
+      el.classList.toggle('active', el.dataset.file === file);
     });
-    document.querySelectorAll(&#x27;.snippet&#x27;).forEach(el =&gt; {
-      el.classList.toggle(&#x27;active&#x27;, el.dataset.file === file);
+    document.querySelectorAll('.snippet').forEach(el =&gt; {
+      el.classList.toggle('active', el.dataset.file === file);
     });
   }
 
@@ -2895,37 +2896,37 @@ gets no discount — the coupon silently fails. &lt;span class=&quot;md-it&quot;
       `.snippet.active[data-pane=&quot;${pane}&quot;][data-file=&quot;${file}&quot;] .hl`
     );
     if (!pane_el) return;
-    pane_el.classList.remove(&#x27;hl-flash&#x27;);
+    pane_el.classList.remove('hl-flash');
     void pane_el.offsetWidth;  // force reflow
-    pane_el.classList.add(&#x27;hl-flash&#x27;);
+    pane_el.classList.add('hl-flash');
   }
 
   function scrollCrossIntoView() {
-    const box = document.getElementById(&#x27;cross-box&#x27;);
-    if (box) box.scrollIntoView({ behavior: &#x27;smooth&#x27;, block: &#x27;nearest&#x27; });
+    const box = document.getElementById('cross-box');
+    if (box) box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
 
   // Tree item clicks → switch file pair
-  document.querySelectorAll(&#x27;.tree-item[data-file]&#x27;).forEach(el =&gt; {
-    el.addEventListener(&#x27;click&#x27;, () =&gt; activate(el.dataset.file));
+  document.querySelectorAll('.tree-item[data-file]').forEach(el =&gt; {
+    el.addEventListener('click', () =&gt; activate(el.dataset.file));
   });
 
   // file::symbol clicks → switch + flash both panes
-  document.querySelectorAll(&#x27;.xref[data-file]&#x27;).forEach(el =&gt; {
-    el.addEventListener(&#x27;click&#x27;, (e) =&gt; {
+  document.querySelectorAll('.xref[data-file]').forEach(el =&gt; {
+    el.addEventListener('click', (e) =&gt; {
       e.stopPropagation();
       activate(el.dataset.file);
       // Flash both src and shadow highlights so the bidirectional link is obvious
       requestAnimationFrame(() =&gt; {
-        flashHighlight(el.dataset.file, &#x27;src&#x27;);
-        flashHighlight(el.dataset.file, &#x27;shd&#x27;);
+        flashHighlight(el.dataset.file, 'src');
+        flashHighlight(el.dataset.file, 'shd');
       });
     });
   });
 
   // _cross/ tree link → scroll cross-box into view
-  const crossLink = document.getElementById(&#x27;link-to-cross&#x27;);
-  if (crossLink) crossLink.addEventListener(&#x27;click&#x27;, scrollCrossIntoView);
+  const crossLink = document.getElementById('link-to-cross');
+  if (crossLink) crossLink.addEventListener('click', scrollCrossIntoView);
 &lt;/script&gt;
 
 &lt;/body&gt;
@@ -3620,7 +3621,7 @@ document.getElementById(&quot;judgeSelect&quot;).addEventListener(&quot;change&q
 
 <h2 id="the-landscape">The landscape</h2>
 
-<p>The idea of giving coding agents persistent memory is gaining traction across several fronts. We group related efforts into three threads and then note where Shadow-Frog departs.</p>
+<p>The idea of giving coding agents persistent memory is gaining traction across several fronts. We group related efforts into four threads and then note where Shadow-Frog departs.</p>
 
 <p><strong>Session-level persistent context.</strong>
 Tools like <a href="https://docs.cline.bot/prompting/cline-memory-bank">Cline Memory Bank</a>, <a href="https://docs.windsurf.com/windsurf/cascade/memories">Windsurf Memories</a>, <a href="https://docs.cursor.com/context/rules-for-ai">Cursor Rules</a>, and Claude Code’s <a href="https://www.anthropic.com/engineering/claude-code-best-practices">CLAUDE.md</a> let developers persist project-level instructions across sessions in markdown files. A thriving open-source ecosystem has grown around this pattern: skill frameworks like <a href="https://github.com/obra/superpowers">Superpowers</a>, MCP-based memory servers like <a href="https://github.com/oraios/serena">Serena</a> and <a href="https://github.com/Gentleman-Programming/engram">engram</a>, and dozens of community Memory Bank ports. These are primarily <em>user-authored</em> and <em>project-scoped</em>: they tell the agent how to behave, but don’t capture what the agent discovers on its own.</p>
@@ -3631,8 +3632,11 @@ Tools like <a href="https://docs.cline.bot/prompting/cline-memory-bank">Cline Me
 <p><strong>Memory consolidation and autonomous exploration.</strong>
 <a href="https://arxiv.org/abs/2605.20616">Auto-Dreamer</a> (Ye et al., 2026) introduces a learned offline consolidator (inspired by the brain-science idea that sleep consolidates short-term experience into long-term knowledge): it periodically rewrites a memory bank to deduplicate and abstract across sessions. <a href="https://arxiv.org/abs/2409.07429">Agent Workflow Memory</a> (Wang et al., 2024) induces reusable workflows from past trajectories. <a href="https://platform.claude.com/docs/en/managed-agents/dreams">Claude Dreams</a> (Anthropic, 2026) runs asynchronous reflection jobs that reorganize an agent’s memory store from session transcripts. These systems consolidate knowledge the agent has <em>already seen</em>. <a href="https://arxiv.org/abs/2305.16291">Voyager</a> (Wang et al., 2023) is different: it explores open-endedly, builds a growing skill library, and discovers things it couldn’t have known without acting, but it operates in Minecraft, not in real codebases.</p>
 
+<p><strong>Parallel agentic orchestration.</strong>
+A complementary thread scales a <em>single</em> task across many agents at once. <a href="https://claude.com/blog/introducing-dynamic-workflows-in-claude-code">Dynamic workflows</a> (Anthropic, 2026), introduced alongside Claude Opus 4.8 as we were preparing this post, let Claude Code write orchestration scripts that distribute a user’s request across tens to hundreds of parallel subagents in a single session: Claude plans the work, has agents attack from independent angles while adversarial agents try to refute their findings, verifies against the existing test suite, and iterates until the answers converge. Its flagship use cases (i.e., codebase-wide bug hunts, security and performance audits, and large migrations) line up almost exactly with the categories our dream loop explores. In addition, the design rests on the same bet we make: the way to learn useful things about a codebase is to <em>run</em> agents against it, rather than to re-read it.</p>
 <p><strong>Where Shadow-Frog departs.</strong>
 Most uses of “dream” in this literature mean <em>offline consolidation</em>: reorganizing memories the agent already collected while working on tasks. Shadow-Frog’s dream is closer to Voyager’s spirit: the agent actively explores the codebase by <em>doing</em>, implementing features, fuzzing inputs, probing code paths, and the discoveries it distills are knowledge that <strong>did not previously exist anywhere</strong>, not in the source, not in any prior session transcript. The shadow is not a wiki of what the code says; it is a record of what we learned by running experiments against it.</p>
+<p>Dynamic workflows leave out three design choices central to ours. <strong>Persistence.</strong> Their orchestration is an <em>execution engine</em> for a task the user hands over: once its agents converge on a single answer, it dissolves and the next session starts cold. A dream instead leaves a durable artifact, the <em>knowledge</em> it uncovered, deduplicated, provenance-tagged, and re-read by later agents. <strong>Self-direction.</strong> Rather than executing a task the user specifies, a dream chooses for itself what to investigate during idle time. <strong>Compounding.</strong> Each dream can branch from an earlier one, so the shadow grows across sessions. One orchestrates execution; the other accumulates an open, model-agnostic memory of what running the code taught us.</p>
 
 <h2 id="citation">Citation</h2>
 
@@ -3717,6 +3721,9 @@ Most uses of “dream” in this literature mean <em>offline consolidation</em>:
   </li>
   <li>
     <p>Paul Gauthier. <strong>Aider: Repository Map.</strong> 2023. <a href="https://aider.chat/docs/repomap.html">aider.chat/docs/repomap.html</a></p>
+  </li>
+  <li>
+    <p>Anthropic. <strong>Introducing Dynamic Workflows in Claude Code.</strong> May 2026. <a href="https://claude.com/blog/introducing-dynamic-workflows-in-claude-code">claude.com/blog/introducing-dynamic-workflows-in-claude-code</a></p>
   </li>
 </ol>
 
