@@ -3623,7 +3623,7 @@ document.getElementById(&quot;judgeSelect&quot;).addEventListener(&quot;change&q
 <p>The idea of giving coding agents persistent memory is gaining traction across several fronts. We group related efforts into five threads and then note where Shadow-Frog departs.</p>
 
 <p><strong>Session-level persistent context.</strong>
-Tools like <a href="https://docs.cline.bot/prompting/cline-memory-bank">Cline Memory Bank</a>, <a href="https://docs.windsurf.com/windsurf/cascade/memories">Windsurf Memories</a>, <a href="https://docs.cursor.com/context/rules-for-ai">Cursor Rules</a>, and Claude Code’s <a href="https://www.anthropic.com/engineering/claude-code-best-practices">CLAUDE.md</a> let developers persist project-level instructions across sessions in markdown files. A thriving open-source ecosystem has grown around this pattern: skill frameworks like <a href="https://github.com/obra/superpowers">Superpowers</a>, MCP-based memory servers like <a href="https://github.com/oraios/serena">Serena</a> and <a href="https://github.com/Gentleman-Programming/engram">engram</a>, and dozens of community Memory Bank ports. These are primarily <em>user-authored</em> and <em>project-scoped</em>: they tell the agent how to behave, but don’t capture what the agent discovers on its own.</p>
+Tools like <a href="https://docs.cline.bot/best-practices/memory-bank">Cline Memory Bank</a>, <a href="https://docs.devin.ai/desktop/cascade/memories">Windsurf Memories</a>, <a href="https://cursor.com/docs/context/rules">Cursor Rules</a>, and Claude Code’s <a href="https://code.claude.com/docs/en/best-practices">CLAUDE.md</a> let developers persist project-level instructions across sessions in markdown files. A thriving open-source ecosystem has grown around this pattern: skill frameworks like <a href="https://github.com/obra/superpowers">Superpowers</a>, MCP-based memory servers like <a href="https://github.com/oraios/serena">Serena</a> and <a href="https://github.com/Gentleman-Programming/engram">engram</a>, and dozens of community Memory Bank ports. These are primarily <em>user-authored</em> and <em>project-scoped</em>: they tell the agent how to behave, but don’t capture what the agent discovers on its own.</p>
 
 <p><strong>Codebase wikis and structure extraction.</strong>
 <a href="https://docs.devin.ai/work-with-devin/deepwiki">DeepWiki</a> (Cognition, 2025) auto-generates wiki-style documentation from a repo’s existing source. <a href="https://swimm.io">Swimm</a> produces architecture maps and knowledge bases via static analysis. On the academic side, <a href="https://aider.chat/docs/repomap.html">Aider’s repo-map</a> builds a graph-ranked symbol index from tree-sitter parses; <a href="https://arxiv.org/abs/2408.03910">CodexGraph</a> (Liu et al., 2024) loads code structure into a graph database the agent queries directly; <a href="https://arxiv.org/abs/2402.16667">RepoAgent</a> (Luo et al., 2024) walks a repo to generate per-function documentation. All of these restructure knowledge that is <em>already in the source</em>. As we noted earlier: that is its own large body of work, but as models get stronger it competes against an unusually stiff baseline, namely plain <code class="language-plaintext highlighter-rouge">grep</code> over the raw code.</p>
@@ -3681,7 +3681,7 @@ Most uses of “dream” in this literature mean <em>offline consolidation</em>:
     <p>Chongrui Ye, Yuxiang Liu, Yu Wang, Haofei Yu, Yining Zhao, Ge Liu, Julian McAuley, and Jiaxuan You. <strong>Auto-Dreamer: Learning Offline Memory Consolidation for Language Agents.</strong> May 2026. <a href="https://arxiv.org/abs/2605.20616">arXiv:2605.20616</a></p>
   </li>
   <li>
-    <p>Zhiruo Wang, Jiayuan Mao, Daniel Fried, and Graham Neubig. <strong>Agent Workflow Memory.</strong> September 2024. <a href="https://arxiv.org/abs/2409.07429">arXiv:2409.07429</a></p>
+    <p>Zora Zhiruo Wang, Jiayuan Mao, Daniel Fried, and Graham Neubig. <strong>Agent Workflow Memory.</strong> September 2024. <a href="https://arxiv.org/abs/2409.07429">arXiv:2409.07429</a></p>
   </li>
   <li>
     <p>Xiangyan Liu, Bo Lan, Zhiyuan Hu, Yang Liu, Zhicheng Zhang, Fei Wang, Michael Shieh, and Wenmeng Zhou. <strong>CodexGraph: Bridging Large Language Models and Code Repositories via Code Graph Databases.</strong> August 2024. <a href="https://arxiv.org/abs/2408.03910">arXiv:2408.03910</a></p>
@@ -3696,16 +3696,16 @@ Most uses of “dream” in this literature mean <em>offline consolidation</em>:
     <p>Anthropic. <strong>Claude Dreams (Managed Agents).</strong> April 2026. <a href="https://platform.claude.com/docs/en/managed-agents/dreams">platform.claude.com/docs/en/managed-agents/dreams</a></p>
   </li>
   <li>
-    <p>Cline. <strong>Memory Bank.</strong> 2024. <a href="https://docs.cline.bot/prompting/cline-memory-bank">docs.cline.bot/prompting/cline-memory-bank</a></p>
+    <p>Cline. <strong>Memory Bank.</strong> 2024. <a href="https://docs.cline.bot/best-practices/memory-bank">docs.cline.bot/best-practices/memory-bank</a></p>
   </li>
   <li>
-    <p>Windsurf (Codeium). <strong>Cascade Memories.</strong> 2025. <a href="https://docs.windsurf.com/windsurf/cascade/memories">docs.windsurf.com/windsurf/cascade/memories</a></p>
+    <p>Windsurf (Cognition). <strong>Cascade Memories.</strong> 2025. <a href="https://docs.devin.ai/desktop/cascade/memories">docs.devin.ai/desktop/cascade/memories</a></p>
   </li>
   <li>
-    <p>Cursor (Anysphere). <strong>Rules for AI.</strong> 2024. <a href="https://docs.cursor.com/context/rules-for-ai">docs.cursor.com/context/rules-for-ai</a></p>
+    <p>Cursor (Anysphere). <strong>Rules.</strong> 2024. <a href="https://cursor.com/docs/context/rules">cursor.com/docs/context/rules</a></p>
   </li>
   <li>
-    <p>Anthropic. <strong>Claude Code Best Practices.</strong> 2025. <a href="https://www.anthropic.com/engineering/claude-code-best-practices">anthropic.com/engineering/claude-code-best-practices</a></p>
+    <p>Anthropic. <strong>Best practices for Claude Code.</strong> 2025. <a href="https://code.claude.com/docs/en/best-practices">code.claude.com/docs/en/best-practices</a></p>
   </li>
   <li>
     <p>Jesse Vincent. <strong>Superpowers: A Software Development Methodology for Coding Agents.</strong> 2025. <a href="https://github.com/obra/superpowers">github.com/obra/superpowers</a></p>
@@ -3732,7 +3732,7 @@ Most uses of “dream” in this literature mean <em>offline consolidation</em>:
     <p>Andrej Karpathy. <strong>LLM Wiki.</strong> April 2026. <a href="https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f">gist.github.com/karpathy/442a6bf555914893e9891c11519de94f</a></p>
   </li>
   <li>
-    <p>Google Cloud. <strong>How the Open Knowledge Format Can Improve Data Sharing.</strong> June 2026. <a href="https://cloud.google.com/blog/products/data-analytics/how-the-open-knowledge-format-can-improve-data-sharing">cloud.google.com/blog/products/data-analytics/how-the-open-knowledge-format-can-improve-data-sharing</a>. Spec repo: <a href="https://github.com/GoogleCloudPlatform/knowledge-catalog/tree/main/okf">github.com/GoogleCloudPlatform/knowledge-catalog/tree/main/okf</a>.</p>
+    <p>Sam McVeety and Amir Hormati. <strong>Introducing the Open Knowledge Format.</strong> Google Cloud Blog, June 2026. <a href="https://cloud.google.com/blog/products/data-analytics/how-the-open-knowledge-format-can-improve-data-sharing">cloud.google.com/blog/products/data-analytics/how-the-open-knowledge-format-can-improve-data-sharing</a>. Spec repo: <a href="https://github.com/GoogleCloudPlatform/knowledge-catalog/tree/main/okf">github.com/GoogleCloudPlatform/knowledge-catalog/tree/main/okf</a>.</p>
   </li>
 </ol>
 
