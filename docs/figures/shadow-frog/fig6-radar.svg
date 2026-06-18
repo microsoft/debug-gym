@@ -1,0 +1,157 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 480" role="img"
+     aria-label="Per-evaluative-dimension means by arm. A 4-axis radar chart with axes for Groundedness, Insight, User Impact, and Spec Clarity. Three overlapping polygons: Baseline (purple), Shadow-Frog (green), and Human (amber). The Shadow-Frog polygon bulges outward on Insight (+0.40 over baseline) and User Impact (+0.24), while pulling inward on Groundedness (−0.23) and Spec Clarity (−0.29) — the rotation that summarizes the result.">
+  <defs>
+    <style>
+      .panel-title    { fill: #1a1a2e; font: 600 14px -apple-system, "Segoe UI", sans-serif; }
+      .panel-sub      { fill: #6b7280; font: 500 11px -apple-system, "Segoe UI", sans-serif; }
+      .axis-label     { fill: #1a1a2e; font: 700 12.5px -apple-system, "Segoe UI", sans-serif; }
+      .axis-delta-pos { fill: #16a34a; font: 700 11px -apple-system, "Segoe UI", sans-serif; }
+      .axis-delta-neg { fill: #b45309; font: 700 11px -apple-system, "Segoe UI", sans-serif; }
+      .tick-label     { fill: #9ca3af; font: 500 9.5px -apple-system, "Segoe UI", sans-serif; }
+      .grid-line      { fill: none; stroke: #e5e7eb; stroke-width: 1; }
+      .grid-spoke     { stroke: #d1d5db; stroke-width: 1; }
+      .legend-text    { fill: #1a1a2e; font: 500 12px -apple-system, "Segoe UI", sans-serif; }
+      .legend-note    { fill: #6b7280; font: 500 11px -apple-system, "Segoe UI", sans-serif; }
+      .legend-strong  { fill: #1a1a2e; font: 600 12.5px -apple-system, "Segoe UI", sans-serif; }
+      .legend-italic  { fill: #4b5563; font: italic 500 11.5px -apple-system, "Segoe UI", sans-serif; }
+    </style>
+  </defs>
+
+  <text class="panel-title" x="280" y="28" text-anchor="middle">Idea-quality means by arm  —  the rotation</text>
+  <text class="panel-sub"   x="280" y="46" text-anchor="middle">3,310 ideas blind-judged on a 1–5 scale (Opus 4.6 primary judge)</text>
+
+  <!-- ================================================================ -->
+  <!-- Radar: center (280, 265), R=140                                  -->
+  <!-- ================================================================ -->
+
+  <!-- Grid (concentric circles at r = 28, 56, 84, 112, 140) -->
+  <g transform="translate(280,265)">
+    <circle class="grid-line" cx="0" cy="0" r="28"/>
+    <circle class="grid-line" cx="0" cy="0" r="56"/>
+    <circle class="grid-line" cx="0" cy="0" r="84"/>
+    <circle class="grid-line" cx="0" cy="0" r="112"/>
+    <circle class="grid-line" cx="0" cy="0" r="140"/>
+    <line class="grid-spoke" x1="0" y1="-140" x2="0" y2="140"/>
+    <line class="grid-spoke" x1="-140" y1="0" x2="140" y2="0"/>
+    <!-- Tick labels on the upper spoke -->
+    <text class="tick-label" x="4" y="-25">2</text>
+    <text class="tick-label" x="4" y="-53">3</text>
+    <text class="tick-label" x="4" y="-81">4</text>
+    <text class="tick-label" x="4" y="-109">5</text>
+  </g>
+
+  <!-- Axis labels (outside the radar) -->
+  <!-- Top -->
+  <text class="axis-label"     x="280" y="110" text-anchor="middle"><title>Groundedness: Does the idea reference real, specific parts of the codebase rather than generic concerns?</title>Groundedness</text>
+  <text class="axis-delta-neg" x="280" y="125" text-anchor="middle">−0.23</text>
+
+  <!-- Right -->
+  <text class="axis-label"     x="432" y="262" text-anchor="start"><title>Insight: Does the idea reveal something non-obvious about the codebase — a hidden pattern, a deeper opportunity?</title>Insight</text>
+  <text class="axis-delta-pos" x="432" y="277" text-anchor="start">+0.40</text>
+
+  <!-- Bottom -->
+  <text class="axis-label"     x="280" y="425" text-anchor="middle"><title>User Impact: Would real users notice or benefit from this if it were shipped?</title>User Impact</text>
+  <text class="axis-delta-pos" x="280" y="440" text-anchor="middle">+0.24</text>
+
+  <!-- Left -->
+  <text class="axis-label"     x="128" y="262" text-anchor="end"><title>Spec Clarity: Could an engineer pick this up and start implementing without follow-up questions?</title>Spec Clarity</text>
+  <text class="axis-delta-neg" x="128" y="277" text-anchor="end">−0.29</text>
+
+  <!-- ================================================================ -->
+  <!-- Polygons. Scale: r = 28 * value                                   -->
+  <!-- Vertex order: top, right, bottom, left                            -->
+  <!-- ================================================================ -->
+
+  <!-- Baseline: [G=3.98, I=2.01, U=3.43, S=4.40]
+       → r: 111.4, 56.3, 96.0, 123.2 -->
+  <polygon points="280,153.6 336.3,265 280,361.0 156.8,265"
+           fill="#7c3aed" fill-opacity="0.10" stroke="#7c3aed" stroke-width="2"/>
+
+  <!-- Human: [3.63, 2.13, 3.26, 3.20] → r: 101.6, 59.6, 91.3, 89.6 -->
+  <polygon points="280,163.4 339.6,265 280,356.3 190.4,265"
+           fill="#fb8c00" fill-opacity="0.08" stroke="#fb8c00" stroke-width="2" stroke-dasharray="5 3"/>
+
+  <!-- Shadow-Frog: [3.75, 2.41, 3.67, 4.12] → r: 105.0, 67.5, 102.8, 115.4 -->
+  <polygon points="280,160.0 347.5,265 280,367.8 164.6,265"
+           fill="#16a34a" fill-opacity="0.18" stroke="#16a34a" stroke-width="2.6"/>
+
+  <!-- Vertex dots (with hover tooltips showing exact value) -->
+  <g fill="#7c3aed">
+    <circle cx="280" cy="153.6" r="3.2"><title>Baseline · Groundedness: 3.98</title></circle>
+    <circle cx="336.3" cy="265" r="3.2"><title>Baseline · Insight: 2.01</title></circle>
+    <circle cx="280" cy="361.0" r="3.2"><title>Baseline · User Impact: 3.43</title></circle>
+    <circle cx="156.8" cy="265" r="3.2"><title>Baseline · Spec Clarity: 4.40</title></circle>
+  </g>
+  <g fill="#fb8c00">
+    <circle cx="280" cy="163.4" r="3.2"><title>Human · Groundedness: 3.63</title></circle>
+    <circle cx="339.6" cy="265" r="3.2"><title>Human · Insight: 2.13</title></circle>
+    <circle cx="280" cy="356.3" r="3.2"><title>Human · User Impact: 3.26</title></circle>
+    <circle cx="190.4" cy="265" r="3.2"><title>Human · Spec Clarity: 3.20</title></circle>
+  </g>
+  <g fill="#16a34a">
+    <circle cx="280" cy="160.0" r="3.6"><title>Shadow-Frog · Groundedness: 3.75 (Δ −0.23 vs Baseline)</title></circle>
+    <circle cx="347.5" cy="265" r="3.6"><title>Shadow-Frog · Insight: 2.41 (Δ +0.40 vs Baseline)</title></circle>
+    <circle cx="280" cy="367.8" r="3.6"><title>Shadow-Frog · User Impact: 3.67 (Δ +0.24 vs Baseline)</title></circle>
+    <circle cx="164.6" cy="265" r="3.6"><title>Shadow-Frog · Spec Clarity: 4.12 (Δ −0.29 vs Baseline)</title></circle>
+  </g>
+
+  <!-- ================================================================ -->
+  <!-- Right side: legend + interpretation                               -->
+  <!-- ================================================================ -->
+
+  <!-- Legend swatches -->
+  <g transform="translate(550, 100)">
+    <line x1="0" y1="0" x2="22" y2="0" stroke="#7c3aed" stroke-width="2.4"/>
+    <circle cx="11" cy="0" r="3.2" fill="#7c3aed"/>
+    <text class="legend-text" x="32" y="4">Baseline</text>
+    <text class="legend-note" x="100" y="4">(n = 1,200)</text>
+
+    <line x1="0" y1="28" x2="22" y2="28" stroke="#16a34a" stroke-width="2.8"/>
+    <circle cx="11" cy="28" r="3.6" fill="#16a34a"/>
+    <text class="legend-strong" x="32" y="32">Shadow-Frog</text>
+    <text class="legend-note"   x="120" y="32">(n = 1,200)</text>
+
+    <line x1="0" y1="56" x2="22" y2="56" stroke="#fb8c00" stroke-width="2" stroke-dasharray="5 3"/>
+    <circle cx="11" cy="56" r="3.2" fill="#fb8c00"/>
+    <text class="legend-text" x="32" y="60">Human</text>
+    <text class="legend-note" x="85" y="60">(n = 910)</text>
+  </g>
+
+  <!-- Interpretation panel -->
+  <g transform="translate(550, 200)">
+    <text class="legend-strong" x="0" y="0">The rotation: depth ↔ ambition</text>
+
+    <g transform="translate(0, 28)">
+      <text x="0" y="0">
+        <tspan class="axis-delta-pos" font-weight="700">▲</tspan>
+        <tspan class="legend-text" dx="6">Insight</tspan>
+        <tspan class="axis-delta-pos" dx="10">+0.40</tspan>
+        <tspan class="legend-note" dx="6">(8/8 repos)</tspan>
+      </text>
+      <text x="0" y="22">
+        <tspan class="axis-delta-pos" font-weight="700">▲</tspan>
+        <tspan class="legend-text" dx="6">User Impact</tspan>
+        <tspan class="axis-delta-pos" dx="10">+0.24</tspan>
+        <tspan class="legend-note" dx="6">(8/8)</tspan>
+      </text>
+      <text x="0" y="44">
+        <tspan class="axis-delta-neg" font-weight="700">▼</tspan>
+        <tspan class="legend-text" dx="6">Groundedness</tspan>
+        <tspan class="axis-delta-neg" dx="10">−0.23</tspan>
+        <tspan class="legend-note" dx="6">(8/8)</tspan>
+      </text>
+      <text x="0" y="66">
+        <tspan class="axis-delta-neg" font-weight="700">▼</tspan>
+        <tspan class="legend-text" dx="6">Spec Clarity</tspan>
+        <tspan class="axis-delta-neg" dx="10">−0.29</tspan>
+        <tspan class="legend-note" dx="6">(6/8)</tspan>
+      </text>
+    </g>
+
+    <text class="legend-italic" x="0" y="125">Every dimension p &lt; 0.001 under all 3 judges.</text>
+    <text class="legend-italic" x="0" y="143">Controlling for problem size dissolves</text>
+    <text class="legend-italic" x="0" y="161">78–97% of the two losses — Shadow-Frog</text>
+    <text class="legend-italic" x="0" y="179">simply picks bigger, more ambitious problems.</text>
+  </g>
+</svg>

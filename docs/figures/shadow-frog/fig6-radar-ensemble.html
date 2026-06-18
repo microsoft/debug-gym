@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ideation radar &mdash; ensemble judge (4,220 ideas)</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", sans-serif;
+         background: #ffffff; color: #1a1a2e; padding: 18px 22px 22px; }
+  h1 { font-size: 16px; font-weight: 600; text-align: center; margin-bottom: 18px; color: #1a1a2e; }
+  .two-col { display: grid; grid-template-columns: minmax(440px, 1.45fr) minmax(260px, 0.75fr);
+             gap: 28px; max-width: 1080px; margin: 0 auto; align-items: center; }
+  .chart-wrap { position: relative; height: 480px; min-width: 0; }
+  .rubric { display: grid; grid-template-columns: 1fr; gap: 10px; font-size: 13px; color: #1a1a2e; }
+  .rubric-item { padding: 10px 14px; border: 1px solid #e5e7eb; border-radius: 6px; background: #fafafa;
+                 line-height: 1.5; }
+  .rubric-item strong { display: block; font-weight: 700; color: #1a1a2e; margin-bottom: 2px;
+                        font-size: 13.5px; }
+  .rubric-item span { color: #4b5563; font-size: 12.5px; }
+  .legend { display: flex; justify-content: center; gap: 28px;
+            font-size: 13px; color: #1a1a2e; margin-top: 16px; flex-wrap: wrap; }
+  .legend-item { display: flex; align-items: center; gap: 8px; }
+  .legend-swatch { width: 22px; height: 3px; border-radius: 2px; }
+  @media (max-width: 820px) {
+    .two-col { grid-template-columns: 1fr; }
+    .chart-wrap { max-width: 540px; margin: 0 auto; width: 100%; height: 400px; }
+  }
+</style>
+</head><body>
+<h1>Ideation quality &mdash; per-axis mean (ensemble judge, 1&ndash;5 scale)</h1>
+
+<div class="two-col">
+  <div class="chart-wrap"><canvas id="radar"></canvas></div>
+  <div class="rubric">
+    <div class="rubric-item"><strong>Groundedness</strong><span>Does the proposal show project-specific knowledge (real APIs, modules, conventions) vs. plausible-sounding generalities?</span></div>
+    <div class="rubric-item"><strong>Insight</strong><span>How unlikely is this idea to emerge from a 5-minute brainstorm by a regular contributor?</span></div>
+    <div class="rubric-item"><strong>User Impact</strong><span>How many real users would benefit, and how meaningfully?</span></div>
+    <div class="rubric-item"><strong>Spec Clarity</strong><span>Could a maintainer turn this into a PR scope without back-and-forth?</span></div>
+  </div>
+</div>
+
+<div class="legend">
+  <div class="legend-item"><div class="legend-swatch" style="background:#9467BD;"></div>Baseline</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:#2CA02C;"></div>Shadow-Frog</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:#FB8C00;"></div>Human (rewritten)</div>
+</div>
+
+<script>
+const AXES = ["Groundedness", "Insight", "User Impact", "Spec Clarity"];
+
+const ENSEMBLE = {
+  "Groundedness": { BL: 4.195, SF: 4.032, HU: 3.724 },
+  "Insight":      { BL: 2.306, SF: 2.705, HU: 2.865 },
+  "User Impact":  { BL: 3.471, SF: 3.670, HU: 3.282 },
+  "Spec Clarity": { BL: 4.298, SF: 3.980, HU: 3.805 },
+};
+
+const ARMS = [
+  { key: "BL", label: "Baseline",          color: "#9467BD", soft: "rgba(148,103,189,0.16)" },
+  { key: "SF", label: "Shadow-Frog",       color: "#2CA02C", soft: "rgba(44,160,44,0.20)"  },
+  { key: "HU", label: "Human (rewritten)", color: "#FB8C00", soft: "rgba(251,140,0,0.14)"  },
+];
+
+const datasets = ARMS.map(arm => ({
+  label: arm.label,
+  data: AXES.map(ax => ENSEMBLE[ax][arm.key]),
+  borderColor: arm.color, backgroundColor: arm.soft,
+  pointBackgroundColor: arm.color, pointBorderColor: "#fff",
+  pointRadius: 4.5, pointHoverRadius: 6, borderWidth: 2.4,
+}));
+
+new Chart(document.getElementById("radar"), {
+  type: "radar",
+  data: { labels: AXES, datasets },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    layout: { padding: 12 },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        callbacks: {
+          title: (items) => items[0].label,
+          label: (ctx) => ctx.dataset.label + ": " + ctx.parsed.r.toFixed(2),
+        },
+      },
+    },
+    scales: {
+      r: {
+        min: 1, max: 5,
+        ticks: { stepSize: 1, font: { size: 10 }, color: "#9ca3af",
+                 backdropColor: "transparent" },
+        pointLabels: { font: { size: 13, weight: "600" }, color: "#1a1a2e",
+                       padding: 12 },
+        grid: { color: "#e5e7eb" },
+        angleLines: { color: "#e5e7eb" },
+      },
+    },
+  },
+});
+</script>
+</body></html>

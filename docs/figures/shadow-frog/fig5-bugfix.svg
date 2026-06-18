@@ -1,0 +1,161 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 380" role="img"
+     aria-label="Where the +4.7 pp comes from. Left: per-task outcomes for 50 SWE-Bench Verified tasks. Six Shadow-Frog unique wins, two Baseline unique wins, one tied, seven both-fail, thirty-four both-pass. Right: hint-delivery to consumption funnel showing 50 tasks total, 23 receive hints, 12 are opened, 2 are judged relevant, 1 actually changes the outcome.">
+  <defs>
+    <style>
+      .panel-title    { fill: #1a1a2e; font: 600 14px -apple-system, "Segoe UI", sans-serif; }
+      .cell-label     { font: 600 11px -apple-system, "Segoe UI", sans-serif; fill: #1a1a2e; }
+      .cell-sub       { font: 500 10.5px -apple-system, "Segoe UI", sans-serif; fill: #6b7280; }
+      .group-label    { font: 600 11px -apple-system, "Segoe UI", sans-serif; }
+      .annotation     { font: italic 500 11.5px -apple-system, "Segoe UI", sans-serif; fill: #4b5563; }
+      .annotation-strong { font: 600 11.5px -apple-system, "Segoe UI", sans-serif; fill: #1a1a2e; }
+      .divider        { stroke: #d1d5db; stroke-width: 1; stroke-dasharray: 4 4; }
+      .funnel-bar     { stroke: rgba(0,0,0,0.06); stroke-width: 1; }
+      .funnel-label   { font: 500 12px -apple-system, "Segoe UI", sans-serif; fill: #1a1a2e; text-anchor: end; }
+      .funnel-count   { font: 700 12.5px -apple-system, "Segoe UI", sans-serif; fill: #1a1a2e; }
+      .funnel-pct     { font: 500 10.5px -apple-system, "Segoe UI", sans-serif; fill: #6b7280; }
+      .callout        { font: 600 11.5px -apple-system, "Segoe UI", sans-serif; fill: #1a1a2e; }
+    </style>
+  </defs>
+
+  <!-- ================================================================ -->
+  <!-- LEFT PANEL: Per-task outcome distribution (50 cells)              -->
+  <!-- ================================================================ -->
+
+  <text class="panel-title" x="270" y="30" text-anchor="middle">Per-task outcomes — 50 SWE-Bench Verified tasks</text>
+  <text class="cell-sub" x="270" y="48" text-anchor="middle">Each cell is one task · sorted by outcome · 3 seeds per task</text>
+
+  <!-- 50 cells -->
+  <!-- SF unique wins: 6 cells (green) -->
+  <rect x="30" y="100" width="8" height="24" fill="#16a34a" rx="1.5"><title>pylint-4661 · Shadow-Frog wins · BL 0/3, SF 3/3</title></rect>
+  <rect x="39" y="100" width="8" height="24" fill="#16a34a" rx="1.5"><title>xarray-6461 · Shadow-Frog wins (variable) · BL 1/3, SF 3/3</title></rect>
+  <rect x="48" y="100" width="8" height="24" fill="#16a34a" rx="1.5"><title>scikit-learn-26194 · Shadow-Frog wins (variable) · BL 0/3, SF 2/3</title></rect>
+  <rect x="57" y="100" width="8" height="24" fill="#16a34a" rx="1.5"><title>sphinx-8548 · Shadow-Frog wins (variable) · BL 1/3, SF 3/3</title></rect>
+  <rect x="66" y="100" width="8" height="24" fill="#16a34a" rx="1.5"><title>pylint-6386 · Shadow-Frog wins (variable) · BL 2/3, SF 3/3</title></rect>
+  <rect x="75" y="100" width="8" height="24" fill="#16a34a" rx="1.5"><title>pytest-7324 · Shadow-Frog wins (variable) — the one shadow-driven win · BL 2/3, SF 3/3</title></rect>
+  <!-- BL unique wins: 2 cells (purple) -->
+  <rect x="89" y="100" width="8" height="24" fill="#7c3aed" rx="1.5"><title>matplotlib-23476 · Baseline wins (variable) · BL 3/3, SF 2/3</title></rect>
+  <rect x="98" y="100" width="8" height="24" fill="#7c3aed" rx="1.5"><title>django-11734 · Baseline wins · BL 3/3, SF 0/3</title></rect>
+  <!-- Tied: 1 cell (gray) -->
+  <rect x="112" y="100" width="8" height="24" fill="#9ca3af" rx="1.5"><title>pylint-4970 · Tied (variable) · BL 2/3, SF 2/3</title></rect>
+  <!-- Both fail: 7 cells (red) -->
+  <rect x="126" y="100" width="8" height="24" fill="#ef4444" rx="1.5"><title>astropy-13398 · Both fail · BL 0/3, SF 0/3</title></rect>
+  <rect x="135" y="100" width="8" height="24" fill="#ef4444" rx="1.5"><title>astropy-14182 · Both fail · BL 0/3, SF 0/3</title></rect>
+  <rect x="144" y="100" width="8" height="24" fill="#ef4444" rx="1.5"><title>astropy-8707 · Both fail · BL 0/3, SF 0/3</title></rect>
+  <rect x="153" y="100" width="8" height="24" fill="#ef4444" rx="1.5"><title>seaborn-3069 · Both fail · BL 0/3, SF 0/3</title></rect>
+  <rect x="162" y="100" width="8" height="24" fill="#ef4444" rx="1.5"><title>seaborn-3187 · Both fail · BL 0/3, SF 0/3</title></rect>
+  <rect x="171" y="100" width="8" height="24" fill="#ef4444" rx="1.5"><title>pytest-10356 · Both fail · BL 0/3, SF 0/3</title></rect>
+  <rect x="180" y="100" width="8" height="24" fill="#ef4444" rx="1.5"><title>sphinx-11510 · Both fail · BL 0/3, SF 0/3</title></rect>
+  <!-- Both pass: 34 cells (light gray) -->
+  <rect x="194" y="100" width="8" height="24" fill="#e5e7eb" rx="1.5"><title>astropy-12907 · Both pass · BL 3/3, SF 3/3</title></rect>
+  <rect x="203" y="100" width="8" height="24" fill="#e5e7eb" rx="1.5"><title>astropy-14096 · Both pass · BL 3/3, SF 3/3</title></rect>
+  <rect x="212" y="100" width="8" height="24" fill="#e5e7eb" rx="1.5"><title>django-11433 · Both pass · BL 3/3, SF 3/3</title></rect>
+  <rect x="221" y="100" width="8" height="24" fill="#e5e7eb" rx="1.5"><title>django-12304 · Both pass · BL 3/3, SF 3/3</title></rect>
+  <rect x="230" y="100" width="8" height="24" fill="#e5e7eb" rx="1.5"><title>django-15525 · Both pass · BL 3/3, SF 3/3</title></rect>
+  <rect x="239" y="100" width="8" height="24" fill="#e5e7eb" rx="1.5"><title>django-15930 · Both pass · BL 3/3, SF 3/3</title></rect>
+  <rect x="248" y="100" width="8" height="24" fill="#e5e7eb" rx="1.5"><title>matplotlib-14623 · Both pass · BL 3/3, SF 3/3</title></rect>
+  <rect x="257" y="100" width="8" height="24" fill="#e5e7eb" rx="1.5"><title>matplotlib-20488 · Both pass · BL 3/3, SF 3/3</title></rect>
+  <rect x="266" y="100" width="8" height="24" fill="#e5e7eb" rx="1.5"><title>matplotlib-20859 · Both pass · BL 3/3, SF 3/3</title></rect>
+  <rect x="275" y="100" width="8" height="24" fill="#e5e7eb" rx="1.5"><title>matplotlib-25775 · Both pass · BL 3/3, SF 3/3</title></rect>
+  <rect x="284" y="100" width="8" height="24" fill="#e5e7eb" rx="1.5"><title>flask-5014 · Both pass · BL 3/3, SF 3/3</title></rect>
+  <rect x="293" y="100" width="8" height="24" fill="#e5e7eb" rx="1.5"><title>requests-1724 · Both pass · BL 3/3, SF 3/3</title></rect>
+  <rect x="302" y="100" width="8" height="24" fill="#e5e7eb" rx="1.5"><title>requests-1921 · Both pass · BL 3/3, SF 3/3</title></rect>
+  <rect x="311" y="100" width="8" height="24" fill="#e5e7eb" rx="1.5"><title>requests-2317 · Both pass · BL 3/3, SF 3/3</title></rect>
+  <rect x="320" y="100" width="8" height="24" fill="#e5e7eb" rx="1.5"><title>requests-5414 · Both pass · BL 3/3, SF 3/3</title></rect>
+  <rect x="329" y="100" width="8" height="24" fill="#e5e7eb" rx="1.5"><title>xarray-2905 · Both pass · BL 3/3, SF 3/3</title></rect>
+  <rect x="338" y="100" width="8" height="24" fill="#e5e7eb" rx="1.5"><title>xarray-3993 · Both pass · BL 3/3, SF 3/3</title></rect>
+  <rect x="347" y="100" width="8" height="24" fill="#e5e7eb" rx="1.5"><title>xarray-4356 · Both pass · BL 3/3, SF 3/3</title></rect>
+  <rect x="356" y="100" width="8" height="24" fill="#e5e7eb" rx="1.5"><title>xarray-4687 · Both pass · BL 3/3, SF 3/3</title></rect>
+  <rect x="365" y="100" width="8" height="24" fill="#e5e7eb" rx="1.5"><title>pylint-6903 · Both pass · BL 3/3, SF 3/3</title></rect>
+  <rect x="374" y="100" width="8" height="24" fill="#e5e7eb" rx="1.5"><title>pytest-5262 · Both pass · BL 3/3, SF 3/3</title></rect>
+  <rect x="383" y="100" width="8" height="24" fill="#e5e7eb" rx="1.5"><title>pytest-7205 · Both pass · BL 3/3, SF 3/3</title></rect>
+  <rect x="392" y="100" width="8" height="24" fill="#e5e7eb" rx="1.5"><title>scikit-learn-10908 · Both pass · BL 3/3, SF 3/3</title></rect>
+  <rect x="401" y="100" width="8" height="24" fill="#e5e7eb" rx="1.5"><title>scikit-learn-12682 · Both pass · BL 3/3, SF 3/3</title></rect>
+  <rect x="410" y="100" width="8" height="24" fill="#e5e7eb" rx="1.5"><title>scikit-learn-14087 · Both pass · BL 3/3, SF 3/3</title></rect>
+  <rect x="419" y="100" width="8" height="24" fill="#e5e7eb" rx="1.5"><title>scikit-learn-14983 · Both pass · BL 3/3, SF 3/3</title></rect>
+  <rect x="428" y="100" width="8" height="24" fill="#e5e7eb" rx="1.5"><title>sphinx-10673 · Both pass · BL 3/3, SF 3/3</title></rect>
+  <rect x="437" y="100" width="8" height="24" fill="#e5e7eb" rx="1.5"><title>sphinx-9281 · Both pass · BL 3/3, SF 3/3</title></rect>
+  <rect x="446" y="100" width="8" height="24" fill="#e5e7eb" rx="1.5"><title>sphinx-9320 · Both pass · BL 3/3, SF 3/3</title></rect>
+  <rect x="455" y="100" width="8" height="24" fill="#e5e7eb" rx="1.5"><title>sympy-13480 · Both pass · BL 3/3, SF 3/3</title></rect>
+  <rect x="464" y="100" width="8" height="24" fill="#e5e7eb" rx="1.5"><title>sympy-15349 · Both pass · BL 3/3, SF 3/3</title></rect>
+  <rect x="473" y="100" width="8" height="24" fill="#e5e7eb" rx="1.5"><title>sympy-17655 · Both pass · BL 3/3, SF 3/3</title></rect>
+  <rect x="482" y="100" width="8" height="24" fill="#e5e7eb" rx="1.5"><title>sympy-19637 · Both pass · BL 3/3, SF 3/3</title></rect>
+  <rect x="491" y="100" width="8" height="24" fill="#e5e7eb" rx="1.5"><title>sympy-24562 · Both pass · BL 3/3, SF 3/3</title></rect>
+
+  <!-- Legend below the cell bar -->
+  <g transform="translate(30, 145)">
+    <rect x="0"   y="0" width="11" height="11" fill="#16a34a" rx="2"/>
+    <text class="cell-label" x="16" y="9.5">SF unique wins (6)</text>
+
+    <rect x="135" y="0" width="11" height="11" fill="#7c3aed" rx="2"/>
+    <text class="cell-label" x="151" y="9.5">BL unique wins (2)</text>
+
+    <rect x="265" y="0" width="11" height="11" fill="#9ca3af" rx="2"/>
+    <text class="cell-label" x="281" y="9.5">Tied (1)</text>
+
+    <rect x="335" y="0" width="11" height="11" fill="#ef4444" rx="2"/>
+    <text class="cell-label" x="351" y="9.5">Both fail (7)</text>
+
+    <rect x="0" y="20" width="11" height="11" fill="#e5e7eb" stroke="#9ca3af" stroke-width="0.5" rx="2"/>
+    <text class="cell-label" x="16" y="29.5">Both pass — easy (34)</text>
+  </g>
+
+  <!-- Spotlight annotation -->
+  <text class="annotation-strong" x="30" y="218">One of the 6 SF wins is pytest-7324 — the only shadow-driven win:</text>
+  <text class="annotation" x="30" y="237">a cross-file shadow doc mapped pytest’s mark-expression pipeline;</text>
+  <text class="annotation" x="30" y="253">a fix recipe at <tspan style="font-family:'SF Mono', Menlo, monospace; font-size: 11px;">expression.py</tspan> told the agent exactly how to patch it.</text>
+  <text class="annotation" x="30" y="269">All 3 SF seeds → 5-line fix.  2 of 3 BL seeds → rewrote ~80 lines.</text>
+  <text class="annotation" x="30" y="293">The other 5 SF wins came from the structured</text>
+  <text class="annotation" x="30" y="309">investigate-first workflow — not from shadow content.</text>
+
+  <!-- ================================================================ -->
+  <!-- Divider                                                          -->
+  <!-- ================================================================ -->
+  <line class="divider" x1="540" y1="40" x2="540" y2="340"/>
+
+  <!-- ================================================================ -->
+  <!-- RIGHT PANEL: Hint-delivery to consumption funnel                  -->
+  <!-- ================================================================ -->
+
+  <text class="panel-title" x="780" y="30" text-anchor="middle">Hint-delivery → consumption funnel</text>
+  <text class="cell-sub"    x="780" y="48" text-anchor="middle">How far each stage’s tasks survive to the next</text>
+
+  <!-- Funnel bars: sqrt-scaled width so small counts stay visible.
+       Scale: width = sqrt(count) * 38, bars start at x=700.
+       50 -> 269, 23 -> 182, 12 -> 132, 2 -> 54, 1 -> 38 -->
+
+  <!-- Bar 1: 50 all tasks -->
+  <text class="funnel-label" x="695" y="92">All tasks</text>
+  <rect class="funnel-bar" x="700" y="78" width="269" height="22" fill="#94a3b8" rx="3"><title>All tasks: 50 SWE-Bench Verified tasks (3 seeds each)</title></rect>
+  <text class="funnel-count" x="977" y="92" text-anchor="start">50</text>
+
+  <!-- Bar 2: 23 hints delivered (46% of universe) -->
+  <text class="funnel-label" x="695" y="132">Pre-filter delivered hints</text>
+  <rect class="funnel-bar" x="700" y="118" width="182" height="22" fill="#22c55e" rx="3"><title>Pre-filter delivered shadow hints to the agent for 23 of 50 tasks (46%)</title></rect>
+  <text class="funnel-count" x="890" y="132" text-anchor="start">23</text>
+  <text class="funnel-pct"   x="916" y="132" text-anchor="start">(46% of 50)</text>
+
+  <!-- Bar 3: 12 read (52% of previous) -->
+  <text class="funnel-label" x="695" y="172">Agent opened</text>
+  <rect class="funnel-bar" x="700" y="158" width="132" height="22" fill="#0ea5e9" rx="3"><title>Agent actually opened the shadow file in 12 of those 23 cases (52%)</title></rect>
+  <text class="funnel-count" x="840" y="172" text-anchor="start">12</text>
+  <text class="funnel-pct"   x="866" y="172" text-anchor="start">(52% of 23)</text>
+
+  <!-- Bar 4: 2 relevant (17% of previous) -->
+  <text class="funnel-label" x="695" y="212">Judged relevant</text>
+  <rect class="funnel-bar" x="700" y="198" width="54" height="22" fill="#f59e0b" rx="3"><title>Of the 12 opened, the agent judged 2 hints relevant to the bug at hand (17%)</title></rect>
+  <text class="funnel-count" x="762" y="212" text-anchor="start">2</text>
+  <text class="funnel-pct"   x="780" y="212" text-anchor="start">(17% of 12)</text>
+
+  <!-- Bar 5: 1 influenced outcome -->
+  <text class="funnel-label" x="695" y="252">Changed the outcome</text>
+  <rect class="funnel-bar" x="700" y="238" width="38" height="22" fill="#dc2626" rx="3"><title>Only 1 case (pytest-7324) where the hint demonstrably changed the fix outcome across all 3 seeds</title></rect>
+  <text class="funnel-count" x="746" y="252" text-anchor="start">1</text>
+  <text class="funnel-pct"   x="760" y="252" text-anchor="start">(pytest-7324)</text>
+
+  <!-- Callout box under funnel -->
+  <rect x="565" y="282" width="425" height="58" fill="#f0f7f0" stroke="#16a34a" stroke-width="1" rx="4"/>
+  <text class="callout"   x="580" y="302">Read path = solid (§1: 99% recall on planted needles).</text>
+  <text class="annotation" x="580" y="320">The bottleneck is <tspan font-weight="700" fill="#1a1a2e">consumption</tspan>: the agent rarely opens the</text>
+  <text class="annotation" x="580" y="334">hints it’s given, and most of the +4.7 pp comes from the workflow.</text>
+</svg>

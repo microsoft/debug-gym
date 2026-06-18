@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 400" role="img"
+     aria-label="Change locality by arm. Three horizontal stacked bars summing to 100 percent each. Baseline: 26% API Surface, 65% New Feature, plus small slivers. Shadow-Frog: 12% API Surface, 75% New Feature, plus small slivers. Human: 33% API Surface, 12% New Feature, 9% Internal Machinery, 7% Ecosystem Bridge, 22% DX and Tooling, 14% Operational Quality. Agents over-index on new features; humans diversify across maintenance and infrastructure work.">
+  <defs>
+    <style>
+      .panel-title  { fill: #1a1a2e; font: 600 14px -apple-system, "Segoe UI", sans-serif; }
+      .panel-sub    { fill: #6b7280; font: 500 11px -apple-system, "Segoe UI", sans-serif; }
+      .arm-label    { fill: #1a1a2e; font: 700 13px -apple-system, "Segoe UI", sans-serif; text-anchor: end; }
+      .arm-sub      { fill: #6b7280; font: 500 11px -apple-system, "Segoe UI", sans-serif; text-anchor: end; }
+      .seg-label    { fill: #ffffff; font: 600 11px -apple-system, "Segoe UI", sans-serif; }
+      .callout      { fill: #1a1a2e; font: 600 11.5px -apple-system, "Segoe UI", sans-serif; }
+      .callout-soft { fill: #4b5563; font: 500 11px -apple-system, "Segoe UI", sans-serif; }
+      .legend-text  { fill: #1a1a2e; font: 500 11px -apple-system, "Segoe UI", sans-serif; }
+    </style>
+  </defs>
+
+  <text class="panel-title" x="450" y="28" text-anchor="middle">Where ideas land — change locality by arm</text>
+  <text class="panel-sub"   x="450" y="46" text-anchor="middle">Each bar's segments sum to 100% · single tag per idea · n shown beside arm</text>
+
+  <!-- ============================================================== -->
+  <!-- Bars                                                            -->
+  <!-- bar_x0=150, bar_w=600 → 100% = 600px                            -->
+  <!-- ============================================================== -->
+
+  <!-- Baseline (y=85) -->
+  <text class="arm-label" x="140" y="100">Baseline</text>
+  <text class="arm-sub"   x="140" y="116">n = 1,200</text>
+  <rect x="150.0" y="85" width="156.6" height="34" fill="#7E57C2"><title>Baseline · API Surface: 26.1% — User-facing signatures, flags, public APIs</title></rect>
+    <text class="seg-label" x="228.3" y="106" text-anchor="middle">26%</text>
+  <rect x="306.6" y="85" width="391.2" height="34" fill="#EF5350"><title>Baseline · New Feature: 65.2% — Net-new capability not previously in the codebase</title></rect>
+    <text class="seg-label" x="502.2" y="106" text-anchor="middle">65% new feature</text>
+  <rect x="697.8" y="85" width="3.0" height="34" fill="#5C6BC0"><title>Baseline · Internal Machinery: 0.5% — Engine-room refactors, internal data structures, plumbing</title></rect>
+  <rect x="700.8" y="85" width="3.6" height="34" fill="#26A69A"><title>Baseline · Cross-Cutting: 0.6% — Single change touching many modules at once</title></rect>
+  <rect x="704.4" y="85" width="30.6" height="34" fill="#8D6E63"><title>Baseline · Ecosystem Bridge: 5.1% — Integrations with external systems, file formats, protocols</title></rect>
+  <rect x="735.0" y="85" width="11.4" height="34" fill="#FFA726"><title>Baseline · DX &amp; Tooling: 1.9% — Developer experience: build, test, lint, dev workflows</title></rect>
+  <rect x="746.4" y="85" width="3.6" height="34" fill="#66BB6A"><title>Baseline · Operational Quality: 0.6% — Reliability, observability, performance, security hardening</title></rect>
+
+  <!-- Shadow-Frog (y=145) -->
+  <text class="arm-label" x="140" y="160">Shadow-Frog</text>
+  <text class="arm-sub"   x="140" y="176">n = 1,200</text>
+  <rect x="150.0" y="145" width="69.6" height="34" fill="#7E57C2"><title>Shadow-Frog · API Surface: 11.6% — User-facing signatures, flags, public APIs</title></rect>
+    <text class="seg-label" x="184.8" y="166" text-anchor="middle">12%</text>
+  <rect x="219.6" y="145" width="451.2" height="34" fill="#EF5350"><title>Shadow-Frog · New Feature: 75.2% — Net-new capability not previously in the codebase</title></rect>
+    <text class="seg-label" x="445.2" y="166" text-anchor="middle">75% new feature</text>
+  <rect x="670.8" y="145" width="13.2" height="34" fill="#5C6BC0"><title>Shadow-Frog · Internal Machinery: 2.2% — Engine-room refactors, internal data structures, plumbing</title></rect>
+  <rect x="684.0" y="145" width="16.8" height="34" fill="#26A69A"><title>Shadow-Frog · Cross-Cutting: 2.8% — Single change touching many modules at once</title></rect>
+  <rect x="700.8" y="145" width="14.4" height="34" fill="#8D6E63"><title>Shadow-Frog · Ecosystem Bridge: 2.4% — Integrations with external systems, file formats, protocols</title></rect>
+  <rect x="715.2" y="145" width="22.8" height="34" fill="#FFA726"><title>Shadow-Frog · DX &amp; Tooling: 3.8% — Developer experience: build, test, lint, dev workflows</title></rect>
+  <rect x="738.0" y="145" width="12.0" height="34" fill="#66BB6A"><title>Shadow-Frog · Operational Quality: 2.0% — Reliability, observability, performance, security hardening</title></rect>
+
+  <!-- Human (y=205) -->
+  <text class="arm-label" x="140" y="220">Human</text>
+  <text class="arm-sub"   x="140" y="236">n = 910</text>
+  <rect x="150.0" y="205" width="200.4" height="34" fill="#7E57C2"><title>Human · API Surface: 33.4% — User-facing signatures, flags, public APIs</title></rect>
+    <text class="seg-label" x="250.2" y="226" text-anchor="middle">33%</text>
+  <rect x="350.4" y="205" width="72.0" height="34" fill="#EF5350"><title>Human · New Feature: 12.0% — Net-new capability not previously in the codebase</title></rect>
+    <text class="seg-label" x="386.4" y="226" text-anchor="middle">12%</text>
+  <rect x="422.4" y="205" width="55.8" height="34" fill="#5C6BC0"><title>Human · Internal Machinery: 9.3% — Engine-room refactors, internal data structures, plumbing</title></rect>
+    <text class="seg-label" x="450.3" y="226" text-anchor="middle">9%</text>
+  <rect x="478.2" y="205" width="15.0" height="34" fill="#26A69A"><title>Human · Cross-Cutting: 2.5% — Single change touching many modules at once</title></rect>
+  <rect x="493.2" y="205" width="40.2" height="34" fill="#8D6E63"><title>Human · Ecosystem Bridge: 6.7% — Integrations with external systems, file formats, protocols</title></rect>
+    <text class="seg-label" x="513.3" y="226" text-anchor="middle">7%</text>
+  <rect x="533.4" y="205" width="130.8" height="34" fill="#FFA726"><title>Human · DX &amp; Tooling: 21.8% — Developer experience: build, test, lint, dev workflows</title></rect>
+    <text class="seg-label" x="598.8" y="226" text-anchor="middle">22%</text>
+  <rect x="664.2" y="205" width="85.8" height="34" fill="#66BB6A"><title>Human · Operational Quality: 14.3% — Reliability, observability, performance, security hardening</title></rect>
+    <text class="seg-label" x="707.1" y="226" text-anchor="middle">14%</text>
+
+  <!-- Bracket + annotation for Human's "maintenance / infrastructure" -->
+  <!-- DX + Operational Quality span x=533.4 to x=750.0 -->
+  <path d="M 533.4 252 L 533.4 248 L 750.0 248 L 750.0 252" fill="none" stroke="#16a34a" stroke-width="1.4"/>
+  <line x1="641.7" y1="248" x2="641.7" y2="244" stroke="#16a34a" stroke-width="1.4"/>
+  <text class="callout" x="641.7" y="270" text-anchor="middle">
+    <tspan fill="#16a34a">36%</tspan> maintenance / infrastructure
+  </text>
+  <text class="callout-soft" x="641.7" y="285" text-anchor="middle">
+    (vs ~2% Baseline, ~6% Shadow-Frog)
+  </text>
+
+  <!-- ============================================================== -->
+  <!-- Legend (bottom, two rows × 4 columns + 3 leftover)               -->
+  <!-- ============================================================== -->
+
+  <g transform="translate(150, 320)">
+    <!-- Row 1 -->
+    <rect x="0"   y="0" width="13" height="13" fill="#7E57C2" rx="2"/>
+    <text class="legend-text" x="18" y="11">API Surface</text>
+
+    <rect x="125" y="0" width="13" height="13" fill="#EF5350" rx="2"/>
+    <text class="legend-text" x="143" y="11">New Feature</text>
+
+    <rect x="260" y="0" width="13" height="13" fill="#5C6BC0" rx="2"/>
+    <text class="legend-text" x="278" y="11">Internal Machinery</text>
+
+    <rect x="420" y="0" width="13" height="13" fill="#26A69A" rx="2"/>
+    <text class="legend-text" x="438" y="11">Cross-Cutting</text>
+
+    <!-- Row 2 -->
+    <rect x="0"   y="26" width="13" height="13" fill="#8D6E63" rx="2"/>
+    <text class="legend-text" x="18" y="37">Ecosystem Bridge</text>
+
+    <rect x="155" y="26" width="13" height="13" fill="#FFA726" rx="2"/>
+    <text class="legend-text" x="173" y="37">DX &amp; Tooling</text>
+
+    <rect x="280" y="26" width="13" height="13" fill="#66BB6A" rx="2"/>
+    <text class="legend-text" x="298" y="37">Operational Quality</text>
+  </g>
+
+  <text class="callout-soft" x="450" y="395" text-anchor="middle">
+    Both agents over-index on <tspan font-style="italic" fill="#1a1a2e">New Feature</tspan>; humans diversify into maintenance, tooling, and infrastructure work.
+  </text>
+</svg>

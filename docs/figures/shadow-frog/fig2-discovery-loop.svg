@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 420" role="img"
+     aria-label="The discovery loop. Four steps: imagine a task, run it on a dream branch, distill a discovery, merge it to the shadow, then return to imagine. An inset shows how later dreams branch off earlier dreams to compound knowledge.">
+  <defs>
+    <style>
+      .panel-title { fill: #1a1a2e; font: 600 14px -apple-system, "Segoe UI", sans-serif; }
+      .node-rect { fill: #eff6ff; stroke: #1d4ed8; stroke-width: 1.6; }
+      .node-text { fill: #1a1a2e; font: 600 12.5px -apple-system, "Segoe UI", sans-serif; text-anchor: middle; }
+      .cycle-arrow { fill: none; stroke: #1d4ed8; stroke-width: 1.8; opacity: 0.9; }
+      .seed-text { fill: #1d4ed8; font: 600 12px -apple-system, "Segoe UI", sans-serif; text-anchor: middle; }
+      .seed-text-it { fill: #1d4ed8; font: italic 500 11px -apple-system, "Segoe UI", sans-serif; text-anchor: middle; }
+      .divider { stroke: #d1d5db; stroke-width: 1; stroke-dasharray: 4 4; }
+      .branch-line { fill: none; stroke-width: 2.4; }
+      .commit-dot { stroke-width: 1.4; }
+      .branch-label { font: 600 12px "SF Mono", Menlo, Consolas, monospace; }
+      .legend-text { font: 500 12px -apple-system, "Segoe UI", sans-serif; fill: #4b5563; }
+    </style>
+    <marker id="ah-cycle" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#1d4ed8"/>
+    </marker>
+  </defs>
+
+  <!-- ================================================================ -->
+  <!-- LEFT PANEL: 4-node discovery cycle (center 260,205 R=130)         -->
+  <!-- Square layout: Imagine top, Run right, Distill bottom, Merge left -->
+  <!-- ================================================================ -->
+
+  <text class="panel-title" x="260" y="32" text-anchor="middle">The discovery loop</text>
+
+  <!-- Cycle arrows: straight lines between rect ellipse-approx edges (rx=47.5, ry=25) -->
+  <line class="cycle-arrow" x1="282.1" y1="97.1"  x2="367.9" y2="182.9" marker-end="url(#ah-cycle)"/>
+  <line class="cycle-arrow" x1="367.9" y1="227.1" x2="282.1" y2="312.9" marker-end="url(#ah-cycle)"/>
+  <line class="cycle-arrow" x1="237.9" y1="312.9" x2="152.1" y2="227.1" marker-end="url(#ah-cycle)"/>
+  <line class="cycle-arrow" x1="152.1" y1="182.9" x2="237.9" y2="97.1"  marker-end="url(#ah-cycle)"/>
+
+  <!-- Node 1: Imagine task (top) -->
+  <g transform="translate(260, 75)">
+    <rect class="node-rect" x="-47.5" y="-25" width="95" height="50" rx="22"/>
+    <text class="node-text" x="0" y="-3">Imagine</text>
+    <text class="node-text" x="0" y="14">task</text>
+  </g>
+
+  <!-- Node 2: Run on dream branch (right) -->
+  <g transform="translate(390, 205)">
+    <rect class="node-rect" x="-47.5" y="-25" width="95" height="50" rx="22"/>
+    <text class="node-text" x="0" y="-3">Run on</text>
+    <text class="node-text" x="0" y="14">dream branch</text>
+  </g>
+
+  <!-- Node 3: Distill discovery (bottom) -->
+  <g transform="translate(260, 335)">
+    <rect class="node-rect" x="-47.5" y="-25" width="95" height="50" rx="22"/>
+    <text class="node-text" x="0" y="-3">Distill</text>
+    <text class="node-text" x="0" y="14">discovery</text>
+  </g>
+
+  <!-- Node 4: Merge to shadow (left) -->
+  <g transform="translate(130, 205)">
+    <rect class="node-rect" x="-47.5" y="-25" width="95" height="50" rx="22"/>
+    <text class="node-text" x="0" y="-3">Merge to</text>
+    <text class="node-text" x="0" y="14">shadow</text>
+  </g>
+
+  <!-- Center label: when the loop fires -->
+  <g transform="translate(260, 200)">
+    <text class="seed-text"    x="0" y="0">Each idle moment</text>
+    <text class="seed-text-it" x="0" y="16">kicks off the loop  ↺</text>
+  </g>
+
+  <!-- ================================================================ -->
+  <!-- Divider                                                          -->
+  <!-- ================================================================ -->
+  <line class="divider" x1="485" y1="40" x2="485" y2="380"/>
+
+  <!-- ================================================================ -->
+  <!-- RIGHT PANEL: compounding inset (git-graph style)                  -->
+  <!-- ================================================================ -->
+
+  <text class="panel-title" x="710" y="32" text-anchor="middle">Compounding — later dreams build on earlier ones</text>
+
+  <!-- main branch (vertical) -->
+  <line class="branch-line" stroke="#6b7280" x1="570" y1="70" x2="570" y2="360"/>
+  <text class="branch-label" fill="#6b7280" x="548" y="65" text-anchor="end">main</text>
+  <circle class="commit-dot" cx="570" cy="100" r="5" fill="#6b7280" stroke="#374151"/>
+  <circle class="commit-dot" cx="570" cy="160" r="5" fill="#6b7280" stroke="#374151"/>
+  <circle class="commit-dot" cx="570" cy="220" r="5" fill="#6b7280" stroke="#374151"/>
+  <circle class="commit-dot" cx="570" cy="280" r="5" fill="#6b7280" stroke="#374151"/>
+  <circle class="commit-dot" cx="570" cy="340" r="5" fill="#6b7280" stroke="#374151"/>
+
+  <!-- dream/A forks off main at y=100, runs down to y=305 on x=645 -->
+  <path class="branch-line" stroke="#1d4ed8" d="M 570 100 C 615 100, 645 130, 645 155 L 645 305"/>
+  <circle class="commit-dot" cx="645" cy="155" r="5" fill="#dbeafe" stroke="#1d4ed8"/>
+  <circle class="commit-dot" cx="645" cy="215" r="5" fill="#dbeafe" stroke="#1d4ed8"/>
+  <circle class="commit-dot" cx="645" cy="275" r="5" fill="#dbeafe" stroke="#1d4ed8"/>
+  <text class="branch-label" fill="#1d4ed8" x="645" y="325" text-anchor="middle">dream/A</text>
+  <text class="legend-text" x="645" y="342" text-anchor="middle" style="font-size:10.5px;">retry layer</text>
+
+  <!-- dream/B forks off dream/A at y=215, lives on x=735 -->
+  <path class="branch-line" stroke="#16a34a" d="M 645 215 C 695 215, 735 245, 735 270 L 735 305"/>
+  <circle class="commit-dot" cx="735" cy="270" r="5" fill="#dcfce7" stroke="#16a34a"/>
+  <circle class="commit-dot" cx="735" cy="305" r="5" fill="#dcfce7" stroke="#16a34a"/>
+  <text class="branch-label" fill="#16a34a" x="735" y="325" text-anchor="middle">dream/B</text>
+  <text class="legend-text" x="735" y="342" text-anchor="middle" style="font-size:10.5px;">+ backoff jitter</text>
+
+  <!-- dream/C forks off dream/B at y=270, lives on x=855 -->
+  <path class="branch-line" stroke="#7c3aed" d="M 735 270 C 790 270, 855 290, 855 305"/>
+  <circle class="commit-dot" cx="855" cy="305" r="5" fill="#ede9fe" stroke="#7c3aed"/>
+  <text class="branch-label" fill="#7c3aed" x="855" y="325" text-anchor="middle">dream/C</text>
+  <text class="legend-text" x="855" y="342" text-anchor="middle" style="font-size:10.5px;">harden HTTP</text>
+
+  <!-- Annotation footer -->
+  <text class="legend-text" x="710" y="395" text-anchor="middle" style="font-style:italic;font-size:11.5px;">
+    Each fork inherits its parent&apos;s code &amp; shadow.
+  </text>
+</svg>

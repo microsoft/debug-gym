@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Shadow tree mirrors source tree (interactive example)</title>
+  <style>
+    :root {
+      --src-accent: #1e40af;
+      --src-bg: #eff6ff;
+      --src-border: #bfdbfe;
+      --shadow-accent: #92400e;
+      --shadow-bg: #fef3c7;
+      --shadow-border: #fde68a;
+      --cross-accent: #b45309;
+      --cross-bg: #fff7ed;
+      --cross-border: #fed7aa;
+      --text-dim: #6b7280;
+      --text: #1a1a2e;
+      --code-bg: #ffffff;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; background: #fff; color: var(--text);
+                  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { padding: 12px 14px; font-size: 13px; line-height: 1.45; }
+
+    .grid-top { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .col { border: 1px solid #e5e7eb; border-radius: 6px; overflow: hidden;
+           background: #fafbfc; min-width: 0; }
+    .col-source { border-color: var(--src-border); }
+    .col-shadow { border-color: var(--shadow-border); }
+    .col-header { padding: 7px 12px; font-weight: 600; font-size: 12.5px;
+                   border-bottom: 1px solid #e5e7eb; display: flex; align-items: baseline;
+                   gap: 6px; }
+    .col-source .col-header { background: var(--src-bg); color: var(--src-accent); border-bottom-color: var(--src-border); }
+    .col-shadow .col-header { background: var(--shadow-bg); color: var(--shadow-accent); border-bottom-color: var(--shadow-border); }
+    .col-header .tag { font-weight: 500; color: var(--text-dim); font-size: 11.5px; }
+
+    .tree { padding: 8px 12px 6px; font-family: "SF Mono", Menlo, Consolas, monospace;
+            font-size: 11.5px; line-height: 1.7; color: #4b5563; }
+    .tree-item { cursor: pointer; padding: 0 4px; margin: 0 -4px; border-radius: 3px;
+                  transition: background 0.15s; white-space: pre; }
+    .tree-item:hover { background: rgba(0,0,0,0.05); }
+    .col-source .tree-item.active { background: var(--src-bg); color: var(--src-accent); font-weight: 700; }
+    .col-shadow .tree-item.active { background: var(--shadow-bg); color: var(--shadow-accent); font-weight: 700; }
+    .tree-item.cross { color: var(--cross-accent); cursor: default; font-weight: 600; }
+    .tree-item.cross:hover { background: transparent; }
+    .tree-item.cross.ref-target { cursor: pointer; }
+    .tree-item.cross.ref-target:hover { background: var(--cross-bg); }
+
+    .snippet { border-top: 1px solid #e5e7eb; background: var(--code-bg); display: none; }
+    .snippet.active { display: block; }
+    .filename-bar { background: #f3f4f6; padding: 4px 10px;
+                     font-family: "SF Mono", Menlo, Consolas, monospace;
+                     font-size: 11px; color: #6b7280;
+                     border-bottom: 1px solid #e5e7eb; }
+    pre { margin: 0; padding: 8px 10px; font-family: "SF Mono", Menlo, Consolas, monospace;
+          font-size: 11.5px; line-height: 1.55; overflow-x: auto; color: var(--text);
+          white-space: pre; }
+    pre code { font-family: inherit; font-size: inherit; }
+
+    /* Python syntax */
+    .py-kw   { color: #7c3aed; font-weight: 600; }
+    .py-fn   { color: #2563eb; font-weight: 600; }
+    .py-str  { color: #b45309; }
+    .py-cmt  { color: #9ca3af; font-style: italic; }
+    .py-num  { color: #059669; }
+    .py-bool { color: #7c3aed; font-weight: 600; }
+
+    /* Markdown syntax */
+    .md-h1   { color: var(--text); font-weight: 700; }
+    .md-h2   { color: var(--text); font-weight: 700; }
+    .md-bold { font-weight: 700; color: var(--text); }
+    .md-it   { font-style: italic; color: var(--text-dim); }
+    .md-bul  { color: #9ca3af; }
+    .md-code { color: #c2410c; background: #fff7ed; padding: 0 3px; border-radius: 2px;
+               font-family: inherit; }
+    .md-lbl  { color: var(--cross-accent); font-weight: 600; }
+
+    /* Highlighted line linking source ↔ shadow ↔ cross */
+    .hl { background: linear-gradient(to right, rgba(180,83,9,0.10), rgba(180,83,9,0.02));
+          display: block; margin: 0 -10px; padding: 0 10px 0 7px;
+          border-left: 3px solid var(--cross-accent); }
+    .hl-flash { animation: flash 1.5s ease-out; }
+    @keyframes flash {
+      0%   { background-color: rgba(180,83,9,0.45); }
+      100% { background-color: rgba(180,83,9,0.10); }
+    }
+
+    /* Cross-file box */
+    .cross-box { margin-top: 12px; border: 1px solid var(--cross-border);
+                  border-radius: 6px; overflow: hidden; background: var(--code-bg); }
+    .cross-box .col-header { background: var(--cross-bg); color: var(--cross-accent);
+                              border-bottom-color: var(--cross-border); }
+
+    /* Clickable file::symbol refs */
+    .xref { cursor: pointer; text-decoration: underline; text-decoration-style: dotted;
+             text-decoration-color: var(--cross-accent); text-underline-offset: 3px;
+             transition: background 0.15s; border-radius: 2px; }
+    .xref:hover { background: var(--cross-bg); }
+    .xref-arrow { color: var(--cross-accent); font-weight: 700; margin-left: 4px;
+                   opacity: 0.7; }
+
+    .caption { margin: 10px 0 0; font-size: 11.5px; color: var(--text-dim);
+               text-align: center; font-style: italic; }
+    .caption code { font-family: "SF Mono", Menlo, Consolas, monospace; font-style: normal;
+                     background: #f3f4f6; padding: 1px 5px; border-radius: 3px; color: #374151; }
+    .hint { margin: 6px 0 12px; font-size: 11.5px; color: var(--text-dim); text-align: center; }
+    .hint kbd { background: #f3f4f6; border: 1px solid #d1d5db; border-radius: 3px;
+                 padding: 1px 5px; font-family: "SF Mono", Menlo, Consolas, monospace;
+                 font-size: 10.5px; color: #374151; }
+
+    @media (max-width: 640px) {
+      .grid-top { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<p class="hint">
+  Click any <span class="xref" style="text-decoration:none;background:var(--cross-bg);padding:1px 4px;">file</span>
+  in the tree, or any <span class="xref" style="text-decoration:none;background:var(--cross-bg);padding:1px 4px;">file::symbol</span>
+  reference in the cross-cutting box below, to navigate between source code and its shadow.
+</p>
+
+<div class="grid-top">
+
+  <!-- ─── SOURCE column ─── -->
+  <div class="col col-source">
+    <div class="col-header">
+      <span>📁 coupon-demo/</span>
+      <span class="tag">— real source code</span>
+    </div>
+    <div class="tree" id="tree-src">
+      <div class="tree-item active" data-file="cart">├── cart.py</div>
+      <div class="tree-item"        data-file="inventory">├── inventory.py</div>
+      <div class="tree-item"        data-file="test_cart">└── test_cart.py</div>
+    </div>
+
+    <!-- cart.py snippet -->
+    <div class="snippet active" data-pane="src" data-file="cart">
+      <div class="filename-bar">cart.py  (excerpt)</div>
+<pre><code><span class="py-kw">def</span> <span class="py-fn">calculate_total</span>(items, coupon_code=<span class="py-bool">None</span>):
+    subtotal = <span class="py-fn">sum</span>(item[<span class="py-str">"price"</span>] * item[<span class="py-str">"qty"</span>] <span class="py-kw">for</span> item <span class="py-kw">in</span> items)
+
+    <span class="py-kw">if</span> coupon_code:
+<span class="hl">        coupon = <span class="py-fn">get_coupon</span>(coupon_code)   <span class="py-cmt"># no .upper()</span></span>
+        <span class="py-kw">if</span> coupon <span class="py-kw">and</span> subtotal &gt;= coupon[<span class="py-str">"min_total"</span>]:
+            subtotal -= subtotal * coupon[<span class="py-str">"discount"</span>]
+    ...
+</code></pre>
+    </div>
+
+    <!-- inventory.py snippet -->
+    <div class="snippet" data-pane="src" data-file="inventory">
+      <div class="filename-bar">inventory.py  (excerpt)</div>
+<pre><code><span class="py-kw">from</span> cart <span class="py-kw">import</span> get_coupon
+
+
+<span class="py-kw">def</span> <span class="py-fn">validate_coupon</span>(code):
+    <span class="py-cmt">"""Check if a coupon code is valid."""</span>
+<span class="hl">    coupon = <span class="py-fn">get_coupon</span>(code.<span class="py-fn">upper</span>())   <span class="py-cmt"># normalizes!</span></span>
+    <span class="py-kw">return</span> coupon <span class="py-kw">is not</span> <span class="py-bool">None</span>
+</code></pre>
+    </div>
+
+    <!-- test_cart.py snippet -->
+    <div class="snippet" data-pane="src" data-file="test_cart">
+      <div class="filename-bar">test_cart.py  (excerpt)</div>
+<pre><code><span class="py-kw">def</span> <span class="py-fn">test_coupon</span>():
+    items = [{<span class="py-str">"name"</span>: <span class="py-str">"Widget"</span>, <span class="py-str">"price"</span>: <span class="py-num">25.00</span>, <span class="py-str">"qty"</span>: <span class="py-num">3</span>}]
+<span class="hl">    total = <span class="py-fn">calculate_total</span>(items, coupon_code=<span class="py-str">"SAVE20"</span>)</span>
+    <span class="py-kw">assert</span> total == <span class="py-num">64.80</span>
+    <span class="py-cmt"># only tests uppercase "SAVE20" — never catches the bug</span>
+</code></pre>
+    </div>
+  </div>
+
+  <!-- ─── SHADOW column ─── -->
+  <div class="col col-shadow">
+    <div class="col-header">
+      <span>🔍 .shadow/</span>
+      <span class="tag">— mirror of the source tree</span>
+    </div>
+    <div class="tree" id="tree-shd">
+      <div class="tree-item active" data-file="cart">├── cart.py.md</div>
+      <div class="tree-item"        data-file="inventory">├── inventory.py.md</div>
+      <div class="tree-item"        data-file="test_cart">├── test_cart.py.md</div>
+      <div class="tree-item cross">└── _cross/</div>
+      <div class="tree-item cross ref-target" id="link-to-cross">    └── coupon-case-normalization-mismatch.md</div>
+    </div>
+
+    <!-- cart.py.md snippet -->
+    <div class="snippet active" data-pane="shd" data-file="cart">
+      <div class="filename-bar">cart.py.md  (excerpt)</div>
+<pre><code><span class="md-h2">## <span class="md-code">`calculate_total`</span></span>
+
+<span class="hl"><span class="md-bul">-</span> Does NOT normalize <span class="md-code">`coupon_code`</span> to uppercase before
+  lookup. Lowercase codes silently produce no discount.
+  This contradicts <span class="md-code">`validate_coupon`</span> which DOES normalize.
+  <span class="md-it">_(verified, source: exploration, labels: [bug])_</span>
+  <span class="md-it">Also involves: <span class="xref" data-file="inventory" data-flash="src"><span class="md-code">`inventory.py::validate_coupon`</span></span></span></span>
+</code></pre>
+    </div>
+
+    <!-- inventory.py.md snippet -->
+    <div class="snippet" data-pane="shd" data-file="inventory">
+      <div class="filename-bar">inventory.py.md  (excerpt)</div>
+<pre><code><span class="md-h2">## <span class="md-code">`validate_coupon`</span></span>
+
+<span class="hl"><span class="md-bul">-</span> Normalizes <span class="md-code">`code`</span> to uppercase via <span class="md-code">`.upper()`</span> before
+  lookup, but <span class="md-code">`calculate_total`</span> does NOT — a code that
+  validates successfully may still produce no discount.
+  <span class="md-it">_(verified, source: exploration, labels: [bug])_</span>
+  <span class="md-it">Also involves: <span class="xref" data-file="cart" data-flash="src"><span class="md-code">`cart.py::calculate_total`</span></span></span></span>
+</code></pre>
+    </div>
+
+    <!-- test_cart.py.md snippet -->
+    <div class="snippet" data-pane="shd" data-file="test_cart">
+      <div class="filename-bar">test_cart.py.md  (excerpt)</div>
+<pre><code><span class="md-h2">## <span class="md-code">`test_coupon`</span></span>
+
+<span class="md-bul">-</span> Verifies SAVE20 on 75.00 subtotal: 75.00 − 20% = 60.00
+  + 4.80 tax = 64.80. <span class="md-it">_(verified)_</span>
+<span class="hl"><span class="md-bul">-</span> Only tests with uppercase coupon code <span class="md-code">`"SAVE20"`</span>. Does not
+  test lowercase, so does NOT catch the case-normalization bug.
+  <span class="md-it">_(verified, source: exploration)_</span>
+  <span class="md-it">Also involves: <span class="xref" data-file="cart" data-flash="src"><span class="md-code">`cart.py::calculate_total`</span></span></span></span>
+</code></pre>
+    </div>
+  </div>
+
+</div>
+
+<!-- ─── CROSS-CUTTING box ─── -->
+<div class="cross-box" id="cross-box">
+  <div class="col-header">
+    <span>🔗 _cross/coupon-case-normalization-mismatch.md</span>
+    <span class="tag">— one discovery, many files</span>
+  </div>
+<pre><code><span class="md-h1"># Coupon case normalization mismatch</span>
+
+<span class="md-bold">**Category**:</span> edge-case
+<span class="md-bold">**Refs**:</span>
+- <span class="xref" data-file="inventory" data-flash="src"><span class="md-code">`inventory.py::validate_coupon`</span></span><span class="xref-arrow">↗ click to jump</span>
+- <span class="xref" data-file="cart" data-flash="src"><span class="md-code">`cart.py::calculate_total`</span></span><span class="xref-arrow">↗ click to jump</span>
+- <span class="xref" data-file="cart" data-flash="src"><span class="md-code">`cart.py::load_coupon`</span></span><span class="xref-arrow">↗ click to jump</span>
+
+<span class="md-bold">**Discovery**:</span> <span class="md-code">`validate_coupon`</span> normalizes codes to uppercase via <span class="md-code">`.upper()`</span>,
+but <span class="md-code">`calculate_total`</span> passes <span class="md-code">`coupon_code`</span> through without normalization. A user
+who validates <span class="md-code">`"save20"`</span> (returns True) and then calls <span class="md-code">`calculate_total("save20")`</span>
+gets no discount — the coupon silently fails because <span class="md-code">`load_coupon`</span>'s keys are uppercase. <span class="md-it">_(verified, source: exploration, labels: [bug])_</span>
+</code></pre>
+</div>
+
+<p class="caption">
+  Real files from <code>examples/coupon-demo/</code>. Every source file pairs with a sibling
+  shadow markdown; <code>_cross/</code> discoveries anchor to many symbols across files
+  via <code>file::symbol</code>.
+</p>
+
+<script>
+  function activate(file) {
+    document.querySelectorAll('.tree-item[data-file]').forEach(el => {
+      el.classList.toggle('active', el.dataset.file === file);
+    });
+    document.querySelectorAll('.snippet').forEach(el => {
+      el.classList.toggle('active', el.dataset.file === file);
+    });
+  }
+
+  function flashHighlight(file, pane) {
+    const pane_el = document.querySelector(
+      `.snippet.active[data-pane="${pane}"][data-file="${file}"] .hl`
+    );
+    if (!pane_el) return;
+    pane_el.classList.remove('hl-flash');
+    void pane_el.offsetWidth;  // force reflow
+    pane_el.classList.add('hl-flash');
+  }
+
+  function scrollCrossIntoView() {
+    const box = document.getElementById('cross-box');
+    if (box) box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  // Tree item clicks → switch file pair
+  document.querySelectorAll('.tree-item[data-file]').forEach(el => {
+    el.addEventListener('click', () => activate(el.dataset.file));
+  });
+
+  // file::symbol clicks → switch + flash both panes
+  document.querySelectorAll('.xref[data-file]').forEach(el => {
+    el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      activate(el.dataset.file);
+      // Flash both src and shadow highlights so the bidirectional link is obvious
+      requestAnimationFrame(() => {
+        flashHighlight(el.dataset.file, 'src');
+        flashHighlight(el.dataset.file, 'shd');
+      });
+    });
+  });
+
+  // _cross/ tree link → scroll cross-box into view
+  const crossLink = document.getElementById('link-to-cross');
+  if (crossLink) crossLink.addEventListener('click', scrollCrossIntoView);
+</script>
+
+</body>
+</html>

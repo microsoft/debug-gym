@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fig 4 (judge) &mdash; SWE-Smith judge verdict</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", sans-serif;
+         background: #ffffff; color: #1a1a2e; padding: 18px 22px 22px; }
+  h1 { font-size: 16px; font-weight: 600; text-align: center; margin-bottom: 18px; color: #1a1a2e; }
+  .chart-wrap { max-width: 920px; margin: 0 auto; position: relative; height: 420px; }
+  .controls { display: flex; justify-content: center; align-items: center; gap: 18px;
+              font-size: 12.5px; color: #4b5563; padding: 12px 0 4px; flex-wrap: wrap;
+              max-width: 920px; margin: 0 auto; }
+  .controls label { cursor: pointer; user-select: none; }
+  .controls input { vertical-align: middle; margin-right: 5px; }
+  .legend { display: flex; justify-content: center; gap: 26px;
+            font-size: 13px; color: #1a1a2e; margin-top: 8px; flex-wrap: wrap; }
+  .legend-item { display: flex; align-items: center; gap: 7px; }
+  .legend-swatch { width: 24px; height: 3px; border-radius: 2px; }
+</style>
+</head><body>
+<h1>SWE-Smith &mdash; judge verdict (LLM judge: report is sufficient to fix the bug)</h1>
+
+<div class="chart-wrap"><canvas id="chart"></canvas></div>
+
+<div class="controls">
+  <label><input type="checkbox" id="toggleCI" checked> Show 95% confidence intervals</label>
+</div>
+
+<div class="legend">
+  <div class="legend-item"><div class="legend-swatch" style="background:#9467BD;"></div>Baseline</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:#2CA02C;"></div>Shadow-Frog</div>
+</div>
+
+<script>
+const SF = '#2CA02C';
+const BL = '#9467BD';
+const SF_SOFT = 'rgba(44,160,44,0.32)';
+const BL_SOFT = 'rgba(148,103,189,0.32)';
+const SF_EDGE = 'rgba(44,160,44,0.55)';
+const BL_EDGE = 'rgba(148,103,189,0.55)';
+
+const BUDGETS = [12, 24, 36, 48, 60, 72, 84, 96, 108, 120];
+
+const DATA = {
+  baseline:   { mean: [22.6, 33.2, 35.5, 36.9, 43.0, 40.5, 44.1, 46.0, 45.9, 46.9],
+                std:  [20.9, 26.0, 25.7, 25.3, 27.3, 25.9, 26.5, 27.2, 26.3, 26.0] },
+  shadowfrog: { mean: [30.1, 51.0, 58.1, 60.0, 60.7, 63.3, 65.7, 71.5, 70.8, 68.0],
+                std:  [23.7, 27.0, 26.0, 24.3, 25.4, 22.2, 21.0, 21.9, 22.0, 22.3] },
+};
+
+const N_BUGS = 100;
+const ROOT_N = Math.sqrt(N_BUGS);
+
+function makeDatasets(showCI) {
+  const bl = DATA.baseline, sf = DATA.shadowfrog;
+  const ciScale = 1.96 / ROOT_N;
+  const out = [
+    { label: 'Baseline',
+      data: bl.mean, borderColor: BL, backgroundColor: BL,
+      pointRadius: 4.5, pointHoverRadius: 6, borderWidth: 2.6, tension: 0.15,
+      order: 2 },
+    { label: 'Shadow-Frog',
+      data: sf.mean, borderColor: SF, backgroundColor: SF,
+      pointRadius: 4.5, pointHoverRadius: 6, borderWidth: 3, tension: 0.15,
+      order: 1 },
+  ];
+  if (showCI) {
+    out.push({
+      label: 'Baseline CI', data: bl.mean.map((m,i)=>m + bl.std[i]*ciScale),
+      borderColor: BL_EDGE, borderWidth: 1, borderDash: [3,3],
+      pointRadius: 0, fill: '+1',
+      backgroundColor: BL_SOFT, order: 4, tension: 0.15,
+    });
+    out.push({
+      label: 'Baseline CI lo', data: bl.mean.map((m,i)=>m - bl.std[i]*ciScale),
+      borderColor: BL_EDGE, borderWidth: 1, borderDash: [3,3],
+      pointRadius: 0, fill: false, order: 5, tension: 0.15,
+    });
+    out.push({
+      label: 'Shadow-Frog CI', data: sf.mean.map((m,i)=>m + sf.std[i]*ciScale),
+      borderColor: SF_EDGE, borderWidth: 1, borderDash: [3,3],
+      pointRadius: 0, fill: '+1',
+      backgroundColor: SF_SOFT, order: 6, tension: 0.15,
+    });
+    out.push({
+      label: 'Shadow-Frog CI lo', data: sf.mean.map((m,i)=>m - sf.std[i]*ciScale),
+      borderColor: SF_EDGE, borderWidth: 1, borderDash: [3,3],
+      pointRadius: 0, fill: false, order: 7, tension: 0.15,
+    });
+  }
+  return out;
+}
+
+const OPTIONS = {
+  responsive: true, maintainAspectRatio: false,
+  interaction: { mode: 'index', intersect: false },
+  plugins: {
+    legend: { display: false },
+    tooltip: {
+      filter: (item) => !item.dataset.label.includes('CI'),
+      callbacks: {
+        title: (items) => `Agent budget = ${items[0].label}`,
+        label: (ctx) => {
+          const v = ctx.parsed.y;
+          const ds = ctx.dataset.label;
+          const arm = ds === 'Baseline' ? 'baseline' : 'shadowfrog';
+          const std = DATA[arm].std[ctx.dataIndex];
+          const ciHalf = (1.96 * std / ROOT_N);
+          return `${ds}: ${v.toFixed(1)}%  (95% CI \u00b1${ciHalf.toFixed(1)})`;
+        },
+      },
+    },
+  },
+  scales: {
+    x: { title: { display: true, text: 'agent budget (sub-agents per task)', font: { size: 12.5 }, color: '#374151' },
+         grid: { color: '#eef0f3' },
+         ticks: { font: { size: 12 }, color: '#4b5563', maxRotation: 0, minRotation: 0 } },
+    y: { min: 0, max: 100,
+         title: { display: true, text: 'score (%)', font: { size: 12.5 }, color: '#374151' },
+         ticks: { callback: v => v + '%', font: { size: 12 }, color: '#4b5563', stepSize: 20 },
+         grid: { color: '#eef0f3' } },
+  },
+  layout: { padding: { left: 4, right: 4, top: 6, bottom: 2 } },
+};
+
+let chart;
+function build(showCI) {
+  if (chart) chart.destroy();
+  chart = new Chart(document.getElementById('chart'), {
+    type: 'line',
+    data: { labels: BUDGETS, datasets: makeDatasets(showCI) },
+    options: OPTIONS,
+  });
+}
+build(true);
+document.getElementById('toggleCI').addEventListener('change', e => build(e.target.checked));
+</script>
+</body></html>

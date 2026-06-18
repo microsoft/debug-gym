@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fig 3 (single) &mdash; Recall on django</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", sans-serif;
+         background: #ffffff; color: #1a1a2e; padding: 18px 22px 22px; }
+  h1 { font-size: 16px; font-weight: 600; text-align: center; margin-bottom: 18px; color: #1a1a2e; }
+  .chart-wrap { max-width: 920px; margin: 0 auto; position: relative; height: 420px; }
+  .controls { display: flex; justify-content: center; align-items: center; gap: 18px;
+              font-size: 12.5px; color: #4b5563; padding: 12px 0 4px; flex-wrap: wrap;
+              max-width: 920px; margin: 0 auto; }
+  .controls label { cursor: pointer; user-select: none; }
+  .controls input { vertical-align: middle; margin-right: 5px; }
+  .legend { display: flex; justify-content: center; gap: 26px;
+            font-size: 13px; color: #1a1a2e; margin-top: 8px; flex-wrap: wrap; }
+  .legend-item { display: flex; align-items: center; gap: 7px; }
+  .legend-swatch { width: 24px; height: 3px; border-radius: 2px; }
+</style>
+</head><body>
+<h1>Navigation recall on django &mdash; file path given, 2,500-needle shadow</h1>
+
+<div class="chart-wrap"><canvas id="chart"></canvas></div>
+
+<div class="controls">
+  <label><input type="checkbox" id="toggleCI" checked> Show 95% confidence intervals</label>
+</div>
+
+<div class="legend">
+  <div class="legend-item"><div class="legend-swatch" style="background:#9467BD;"></div>No shadow</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:#FB8C00;"></div>Flat shadow</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:#2CA02C;"></div>Shadow-Frog</div>
+</div>
+
+<script>
+const CELL = {
+  per_file_shadow: {m:[0.0,0.0,0.2169,0.9759,1.0,1.0,1.0],
+                    lo:[0.0,0.0,0.1325,0.9398,1.0,1.0,1.0],
+                    hi:[0.0,0.0,0.3133,1.0,1.0,1.0,1.0]},
+  no_shadow:      {m:[0.0,0.0,0.0,0.1241,0.1711,0.1717,0.1259],
+                    lo:[0.0,0.0,0.0,0.0651,0.0946,0.1018,0.0614],
+                    hi:[0.0,0.0,0.0,0.1922,0.241,0.247,0.1928]},
+  flat_shadow:    {m:[0.0,0.0,0.012,0.362,0.9669,0.9831,0.9373],
+                    lo:[0.0,0.0,0.0,0.2681,0.9277,0.9518,0.8795],
+                    hi:[0.0,0.0,0.0361,0.459,0.994,1.0,0.9855]},
+};
+
+const BUDGETS = ["1","2","4","8","16","32","\u221E"];
+const ARMS = [
+  {key:"no_shadow",      label:"No shadow",       color:"#9467BD", soft:"rgba(148,103,189,0.16)"},
+  {key:"flat_shadow",    label:"Flat shadow",     color:"#FB8C00", soft:"rgba(251,140,0,0.16)"},
+  {key:"per_file_shadow",label:"Shadow-Frog", color:"#2CA02C", soft:"rgba(44,160,44,0.16)"},
+];
+
+function makeDatasets(showCI) {
+  const out = [];
+  for (const arm of ARMS) {
+    const d = CELL[arm.key];
+    out.push({
+      label: arm.label,
+      data: d.m.map(v => v * 100),
+      borderColor: arm.color, backgroundColor: arm.color,
+      pointRadius: 4, pointHoverRadius: 6, borderWidth: 2.6, tension: 0.15,
+      order: 2,
+    });
+    if (showCI) {
+      out.push({
+        label: arm.label + " CI",
+        data: d.hi.map(v => v * 100),
+        borderColor: "transparent", pointRadius: 0, fill: "+1",
+        backgroundColor: arm.soft, order: 4, tension: 0.15,
+      });
+      out.push({
+        label: arm.label + " CI lo",
+        data: d.lo.map(v => v * 100),
+        borderColor: "transparent", pointRadius: 0, fill: false, order: 5, tension: 0.15,
+      });
+    }
+  }
+  return out;
+}
+
+const OPTIONS = {
+  responsive: true, maintainAspectRatio: false,
+  interaction: { mode: "index", intersect: false },
+  plugins: {
+    legend: { display: false },
+    tooltip: {
+      filter: (item) => !item.dataset.label.includes(" CI"),
+      callbacks: {
+        title: (items) => "Budget = " + items[0].label + " tool calls",
+        label: (ctx) => {
+          const arm = ARMS.find(a => a.label === ctx.dataset.label);
+          const d = CELL[arm.key];
+          const i = ctx.dataIndex;
+          const m = (d.m[i]*100).toFixed(1);
+          const lo = (d.lo[i]*100).toFixed(1);
+          const hi = (d.hi[i]*100).toFixed(1);
+          return arm.label + ": " + m + "% (CI " + lo + "\u2013" + hi + ")";
+        },
+      },
+    },
+  },
+  scales: {
+    x: { title: { display: true, text: "tool-call budget", font: { size: 12.5 }, color: "#374151" },
+         grid: { color: "#eef0f3" },
+         ticks: { font: { size: 12 }, color: "#4b5563",
+                  autoSkip: false, maxRotation: 0, minRotation: 0 } },
+    y: { min: 0, max: 100,
+         title: { display: true, text: "recall (%)", font: { size: 12.5 }, color: "#374151" },
+         ticks: { callback: v => v + "%", font: { size: 12 }, color: "#4b5563", stepSize: 25 },
+         grid: { color: "#eef0f3" } },
+  },
+  layout: { padding: { left: 4, right: 4, top: 6, bottom: 2 } },
+};
+
+let chart;
+function build(showCI) {
+  if (chart) chart.destroy();
+  chart = new Chart(document.getElementById("chart"), {
+    type: "line",
+    data: { labels: BUDGETS, datasets: makeDatasets(showCI) },
+    options: OPTIONS,
+  });
+}
+build(true);
+document.getElementById("toggleCI").addEventListener("change", e => build(e.target.checked));
+</script>
+</body></html>

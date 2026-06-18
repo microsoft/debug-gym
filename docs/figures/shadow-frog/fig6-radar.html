@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fig 6 &mdash; Ideation radar</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", sans-serif;
+         background: #ffffff; color: #1a1a2e; padding: 8px 14px 14px; }
+  h1 { font-size: 14px; font-weight: 600; text-align: center; margin-bottom: 2px; color: #1a1a2e; }
+  .sub { font-size: 11.5px; color: #6b7280; text-align: center; margin-bottom: 8px; }
+  .layout { display: grid; grid-template-columns: 1fr 220px; gap: 16px; align-items: start; }
+  .chart-wrap { position: relative; height: 380px; min-width: 0; }
+  .side { padding-top: 18px; }
+  .controls { background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 6px;
+              padding: 10px 12px; font-size: 12px; color: #1a1a2e; margin-bottom: 10px; }
+  .controls .label { font-size: 10.5px; color: #6b7280; text-transform: uppercase;
+                     letter-spacing: 0.04em; margin-bottom: 4px; font-weight: 600; }
+  .controls select { width: 100%; padding: 4px 6px; font-size: 12.5px;
+                     border: 1px solid #d1d5db; border-radius: 4px; background: #fff; }
+  .delta-table { font-size: 11.5px; color: #1a1a2e; }
+  .delta-table .row { display: flex; justify-content: space-between;
+                      padding: 3px 0; border-bottom: 1px dotted #e5e7eb; }
+  .delta-table .row:last-child { border-bottom: none; }
+  .delta-table .pos { color: #16a34a; font-weight: 600; }
+  .delta-table .neg { color: #b45309; font-weight: 600; }
+  .legend { display: flex; justify-content: center; gap: 22px;
+            font-size: 12px; color: #1a1a2e; margin-top: 6px; }
+  .legend-item { display: flex; align-items: center; gap: 6px; }
+  .legend-swatch { width: 22px; height: 3px; border-radius: 2px; }
+  .note { text-align: center; font-size: 10.5px; color: #9ca3af; margin-top: 6px; }
+  .rubric-item { margin-bottom: 2px; font-size: 11px; line-height: 1.5; color: #374151; }
+  .rubric-item:last-child { margin-bottom: 0; }
+  @media (max-width: 720px) {
+    .layout { grid-template-columns: 1fr; }
+    .chart-wrap { height: 340px; }
+    .side { padding-top: 0; }
+  }
+</style>
+</head><body>
+<h1>Per-evaluative-dimension means by arm</h1>
+<div class="sub">4 axes &middot; 1&ndash;5 rating &middot; 4,220 ideas total (1,200 Baseline + 1,200 Shadow-Frog + 910 Human-rewritten) &middot; switch judges to see how each rater scored</div>
+
+<div class="layout">
+  <div class="chart-col">
+    <div class="chart-wrap"><canvas id="radar"></canvas></div>
+    <div class="legend">
+      <div class="legend-item"><div class="legend-swatch" style="background:#9467BD;"></div>Baseline</div>
+      <div class="legend-item"><div class="legend-swatch" style="background:#2CA02C;"></div>Shadow-Frog</div>
+      <div class="legend-item"><div class="legend-swatch" style="background:#FB8C00;"></div>Human (rewritten)</div>
+    </div>
+    <div class="note">Hover any axis vertex for the exact mean score.</div>
+  </div>
+  <div class="side">
+    <div class="controls">
+      <div class="label">Judge</div>
+      <select id="judgeSelect">
+        <option value="opus46">Claude Opus 4.6</option>
+        <option value="opus47">Claude Opus 4.7</option>
+        <option value="gpt55">GPT-5.5</option>
+        <option value="ensemble" selected>Ensemble (mean of 3, default)</option>
+      </select>
+    </div>
+    <div class="controls">
+      <div class="label">Shadow-Frog &minus; Baseline deltas</div>
+      <div id="deltas" class="delta-table"></div>
+    </div>
+    <div class="controls rubric-panel">
+      <div class="label">Rubric definitions</div>
+      <div class="rubric-item"><strong>Groundedness</strong> &mdash; Does the proposal demonstrate project-specific knowledge (real APIs, modules, conventions) vs. plausible-sounding generalities?</div>
+      <div class="rubric-item"><strong>Insight</strong> &mdash; How unlikely is this idea to emerge from a 5-minute brainstorm by a regular contributor?</div>
+      <div class="rubric-item"><strong>User Impact</strong> &mdash; How many real users would benefit and how meaningfully?</div>
+      <div class="rubric-item"><strong>Spec Clarity</strong> &mdash; Could a maintainer turn this into a PR scope without back-and-forth?</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const DATA = {"opus46":{"Groundedness":{"BL":3.975,"SF":3.747,"HU":3.580},"Insight":{"BL":2.013,"SF":2.414,"HU":2.390},"User Impact":{"BL":3.428,"SF":3.665,"HU":3.160},"Spec Clarity":{"BL":4.4,"SF":4.115,"HU":3.900}},"opus47":{"Groundedness":{"BL":3.978,"SF":3.833,"HU":3.737},"Insight":{"BL":2.329,"SF":2.768,"HU":2.940},"User Impact":{"BL":3.298,"SF":3.411,"HU":3.182},"Spec Clarity":{"BL":4.041,"SF":3.688,"HU":3.568}},"gpt55":{"Groundedness":{"BL":4.632,"SF":4.518,"HU":3.855},"Insight":{"BL":2.576,"SF":2.933,"HU":3.265},"User Impact":{"BL":3.688,"SF":3.934,"HU":3.504},"Spec Clarity":{"BL":4.453,"SF":4.138,"HU":3.947}},"ensemble":{"Groundedness":{"BL":4.195,"SF":4.032,"HU":3.724},"Insight":{"BL":2.306,"SF":2.705,"HU":2.865},"User Impact":{"BL":3.471,"SF":3.67,"HU":3.282},"Spec Clarity":{"BL":4.298,"SF":3.98,"HU":3.805}}};
+
+const AXES = ["Groundedness","Insight","User Impact","Spec Clarity"];
+const AXIS_RUBRIC = {
+  "Groundedness": "Does the proposal demonstrate project-specific knowledge (real APIs, modules, conventions) vs. plausible-sounding generalities?",
+  "Insight":      "How unlikely is this idea to emerge from a 5-minute brainstorm by a regular contributor?",
+  "User Impact":  "How many real users would benefit and how meaningfully?",
+  "Spec Clarity": "Could a maintainer turn this into a PR scope without back-and-forth?",
+};
+const ARMS = [
+  {key:"BL", label:"Baseline",    color:"#9467BD", soft:"rgba(148,103,189,0.18)"},
+  {key:"SF", label:"Shadow-Frog", color:"#2CA02C", soft:"rgba(44,160,44,0.18)"},
+  {key:"HU", label:"Human (rewritten)", color:"#FB8C00", soft:"rgba(251,140,0,0.16)"},
+];
+
+function makeDatasets(judge) {
+  const cell = DATA[judge];
+  return ARMS.map(arm => ({
+    label: arm.label,
+    data: AXES.map(ax => cell[ax][arm.key]),
+    borderColor: arm.color, backgroundColor: arm.soft,
+    pointBackgroundColor: arm.color, pointBorderColor: "#fff",
+    pointHoverRadius: 6, pointRadius: 3.5, borderWidth: 2,
+  }));
+}
+
+function fmtDelta(d) {
+  const s = (d >= 0 ? "+" : "−") + Math.abs(d).toFixed(2);
+  const cls = d >= 0 ? "pos" : "neg";
+  const arrow = d >= 0 ? "▲" : "▼";
+  return '<span class="' + cls + '">' + arrow + " " + s + '</span>';
+}
+
+function renderDeltas(judge) {
+  const cell = DATA[judge];
+  const rows = AXES.map(ax => {
+    const d = cell[ax].SF - cell[ax].BL;
+    return '<div class="row"><span>' + ax + '</span>' + fmtDelta(d) + '</div>';
+  }).join("");
+  document.getElementById("deltas").innerHTML = rows;
+}
+
+let chart = null;
+function build(judge) {
+  if (chart) chart.destroy();
+  chart = new Chart(document.getElementById("radar"), {
+    type: "radar",
+    data: { labels: AXES, datasets: makeDatasets(judge) },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            title: (items) => items[0].label,
+            label: (ctx) => ctx.dataset.label + ": " + ctx.parsed.r.toFixed(2),
+          },
+        },
+      },
+      scales: {
+        r: { min: 1, max: 5,
+             ticks: { stepSize: 1, font: { size: 9 }, color: "#9ca3af",
+                      backdropColor: "transparent" },
+             pointLabels: { font: { size: 12, weight: "600" }, color: "#1a1a2e" },
+             grid: { color: "#e5e7eb" }, angleLines: { color: "#e5e7eb" } },
+      },
+    },
+  });
+  renderDeltas(judge);
+}
+
+build("ensemble");
+document.getElementById("judgeSelect").addEventListener("change", e => build(e.target.value));
+</script>
+</body></html>

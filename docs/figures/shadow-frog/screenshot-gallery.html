@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-store">
+<title>Shadow-Frog figures — screenshot gallery</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: #ffffff; color: #1a1a2e;
+               font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif; }
+  body { padding: 12px 24px 60px; }
+
+  .gallery-header { max-width: 1280px; margin: 0 auto 14px; }
+  .gallery-header h1 { font-size: 14px; font-weight: 600; color: #6b7280;
+                       letter-spacing: 0.02em; text-transform: uppercase; margin-bottom: 8px; }
+  .gallery-toc { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12px; color: #1f3a93;
+                 padding: 6px 12px; background: #f6f8fc; border: 1px solid #e3e8f1; border-radius: 6px; }
+  .gallery-toc a { color: #1f3a93; text-decoration: none; }
+  .gallery-toc a:hover { text-decoration: underline; }
+
+  .figure-block { max-width: 1280px; margin: 0 auto 56px; }
+  .figure-block.wide { max-width: 1400px; }
+  .figure-block.tldr { max-width: 1100px; }
+  .figure-block.radar { max-width: 1000px; }
+  .figure-block.shadow-tree { max-width: 960px; }
+
+  /* Helper anchor offset so scroll-to-anchor lands cleanly at section top. */
+  .figure-block { scroll-margin-top: 12px; }
+
+  .figure-label { font-size: 12.5px; font-weight: 600; color: #6b7280;
+                  letter-spacing: 0.02em; text-transform: uppercase;
+                  margin-bottom: 8px; padding-left: 2px; }
+  .figure-label .num { color: #1f3a93; }
+
+  .figure-host { background: #ffffff; border-radius: 8px; overflow: hidden;
+                 box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+                 border: 1px solid #e5e7eb; }
+  .figure-host.dark { background: linear-gradient(135deg, #1a1a2e, #16213e);
+                      padding: 8px; border-color: #2a3760; }
+  .figure-host iframe { display: block; width: 100%; border: 0; background: #ffffff; }
+  .figure-host.dark iframe { border-radius: 4px; }
+  .figure-host img.svg-figure { display: block; width: 100%; height: auto; background: #ffffff; }
+
+  /* Viewport-fit sizing: figure stays fully visible on standard laptop screens.
+     Figure 0's wide variant fills width entirely; size by viewport-bounded height. */
+  .figure-host.fit-viewport { display: block; padding: 0; background: transparent; border: 0;
+                              box-shadow: none; }
+  .figure-host.fit-viewport iframe {
+    display: block;
+    width: 100%;
+    /* Section chrome ≈ label 25 + caption 50 + body padding 24 + safety ≈ 110px */
+    height: min(calc(100vh - 110px), 900px);
+    margin: 0;
+    border-radius: 8px;
+  }
+
+  .figure-caption { margin-top: 10px; font-size: 12.5px; line-height: 1.55; color: #555;
+                    padding: 0 4px; }
+  .figure-caption strong { color: #1a1a2e; }
+
+  .divider { max-width: 1280px; margin: 0 auto; border: 0; border-top: 1px dashed #d1d5db; }
+
+  /* Print-friendly: hide chrome on print, keep figures */
+  @media print {
+    body { padding: 0; }
+    .gallery-header, .gallery-toc, .figure-label, .figure-caption, .divider { display: none; }
+    .figure-block { margin: 0 0 12mm; max-width: none; page-break-inside: avoid; }
+    .figure-host { border: 0; box-shadow: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="gallery-header">
+  <h1>Shadow-Frog · screenshot gallery</h1>
+  <nav class="gallery-toc">
+    <a href="#fig0">Fig 0 · Sunburst</a>
+    <a href="#figtldr">TL;DR</a>
+    <a href="#fig1">Fig 1 · Shadow tree</a>
+    <a href="#fig2">Fig 2 · Dream loop</a>
+    <a href="#fig3">Fig 3 · Recall</a>
+    <a href="#fig3hl">Fig 3 · Recall (single case)</a>
+    <a href="#fig4">Fig 4 · SWE-Smith</a>
+    <a href="#fig4hl">Fig 4 · SWE-Smith (judge only)</a>
+    <a href="#figverdict">Verdict donut</a>
+    <a href="#fig5">Fig 5 · Bug-fix</a>
+    <a href="#fig6">Fig 6 · Radar</a>
+    <a href="#fig6e">Fig 6 · Radar (ensemble only)</a>
+    <a href="#fig7">Fig 7 · Locality</a>
+  </nav>
+</div>
+
+<!-- =================================================================== -->
+<section class="figure-block" id="fig0">
+  <div class="figure-label"><span class="num">Figure 0</span> &nbsp;|&nbsp; Dream sunburst</div>
+  <div class="figure-host fit-viewport">
+    <iframe src="fig0-hero-sunburst-wide.html?v=2" title="xarray dream lineage sunburst (n = 115 dreams)"
+            loading="lazy"></iframe>
+  </div>
+  <div class="figure-caption"><strong>Figure 0 — A dream campaign in the wild.</strong> One repo's full lineage sunburst (pydata/xarray, <em>n</em> = 115 dreams). Each slice is one autonomous dream; rings move outward as later dreams branch off earlier ones; color marks the kind of work the dream explored.</div>
+</section>
+<hr class="divider">
+
+<!-- =================================================================== -->
+<section class="figure-block tldr" id="figtldr">
+  <div class="figure-label"><span class="num">TL;DR</span> &nbsp;|&nbsp; Headline numbers</div>
+  <div class="figure-host">
+    <iframe src="fig-tldr.html?v=3" title="Three-panel results summary"
+            style="height: 280px;" loading="lazy"></iframe>
+  </div>
+  <div class="figure-caption"><strong>Figure TL;DR — Headline numbers.</strong> 97.6% recall at 8 tool calls (Shadow-Frog). 88% module / 22% exact function on 50 real bugs from SWE-Bench Verified. +25.4 ppts blind bug hunting on SWE-Smith (wins 15/20 repos).</div>
+</section>
+<hr class="divider">
+
+<!-- =================================================================== -->
+<section class="figure-block shadow-tree" id="fig1">
+  <div class="figure-label"><span class="num">Figure 1</span> &nbsp;|&nbsp; Shadow tree</div>
+  <div class="figure-host">
+    <iframe src="fig1-shadow-tree.html?v=4" title="Shadow mirrors the source tree"
+            style="height: 740px;" loading="lazy"></iframe>
+  </div>
+  <div class="figure-caption"><strong>Figure 1 — Shadow mirrors the source tree.</strong> Every source file pairs with a sibling markdown in <code>.shadow/</code>; cross-cutting discoveries live in <code>.shadow/_cross/</code> and anchor to specific <code>file::symbol</code> locations on both sides.</div>
+</section>
+<hr class="divider">
+
+<!-- =================================================================== -->
+<section class="figure-block radar" id="fig2">
+  <div class="figure-label"><span class="num">Figure 2</span> &nbsp;|&nbsp; Dream loop</div>
+  <div class="figure-host">
+  <img class="svg-figure" src="fig2-discovery-loop.svg?v=4" alt="Discovery loop: imagine, run, distill, merge. Inset: compounding dreams branch from earlier dreams.">
+  </div>
+  <div class="figure-caption"><strong>Figure 2 — The discovery loop.</strong> Imagine a task, execute on a dedicated git branch, distill into a discovery, merge into the shadow. Inset: later dreams branch from earlier ones, inheriting both code and shadow.</div>
+</section>
+<hr class="divider">
+
+<!-- =================================================================== -->
+<section class="figure-block wide" id="fig3">
+  <div class="figure-label"><span class="num">Figure 3</span> &nbsp;|&nbsp; Recall sweep</div>
+  <div class="figure-host" style="background: #f8fafc; padding: 10px;">
+    <iframe src="fig3-recall.html?v=3" title="Recall sweep on django"
+            style="height: 640px; background: transparent;" loading="lazy"></iframe>
+  </div>
+  <div class="figure-caption"><strong>Figure 3 — Recall on django.</strong> Rows: file path given vs must search. Columns: shadow size (50 → 35k needles). x-axis: tool-call budget (1 → ∞). At an 8-call budget on the 2,500-needle shadow: Shadow-Frog <strong>97.6%</strong>, flat 36.2%, no-shadow 12.4%.</div>
+</section>
+<hr class="divider">
+
+<!-- =================================================================== -->
+<section class="figure-block" id="fig3hl">
+  <div class="figure-label"><span class="num">Figure 3 (single case)</span> &nbsp;|&nbsp; Recall &mdash; file path given, 2,500-needle shadow</div>
+  <div class="figure-host" style="background: #f8fafc; padding: 10px;">
+    <iframe src="fig3-recall-single.html?v=2" title="Recall on django, single case"
+            style="height: 580px; background: transparent;" loading="lazy"></iframe>
+  </div>
+  <div class="figure-caption"><strong>Figure 3 (single-case variant) — Recall on django, realistic case only.</strong> Drops the 2&times;5 grid of small panels in favor of a single, larger chart for the file-path-given &times; 2,500-needle cell. Cleaner option for slides and screenshots.</div>
+</section>
+<hr class="divider">
+
+<!-- =================================================================== -->
+<section class="figure-block wide" id="fig4">
+  <div class="figure-label"><span class="num">Figure 4</span> &nbsp;|&nbsp; SWE-Smith curves</div>
+  <div class="figure-host" style="background: #f8fafc; padding: 10px;">
+    <iframe src="fig4-swesmith.html?v=2" title="SWE-Smith budget curves"
+            style="height: 500px; background: transparent;" loading="lazy"></iframe>
+  </div>
+  <div class="figure-caption"><strong>Figure 4 — SWE-Smith budget curves.</strong> Three panels (file match, function match, judge verdict). Baseline vs Shadow-Frog across 10 budget levels. +25.4 ppts at the strict tier (71.5% vs 46.0%); wins 15 of 20 repos.</div>
+</section>
+<hr class="divider">
+
+<!-- =================================================================== -->
+<section class="figure-block" id="fig4hl">
+  <div class="figure-label"><span class="num">Figure 4 (judge only)</span> &nbsp;|&nbsp; SWE-Smith &mdash; judge verdict</div>
+  <div class="figure-host" style="background: #f8fafc; padding: 10px;">
+    <iframe src="fig4-swesmith-judge.html?v=2" title="SWE-Smith judge verdict only"
+            style="height: 580px; background: transparent;" loading="lazy"></iframe>
+  </div>
+  <div class="figure-caption"><strong>Figure 4 (judge-only variant) — SWE-Smith judge verdict only.</strong> Drops the three-panel grid in favor of a single, larger chart for the strict-tier judge verdict. Cleaner option for slides and screenshots.</div>
+</section>
+<hr class="divider">
+
+<!-- =================================================================== -->
+<section class="figure-block" id="figverdict">
+  <div class="figure-label"><span class="num">Verdict donut</span> &nbsp;|&nbsp; SWE-Bench bug hunting (50 tasks)</div>
+  <div class="figure-host" style="background: #f8fafc; padding: 10px;">
+    <iframe src="fig-verdict.html?v=2" title="Bug hunting verdict distribution"
+            style="height: 460px; background: transparent;" loading="lazy"></iframe>
+  </div>
+  <div class="figure-caption"><strong>Verdict donut — blind bug hunting on 50 SWE-Bench Verified tasks.</strong> The LLM judge sorts each task into one of four tiers, labeled by what they actually mean (rather than the &sect;3A code names IDENTIFIED / ADJACENT / AREA / MISSED). The aggregated &ldquo;Judge &ge; AREA&rdquo; headline of 88% is the top three slices combined; the strict-tier headline of 22% is the red slice alone.</div>
+</section>
+<hr class="divider">
+
+<!-- =================================================================== -->
+<section class="figure-block" id="fig5">
+  <div class="figure-label"><span class="num">Figure 5</span> &nbsp;|&nbsp; Bug-fix funnel</div>
+  <div class="figure-host">
+    <img class="svg-figure" src="fig5-bugfix.svg" alt="Bug-fix outcomes and hint-delivery funnel.">
+  </div>
+  <div class="figure-caption"><strong>Figure 5 — Where the +4.7 ppts comes from.</strong> Left: per-task outcomes on 50 SWE-Bench Verified tasks (6 Shadow-Frog wins, 2 baseline wins, 1 tie, 7 both-fail, 34 both-pass). Right: hint-delivery funnel: 50 tasks → 23 with hints delivered → 12 opened → 2 judged relevant → 1 actually changes the outcome.</div>
+</section>
+<hr class="divider">
+
+<!-- =================================================================== -->
+<section class="figure-block radar" id="fig6">
+  <div class="figure-label"><span class="num">Figure 6</span> &nbsp;|&nbsp; Ideation radar</div>
+  <div class="figure-host" style="background: #f8fafc; padding: 10px;">
+    <iframe src="fig6-radar.html" title="Ideation radar"
+            style="height: 560px; background: transparent;" loading="lazy"></iframe>
+  </div>
+  <div class="figure-caption"><strong>Figure 6 — Blind-judged quality profile.</strong> Shadow-Frog tilts toward Insight (all 8 repos) and User Impact (all 8 repos); its Groundedness gap largely dissolves when controlling for problem size. Human ideas are rewritten into the same format before judging.</div>
+</section>
+<hr class="divider">
+
+<!-- =================================================================== -->
+<section class="figure-block radar" id="fig6e">
+  <div class="figure-label"><span class="num">Figure 6 (ensemble only)</span> &nbsp;|&nbsp; Ideation radar &mdash; slide variant</div>
+  <div class="figure-host" style="background: #f8fafc; padding: 10px;">
+    <iframe src="fig6-radar-ensemble.html?v=3" title="Ideation radar, ensemble judge only"
+            style="height: 580px; background: transparent;" loading="lazy"></iframe>
+  </div>
+  <div class="figure-caption"><strong>Figure 6 (ensemble-only variant) — Slide-ready radar.</strong> Drops the interactive judge selector, the side deltas table, and the rubric panel in favor of one larger radar (ensemble judge only) with a compact per-axis values table directly below the chart. No hover required to read the numbers.</div>
+</section>
+<hr class="divider">
+
+<!-- =================================================================== -->
+<section class="figure-block" id="fig7">
+  <div class="figure-label"><span class="num">Figure 7</span> &nbsp;|&nbsp; Change locality</div>
+  <div class="figure-host">
+    <img class="svg-figure" src="fig7-locality.svg" alt="Change locality by arm.">
+  </div>
+  <div class="figure-caption"><strong>Figure 7 — Change locality by arm.</strong> Where each system tends to make changes: Baseline and Shadow-Frog both lean toward New Feature work; humans diversify across DX/Tooling, Operational Quality, and Internal Machinery.</div>
+</section>
+
+</body>
+</html>

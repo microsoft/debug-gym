@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fig 3 &mdash; Recall on django</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", sans-serif;
+         background: #ffffff; color: #1a1a2e; padding: 8px 14px 14px; }
+  h1 { font-size: 14px; font-weight: 600; text-align: center; margin-bottom: 2px; color: #1a1a2e; }
+  .sub { font-size: 11.5px; color: #6b7280; text-align: center; margin-bottom: 10px; }
+  .grid { display: grid; grid-template-columns: 28px repeat(5, 1fr); gap: 6px;
+          margin-bottom: 6px; }
+  .colhead { font-size: 10.5px; color: #6b7280; text-align: center; font-weight: 600;
+             padding-bottom: 2px; }
+  .rowhead { writing-mode: vertical-rl; transform: rotate(180deg);
+             font-size: 10.5px; color: #6b7280; font-weight: 600;
+             display: flex; align-items: center; justify-content: center; }
+  .panel { background: #fafafa; border: 1px solid #e5e7eb; border-radius: 4px;
+           padding: 4px 6px 6px; min-width: 0; position: relative; }
+  .panel-canvas-wrap { position: relative; height: 158px; min-width: 0; }
+  .panel-badge { position: absolute; top: -7px; left: 50%; transform: translateX(-50%);
+                 background: #10b981; color: #fff; font-size: 9px; font-weight: 700;
+                 padding: 1px 6px; border-radius: 8px; letter-spacing: 0.3px;
+                 white-space: nowrap; }
+  .controls { display: flex; justify-content: center; align-items: center; gap: 16px;
+              font-size: 12px; color: #4b5563; padding: 6px 0; flex-wrap: wrap; }
+  .controls label { cursor: pointer; user-select: none; }
+  .controls input { vertical-align: middle; margin-right: 4px; }
+  .legend { display: flex; justify-content: center; gap: 18px;
+            font-size: 12px; color: #1a1a2e; margin-top: 4px; flex-wrap: wrap; }
+  .legend-item { display: flex; align-items: center; gap: 6px; }
+  .legend-swatch { width: 20px; height: 3px; border-radius: 2px; }
+  .note { text-align: center; font-size: 11.5px; color: #1a1a2e; margin-top: 8px; }
+  .note .pill { display: inline-block; background: #10b981; color: #fff;
+                font-size: 10px; font-weight: 700; padding: 1px 6px;
+                border-radius: 8px; vertical-align: 1px; letter-spacing: 0.3px; }
+  @media (max-width: 720px) {
+    .grid { grid-template-columns: 1fr; }
+    .colhead, .rowhead { display: none; }
+  }
+</style>
+</head><body>
+<h1>Navigation recall on django &mdash; Shadow-Frog vs flat vs no-shadow</h1>
+<div class="sub">Rows: task framing &middot; Columns: shadow size &middot; x-axis: tool-call budget (1 &rarr; &infin;) &middot; y-axis: recall &middot; bands: 95% bootstrap confidence interval</div>
+
+<div class="grid" id="grid"></div>
+
+<div class="controls">
+  <label><input type="checkbox" id="toggleCI" checked> Show 95% confidence intervals</label>
+  <span style="color:#9ca3af;">&middot;</span>
+  <span>Hover any point for the exact recall (n=83 needles per cell).</span>
+</div>
+
+<div class="legend">
+  <div class="legend-item"><div class="legend-swatch" style="background:#9467BD;"></div>No shadow</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:#FB8C00;"></div>Flat shadow</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:#2CA02C;"></div>Shadow-Frog</div>
+</div>
+
+<div class="note"><span class="pill">★ HEADLINE</span> &nbsp;Realistic case: file path given, 2,500-needle shadow, <strong>budget of just 8 tool calls</strong> &mdash; Shadow-Frog reaches <strong>97.6%</strong>, flat shadow only <strong>36.2%</strong>, no-shadow <strong>12.4%</strong>. The flat&rarr;Shadow-Frog gap dissolves only at much higher budgets &mdash; at realistic budgets, shadow <em>structure</em> matters as much as shadow <em>content</em>.</div>
+
+<script>
+const DATA = {"given":{"50":{"per_file_shadow":{"m":[0.0,0.0,0.12,1.0,1.0,1.0,1.0],"lo":[0.0,0.0,0.0,1.0,1.0,1.0,1.0],"hi":[0.0,0.0,0.28,1.0,1.0,1.0,1.0]},"no_shadow":{"m":[0.0,0.0,0.0,0.06,0.28,0.14,0.04],"lo":[0.0,0.0,0.0,0.0,0.12,0.02,0.0],"hi":[0.0,0.0,0.0,0.16,0.46,0.3,0.12]},"flat_shadow":{"m":[0.0,0.0,0.08,0.88,1.0,1.0,1.0],"lo":[0.0,0.0,0.0,0.76,1.0,1.0,1.0],"hi":[0.0,0.0,0.2,1.0,1.0,1.0,1.0]}},"400":{"per_file_shadow":{"m":[0.0,0.0,0.3438,0.9688,1.0,1.0,1.0],"lo":[0.0,0.0,0.1875,0.9062,1.0,1.0,1.0],"hi":[0.0,0.0,0.5,1.0,1.0,1.0,1.0]},"no_shadow":{"m":[0.0,0.0,0.0,0.1094,0.2552,0.151,0.0781],"lo":[0.0,0.0,0.0,0.0312,0.1172,0.0521,0.0078],"hi":[0.0,0.0,0.0,0.2006,0.4089,0.2734,0.1562]},"flat_shadow":{"m":[0.0,0.0,0.0,0.25,0.9766,1.0,1.0],"lo":[0.0,0.0,0.0,0.0938,0.9297,1.0,1.0],"hi":[0.0,0.0,0.0,0.4062,1.0,1.0,1.0]}},"2500":{"per_file_shadow":{"m":[0.0,0.0,0.2169,0.9759,1.0,1.0,1.0],"lo":[0.0,0.0,0.1325,0.9398,1.0,1.0,1.0],"hi":[0.0,0.0,0.3133,1.0,1.0,1.0,1.0]},"no_shadow":{"m":[0.0,0.0,0.0,0.1241,0.1711,0.1717,0.1259],"lo":[0.0,0.0,0.0,0.0651,0.0946,0.1018,0.0614],"hi":[0.0,0.0,0.0,0.1922,0.241,0.247,0.1928]},"flat_shadow":{"m":[0.0,0.0,0.012,0.362,0.9669,0.9831,0.9373],"lo":[0.0,0.0,0.0,0.2681,0.9277,0.9518,0.8795],"hi":[0.0,0.0,0.0361,0.459,0.994,1.0,0.9855]}},"10000":{"per_file_shadow":{"m":[0.0,0.0,0.1446,0.988,1.0,1.0,1.0],"lo":[0.0,0.0,0.0723,0.9639,1.0,1.0,1.0],"hi":[0.0,0.0,0.2169,1.0,1.0,1.0,1.0]},"no_shadow":{"m":[0.0,0.0,0.0,0.0732,0.1831,0.2,0.0723],"lo":[0.0,0.0,0.0,0.0292,0.1096,0.1225,0.0241],"hi":[0.0,0.0,0.0,0.1254,0.2657,0.2777,0.1325]},"flat_shadow":{"m":[0.0,0.0,0.0482,0.2669,0.9749,0.9849,0.9381],"lo":[0.0,0.0,0.012,0.1759,0.9448,0.9639,0.887],"hi":[0.0,0.0,0.0964,0.3614,0.997,1.0,0.9786]}},"35461":{"per_file_shadow":{"m":[0.0,0.0,0.0602,0.8554,0.9986,1.0,0.997],"lo":[0.0,0.0,0.012,0.7831,0.9957,1.0,0.9932],"hi":[0.0,0.0,0.1205,0.9277,1.0,1.0,1.0]},"no_shadow":{"m":[0.0,0.0,0.0,0.0899,0.1613,0.112,0.0652],"lo":[0.0,0.0,0.0,0.0482,0.0988,0.0603,0.0287],"hi":[0.0,0.0,0.0,0.1401,0.2275,0.1737,0.1106]},"flat_shadow":{"m":[0.0,0.0,0.012,0.2254,0.9439,0.9845,0.9563],"lo":[0.0,0.0,0.0,0.1401,0.8994,0.9621,0.9185],"hi":[0.0,0.0,0.0361,0.3188,0.977,0.998,0.989]}}},"must_search":{"50":{"per_file_shadow":{"m":[0.0,0.0,0.2083,0.9167,1.0,1.0,1.0],"lo":[0.0,0.0,0.0417,0.7917,1.0,1.0,1.0],"hi":[0.0,0.0,0.375,1.0,1.0,1.0,1.0]},"no_shadow":{"m":[0.0,0.0,0.0417,0.1667,0.5417,0.6667,0.625],"lo":[0.0,0.0,0.0,0.0417,0.3333,0.4583,0.4167],"hi":[0.0,0.0,0.125,0.3333,0.75,0.8333,0.8333]},"flat_shadow":{"m":[0.0,0.0,0.125,1.0,1.0,1.0,1.0],"lo":[0.0,0.0,0.0,1.0,1.0,1.0,1.0],"hi":[0.0,0.0,0.25,1.0,1.0,1.0,1.0]}},"400":{"per_file_shadow":{"m":[0.0,0.0,0.3103,0.931,1.0,1.0,1.0],"lo":[0.0,0.0,0.1379,0.8276,1.0,1.0,1.0],"hi":[0.0,0.0,0.4828,1.0,1.0,1.0,1.0]},"no_shadow":{"m":[0.0,0.0,0.0345,0.3103,0.4483,0.4828,0.7586],"lo":[0.0,0.0,0.0,0.1379,0.2759,0.3103,0.5862],"hi":[0.0,0.0,0.1034,0.4828,0.6552,0.6552,0.8966]},"flat_shadow":{"m":[0.0,0.0,0.0,0.6552,1.0,1.0,1.0],"lo":[0.0,0.0,0.0,0.4828,1.0,1.0,1.0],"hi":[0.0,0.0,0.0,0.8276,1.0,1.0,1.0]}},"2500":{"per_file_shadow":{"m":[0.0,0.0,0.1205,0.6988,0.9518,0.988,0.988],"lo":[0.0,0.0,0.0602,0.6145,0.9036,0.9639,0.9639],"hi":[0.0,0.0,0.1928,0.7831,0.988,1.0,1.0]},"no_shadow":{"m":[0.0,0.0,0.0361,0.1205,0.3976,0.5904,0.6747],"lo":[0.0,0.0,0.0,0.0482,0.2892,0.4819,0.5783],"hi":[0.0,0.0,0.0843,0.1928,0.506,0.6867,0.7831]},"flat_shadow":{"m":[0.0,0.0,0.0482,0.5422,0.988,1.0,0.988],"lo":[0.0,0.0,0.012,0.4337,0.9639,1.0,0.9639],"hi":[0.0,0.0,0.0964,0.6386,1.0,1.0,1.0]}},"10000":{"per_file_shadow":{"m":[0.0,0.0,0.0241,0.5181,0.9277,0.9518,0.9759],"lo":[0.0,0.0,0.0,0.4217,0.8675,0.9036,0.9398],"hi":[0.0,0.0,0.0602,0.6265,0.9759,0.988,1.0]},"no_shadow":{"m":[0.0,0.0,0.0,0.1325,0.3976,0.6145,0.6988],"lo":[0.0,0.0,0.0,0.0602,0.2892,0.506,0.6024],"hi":[0.0,0.0,0.0,0.2048,0.494,0.7108,0.7831]},"flat_shadow":{"m":[0.0,0.0,0.0241,0.3976,0.9157,0.9518,0.988],"lo":[0.0,0.0,0.0,0.3012,0.8554,0.9036,0.9639],"hi":[0.0,0.0,0.0602,0.506,0.9759,0.988,1.0]}},"35461":{"per_file_shadow":{"m":[0.0,0.0,0.012,0.494,0.8554,0.9277,0.9398],"lo":[0.0,0.0,0.0,0.3976,0.7831,0.8675,0.8795],"hi":[0.0,0.0,0.0361,0.5904,0.9277,0.9759,0.988]},"no_shadow":{"m":[0.0,0.0,0.0,0.1928,0.4458,0.6506,0.6747],"lo":[0.0,0.0,0.0,0.1205,0.3494,0.5542,0.5663],"hi":[0.0,0.0,0.0,0.2771,0.5422,0.747,0.7711]},"flat_shadow":{"m":[0.0,0.0,0.0,0.3133,0.8193,0.9398,0.988],"lo":[0.0,0.0,0.0,0.2048,0.7229,0.8916,0.9639],"hi":[0.0,0.0,0.0,0.4096,0.9036,0.988,1.0]}}}};
+
+const SIZES = ["50","400","2500","10000","35461"];
+const SIZE_LABELS = {"50":"50 needles","400":"400 needles","2500":"2,500 needles","10000":"10k needles","35461":"35k needles"};
+const HINTS = ["given","must_search"];
+const HINT_LABELS = {"given":"file path given","must_search":"agent must search"};
+const BUDGETS = ["1","2","4","8","16","32","∞"];
+const ARMS = [
+  {key:"no_shadow",      label:"No shadow",       color:"#9467BD", soft:"rgba(148,103,189,0.16)"},
+  {key:"flat_shadow",    label:"Flat shadow",     color:"#FB8C00", soft:"rgba(251,140,0,0.16)"},
+  {key:"per_file_shadow",label:"Shadow-Frog", color:"#2CA02C", soft:"rgba(44,160,44,0.16)"},
+];
+
+// Build grid DOM
+const grid = document.getElementById("grid");
+grid.appendChild(document.createElement("div")); // corner
+for (const s of SIZES) {
+  const h = document.createElement("div");
+  h.className = "colhead";
+  h.textContent = SIZE_LABELS[s];
+  grid.appendChild(h);
+}
+for (const h of HINTS) {
+  const rh = document.createElement("div");
+  rh.className = "rowhead";
+  rh.textContent = HINT_LABELS[h];
+  grid.appendChild(rh);
+  for (const s of SIZES) {
+    const p = document.createElement("div");
+    p.className = "panel";
+    if (h === "given" && s === "2500") {
+      p.style.borderColor = "#10b981";
+      p.style.background = "#ecfdf5";
+      const badge = document.createElement("div");
+      badge.className = "panel-badge";
+      badge.textContent = "★ HEADLINE";
+      p.appendChild(badge);
+    }
+    const w = document.createElement("div");
+    w.className = "panel-canvas-wrap";
+    const c = document.createElement("canvas");
+    c.id = "c_" + h + "_" + s;
+    w.appendChild(c);
+    p.appendChild(w);
+    grid.appendChild(p);
+  }
+}
+
+function makeDatasets(hint, size, showCI) {
+  const cell = DATA[hint][size];
+  const out = [];
+  for (const arm of ARMS) {
+    const d = cell[arm.key];
+    out.push({
+      label: arm.label,
+      data: d.m.map(v => v * 100),
+      borderColor: arm.color, backgroundColor: arm.color,
+      pointRadius: 1.8, pointHoverRadius: 4, borderWidth: 1.8, tension: 0.15,
+      order: 2,
+    });
+    if (showCI) {
+      out.push({
+        label: arm.label + " CI",
+        data: d.hi.map(v => v * 100),
+        borderColor: "transparent", pointRadius: 0, fill: "+1",
+        backgroundColor: arm.soft, order: 4, tension: 0.15,
+      });
+      out.push({
+        label: arm.label + " CI lo",
+        data: d.lo.map(v => v * 100),
+        borderColor: "transparent", pointRadius: 0, fill: false, order: 5, tension: 0.15,
+      });
+    }
+  }
+  return out;
+}
+
+function makeOptions(hint, size) {
+  const isLeftCol = size === "50";
+  const isBottomRow = hint === "must_search";
+  return {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: "index", intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        callbacks: {
+          title: (items) => "Budget = " + items[0].label + "  ·  " + HINT_LABELS[hint] + ", " + SIZE_LABELS[size],
+          label: (ctx) => {
+            const arm = ARMS.find(a => a.label === ctx.dataset.label);
+            const d = DATA[hint][size][arm.key];
+            const i = ctx.dataIndex;
+            const m = (d.m[i]*100).toFixed(1);
+            const lo = (d.lo[i]*100).toFixed(1);
+            const hi = (d.hi[i]*100).toFixed(1);
+            return arm.label + ": " + m + "% (CI " + lo + "–" + hi + ")";
+          },
+        },
+      },
+    },
+    scales: {
+      x: { grid: { color: "#f0f0f0" },
+           ticks: { display: isBottomRow, font: { size: 9 }, color: "#6b7280",
+                    autoSkip: false, maxRotation: 0, minRotation: 0 } },
+      y: { min: 0, max: 100,
+           ticks: { display: isLeftCol, callback: v => v + "%", font: { size: 9 }, color: "#6b7280", stepSize: 25 },
+           grid: { color: "#f0f0f0" } },
+    },
+    layout: { padding: { left: 2, right: 2, top: 4, bottom: isBottomRow ? 0 : 2 } },
+  };
+}
+
+const charts = {};
+function build(showCI) {
+  for (const h of HINTS) for (const s of SIZES) {
+    const id = "c_" + h + "_" + s;
+    if (charts[id]) charts[id].destroy();
+    charts[id] = new Chart(document.getElementById(id), {
+      type: "line",
+      data: { labels: BUDGETS, datasets: makeDatasets(h, s, showCI) },
+      options: makeOptions(h, s),
+    });
+  }
+}
+
+build(true);
+document.getElementById("toggleCI").addEventListener("change", e => build(e.target.checked));
+</script>
+</body></html>

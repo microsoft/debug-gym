@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fig 4 — SWE-Smith budget curves</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", sans-serif;
+         background: #ffffff; color: #1a1a2e; padding: 8px 14px 14px; }
+  h1 { font-size: 14px; font-weight: 600; text-align: center; margin-bottom: 2px; color: #1a1a2e; }
+  .sub { font-size: 11.5px; color: #6b7280; text-align: center; margin-bottom: 14px; }
+  .panels { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; margin-bottom: 8px; }
+  .panel { background: #fafafa; border: 1px solid #e5e7eb; border-radius: 6px;
+           padding: 10px 12px 14px; min-width: 0; }
+  .panel-title { font-size: 12.5px; font-weight: 600; text-align: center; margin-bottom: 2px; }
+  .panel-sub { font-size: 11px; color: #6b7280; text-align: center; margin-bottom: 8px; min-height: 28px; }
+  .panel-canvas-wrap { position: relative; height: 230px; min-width: 0; }
+  .controls { display: flex; justify-content: center; align-items: center; gap: 16px;
+              font-size: 12px; color: #4b5563; padding: 6px 0; }
+  .controls label { cursor: pointer; user-select: none; }
+  .controls input { vertical-align: middle; margin-right: 4px; }
+  .legend { display: flex; justify-content: center; gap: 22px;
+            font-size: 12.5px; color: #1a1a2e; margin-top: 4px; }
+  .legend-item { display: flex; align-items: center; gap: 6px; }
+  .legend-swatch { width: 22px; height: 3px; border-radius: 2px; }
+  @media (max-width: 720px) {
+    .panels { grid-template-columns: 1fr; }
+    .panel-canvas-wrap { height: 200px; }
+  }
+</style>
+</head><body>
+<h1>SWE-Smith — knowledge compounds with budget</h1>
+<div class="sub">3 increasingly strict bug-identification metrics &middot; 20 repos &times; 100 injected bugs &middot; n=100 per cell &middot; bands are 95% confidence intervals</div>
+
+<div class="panels">
+  <div class="panel">
+    <div class="panel-title">Level 1 — file match</div>
+    <div class="panel-sub">Did any finding mention the buggy file? (keyword match)</div>
+    <div class="panel-canvas-wrap"><canvas id="c1"></canvas></div>
+  </div>
+  <div class="panel">
+    <div class="panel-title">Level 2 — function match</div>
+    <div class="panel-sub">Did any finding identify the buggy function? (keyword match)</div>
+    <div class="panel-canvas-wrap"><canvas id="c2"></canvas></div>
+  </div>
+  <div class="panel">
+    <div class="panel-title">Judge — verdict</div>
+    <div class="panel-sub">LLM judge: report is sufficient to fix the bug</div>
+    <div class="panel-canvas-wrap"><canvas id="c3"></canvas></div>
+  </div>
+</div>
+
+<div class="controls">
+  <label><input type="checkbox" id="toggleCI" checked> Show 95% confidence intervals</label>
+  <span style="color:#9ca3af;">&middot;</span>
+  <span>Hover any point for the exact value.</span>
+</div>
+
+<div class="legend">
+  <div class="legend-item"><div class="legend-swatch" style="background:#9467BD;"></div>Baseline</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:#2CA02C;"></div>Shadow-Frog</div>
+</div>
+
+<script>
+const SF = '#2CA02C';
+const BL = '#9467BD';
+const SF_SOFT = 'rgba(44,160,44,0.32)';
+const BL_SOFT = 'rgba(148,103,189,0.32)';
+const SF_EDGE = 'rgba(44,160,44,0.55)';
+const BL_EDGE = 'rgba(148,103,189,0.55)';
+
+const BUDGETS = [12, 24, 36, 48, 60, 72, 84, 96, 108, 120];
+
+const DATA = {
+  baseline: {
+    L1:    { mean: [49.0, 57.1, 62.1, 65.0, 68.6, 70.3, 70.7, 72.7, 74.1, 75.2],
+             std:  [27.2, 28.6, 28.0, 26.7, 26.0, 25.6, 25.2, 24.9, 25.0, 24.9] },
+    L2:    { mean: [36.0, 43.7, 48.1, 51.6, 54.7, 56.7, 57.0, 59.2, 60.6, 61.8],
+             std:  [25.7, 29.5, 30.2, 29.9, 29.9, 29.8, 29.3, 29.3, 29.5, 29.4] },
+    judge: { mean: [22.6, 33.2, 35.5, 36.9, 43.0, 40.5, 44.1, 46.0, 45.9, 46.9],
+             std:  [20.9, 26.0, 25.7, 25.3, 27.3, 25.9, 26.5, 27.2, 26.3, 26.0] },
+  },
+  shadowfrog: {
+    L1:    { mean: [46.0, 63.1, 73.2, 79.8, 84.7, 85.5, 86.2, 87.2, 88.0, 84.3],
+             std:  [28.9, 30.1, 27.9, 24.0, 21.6, 21.4, 20.9, 20.3, 20.2, 27.4] },
+    L2:    { mean: [26.4, 37.5, 48.9, 53.2, 62.5, 62.7, 64.7, 65.7, 67.7, 65.0],
+             std:  [19.1, 27.9, 27.4, 25.8, 27.4, 28.6, 28.9, 29.0, 26.8, 32.2] },
+    judge: { mean: [30.1, 51.0, 58.1, 60.0, 60.7, 63.3, 65.7, 71.5, 70.8, 68.0],
+             std:  [23.7, 27.0, 26.0, 24.3, 25.4, 22.2, 21.0, 21.9, 22.0, 22.3] },
+  },
+};
+
+const N_BUGS = 100;
+const ROOT_N = Math.sqrt(N_BUGS);
+
+function makeDatasets(metric, showCI) {
+  const bl = DATA.baseline[metric], sf = DATA.shadowfrog[metric];
+  const ciScale = 1.96 / ROOT_N;
+  const out = [
+    { label: 'Baseline',
+      data: bl.mean, borderColor: BL, backgroundColor: BL,
+      pointRadius: 3.4, pointHoverRadius: 5, borderWidth: 2.2, tension: 0.15,
+      order: 2 },
+    { label: 'Shadow-Frog',
+      data: sf.mean, borderColor: SF, backgroundColor: SF,
+      pointRadius: 3.4, pointHoverRadius: 5, borderWidth: 2.6, tension: 0.15,
+      order: 1 },
+  ];
+  if (showCI) {
+    out.push({
+      label: 'Baseline CI', data: bl.mean.map((m,i)=>m + bl.std[i]*ciScale),
+      borderColor: BL_EDGE, borderWidth: 1, borderDash: [3,3],
+      pointRadius: 0, fill: '+1',
+      backgroundColor: BL_SOFT, order: 4, tension: 0.15,
+    });
+    out.push({
+      label: 'Baseline CI lo', data: bl.mean.map((m,i)=>m - bl.std[i]*ciScale),
+      borderColor: BL_EDGE, borderWidth: 1, borderDash: [3,3],
+      pointRadius: 0, fill: false, order: 5, tension: 0.15,
+    });
+    out.push({
+      label: 'Shadow-Frog CI', data: sf.mean.map((m,i)=>m + sf.std[i]*ciScale),
+      borderColor: SF_EDGE, borderWidth: 1, borderDash: [3,3],
+      pointRadius: 0, fill: '+1',
+      backgroundColor: SF_SOFT, order: 6, tension: 0.15,
+    });
+    out.push({
+      label: 'Shadow-Frog CI lo', data: sf.mean.map((m,i)=>m - sf.std[i]*ciScale),
+      borderColor: SF_EDGE, borderWidth: 1, borderDash: [3,3],
+      pointRadius: 0, fill: false, order: 7, tension: 0.15,
+    });
+  }
+  return out;
+}
+
+function makeOptions(metric, isLeftPanel) {
+  return {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        filter: (item) => !item.dataset.label.includes('CI'),
+        callbacks: {
+          title: (items) => `Agent budget = ${items[0].label}`,
+          label: (ctx) => {
+            const v = ctx.parsed.y;
+            const ds = ctx.dataset.label;
+            const arm = ds === 'Baseline' ? 'baseline' : 'shadowfrog';
+            const std = DATA[arm][metric].std[ctx.dataIndex];
+            const ciHalf = (1.96 * std / ROOT_N);
+            return `${ds}: ${v.toFixed(1)}%  (95% CI ±${ciHalf.toFixed(1)})`;
+          },
+        },
+      },
+    },
+    scales: {
+      x: { title: { display: true, text: 'agent budget (sub-agents per task)', font: { size: 11 }, color: '#6b7280' },
+           grid: { color: '#f0f0f0' },
+           ticks: { font: { size: 10.5 }, color: '#6b7280', maxRotation: 0, minRotation: 0 } },
+      y: { min: 0, max: 100,
+           title: { display: isLeftPanel, text: 'score (%)', font: { size: 11 }, color: '#6b7280' },
+           ticks: { display: isLeftPanel, callback: v => v + '%', font: { size: 10.5 }, color: '#6b7280', stepSize: 20 },
+           grid: { color: '#f0f0f0' } },
+    },
+    layout: { padding: { left: 2, right: 2, top: 2, bottom: 0 } },
+  };
+}
+
+const charts = {};
+function build(showCI) {
+  ['L1','L2','judge'].forEach((m,i) => {
+    const id = 'c' + (i+1);
+    if (charts[id]) charts[id].destroy();
+    charts[id] = new Chart(document.getElementById(id), {
+      type: 'line',
+      data: { labels: BUDGETS, datasets: makeDatasets(m, showCI) },
+      options: makeOptions(m, i === 0),
+    });
+  });
+}
+
+build(true);
+document.getElementById('toggleCI').addEventListener('change', e => build(e.target.checked));
+</script>
+</body></html>

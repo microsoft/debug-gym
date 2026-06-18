@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fig 7 &mdash; Change Locality</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", sans-serif;
+         background: #ffffff; color: #1a1a2e; padding: 8px 14px 14px; }
+  h1 { font-size: 14px; font-weight: 600; text-align: center; margin-bottom: 2px; color: #1a1a2e; }
+  .sub { font-size: 11.5px; color: #6b7280; text-align: center; margin-bottom: 10px; }
+  .chart-wrap { position: relative; height: 200px; max-width: 1000px; margin: 0 auto; }
+  .annotation { text-align: center; font-size: 12px; color: #b45309; margin-top: 4px;
+                font-weight: 600; }
+  .legend { display: flex; justify-content: center; gap: 12px;
+            font-size: 11.5px; color: #1a1a2e; margin-top: 10px; flex-wrap: wrap; }
+  .legend-item { display: flex; align-items: center; gap: 5px; cursor: default; }
+  .legend-swatch { width: 14px; height: 14px; border-radius: 3px; }
+  .note { text-align: center; font-size: 10.5px; color: #9ca3af; margin-top: 8px; }
+  .glossary { font-size: 10.5px; color: #6b7280; text-align: center;
+              max-width: 900px; margin: 8px auto 0; line-height: 1.5; }
+</style>
+</head><body>
+<h1>Change Locality &mdash; what kind of work each arm proposes</h1>
+<div class="sub">Stacked bars showing 7-category single-tag distribution per arm. Each idea is assigned to exactly one category.</div>
+
+<div class="chart-wrap"><canvas id="chart"></canvas></div>
+<div class="annotation">Human ships <strong>36%</strong> as maintenance &amp; infrastructure (Developer Experience &amp; Tooling + Operational Quality) &mdash; basically invisible to both agent arms.</div>
+
+<div class="legend" id="legend"></div>
+<div class="glossary">
+  <em>API Surface</em> = user-facing signatures &amp; flags &middot;
+  <em>New Feature</em> = net-new capability &middot;
+  <em>Internal Machinery</em> = engine-room refactors &middot;
+  <em>Cross-Cutting</em> = changes touching many modules at once &middot;
+  <em>Ecosystem Bridge</em> = integrations with external systems &middot;
+  <em>DX &amp; Tooling</em> = build / test / lint / developer workflows &middot;
+  <em>Operational Quality</em> = reliability / observability / perf / security
+</div>
+<div class="note">Hover any segment for the arm, category, and exact percentage.</div>
+
+<script>
+const DATA = {
+  "Baseline":    {"API Surface": 26.1, "New Feature": 65.2, "Internal Machinery": 0.5, "Cross-Cutting": 0.6, "Ecosystem Bridge": 5.1, "DX & Tooling": 1.9, "Operational Quality": 0.6},
+  "Shadow-Frog": {"API Surface": 11.6, "New Feature": 75.2, "Internal Machinery": 2.2, "Cross-Cutting": 2.8, "Ecosystem Bridge": 2.4, "DX & Tooling": 3.8, "Operational Quality": 2.0},
+  "Human":       {"API Surface": 33.4, "New Feature": 12.0, "Internal Machinery": 9.3, "Cross-Cutting": 2.5, "Ecosystem Bridge": 6.7, "DX & Tooling": 21.8, "Operational Quality": 14.3},
+};
+const ARMS = ["Baseline", "Shadow-Frog", "Human"];
+const CATEGORIES = [
+  {key: "API Surface",         color: "#7E57C2", rubric: "User-facing signatures, flags, public APIs"},
+  {key: "New Feature",         color: "#EF5350", rubric: "Net-new capability not previously in the codebase"},
+  {key: "Internal Machinery",  color: "#5C6BC0", rubric: "Engine-room refactors, internal data structures, plumbing"},
+  {key: "Cross-Cutting",       color: "#26A69A", rubric: "Single change touching many modules at once"},
+  {key: "Ecosystem Bridge",    color: "#8D6E63", rubric: "Integrations with external systems, file formats, protocols"},
+  {key: "DX & Tooling",        color: "#FFA726", rubric: "Developer experience: build, test, lint, dev workflows"},
+  {key: "Operational Quality", color: "#66BB6A", rubric: "Reliability, observability, performance, security hardening"},
+];
+
+const datasets = CATEGORIES.map(cat => ({
+  label: cat.key,
+  data: ARMS.map(arm => DATA[arm][cat.key]),
+  backgroundColor: cat.color, borderColor: "#fff", borderWidth: 1,
+  rubric: cat.rubric,
+}));
+
+new Chart(document.getElementById("chart"), {
+  type: "bar",
+  data: { labels: ARMS, datasets: datasets },
+  options: {
+    indexAxis: "y",
+    responsive: true, maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        callbacks: {
+          title: (items) => items[0].dataset.label + "  ·  " + items[0].dataset.rubric,
+          label: (ctx) => ctx.label + ": " + ctx.parsed.x.toFixed(1) + "%",
+        },
+      },
+    },
+    scales: {
+      x: { stacked: true, min: 0, max: 100,
+           grid: { color: "#f0f0f0" },
+           ticks: { callback: v => v + "%", font: { size: 11 }, color: "#6b7280", stepSize: 20 } },
+      y: { stacked: true, grid: { display: false },
+           ticks: { font: { size: 13, weight: "600" }, color: "#1a1a2e" } },
+    },
+  },
+});
+
+// Build legend
+const lg = document.getElementById("legend");
+for (const cat of CATEGORIES) {
+  const item = document.createElement("div");
+  item.className = "legend-item";
+  item.innerHTML = '<div class="legend-swatch" style="background:' + cat.color + '"></div>' + cat.key;
+  lg.appendChild(item);
+}
+</script>
+</body></html>
