@@ -6,6 +6,7 @@ author: "MSR Montréal Froggy Team"
 reading_time: 20
 tags: ["Coding Agents", "Skills", "Software Engineering", "Copilot CLI"]
 description: "Shadow-Frog turns idle coding-agent time into autonomous discovery loops, building a shadow knowledge base for any codebase. We evaluate it across retrieval, bug hunting, bug fixing, and feature ideation."
+github_url: "https://github.com/microsoft/ShadowFrog"
 ---
 
 <style>

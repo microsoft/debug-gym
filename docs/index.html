@@ -120,16 +120,18 @@ title: "MSR Montréal - Froggy Team"
                 <span class="icon"><i class="fas fa-book-open"></i></span>
                 <span>Read Blog Post</span>
               </a>
-              <a href="{% if post.arxiv_url %}{{ post.arxiv_url }}{% elsif post.paper_local %}{{ post.paper_local | relative_url }}{% endif %}" target="_blank" class="button is-link">  
+              {% if post.arxiv_url or post.paper_local %}
+              <a href="{% if post.arxiv_url %}{{ post.arxiv_url }}{% elsif post.paper_local %}{{ post.paper_local | relative_url }}{% endif %}" target="_blank" class="button is-link">
                 <span class="icon"><i class="ai ai-arxiv"></i></span>
                 <span>Paper</span>
               </a>
-                {% if post.github_url %}
-                <a href="{{ post.github_url }}" target="_blank" class="button is-dark">
+              {% endif %}
+              {% if post.github_url %}
+              <a href="{{ post.github_url }}" target="_blank" class="button is-dark">
                 <span class="icon"><i class="fab fa-github"></i></span>
                 <span>Code</span>
-                </a>
-                {% endif %}
+              </a>
+              {% endif %}
                 {% if post.frogboss_url %}
                 <a href="{{ post.frogboss_url }}" target="_blank" class="button is-success">
                 <span class="icon"><i class="fas fa-frog"></i></span>
@@ -142,7 +144,6 @@ title: "MSR Montréal - Froggy Team"
                 <span>FrogMini-14B</span>
                 </a>
                 {% endif %}
-              </a>
             </div>
           </div>
         {% endcapture %}
