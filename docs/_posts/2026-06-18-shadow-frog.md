@@ -259,6 +259,8 @@ Dynamic workflows leave out three design choices central to ours. **Persistence.
 
 ## Citation
 
+Archived PDF snapshot: [https://doi.org/10.5281/zenodo.20779734](https://doi.org/10.5281/zenodo.20779734)
+
 <div class="project-bibtex" markdown="0" style="position: relative; padding-top: 1.5rem;">
   <button type="button" class="button is-primary is-small copy-btn"
     style="position: absolute; top: 1rem; right: 1rem;"
@@ -268,6 +270,7 @@ Dynamic workflows leave out three design choices central to ours. **Persistence.
   <pre class="project-bibtex__code"><code id="shadow-frog-bibtex" style="white-space: pre-wrap;">@misc{shadowfrog,
   title  = {Shadow-Frog: Coding Agents that Dream and Discover},
   url    = {https://microsoft.github.io/debug-gym/blog/2026/06/shadow-frog/},
+  doi    = {10.5281/zenodo.20779734},
   author = {Yuan, Xingdi and Vera, Fabio and Moldavskaya, Darya and Singh, Chinmay and Shi, Zhengyan and Caccia, Lucas and Pereira, Matheus and Kim, Minseon and Bowers, Emma and Côté, Marc-Alexandre and Sordoni, Alessandro},
   month  = {June},
   year   = {2026}
