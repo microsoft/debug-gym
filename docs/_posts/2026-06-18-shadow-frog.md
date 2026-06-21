@@ -195,7 +195,7 @@ Can the shadow help an agent imagine what to build next? We pin 8 open-source re
             loading="lazy"></iframe>
   </div>
   <figcaption style="text-align:left;font-size:0.92em;color:#555;margin-top:10px;line-height:1.5;">
-    <strong>Figure 6 &mdash; Blind-judged quality profile.</strong> Shadow-Frog tilts toward Insight and User Impact; its Groundedness gap largely dissolves when controlling for problem size. Human ideas (amber) are rewritten into the same format agents use before judging, so the comparison reflects substance rather than writing style.
+    <strong>Figure 5 &mdash; Blind-judged quality profile.</strong> Shadow-Frog tilts toward Insight and User Impact; its Groundedness gap largely dissolves when controlling for problem size. Human ideas (amber) are rewritten into the same format agents use before judging, so the comparison reflects substance rather than writing style.
   </figcaption>
 </figure>
 
