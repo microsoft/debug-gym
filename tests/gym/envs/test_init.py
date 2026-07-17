@@ -52,6 +52,11 @@ class TestSelectEnv:
         env_class = select_env("r2egym")
         assert env_class == R2EGymEnv
 
+    def test_select_r2e_env_alias(self):
+        """Test selecting R2EGymEnv with pond's canonical dataset name."""
+        env_class = select_env("r2e")
+        assert env_class == R2EGymEnv
+
     def test_select_free_env(self):
         """Test selecting FreeEnv."""
         env_class = select_env("FreeEnv")
@@ -91,6 +96,7 @@ class TestSelectEnv:
             "swesmith",
             "mini_nightmare",
             "r2egym",
+            "r2e",
             "FreeEnv",
         ]
 
