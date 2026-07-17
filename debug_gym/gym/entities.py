@@ -1,11 +1,21 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
+
+
+@dataclass
+class EvalDetails:
+    parsed_tests: dict[str, str]
+    n_parsed: int
+    n_passed: int
+    n_failed: int
+    reward: float
 
 
 @dataclass
 class EvalOutput:
     success: bool
     output: str
+    details: EvalDetails | None = field(default=None, compare=False)
 
 
 @dataclass
