@@ -343,3 +343,127 @@ def test_docker_terminal_nohup_without_redirection_may_timeout(tmp_path):
         terminal.run("pkill -f 'sleep 100'")
     finally:
         terminal.clean_up()
+
+
+@pytest.if_docker_running
+def test_docker_terminal_default_resource_limits():
+    """Test that default resource limits are set correctly."""
+    terminal = DockerTerminal(base_image="ubuntu:latest")
+    try:
+        assert terminal.mem_limit == "16G"
+        assert terminal.pids_limit == 4096
+        assert terminal.cpu_limit is None
+        assert terminal.container.status == "running"
+    finally:
+        terminal.clean_up()
+
+
+@pytest.if_docker_running
+def test_docker_terminal_custom_mem_limit(tmp_path):
+    """Test that custom mem_limit is applied to the container."""
+    working_dir = str(tmp_path)
+    terminal = DockerTerminal(
+        working_dir=working_dir, base_image="ubuntu:latest", mem_limit="512M"
+    )
+    try:
+        assert terminal.mem_limit == "512M"
+        assert terminal.container.status == "running"
+        # Verify the memory limit is applied inside the container via cgroup
+        success, output = terminal.run(
+            "cat /sys/fs/cgroup/memory.max 2>/dev/null || "
+            "cat /sys/fs/cgroup/memory/memory.limit_in_bytes 2>/dev/null",
+            timeout=5,
+        )
+        assert success is True
+        # 512M = 536870912 bytes
+        assert "536870912" in output
+    finally:
+        terminal.clean_up()
+
+
+@pytest.if_docker_running
+def test_docker_terminal_custom_pids_limit(tmp_path):
+    """Test that custom pids_limit is applied to the container."""
+    working_dir = str(tmp_path)
+    terminal = DockerTerminal(
+        working_dir=working_dir, base_image="ubuntu:latest", pids_limit=100
+    )
+    try:
+        assert terminal.pids_limit == 100
+        assert terminal.container.status == "running"
+        # Verify the PID limit via cgroup
+        success, output = terminal.run(
+            "cat /sys/fs/cgroup/pids.max 2>/dev/null || "
+            "cat /sys/fs/cgroup/pids/pids.max 2>/dev/null",
+            timeout=5,
+        )
+        assert success is True
+        assert "100" in output
+    finally:
+        terminal.clean_up()
+
+
+@pytest.if_docker_running
+def test_docker_terminal_pids_limit_none(tmp_path):
+    """Test that pids_limit=None allows unlimited PIDs."""
+    working_dir = str(tmp_path)
+    terminal = DockerTerminal(
+        working_dir=working_dir, base_image="ubuntu:latest", pids_limit=None
+    )
+    try:
+        assert terminal.pids_limit is None
+        assert terminal.container.status == "running"
+        # Container should run fine without PID limit
+        success, output = terminal.run("echo 'no pids limit'", timeout=5)
+        assert success is True
+        assert "no pids limit" in output
+    finally:
+        terminal.clean_up()
+
+
+@pytest.if_docker_running
+def test_docker_terminal_custom_cpu_limit(tmp_path):
+    """Test that custom cpu_limit is applied to the container."""
+    working_dir = str(tmp_path)
+    terminal = DockerTerminal(
+        working_dir=working_dir, base_image="ubuntu:latest", cpu_limit=2.0
+    )
+    try:
+        assert terminal.cpu_limit == 2.0
+        assert terminal.container.status == "running"
+        # Verify CPU quota via cgroup (2 cores = 200000 microseconds per 100000 period)
+        success, output = terminal.run(
+            "cat /sys/fs/cgroup/cpu.max 2>/dev/null || "
+            "cat /sys/fs/cgroup/cpu/cpu.cfs_quota_us 2>/dev/null",
+            timeout=5,
+        )
+        assert success is True
+        assert "200000" in output
+    finally:
+        terminal.clean_up()
+
+
+@pytest.if_docker_running
+def test_docker_terminal_resource_limits_via_select_terminal():
+    """Test that resource limits can be configured via select_terminal config dict."""
+    config = {
+        "type": "docker",
+        "mem_limit": "1G",
+        "pids_limit": 2048,
+        "cpu_limit": 1.5,
+    }
+    terminal = select_terminal(config)
+    try:
+        assert isinstance(terminal, DockerTerminal)
+        assert terminal.mem_limit == "1G"
+        assert terminal.pids_limit == 2048
+        assert terminal.cpu_limit == 1.5
+        # Verify config dict is not modified
+        assert config == {
+            "type": "docker",
+            "mem_limit": "1G",
+            "pids_limit": 2048,
+            "cpu_limit": 1.5,
+        }
+    finally:
+        terminal.clean_up()
