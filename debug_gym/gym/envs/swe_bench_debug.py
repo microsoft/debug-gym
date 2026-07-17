@@ -20,6 +20,7 @@ class SWEBenchDebugEnv(SWEBenchEnv):
         details = self._calculate_eval_details(
             output,
             assume_missing_p2p_passed=True,
+            require_markers=False,
         )
         self.last_eval = EvalOutput(success, output, details=details)
         return self.last_eval

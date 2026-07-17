@@ -1,8 +1,9 @@
+import base64
 from unittest.mock import MagicMock, patch
 
 import pytest
 from anyio import Path
-from swebench.harness.constants import TESTS_TIMEOUT
+from swebench.harness.constants import END_TEST_OUTPUT, START_TEST_OUTPUT, TESTS_TIMEOUT
 from swebench.harness.constants import TestStatus as SWETestStatus
 from swebench.harness.log_parsers import MAP_REPO_TO_PARSER
 
@@ -13,17 +14,6 @@ from debug_gym.gym.envs.swe_bench_debug import SWEBenchDebugEnv
 from debug_gym.gym.terminals.docker import DockerTerminal
 from debug_gym.gym.tools.tool import ToolCall
 from debug_gym.gym.tools.toolbox import Toolbox
-
-RUN_TESTS_SCRIPT = """\
-#!/bin/bash
-cd /testbed
-git checkout 0123456789abcdef tests/test_example.py
-git apply - <<'EOF'
-diff --git a/tests/test_example.py b/tests/test_example.py
-EOF
-pytest -rA tests/test_example.py
-git checkout 0123456789abcdef tests/test_example.py
-"""
 
 
 def make_swe_bench_env(env_class=SWEBenchEnv, **task_overrides):
@@ -44,8 +34,6 @@ def make_swe_bench_env(env_class=SWEBenchEnv, **task_overrides):
         "FAIL_TO_PASS": '["test_f2p"]',
         "PASS_TO_PASS": '["test_p2p"]',
         "environment_setup_commit": "",
-        "docker_image": "slimshetty/swebench-verified:test-image",
-        "run_tests": RUN_TESTS_SCRIPT,
         **task_overrides,
     }
     terminal = MagicMock(spec=DockerTerminal)
@@ -56,7 +44,11 @@ def make_swe_bench_env(env_class=SWEBenchEnv, **task_overrides):
     return env, terminal
 
 
-def test_setup_task_uses_dataset_image_and_accepts_test_lists():
+def marked_test_output(content: str = "results") -> str:
+    return f"before\n{START_TEST_OUTPUT}\n{content}\n{END_TEST_OUTPUT}\nafter"
+
+
+def test_setup_task_uses_official_image_and_accepts_test_lists():
     env, _ = make_swe_bench_env(
         FAIL_TO_PASS=["test_f2p"],
         PASS_TO_PASS=["test_p2p"],
@@ -64,28 +56,26 @@ def test_setup_task_uses_dataset_image_and_accepts_test_lists():
 
     env.setup_task()
 
-    assert env.base_image == "slimshetty/swebench-verified:test-image"
-    assert env.fail_to_pass == ["test_f2p"]
-    assert env.pass_to_pass == ["test_p2p"]
-    assert env.run_tests_script == RUN_TESTS_SCRIPT
-    assert env.use_image_runner
-
-
-def test_setup_task_preserves_legacy_dataset_and_image_fallback():
-    env, _ = make_swe_bench_env()
-    del env.task_data["docker_image"]
-    del env.task_data["run_tests"]
-
-    env.setup_task()
-
     assert (
         env.base_image == "swebench/sweb.eval.x86_64.astropy_1776_astropy-14096:latest"
     )
-    assert env.run_tests_script is None
-    assert not env.use_image_runner
+    assert env.fail_to_pass == ["test_f2p"]
+    assert env.pass_to_pass == ["test_p2p"]
+    assert START_TEST_OUTPUT in env.eval_script
+    assert END_TEST_OUTPUT in env.eval_script
+    assert env.test_patch in env.eval_script
+    assert "/run_tests.sh" not in env.eval_script
 
 
-def test_setup_terminal_batches_runner_setup_and_strips_future_history():
+def test_setup_task_allows_explicit_image_override():
+    env, _ = make_swe_bench_env(docker_image="registry.example/swebench:test-image")
+
+    env.setup_task()
+
+    assert env.base_image == "registry.example/swebench:test-image"
+
+
+def test_setup_terminal_uses_official_image_setup_and_strips_future_history():
     env, terminal = make_swe_bench_env()
     terminal.run.return_value = (True, "")
     env.setup_task()
@@ -97,17 +87,17 @@ def test_setup_terminal_batches_runner_setup_and_strips_future_history():
         for call in terminal.run.call_args_list
         if isinstance(call.args[0], list)
     ]
-    runner_setup = next(
+    image_setup = next(
         commands
         for commands in list_calls
-        if any("base64 -d > /run_tests.sh" in command for command in commands)
+        if "ln -s /opt/miniconda3/envs/testbed /root/.venv" in commands
     )
-    assert any("chmod +x /run_tests.sh" in command for command in runner_setup)
-    assert any(
-        "ln -s /opt/miniconda3/envs/testbed /root/.venv" in command
-        for command in runner_setup
+    assert "python -m pip install chardet" in image_setup
+    assert all(
+        "/run_tests.sh" not in command
+        for commands in list_calls
+        for command in commands
     )
-    assert "python -m pip install chardet" in runner_setup
 
     history_strip = next(
         commands
@@ -154,10 +144,10 @@ def test_setup_terminal_discovers_requests_certificate_directory():
     assert "lib/python3.9/site-packages" not in joined
 
 
-def test_eval_uses_image_runner_and_records_binary_grading_details():
+def test_eval_runs_official_eval_script_and_records_binary_grading_details():
     env, terminal = make_swe_bench_env()
     env.setup_task()
-    terminal.run.return_value = (True, f"{env.test_cmd}\nresults")
+    terminal.run.return_value = (True, marked_test_output())
 
     with patch.dict(
         MAP_REPO_TO_PARSER,
@@ -170,10 +160,17 @@ def test_eval_uses_image_runner_and_records_binary_grading_details():
     ):
         eval_output = env.eval()
 
-    assert any(
-        call.args[0] == "/run_tests.sh" and call.kwargs == {"timeout": env.run_timeout}
+    eval_call = next(
+        call
         for call in terminal.run.call_args_list
+        if isinstance(call.args[0], str) and "/bin/bash /eval.sh" in call.args[0]
     )
+    assert eval_call.kwargs == {"timeout": env.run_timeout}
+    encoded_script = (
+        eval_call.args[0].split("printf %s ", 1)[1].split(" | base64 -d", 1)[0]
+    )
+    assert base64.b64decode(encoded_script).decode() == env.eval_script
+    assert "/run_tests.sh" not in eval_call.args[0]
     assert eval_output.details is not None
     assert eval_output.details.reward == 1
     assert eval_output.details.n_fail_to_pass == 1
@@ -195,17 +192,10 @@ def test_eval_returns_zero_for_swebench_runner_failure_sentinel():
     assert details.parsed_tests == {}
 
 
-def test_eval_preserves_legacy_hidden_test_path():
+def test_eval_requires_official_output_markers():
     env, terminal = make_swe_bench_env()
-    del env.task_data["docker_image"]
-    del env.task_data["run_tests"]
     env.setup_task()
-    terminal.run.side_effect = [
-        (True, ""),
-        (True, ""),
-        (True, f"{env.test_cmd}\nresults"),
-        (True, ""),
-    ]
+    terminal.run.return_value = (True, "results")
 
     with patch.dict(
         MAP_REPO_TO_PARSER,
@@ -218,18 +208,13 @@ def test_eval_preserves_legacy_hidden_test_path():
     ):
         eval_output = env.eval()
 
-    commands = [call.args[0] for call in terminal.run.call_args_list]
-    assert env.entrypoint in commands
-    assert any(command.startswith("git apply -") for command in commands)
-    assert env.EVAL_COMMAND not in commands
     assert eval_output.details is not None
-    assert eval_output.details.reward == 1
+    assert eval_output.details.reward == 0
+    assert eval_output.details.parsed_tests == {}
 
 
-def test_legacy_grading_preserves_missing_pass_to_pass_compatibility():
+def test_official_grading_requires_pass_to_pass_results():
     env, _ = make_swe_bench_env()
-    del env.task_data["docker_image"]
-    del env.task_data["run_tests"]
     env.setup_task()
 
     with patch.dict(
@@ -240,10 +225,56 @@ def test_legacy_grading_preserves_missing_pass_to_pass_compatibility():
             }
         },
     ):
-        details = env._calculate_eval_details(f"{env.test_cmd}\nresults")
+        details = env._calculate_eval_details(marked_test_output())
 
     assert details.parsed_tests == {"test_f2p": SWETestStatus.PASSED.value}
+    assert details.reward == 0
+
+
+def test_parser_falls_back_to_full_log_when_marker_body_has_no_results():
+    env, _ = make_swe_bench_env()
+    env.setup_task()
+    parsed_content = []
+
+    def parser(content, test_spec):
+        parsed_content.append(content)
+        if "outside-result" in content:
+            return {
+                "test_f2p": SWETestStatus.PASSED.value,
+                "test_p2p": SWETestStatus.PASSED.value,
+            }
+        return {}
+
+    output = (
+        f"outside-result\n{START_TEST_OUTPUT}\nno results\n"
+        f"{END_TEST_OUTPUT}\noutside-result"
+    )
+    with patch.dict(MAP_REPO_TO_PARSER, {"astropy/astropy": parser}):
+        details = env._calculate_eval_details(output)
+
+    assert len(parsed_content) == 2
+    assert "outside-result" not in parsed_content[0]
+    assert "outside-result" in parsed_content[1]
     assert details.reward == 1
+
+
+def test_new_test_files_are_removed_without_resetting_the_worktree():
+    test_patch = """\
+diff --git a/tests/test_new.py b/tests/test_new.py
+new file mode 100644
+--- /dev/null
++++ b/tests/test_new.py
+@@ -0,0 +1 @@
++def test_new(): pass
+"""
+    env, terminal = make_swe_bench_env(test_patch=test_patch)
+
+    env.setup_task()
+    env._restore_test_files()
+
+    assert f"git checkout {env.base_commit}" not in env.eval_script
+    assert env.eval_script.count("rm -f tests/test_new.py") == 2
+    terminal.run.assert_called_once_with(["rm -f tests/test_new.py"])
 
 
 def test_debug_eval_records_structured_grading_details():
@@ -283,7 +314,7 @@ def test_eval_binary_reward_requires_pass_to_pass_tests():
             }
         },
     ):
-        details = env._calculate_eval_details(f"{env.test_cmd}\nresults")
+        details = env._calculate_eval_details(marked_test_output())
 
     assert details.reward == 0
     assert env.calculate_max_score(MagicMock()) == 1
@@ -372,13 +403,11 @@ def test_load_dataset():
             "problem_statement",
             "hints_text",
             "created_at",
+            "difficulty",
             "version",
             "FAIL_TO_PASS",
             "PASS_TO_PASS",
             "environment_setup_commit",
-            "docker_image",
-            "parsed_commit",
-            "run_tests",
         ]
     )
 
@@ -393,7 +422,7 @@ def test_setup_task(get_swe_bench_env):
     assert env.version == "5.1"
     assert env.package_name == "astropy"
     assert env.base_image == (
-        "slimshetty/swebench-verified:" "sweb.eval.x86_64.astropy__astropy-14096"
+        "swebench/sweb.eval.x86_64.astropy_1776_astropy-14096:latest"
     )
 
 

@@ -6,12 +6,14 @@ import datasets
 import docker
 from swebench.harness.constants import (
     APPLY_PATCH_FAIL,
+    END_TEST_OUTPUT,
     FAIL_ONLY_REPOS,
     FAIL_TO_PASS,
     KEY_INSTANCE_ID,
     MAP_REPO_VERSION_TO_SPECS,
     PASS_TO_PASS,
     RESET_FAILED,
+    START_TEST_OUTPUT,
     TESTS_ERROR,
     TESTS_TIMEOUT,
     EvalType,
@@ -40,7 +42,7 @@ def _parse_test_list(value: str | list[str]) -> list[str]:
 
 class SWEBenchEnv(RepoEnv):
     CACHE = DEBUG_GYM_CACHE_DIR / "swe-bench"
-    EVAL_COMMAND = "/run_tests.sh"
+    EVAL_SCRIPT_PATH = "/eval.sh"
 
     def __init__(
         self,
@@ -79,12 +81,9 @@ class SWEBenchEnv(RepoEnv):
         self.test_patch = self.task_data["test_patch"]
         self.fail_to_pass = _parse_test_list(self.task_data["FAIL_TO_PASS"])
         self.pass_to_pass = _parse_test_list(self.task_data["PASS_TO_PASS"])
-        self.run_tests_script = self.task_data.get("run_tests")
-        self.use_image_runner = bool(
-            self.task_data.get("docker_image") or self.run_tests_script
-        )
         self.test_cmd = self.install_configs["test_cmd"]
         self.test_directives = get_test_directives(self.task_data)
+        self.eval_script = self._make_eval_script()
 
         self.entrypoint = " ".join([self.test_cmd, *self.test_directives])
 
@@ -124,11 +123,6 @@ class SWEBenchEnv(RepoEnv):
         self.terminal.base_image = self.base_image
         self.workspace.reset()
         self.set_entrypoints(self.entrypoint, self.debug_entrypoint)
-
-    @staticmethod
-    def _runner_install_command(script: str) -> str:
-        encoded = base64.b64encode(script.encode()).decode()
-        return f"printf %s {shlex.quote(encoded)} | base64 -d > /run_tests.sh"
 
     def _strip_future_git_history(self) -> None:
         target_commit = shlex.quote(self.base_commit or "HEAD")
@@ -198,17 +192,10 @@ class SWEBenchEnv(RepoEnv):
         self.terminal.session_commands.append("source /opt/miniconda3/bin/activate")
         self.terminal.session_commands.append("conda activate testbed")
 
-        setup_commands = []
-        if self.run_tests_script:
-            setup_commands.append(self._runner_install_command(self.run_tests_script))
-        if self.use_image_runner:
-            setup_commands.append("chmod +x /run_tests.sh")
-        setup_commands.extend(
-            [
-                "ln -s /opt/miniconda3/envs/testbed /root/.venv",
-                "python -m pip install chardet",
-            ]
-        )
+        setup_commands = [
+            "ln -s /opt/miniconda3/envs/testbed /root/.venv",
+            "python -m pip install chardet",
+        ]
         self.terminal.run(setup_commands, timeout=300, raises=True)
         self._strip_future_git_history()
 
@@ -245,51 +232,96 @@ class SWEBenchEnv(RepoEnv):
         self.logger.debug("Patch applied successfully.")
 
     @staticmethod
-    def _extract_files_from_patch(patch: str) -> list[str]:
-        """Extract unique file paths from a unified diff patch."""
-        files = []
+    def _get_test_files_from_patch(patch: str) -> tuple[list[str], list[str]]:
+        """Separate modified test files from files added by the test patch."""
+        modified_files = []
+        new_files = []
+        source_file = None
         for line in patch.splitlines():
-            if line.startswith("diff --git"):
-                # e.g. "diff --git a/tests/foo.py b/tests/foo.py"
-                parts = line.split()
-                if len(parts) >= 4:
-                    path = parts[-1].removeprefix("b/")
-                    if path not in files:
-                        files.append(path)
-        return files
+            if line.startswith("--- "):
+                source_file = line[4:].split("\t", 1)[0]
+            elif line.startswith("+++ ") and source_file is not None:
+                target_file = line[4:].split("\t", 1)[0]
+                if source_file == "/dev/null" and target_file.startswith("b/"):
+                    new_files.append(target_file[2:])
+                elif source_file.startswith("a/"):
+                    modified_files.append(source_file[2:])
+                source_file = None
+        return modified_files, new_files
+
+    def _test_reset_commands(self) -> list[str]:
+        modified_files, new_files = self._get_test_files_from_patch(self.test_patch)
+        commands = []
+        if modified_files:
+            commands.append(
+                f"git checkout {self.base_commit} {shlex.join(modified_files)}"
+            )
+        if new_files:
+            commands.append(f"rm -f {shlex.join(new_files)}")
+        return commands
+
+    def _make_eval_script(self) -> str:
+        """Generate the official eval script with current test reset semantics."""
+        commands = list(self.test_spec.eval_script_list)
+        reset_commands = self._test_reset_commands()
+        _, new_files = self._get_test_files_from_patch(self.test_patch)
+
+        def is_test_reset(command: str) -> bool:
+            if command.startswith(f"git checkout {self.base_commit}"):
+                return True
+            if not command.startswith("rm -f "):
+                return False
+            try:
+                return set(shlex.split(command)[2:]) == set(new_files)
+            except ValueError:
+                return False
+
+        apply_index = next(
+            index
+            for index, command in enumerate(commands)
+            if command.startswith("git apply -v - <<")
+        )
+        reset_start = apply_index
+        while reset_start > 0 and is_test_reset(commands[reset_start - 1]):
+            reset_start -= 1
+        commands[reset_start:apply_index] = reset_commands
+
+        end_index = commands.index(f": '{END_TEST_OUTPUT}'")
+        reset_end = end_index + 1
+        while reset_end < len(commands) and is_test_reset(commands[reset_end]):
+            del commands[reset_end]
+        commands[reset_end:reset_end] = reset_commands
+
+        return "\n".join(["#!/bin/bash", "set -uxo pipefail", *commands]) + "\n"
 
     def _restore_test_files(self) -> None:
-        test_files = self._extract_files_from_patch(self.test_patch)
-        if test_files:
-            self.terminal.run(f"git checkout -- {shlex.join(test_files)}")
+        reset_commands = self._test_reset_commands()
+        if reset_commands:
+            self.terminal.run(reset_commands)
 
     def eval(self, **kwargs) -> EvalOutput:
         self._restore_test_files()
-
-        if self.use_image_runner:
-            success, output = self.terminal.run(
-                self.EVAL_COMMAND, timeout=self.run_timeout
-            )
-        else:
-            self.terminal.run(f"git apply - <<'EOF'\n{self.test_patch}\nEOF")
-            success, output = self.terminal.run(
-                self.entrypoint, timeout=self.run_timeout
-            )
-
-        details = self._calculate_eval_details(
-            output,
-            assume_missing_p2p_passed=not self.use_image_runner,
+        encoded_script = base64.b64encode(self.eval_script.encode()).decode()
+        command = (
+            f"printf %s {shlex.quote(encoded_script)} | base64 -d "
+            f"> {self.EVAL_SCRIPT_PATH} && "
+            f"/bin/bash {self.EVAL_SCRIPT_PATH}; "
+            f"status=$?; rm -f {self.EVAL_SCRIPT_PATH}; exit $status"
         )
+        success, output = self.terminal.run(command, timeout=self.run_timeout)
+        details = self._calculate_eval_details(output)
         self.last_eval = EvalOutput(success, output, details=details)
         self._restore_test_files()
 
         return self.last_eval
 
-    def _get_logs_eval(self, content: str) -> tuple[dict[str, str], bool]:
+    def _get_logs_eval(
+        self,
+        content: str,
+        *,
+        require_markers: bool = True,
+    ) -> tuple[dict[str, str], bool]:
         log_parser = MAP_REPO_TO_PARSER[self.repo]
-        test_cmd = (
-            self.test_cmd[-1] if isinstance(self.test_cmd, list) else self.test_cmd
-        )
 
         bad_codes = [
             code
@@ -305,20 +337,34 @@ class SWEBenchEnv(RepoEnv):
             self.logger.error(f"Bad code found in log: {bad_codes}")
             return {}, False
 
-        content = content.split(test_cmd)[-1]
+        has_markers = START_TEST_OUTPUT in content and END_TEST_OUTPUT in content
+        if require_markers and not has_markers:
+            self.logger.error("Official SWE-bench test output markers not found.")
+            return {}, False
+
+        test_content = content
+        if has_markers:
+            test_content = content.split(START_TEST_OUTPUT, 1)[1].split(
+                END_TEST_OUTPUT, 1
+            )[0]
         self.logger.info(f"using swebench log_parser for repo: {self.repo}")
-        return log_parser(content, self.test_spec), True
+        status_map = log_parser(test_content, self.test_spec)
+        if has_markers and not status_map:
+            status_map = log_parser(content, self.test_spec)
+        return status_map, True
 
     def _calculate_eval_details(
         self,
         output: str,
         *,
-        assume_missing_p2p_passed: bool | None = None,
+        assume_missing_p2p_passed: bool = False,
+        require_markers: bool = True,
     ) -> EvalDetails:
-        test_status_map, found = self._get_logs_eval(output)
+        test_status_map, found = self._get_logs_eval(
+            output,
+            require_markers=require_markers,
+        )
         grading_status_map = dict(test_status_map)
-        if assume_missing_p2p_passed is None:
-            assume_missing_p2p_passed = not self.use_image_runner
         if assume_missing_p2p_passed:
             for test_name in self.pass_to_pass:
                 grading_status_map.setdefault(test_name, TestStatus.PASSED.value)
@@ -365,8 +411,8 @@ class SWEBenchEnv(RepoEnv):
     @classmethod
     def load_dataset(
         cls,
-        dataset_id: str = "R2E-Gym/SWE-Bench-Verified",
-        dataset_revision: str = "1fe83d7d3cb55a5eac714155f360614b3b7c2ad2",
+        dataset_id: str = "SWE-bench/SWE-bench_Verified",
+        dataset_revision: str = "91aa3ed51b709be6457e12d00300a6a596d4c6a3",
         split: str = "test",
         problems: list | None = None,
         prepull_images: bool = False,
