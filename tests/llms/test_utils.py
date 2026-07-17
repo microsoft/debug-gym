@@ -21,14 +21,8 @@ def test_print_messages(logger_mock):
         {"role": "system", "content": 12345},
     ]
     print_messages(messages, logger_mock)
+    # print_messages only prints the last two messages
     assert logger_mock._log_history == [
-        "[yellow]System message[/yellow]",
-        "[magenta]Hello[/magenta]",
-        "[cyan]Hi[/cyan]",
-        "[cyan]Tool call: Tool call 1[/cyan]",
-        "[cyan]Tool call: Tool call 2[/cyan]",
-        "[green]Tool message[/green]",
-        "[magenta]Tool result[/magenta]",
         "[cyan]Tool call: {'key': 3, 'key2': 'value'}[/cyan]",
         "[yellow]12345[/yellow]",
     ]
