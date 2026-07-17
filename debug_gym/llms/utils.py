@@ -1,3 +1,5 @@
+import logging
+
 from debug_gym.logger import DebugGymLogger, log_with_color
 
 
@@ -180,7 +182,8 @@ def print_messages(messages: list[dict], logger: DebugGymLogger):
         cyan: user messages
         yellow: system message
     """
-    for m in messages:
+    # Only print the last two messages (assume single tool call per turn, so last two messages are most relevant).
+    for m in messages[-2:]:
         role = m["role"]
         if role == "tool":
             log_with_color(logger, m["content"], "green")

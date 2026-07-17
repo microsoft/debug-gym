@@ -38,16 +38,19 @@ def make_env_factory(env_name, worker_id, tmp_path_factory):
         env = env_class(task_data=task_data)
         return env
 
-    if worker_id == "master":
-        # Not running with pytest-xdist or we are in the master process
-        _make_env()
-    else:
-        # When running with pytest-xdist, synchronize between workers using a lock
-        root_tmp_dir = tmp_path_factory.getbasetemp().parent
-        lock_file = root_tmp_dir / f"{env_class.__name__}_init.lock"
-        with FileLock(str(lock_file)):
-            # Only the first worker to acquire the lock will initialize the environment
+    try:
+        if worker_id == "master":
+            # Not running with pytest-xdist or we are in the master process
             _make_env()
+        else:
+            # When running with pytest-xdist, synchronize between workers using a lock
+            root_tmp_dir = tmp_path_factory.getbasetemp().parent
+            lock_file = root_tmp_dir / f"{env_class.__name__}_init.lock"
+            with FileLock(str(lock_file)):
+                # Only the first worker to acquire the lock will initialize the environment
+                _make_env()
+    except FileNotFoundError as e:
+        pytest.skip(f"Could not load dataset (network or Hub unavailable): {e}")
 
     return _make_env
 
