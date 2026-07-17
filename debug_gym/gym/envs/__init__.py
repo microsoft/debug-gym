@@ -41,7 +41,7 @@ def select_env(env_type: str = None) -> type[RepoEnv]:
             return SWESmithEnv
         case "mini_nightmare":
             return MiniNightmareEnv
-        case "r2egym":
+        case "r2egym" | "r2e":
             return R2EGymEnv
         case "FreeEnv":
             return FreeEnv

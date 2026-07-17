@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, call, patch
 import numpy as np
 import pytest
 
-from debug_gym.gym.entities import EvalOutput, Event, Observation
+from debug_gym.gym.entities import EvalDetails, EvalOutput, Event, Observation
 from debug_gym.gym.envs import load_dataset, select_env
 from debug_gym.gym.envs.aider import AiderBenchmarkEnv
 from debug_gym.gym.envs.env import EnvInfo, EventHooks, RepoEnv, TooledEnv
@@ -288,6 +288,20 @@ def test_eval_success(tmp_path):
     env.reset()
     output = env.eval()
     assert output == EvalOutput(success=True, output="Hello, World!")
+
+
+def test_eval_output_details_do_not_affect_equality():
+    details = EvalDetails(
+        reward=1,
+        parsed_tests={"test_example": "PASSED"},
+        n_parsed=1,
+        n_passed=1,
+        n_failed=0,
+    )
+
+    assert EvalOutput(success=True, output="ok", details=details) == EvalOutput(
+        success=True, output="ok"
+    )
 
 
 def test_eval_timeout(tmp_path):
@@ -633,6 +647,9 @@ class TestSelectEnv:
 
     def test_select_env_r2egym(self):
         assert select_env("r2egym") == R2EGymEnv
+
+    def test_select_env_r2e_alias(self):
+        assert select_env("r2e") == R2EGymEnv
 
     def test_select_env_unknown(self):
         with pytest.raises(ValueError, match="Unknown environment unknown_env"):

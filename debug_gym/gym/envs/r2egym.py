@@ -9,7 +9,7 @@ import yaml
 from datasets import load_dataset, load_from_disk
 
 from debug_gym.constants import DEBUG_GYM_CACHE_DIR
-from debug_gym.gym.entities import EvalOutput
+from debug_gym.gym.entities import EvalDetails, EvalOutput
 from debug_gym.gym.envs.env import RepoEnv
 from debug_gym.gym.terminals.docker import DockerTerminal
 from debug_gym.gym.terminals.kubernetes import KubernetesTerminal
@@ -25,21 +25,25 @@ def decolor_dict_keys(key):
     return {decolor(k): v for k, v in key.items()}
 
 
-def parse_log_pytest(log: str | None) -> dict[str, str]:
+def _parse_log_pytest_with_optional_passes(
+    log: str | None,
+) -> tuple[dict[str, str], set[str]]:
     """
     Parser for test logs generated with pytest framework
 
     Args:
         log (str): log content
     Returns:
-        dict: test case to test status mapping
+        tuple: test statuses and expected-failure tests that may be absent from
+            legacy expected-output maps
     """
     # Ref: https://github.com/R2E-Gym/R2E-Gym/blob/main/src/r2egym/repo_analysis/execution_log_parser.py#L4
     if log is None:
-        return {}
+        return {}, set()
     test_status_map = {}
+    optional_passes = set()
     if "short test summary info" not in log:
-        return test_status_map
+        return test_status_map, optional_passes
     log = log.split("short test summary info")[1]
     log = log.strip()
     log = log.split("\n")
@@ -57,12 +61,22 @@ def parse_log_pytest(log: str | None) -> dict[str, str]:
                 test_name = line
             test_name = test_name.split(" - ")[0]
             test_status_map[test_name] = "ERROR"
+        elif "XFAIL" in line or "XPASS" in line:
+            test_name = ".".join(line.split("::")[1:]).split(" - ")[0]
+            test_status_map[test_name] = "PASSED"
+            optional_passes.add(test_name)
+    return test_status_map, optional_passes
+
+
+def parse_log_pytest(log: str | None) -> dict[str, str]:
+    test_status_map, _ = _parse_log_pytest_with_optional_passes(log)
     return test_status_map
 
 
 class R2EGymEnv(RepoEnv):
     CACHE = DEBUG_GYM_CACHE_DIR / "r2e-gym"
     CONFIG = importlib_files("debug_gym") / "gym" / "envs" / "configs" / "r2egym.yaml"
+    EVAL_COMMAND = "bash /root/run_tests.sh"
 
     def __init__(
         self,
@@ -95,13 +109,13 @@ class R2EGymEnv(RepoEnv):
 
     def setup_task(self):
         self.base_image = self.task_data["docker_image"]
-        self.package_name = self.task_data["repo_name"]
-        self.expected_output = json.loads(self.task_data["expected_output_json"])
-        self.expected_output = decolor_dict_keys(self.expected_output)
-        self.expected_output = {
-            k.split(" - ")[0]: self.expected_output[k]
-            for k in sorted(self.expected_output.keys())
-        }
+        self.package_name = self.task_data.get("repo_name", "")
+        self.expected_output = None
+        if "expected_output_json" in self.task_data:
+            self.expected_output = self._parse_expected_output(
+                self.task_data["expected_output_json"],
+                "task_data['expected_output_json']",
+            )
 
         self.commit_hash = self.task_data["commit_hash"]
 
@@ -134,6 +148,37 @@ class R2EGymEnv(RepoEnv):
 
         self.git_apply_cmd = f"git apply -"
 
+    @staticmethod
+    def _parse_expected_output(expected_json: str, source: str) -> dict[str, str]:
+        try:
+            expected_output = json.loads(expected_json)
+        except (json.JSONDecodeError, TypeError) as exc:
+            raise ValueError(
+                f"Invalid R2E expected output JSON from {source}."
+            ) from exc
+
+        expected_output = decolor_dict_keys(expected_output)
+        return {
+            key.split(" - ")[0]: expected_output[key] for key in sorted(expected_output)
+        }
+
+    def load_expected_output(self) -> None:
+        if self.expected_output is not None:
+            return
+
+        expected_output_path = f"{self.alt_path}/expected_test_output.json"
+        success, expected_json = self.terminal.run(
+            f"cat {shlex.quote(expected_output_path)}", timeout=300
+        )
+        if not success:
+            raise ValueError(
+                "R2E task has no expected_output_json and "
+                f"{expected_output_path} could not be read."
+            )
+        self.expected_output = self._parse_expected_output(
+            expected_json, expected_output_path
+        )
+
     def setup_workspace(self):
         self.terminal.task_name = self.task_name
         self.terminal.base_image = self.base_image
@@ -153,58 +198,48 @@ class R2EGymEnv(RepoEnv):
         repo_path_q = shlex.quote(self.repo_path)
         alt_path_q = shlex.quote(self.alt_path)
 
-        # create a symlink from repo_path/.venv to /root/.venv
-        self.terminal.run(f"ln -s {repo_path_q}/.venv {alt_path_q}/.venv")
-
-        self.terminal.run(
-            f"ln -s {repo_path_q}/.venv/bin/python {alt_path_q}/.local/bin/python"
-        )
-        self.terminal.run(
-            f"ln -s {repo_path_q}/.venv/bin/python {alt_path_q}/.local/bin/python3"
-        )
-        self.terminal.run(
-            f"find {repo_path_q}/.venv/bin -type f -executable -exec ln -sf {{}} {alt_path_q}/.local/bin/ \\;"
-        )
-
-        self.terminal.run("uv pip install chardet")
-
-        self.terminal.run("find . -name '*.pyc' -delete")
-        self.terminal.run("find . -name '__pycache__' -exec rm -rf {} +")
-
-        # also delete pycache and pyc from /r2e_tests
-        self.terminal.run("find /r2e_tests -name '*.pyc' -delete")
-        self.terminal.run("find /r2e_tests -name '__pycache__' -exec rm -rf {} +")
-
-        # move all skip files (if present) to /root
-        SKIP_FILES_NEW = [
-            "run_tests.sh",
-            "r2e_tests",
+        setup_commands = [
+            f"ln -s {repo_path_q}/.venv {alt_path_q}/.venv",
+            f"ln -s {repo_path_q}/.venv/bin/python {alt_path_q}/.local/bin/python",
+            f"ln -s {repo_path_q}/.venv/bin/python {alt_path_q}/.local/bin/python3",
+            f"find {repo_path_q}/.venv/bin -type f -executable -exec ln -sf {{}} {alt_path_q}/.local/bin/ \\;",
+            "uv pip install chardet",
+            "find . -name '*.pyc' -delete",
+            "find . -name '__pycache__' -exec rm -rf {} +",
+            (
+                "if [ -d /r2e_tests ]; then "
+                "find /r2e_tests -name '*.pyc' -delete; "
+                "find /r2e_tests -name '__pycache__' -exec rm -rf {} +; "
+                "fi"
+            ),
+            (
+                f"if [ -f {repo_path_q}/run_tests.sh ]; then "
+                f"mv {repo_path_q}/run_tests.sh {alt_path_q}/run_tests.sh; "
+                "fi"
+            ),
+            (
+                "if [ -d /r2e_tests ]; then "
+                f"rm -rf {alt_path_q}/r2e_tests {repo_path_q}/r2e_tests; "
+                f"mv /r2e_tests {alt_path_q}/r2e_tests; "
+                f"ln -s {alt_path_q}/r2e_tests {repo_path_q}/r2e_tests; "
+                "fi"
+            ),
+            "git config user.name 'debug-gym'",
+            "git config user.email '<>'",
         ]
-        for skip_file in SKIP_FILES_NEW:
-            skip_file_q = shlex.quote(skip_file)
-            self.terminal.run(
-                f"mv {repo_path_q}/{skip_file_q} {alt_path_q}/{skip_file_q}"
-            )
-
-        # r2e_tests are in the / directory, move them to /root
-        self.terminal.run(f"mv /r2e_tests {alt_path_q}/r2e_tests")
-
-        # make a softlink for /root/r2e_tests (if present)
-        self.terminal.run(f"ln -s {alt_path_q}/r2e_tests {repo_path_q}/r2e_tests")
+        self.terminal.run(setup_commands, timeout=300, raises=True)
 
         self.terminal.session_commands.append("source .venv/bin/activate")
 
-        self.terminal.run("git config user.name 'debug-gym'")
-        self.terminal.run("git config user.email '<>'")
-
         # Get the gold patch.
         _, self.gold_patch = self.terminal.run(
-            f"git diff HEAD {self.commit_hash}", raises=True
+            f"git diff HEAD {self.commit_hash}", timeout=300, raises=True
         )
 
         # Remove the remote so the agent won't see newer commits.
         # TODO: remove .git/ entirely?
-        self.terminal.run("git remote remove origin")
+        self.terminal.run("git remote remove origin", timeout=300)
+        self.load_expected_output()
 
     def apply_gold_patch(self):
         self.logger.debug(f"Applying gold patch to {self.working_dir}.")
@@ -216,12 +251,12 @@ class R2EGymEnv(RepoEnv):
         """Evaluates the current code using the provided entrypoint.
         Sets the last_eval and returns it.
         Override in subclasses for different behavior."""
-        success, output = self.terminal.run(self.entrypoint, timeout=self.run_timeout)
+        success, output = self.terminal.run(self.EVAL_COMMAND, timeout=self.run_timeout)
 
-        # success, output = self.terminal.run(f"bash {self.alt_path}/run_tests.sh", timeout=self.run_timeout)
         # Remove ANSI escape codes and \r characters
         output = re.sub(r"\x1b\[[0-9;]*m|\r", "", output)
-        self.last_eval = EvalOutput(success, output)
+        details = self._calculate_eval_details(output)
+        self.last_eval = EvalOutput(success, output, details=details)
         return self.last_eval
 
     def calculate_max_score(self, eval_output: EvalOutput) -> int:
@@ -229,28 +264,50 @@ class R2EGymEnv(RepoEnv):
         return 1
 
     def calculate_score(self, eval_output: EvalOutput) -> int:
-        parse = parse_log_pytest(eval_output.output)
+        if eval_output.details is not None:
+            return int(eval_output.details.reward)
+        return int(self._calculate_eval_details(eval_output.output).reward)
+
+    def _calculate_eval_details(self, output: str) -> EvalDetails:
+        if self.expected_output is None:
+            raise ValueError("R2E expected output has not been loaded.")
+
+        parse, optional_passes = _parse_log_pytest_with_optional_passes(output)
         parse = decolor_dict_keys(parse)
         parse = {k.split(" - ")[0]: parse[k] for k in sorted(parse.keys())}
+        optional_passes = set(decolor_dict_keys({key: None for key in optional_passes}))
+        optional_passes = {key.split(" - ")[0] for key in optional_passes}
+        graded_parse = {
+            key: status
+            for key, status in parse.items()
+            if key in self.expected_output or key not in optional_passes
+        }
 
         # Compare
-        if len(parse) != len(self.expected_output):
+        if len(graded_parse) != len(self.expected_output):
             reward = 0
         else:
             # If ANY mismatch, reward = 0, else = 1
             match = True
-            for k in parse.keys():
+            for k in graded_parse.keys():
                 if not k:
                     continue
                 if k not in self.expected_output:
                     match = False
                     break
-                if parse[k] != self.expected_output[k]:
+                if graded_parse[k] != self.expected_output[k]:
                     match = False
                     break
             reward = 1 if match else 0
 
-        return reward
+        n_passed = sum(status == "PASSED" for status in parse.values())
+        return EvalDetails(
+            parsed_tests=parse,
+            n_parsed=len(parse),
+            n_passed=n_passed,
+            n_failed=len(parse) - n_passed,
+            reward=reward,
+        )
 
     @classmethod
     def load_dataset(
