@@ -9,6 +9,9 @@ class EvalDetails:
     n_passed: int
     n_failed: int
     reward: float
+    n_fail_to_pass: int = 0
+    n_pass_to_pass: int = 0
+    grading_report: dict = field(default_factory=dict)
 
 
 @dataclass

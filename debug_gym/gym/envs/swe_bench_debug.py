@@ -17,7 +17,11 @@ class SWEBenchDebugEnv(SWEBenchEnv):
 
     def eval(self, **kwargs) -> EvalOutput:
         success, output = self.terminal.run(self.entrypoint, timeout=self.run_timeout)
-        self.last_eval = EvalOutput(success, output)
+        details = self._calculate_eval_details(
+            output,
+            assume_missing_p2p_passed=True,
+        )
+        self.last_eval = EvalOutput(success, output, details=details)
         return self.last_eval
 
     @classmethod

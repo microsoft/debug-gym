@@ -1,23 +1,46 @@
+import base64
 import json
+import shlex
 
 import datasets
 import docker
-from swebench.harness.constants import MAP_REPO_VERSION_TO_SPECS, TestStatus
+from swebench.harness.constants import (
+    APPLY_PATCH_FAIL,
+    FAIL_ONLY_REPOS,
+    FAIL_TO_PASS,
+    KEY_INSTANCE_ID,
+    MAP_REPO_VERSION_TO_SPECS,
+    PASS_TO_PASS,
+    RESET_FAILED,
+    TESTS_ERROR,
+    TESTS_TIMEOUT,
+    EvalType,
+    ResolvedStatus,
+    TestStatus,
+)
+from swebench.harness.grading import get_eval_tests_report, get_resolution_status
 from swebench.harness.log_parsers import MAP_REPO_TO_PARSER
 from swebench.harness.test_spec.python import get_test_directives
 from swebench.harness.test_spec.test_spec import make_test_spec
 
 from debug_gym.constants import DEBUG_GYM_CACHE_DIR
-from debug_gym.gym.entities import EvalOutput
+from debug_gym.gym.entities import EvalDetails, EvalOutput
 from debug_gym.gym.envs.env import RepoEnv
 from debug_gym.gym.terminals.docker import DockerTerminal
 from debug_gym.gym.terminals.kubernetes import KubernetesTerminal
 from debug_gym.gym.terminals.terminal import DebugGymLogger, Terminal
 from debug_gym.gym.utils import filter_problems
 
+PASSING_STATUSES = (TestStatus.PASSED.value, TestStatus.XFAIL.value)
+
+
+def _parse_test_list(value: str | list[str]) -> list[str]:
+    return json.loads(value) if isinstance(value, str) else list(value)
+
 
 class SWEBenchEnv(RepoEnv):
     CACHE = DEBUG_GYM_CACHE_DIR / "swe-bench"
+    EVAL_COMMAND = "/run_tests.sh"
 
     def __init__(
         self,
@@ -49,13 +72,17 @@ class SWEBenchEnv(RepoEnv):
         self.install_configs = MAP_REPO_VERSION_TO_SPECS[self.repo][self.version]
         self.gold_patch = self.task_data["patch"]
         self.test_spec = make_test_spec(self.task_data)
-        self.base_image = f"swebench/{self.test_spec.instance_image_key}".replace(
-            "__", "_1776_"
+        self.base_image = self.task_data.get("docker_image") or (
+            f"swebench/{self.test_spec.instance_image_key}".replace("__", "_1776_")
         )
         self.base_commit = self.task_data["base_commit"]
         self.test_patch = self.task_data["test_patch"]
-        self.fail_to_pass = json.loads(self.task_data["FAIL_TO_PASS"])
-        self.pass_to_pass = json.loads(self.task_data["PASS_TO_PASS"])
+        self.fail_to_pass = _parse_test_list(self.task_data["FAIL_TO_PASS"])
+        self.pass_to_pass = _parse_test_list(self.task_data["PASS_TO_PASS"])
+        self.run_tests_script = self.task_data.get("run_tests")
+        self.use_image_runner = bool(
+            self.task_data.get("docker_image") or self.run_tests_script
+        )
         self.test_cmd = self.install_configs["test_cmd"]
         self.test_directives = get_test_directives(self.task_data)
 
@@ -98,40 +125,118 @@ class SWEBenchEnv(RepoEnv):
         self.workspace.reset()
         self.set_entrypoints(self.entrypoint, self.debug_entrypoint)
 
+    @staticmethod
+    def _runner_install_command(script: str) -> str:
+        encoded = base64.b64encode(script.encode()).decode()
+        return f"printf %s {shlex.quote(encoded)} | base64 -d > /run_tests.sh"
+
+    def _strip_future_git_history(self) -> None:
+        target_commit = shlex.quote(self.base_commit or "HEAD")
+        commands = [
+            "git remote remove origin 2>/dev/null || true",
+            f"TARGET_COMMIT={target_commit}",
+            'TARGET_TIMESTAMP=$(git show -s --format=%ct "$TARGET_COMMIT")',
+            (
+                'git checkout --detach "$TARGET_COMMIT" 2>/dev/null '
+                "|| git checkout --detach 2>/dev/null || true"
+            ),
+            (
+                "git for-each-ref --format='delete %(refname)' "
+                "refs/heads refs/remotes "
+                "| git update-ref --stdin 2>/dev/null || true"
+            ),
+            (
+                "git tag -l | while read -r tag; do "
+                'TAG_COMMIT=$(git rev-list -n 1 "$tag") || continue; '
+                'TAG_TIME=$(git show -s --format=%ct "$TAG_COMMIT") || continue; '
+                'if [ "$TAG_TIME" -gt "$TARGET_TIMESTAMP" ]; then '
+                'git tag -d "$tag"; fi; done'
+            ),
+            "rm -f .git/FETCH_HEAD .git/ORIG_HEAD",
+            "git reflog expire --expire=now --all 2>/dev/null || true",
+            "git gc --prune=now 2>/dev/null || true",
+            "AFTER_TIMESTAMP=$((TARGET_TIMESTAMP + 1))",
+            (
+                "COMMIT_COUNT=$(git log --oneline --all "
+                '--after="@$AFTER_TIMESTAMP" | wc -l)'
+            ),
+            '[ "$COMMIT_COUNT" -eq 0 ] || exit 1',
+        ]
+        self.terminal.run(commands, timeout=300, raises=True)
+
+    def _setup_local_httpbin(self) -> None:
+        python = "/opt/miniconda3/envs/testbed/bin/python"
+        commands = [
+            (
+                f"{python} -m pip install "
+                "'httpbin[mainapp]==0.10.2' 'pytest-httpbin==2.1.0'"
+            ),
+            (
+                "CERT_DIR=$("
+                f'{python} -c "import pytest_httpbin.certs, os; '
+                'print(os.path.dirname(pytest_httpbin.certs.__file__))"'
+                ")"
+            ),
+            (
+                "(nohup gunicorn -b 127.0.0.1:80 -k gevent "
+                "httpbin:app > /dev/null 2>&1 &)"
+            ),
+            (
+                "(nohup gunicorn -b 127.0.0.1:443 "
+                "--certfile=$CERT_DIR/server.pem "
+                "--keyfile=$CERT_DIR/server.key "
+                "-k gevent httpbin:app > /dev/null 2>&1 &)"
+            ),
+            'echo "127.0.0.1    httpbin.org" >> /etc/hosts',
+            'echo "export CURL_CA_BUNDLE=" >> ~/.bashrc',
+        ]
+        self.terminal.run(commands, timeout=300, raises=True)
+
     def setup_terminal(self):
         self.logger.debug(f"Configuring {self.terminal}...")
 
         self.terminal.session_commands.append("source /opt/miniconda3/bin/activate")
         self.terminal.session_commands.append("conda activate testbed")
 
+        setup_commands = []
+        if self.run_tests_script:
+            setup_commands.append(self._runner_install_command(self.run_tests_script))
+        if self.use_image_runner:
+            setup_commands.append("chmod +x /run_tests.sh")
+        setup_commands.extend(
+            [
+                "ln -s /opt/miniconda3/envs/testbed /root/.venv",
+                "python -m pip install chardet",
+            ]
+        )
+        self.terminal.run(setup_commands, timeout=300, raises=True)
+        self._strip_future_git_history()
+
+        fixup_commands = []
         if self.package_name == "astropy":
-            self.terminal.run("sed -i '/^addopts = -p no:warnings/s/^/# /' setup.cfg")
+            fixup_commands.append(
+                "sed -i '/^addopts = -p no:warnings/s/^/# /' setup.cfg"
+            )
         elif self.package_name == "requests":
-            # To avoid using httpbin.org which is unresponsive at time.
-            self.terminal.run(
-                "pip install httpbin[mainapp]==0.10.2 pytest-httpbin==2.1.0"
-            )
-            # Use subshell () with background to properly detach in non-TTY mode
-            # The subshell exits immediately after launching the background process
-            self.terminal.run(
-                "(nohup gunicorn -b 127.0.0.1:80 -k gevent httpbin:app > /dev/null 2>&1 &)"
-            )
-            self.terminal.run(
-                "(nohup gunicorn -b 127.0.0.1:443 --certfile=/opt/miniconda3/envs/testbed/lib/python3.9/site-packages/pytest_httpbin/certs/server.pem --keyfile=/opt/miniconda3/envs/testbed/lib/python3.9/site-packages/pytest_httpbin/certs/server.key -k gevent httpbin:app > /dev/null 2>&1 &)"
-            )
-            self.terminal.run('echo "127.0.0.1    httpbin.org" >> /etc/hosts')
+            self._setup_local_httpbin()
         elif self.task_name == "pylint-dev__pylint-4661":
-            self.terminal.run("pip install appdirs==1.4.4")
+            fixup_commands.append("pip install appdirs==1.4.4")
         elif self.package_name == "sphinx" or self.package_name == "sympy":
-            self.terminal.run("pip install pytest")
+            fixup_commands.append("pip install pytest")
 
-        # Apply any changes needed to the install commands.
-        self.terminal.run("git config user.name 'debug-gym'")
-        self.terminal.run("git config user.email '<>'")
-        self.terminal.run(f"git commit -am 'Setting up {self.task_name}'")
+        if fixup_commands:
+            self.terminal.run(fixup_commands, timeout=300, raises=True)
 
-        # Remove the remote so the agent won't see newer commits.
-        self.terminal.run("git remote remove origin")
+        setup_commit = shlex.quote(f"Setting up {self.task_name}")
+        self.terminal.run(
+            [
+                "git config user.name 'debug-gym'",
+                "git config user.email '<>'",
+                f"git diff --quiet || git commit -am {setup_commit}",
+            ],
+            timeout=300,
+            raises=True,
+        )
 
     def apply_gold_patch(self):
         self.logger.debug(f"Applying gold patch to {self.working_dir}.")
@@ -153,57 +258,115 @@ class SWEBenchEnv(RepoEnv):
                         files.append(path)
         return files
 
-    def eval(self, **kwargs) -> EvalOutput:
-        # We need to apply the test patch before running any evaluation.
-        # Reset any changes made to test patch files.
+    def _restore_test_files(self) -> None:
         test_files = self._extract_files_from_patch(self.test_patch)
-        self.terminal.run(f"git checkout -- {' '.join(test_files)}")
+        if test_files:
+            self.terminal.run(f"git checkout -- {shlex.join(test_files)}")
 
-        # Apply official test patch (hidden until now)
-        self.terminal.run(f"git apply - <<'EOF'\n{self.test_patch}\nEOF")
+    def eval(self, **kwargs) -> EvalOutput:
+        self._restore_test_files()
 
-        success, output = self.terminal.run(self.entrypoint, timeout=self.run_timeout)
-        self.last_eval = EvalOutput(success, output)
+        if self.use_image_runner:
+            success, output = self.terminal.run(
+                self.EVAL_COMMAND, timeout=self.run_timeout
+            )
+        else:
+            self.terminal.run(f"git apply - <<'EOF'\n{self.test_patch}\nEOF")
+            success, output = self.terminal.run(
+                self.entrypoint, timeout=self.run_timeout
+            )
 
-        # Reset any changes made to test patch files.
-        self.terminal.run(f"git checkout -- {' '.join(test_files)}")
+        details = self._calculate_eval_details(
+            output,
+            assume_missing_p2p_passed=not self.use_image_runner,
+        )
+        self.last_eval = EvalOutput(success, output, details=details)
+        self._restore_test_files()
 
         return self.last_eval
 
+    def _get_logs_eval(self, content: str) -> tuple[dict[str, str], bool]:
+        log_parser = MAP_REPO_TO_PARSER[self.repo]
+        test_cmd = (
+            self.test_cmd[-1] if isinstance(self.test_cmd, list) else self.test_cmd
+        )
+
+        bad_codes = [
+            code
+            for code in (
+                APPLY_PATCH_FAIL,
+                RESET_FAILED,
+                TESTS_ERROR,
+                TESTS_TIMEOUT,
+            )
+            if code in content
+        ]
+        if bad_codes:
+            self.logger.error(f"Bad code found in log: {bad_codes}")
+            return {}, False
+
+        content = content.split(test_cmd)[-1]
+        self.logger.info(f"using swebench log_parser for repo: {self.repo}")
+        return log_parser(content, self.test_spec), True
+
+    def _calculate_eval_details(
+        self,
+        output: str,
+        *,
+        assume_missing_p2p_passed: bool | None = None,
+    ) -> EvalDetails:
+        test_status_map, found = self._get_logs_eval(output)
+        grading_status_map = dict(test_status_map)
+        if assume_missing_p2p_passed is None:
+            assume_missing_p2p_passed = not self.use_image_runner
+        if assume_missing_p2p_passed:
+            for test_name in self.pass_to_pass:
+                grading_status_map.setdefault(test_name, TestStatus.PASSED.value)
+        eval_ref = {
+            KEY_INSTANCE_ID: self.test_spec.instance_id,
+            FAIL_TO_PASS: self.fail_to_pass,
+            PASS_TO_PASS: self.pass_to_pass,
+        }
+        eval_type = (
+            EvalType.FAIL_ONLY
+            if self.test_spec.repo in FAIL_ONLY_REPOS
+            else EvalType.PASS_AND_FAIL
+        )
+        report = get_eval_tests_report(
+            grading_status_map,
+            eval_ref,
+            eval_type=eval_type,
+        )
+        reward = int(
+            found and get_resolution_status(report) == ResolvedStatus.FULL.value
+        )
+        n_passed = sum(
+            status in PASSING_STATUSES for status in test_status_map.values()
+        )
+        return EvalDetails(
+            parsed_tests=test_status_map,
+            n_parsed=len(test_status_map),
+            n_passed=n_passed,
+            n_failed=len(test_status_map) - n_passed,
+            reward=reward,
+            n_fail_to_pass=len(self.fail_to_pass),
+            n_pass_to_pass=len(self.pass_to_pass),
+            grading_report=report,
+        )
+
     def calculate_max_score(self, eval_output: EvalOutput) -> int:
-        return len(self.fail_to_pass)
+        return 1
 
     def calculate_score(self, eval_output: EvalOutput) -> int:
-        test_status_map = MAP_REPO_TO_PARSER[self.repo](
-            eval_output.output, self.test_spec
-        )
-        self.logger.debug(f"fail_to_pass: {self.fail_to_pass}")
-        self.logger.debug(f"Test status map: {test_status_map}")
-        f2p_score = sum(
-            1
-            for test in self.fail_to_pass
-            # *Do not* assume silent success for now as done in SWE-Bench grading.py
-            if test_status_map.get(test, TestStatus.ERROR.value)
-            in (TestStatus.PASSED.value, TestStatus.XFAIL.value)
-        )
-        p2p_score = sum(
-            1
-            for test in self.pass_to_pass
-            if test_status_map.get(test, TestStatus.PASSED.value)
-            in (TestStatus.PASSED.value, TestStatus.XFAIL.value)
-        )
-
-        # The final score is f2p_score only if all pass_to_pass tests passed.
-        score = f2p_score if p2p_score == len(self.pass_to_pass) else 0
-
-        assert score <= self.max_score
-        return score
+        if eval_output.details is not None:
+            return int(eval_output.details.reward)
+        return int(self._calculate_eval_details(eval_output.output).reward)
 
     @classmethod
     def load_dataset(
         cls,
-        dataset_id: str = "SWE-bench/SWE-bench_Verified",
-        dataset_revision: str = "99450355ca8c611021187a57ffac304b66666738",
+        dataset_id: str = "R2E-Gym/SWE-Bench-Verified",
+        dataset_revision: str = "1fe83d7d3cb55a5eac714155f360614b3b7c2ad2",
         split: str = "test",
         problems: list | None = None,
         prepull_images: bool = False,
@@ -221,19 +384,23 @@ class SWEBenchEnv(RepoEnv):
         for task_data in dataset.values():
             task_data["env_type"] = "swebench"
 
-        image_names = set(
-            f"sweb.eval.x86_64.{id.replace('__', '_1776_')}" for id in dataset
-        )
+        image_names = {
+            task_data.get("docker_image")
+            or (
+                f"swebench/sweb.eval.x86_64."
+                f"{instance_id.replace('__', '_1776_')}:latest"
+            )
+            for instance_id, task_data in dataset.items()
+        }
 
         if prepull_images:
             # Download all images needed for SWE-Bench.
             client = docker.from_env()
-            tagged_image_names = set(f"swebench/{name}:latest" for name in image_names)
 
             existing_images = set(
                 tag for image in client.images.list() for tag in image.tags
             )
-            missing_images = tagged_image_names - existing_images
+            missing_images = image_names - existing_images
             if missing_images:
                 if logger:
                     logger.info(f"Found {len(missing_images)} missing Docker images.")
