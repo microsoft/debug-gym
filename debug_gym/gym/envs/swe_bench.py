@@ -261,7 +261,7 @@ class SWEBenchEnv(RepoEnv):
         return commands
 
     def _make_eval_script(self) -> str:
-        """Generate the official eval script with current test reset semantics."""
+        """Backport the upstream new-test-file reset fix missing from 4.1.0."""
         commands = list(self.test_spec.eval_script_list)
         reset_commands = self._test_reset_commands()
         _, new_files = self._get_test_files_from_patch(self.test_patch)

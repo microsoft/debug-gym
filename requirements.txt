@@ -8,7 +8,7 @@ termcolor==3.1.0
 transformers==4.51.3
 tiktoken
 docker==7.1.0
-swebench==4.0.3
+swebench==4.1.0
 swesmith==0.0.4
 prompt_toolkit==3.0.51
 anthropic==0.51.0
