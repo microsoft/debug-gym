@@ -12,7 +12,7 @@ swebench==4.0.3
 swesmith==0.0.4
 # swesmith requires sglang, but sglang>0.5.2 pulls in heavy runtime
 # dependencies (torch, flashinfer) that fail to build.
-sglang==0.5.12.post1
+sglang==0.5.2
 prompt_toolkit==3.0.51
 anthropic==0.51.0
 jinja2==3.1.6
