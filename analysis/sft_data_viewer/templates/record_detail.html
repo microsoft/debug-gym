@@ -621,7 +621,7 @@
         // Create collapsible JSON viewer (adapted from json_log_viewer)
         function createCollapsibleJSON(obj, container, level = 0) {
             if (typeof obj !== 'object' || obj === null) {
-                container.innerHTML = formatJSONValue(obj);
+                appendJSONValue(container, obj);
                 return;
             }
 
@@ -629,7 +629,7 @@
             const keys = Object.keys(obj);
             
             if (keys.length === 0) {
-                container.innerHTML = isArray ? '[]' : '{}';
+                container.textContent = isArray ? '[]' : '{}';
                 return;
             }
 
@@ -638,7 +638,12 @@
             // Create header for collapsible section
             const header = document.createElement('div');
             header.className = 'collapsible';
-            header.innerHTML = `${isArray ? '[' : '{'} <span style="color: #666; font-size: 14px;">(${keys.length} items)</span>`;
+            header.appendChild(document.createTextNode(`${isArray ? '[' : '{'} `));
+            const countSpan = document.createElement('span');
+            countSpan.style.color = '#666';
+            countSpan.style.fontSize = '14px';
+            countSpan.textContent = `(${keys.length} items)`;
+            header.appendChild(countSpan);
             
             // Create content container
             const content = document.createElement('div');
@@ -658,7 +663,7 @@
                 if (typeof obj[key] === 'object' && obj[key] !== null) {
                     createCollapsibleJSON(obj[key], valueContainer, level + 1);
                 } else {
-                    valueContainer.innerHTML = formatJSONValue(obj[key]);
+                    appendJSONValue(valueContainer, obj[key]);
                 }
                 
                 item.appendChild(keySpan);
@@ -687,17 +692,24 @@
             container.appendChild(wrapper);
         }
 
-        function formatJSONValue(value) {
+        function appendJSONValue(container, value) {
+            const valueSpan = document.createElement('span');
             if (typeof value === 'string') {
-                return `<span class="json-string">"${value}"</span>`;
+                valueSpan.className = 'json-string';
+                valueSpan.textContent = `"${value}"`;
             } else if (typeof value === 'number') {
-                return `<span class="json-number">${value}</span>`;
+                valueSpan.className = 'json-number';
+                valueSpan.textContent = String(value);
             } else if (typeof value === 'boolean') {
-                return `<span class="json-boolean">${value}</span>`;
+                valueSpan.className = 'json-boolean';
+                valueSpan.textContent = String(value);
             } else if (value === null) {
-                return `<span class="json-null">null</span>`;
+                valueSpan.className = 'json-null';
+                valueSpan.textContent = 'null';
+            } else {
+                valueSpan.textContent = String(value);
             }
-            return value;
+            container.appendChild(valueSpan);
         }
 
         // Setup navigation functionality
@@ -812,7 +824,7 @@
                 if (jsonElement && jsonElement.textContent.trim()) {
                     try {
                         const jsonData = JSON.parse(jsonElement.textContent.trim());
-                        jsonElement.innerHTML = '';
+                        jsonElement.replaceChildren();
                         createCollapsibleJSON(jsonData, jsonElement);
                     } catch (e) {
                         // Keep original content if parsing fails, but clean up whitespace

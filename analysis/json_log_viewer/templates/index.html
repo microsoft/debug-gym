@@ -569,9 +569,11 @@
                 <a href="/statistics" class="change-file-btn">
                     <i class="fas fa-chart-bar"></i> Statistics
                 </a>
-                <a href="/change_file" class="change-file-btn">
-                    <i class="fas fa-exchange-alt"></i> Change File
-                </a>
+                <form method="post" action="{{ url_for('change_file') }}" style="display: inline;">
+                    <button type="submit" class="change-file-btn">
+                        <i class="fas fa-exchange-alt"></i> Change File
+                    </button>
+                </form>
             </div>
         </div>
 
@@ -975,6 +977,7 @@
                 
                 if (!data.error) {
                     const displayStepId = data.step_id ?? stepId;
+                    const safeDisplayStepId = escapeHTML(displayStepId);
                     const indexNote = displayStepId !== stepId
                         ? ` <span class="step-index-note">(index ${stepId})</span>`
                         : '';
@@ -1002,7 +1005,7 @@
                     ` : '';
 
                     detailsContainer.innerHTML = `
-                        <h3><i class="fas fa-search-plus"></i> Step ${displayStepId}${indexNote}</h3>
+                        <h3><i class="fas fa-search-plus"></i> Step ${safeDisplayStepId}${indexNote}</h3>
                         ${systemSection}
                         ${problemSection}
 
@@ -1106,7 +1109,7 @@
                     detailsContainer.innerHTML = `
                         <h3><i class="fas fa-exclamation-triangle"></i> Error</h3>
                         <div style="color: #e74c3c; padding: 20px;">
-                            <i class="fas fa-times-circle"></i> ${data.error}
+                            <i class="fas fa-times-circle"></i> ${escapeHTML(data.error)}
                         </div>
                     `;
                 }
@@ -1120,7 +1123,7 @@
                 detailsContainer.innerHTML = `
                     <h3><i class="fas fa-exclamation-triangle"></i> Error</h3>
                     <div style="color: #e74c3c; padding: 20px;">
-                        <i class="fas fa-times-circle"></i> Failed to load step data: ${error.message}
+                        <i class="fas fa-times-circle"></i> Failed to load step data: ${escapeHTML(error.message)}
                     </div>
                 `;
                 

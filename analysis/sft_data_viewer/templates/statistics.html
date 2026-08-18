@@ -258,9 +258,9 @@
         // Role Distribution Chart
         const roleCtx = document.getElementById('roleChart').getContext('2d');
         const roleData = {
-            labels: [{% for role in stats.role_counts.keys() %}'{{ role|title }}'{% if not loop.last %},{% endif %}{% endfor %}],
+            labels: {{ stats.role_counts.keys() | map('title') | list | tojson }},
             datasets: [{
-                data: [{% for count in stats.role_counts.values() %}{{ count }}{% if not loop.last %},{% endif %}{% endfor %}],
+                data: {{ stats.role_counts.values() | list | tojson }},
                 backgroundColor: [
                     '#6f42c1', '#0d6efd', '#198754', '#fd7e14', '#dc3545', '#ffc107'
                 ]
@@ -282,9 +282,9 @@
         // Criteria Combinations Chart
         const criteriaCtx = document.getElementById('criteriaChart').getContext('2d');
         const criteriaData = {
-            labels: [{% for combo in stats.criteria_combinations %}'{{ combo.criteria_text }}'{% if not loop.last %},{% endif %}{% endfor %}],
+            labels: {{ stats.criteria_combinations | map(attribute='criteria_text') | list | tojson }},
             datasets: [{
-                data: [{% for combo in stats.criteria_combinations %}{{ combo.count }}{% if not loop.last %},{% endif %}{% endfor %}],
+                data: {{ stats.criteria_combinations | map(attribute='count') | list | tojson }},
                 backgroundColor: [
                     '#198754', '#fd7e14', '#dc3545', '#6f42c1', '#0d6efd', '#ffc107', '#20c997', '#e83e8c'
                 ]

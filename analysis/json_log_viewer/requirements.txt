@@ -1,3 +1,2 @@
-flask
-flask-cors
-werkzeug
+Flask==3.1.3
+Werkzeug==3.1.6

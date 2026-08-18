@@ -40,7 +40,9 @@
                         {% if not is_shuffled %}
                         <a href="{{ url_for('index', shuffle='true') }}" class="btn btn-warning me-2" title="View trajectories in random order to see more diversity">🎲 Random Shuffle</a>
                         {% endif %}
-                        <a href="{{ url_for('change_file') }}" class="btn btn-secondary">📁 Change File</a>
+                        <form method="post" action="{{ url_for('change_file') }}" class="d-inline">
+                            <button type="submit" class="btn btn-secondary">📁 Change File</button>
+                        </form>
                     </div>
                 </div>
 
