@@ -197,6 +197,52 @@ def test_write_file_exceeding_max_command_length(workspace):
     assert file_path.read_text() == file_content_exceeding_max_command_length
 
 
+def test_write_file_does_not_execute_content(workspace):
+    file_path = workspace.working_dir / "payload.txt"
+    side_effect = workspace.working_dir / "side-effect"
+    file_content = (
+        "Unicode: café 世界 🚀\n"
+        "DEBUGGYM_EOF\n"
+        f"$(touch {side_effect}) `touch {side_effect}`; touch {side_effect}\n"
+        + ("large-content\n" * 200_000)
+    )
+
+    workspace.write_file("payload.txt", file_content)
+
+    assert file_path.read_bytes() == file_content.encode("utf-8")
+    assert not side_effect.exists()
+
+
+def test_write_file_rejects_symlink_escape(workspace, tmp_path):
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    link = workspace.working_dir / "escape"
+    try:
+        link.symlink_to(outside, target_is_directory=True)
+    except OSError as exc:
+        pytest.skip(f"Symlinks are unavailable: {exc}")
+
+    with pytest.raises(WorkspaceWriteError, match="outside the workspace"):
+        workspace.write_file("escape/payload.txt", "blocked")
+
+    assert not (outside / "payload.txt").exists()
+
+
+def test_write_file_replaces_hard_link_without_modifying_outside_file(
+    workspace, tmp_path
+):
+    outside = tmp_path / "outside.txt"
+    outside.write_text("outside", encoding="utf-8")
+    hard_link = workspace.working_dir / "hard-link.txt"
+    os.link(outside, hard_link)
+
+    workspace.write_file("hard-link.txt", "inside")
+
+    assert outside.read_text(encoding="utf-8") == "outside"
+    assert hard_link.read_text(encoding="utf-8") == "inside"
+    assert not hard_link.samefile(outside)
+
+
 def test_write_file_path_outside_workspace_relative(workspace):
     """Ensure path traversal attacks are blocked."""
     with pytest.raises(WorkspaceWriteError) as exc_info:

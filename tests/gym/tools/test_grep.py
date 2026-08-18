@@ -1,3 +1,5 @@
+from unittest.mock import Mock
+
 import pytest
 
 from debug_gym.gym.envs.local import LocalEnv
@@ -254,6 +256,34 @@ class TestGrepTool:
             "search limit reached" in result.observation
             or "Found 2 matches" in result.observation
         )
+
+    @pytest.mark.parametrize(
+        "max_results",
+        ["10; touch /tmp/grep-injection", "10.5", 0, -1, 10_001, True],
+    )
+    def test_grep_rejects_invalid_max_results_without_running_terminal(
+        self, max_results
+    ):
+        terminal = Mock()
+        environment = Mock(terminal=terminal)
+
+        result = GrepTool().use(environment, pattern="needle", max_results=max_results)
+
+        assert (
+            "max_results must be an integer between 1 and 10000" in result.observation
+        )
+        terminal.run.assert_not_called()
+
+    @pytest.mark.parametrize("max_results", [1, 10_000])
+    def test_grep_accepts_max_results_bounds(self, max_results):
+        terminal = Mock()
+        terminal.run.return_value = (True, "")
+        environment = Mock(terminal=terminal)
+
+        GrepTool().use(environment, pattern="needle", max_results=max_results)
+
+        command = terminal.run.call_args.args[0]
+        assert command.endswith(f" | head -{max_results}")
 
     def test_grep_no_matches_found(self, tmp_path, setup_grep_repo_env):
         """Test behavior when no matches are found"""

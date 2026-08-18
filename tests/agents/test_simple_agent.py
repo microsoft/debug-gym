@@ -3,8 +3,11 @@ from unittest.mock import Mock
 import pytest
 
 from debug_gym.agents.base_agent import AgentArgs
-from debug_gym.agents.simple_agent import SimpleAgent, describe_tools
-from debug_gym.gym.tools.tool import EnvironmentTool
+from debug_gym.agents.simple_agent import SimpleAgent, SimpleAgentArgs, describe_tools
+from debug_gym.gym.entities import Observation
+from debug_gym.gym.envs.env import EnvInfo, RepoEnv
+from debug_gym.gym.tools.tool import EnvironmentTool, ToolCall
+from debug_gym.llms.base import LLMResponse
 
 
 @pytest.fixture
@@ -50,6 +53,41 @@ def test_parse_fallback_and_exception(agent):
     assert not tool_calls
 
 
+@pytest.mark.parametrize(
+    ("schema", "value", "expected"),
+    [
+        ({"type": ["integer"]}, "42", 42),
+        ({"type": ["number"]}, "-1.5e2", -150.0),
+        ({"type": ["number"]}, "9" * 309, int("9" * 309)),
+        ({"type": ["boolean"]}, "true", True),
+        ({"type": ["boolean"]}, "0", False),
+        ({"type": ["integer", "null"]}, "null", None),
+    ],
+)
+def test_cast_param_converts_declared_scalar_types(schema, value, expected):
+    assert SimpleAgent._cast_param(value, schema) == expected
+
+
+@pytest.mark.parametrize(
+    ("schema", "value"),
+    [
+        ({"type": ["integer"]}, "10; command"),
+        ({"type": ["number"]}, "NaN"),
+        ({"type": ["number"]}, "1.2.3"),
+        ({"type": ["boolean"]}, "yes"),
+    ],
+)
+def test_cast_param_rejects_malformed_declared_scalar_types(schema, value):
+    with pytest.raises(ValueError, match="Expected"):
+        SimpleAgent._cast_param(value, schema)
+
+
+def test_cast_param_preserves_string_when_schema_explicitly_allows_it():
+    schema = {"type": ["string", "number"]}
+
+    assert SimpleAgent._cast_param("not-a-number", schema) == "not-a-number"
+
+
 class MockTool(EnvironmentTool):
     """Mock tool for testing."""
 
@@ -61,6 +99,137 @@ class MockTool(EnvironmentTool):
 
     def use(self, *args, **kwargs):
         pass
+
+
+class ParsingRecoveryEnv(RepoEnv):
+    def __init__(self, tool):
+        super().__init__(task_data={}, terminal=None)
+        self._tools = {tool.name: tool}
+
+    @property
+    def task_name(self):
+        return "parser-recovery"
+
+    @property
+    def instructions(self):
+        return "Recover from malformed model actions."
+
+    def reset(self, *, options=None):
+        self._reset_env_state()
+        self.step_observation = Observation("env", self.instructions)
+        self.all_observations = [self.step_observation]
+        self.infos = EnvInfo(
+            step_observation=self.step_observation,
+            all_observations=self.all_observations,
+            eval_observation=None,
+            current_breakpoints=self.current_breakpoints(),
+            action_reasoning=None,
+            action_content=None,
+            action_tool_call=None,
+            instructions=self.instructions,
+            score=0,
+            max_score=0,
+            terminated=False,
+            resolved=False,
+            tools=self.tools,
+        )
+        return self.infos
+
+
+@pytest.mark.parametrize(
+    ("model_response", "expected_error"),
+    [
+        (
+            (
+                "<function=grep><parameter=pattern>x</parameter>"
+                "<parameter=max_results>not-an-integer</parameter></function>"
+            ),
+            "Invalid value for parameter 'max_results': Expected integer",
+        ),
+        (
+            "<function=></function>",
+            "Malformed tool call: missing function name",
+        ),
+    ],
+)
+def test_run_recovers_from_malformed_tool_call(model_response, expected_error):
+    grep = MockTool(
+        name="grep",
+        description="Search files.",
+        arguments={
+            "pattern": {"type": ["string"], "description": "Pattern."},
+            "max_results": {"type": ["integer"], "description": "Result limit."},
+        },
+    )
+    env = ParsingRecoveryEnv(grep)
+    llm = Mock()
+    llm.return_value = LLMResponse(
+        prompt=[],
+        response=model_response,
+    )
+    llm.convert_observation_to_message.side_effect = lambda observation, *args: {
+        "role": "user",
+        "content": observation,
+    }
+    llm.convert_response_to_message.return_value = {
+        "role": "assistant",
+        "content": "",
+    }
+    llm.define_tools.return_value = []
+    agent = SimpleAgent(agent_args=SimpleAgentArgs(max_steps=1))
+    agent.logger = Mock()
+    agent.llm = llm
+
+    trajectory = agent.run(env)
+
+    assert len(trajectory["log"]) == 2
+    assert env.infos.action_tool_call == ToolCall(
+        id="invalid_tool_response",
+        name="invalid_tool_response",
+        arguments={"error": expected_error},
+    )
+    assert (
+        env.infos.step_observation.observation == f"Invalid tool call: {expected_error}"
+    )
+
+
+def test_model_cannot_spoof_invalid_tool_response_sentinel():
+    env = ParsingRecoveryEnv(
+        MockTool(name="grep", description="Search files.", arguments={})
+    )
+
+    message, tool_info = env.get_triggered_tools(
+        ToolCall(
+            id="None",
+            name="invalid_tool_response",
+            arguments={"error": "model supplied"},
+        )
+    )
+
+    assert (
+        message == "Tool 'invalid_tool_response' not found among available tools: grep."
+    )
+    assert tool_info is None
+
+
+def test_invalid_tool_response_is_not_serialized_as_an_available_tool():
+    agent = SimpleAgent(agent_args=SimpleAgentArgs(max_steps=1))
+    response = LLMResponse(
+        prompt=[],
+        response="The generated action was invalid.",
+        tool=ToolCall(
+            id="invalid_tool_response",
+            name="invalid_tool_response",
+            arguments={"error": "Invalid value"},
+        ),
+    )
+
+    message = agent.convert_response_to_message(response)
+
+    assert message == {
+        "role": "assistant",
+        "content": "The generated action was invalid.",
+    }
 
 
 def test_describe_tools_with_parameters():

@@ -144,11 +144,21 @@ jobs:
           pip install --upgrade pip
           pip install -e '.[dev]'
       - name: Run security regressions
+        env:
+          ALLOW_LOCAL_TERMINAL: true
+          DEBUG_GYM_DEBUG: 1
         run: |
           pytest -vv --timeout=600 \
             tests/analysis/test_json_log_viewer.py \
             tests/analysis/test_sft_data_viewer.py \
-            tests/analysis/test_viewer_file_access.py
+            tests/analysis/test_viewer_file_access.py \
+            tests/agents/test_simple_agent.py \
+            tests/gym/terminals/test_terminal.py::test_custom_terminal_must_implement_confined_write_bytes \
+            tests/gym/terminals/test_local_terminal.py::test_write_text_preserves_untrusted_content \
+            tests/gym/terminals/test_local_terminal.py::test_write_text_rejects_in_root_symlink \
+            tests/gym/terminals/test_local_terminal.py::test_write_text_rejects_symlinked_working_root \
+            tests/gym/terminals/test_docker.py::test_write_text_preserves_untrusted_content \
+            tests/gym/terminals/test_kubernetes.py::test_write_bytes_transfers_content_out_of_band
 
   report-coverage:
     runs-on: ubuntu-latest
