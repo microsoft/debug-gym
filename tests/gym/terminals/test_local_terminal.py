@@ -1,9 +1,37 @@
+import os
 import re
 
 import pytest
 
+import debug_gym.gym.terminals.local as local_module
 from debug_gym.gym.terminals.local import LocalTerminal
-from debug_gym.gym.terminals.terminal import UnrecoverableTerminalError
+from debug_gym.gym.terminals.terminal import (
+    TerminalError,
+    UnrecoverableTerminalError,
+)
+
+
+def test_local_terminal_requires_explicit_opt_in(monkeypatch):
+    monkeypatch.delenv("ALLOW_LOCAL_TERMINAL", raising=False)
+
+    with pytest.raises(TerminalError, match="ALLOW_LOCAL_TERMINAL=true"):
+        LocalTerminal()
+
+
+@pytest.mark.parametrize("value", ["", "yes", "1", "tru", "false"])
+def test_local_terminal_rejects_disabled_or_malformed_opt_in(monkeypatch, value):
+    monkeypatch.setenv("ALLOW_LOCAL_TERMINAL", value)
+
+    with pytest.raises(TerminalError, match="ALLOW_LOCAL_TERMINAL=true"):
+        LocalTerminal()
+
+
+def test_local_terminal_explicit_opt_in_allows_execution(monkeypatch, tmp_path):
+    monkeypatch.setenv("ALLOW_LOCAL_TERMINAL", "TrUe")
+
+    terminal = LocalTerminal(working_dir=str(tmp_path))
+
+    assert terminal.run("printf enabled") == (True, "enabled")
 
 
 def test_terminal_run(tmp_path):
@@ -261,3 +289,126 @@ def test_copy_content(tmp_path):
     with open(working_dir / "tmp.txt", "r") as f:
         content = f.read()
     assert content == "Hello World"
+
+
+def test_write_text_preserves_untrusted_content(monkeypatch, tmp_path):
+    monkeypatch.setenv("ALLOW_LOCAL_TERMINAL", "true")
+    terminal = LocalTerminal(working_dir=str(tmp_path))
+    monkeypatch.setattr(terminal, "_effective_umask", lambda: 0o022)
+    side_effect = tmp_path / "side-effect"
+    content = (
+        "Unicode: café 世界 🚀\n"
+        "DEBUGGYM_EOF\n"
+        f"$(touch {side_effect}) `touch {side_effect}`; touch {side_effect}\n"
+        + ("x" * (2 * 1024 * 1024))
+        + "\n"
+    )
+
+    terminal.write_text(tmp_path / "payload.txt", content)
+
+    assert (tmp_path / "payload.txt").read_bytes() == content.encode("utf-8")
+    assert not side_effect.exists()
+
+
+def test_write_text_rejects_in_root_symlink(monkeypatch, tmp_path):
+    monkeypatch.setenv("ALLOW_LOCAL_TERMINAL", "true")
+    real_directory = tmp_path / "real"
+    real_directory.mkdir()
+    alias = tmp_path / "alias"
+    try:
+        alias.symlink_to(real_directory, target_is_directory=True)
+    except OSError as exc:
+        pytest.skip(f"Symlinks are unavailable: {exc}")
+    terminal = LocalTerminal(working_dir=str(tmp_path))
+
+    with pytest.raises(TerminalError, match="symbolic link"):
+        terminal.write_text(alias / "payload.txt", "blocked")
+
+    assert not (real_directory / "payload.txt").exists()
+
+
+def test_write_text_rejects_symlinked_working_root(monkeypatch, tmp_path):
+    monkeypatch.setenv("ALLOW_LOCAL_TERMINAL", "true")
+    real_root = tmp_path / "real-root"
+    real_root.mkdir()
+    linked_root = tmp_path / "linked-root"
+    try:
+        linked_root.symlink_to(real_root, target_is_directory=True)
+    except OSError as exc:
+        pytest.skip(f"Symlinks are unavailable: {exc}")
+    terminal = LocalTerminal(working_dir=str(linked_root))
+
+    with pytest.raises(TerminalError, match="symbolic link"):
+        terminal.write_text("payload.txt", "blocked")
+
+    assert not (real_root / "payload.txt").exists()
+
+
+@pytest.mark.skipif(
+    os.open not in os.supports_dir_fd or not getattr(os, "O_NOFOLLOW", 0),
+    reason="Ancestor-swap test requires descriptor-relative open support",
+)
+def test_write_text_is_bound_to_pinned_parent(monkeypatch, tmp_path):
+    monkeypatch.setenv("ALLOW_LOCAL_TERMINAL", "true")
+    current = tmp_path / "current"
+    current.mkdir()
+    pinned = tmp_path / "pinned"
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    terminal = LocalTerminal(working_dir=str(tmp_path))
+    monkeypatch.setattr(terminal, "_effective_umask", lambda: 0o022)
+    real_open = local_module.os.open
+    swapped = False
+
+    def swap_before_temporary_open(path, flags, mode=0o777, *, dir_fd=None):
+        nonlocal swapped
+        if (
+            isinstance(path, str)
+            and path.startswith(".debug-gym-write-")
+            and dir_fd is not None
+            and not swapped
+        ):
+            current.rename(pinned)
+            current.symlink_to(outside, target_is_directory=True)
+            swapped = True
+        return real_open(path, flags, mode, dir_fd=dir_fd)
+
+    monkeypatch.setattr(local_module.os, "open", swap_before_temporary_open)
+    monkeypatch.setattr(
+        local_module.os,
+        "supports_dir_fd",
+        local_module.os.supports_dir_fd | {swap_before_temporary_open},
+    )
+
+    terminal.write_text("current/payload.txt", "inside")
+
+    assert (pinned / "payload.txt").read_text(encoding="utf-8") == "inside"
+    assert not (outside / "payload.txt").exists()
+
+
+def test_write_text_honors_process_umask(monkeypatch, tmp_path):
+    monkeypatch.setenv("ALLOW_LOCAL_TERMINAL", "true")
+    terminal = LocalTerminal(working_dir=str(tmp_path))
+    previous_umask = os.umask(0o077)
+    try:
+        terminal.write_text(tmp_path / "private.txt", "private")
+    finally:
+        os.umask(previous_umask)
+
+    assert (tmp_path / "private.txt").stat().st_mode & 0o777 == 0o600
+
+
+def test_write_text_honors_session_umask(monkeypatch, tmp_path):
+    monkeypatch.setenv("ALLOW_LOCAL_TERMINAL", "true")
+    terminal = LocalTerminal(
+        working_dir=str(tmp_path),
+        session_commands=["umask 0077"],
+    )
+    previous_umask = os.umask(0o022)
+    try:
+        terminal.write_text(tmp_path / "private" / "data.txt", "private")
+    finally:
+        os.umask(previous_umask)
+
+    assert (tmp_path / "private").stat().st_mode & 0o777 == 0o700
+    assert (tmp_path / "private" / "data.txt").stat().st_mode & 0o777 == 0o600

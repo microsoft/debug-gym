@@ -1,12 +1,14 @@
 import atexit
 import json
 import os
+import posixpath
 import random
 import shlex
 import subprocess
+import tempfile
 import time
 import uuid
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 from jinja2 import Template
 from kubernetes import client, config, stream, watch
@@ -24,6 +26,7 @@ from debug_gym.gym.terminals.shell_session import ShellSession
 from debug_gym.gym.terminals.terminal import (
     DISABLE_ECHO_COMMAND,
     Terminal,
+    TerminalError,
     UnrecoverableTerminalError,
 )
 from debug_gym.logger import DebugGymLogger
@@ -410,9 +413,17 @@ class KubernetesTerminal(Terminal):
     @property
     def default_shell_command(self) -> list[str]:
         """Expects the pod to have bash installed."""
-        kubeconfig = f"--kubeconfig {self.kube_config} " if self.kube_config else ""
+        kubeconfig = (
+            f"--kubeconfig {shlex.quote(self.kube_config)} " if self.kube_config else ""
+        )
+        context = (
+            f"--context {shlex.quote(self.kube_context)} " if self.kube_context else ""
+        )
         bash_cmd = "/bin/bash --noprofile --norc --noediting"
-        return f"kubectl {kubeconfig}exec -it {self.pod.name} -c main -n {self.pod.namespace} -- {bash_cmd}"
+        return (
+            f"kubectl {kubeconfig}{context}exec -it {self.pod.name} "
+            f"-c main -n {self.pod.namespace} -- {bash_cmd}"
+        )
 
     def _ensure_pod_running(self) -> None:
         """Ensure the backing pod exists and is in Running phase."""
@@ -789,6 +800,225 @@ class KubernetesTerminal(Terminal):
     def __str__(self):
         return f"KubernetesTerminal[{self.pod_name}, {self.working_dir}]"
 
+    def _normalize_write_target(
+        self, filepath: str | Path
+    ) -> tuple[PurePosixPath, PurePosixPath]:
+        root = PurePosixPath(posixpath.normpath(str(self.working_dir)))
+        target = PurePosixPath(str(filepath))
+        if not target.is_absolute():
+            target = root / target
+        target = PurePosixPath(posixpath.normpath(str(target)))
+        try:
+            target.relative_to(root)
+        except ValueError as exc:
+            raise TerminalError(
+                "Write target is outside the terminal working directory"
+            ) from exc
+        if target == root:
+            raise TerminalError("Write target must be a file")
+        return root, target
+
+    def _reject_symlink_ancestors(
+        self, root: PurePosixPath, target: PurePosixPath
+    ) -> None:
+        current = root
+        ancestors = [root]
+        for part in target.parent.relative_to(root).parts:
+            current /= part
+            ancestors.append(current)
+        ancestors.append(target)
+        for ancestor in ancestors:
+            success, _ = self.run(
+                f"test -L {shlex.quote(str(ancestor))}",
+                raises=False,
+            )
+            if success:
+                raise TerminalError("Write target contains a symbolic-link directory")
+
+    def _destination_metadata(
+        self, target: PurePosixPath
+    ) -> tuple[int, int, int, int, int, bool]:
+        user_success, user_output = self.run("id -u", raises=False)
+        group_success, group_output = self.run("id -g", raises=False)
+        groups_success, groups_output = self.run("id -G", raises=False)
+        if not user_success or not group_success or not groups_success:
+            raise TerminalError("Failed to determine the pod user")
+        runtime_user_id = int(user_output.splitlines()[-1])
+        runtime_group_id = int(group_output.splitlines()[-1])
+        runtime_group_ids = {
+            int(group) for group in groups_output.splitlines()[-1].split()
+        }
+
+        exists, _ = self.run(
+            f"test -e {shlex.quote(str(target))}",
+            raises=False,
+        )
+        if not exists:
+            umask_success, umask_output = self.run("umask", raises=False)
+            parent_success, parent_output = self.run(
+                f"stat -c '%a %g' -- {shlex.quote(str(target.parent))}",
+                raises=False,
+            )
+            if not umask_success or not parent_success:
+                raise TerminalError("Failed to determine destination file metadata")
+            parent_mode, parent_group_id = parent_output.splitlines()[-1].split()
+            mode = 0o666 & ~int(umask_output.splitlines()[-1], 8)
+            group_id = (
+                int(parent_group_id)
+                if int(parent_mode, 8) & 0o2000
+                else runtime_group_id
+            )
+            return (
+                mode,
+                runtime_user_id,
+                group_id,
+                runtime_user_id,
+                runtime_group_id,
+                False,
+            )
+
+        is_regular, _ = self.run(
+            f"test -f {shlex.quote(str(target))}",
+            raises=False,
+        )
+        if not is_regular:
+            raise TerminalError("Write target must be a regular file")
+        success, output = self.run(
+            f"stat -c '%a %u %g' -- {shlex.quote(str(target))}",
+            raises=False,
+        )
+        if not success:
+            raise TerminalError("Failed to inspect destination file")
+        mode, user_id, group_id = output.splitlines()[-1].split()
+        user_id = int(user_id)
+        group_id = int(group_id)
+        if runtime_user_id != 0 and (
+            user_id != runtime_user_id
+            or (
+                group_id not in runtime_group_ids
+                and not self._inherits_parent_group(target.parent, group_id)
+            )
+        ):
+            raise TerminalError("Cannot preserve destination file ownership")
+        return (
+            int(mode, 8) & ~0o6000,
+            user_id,
+            group_id,
+            runtime_user_id,
+            runtime_group_id,
+            True,
+        )
+
+    def _inherits_parent_group(self, parent: PurePosixPath, group_id: int) -> bool:
+        success, output = self.run(
+            f"stat -c '%a %g' -- {shlex.quote(str(parent))}",
+            raises=False,
+        )
+        if not success:
+            raise TerminalError("Failed to inspect destination directory")
+        parent_mode, parent_group_id = output.splitlines()[-1].split()
+        return bool(int(parent_mode, 8) & 0o2000 and int(parent_group_id) == group_id)
+
+    def _kubectl_copy(self, src: str, target: str) -> None:
+        cmd = ["kubectl"]
+        if self.kube_config:
+            cmd.extend(["--kubeconfig", self.kube_config])
+        if self.kube_context:
+            cmd.extend(["--context", self.kube_context])
+        cmd.extend(
+            [
+                "cp",
+                src,
+                f"{self.pod.namespace}/{self.pod.name}:{target}",
+            ]
+        )
+
+        last_error = ""
+        for _ in range(NB_RETRIES_RUN):
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=120,
+            )
+            if result.returncode == 0:
+                return
+            last_error = result.stderr
+            if "Internal Server Error" not in result.stderr:
+                break
+            self.logger.debug(
+                f"[{self.pod.name}] Transient error during copy; retrying"
+            )
+            time.sleep(random.uniform(5, 10))
+        raise ValueError(f"Failed to copy content to pod: {last_error}")
+
+    def write_bytes(self, filepath: str | Path, content: bytes) -> None:
+        """Transfer bytes with kubectl without exposing content to a shell."""
+        if not isinstance(content, bytes):
+            raise TypeError("content must be bytes")
+        if not self.pod.is_running():
+            raise UnrecoverableTerminalError("Pod is not running. Cannot copy files.")
+
+        root, target = self._normalize_write_target(filepath)
+        self._reject_symlink_ancestors(root, target)
+
+        success, _ = self.run(
+            f"mkdir -p -- {shlex.quote(str(target.parent))}",
+            raises=False,
+        )
+        if not success:
+            raise TerminalError("Failed to create destination directory")
+        (
+            mode,
+            user_id,
+            group_id,
+            runtime_user_id,
+            runtime_group_id,
+            _,
+        ) = self._destination_metadata(target)
+        temporary_target = target.parent / f".debug-gym-write-{uuid.uuid4().hex}.tmp"
+        local_temporary_path = None
+        try:
+            with tempfile.NamedTemporaryFile(delete=False) as temporary_file:
+                local_temporary_path = temporary_file.name
+                temporary_file.write(content)
+            self._kubectl_copy(local_temporary_path, str(temporary_target))
+            metadata_commands = [
+                f"chmod {mode:o} -- {shlex.quote(str(temporary_target))}"
+            ]
+            if runtime_user_id == 0:
+                metadata_commands.append(
+                    f"chown {user_id}:{group_id} -- "
+                    f"{shlex.quote(str(temporary_target))}"
+                )
+            elif group_id != runtime_group_id:
+                metadata_commands.append(
+                    "(test "
+                    f'"$(stat -c %g -- {shlex.quote(str(temporary_target))})" '
+                    f"= {group_id} || chgrp {group_id} -- "
+                    f"{shlex.quote(str(temporary_target))})"
+                )
+            metadata_commands.append(
+                "mv -f -- "
+                f"{shlex.quote(str(temporary_target))} {shlex.quote(str(target))}"
+            )
+            success, _ = self.run(
+                " && ".join(metadata_commands),
+                raises=False,
+            )
+            if not success:
+                raise TerminalError("Failed to replace destination file")
+        finally:
+            if local_temporary_path is not None:
+                Path(local_temporary_path).unlink(missing_ok=True)
+            try:
+                self.run(
+                    f"rm -f -- {shlex.quote(str(temporary_target))}",
+                    raises=False,
+                )
+            except UnrecoverableTerminalError:
+                pass
+
     def copy_content(self, src: str | Path, target: str | Path | None = None) -> None:
         """Copy files or directories from host to pod using kubectl cp.
 
@@ -809,40 +1039,10 @@ class KubernetesTerminal(Terminal):
             # The official Kubernetes Python client does not provide a direct method for file copy.
             # The recommended approach is still to use 'kubectl cp' via subprocess.
             # Alternatives (using tar + exec) are complex and less reliable for directories.
-            cmd = ["kubectl"]
-            if self.kube_config:
-                cmd.extend(["--kubeconfig", self.kube_config])
             # restore previous behavior
             if os.path.isdir(src):
                 src = f"{src}/."
-            cmd.extend(
-                [
-                    "cp",
-                    f"{src}",
-                    f"{self.pod.namespace}/{self.pod.name}:{target}",
-                ]
-            )
-
-            for _ in range(NB_RETRIES_RUN):
-                result = subprocess.run(
-                    cmd,
-                    capture_output=True,
-                    text=True,
-                    timeout=120,  # Increased timeout for directory operations
-                )
-
-                if result.returncode != 0:
-                    if "Internal Server Error" in result.stderr:
-                        self.logger.debug(
-                            f"[{self.pod.name}] Transient error during copy, retrying: {result.stderr}"
-                        )
-                        backoff = random.uniform(5, 10)  # seconds
-                        time.sleep(backoff)
-                        continue  # Retry
-
-                    raise ValueError(
-                        f"Failed to copy {src} to {target}: {result.stderr}"
-                    )
+            self._kubectl_copy(src, target)
 
             self.logger.debug(f"Successfully copied {src} to {target}")
 

@@ -11,6 +11,12 @@ from debug_gym.llms.base import LLM, LLMConfigRegistry, LLMResponse
 from debug_gym.logger import DebugGymLogger
 
 
+@pytest.fixture(autouse=True)
+def allow_local_terminal_for_tests(monkeypatch):
+    """Tests explicitly opt in when exercising host-backed terminal workflows."""
+    monkeypatch.setenv("ALLOW_LOCAL_TERMINAL", "true")
+
+
 @pytest.fixture
 def logger_mock():
     logger = DebugGymLogger("test_logger")

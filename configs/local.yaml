@@ -23,6 +23,8 @@ task_data:
   debug_entrypoint: python -m pdb -m pytest -s test.py
 
 terminal:
+  # Docker is recommended. If you intentionally change this to `local`, export
+  # ALLOW_LOCAL_TERMINAL=true before starting debug-gym.
   type: docker
 
 agent:

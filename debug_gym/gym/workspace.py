@@ -5,7 +5,7 @@ import tempfile
 from pathlib import Path
 
 from debug_gym.gym.terminals.local import LocalTerminal
-from debug_gym.gym.terminals.terminal import Terminal
+from debug_gym.gym.terminals.terminal import Terminal, UnrecoverableTerminalError
 from debug_gym.logger import DebugGymLogger
 
 
@@ -54,6 +54,12 @@ class Workspace:
         target = Path(target or self.working_dir).resolve()
         self.terminal.copy_content(src, target)
 
+    def _workspace_root(self) -> Path:
+        root = Path(os.path.normpath(self.working_dir))
+        if isinstance(self.terminal, LocalTerminal):
+            root = root.resolve(strict=True)
+        return root
+
     def resolve_path(self, filepath: str | Path, raises: bool = False) -> Path:
         """Convert a relative filepath to absolute based on the working_dir.
         If the path is already absolute, it is returned as is.
@@ -65,27 +71,22 @@ class Workspace:
         if not abs_filepath.is_absolute():
             abs_filepath = Path(self.working_dir) / abs_filepath
 
-        # Normalize the path (resolve .., . without resolving symlinks)
-        # This is done in Python for cross-platform compatibility
+        # Normalize traversal components in Python for cross-platform compatibility.
         abs_filepath = Path(os.path.normpath(abs_filepath))
+        if isinstance(self.terminal, LocalTerminal):
+            # Local paths can be resolved canonically, including existing symlinks.
+            abs_filepath = abs_filepath.resolve(strict=False)
         abs_filepath_str = str(abs_filepath)
 
-        if raises and abs_filepath != self.working_dir:
-            # Check if file is within working_dir (security check)
-            # Use os.path.commonpath to safely check if path is under working_dir
+        workspace_root = self._workspace_root()
+        if raises and abs_filepath != workspace_root:
             try:
-                common = os.path.commonpath([str(self.working_dir), abs_filepath_str])
-                if common != str(self.working_dir):
-                    raise FileNotFoundError(
-                        f"`{filepath}` does not exist or is not in "
-                        f"the working directory `{self.working_dir}`."
-                    )
-            except ValueError:
-                # commonpath raises ValueError for paths on different drives (Windows)
+                abs_filepath.relative_to(workspace_root)
+            except ValueError as exc:
                 raise FileNotFoundError(
                     f"`{filepath}` does not exist or is not in "
                     f"the working directory `{self.working_dir}`."
-                )
+                ) from exc
 
             # Check if file exists via terminal
             check_cmd = f"test -e {shlex.quote(abs_filepath_str)}"
@@ -125,61 +126,19 @@ class Workspace:
         """Writes `content` to `filepath` exactly as-is, preserving any trailing newlines."""
         abs_filepath = self.resolve_path(filepath, raises=False)
 
-        # Security check: ensure path is within workspace
         try:
-            common = os.path.commonpath([str(self.working_dir), str(abs_filepath)])
-            if common != str(self.working_dir):
-                raise WorkspaceWriteError(
-                    f"Failed to write `{filepath}` because it is outside the workspace."
-                )
-        except ValueError:
-            # commonpath raises ValueError for paths on different drives (Windows)
+            abs_filepath.relative_to(self._workspace_root())
+        except ValueError as exc:
             raise WorkspaceWriteError(
                 f"Failed to write `{filepath}` because it is outside the workspace."
-            )
+            ) from exc
 
-        def _run_or_raise(command: str):
-            success, output = self.terminal.run(
-                command, raises=False, strip_output=False
-            )
-            if not success:
-                message = output.strip() or "Unknown error"
-                raise WorkspaceWriteError(
-                    f"Failed to write `{filepath}`. Command output:\n{message}"
-                )
-
-        # create parent directories via the terminal if needed
-        _run_or_raise(f"mkdir -p {shlex.quote(str(abs_filepath.parent))}")
-
-        # We will split content in chunks of 32kB to avoid hitting command length limits.
-        chunk_size = 32 * 1024  # 32kB
-        first_chunk = content[:chunk_size]
-        rest = content[chunk_size:]
-
-        # In the following command we:
-        # - use a single-quoted heredoc (cat <<'nDEBUGGYM_EOF' ... nDEBUGGYM_EOF) so the heredoc body is taken literally (no shell expansion)
-        # - append a sentinel character DEBUGGYM_DEL inside the heredoc so we can detect/restore trailing newlines later
-        # - capture the heredoc output into shell variable CONTENT since command substitution strips trailing newlines
-        # - "${CONTENT%DEBUGGYM_DEL}" removes the trailing sentinel DEBUGGYM_DEL (restoring the original trailing-newline state)
-        # - echo -n writes the result without adding an extra newline
-        quoted_filepath = shlex.quote(str(abs_filepath))
-        cmd = (
-            "CONTENT=$(cat <<'DEBUGGYM_EOF'\n"
-            f"{first_chunk}DEBUGGYM_DEL\nDEBUGGYM_EOF\n); "
-            'echo -n "${CONTENT%DEBUGGYM_DEL}" > '
-            f"{quoted_filepath}"
-        )
-        _run_or_raise(cmd)
-
-        for i in range(0, len(rest), chunk_size):
-            chunk = rest[i : i + chunk_size]
-            cmd = (
-                "CONTENT=$(cat <<'DEBUGGYM_EOF'\n"
-                f"{chunk}DEBUGGYM_DEL\nDEBUGGYM_EOF\n); "
-                'echo -n "${CONTENT%DEBUGGYM_DEL}" >> '
-                f"{quoted_filepath}"
-            )
-            _run_or_raise(cmd)
+        try:
+            self.terminal.write_text(abs_filepath, content)
+        except UnrecoverableTerminalError:
+            raise
+        except (OSError, RuntimeError, ValueError) as exc:
+            raise WorkspaceWriteError(f"Failed to write `{filepath}`.") from exc
 
     def directory_tree(self, root: str | Path = None, max_depth: int = 1):
         """List the directory tree using the `tree` command.

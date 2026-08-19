@@ -1,7 +1,10 @@
+import hashlib
 import os
 import platform
 import subprocess
 import time
+from pathlib import Path, PurePosixPath
+from unittest.mock import Mock, patch
 
 import pytest
 
@@ -10,6 +13,7 @@ from debug_gym.gym.terminals.kubernetes import KubernetesTerminal
 from debug_gym.gym.terminals.shell_session import DEFAULT_PS1
 from debug_gym.gym.terminals.terminal import (
     DISABLE_ECHO_COMMAND,
+    TerminalError,
     UnrecoverableTerminalError,
 )
 
@@ -267,6 +271,221 @@ def test_copy_content(tmp_path):
     _, output = terminal.run(f"cat {terminal.working_dir}/tmp.txt", timeout=1)
     assert output == "Hello World"
     terminal.close()
+
+
+@if_kubernetes_available
+def test_write_text_preserves_untrusted_content():
+    terminal = KubernetesTerminal(base_image="python:3.12-slim", working_dir="/testbed")
+    content = "DEBUGGYM_EOF\n$(touch /tmp/side-effect)\nUnicode: 世界 🚀\n" + (
+        "x" * (2 * 1024 * 1024)
+    )
+    expected_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()
+    try:
+        terminal.run("touch /testbed/payload.txt && chmod 0755 /testbed/payload.txt")
+        terminal.write_text(f"{terminal.working_dir}/payload.txt", content)
+
+        success, output = terminal.run(
+            'python -c "from pathlib import Path; import hashlib; '
+            "print(hashlib.sha256(Path('payload.txt').read_bytes()).hexdigest())\""
+        )
+        assert success
+        assert output == expected_hash
+        assert terminal.run('test "$(stat -c %a /testbed/payload.txt)" = 755')[0]
+        assert terminal.run("test ! -e /tmp/side-effect")[0]
+
+        terminal.run("mkdir -p /tmp/outside && ln -s /tmp/outside /testbed/escape")
+        with pytest.raises(TerminalError, match="symbolic-link"):
+            terminal.write_text("/testbed/escape/payload.txt", "blocked")
+        assert terminal.run("test ! -e /tmp/outside/payload.txt")[0]
+
+        terminal.run("ln -s /tmp/outside-target /testbed/linked-file")
+        with pytest.raises(TerminalError, match="symbolic-link"):
+            terminal.write_text("/testbed/linked-file", "blocked")
+        assert terminal.run("test ! -e /tmp/outside-target")[0]
+
+        terminal.run("mkdir -p /testbed/real && ln -s /testbed/real /testbed/alias")
+        with pytest.raises(TerminalError, match="symbolic-link"):
+            terminal.write_text("/testbed/alias/in-root.txt", "blocked")
+        assert terminal.run("test ! -e /testbed/real/in-root.txt")[0]
+
+        terminal.run("ln -s /testbed /testbed-root")
+        terminal._working_dir = "/testbed-root"
+        with pytest.raises(TerminalError, match="symbolic-link"):
+            terminal.write_text("/testbed-root/root-link.txt", "blocked")
+        terminal._working_dir = "/testbed"
+        assert terminal.run("test ! -e /testbed/root-link.txt")[0]
+
+        terminal.run(
+            "printf outside > /tmp/outside-hard-link && "
+            "ln /tmp/outside-hard-link /testbed/hard-link"
+        )
+        terminal.write_text("/testbed/hard-link", "inside")
+        assert terminal.run(
+            'test "$(cat /tmp/outside-hard-link)" = outside && '
+            'test "$(cat /testbed/hard-link)" = inside'
+        )[0]
+    finally:
+        terminal.close()
+
+
+def test_write_bytes_transfers_content_out_of_band():
+    terminal = KubernetesTerminal.__new__(KubernetesTerminal)
+    terminal._working_dir = "/testbed"
+    terminal._pod = Mock()
+    terminal._pod.is_running.return_value = True
+    terminal._pod.name = "test-pod"
+    terminal._pod.namespace = "default"
+    terminal.sessions = []
+    terminal.logger = Mock()
+    terminal._destination_metadata = Mock(
+        return_value=(0o644, 1000, 1000, 1000, 1000, False)
+    )
+    terminal.run = Mock(
+        side_effect=lambda command, **kwargs: (
+            (True, "")
+            if command.startswith(("mkdir ", "chmod ", "rm "))
+            else (False, "")
+        )
+    )
+    content = b"DEBUGGYM_EOF\n$(touch /tmp/side-effect)\n"
+
+    def assert_copy_content(src, target):
+        assert Path(src).read_bytes() == content
+        assert "DEBUGGYM_EOF" not in target
+
+    terminal._kubectl_copy = Mock(side_effect=assert_copy_content)
+    try:
+        terminal.write_bytes("/testbed/nested/payload.txt", content)
+
+        terminal._kubectl_copy.assert_called_once()
+        assert all(
+            "DEBUGGYM_EOF" not in call.args[0] for call in terminal.run.call_args_list
+        )
+        replacement_commands = [
+            call.args[0]
+            for call in terminal.run.call_args_list
+            if call.args[0].startswith("chmod ")
+        ]
+        assert len(replacement_commands) == 1
+        assert "mv -f --" in replacement_commands[0]
+        assert ".debug-gym-write-" in replacement_commands[0]
+    finally:
+        terminal._pod = None
+
+
+def test_destination_metadata_strips_privileged_bits():
+    terminal = KubernetesTerminal.__new__(KubernetesTerminal)
+    terminal._pod = None
+    terminal.sessions = []
+    terminal.run = Mock(
+        side_effect=[
+            (True, "0"),
+            (True, "0"),
+            (True, "0"),
+            (True, ""),
+            (True, ""),
+            (True, "6755 0 0"),
+        ]
+    )
+
+    assert terminal._destination_metadata(PurePosixPath("/testbed/privileged")) == (
+        0o755,
+        0,
+        0,
+        0,
+        0,
+        True,
+    )
+
+
+def test_destination_metadata_honors_pod_umask():
+    terminal = KubernetesTerminal.__new__(KubernetesTerminal)
+    terminal._pod = None
+    terminal.sessions = []
+    terminal.run = Mock(
+        side_effect=[
+            (True, "1000"),
+            (True, "1000"),
+            (True, "1000 1234"),
+            (False, ""),
+            (True, "0077"),
+            (True, "2775 1234"),
+        ]
+    )
+
+    assert terminal._destination_metadata(PurePosixPath("/testbed/new")) == (
+        0o600,
+        1000,
+        1234,
+        1000,
+        1000,
+        False,
+    )
+
+
+def test_destination_metadata_accepts_supplementary_group():
+    terminal = KubernetesTerminal.__new__(KubernetesTerminal)
+    terminal._pod = None
+    terminal.sessions = []
+    terminal.run = Mock(
+        side_effect=[
+            (True, "1000"),
+            (True, "1000"),
+            (True, "1000 1234"),
+            (True, ""),
+            (True, ""),
+            (True, "0660 1000 1234"),
+        ]
+    )
+
+    assert terminal._destination_metadata(PurePosixPath("/testbed/shared")) == (
+        0o660,
+        1000,
+        1234,
+        1000,
+        1000,
+        True,
+    )
+
+
+def test_kubectl_copy_uses_configured_context():
+    terminal = KubernetesTerminal.__new__(KubernetesTerminal)
+    terminal.kube_config = "/tmp/kubeconfig"
+    terminal.kube_context = "isolated-context"
+    terminal._pod = Mock()
+    terminal._pod.name = "test-pod"
+    terminal._pod.namespace = "default"
+    terminal.logger = Mock()
+    terminal.sessions = []
+
+    with patch("subprocess.run", return_value=Mock(returncode=0)) as run:
+        terminal._kubectl_copy("/tmp/source", "/testbed/target")
+
+    command = run.call_args.args[0]
+    assert command[:5] == [
+        "kubectl",
+        "--kubeconfig",
+        "/tmp/kubeconfig",
+        "--context",
+        "isolated-context",
+    ]
+    terminal._pod = None
+
+
+def test_interactive_shell_uses_configured_context():
+    terminal = KubernetesTerminal.__new__(KubernetesTerminal)
+    terminal.kube_config = "/tmp/kube config"
+    terminal.kube_context = "isolated-context"
+    terminal._pod = Mock()
+    terminal._pod.name = "test-pod"
+    terminal._pod.namespace = "default"
+    terminal.sessions = []
+
+    command = terminal.default_shell_command
+
+    assert "--kubeconfig '/tmp/kube config'" in command
+    assert "--context isolated-context" in command
+    terminal._pod = None
 
 
 @if_kubernetes_available

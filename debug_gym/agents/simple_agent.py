@@ -1,3 +1,4 @@
+import math
 import re
 from dataclasses import dataclass
 from typing import List, Tuple
@@ -123,7 +124,10 @@ class SimpleAgent(BaseAgent):
         """Convert a response string to a message dict."""
         # Role should be "assistant" for LLM responses with the tool call dump in the xml-like format.
         content = response.response
-        if response.tool and response.tool.name != "empty_tool_response":
+        if response.tool and response.tool.name not in {
+            "empty_tool_response",
+            "invalid_tool_response",
+        }:
             content += "\n" + XML_TOOL_CALL_TEMPLATE.format(
                 tool_name=response.tool.name,
                 parameters="\n".join(
@@ -157,18 +161,35 @@ class SimpleAgent(BaseAgent):
         types = arg_schema.get("type", [])
         if not isinstance(types, list):
             types = [types]
+
+        if "null" in types and value.lower() == "null":
+            return None
+
         for t in types:
+            if t == "integer":
+                if re.fullmatch(r"[+-]?\d+", value):
+                    return int(value)
             if t == "number":
                 try:
-                    # Prefer int if the value has no decimal point
-                    return int(value) if "." not in value else float(value)
-                except (ValueError, TypeError):
+                    number = (
+                        int(value) if re.fullmatch(r"[+-]?\d+", value) else float(value)
+                    )
+                    if isinstance(number, int) or math.isfinite(number):
+                        return number
+                except (OverflowError, TypeError, ValueError):
                     continue
             if t == "boolean":
                 if value.lower() in ("true", "1"):
                     return True
                 if value.lower() in ("false", "0"):
                     return False
+
+        if "string" in types:
+            return value
+        declared_scalar_types = {"integer", "number", "boolean"}.intersection(types)
+        if declared_scalar_types:
+            expected = " or ".join(sorted(declared_scalar_types))
+            raise ValueError(f"Expected {expected}")
         return value
 
     def parse_tool_calls(self, text: str) -> List[ToolCall]:
@@ -214,9 +235,14 @@ class SimpleAgent(BaseAgent):
             for param_key, param_value in param_matches:
                 param_key = param_key.strip()
                 param_value = param_value.strip()
-                params[param_key] = self._cast_param(
-                    param_value, tool_arg_schema.get(param_key)
-                )
+                try:
+                    params[param_key] = self._cast_param(
+                        param_value, tool_arg_schema.get(param_key)
+                    )
+                except ValueError as exc:
+                    raise ValueError(
+                        f"Invalid value for parameter {param_key!r}: {exc}"
+                    ) from exc
 
             tool_calls.append(ToolCall(id="None", name=function_name, arguments=params))
 
@@ -252,6 +278,8 @@ class SimpleAgent(BaseAgent):
         action = action.strip()
 
         tool_calls = self.parse_tool_calls(action)
+        if not tool_calls:
+            raise ValueError("Malformed tool call: missing function name")
         if len(tool_calls) > 1:
             self.logger.warning(
                 f"Multiple tool calls detected ({len(tool_calls)}), using the first one."
@@ -270,7 +298,15 @@ class SimpleAgent(BaseAgent):
         """
         messages = self.build_prompt(info)
         response = self.llm(messages, tools=None)
-        response.response, response.tool = self.parse_thought_and_tool(
-            response.response
-        )
+        try:
+            response.response, response.tool = self.parse_thought_and_tool(
+                response.response
+            )
+        except ValueError as exc:
+            response.response = response.response.split("<function=", 1)[0].strip()
+            response.tool = ToolCall(
+                id="invalid_tool_response",
+                name="invalid_tool_response",
+                arguments={"error": str(exc)},
+            )
         return response

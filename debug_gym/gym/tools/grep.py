@@ -9,6 +9,8 @@ from debug_gym.gym.tools.toolbox import Toolbox
 @Toolbox.register()
 class GrepTool(EnvironmentTool):
     name: str = "grep"
+    DEFAULT_MAX_RESULTS = 100
+    MAX_RESULTS = 10_000
 
     examples = [
         """Use grep with `pattern`: "function" to search for the word "function" in all files in the repository.""",
@@ -33,8 +35,11 @@ class GrepTool(EnvironmentTool):
             "description": "Optional glob pattern to search in. If None, searches the entire repository. Path should be relative to the repository root.",
         },
         "max_results": {
-            "type": ["number", "null"],
-            "description": "Maximum number of matching lines to return. If None, returns 100 matches.",
+            "type": ["integer", "null"],
+            "description": (
+                "Maximum number of matching lines to return, from 1 to 10000. "
+                "If None, returns 100 matches."
+            ),
         },
     }
 
@@ -46,11 +51,23 @@ class GrepTool(EnvironmentTool):
         regex: bool = True,
         case_sensitive: bool = True,
         line_numbers: bool = True,
-        max_results: int = 100,
+        max_results: int = DEFAULT_MAX_RESULTS,
     ) -> Observation:
         """Use grep functionality via bash tool as a special case."""
         if not pattern:
             return Observation(self.name, "Pattern cannot be empty.")
+
+        if max_results is None:
+            max_results = self.DEFAULT_MAX_RESULTS
+        if (
+            isinstance(max_results, bool)
+            or not isinstance(max_results, int)
+            or not 1 <= max_results <= self.MAX_RESULTS
+        ):
+            return Observation(
+                self.name,
+                f"max_results must be an integer between 1 and {self.MAX_RESULTS}.",
+            )
 
         # Build grep command arguments
         grep_args = []
@@ -85,25 +102,9 @@ class GrepTool(EnvironmentTool):
             " | grep -v '/.git/' | grep -v '__pycache__' | grep -v '/node_modules/'"
         )
 
-        if max_results:
-            command += f" | head -{max_results}"
+        command += f" | head -{max_results:d}"
 
         try:
-            # Assert that the terminal is not a local terminal (only in production)
-            import os
-
-            from debug_gym.gym.terminals.local import LocalTerminal
-
-            # Treat local terminals as allowed unless explicitly disabled via env var
-            allow_local = os.environ.get("ALLOW_LOCAL_TERMINAL", "true").lower()
-            if allow_local not in {"true", "false"}:
-                allow_local = "true"
-            if allow_local == "false" and type(environment.terminal) is LocalTerminal:
-                return Observation(
-                    self.name,
-                    "Error: grep tool requires a non-local terminal. Current terminal type is not supported.",
-                )
-
             # Use the environment's terminal to run the grep command
             success, output = environment.terminal.run(command, timeout=30)
 
