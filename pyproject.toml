@@ -40,4 +40,6 @@ dev = [
     "pytest-env",
     "isort",
     "black",
+    "Flask==3.1.3",
+    "Werkzeug==3.1.6",
 ]

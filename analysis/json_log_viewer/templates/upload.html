@@ -525,12 +525,29 @@
         // File browser functionality
         let currentPath = '';
 
+        function showBrowserMessage(className, iconClass, message) {
+            const contentDiv = document.getElementById('file-browser-content');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = className;
+            if (iconClass) {
+                const icon = document.createElement('i');
+                icon.className = `fas ${iconClass}`;
+                messageDiv.appendChild(icon);
+                messageDiv.appendChild(document.createTextNode(' '));
+            }
+            messageDiv.appendChild(document.createTextNode(message));
+            contentDiv.replaceChildren(messageDiv);
+        }
+
         async function loadDirectory(path = '') {
             const contentDiv = document.getElementById('file-browser-content');
             const pathSpan = document.getElementById('current-path-text');
 
-            // Show loading state
-            contentDiv.innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i> Loading directory contents...</div>';
+            showBrowserMessage(
+                'loading',
+                'fa-spinner fa-spin',
+                'Loading directory contents...'
+            );
 
             try {
                 const response = await fetch(`/browse_directory${path ? '?path=' + encodeURIComponent(path) : ''}`);
@@ -542,9 +559,7 @@
 
                 currentPath = data.current_path;
                 pathSpan.textContent = currentPath;
-
-                // Build directory contents HTML
-                let html = '';
+                contentDiv.replaceChildren();
 
                 for (const item of data.items) {
                     const iconClass = item.type === 'directory'
@@ -555,30 +570,45 @@
                         ? (item.is_parent ? 'browser-item directory parent-dir' : 'browser-item directory')
                         : 'browser-item file';
 
-                    html += `
-                        <div class="${itemClass}" onclick="handleItemClick('${item.path}', '${item.type}')">
-                            <div class="file-info">
-                                <i class="fas ${iconClass}"></i>
-                                <span class="filename">${item.name}</span>
-                            </div>
-                            ${item.type === 'file' ? '<div class="load-btn-text">Click to load</div>' : ''}
-                        </div>
-                    `;
+                    const browserItem = document.createElement('div');
+                    browserItem.className = itemClass;
+                    browserItem.addEventListener('click', () => {
+                        handleItemClick(item.path, item.type);
+                    });
+
+                    const fileInfo = document.createElement('div');
+                    fileInfo.className = 'file-info';
+                    const icon = document.createElement('i');
+                    icon.className = `fas ${iconClass}`;
+                    const filenameSpan = document.createElement('span');
+                    filenameSpan.className = 'filename';
+                    filenameSpan.textContent = item.name;
+                    fileInfo.append(icon, filenameSpan);
+                    browserItem.appendChild(fileInfo);
+
+                    if (item.type === 'file') {
+                        const loadText = document.createElement('div');
+                        loadText.className = 'load-btn-text';
+                        loadText.textContent = 'Click to load';
+                        browserItem.appendChild(loadText);
+                    }
+                    contentDiv.appendChild(browserItem);
                 }
 
                 if (data.items.length === 0) {
-                    html = '<div class="loading">No JSON files found in this directory</div>';
+                    showBrowserMessage(
+                        'loading',
+                        '',
+                        'No JSON files found in this directory'
+                    );
                 }
 
-                contentDiv.innerHTML = html;
-
             } catch (error) {
-                contentDiv.innerHTML = `
-                    <div class="error-message">
-                        <i class="fas fa-exclamation-triangle"></i>
-                        Error: ${error.message}
-                    </div>
-                `;
+                showBrowserMessage(
+                    'error-message',
+                    'fa-exclamation-triangle',
+                    `Error: ${error.message}`
+                );
             }
         }
 
@@ -589,7 +619,11 @@
             } else if (type === 'file') {
                 // Load the JSON file
                 try {
-                    const response = await fetch(`/load_file_from_path?path=${encodeURIComponent(path)}`);
+                    const response = await fetch('/load_file_from_path', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({path}),
+                    });
                     const data = await response.json();
 
                     if (response.ok && data.success) {

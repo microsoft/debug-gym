@@ -257,9 +257,9 @@
             <a href="{{ url_for('index') }}" class="nav-btn">
                 🔍 View Trajectory
             </a>
-            <a href="{{ url_for('change_file') }}" class="nav-btn">
-                📁 Change File
-            </a>
+            <form method="post" action="{{ url_for('change_file') }}" style="display: inline;">
+                <button type="submit" class="nav-btn">📁 Change File</button>
+            </form>
         </div>
         
         <div class="stats-container">
