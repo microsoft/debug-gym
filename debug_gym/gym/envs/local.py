@@ -1,5 +1,4 @@
 from debug_gym.gym.envs.env import RepoEnv
-from debug_gym.gym.terminals.local import LocalTerminal
 from debug_gym.gym.terminals.terminal import Terminal
 
 
@@ -13,8 +12,11 @@ class LocalEnv(RepoEnv):
         debug_entrypoint: str | None = None,
         **kwargs,
     ):
+        if terminal is None:
+            raise ValueError(
+                "LocalEnv requires an isolated Docker or Kubernetes terminal."
+            )
         task_data = {"path": path}
-        terminal = terminal or LocalTerminal()
         super().__init__(
             task_data=task_data,
             terminal=terminal,

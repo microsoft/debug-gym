@@ -1,13 +1,5 @@
-from debug_gym.gym.envs.aider import AiderBenchmarkEnv
-from debug_gym.gym.envs.env import RepoEnv, TooledEnv
-from debug_gym.gym.envs.free_env import FreeEnv
-from debug_gym.gym.envs.local import LocalEnv
-from debug_gym.gym.envs.mini_nightmare import MiniNightmareEnv
-from debug_gym.gym.envs.r2egym import R2EGymEnv
-from debug_gym.gym.envs.swe_bench import SWEBenchEnv
-from debug_gym.gym.envs.swe_bench_debug import SWEBenchDebugEnv
-from debug_gym.gym.envs.swe_qa import SWEQAEnv
-from debug_gym.gym.envs.swe_smith import SWESmithEnv
+from importlib import import_module
+
 from debug_gym.logger import DebugGymLogger
 
 __all__ = [
@@ -26,29 +18,45 @@ __all__ = [
     "load_dataset",
 ]
 
+_ENV_CLASSES = {
+    "AiderBenchmarkEnv": "debug_gym.gym.envs.aider",
+    "RepoEnv": "debug_gym.gym.envs.env",
+    "TooledEnv": "debug_gym.gym.envs.env",
+    "FreeEnv": "debug_gym.gym.envs.free_env",
+    "LocalEnv": "debug_gym.gym.envs.local",
+    "MiniNightmareEnv": "debug_gym.gym.envs.mini_nightmare",
+    "R2EGymEnv": "debug_gym.gym.envs.r2egym",
+    "SWEBenchEnv": "debug_gym.gym.envs.swe_bench",
+    "SWEBenchDebugEnv": "debug_gym.gym.envs.swe_bench_debug",
+    "SWESmithEnv": "debug_gym.gym.envs.swe_smith",
+    "SWEQAEnv": "debug_gym.gym.envs.swe_qa",
+}
 
-def select_env(env_type: str = None) -> type[RepoEnv]:
-    match env_type:
-        case "local":
-            return LocalEnv
-        case "aider":
-            return AiderBenchmarkEnv
-        case "swebench":
-            return SWEBenchEnv
-        case "swebench-debug":
-            return SWEBenchDebugEnv
-        case "swesmith":
-            return SWESmithEnv
-        case "mini_nightmare":
-            return MiniNightmareEnv
-        case "r2egym" | "r2e":
-            return R2EGymEnv
-        case "FreeEnv":
-            return FreeEnv
-        case "sweqa":
-            return SWEQAEnv
-        case _:
-            raise ValueError(f"Unknown environment {env_type}")
+_ENV_TYPES = {
+    "local": "LocalEnv",
+    "aider": "AiderBenchmarkEnv",
+    "swebench": "SWEBenchEnv",
+    "swebench-debug": "SWEBenchDebugEnv",
+    "swesmith": "SWESmithEnv",
+    "mini_nightmare": "MiniNightmareEnv",
+    "r2egym": "R2EGymEnv",
+    "r2e": "R2EGymEnv",
+    "FreeEnv": "FreeEnv",
+    "sweqa": "SWEQAEnv",
+}
+
+
+def __getattr__(name: str):
+    if module_name := _ENV_CLASSES.get(name):
+        return getattr(import_module(module_name), name)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+def select_env(env_type: str = None) -> type:
+    class_name = _ENV_TYPES.get(env_type)
+    if class_name is None:
+        raise ValueError(f"Unknown environment {env_type}")
+    return __getattr__(class_name)
 
 
 def load_dataset(config: dict, logger: DebugGymLogger | None = None) -> dict:

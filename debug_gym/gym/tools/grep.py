@@ -89,21 +89,6 @@ class GrepTool(EnvironmentTool):
             command += f" | head -{max_results}"
 
         try:
-            # Assert that the terminal is not a local terminal (only in production)
-            import os
-
-            from debug_gym.gym.terminals.local import LocalTerminal
-
-            # Treat local terminals as allowed unless explicitly disabled via env var
-            allow_local = os.environ.get("ALLOW_LOCAL_TERMINAL", "true").lower()
-            if allow_local not in {"true", "false"}:
-                allow_local = "true"
-            if allow_local == "false" and type(environment.terminal) is LocalTerminal:
-                return Observation(
-                    self.name,
-                    "Error: grep tool requires a non-local terminal. Current terminal type is not supported.",
-                )
-
             # Use the environment's terminal to run the grep command
             success, output = environment.terminal.run(command, timeout=30)
 

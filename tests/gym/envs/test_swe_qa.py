@@ -2,7 +2,7 @@ import pytest
 
 from debug_gym.gym.entities import EvalOutput
 from debug_gym.gym.envs.swe_qa import SWEQA_REPOS, SWEQAEnv
-from debug_gym.gym.terminals.local import LocalTerminal
+from tests.helpers import HostTerminal
 
 
 class TestSWEQAEnv:
@@ -24,7 +24,7 @@ class TestSWEQAEnv:
 
     def test_init_with_invalid_terminal_raises(self, task_data):
         """Test that SWEQAEnv rejects non-Docker/Kubernetes terminals."""
-        terminal = LocalTerminal()
+        terminal = HostTerminal()
         with pytest.raises(ValueError, match="only supports DockerTerminal"):
             SWEQAEnv(task_data=task_data, terminal=terminal)
 
