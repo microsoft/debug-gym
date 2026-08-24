@@ -4,13 +4,13 @@ from pathlib import Path
 import pytest
 
 from debug_gym.gym.terminals.docker import DockerTerminal
+from debug_gym.gym.terminals.local import LocalTerminal
 from debug_gym.gym.workspace import Workspace, WorkspaceReadError, WorkspaceWriteError
-from tests.helpers import HostTerminal
 
 
 @pytest.fixture
 def workspace():
-    terminal = HostTerminal()
+    terminal = LocalTerminal()
     workspace = Workspace(terminal)
     workspace.reset()
 
@@ -40,7 +40,7 @@ def test_directory_tree(workspace):
 @pytest.if_docker_running
 def test_reset_and_cleanup_workspace():
     # Setup workspace with a native terminal.
-    terminal = HostTerminal()
+    terminal = LocalTerminal()
     workspace = Workspace(terminal)
 
     assert workspace._tempdir is None

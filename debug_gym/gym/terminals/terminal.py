@@ -27,7 +27,6 @@ DEFAULT_MAX_OUTPUT_BYTES = 100_000_000  # 100 MB
 
 
 class Terminal(ABC):
-    uses_host_filesystem = False
 
     def __init__(
         self,

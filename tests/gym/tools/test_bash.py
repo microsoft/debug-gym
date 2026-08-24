@@ -4,10 +4,10 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from debug_gym.gym.entities import Observation
+from debug_gym.gym.envs.local import LocalEnv
 from debug_gym.gym.tools.bash import BashTool
 from debug_gym.gym.tools.tool import ToolCall
 from debug_gym.gym.tools.toolbox import Toolbox
-from tests.helpers import LocalEnv
 
 
 @pytest.fixture
@@ -188,7 +188,7 @@ def test_bash_environment_variables(env):
     assert len(observation.strip()) > 0
 
 
-@patch("tests.helpers.HostTerminal.run")
+@patch("debug_gym.gym.terminals.LocalTerminal.run")
 def test_bash_terminal_failure(mock_run, bash_tool):
     """Test handling of terminal execution failure."""
     # Mock terminal.run to return failure
@@ -207,7 +207,7 @@ def test_bash_terminal_failure(mock_run, bash_tool):
     assert "permission denied" in result.observation
 
 
-@patch("tests.helpers.HostTerminal.run")
+@patch("debug_gym.gym.terminals.LocalTerminal.run")
 def test_bash_terminal_success(mock_run, bash_tool):
     """Test successful terminal execution."""
     # Mock terminal.run to return success
@@ -228,7 +228,7 @@ def test_bash_terminal_success(mock_run, bash_tool):
     mock_run.assert_called_once_with("echo hello", timeout=30)
 
 
-@patch("tests.helpers.HostTerminal.run")
+@patch("debug_gym.gym.terminals.LocalTerminal.run")
 def test_bash_empty_output_handling(mock_run, bash_tool):
     """Test handling of commands with empty output."""
     # Mock terminal.run to return success with empty output
@@ -493,7 +493,7 @@ def test_bash_file_creation_unicode_content(env):
     assert "🎉" in observation
 
 
-@patch("tests.helpers.HostTerminal.run")
+@patch("debug_gym.gym.terminals.LocalTerminal.run")
 def test_bash_custom_timeout(mock_run, bash_tool):
     """Test that a custom timeout is passed to terminal.run."""
     mock_run.return_value = (True, "output")
@@ -505,7 +505,7 @@ def test_bash_custom_timeout(mock_run, bash_tool):
     mock_run.assert_called_once_with("pytest tests/", timeout=600)
 
 
-@patch("tests.helpers.HostTerminal.run")
+@patch("debug_gym.gym.terminals.LocalTerminal.run")
 def test_bash_timeout_clamped_to_max(mock_run, bash_tool):
     """Test that timeout exceeding MAX_TIMEOUT is clamped."""
     mock_run.return_value = (True, "output")
@@ -517,7 +517,7 @@ def test_bash_timeout_clamped_to_max(mock_run, bash_tool):
     mock_run.assert_called_once_with("long_command", timeout=BashTool.MAX_TIMEOUT)
 
 
-@patch("tests.helpers.HostTerminal.run")
+@patch("debug_gym.gym.terminals.LocalTerminal.run")
 def test_bash_timeout_none_uses_default(mock_run, bash_tool):
     """Test that timeout=None uses the default timeout."""
     mock_run.return_value = (True, "output")

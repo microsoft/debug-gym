@@ -1,5 +1,6 @@
 from debug_gym.gym.terminals.docker import DockerTerminal
 from debug_gym.gym.terminals.kubernetes import KubernetesTerminal
+from debug_gym.gym.terminals.local import LocalTerminal
 from debug_gym.gym.terminals.terminal import Terminal
 from debug_gym.logger import DebugGymLogger
 
@@ -32,10 +33,7 @@ def select_terminal(
         case "kubernetes":
             terminal_class = KubernetesTerminal
         case "local":
-            raise ValueError(
-                "Local terminal is no longer supported. "
-                "Use a Docker or Kubernetes terminal."
-            )
+            terminal_class = LocalTerminal
         case _:
             raise ValueError(f"Unknown terminal {terminal_type}")
 

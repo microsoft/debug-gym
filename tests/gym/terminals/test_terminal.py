@@ -1,7 +1,18 @@
+import tempfile
+from pathlib import Path
+
 import pytest
 
-from debug_gym.gym.terminals import DockerTerminal, select_terminal
+from debug_gym.gym.terminals import DockerTerminal, LocalTerminal, select_terminal
 from debug_gym.gym.terminals.shell_session import DEFAULT_PS1, ShellSession
+
+
+@pytest.fixture
+def tmp_dir_prefix(tmp_path):
+    """Expected tmp_dir_prefix for a terminal session."""
+    tmp_dir = tempfile.TemporaryDirectory(prefix="Terminal-")
+    tmp_dir_prefix = str(Path(tmp_dir.name).resolve()).split("Terminal-")[0]
+    return tmp_dir_prefix
 
 
 @pytest.if_is_linux
@@ -58,6 +69,61 @@ def test_shell_session_timeout(tmp_path):
     assert shell.is_running is False
 
 
+def test_terminal_init(tmp_dir_prefix):
+    terminal = LocalTerminal()
+    assert terminal.session_commands == []
+    assert terminal.env_vars["NO_COLOR"] == "1"
+    assert terminal.env_vars["PS1"] == DEFAULT_PS1
+    assert len(terminal.env_vars) > 2  # NO_COLOR, PS1 + os env vars
+    assert terminal.working_dir.startswith(tmp_dir_prefix)
+
+
+def test_terminal_init_no_os_env_vars():
+    terminal = LocalTerminal(include_os_env_vars=False)
+    assert terminal.env_vars == {
+        "NO_COLOR": "1",
+        "PS1": DEFAULT_PS1,
+        "PYTHONSTARTUP": "",
+        "PYTHONDONTWRITEBYTECODE": "1",
+    }
+
+
+def test_terminal_init_with_params(tmp_path):
+    working_dir = str(tmp_path)
+    session_commands = ["echo 'Hello World'"]
+    env_vars = {"ENV_VAR": "value"}
+    terminal = LocalTerminal(working_dir, session_commands, env_vars)
+    assert terminal.working_dir == working_dir
+    assert terminal.session_commands == session_commands
+    assert terminal.env_vars["NO_COLOR"] == "1"
+    assert terminal.env_vars["ENV_VAR"] == "value"
+    status, output = terminal.run("pwd", timeout=1)
+    assert status
+    assert output == f"Hello World\n{working_dir}"
+    status, output = terminal.run("echo $ENV_VAR", timeout=1)
+    assert status
+    assert output == "Hello World\nvalue"
+
+
+def test_terminal_run(tmp_path):
+    working_dir = str(tmp_path)
+    terminal = LocalTerminal(working_dir=working_dir)
+    entrypoint = "echo 'Hello World'"
+    success, output = terminal.run(entrypoint, timeout=1)
+    assert success is True
+    assert output == "Hello World"
+    assert terminal.working_dir == working_dir
+
+
+def test_terminal_run_tmp_working_dir(tmp_path, tmp_dir_prefix):
+    terminal = LocalTerminal()
+    entrypoint = "echo 'Hello World'"
+    success, output = terminal.run(entrypoint, timeout=1)
+    assert success is True
+    assert output == "Hello World"
+    assert terminal.working_dir.startswith(tmp_dir_prefix)
+
+
 def test_select_terminal_default():
     terminal = select_terminal(None)
     assert terminal is None
@@ -67,11 +133,8 @@ def test_select_terminal_default():
 
 def test_select_terminal_local():
     config = {"type": "local"}
-    with pytest.raises(
-        ValueError,
-        match="Local terminal is no longer supported. Use a Docker or Kubernetes terminal.",
-    ):
-        select_terminal(config)
+    terminal = select_terminal(config)
+    assert isinstance(terminal, LocalTerminal)
     assert config == {"type": "local"}  # config should not be modified
 
 

@@ -8,7 +8,7 @@ from debug_gym.gym.entities import EvalDetails, EvalOutput, Event, Observation
 from debug_gym.gym.envs import load_dataset, select_env
 from debug_gym.gym.envs.aider import AiderBenchmarkEnv
 from debug_gym.gym.envs.env import EnvInfo, EventHooks, RepoEnv, TooledEnv
-from debug_gym.gym.envs.local import LocalEnv as ProductionLocalEnv
+from debug_gym.gym.envs.local import LocalEnv
 from debug_gym.gym.envs.mini_nightmare import MiniNightmareEnv
 from debug_gym.gym.envs.r2egym import R2EGymEnv
 from debug_gym.gym.envs.swe_bench import SWEBenchEnv
@@ -17,7 +17,6 @@ from debug_gym.gym.envs.swe_smith import SWESmithEnv
 from debug_gym.gym.terminals.terminal import UnrecoverableTerminalError
 from debug_gym.gym.tools.tool import ToolCall
 from debug_gym.gym.tools.toolbox import Toolbox
-from tests.helpers import LocalEnv
 
 
 @pytest.fixture
@@ -629,7 +628,7 @@ class TestSelectEnv:
     """Test cases for select_env function."""
 
     def test_select_env_local(self):
-        assert select_env("local") == ProductionLocalEnv
+        assert select_env("local") == LocalEnv
 
     def test_select_env_aider(self):
         assert select_env("aider") == AiderBenchmarkEnv

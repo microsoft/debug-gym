@@ -5,9 +5,9 @@ from unittest.mock import MagicMock
 import pytest
 
 from debug_gym.gym.entities import Event
+from debug_gym.gym.envs.local import LocalEnv
 from debug_gym.gym.terminals.docker import DockerTerminal
 from debug_gym.gym.tools.pdb import PDBTool
-from tests.helpers import LocalEnv
 
 
 def clean_up_pytest_path(obs):
@@ -49,7 +49,7 @@ def setup_pdb_repo_env(setup_test_repo, setup_breakpoints_state):
 
 
 def test_pdb_use(tmp_path, setup_test_repo):
-    # Test PDBTool with the host-backed test terminal and verbose pytest.
+    # Test PDBTool with LocalTerminal, verbose pytest
     tests_path = str(setup_test_repo(tmp_path))
     env = LocalEnv(
         path=tests_path,
@@ -75,7 +75,7 @@ def test_pdb_use(tmp_path, setup_test_repo):
 
 
 def test_pdb_use_empty_command(tmp_path, setup_test_repo):
-    # Test PDBTool with the host-backed test terminal and verbose pytest.
+    # Test PDBTool with LocalTerminal, verbose pytest
     tests_path = str(setup_test_repo(tmp_path))
     env = LocalEnv(
         path=tests_path,
@@ -90,7 +90,7 @@ def test_pdb_use_empty_command(tmp_path, setup_test_repo):
 
 
 def test_pdb_b_fail_blank_or_comment(tmp_path, setup_test_repo):
-    # Test PDBTool with the host-backed test terminal and verbose pytest.
+    # Test PDBTool with LocalTerminal, verbose pytest
     tests_path = str(setup_test_repo(tmp_path))
     env = LocalEnv(
         path=tests_path,
@@ -109,7 +109,7 @@ def test_pdb_b_fail_blank_or_comment(tmp_path, setup_test_repo):
 
 
 def test_pdb_pass_empty_path_if_in_session(tmp_path, setup_test_repo):
-    # Test PDBTool with the host-backed test terminal and verbose pytest.
+    # Test PDBTool with LocalTerminal, verbose pytest
     tests_path = str(setup_test_repo(tmp_path))
     env = LocalEnv(
         path=tests_path,

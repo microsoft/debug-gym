@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+from debug_gym.gym.envs.local import LocalEnv
 from debug_gym.gym.utils import (
     cleanup_pytest_output,
     extract_max_score_from_pytest_output,
@@ -14,7 +15,6 @@ from debug_gym.gym.utils import (
     show_line_number,
     unzip,
 )
-from tests.helpers import LocalEnv
 
 
 def test_show_line_number_empty_code_string():

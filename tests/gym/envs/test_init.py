@@ -22,13 +22,6 @@ class TestSelectEnv:
         env_class = select_env("local")
         assert env_class == LocalEnv
 
-    def test_local_env_requires_isolated_terminal(self, tmp_path):
-        with pytest.raises(
-            ValueError,
-            match="LocalEnv requires an isolated Docker or Kubernetes terminal.",
-        ):
-            LocalEnv(path=tmp_path)
-
     def test_select_aider_env(self):
         """Test selecting AiderBenchmarkEnv."""
         env_class = select_env("aider")

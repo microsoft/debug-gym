@@ -2,9 +2,9 @@ import pytest
 
 from debug_gym.gym.entities import Observation
 from debug_gym.gym.envs.env import Event
+from debug_gym.gym.envs.local import LocalEnv
 from debug_gym.gym.tools.tool import EnvironmentTool, Record
 from debug_gym.gym.tools.toolbox import Toolbox
-from tests.helpers import LocalEnv
 
 
 class FakeTool(EnvironmentTool):

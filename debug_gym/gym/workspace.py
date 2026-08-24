@@ -1,8 +1,10 @@
+import atexit
 import os
 import shlex
 import tempfile
 from pathlib import Path
 
+from debug_gym.gym.terminals.local import LocalTerminal
 from debug_gym.gym.terminals.terminal import Terminal
 from debug_gym.logger import DebugGymLogger
 
@@ -37,8 +39,10 @@ class Workspace:
         self.cleanup()
 
         self.working_dir = self.working_dir or Path("/testbed")
-        if self.terminal.uses_host_filesystem:
+        # only create temp dir for local terminal
+        if type(self.terminal) is LocalTerminal:
             self._tempdir = tempfile.TemporaryDirectory(prefix="DebugGym-")
+            atexit.register(self._tempdir.cleanup)
             self.working_dir = Path(self._tempdir.name).resolve()
 
         self.logger.debug(f"Working directory: {self.working_dir}")
