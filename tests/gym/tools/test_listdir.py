@@ -1,7 +1,7 @@
 import pytest
 
-from debug_gym.gym.envs.local import LocalEnv
 from debug_gym.gym.tools.listdir import ListdirTool
+from tests.helpers import LocalEnv
 
 
 @pytest.fixture

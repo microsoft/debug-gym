@@ -8,9 +8,9 @@ import pytest
 
 from debug_gym.gym.envs.free_env import FreeEnv
 from debug_gym.gym.terminals.docker import DockerTerminal
-from debug_gym.gym.terminals.local import LocalTerminal
 from debug_gym.gym.tools.toolbox import Toolbox
 from debug_gym.logger import DebugGymLogger
+from tests.helpers import HostTerminal
 
 
 @pytest.fixture
@@ -60,13 +60,13 @@ class TestFreeEnvInitialization:
         assert env.task_data == task_data
         assert env.logger == logger
 
-    def test_init_with_local_terminal_raises_error(self, test_repo, logger):
-        """Test that LocalTerminal raises ValueError."""
+    def test_init_with_host_terminal_raises_error(self, test_repo, logger):
+        """Test that a host-backed terminal raises ValueError."""
         task_data = {
             "image": "python:3.11",
             "local_path": str(test_repo),
         }
-        terminal = LocalTerminal()
+        terminal = HostTerminal()
 
         with pytest.raises(
             ValueError, match="only supports DockerTerminal and KubernetesTerminal"
@@ -96,7 +96,7 @@ class TestFreeEnvProperties:
             "image": "python:3.11-slim",
             "local_path": str(test_repo),
         }
-        terminal = LocalTerminal()
+        terminal = HostTerminal()
 
         # Bypass terminal type check for testing
         env = FreeEnv.__new__(FreeEnv)
@@ -112,7 +112,7 @@ class TestFreeEnvProperties:
             "image": "python:3.11",
             "local_path": str(test_repo),
         }
-        terminal = LocalTerminal()
+        terminal = HostTerminal()
 
         env = FreeEnv.__new__(FreeEnv)
         env.task_data = task_data
@@ -133,7 +133,7 @@ class TestFreeEnvSetupTask:
             "image": "python:3.11-alpine",
             "local_path": str(test_repo),
         }
-        terminal = LocalTerminal()
+        terminal = HostTerminal()
 
         env = FreeEnv.__new__(FreeEnv)
         env.task_data = task_data
@@ -188,7 +188,7 @@ class TestFreeEnvSetupTerminal:
             "local_path": str(test_repo),
             "setup_commands": ["echo 'setup complete'"],
         }
-        terminal = LocalTerminal()
+        terminal = HostTerminal()
 
         env = FreeEnv.__new__(FreeEnv)
         env.task_data = task_data

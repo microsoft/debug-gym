@@ -45,21 +45,6 @@ class BashTool(EnvironmentTool):
     def use(self, environment, command: str, timeout: int = None) -> Observation:
         """Execute a bash command in the environment's terminal and return the result."""
         try:
-            # Assert that the terminal is not a local terminal (only in production)
-            import os
-
-            from debug_gym.gym.terminals.local import LocalTerminal
-
-            # Treat local terminals as allowed unless explicitly disabled via env var
-            allow_local = os.environ.get("ALLOW_LOCAL_TERMINAL", "true").lower()
-            if allow_local not in {"true", "false"}:
-                allow_local = "true"
-            if allow_local == "false" and type(environment.terminal) is LocalTerminal:
-                return Observation(
-                    self.name,
-                    "Error: bash tool requires a non-local terminal. Current terminal type is not supported.",
-                )
-
             # Resolve timeout: use provided value, clamp to max, or fall back to default
             if timeout is not None:
                 timeout = max(1, min(int(timeout), self.MAX_TIMEOUT))
