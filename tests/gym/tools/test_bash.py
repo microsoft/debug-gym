@@ -7,7 +7,7 @@ from debug_gym.gym.entities import Observation
 from debug_gym.gym.tools.bash import BashTool
 from debug_gym.gym.tools.tool import ToolCall
 from debug_gym.gym.tools.toolbox import Toolbox
-from tests.helpers import LocalEnv
+from tests.helpers import docker_local_env
 
 
 @pytest.fixture
@@ -30,7 +30,7 @@ def env(tmp_path):
     with open(subdir / "nested.txt", "w") as f:
         f.write("nested file content")
 
-    env = LocalEnv(path=repo_path)
+    env = docker_local_env(path=repo_path)
     bash_tool = Toolbox.get_tool("bash")
     env.add_tool(bash_tool)
     env.reset()
@@ -188,16 +188,13 @@ def test_bash_environment_variables(env):
     assert len(observation.strip()) > 0
 
 
-@patch("debug_gym.gym.terminals.docker.DockerTerminal.run")
-def test_bash_terminal_failure(mock_run, bash_tool):
+def test_bash_terminal_failure(bash_tool):
     """Test handling of terminal execution failure."""
-    # Mock terminal.run to return failure
-    mock_run.return_value = (False, "Command failed: permission denied")
-
-    # Create mock environment with terminal
     mock_env = MagicMock()
-    mock_env.terminal = MagicMock()
-    mock_env.terminal.run = mock_run
+    mock_env.terminal.run.return_value = (
+        False,
+        "Command failed: permission denied",
+    )
 
     result = bash_tool.use(mock_env, "some_command")
 
@@ -207,16 +204,10 @@ def test_bash_terminal_failure(mock_run, bash_tool):
     assert "permission denied" in result.observation
 
 
-@patch("debug_gym.gym.terminals.docker.DockerTerminal.run")
-def test_bash_terminal_success(mock_run, bash_tool):
+def test_bash_terminal_success(bash_tool):
     """Test successful terminal execution."""
-    # Mock terminal.run to return success
-    mock_run.return_value = (True, "Success output")
-
-    # Create mock environment with terminal
     mock_env = MagicMock()
-    mock_env.terminal = MagicMock()
-    mock_env.terminal.run = mock_run
+    mock_env.terminal.run.return_value = (True, "Success output")
 
     result = bash_tool.use(mock_env, "echo hello")
 
@@ -225,19 +216,13 @@ def test_bash_terminal_success(mock_run, bash_tool):
     assert result.observation == "Success output"
 
     # Verify terminal.run was called with correct parameters (default timeout)
-    mock_run.assert_called_once_with("echo hello", timeout=30)
+    mock_env.terminal.run.assert_called_once_with("echo hello", timeout=30)
 
 
-@patch("debug_gym.gym.terminals.docker.DockerTerminal.run")
-def test_bash_empty_output_handling(mock_run, bash_tool):
+def test_bash_empty_output_handling(bash_tool):
     """Test handling of commands with empty output."""
-    # Mock terminal.run to return success with empty output
-    mock_run.return_value = (True, "")
-
-    # Create mock environment with terminal
     mock_env = MagicMock()
-    mock_env.terminal = MagicMock()
-    mock_env.terminal.run = mock_run
+    mock_env.terminal.run.return_value = (True, "")
 
     result = bash_tool.use(mock_env, "touch file")
 
@@ -493,40 +478,35 @@ def test_bash_file_creation_unicode_content(env):
     assert "🎉" in observation
 
 
-@patch("debug_gym.gym.terminals.docker.DockerTerminal.run")
-def test_bash_custom_timeout(mock_run, bash_tool):
+def test_bash_custom_timeout(bash_tool):
     """Test that a custom timeout is passed to terminal.run."""
-    mock_run.return_value = (True, "output")
     mock_env = MagicMock()
-    mock_env.terminal = MagicMock()
-    mock_env.terminal.run = mock_run
+    mock_env.terminal.run.return_value = (True, "output")
 
     bash_tool.use(mock_env, "pytest tests/", timeout=600)
-    mock_run.assert_called_once_with("pytest tests/", timeout=600)
+    mock_env.terminal.run.assert_called_once_with("pytest tests/", timeout=600)
 
 
-@patch("debug_gym.gym.terminals.docker.DockerTerminal.run")
-def test_bash_timeout_clamped_to_max(mock_run, bash_tool):
+def test_bash_timeout_clamped_to_max(bash_tool):
     """Test that timeout exceeding MAX_TIMEOUT is clamped."""
-    mock_run.return_value = (True, "output")
     mock_env = MagicMock()
-    mock_env.terminal = MagicMock()
-    mock_env.terminal.run = mock_run
+    mock_env.terminal.run.return_value = (True, "output")
 
     bash_tool.use(mock_env, "long_command", timeout=9999)
-    mock_run.assert_called_once_with("long_command", timeout=BashTool.MAX_TIMEOUT)
+    mock_env.terminal.run.assert_called_once_with(
+        "long_command", timeout=BashTool.MAX_TIMEOUT
+    )
 
 
-@patch("debug_gym.gym.terminals.docker.DockerTerminal.run")
-def test_bash_timeout_none_uses_default(mock_run, bash_tool):
+def test_bash_timeout_none_uses_default(bash_tool):
     """Test that timeout=None uses the default timeout."""
-    mock_run.return_value = (True, "output")
     mock_env = MagicMock()
-    mock_env.terminal = MagicMock()
-    mock_env.terminal.run = mock_run
+    mock_env.terminal.run.return_value = (True, "output")
 
     bash_tool.use(mock_env, "echo hi", timeout=None)
-    mock_run.assert_called_once_with("echo hi", timeout=BashTool.DEFAULT_TIMEOUT)
+    mock_env.terminal.run.assert_called_once_with(
+        "echo hi", timeout=BashTool.DEFAULT_TIMEOUT
+    )
 
 
 def test_bash_with_timeout_via_env_step(env):

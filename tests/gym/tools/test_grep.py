@@ -1,7 +1,7 @@
 import pytest
 
 from debug_gym.gym.tools.grep import GrepTool
-from tests.helpers import LocalEnv
+from tests.helpers import docker_local_env
 
 
 @pytest.fixture
@@ -176,7 +176,7 @@ env/
 def setup_grep_repo_env(setup_grep_test_repo):
     def _setup_grep_repo_env(base_dir):
         test_repo = setup_grep_test_repo(base_dir)
-        env = LocalEnv(path=str(test_repo))
+        env = docker_local_env(path=str(test_repo))
         grep_tool = GrepTool()
         env.reset()
         return grep_tool, env

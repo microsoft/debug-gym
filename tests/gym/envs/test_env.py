@@ -8,7 +8,7 @@ from debug_gym.gym.entities import EvalDetails, EvalOutput, Event, Observation
 from debug_gym.gym.envs import load_dataset, select_env
 from debug_gym.gym.envs.aider import AiderBenchmarkEnv
 from debug_gym.gym.envs.env import EnvInfo, EventHooks, RepoEnv, TooledEnv
-from debug_gym.gym.envs.local import LocalEnv as ProductionLocalEnv
+from debug_gym.gym.envs.local import LocalEnv
 from debug_gym.gym.envs.mini_nightmare import MiniNightmareEnv
 from debug_gym.gym.envs.r2egym import R2EGymEnv
 from debug_gym.gym.envs.swe_bench import SWEBenchEnv
@@ -17,12 +17,12 @@ from debug_gym.gym.envs.swe_smith import SWESmithEnv
 from debug_gym.gym.terminals.terminal import UnrecoverableTerminalError
 from debug_gym.gym.tools.tool import ToolCall
 from debug_gym.gym.tools.toolbox import Toolbox
-from tests.helpers import LocalEnv
+from tests.helpers import docker_local_env
 
 
 @pytest.fixture
 def env_mock(tmp_path):
-    env = LocalEnv(path=tmp_path)
+    env = docker_local_env(path=tmp_path)
     return env
 
 
@@ -187,7 +187,7 @@ def env(tmp_path):
     (repo_path / "file2.txt").touch()
     (subdir_path / "subfile1.txt").touch()
 
-    env = LocalEnv(path=repo_path)
+    env = docker_local_env(path=repo_path)
     return env
 
 
@@ -224,7 +224,7 @@ def test_step(
     mock_pdb_tool.current_frame_file = "file.py"
     mock_get_tool.return_value = None
 
-    env = LocalEnv(path=tmp_path)
+    env = docker_local_env(path=tmp_path)
     env.reset()
     env.last_eval = EvalOutput(success=False, output="1 failed, 0 passed")
     tool_call = ToolCall(id="123", name="pdb", arguments={"command": "b 10"})
@@ -247,7 +247,7 @@ def test_step(
 def test_reset(tmp_path):
     (tmp_path / "test.py").write_text("def test_1():\n  assert False\n")
 
-    env = LocalEnv(path=tmp_path, entrypoint="pytest test.py")
+    env = docker_local_env(path=tmp_path, entrypoint="pytest test.py")
     infos = env.reset()
 
     assert env.last_eval is None
@@ -272,7 +272,7 @@ def test_reset(tmp_path):
 def test_eval(tmp_path):
     (tmp_path / "test.py").write_text("def test_1():\n  assert False\n")
 
-    env = LocalEnv(path=tmp_path, entrypoint="pytest test.py")
+    env = docker_local_env(path=tmp_path, entrypoint="pytest test.py")
     env.reset()
     env.eval()
     assert "FAILED test.py::test_1 - assert False" in env.last_eval.output
@@ -283,7 +283,7 @@ def test_eval_success(tmp_path):
     # create a dummy file
     with open(tmp_path / "file.py", "w") as f:
         f.write("print('Hello, World!')")
-    env = LocalEnv(path=working_dir, entrypoint="python file.py")
+    env = docker_local_env(path=working_dir, entrypoint="python file.py")
     env.reset()
     output = env.eval()
     assert output == EvalOutput(success=True, output="Hello, World!")
@@ -308,7 +308,7 @@ def test_eval_timeout(tmp_path):
     # runs for longer than the timeout
     with open(tmp_path / "file.py", "w") as f:
         f.write("import time; time.sleep(5)")
-    env = LocalEnv(path=working_dir, entrypoint="python file.py", run_timeout=1)
+    env = docker_local_env(path=working_dir, entrypoint="python file.py", run_timeout=1)
     env.reset()
     output = env.eval()
     assert output == EvalOutput(
@@ -470,7 +470,7 @@ def test_queue_and_process_events():
 
 
 def test_has_breakpoint_true_and_false(tmp_path):
-    env = LocalEnv(path=tmp_path)
+    env = docker_local_env(path=tmp_path)
     env.reset()
     file_path = env.working_dir / "test.py"
     line_number = 10
@@ -483,7 +483,7 @@ def test_has_breakpoint_true_and_false(tmp_path):
 
 
 def test_has_breakpoint_relative_path(tmp_path):
-    env = LocalEnv(path=tmp_path)
+    env = docker_local_env(path=tmp_path)
     env.reset()
     file_path = env.working_dir / "foo.py"
     line_number = 5
@@ -592,7 +592,7 @@ def test_env_info_str_many_breakpoints():
 
 def test_get_triggered_tools_empty_tool_response(tmp_path):
     """Test get_triggered_tools with empty_tool_response action."""
-    env = LocalEnv(path=tmp_path)
+    env = docker_local_env(path=tmp_path)
     action = ToolCall(id="empty", name="empty_tool_response", arguments={})
     error, tool_info = env.get_triggered_tools(action)
     assert "No tool call was generated" in error
@@ -625,7 +625,7 @@ class TestSelectEnv:
     """Test cases for select_env function."""
 
     def test_select_env_local(self):
-        assert select_env("local") == ProductionLocalEnv
+        assert select_env("local") == LocalEnv
 
     def test_select_env_aider(self):
         assert select_env("aider") == AiderBenchmarkEnv
@@ -665,7 +665,7 @@ class TestSoftReset:
         test_file = tmp_path / "test.py"
         test_file.write_text("print('hello')")
 
-        env = LocalEnv(path=tmp_path)
+        env = docker_local_env(path=tmp_path)
         env.reset()
 
         # Set some state
@@ -685,7 +685,7 @@ class TestSoftReset:
         test_file = tmp_path / "test.py"
         test_file.write_text("print('hello')")
 
-        env = LocalEnv(path=tmp_path)
+        env = docker_local_env(path=tmp_path)
         env.reset()
 
         # Get a reference to the terminal
@@ -702,7 +702,7 @@ class TestSoftReset:
         test_file = tmp_path / "test.py"
         test_file.write_text("original content")
 
-        env = LocalEnv(path=tmp_path)
+        env = docker_local_env(path=tmp_path)
         env.reset()
 
         # Modify the file
@@ -719,7 +719,7 @@ class TestSoftReset:
         test_file = tmp_path / "test.py"
         test_file.write_text("print('hello')")
 
-        env = LocalEnv(path=tmp_path)
+        env = docker_local_env(path=tmp_path)
         env.reset()
 
         # Add a mock tool that listens to ENV_RESET

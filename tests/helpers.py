@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from debug_gym.gym.envs.local import LocalEnv as ProductionLocalEnv
+from debug_gym.gym.envs.local import LocalEnv
 from debug_gym.gym.envs.mini_nightmare import (
     DOCKER_MINI_NIGHTMARE_IMAGE_NAME,
     build_docker_image,
@@ -14,12 +14,11 @@ def docker_test_terminal() -> DockerTerminal:
     return DockerTerminal(base_image=DOCKER_MINI_NIGHTMARE_IMAGE_NAME)
 
 
-class LocalEnv(ProductionLocalEnv):
-    """Local-path environment using a Docker terminal."""
-
-    def __init__(self, path: str | Path, terminal: Terminal | None = None, **kwargs):
-        super().__init__(
-            path=str(path),
-            terminal=terminal or docker_test_terminal(),
-            **kwargs,
-        )
+def docker_local_env(
+    path: str | Path, terminal: Terminal | None = None, **kwargs
+) -> LocalEnv:
+    return LocalEnv(
+        path=str(path),
+        terminal=terminal or docker_test_terminal(),
+        **kwargs,
+    )

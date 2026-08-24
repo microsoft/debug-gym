@@ -4,7 +4,7 @@ from debug_gym.gym.entities import Observation
 from debug_gym.gym.envs.env import Event
 from debug_gym.gym.tools.tool import EnvironmentTool, Record
 from debug_gym.gym.tools.toolbox import Toolbox
-from tests.helpers import LocalEnv
+from tests.helpers import docker_local_env
 
 
 class FakeTool(EnvironmentTool):
@@ -26,7 +26,7 @@ class FakeToolWithSetup(EnvironmentTool):
 
 @pytest.fixture
 def env(tmp_path):
-    env = LocalEnv(path=tmp_path)
+    env = docker_local_env(path=tmp_path)
     return env
 
 
@@ -161,7 +161,7 @@ class TestSetupCommands:
     def test_setup_commands_run_on_reset(self, tmp_path):
         """Test that setup commands run when reset() is called after tool registration."""
         # Create env and add tool before reset
-        env = LocalEnv(path=tmp_path)
+        env = docker_local_env(path=tmp_path)
         tool = FakeToolWithSetup()
         env.add_tool(tool)
 
@@ -178,7 +178,7 @@ class TestSetupCommands:
     def test_setup_commands_run_immediately_when_added_after_reset(self, tmp_path):
         """Test that setup commands run immediately when tool is added after reset()."""
         # Create env and reset first
-        env = LocalEnv(path=tmp_path)
+        env = docker_local_env(path=tmp_path)
         env.reset()
 
         # Create a marker file via setup command
@@ -194,7 +194,7 @@ class TestSetupCommands:
 
     def test_setup_commands_run_on_each_reset(self, tmp_path):
         """Test that setup commands run on each reset() call."""
-        env = LocalEnv(path=tmp_path)
+        env = docker_local_env(path=tmp_path)
         tool = FakeToolWithSetup()
         env.add_tool(tool)
 
@@ -212,7 +212,7 @@ class TestSetupCommands:
 
     def test_tool_without_setup_commands(self, tmp_path):
         """Test that tools without setup_commands work normally."""
-        env = LocalEnv(path=tmp_path)
+        env = docker_local_env(path=tmp_path)
         tool = FakeTool()  # No setup_commands
 
         assert tool.setup_commands == ()
@@ -226,7 +226,7 @@ class TestSetupCommands:
 
     def test_setup_commands_failure_does_not_raise(self, tmp_path):
         """Test that failing setup commands don't raise exceptions (raises=False)."""
-        env = LocalEnv(path=tmp_path)
+        env = docker_local_env(path=tmp_path)
         tool = FakeToolWithSetup()
         # Command that will fail
         tool.setup_commands = ["exit 1"]

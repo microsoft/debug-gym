@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 
 from debug_gym.gym.tools.edit import EditTool
-from tests.helpers import LocalEnv
+from tests.helpers import docker_local_env
 
 
 @pytest.fixture
@@ -23,7 +23,7 @@ def env(tmp_path):
     with open(repo_path / "test.py", "w") as f:
         f.write(file_content)
 
-    env = LocalEnv(path=repo_path)
+    env = docker_local_env(path=repo_path)
 
     edit_tool = EditTool()
     env.add_tool(edit_tool)

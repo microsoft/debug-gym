@@ -1,5 +1,3 @@
-from unittest.mock import MagicMock
-
 import pytest
 
 from debug_gym.gym.entities import EvalOutput
@@ -23,11 +21,9 @@ class TestSWEQAEnv:
             "answer": "It is lazy.",
         }
 
-    def test_init_with_invalid_terminal_raises(self, task_data):
-        """Test that SWEQAEnv rejects non-Docker/Kubernetes terminals."""
-        terminal = MagicMock()
+    def test_init_with_unsupported_terminal_raises(self, task_data):
         with pytest.raises(ValueError, match="only supports DockerTerminal"):
-            SWEQAEnv(task_data=task_data, terminal=terminal)
+            SWEQAEnv(task_data=task_data, terminal=object())
 
     def test_setup_task_scikit_learn(self, task_data):
         """Test setup_task correctly parses scikit_learn instance_id."""
