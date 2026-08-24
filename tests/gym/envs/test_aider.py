@@ -6,7 +6,6 @@ from debug_gym.gym.envs import AiderBenchmarkEnv
 from debug_gym.gym.terminals.docker import DockerTerminal
 from debug_gym.gym.tools.tool import ToolCall
 from debug_gym.gym.tools.toolbox import Toolbox
-from tests.helpers import HostTerminal
 
 
 @pytest.fixture(scope="session")
@@ -36,10 +35,9 @@ def setup_aider_repo(tmp_path_factory):
 
 @pytest.fixture
 def env(setup_aider_repo):
-    terminal = HostTerminal()
-    dataset = AiderBenchmarkEnv.load_dataset(build_image=False)
+    dataset = AiderBenchmarkEnv.load_dataset()
     task_data = dataset["clock"]
-    env = AiderBenchmarkEnv(task_data=task_data, terminal=terminal)
+    env = AiderBenchmarkEnv(task_data=task_data)
     env.reset()
     return env
 

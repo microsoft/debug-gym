@@ -49,7 +49,7 @@ def setup_pdb_repo_env(setup_test_repo, setup_breakpoints_state):
 
 
 def test_pdb_use(tmp_path, setup_test_repo):
-    # Test PDBTool with the host-backed test terminal and verbose pytest.
+    # Test PDBTool with the Docker test terminal and verbose pytest.
     tests_path = str(setup_test_repo(tmp_path))
     env = LocalEnv(
         path=tests_path,
@@ -75,7 +75,7 @@ def test_pdb_use(tmp_path, setup_test_repo):
 
 
 def test_pdb_use_empty_command(tmp_path, setup_test_repo):
-    # Test PDBTool with the host-backed test terminal and verbose pytest.
+    # Test PDBTool with the Docker test terminal and verbose pytest.
     tests_path = str(setup_test_repo(tmp_path))
     env = LocalEnv(
         path=tests_path,
@@ -90,7 +90,7 @@ def test_pdb_use_empty_command(tmp_path, setup_test_repo):
 
 
 def test_pdb_b_fail_blank_or_comment(tmp_path, setup_test_repo):
-    # Test PDBTool with the host-backed test terminal and verbose pytest.
+    # Test PDBTool with the Docker test terminal and verbose pytest.
     tests_path = str(setup_test_repo(tmp_path))
     env = LocalEnv(
         path=tests_path,
@@ -109,7 +109,7 @@ def test_pdb_b_fail_blank_or_comment(tmp_path, setup_test_repo):
 
 
 def test_pdb_pass_empty_path_if_in_session(tmp_path, setup_test_repo):
-    # Test PDBTool with the host-backed test terminal and verbose pytest.
+    # Test PDBTool with the Docker test terminal and verbose pytest.
     tests_path = str(setup_test_repo(tmp_path))
     env = LocalEnv(
         path=tests_path,
@@ -659,11 +659,13 @@ def test_pdb_list_output_indentation(tmp_path, setup_pdb_repo_env):
     """Test PDB list output indentation for line numbers around 100 (3-digit)"""
     pdb_tool, env = setup_pdb_repo_env(tmp_path)
     wd = env.working_dir
-    with (wd / "large_file.py").open("w") as f:
-        f.write("def dummy_function():\n")
-        f.write("\n".join(f"    'Line {i+1}'" for i in range(1, 2000)))
-        f.write("\n\nif __name__ == '__main__':\n")
-        f.write("    dummy_function()\n")
+    env.workspace.write_file(
+        "large_file.py",
+        "def dummy_function():\n"
+        + "\n".join(f"    'Line {i+1}'" for i in range(1, 2000))
+        + "\n\nif __name__ == '__main__':\n"
+        + "    dummy_function()\n",
+    )
     debug_entrypoint = "python -m pdb large_file.py"
     pdb_obs = pdb_tool.use(env, "b large_file.py:100", debug_entrypoint)
     assert (
@@ -851,8 +853,9 @@ def test_pdb_changing_entrypoint(tmp_path, setup_pdb_repo_env):
     wd = env.working_dir
 
     # Create a simple Python script to debug
-    with (wd / "simple_script.py").open("w") as f:
-        f.write("""
+    env.workspace.write_file(
+        "simple_script.py",
+        """
 def main():
     x = 42
     print(f"Value is {x}")
@@ -860,7 +863,8 @@ def main():
 
 if __name__ == "__main__":
     main()
-""")
+""",
+    )
 
     # Use entrypoint to debug the simple script instead of pytest
     script_entrypoint = "python -m pdb simple_script.py"

@@ -1,6 +1,5 @@
 import os
 import shlex
-import tempfile
 from pathlib import Path
 
 from debug_gym.gym.terminals.terminal import Terminal
@@ -22,24 +21,17 @@ class WorkspaceWriteError(WorkspaceError):
 class Workspace:
 
     def __init__(self, terminal: Terminal, logger: DebugGymLogger | None = None):
-        self._tempdir = None
         self.working_dir = None
         self.logger = logger or DebugGymLogger("debug-gym")
         self.terminal = terminal
 
     def cleanup(self):
         self.working_dir = None
-        if self._tempdir:
-            self._tempdir.cleanup()
-            self._tempdir = None
 
     def reset(self):
         self.cleanup()
 
         self.working_dir = self.working_dir or Path("/testbed")
-        if self.terminal.uses_host_filesystem:
-            self._tempdir = tempfile.TemporaryDirectory(prefix="DebugGym-")
-            self.working_dir = Path(self._tempdir.name).resolve()
 
         self.logger.debug(f"Working directory: {self.working_dir}")
         self.terminal.working_dir = str(self.working_dir)

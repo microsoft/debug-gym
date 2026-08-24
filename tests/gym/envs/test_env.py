@@ -195,9 +195,7 @@ def test_patch(env):
     env.reset()
 
     # Change the content of a file
-    file1 = env.working_dir / "file1.txt"
-    with open(file1, "w") as f:
-        f.write("Hello, World!")
+    env.workspace.write_file("file1.txt", "Hello, World!")
 
     result = env.patch
     expected = (
@@ -475,7 +473,6 @@ def test_has_breakpoint_true_and_false(tmp_path):
     env = LocalEnv(path=tmp_path)
     env.reset()
     file_path = env.working_dir / "test.py"
-    file_path.write_text("print('hello')")
     line_number = 10
     key = f"{file_path}|||{line_number}"
     env.current_breakpoints_state = {key: "b test.py:10"}
@@ -489,7 +486,6 @@ def test_has_breakpoint_relative_path(tmp_path):
     env = LocalEnv(path=tmp_path)
     env.reset()
     file_path = env.working_dir / "foo.py"
-    file_path.write_text("print('foo')")
     line_number = 5
     key = f"{file_path}|||{line_number}"
     env.current_breakpoints_state = {key: "b foo.py:5"}
@@ -710,13 +706,13 @@ class TestSoftReset:
         env.reset()
 
         # Modify the file
-        (env.working_dir / "test.py").write_text("modified content")
+        env.workspace.write_file("test.py", "modified content")
 
         # Soft reset should NOT revert file changes
         env.reset(options={"reset_runtime": False})
 
         # File should still be modified
-        assert (env.working_dir / "test.py").read_text() == "modified content"
+        assert env.workspace.read_file("test.py") == "modified content"
 
     def test_soft_reset_notifies_tools(self, tmp_path):
         """Test that soft reset still notifies tools of ENV_RESET event."""

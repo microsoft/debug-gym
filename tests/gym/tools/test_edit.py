@@ -72,8 +72,7 @@ def test_edit_with_file_path(env):
         "+    print(f'Hello, {name}!')\n"
         "     print('Goodbye, world!')\n"
     )
-    with open(env.working_dir / "test.py", "r") as f:
-        new_content = f.read()
+    new_content = env.workspace.read_file("test.py")
     assert new_content == (
         "import abc\n"
         "\n"
@@ -110,8 +109,7 @@ def test_edit_start_end(env):
         "-    print('Goodbye, world!')\n"
         "+    print(f'Hello, {name}!')\n"
     )
-    with open(env.working_dir / "test.py", "r") as f:
-        new_content = f.read()
+    new_content = env.workspace.read_file("test.py")
     assert new_content == ("import abc\n\ndef greet():\n    print(f'Hello, {name}!')\n")
 
 
@@ -139,8 +137,7 @@ def test_full_edit(env):
         "-    print('Goodbye, world!')\n"
         "+print(f'Hello, {name}!')"
     )
-    with open(env.working_dir / "test.py", "r") as f:
-        new_content = f.read()
+    new_content = env.workspace.read_file("test.py")
     assert new_content == "print(f'Hello, {name}!')"
 
 
@@ -154,7 +151,7 @@ def test_edit_invalid_file(env):
     }
     obs = edit_tool.use(env, **patch)
     assert edit_tool.edit_success
-    assert (env.working_dir / "another_file.py").exists()
+    assert env.workspace.has_file("another_file.py")
     assert env.workspace.read_file("another_file.py") == "    print(f'Hello, {name}!')"
 
 
@@ -223,8 +220,7 @@ def test_edit_with_newlines(env):
         "+    print(f'Hello #2!')\n"
         "     print('Goodbye, world!')\n"
     )
-    with open(env.working_dir / "test.py", "r") as f:
-        new_content = f.read()
+    new_content = env.workspace.read_file("test.py")
 
     assert new_content == (
         "import abc\n"
@@ -240,7 +236,7 @@ def test_edit_new_file(env):
     """Ensure the edit tool can create a brand new file when it does not already exist."""
     edit_tool = env.get_tool("edit")
     filename = "new_dir/nested/new_module.py"
-    assert not (env.working_dir / filename).exists()
+    assert not env.workspace.has_file(filename)
 
     patch = {
         "path": filename,
@@ -253,8 +249,7 @@ def test_edit_new_file(env):
     assert f"The file `{filename}` has been updated successfully." in obs.observation
     assert "def added():" in obs.observation
 
-    with open(env.working_dir / filename, "r") as f:
-        content = f.read()
+    content = env.workspace.read_file(filename)
     assert content == "def added():\n    return 'created'\n"
 
 

@@ -166,14 +166,14 @@ class TestSetupCommands:
         env.add_tool(tool)
 
         # Create a marker file via setup command to verify it ran
-        marker_file = tmp_path / "setup_marker.txt"
+        marker_file = "setup_marker.txt"
         tool.setup_commands = [f"echo 'setup_ran' > {marker_file}"]
 
         # Reset should trigger on_env_reset which runs setup commands
         env.reset()
 
-        assert marker_file.exists()
-        assert "setup_ran" in marker_file.read_text()
+        assert env.workspace.has_file(marker_file)
+        assert "setup_ran" in env.workspace.read_file(marker_file)
 
     def test_setup_commands_run_immediately_when_added_after_reset(self, tmp_path):
         """Test that setup commands run immediately when tool is added after reset()."""
@@ -182,15 +182,15 @@ class TestSetupCommands:
         env.reset()
 
         # Create a marker file via setup command
-        marker_file = tmp_path / "setup_marker_after_reset.txt"
+        marker_file = "setup_marker_after_reset.txt"
 
         # Add tool after reset - setup commands should run immediately in register()
         tool = FakeToolWithSetup()
         tool.setup_commands = [f"echo 'setup_ran_after' > {marker_file}"]
         env.add_tool(tool)
 
-        assert marker_file.exists()
-        assert "setup_ran_after" in marker_file.read_text()
+        assert env.workspace.has_file(marker_file)
+        assert "setup_ran_after" in env.workspace.read_file(marker_file)
 
     def test_setup_commands_run_on_each_reset(self, tmp_path):
         """Test that setup commands run on each reset() call."""
@@ -199,16 +199,16 @@ class TestSetupCommands:
         env.add_tool(tool)
 
         # Use a counter file to track how many times setup ran
-        counter_file = tmp_path / "setup_counter.txt"
+        counter_file = "setup_counter.txt"
         tool.setup_commands = [f"echo 'x' >> {counter_file}"]
 
         # First reset
         env.reset()
-        assert counter_file.read_text().count("x") == 1
+        assert env.workspace.read_file(counter_file).count("x") == 1
 
         # Second reset
         env.reset()
-        assert counter_file.read_text().count("x") == 2
+        assert env.workspace.read_file(counter_file).count("x") == 1
 
     def test_tool_without_setup_commands(self, tmp_path):
         """Test that tools without setup_commands work normally."""
