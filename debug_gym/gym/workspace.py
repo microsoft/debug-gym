@@ -142,7 +142,7 @@ class Workspace:
 
         # Use terminal file-copy for large content to avoid slow command-based writes.
         chunk_size = 32 * 1024  # 32kB
-        if len(content.encode()) > chunk_size:
+        if len(content) > chunk_size:
             relative_filepath = abs_filepath.relative_to(self.working_dir)
             with tempfile.TemporaryDirectory() as tmp_dir:
                 staged_filepath = Path(tmp_dir) / relative_filepath
