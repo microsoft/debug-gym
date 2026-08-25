@@ -12,9 +12,22 @@ from tests.helpers import docker_local_env
 
 def clean_up_pytest_path(obs):
     """clean up the pytest path to not depend on the env"""
-    return re.sub(
+    obs = re.sub(
         r"Current frame:\n.*pytest/__main__\.py",
         "Current frame:\n.../pytest/__main__.py",
+        obs,
+    )
+    return re.sub(
+        "  5  \tfrom _pytest.config import _console_main\r\n"
+        "  6  \t\r\n"
+        "  7  \t\r\n"
+        '  8  \tif __name__ == "__main__":\r\n'
+        "  9  \t    raise SystemExit\\(_console_main\\(\\)\\)\r\n",
+        "  5  \timport pytest\r\n"
+        "  6  \t\r\n"
+        "  7  \t\r\n"
+        '  8  \tif __name__ == "__main__":\r\n'
+        "  9  \t    raise SystemExit(pytest.console_main())\r\n",
         obs,
     )
 

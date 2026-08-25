@@ -1,5 +1,6 @@
 import os
 import shlex
+import tempfile
 from pathlib import Path
 
 from debug_gym.gym.terminals.terminal import Terminal
@@ -139,8 +140,18 @@ class Workspace:
         # create parent directories via the terminal if needed
         _run_or_raise(f"mkdir -p {shlex.quote(str(abs_filepath.parent))}")
 
-        # We will split content in chunks of 32kB to avoid hitting command length limits.
+        # Use terminal file-copy for large content to avoid slow command-based writes.
         chunk_size = 32 * 1024  # 32kB
+        if len(content.encode()) > chunk_size:
+            relative_filepath = abs_filepath.relative_to(self.working_dir)
+            with tempfile.TemporaryDirectory() as tmp_dir:
+                staged_filepath = Path(tmp_dir) / relative_filepath
+                staged_filepath.parent.mkdir(parents=True, exist_ok=True)
+                staged_filepath.write_text(content, encoding="utf-8")
+                self.terminal.copy_content(tmp_dir, self.working_dir)
+            return
+
+        # Split smaller content in chunks of 32kB to avoid hitting command length limits.
         first_chunk = content[:chunk_size]
         rest = content[chunk_size:]
 
