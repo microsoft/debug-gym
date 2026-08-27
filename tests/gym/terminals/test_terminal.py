@@ -2,6 +2,7 @@ import pytest
 
 from debug_gym.gym.terminals import DockerTerminal, select_terminal
 from debug_gym.gym.terminals.shell_session import DEFAULT_PS1, ShellSession
+from debug_gym.gym.terminals.terminal import MAX_LOG_OUTPUT_CHARS
 
 
 @pytest.if_is_linux
@@ -63,6 +64,20 @@ def test_select_terminal_default():
     assert terminal is None
     terminal = select_terminal()
     assert terminal is None
+
+
+def test_terminal_bounds_output_for_logging():
+    terminal = DockerTerminal(base_image="ubuntu:latest")
+    output = "A" * (MAX_LOG_OUTPUT_CHARS + 1)
+
+    assert terminal._output_for_logging("short output") == "short output"
+
+    logged_output = terminal._output_for_logging(output)
+
+    assert logged_output.startswith("A" * MAX_LOG_OUTPUT_CHARS)
+    assert logged_output.endswith(
+        f"[LOG OUTPUT TRUNCATED: {len(output)} chars]"
+    )
 
 
 def test_select_terminal_local():
