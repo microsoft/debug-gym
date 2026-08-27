@@ -4,17 +4,14 @@ import pytest
 
 from debug_gym.gym.envs.mini_nightmare import MiniNightmareEnv
 from debug_gym.gym.terminals.docker import DockerTerminal
-from debug_gym.gym.terminals.local import LocalTerminal
 from debug_gym.gym.tools.toolbox import Toolbox
 
 
 @pytest.fixture
 def mini_nightmare_env():
-    # Initialize the MiniNightmareEnv with LocalTerminal
-    terminal = LocalTerminal()
-    dataset = MiniNightmareEnv.load_dataset(build_image=False)
+    dataset = MiniNightmareEnv.load_dataset()
     task_data = dataset["config"]
-    env = MiniNightmareEnv(task_data=task_data, terminal=terminal)
+    env = MiniNightmareEnv(task_data=task_data)
     env.add_tool(Toolbox.get_tool("eval"))
     return env
 

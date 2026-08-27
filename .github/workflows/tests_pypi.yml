@@ -154,7 +154,6 @@ jobs:
           pip install "debug-gym[dev]==${{ needs.get-latest-release.outputs.release-tag }}"
       - name: Test - PR - Fast
         env:
-          ALLOW_LOCAL_TERMINAL: true
           DEBUG_GYM_DEBUG: 1
         run: |
           pytest -vv -n 16 -k "not test_swe_bench and not test_swe_smith and not test_r2egym and not test_kubernetes" --timeout=600 --cov=debug_gym --cov-report=term-missing

@@ -5,7 +5,6 @@ from pathlib import Path
 
 import pytest
 
-from debug_gym.gym.envs.local import LocalEnv
 from debug_gym.gym.utils import (
     cleanup_pytest_output,
     extract_max_score_from_pytest_output,
@@ -15,6 +14,7 @@ from debug_gym.gym.utils import (
     show_line_number,
     unzip,
 )
+from tests.helpers import docker_local_env
 
 
 def test_show_line_number_empty_code_string():
@@ -45,7 +45,7 @@ def test_show_line_number_no_code_path_no_breakpoints():
 
 
 def test_show_line_number_with_code_path(tmp_path):
-    env = LocalEnv(path=tmp_path)
+    env = docker_local_env(path=tmp_path)
     env.reset()
     code_path = f"{env.working_dir}/code.py"
     breakpoints_state = {f"{code_path}|||2": "b 2"}
@@ -65,7 +65,7 @@ def test_show_line_number_with_code_path(tmp_path):
 
 
 def test_show_line_number_multiple_breakpoints(tmp_path):
-    env = LocalEnv(path=tmp_path)
+    env = docker_local_env(path=tmp_path)
     env.reset()
     code_path = f"{env.working_dir}/code.py"
     breakpoints_state = {
@@ -92,7 +92,7 @@ def test_show_line_number_multiple_breakpoints(tmp_path):
 
 
 def test_show_line_number_multiple_breakpoints_with_start_index(tmp_path):
-    env = LocalEnv(path=tmp_path)
+    env = docker_local_env(path=tmp_path)
     env.reset()
     code_path = f"{env.working_dir}/code.py"
     breakpoints_state = {

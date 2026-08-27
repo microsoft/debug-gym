@@ -1,14 +1,14 @@
 import pytest
 
-from debug_gym.gym.envs.local import LocalEnv
 from debug_gym.gym.tools.listdir import ListdirTool
+from tests.helpers import docker_local_env
 
 
 @pytest.fixture
 def setup_listdir_repo_env(setup_test_repo):
     def _setup_listdir_repo_env(base_dir):
         test_repo = setup_test_repo(base_dir)
-        env = LocalEnv(path=str(test_repo))
+        env = docker_local_env(path=str(test_repo))
         listdir_tool = ListdirTool()
         listdir_tool.register(env)
         env.reset()

@@ -3,9 +3,9 @@ from pathlib import Path
 import pytest
 
 from debug_gym.gym.entities import Observation
-from debug_gym.gym.envs.local import LocalEnv
 from debug_gym.gym.tools.tool import ToolCall
 from debug_gym.gym.tools.toolbox import Toolbox
+from tests.helpers import docker_local_env
 
 
 @pytest.fixture
@@ -26,7 +26,7 @@ def env(tmp_path):
 
     (repo_path / "empty.py").touch()  # Create an empty file
 
-    env = LocalEnv(path=repo_path)
+    env = docker_local_env(path=repo_path)
     view_tool = Toolbox.get_tool("view")
     env.add_tool(view_tool)
     env.reset()

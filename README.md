@@ -141,7 +141,6 @@ To demonstrate how to integrate `debug-gym` with coding tasks and repositories, 
 
 | Terminal Type | Description |
 | :-: | :----- |
-| `LocalTerminal` | Executes commands directly on the local machine using bash. Ideal for development and testing on local systems. |
 | `DockerTerminal` | Executes commands inside Docker containers running on your machine. Provides isolated execution environments. (Recommended) |
 | `KubernetesTerminal` | Executes commands in Kubernetes pods for scalable deployments. Provides isolated execution environments. Suitable when dealing with large benchmarks like `swebench`, `swesmith`, and `r2egym`. |
 
