@@ -4,12 +4,14 @@ import platform
 import subprocess
 import time
 from pathlib import Path, PurePosixPath
+from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 import pytest
+from kubernetes.client.rest import ApiException
 
 from debug_gym.gym.terminals import select_terminal
-from debug_gym.gym.terminals.kubernetes import KubernetesTerminal
+from debug_gym.gym.terminals.kubernetes import KubernetesTerminal, Pod
 from debug_gym.gym.terminals.shell_session import DEFAULT_PS1
 from debug_gym.gym.terminals.terminal import (
     DISABLE_ECHO_COMMAND,
@@ -36,6 +38,78 @@ if_is_linux = pytest.mark.skipif(
     platform.system() != "Linux",
     reason="Interactive ShellSession (pty) requires Linux.",
 )
+
+
+@pytest.fixture
+def pod():
+    pod = Pod.__new__(Pod)
+    pod.k8s_client = Mock()
+    pod.name = "test-pod"
+    pod.namespace = "default"
+    pod.logger = Mock()
+    pod._last_pending_reason = None
+    return pod
+
+
+def test_pod_exists_and_is_running(pod):
+    pod.k8s_client.read_namespaced_pod.return_value = SimpleNamespace(
+        status=SimpleNamespace(phase="Running")
+    )
+
+    assert pod.exists() is True
+    assert pod.is_running() is True
+
+    pod.k8s_client.read_namespaced_pod.side_effect = ApiException(status=404)
+    assert pod.exists() is False
+    assert pod.is_running() is False
+
+    pod.k8s_client.read_namespaced_pod.side_effect = ApiException(status=500)
+    with pytest.raises(ApiException):
+        pod.exists()
+    with pytest.raises(ApiException):
+        pod.is_running()
+
+
+def test_pod_detects_sandbox_reservation_errors(pod):
+    pod.k8s_client.list_namespaced_event.return_value = SimpleNamespace(
+        items=[
+            SimpleNamespace(
+                reason="FailedCreatePodSandBox",
+                message="pod sandbox name is reserved for another container",
+            )
+        ]
+    )
+
+    assert pod._has_sandbox_reservation_error() is True
+
+    pod.k8s_client.list_namespaced_event.return_value = SimpleNamespace(items=[])
+    assert pod._has_sandbox_reservation_error() is False
+
+    pod.k8s_client.list_namespaced_event.side_effect = ApiException(status=500)
+    assert pod._has_sandbox_reservation_error() is False
+
+
+def test_pod_logs_pending_status_changes(pod):
+    pending = SimpleNamespace(
+        status=SimpleNamespace(
+            conditions=[
+                SimpleNamespace(
+                    status="False", reason="Unschedulable", message="No nodes"
+                )
+            ]
+        )
+    )
+
+    pod._log_pending_status(pending)
+    pod._log_pending_status(pending)
+
+    assert pod._last_pending_reason == "Unschedulable: No nodes"
+    pod.logger.debug.assert_called_once()
+
+    pending.status.conditions = []
+    pod._log_pending_status(pending)
+    assert pod._last_pending_reason == "scheduling"
+    assert pod.logger.debug.call_count == 2
 
 
 @if_kubernetes_available

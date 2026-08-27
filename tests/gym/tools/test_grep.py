@@ -2,8 +2,8 @@ from unittest.mock import Mock
 
 import pytest
 
-from debug_gym.gym.envs.local import LocalEnv
 from debug_gym.gym.tools.grep import GrepTool
+from tests.helpers import docker_local_env
 
 
 @pytest.fixture
@@ -178,7 +178,7 @@ env/
 def setup_grep_repo_env(setup_grep_test_repo):
     def _setup_grep_repo_env(base_dir):
         test_repo = setup_grep_test_repo(base_dir)
-        env = LocalEnv(path=str(test_repo))
+        env = docker_local_env(path=str(test_repo))
         grep_tool = GrepTool()
         env.reset()
         return grep_tool, env
@@ -374,9 +374,7 @@ class TestGrepTool:
         grep_tool, env = setup_grep_repo_env(tmp_path)
 
         # Create a file with a very long line
-        long_line_file = env.working_dir / "long_line.txt"
-        with long_line_file.open("w") as f:
-            f.write("search_term " + "x" * 300 + " end")
+        env.workspace.write_file("long_line.txt", "search_term " + "x" * 300 + " end")
 
         result = grep_tool.use(env, pattern="search_term")
         assert result.source == "grep"
@@ -388,9 +386,10 @@ class TestGrepTool:
         grep_tool, env = setup_grep_repo_env(tmp_path)
 
         # Create a file with Unicode content
-        unicode_file = env.working_dir / "unicode.txt"
-        with unicode_file.open("w", encoding="utf-8") as f:
-            f.write("Hello 世界 🌍 café naïve résumé\nSearch term with émojis 🚀✨")
+        env.workspace.write_file(
+            "unicode.txt",
+            "Hello 世界 🌍 café naïve résumé\nSearch term with émojis 🚀✨",
+        )
 
         result = grep_tool.use(env, pattern="Search term")
         assert result.source == "grep"

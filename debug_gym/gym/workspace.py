@@ -1,10 +1,7 @@
-import atexit
 import os
 import shlex
-import tempfile
 from pathlib import Path
 
-from debug_gym.gym.terminals.local import LocalTerminal
 from debug_gym.gym.terminals.terminal import Terminal, UnrecoverableTerminalError
 from debug_gym.logger import DebugGymLogger
 
@@ -24,26 +21,17 @@ class WorkspaceWriteError(WorkspaceError):
 class Workspace:
 
     def __init__(self, terminal: Terminal, logger: DebugGymLogger | None = None):
-        self._tempdir = None
         self.working_dir = None
         self.logger = logger or DebugGymLogger("debug-gym")
         self.terminal = terminal
 
     def cleanup(self):
         self.working_dir = None
-        if self._tempdir:
-            self._tempdir.cleanup()
-            self._tempdir = None
 
     def reset(self):
         self.cleanup()
 
         self.working_dir = self.working_dir or Path("/testbed")
-        # only create temp dir for local terminal
-        if type(self.terminal) is LocalTerminal:
-            self._tempdir = tempfile.TemporaryDirectory(prefix="DebugGym-")
-            atexit.register(self._tempdir.cleanup)
-            self.working_dir = Path(self._tempdir.name).resolve()
 
         self.logger.debug(f"Working directory: {self.working_dir}")
         self.terminal.working_dir = str(self.working_dir)
@@ -55,10 +43,7 @@ class Workspace:
         self.terminal.copy_content(src, target)
 
     def _workspace_root(self) -> Path:
-        root = Path(os.path.normpath(self.working_dir))
-        if isinstance(self.terminal, LocalTerminal):
-            root = root.resolve(strict=True)
-        return root
+        return Path(os.path.normpath(self.working_dir))
 
     def resolve_path(self, filepath: str | Path, raises: bool = False) -> Path:
         """Convert a relative filepath to absolute based on the working_dir.
@@ -73,9 +58,6 @@ class Workspace:
 
         # Normalize traversal components in Python for cross-platform compatibility.
         abs_filepath = Path(os.path.normpath(abs_filepath))
-        if isinstance(self.terminal, LocalTerminal):
-            # Local paths can be resolved canonically, including existing symlinks.
-            abs_filepath = abs_filepath.resolve(strict=False)
         abs_filepath_str = str(abs_filepath)
 
         workspace_root = self._workspace_root()

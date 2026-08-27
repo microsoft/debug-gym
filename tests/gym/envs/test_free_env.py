@@ -8,9 +8,9 @@ import pytest
 
 from debug_gym.gym.envs.free_env import FreeEnv
 from debug_gym.gym.terminals.docker import DockerTerminal
-from debug_gym.gym.terminals.local import LocalTerminal
 from debug_gym.gym.tools.toolbox import Toolbox
 from debug_gym.logger import DebugGymLogger
+from tests.helpers import docker_test_terminal
 
 
 @pytest.fixture
@@ -60,18 +60,16 @@ class TestFreeEnvInitialization:
         assert env.task_data == task_data
         assert env.logger == logger
 
-    def test_init_with_local_terminal_raises_error(self, test_repo, logger):
-        """Test that LocalTerminal raises ValueError."""
+    def test_init_with_unsupported_terminal_raises_error(self, test_repo, logger):
         task_data = {
             "image": "python:3.11",
             "local_path": str(test_repo),
         }
-        terminal = LocalTerminal()
 
         with pytest.raises(
             ValueError, match="only supports DockerTerminal and KubernetesTerminal"
         ):
-            FreeEnv(task_data=task_data, terminal=terminal, logger=logger)
+            FreeEnv(task_data=task_data, terminal=object(), logger=logger)
 
     def test_init_default_setup_commands(self, test_repo, logger):
         """Test that default setup_commands are set when not provided."""
@@ -96,12 +94,8 @@ class TestFreeEnvProperties:
             "image": "python:3.11-slim",
             "local_path": str(test_repo),
         }
-        terminal = LocalTerminal()
-
-        # Bypass terminal type check for testing
         env = FreeEnv.__new__(FreeEnv)
         env.task_data = task_data
-        env.terminal = terminal
         env.logger = logger
 
         assert env.task_name == "FreeEnv(python:3.11-slim)"
@@ -112,11 +106,8 @@ class TestFreeEnvProperties:
             "image": "python:3.11",
             "local_path": str(test_repo),
         }
-        terminal = LocalTerminal()
-
         env = FreeEnv.__new__(FreeEnv)
         env.task_data = task_data
-        env.terminal = terminal
         env.logger = logger
 
         instructions = env.instructions
@@ -133,7 +124,7 @@ class TestFreeEnvSetupTask:
             "image": "python:3.11-alpine",
             "local_path": str(test_repo),
         }
-        terminal = LocalTerminal()
+        terminal = DockerTerminal()
 
         env = FreeEnv.__new__(FreeEnv)
         env.task_data = task_data
@@ -188,7 +179,7 @@ class TestFreeEnvSetupTerminal:
             "local_path": str(test_repo),
             "setup_commands": ["echo 'setup complete'"],
         }
-        terminal = LocalTerminal()
+        terminal = docker_test_terminal()
 
         env = FreeEnv.__new__(FreeEnv)
         env.task_data = task_data
@@ -197,8 +188,8 @@ class TestFreeEnvSetupTerminal:
 
         # Test _git_available method
         result = env._git_available()
-        # On most systems, git should be available
-        assert isinstance(result, bool)
+        assert result is True
+        terminal.close()
 
     def test_git_available_with_none_terminal(self, logger):
         """Test _git_available returns False when terminal is None."""

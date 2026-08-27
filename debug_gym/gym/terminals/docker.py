@@ -249,10 +249,14 @@ class DockerTerminal(Terminal):
 
         if raises and not success:
             # Command includes the entrypoint + session commands
-            self.logger.debug(f"Failed to run command `{command}`:\n{output}")
+            logged_output = self._output_for_logging(output)
+            self.logger.debug(f"Failed to run command `{command}`:\n{logged_output}")
             raise ValueError(f"Failed to run command `{entrypoint}`:\n{output}")
 
-        self.logger.debug(f"Output from terminal with status `{status}`:\n{output}")
+        logged_output = self._output_for_logging(output)
+        self.logger.debug(
+            f"Output from terminal with status `{status}`:\n{logged_output}"
+        )
         return success, output
 
     def setup_container(self) -> docker.models.containers.Container:

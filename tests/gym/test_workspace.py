@@ -1,28 +1,22 @@
-import os
 from pathlib import Path
 
 import pytest
 
 from debug_gym.gym.terminals.docker import DockerTerminal
-from debug_gym.gym.terminals.local import LocalTerminal
 from debug_gym.gym.workspace import Workspace, WorkspaceReadError, WorkspaceWriteError
+from tests.helpers import docker_test_terminal
 
 
 @pytest.fixture
 def workspace():
-    terminal = LocalTerminal()
+    terminal = docker_test_terminal()
     workspace = Workspace(terminal)
     workspace.reset()
-
-    repo_path = workspace.working_dir
-    subdir_path = repo_path / "subdir"
-    subdir_path.mkdir()
-    (repo_path / ".hidden").touch()
-    (repo_path / "file1.txt").touch()
-    (repo_path / "file2.txt").touch()
-    (subdir_path / "subfile1.txt").touch()
-
-    return workspace
+    terminal.run(
+        "mkdir -p subdir && touch .hidden file1.txt file2.txt subdir/subfile1.txt"
+    )
+    yield workspace
+    terminal.close()
 
 
 def test_directory_tree(workspace):
@@ -39,47 +33,23 @@ def test_directory_tree(workspace):
 
 @pytest.if_docker_running
 def test_reset_and_cleanup_workspace():
-    # Setup workspace with a native terminal.
-    terminal = LocalTerminal()
-    workspace = Workspace(terminal)
-
-    assert workspace._tempdir is None
-    assert workspace.working_dir is None
-
-    workspace.reset()
-    assert workspace._tempdir is not None
-    assert isinstance(workspace.working_dir, Path)
-    assert str(workspace.working_dir) == workspace._tempdir.name
-    assert str(os.path.basename(workspace.working_dir)).startswith("DebugGym-")
-    assert os.path.isdir(workspace.working_dir)
-
-    working_dir = str(workspace.working_dir)
-    workspace.cleanup()
-    assert workspace._tempdir is None
-    assert workspace.working_dir is None
-    assert not os.path.isdir(working_dir)
-
-    # Setup workspace with a remote terminal.
     terminal = DockerTerminal(base_image="ubuntu:latest")
     workspace = Workspace(terminal)
 
-    assert workspace._tempdir is None
     assert workspace.working_dir is None
 
     workspace.reset()
-    assert workspace._tempdir is None
     assert isinstance(workspace.working_dir, Path)
     assert str(workspace.working_dir) == "/testbed"
-    # Nothing should be created on the host.
-    assert not os.path.isdir(workspace.working_dir)
 
     workspace.cleanup()
     assert workspace.working_dir is None
+    terminal.close()
 
 
 def test_resolve_path(workspace):
     abs_path = (workspace.working_dir / "file.txt").resolve()
-    (abs_path).touch()
+    workspace.write_file("file.txt", "")
 
     # env.working_dir itself
     path_from_env = workspace.resolve_path(str(workspace.working_dir), raises=True)
@@ -134,9 +104,8 @@ def test_resolve_path_do_not_raise_working_dir(workspace):
 
 
 def test_read_file_reads_existing_file(workspace):
-    file_path = workspace.working_dir / "test.txt"
     file_content = "Hello, DebugGym!\n"
-    file_path.write_text(file_content)
+    workspace.write_file("test.txt", file_content)
     # Read file using relative path
     result = workspace.read_file(str(workspace.working_dir / "test.txt"))
     assert result == file_content
@@ -146,7 +115,7 @@ def test_read_file_reads_existing_file(workspace):
 
 
 def test_read_file_raises_for_nonexistent_file(workspace):
-    (workspace.working_dir / "test.txt").touch()
+    workspace.write_file("test.txt", "")
     # relative path that does not exist
     with pytest.raises(WorkspaceReadError):
         workspace.read_file("does_not_exist.txt")
@@ -156,49 +125,42 @@ def test_read_file_raises_for_nonexistent_file(workspace):
 
 
 def test_write_file_basic(workspace):
-    file_path = workspace.working_dir / "test.txt"
     file_content = "Hello, DebugGym!\n\n\n"
     workspace.write_file("test.txt", file_content)
-    assert file_path.read_text() == file_content
+    assert workspace.read_file("test.txt") == file_content
 
 
 def test_write_file_single_line_no_newline(workspace):
-    file_path = workspace.working_dir / "test.txt"
     file_content_single_line = "Hello, DebugGym!"
     workspace.write_file("test.txt", file_content_single_line)
-    assert file_path.read_text() == file_content_single_line
+    assert workspace.read_file("test.txt") == file_content_single_line
 
 
 def test_write_file_with_delimiter(workspace):
-    file_path = workspace.working_dir / "test.txt"
     file_content_single_line = "Hello, DebugGym!nDEBUGGYM_DEL"
     workspace.write_file("test.txt", file_content_single_line)
-    assert file_path.read_text() == file_content_single_line
+    assert workspace.read_file("test.txt") == file_content_single_line
 
 
 def test_write_file_with_newlines(workspace):
-    file_path = workspace.working_dir / "test.txt"
     file_content_with_newlines = "Hello, DebugGym!\nThis is a test.\n"
     workspace.write_file("test.txt", file_content_with_newlines)
-    assert file_path.read_text() == file_content_with_newlines
+    assert workspace.read_file("test.txt") == file_content_with_newlines
 
 
 def test_write_file_empty_content(workspace):
-    file_path = workspace.working_dir / "test.txt"
     file_content_empty = ""
     workspace.write_file("test.txt", file_content_empty)
-    assert file_path.read_text() == file_content_empty
+    assert workspace.read_file("test.txt") == file_content_empty
 
 
 def test_write_file_exceeding_max_command_length(workspace):
-    file_path = workspace.working_dir / "test.txt"
     file_content_exceeding_max_command_length = "A" * (2 * 1024**2)  # 2MB of 'A's
     workspace.write_file("test.txt", file_content_exceeding_max_command_length)
-    assert file_path.read_text() == file_content_exceeding_max_command_length
+    assert workspace.read_file("test.txt") == file_content_exceeding_max_command_length
 
 
 def test_write_file_does_not_execute_content(workspace):
-    file_path = workspace.working_dir / "payload.txt"
     side_effect = workspace.working_dir / "side-effect"
     file_content = (
         "Unicode: café 世界 🚀\n"
@@ -209,38 +171,40 @@ def test_write_file_does_not_execute_content(workspace):
 
     workspace.write_file("payload.txt", file_content)
 
-    assert file_path.read_bytes() == file_content.encode("utf-8")
-    assert not side_effect.exists()
+    assert workspace.read_file("payload.txt") == file_content
+    success, _ = workspace.terminal.run(f"test ! -e {side_effect}")
+    assert success
 
 
-def test_write_file_rejects_symlink_escape(workspace, tmp_path):
-    outside = tmp_path / "outside"
-    outside.mkdir()
+def test_write_file_rejects_symlink_escape(workspace):
+    outside = "/tmp/debug-gym-outside"
     link = workspace.working_dir / "escape"
-    try:
-        link.symlink_to(outside, target_is_directory=True)
-    except OSError as exc:
-        pytest.skip(f"Symlinks are unavailable: {exc}")
+    success, _ = workspace.terminal.run(f"mkdir -p {outside} && ln -s {outside} {link}")
+    assert success
 
-    with pytest.raises(WorkspaceWriteError, match="outside the workspace"):
+    with pytest.raises(WorkspaceWriteError, match="Failed to write"):
         workspace.write_file("escape/payload.txt", "blocked")
 
-    assert not (outside / "payload.txt").exists()
+    success, _ = workspace.terminal.run(f"test ! -e {outside}/payload.txt")
+    assert success
 
 
-def test_write_file_replaces_hard_link_without_modifying_outside_file(
-    workspace, tmp_path
-):
-    outside = tmp_path / "outside.txt"
-    outside.write_text("outside", encoding="utf-8")
+def test_write_file_replaces_hard_link_without_modifying_outside_file(workspace):
+    outside = "/tmp/debug-gym-outside.txt"
     hard_link = workspace.working_dir / "hard-link.txt"
-    os.link(outside, hard_link)
+    success, _ = workspace.terminal.run(
+        f"printf outside > {outside} && ln {outside} {hard_link}"
+    )
+    assert success
 
     workspace.write_file("hard-link.txt", "inside")
 
-    assert outside.read_text(encoding="utf-8") == "outside"
-    assert hard_link.read_text(encoding="utf-8") == "inside"
-    assert not hard_link.samefile(outside)
+    success, outside_content = workspace.terminal.run(f"cat {outside}")
+    assert success
+    assert outside_content == "outside"
+    assert workspace.read_file("hard-link.txt") == "inside"
+    success, _ = workspace.terminal.run(f"test ! {outside} -ef {hard_link}")
+    assert success
 
 
 def test_write_file_path_outside_workspace_relative(workspace):

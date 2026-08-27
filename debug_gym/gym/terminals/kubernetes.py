@@ -643,10 +643,14 @@ class KubernetesTerminal(Terminal):
             return False, output
 
         if raises and not success:
-            self.logger.error(f"Failed to run command `{command}`:\n{output}")
+            logged_output = self._output_for_logging(output)
+            self.logger.error(f"Failed to run command `{command}`:\n{logged_output}")
             raise ValueError(f"Failed to run command `{entrypoint}`")
 
-        self.logger.debug(f"[{self.pod.name}] Output success `{success}`:\n{output}")
+        logged_output = self._output_for_logging(output)
+        self.logger.debug(
+            f"[{self.pod.name}] Output success `{success}`:\n{logged_output}"
+        )
         return success, output
 
     def setup_pod(self, max_retries: int = 3) -> None:
