@@ -75,9 +75,7 @@ def test_terminal_bounds_output_for_logging():
     logged_output = terminal._output_for_logging(output)
 
     assert logged_output.startswith("A" * MAX_LOG_OUTPUT_CHARS)
-    assert logged_output.endswith(
-        f"[LOG OUTPUT TRUNCATED: {len(output)} chars]"
-    )
+    assert logged_output.endswith(f"[LOG OUTPUT TRUNCATED: {len(output)} chars]")
 
 
 def test_select_terminal_local():

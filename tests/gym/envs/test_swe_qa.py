@@ -1,3 +1,6 @@
+from types import SimpleNamespace
+from unittest.mock import Mock, call
+
 import pytest
 
 from debug_gym.gym.entities import EvalOutput
@@ -26,36 +29,77 @@ class TestSWEQAEnv:
             SWEQAEnv(task_data=task_data, terminal=object())
 
     def test_setup_task_scikit_learn(self, task_data):
-        """Test setup_task correctly parses scikit_learn instance_id."""
-        # Directly test the setup_task logic without instantiating the full env
-        instance_id = task_data["instance_id"]
-        repo_name = instance_id.split("-")[0]
-        if repo_name == "scikit_learn":
-            repo_name = "scikit-learn"
-        problem_idx = int(instance_id.split("-")[1])
+        env = SWEQAEnv.__new__(SWEQAEnv)
+        env.task_data = task_data
 
-        assert repo_name == "scikit-learn"
-        assert problem_idx == 42
+        env.setup_task()
+
+        assert env.repo_name == "scikit-learn"
+        assert env.problem_idx == 42
+        assert env.base_image == "python:3.12"
+        assert env.answer == "self"
+        assert env.instructions == task_data["question"]
+        assert env.task_name == task_data["instance_id"]
 
     def test_setup_task_django(self, task_data_django):
-        """Test setup_task logic with non-scikit_learn repo."""
-        instance_id = task_data_django["instance_id"]
-        repo_name = instance_id.split("-")[0]
-        if repo_name == "scikit_learn":
-            repo_name = "scikit-learn"
-        problem_idx = int(instance_id.split("-")[1])
+        env = SWEQAEnv.__new__(SWEQAEnv)
+        env.task_data = task_data_django
 
-        assert repo_name == "django"
-        assert problem_idx == 10
+        env.setup_task()
 
-    def test_calculate_resolved(self):
-        """Test calculate_resolved returns eval_output.success."""
-        # Test the logic directly - calculate_resolved just returns eval_output.success
+        assert env.repo_name == "django"
+        assert env.problem_idx == 10
+
+    def test_eval_and_calculate_resolved(self, task_data):
+        env = SWEQAEnv.__new__(SWEQAEnv)
+        env.task_data = task_data
+
+        eval_output = env.eval()
+        assert eval_output == EvalOutput(
+            success=True, output="Agent has submitted an answer."
+        )
+        assert env.last_eval == eval_output
+
         eval_output_success = EvalOutput(success=True, output="ok")
-        assert eval_output_success.success is True
-
         eval_output_fail = EvalOutput(success=False, output="fail")
-        assert eval_output_fail.success is False
+        assert env.calculate_resolved(eval_output_success) is True
+        assert env.calculate_resolved(eval_output_fail) is False
+
+    def test_setup_workspace(self, task_data, tmp_path):
+        env = SWEQAEnv.__new__(SWEQAEnv)
+        env.task_data = task_data
+        env.setup_task()
+        env.CACHE = tmp_path
+        env.terminal = Mock()
+        env.workspace = Mock(working_dir="/testbed")
+        env.logger = Mock()
+
+        env.setup_workspace()
+
+        assert env.terminal.task_name == task_data["instance_id"]
+        assert env.terminal.base_image == "python:3.12"
+        env.workspace.reset.assert_called_once_with()
+        env.workspace.copy_content.assert_called_once_with(
+            src=tmp_path / "scikit-learn", target="/testbed"
+        )
+
+    def test_setup_terminal(self, task_data):
+        env = SWEQAEnv.__new__(SWEQAEnv)
+        env.task_data = task_data
+        env.terminal = Mock(env_vars={}, session_commands=[])
+        env.workspace = SimpleNamespace(working_dir="/testbed")
+        env.logger = Mock()
+
+        env.setup_terminal()
+
+        assert env.terminal.env_vars["PATH"] == "/root/.local/bin:/bin"
+        assert env.terminal.run.call_args_list == [
+            call("chown -R root:root /testbed"),
+            call("curl -LsSf https://astral.sh/uv/install.sh | sh"),
+            call("uv venv && source .venv/bin/activate"),
+            call("uv pip install pip"),
+        ]
+        assert env.terminal.session_commands == ["source /testbed/.venv/bin/activate"]
 
 
 class TestSWEQARepos:
