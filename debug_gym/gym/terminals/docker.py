@@ -1,12 +1,10 @@
 import atexit
 import os
-import posixpath
 import shlex
 import tarfile
-import time
 import uuid
 from io import BytesIO
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 
 import docker
 from docker import errors as docker_errors
@@ -15,7 +13,6 @@ from debug_gym.gym.terminals.shell_session import ShellSession
 from debug_gym.gym.terminals.terminal import (
     DISABLE_ECHO_COMMAND,
     Terminal,
-    TerminalError,
     UnrecoverableTerminalError,
 )
 from debug_gym.logger import DebugGymLogger
@@ -359,169 +356,6 @@ class DockerTerminal(Terminal):
 
     def __str__(self):
         return f"DockerTerminal[{self.container}, {self.working_dir}]"
-
-    def _normalize_write_target(
-        self, filepath: str | Path
-    ) -> tuple[PurePosixPath, PurePosixPath]:
-        root = PurePosixPath(posixpath.normpath(str(self.working_dir)))
-        target = PurePosixPath(str(filepath))
-        if not target.is_absolute():
-            target = root / target
-        target = PurePosixPath(posixpath.normpath(str(target)))
-        try:
-            target.relative_to(root)
-        except ValueError as exc:
-            raise TerminalError(
-                "Write target is outside the terminal working directory"
-            ) from exc
-        if target == root:
-            raise TerminalError("Write target must be a file")
-        return root, target
-
-    def _exec_write_command(self, command: list[str]) -> tuple[int, bytes]:
-        self._ensure_container_running()
-        try:
-            return self.container.exec_run(
-                command,
-                workdir="/",
-                environment=self.env_vars,
-                stdout=True,
-                stderr=True,
-            )
-        except docker_errors.APIError as exc:
-            raise UnrecoverableTerminalError(
-                "Docker file operation encountered an API error."
-            ) from exc
-        except docker_errors.DockerException as exc:
-            raise UnrecoverableTerminalError(
-                "Docker file operation failed unexpectedly."
-            ) from exc
-
-    def _reject_symlink_ancestors(
-        self, root: PurePosixPath, target: PurePosixPath
-    ) -> None:
-        current = root
-        ancestors = [root]
-        for part in target.parent.relative_to(root).parts:
-            current /= part
-            ancestors.append(current)
-        ancestors.append(target)
-        for ancestor in ancestors:
-            status, _ = self._exec_write_command(["test", "-L", str(ancestor)])
-            if status == 0:
-                raise TerminalError("Write target contains a symbolic-link directory")
-
-    def _runtime_identity(self) -> tuple[int, int, set[int]]:
-        user_status, user_output = self._exec_write_command(["id", "-u"])
-        group_status, group_output = self._exec_write_command(["id", "-g"])
-        groups_status, groups_output = self._exec_write_command(["id", "-G"])
-        if user_status != 0 or group_status != 0 or groups_status != 0:
-            raise TerminalError("Failed to determine the container user")
-        return (
-            int(user_output.strip()),
-            int(group_output.strip()),
-            {int(group) for group in groups_output.split()},
-        )
-
-    def _destination_metadata(self, target: PurePosixPath) -> tuple[int, int, int]:
-        runtime_user_id, runtime_group_id, runtime_group_ids = self._runtime_identity()
-        exists, _ = self._exec_write_command(["test", "-e", str(target)])
-        if exists == 0:
-            is_regular, _ = self._exec_write_command(["test", "-f", str(target)])
-            if is_regular != 0:
-                raise TerminalError("Write target must be a regular file")
-            status, output = self._exec_write_command(
-                ["stat", "-c", "%a %u %g", "--", str(target)]
-            )
-            if status != 0:
-                raise TerminalError("Failed to inspect destination file")
-            mode, user_id, group_id = output.decode().strip().split()
-            user_id = int(user_id)
-            group_id = int(group_id)
-            if runtime_user_id != 0 and (
-                user_id != runtime_user_id
-                or (
-                    group_id not in runtime_group_ids
-                    and not self._inherits_parent_group(target.parent, group_id)
-                )
-            ):
-                raise TerminalError("Cannot preserve destination file ownership")
-            return int(mode, 8) & ~0o6000, user_id, group_id
-
-        umask_success, umask_output = self.run("umask", raises=False)
-        parent_status, parent_output = self._exec_write_command(
-            ["stat", "-c", "%a %g", "--", str(target.parent)]
-        )
-        if not umask_success or parent_status != 0:
-            raise TerminalError("Failed to determine destination file metadata")
-        parent_mode, parent_group_id = parent_output.decode().strip().split()
-        mode = 0o666 & ~int(umask_output.splitlines()[-1], 8)
-        group_id = (
-            int(parent_group_id) if int(parent_mode, 8) & 0o2000 else runtime_group_id
-        )
-        return mode, runtime_user_id, group_id
-
-    def _inherits_parent_group(self, parent: PurePosixPath, group_id: int) -> bool:
-        status, output = self._exec_write_command(
-            ["stat", "-c", "%a %g", "--", str(parent)]
-        )
-        if status != 0:
-            raise TerminalError("Failed to inspect destination directory")
-        parent_mode, parent_group_id = output.decode().strip().split()
-        return bool(int(parent_mode, 8) & 0o2000 and int(parent_group_id) == group_id)
-
-    def write_bytes(self, filepath: str | Path, content: bytes) -> None:
-        """Transfer bytes through Docker without exposing content to a shell."""
-        if not isinstance(content, bytes):
-            raise TypeError("content must be bytes")
-
-        root, target = self._normalize_write_target(filepath)
-        self._reject_symlink_ancestors(root, target)
-
-        success, output = self.run(
-            f"mkdir -p -- {shlex.quote(str(target.parent))}",
-            raises=False,
-        )
-        if not success:
-            raise TerminalError(f"Failed to create destination directory: {output}")
-        mode, user_id, group_id = self._destination_metadata(target)
-
-        temporary_name = f".debug-gym-write-{uuid.uuid4().hex}.tmp"
-        temporary_target = target.parent / temporary_name
-        archive = BytesIO()
-        with tarfile.open(fileobj=archive, mode="w") as tar:
-            info = tarfile.TarInfo(name=temporary_name)
-            info.size = len(content)
-            info.mode = mode
-            info.uid = user_id
-            info.gid = group_id
-            info.mtime = int(time.time())
-            tar.addfile(info, BytesIO(content))
-        archive.seek(0)
-
-        try:
-            self._ensure_container_running()
-            self.container.put_archive(str(target.parent), archive.getvalue())
-            status, output = self._exec_write_command(
-                ["mv", "-f", "--", str(temporary_target), str(target)]
-            )
-            if status != 0:
-                raise TerminalError(
-                    f"Failed to replace destination file: {output.decode(errors='replace')}"
-                )
-        except docker_errors.APIError as exc:
-            raise UnrecoverableTerminalError(
-                "Docker file transfer encountered an API error."
-            ) from exc
-        except docker_errors.DockerException as exc:
-            raise UnrecoverableTerminalError(
-                "Docker file transfer failed unexpectedly."
-            ) from exc
-        finally:
-            try:
-                self._exec_write_command(["rm", "-f", "--", str(temporary_target)])
-            except UnrecoverableTerminalError:
-                pass
 
     def copy_content(self, src: str | Path, target: str | Path | None = None) -> None:
         """Copy files contained in src on the host to target in the container."""

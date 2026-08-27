@@ -137,19 +137,6 @@ class Terminal(ABC):
     def __str__(self):
         return f"Terminal[{self.working_dir}]"
 
-    def write_text(
-        self, filepath: str | Path, content: str, encoding: str = "utf-8"
-    ) -> None:
-        """Write text without embedding it in a shell command."""
-        if not isinstance(content, str):
-            raise TypeError("content must be a string")
-        self.write_bytes(filepath, content.encode(encoding))
-
-    @abstractmethod
-    def write_bytes(self, filepath: str | Path, content: bytes) -> None:
-        """Atomically write bytes while enforcing the backend workspace boundary."""
-        raise NotImplementedError
-
     @abstractmethod
     def copy_content(self, src: str | Path, target: str | Path | None = None) -> None:
         """Copy files contained in src on the host to target on the host."""

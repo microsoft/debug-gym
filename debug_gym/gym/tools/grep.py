@@ -35,7 +35,7 @@ class GrepTool(EnvironmentTool):
             "description": "Optional glob pattern to search in. If None, searches the entire repository. Path should be relative to the repository root.",
         },
         "max_results": {
-            "type": ["integer", "null"],
+            "type": ["number", "null"],
             "description": (
                 "Maximum number of matching lines to return, from 1 to 10000. "
                 "If None, returns 100 matches."

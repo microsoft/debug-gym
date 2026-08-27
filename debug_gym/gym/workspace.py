@@ -1,8 +1,9 @@
 import os
 import shlex
+import tempfile
 from pathlib import Path
 
-from debug_gym.gym.terminals.terminal import Terminal, UnrecoverableTerminalError
+from debug_gym.gym.terminals.terminal import Terminal
 from debug_gym.logger import DebugGymLogger
 
 
@@ -42,9 +43,6 @@ class Workspace:
         target = Path(target or self.working_dir).resolve()
         self.terminal.copy_content(src, target)
 
-    def _workspace_root(self) -> Path:
-        return Path(os.path.normpath(self.working_dir))
-
     def resolve_path(self, filepath: str | Path, raises: bool = False) -> Path:
         """Convert a relative filepath to absolute based on the working_dir.
         If the path is already absolute, it is returned as is.
@@ -56,19 +54,27 @@ class Workspace:
         if not abs_filepath.is_absolute():
             abs_filepath = Path(self.working_dir) / abs_filepath
 
-        # Normalize traversal components in Python for cross-platform compatibility.
+        # Normalize the path (resolve .., . without resolving symlinks)
+        # This is done in Python for cross-platform compatibility
         abs_filepath = Path(os.path.normpath(abs_filepath))
         abs_filepath_str = str(abs_filepath)
 
-        workspace_root = self._workspace_root()
-        if raises and abs_filepath != workspace_root:
+        if raises and abs_filepath != self.working_dir:
+            # Check if file is within working_dir (security check)
+            # Use os.path.commonpath to safely check if path is under working_dir
             try:
-                abs_filepath.relative_to(workspace_root)
-            except ValueError as exc:
+                common = os.path.commonpath([str(self.working_dir), abs_filepath_str])
+                if common != str(self.working_dir):
+                    raise FileNotFoundError(
+                        f"`{filepath}` does not exist or is not in "
+                        f"the working directory `{self.working_dir}`."
+                    )
+            except ValueError:
+                # commonpath raises ValueError for paths on different drives (Windows)
                 raise FileNotFoundError(
                     f"`{filepath}` does not exist or is not in "
                     f"the working directory `{self.working_dir}`."
-                ) from exc
+                )
 
             # Check if file exists via terminal
             check_cmd = f"test -e {shlex.quote(abs_filepath_str)}"
@@ -108,19 +114,25 @@ class Workspace:
         """Writes `content` to `filepath` exactly as-is, preserving any trailing newlines."""
         abs_filepath = self.resolve_path(filepath, raises=False)
 
+        # Security check: ensure path is within workspace
         try:
-            abs_filepath.relative_to(self._workspace_root())
-        except ValueError as exc:
+            common = os.path.commonpath([str(self.working_dir), str(abs_filepath)])
+            if common != str(self.working_dir):
+                raise WorkspaceWriteError(
+                    f"Failed to write `{filepath}` because it is outside the workspace."
+                )
+        except ValueError:
+            # commonpath raises ValueError for paths on different drives (Windows)
             raise WorkspaceWriteError(
                 f"Failed to write `{filepath}` because it is outside the workspace."
-            ) from exc
+            )
 
-        try:
-            self.terminal.write_text(abs_filepath, content)
-        except UnrecoverableTerminalError:
-            raise
-        except (OSError, RuntimeError, ValueError) as exc:
-            raise WorkspaceWriteError(f"Failed to write `{filepath}`.") from exc
+        relative_filepath = abs_filepath.relative_to(self.working_dir)
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            staged_filepath = Path(tmp_dir) / relative_filepath
+            staged_filepath.parent.mkdir(parents=True, exist_ok=True)
+            staged_filepath.write_text(content, encoding="utf-8")
+            self.terminal.copy_content(tmp_dir, self.working_dir)
 
     def directory_tree(self, root: str | Path = None, max_depth: int = 1):
         """List the directory tree using the `tree` command.

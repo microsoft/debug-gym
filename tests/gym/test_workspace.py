@@ -162,48 +162,12 @@ def test_write_file_exceeding_max_command_length(workspace):
 
 def test_write_file_does_not_execute_content(workspace):
     side_effect = workspace.working_dir / "side-effect"
-    file_content = (
-        "Unicode: café 世界 🚀\n"
-        "DEBUGGYM_EOF\n"
-        f"$(touch {side_effect}) `touch {side_effect}`; touch {side_effect}\n"
-        + ("large-content\n" * 200_000)
-    )
+    content = f"payload\nDEBUGGYM_EOF\n); touch {side_effect}\n#"
 
-    workspace.write_file("payload.txt", file_content)
+    workspace.write_file("payload.txt", content)
 
-    assert workspace.read_file("payload.txt") == file_content
+    assert workspace.read_file("payload.txt") == content
     success, _ = workspace.terminal.run(f"test ! -e {side_effect}")
-    assert success
-
-
-def test_write_file_rejects_symlink_escape(workspace):
-    outside = "/tmp/debug-gym-outside"
-    link = workspace.working_dir / "escape"
-    success, _ = workspace.terminal.run(f"mkdir -p {outside} && ln -s {outside} {link}")
-    assert success
-
-    with pytest.raises(WorkspaceWriteError, match="Failed to write"):
-        workspace.write_file("escape/payload.txt", "blocked")
-
-    success, _ = workspace.terminal.run(f"test ! -e {outside}/payload.txt")
-    assert success
-
-
-def test_write_file_replaces_hard_link_without_modifying_outside_file(workspace):
-    outside = "/tmp/debug-gym-outside.txt"
-    hard_link = workspace.working_dir / "hard-link.txt"
-    success, _ = workspace.terminal.run(
-        f"printf outside > {outside} && ln {outside} {hard_link}"
-    )
-    assert success
-
-    workspace.write_file("hard-link.txt", "inside")
-
-    success, outside_content = workspace.terminal.run(f"cat {outside}")
-    assert success
-    assert outside_content == "outside"
-    assert workspace.read_file("hard-link.txt") == "inside"
-    success, _ = workspace.terminal.run(f"test ! {outside} -ef {hard_link}")
     assert success
 
 

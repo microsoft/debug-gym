@@ -147,16 +147,6 @@ To demonstrate how to integrate `debug-gym` with coding tasks and repositories, 
 All terminals support:
 - Specify custom working directories and session commands
 - Environment variable configuration
-- Out-of-band payload writes through `write_bytes`/`write_text`; file contents
-  are never embedded in generated shell commands. `write_bytes` is an explicit
-  backend capability, so custom `Terminal` subclasses must implement their own
-  confined atomic replacement rather than inheriting a path-based fallback.
-- A fail-closed write contract across Docker and Kubernetes: the
-  working root, ancestor directories, and final target must not be symbolic
-  links, including links that resolve inside the workspace. Replacements break
-  hard-link aliases, preserve ordinary mode and ownership when permitted, and
-  strip set-user-ID/set-group-ID bits. ACLs, extended attributes, and file
-  capabilities are not preserved.
 - Command execution with timeout handling
 - Output capturing and error reporting
 - Automatic cleanup and resource management

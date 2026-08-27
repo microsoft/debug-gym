@@ -2,25 +2,7 @@ import pytest
 
 from debug_gym.gym.terminals import DockerTerminal, select_terminal
 from debug_gym.gym.terminals.shell_session import DEFAULT_PS1, ShellSession
-from debug_gym.gym.terminals.terminal import MAX_LOG_OUTPUT_CHARS, Terminal
-
-
-class TerminalWithoutWriteBytes(Terminal):
-    @property
-    def default_shell_command(self):
-        return "/bin/sh"
-
-    def prepare_command(self, entrypoint):
-        return [entrypoint]
-
-    def run(self, entrypoint, timeout=None, raises=False, strip_output=True):
-        return True, ""
-
-    def new_shell_session(self):
-        return None
-
-    def copy_content(self, src, target=None):
-        return None
+from debug_gym.gym.terminals.terminal import MAX_LOG_OUTPUT_CHARS
 
 
 @pytest.if_is_linux
@@ -122,11 +104,6 @@ def test_select_terminal_unknown():
 def test_select_terminal_invalid_config():
     with pytest.raises(TypeError):
         select_terminal("not a dict")
-
-
-def test_custom_terminal_must_implement_confined_write_bytes():
-    with pytest.raises(TypeError, match="write_bytes"):
-        TerminalWithoutWriteBytes()
 
 
 def test_select_terminal_kubernetes_extra_labels(monkeypatch):

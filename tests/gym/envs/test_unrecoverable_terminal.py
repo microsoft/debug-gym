@@ -36,9 +36,6 @@ class AlwaysFailTerminal(Terminal):
     def copy_content(self, src, target=None):
         return None
 
-    def write_bytes(self, filepath, content):
-        raise UnrecoverableTerminalError(self.message)
-
 
 class MinimalEnv(RepoEnv):
     def __init__(self, terminal):

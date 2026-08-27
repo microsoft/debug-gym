@@ -1,8 +1,5 @@
-import hashlib
 import os
 import time
-from pathlib import PurePosixPath
-from unittest.mock import Mock
 
 import docker
 import pytest
@@ -13,87 +10,8 @@ from debug_gym.gym.terminals.docker import DockerTerminal
 from debug_gym.gym.terminals.shell_session import DEFAULT_PS1
 from debug_gym.gym.terminals.terminal import (
     DISABLE_ECHO_COMMAND,
-    TerminalError,
     UnrecoverableTerminalError,
 )
-
-
-def test_destination_metadata_rejects_foreign_owner_for_non_root_user():
-    terminal = DockerTerminal.__new__(DockerTerminal)
-    terminal._exec_write_command = Mock(
-        side_effect=[
-            (0, b"1000\n"),
-            (0, b"1000\n"),
-            (0, b"1000\n"),
-            (0, b""),
-            (0, b""),
-            (0, b"6755 0 0\n"),
-            (0, b"0755 1000\n"),
-        ]
-    )
-
-    with pytest.raises(TerminalError, match="ownership"):
-        terminal._destination_metadata(PurePosixPath("/testbed/privileged"))
-
-
-def test_destination_metadata_strips_privileged_bits_for_root():
-    terminal = DockerTerminal.__new__(DockerTerminal)
-    terminal._exec_write_command = Mock(
-        side_effect=[
-            (0, b"0\n"),
-            (0, b"0\n"),
-            (0, b"0\n"),
-            (0, b""),
-            (0, b""),
-            (0, b"6755 0 0\n"),
-        ]
-    )
-
-    assert terminal._destination_metadata(PurePosixPath("/testbed/privileged")) == (
-        0o755,
-        0,
-        0,
-    )
-
-
-def test_destination_metadata_accepts_supplementary_group():
-    terminal = DockerTerminal.__new__(DockerTerminal)
-    terminal._exec_write_command = Mock(
-        side_effect=[
-            (0, b"1000\n"),
-            (0, b"1000\n"),
-            (0, b"1000 1234\n"),
-            (0, b""),
-            (0, b""),
-            (0, b"0660 1000 1234\n"),
-        ]
-    )
-
-    assert terminal._destination_metadata(PurePosixPath("/testbed/shared")) == (
-        0o660,
-        1000,
-        1234,
-    )
-
-
-def test_destination_metadata_honors_container_umask_for_new_file():
-    terminal = DockerTerminal.__new__(DockerTerminal)
-    terminal.run = Mock(return_value=(True, "0077"))
-    terminal._exec_write_command = Mock(
-        side_effect=[
-            (0, b"1000\n"),
-            (0, b"1000\n"),
-            (0, b"1000 1234\n"),
-            (1, b""),
-            (0, b"2775 1234\n"),
-        ]
-    )
-
-    assert terminal._destination_metadata(PurePosixPath("/testbed/new")) == (
-        0o600,
-        1000,
-        1234,
-    )
 
 
 @pytest.if_docker_running
@@ -283,79 +201,6 @@ def test_copy_content(tmp_path):
     # Verify the content was copied correctly
     _, output = terminal.run(f"cat {terminal.working_dir}/tmp.txt", timeout=1)
     assert output == "Hello World"
-
-
-@pytest.if_docker_running
-def test_write_text_preserves_untrusted_content():
-    terminal = DockerTerminal(base_image="python:3.12-slim", working_dir="/testbed")
-    content = "DEBUGGYM_EOF\n$(touch /tmp/side-effect)\nUnicode: 世界 🚀\n" + (
-        "x" * (2 * 1024 * 1024)
-    )
-    expected_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()
-    try:
-        terminal.run("touch /testbed/payload.txt && chmod 0755 /testbed/payload.txt")
-        terminal.write_text(f"{terminal.working_dir}/payload.txt", content)
-
-        success, output = terminal.run(
-            'python -c "from pathlib import Path; import hashlib; '
-            "print(hashlib.sha256(Path('payload.txt').read_bytes()).hexdigest())\""
-        )
-        assert success
-        assert output == expected_hash
-        assert terminal.run('test "$(stat -c %a /testbed/payload.txt)" = 755')[0]
-        assert terminal.run("test ! -e /tmp/side-effect")[0]
-
-        terminal.run("mkdir -p /tmp/outside && ln -s /tmp/outside /testbed/escape")
-        with pytest.raises(TerminalError, match="symbolic-link"):
-            terminal.write_text("/testbed/escape/payload.txt", "blocked")
-        assert terminal.run("test ! -e /tmp/outside/payload.txt")[0]
-
-        terminal.run("ln -s /tmp/outside-target /testbed/linked-file")
-        with pytest.raises(TerminalError, match="symbolic-link"):
-            terminal.write_text("/testbed/linked-file", "blocked")
-        assert terminal.run("test ! -e /tmp/outside-target")[0]
-
-        terminal.run("mkdir -p /testbed/real && ln -s /testbed/real /testbed/alias")
-        with pytest.raises(TerminalError, match="symbolic-link"):
-            terminal.write_text("/testbed/alias/in-root.txt", "blocked")
-        assert terminal.run("test ! -e /testbed/real/in-root.txt")[0]
-
-        terminal.run("ln -s /testbed /testbed-root")
-        terminal._working_dir = "/testbed-root"
-        with pytest.raises(TerminalError, match="symbolic-link"):
-            terminal.write_text("/testbed-root/root-link.txt", "blocked")
-        terminal._working_dir = "/testbed"
-        assert terminal.run("test ! -e /testbed/root-link.txt")[0]
-
-        terminal.run(
-            "printf outside > /tmp/outside-hard-link && "
-            "ln /tmp/outside-hard-link /testbed/hard-link"
-        )
-        terminal.write_text("/testbed/hard-link", "inside")
-        assert terminal.run(
-            'test "$(cat /tmp/outside-hard-link)" = outside && '
-            'test "$(cat /testbed/hard-link)" = inside'
-        )[0]
-    finally:
-        terminal.close()
-
-
-@pytest.if_docker_running
-def test_write_text_honors_session_umask():
-    terminal = DockerTerminal(
-        base_image="python:3.12-slim",
-        working_dir="/testbed",
-        session_commands=["umask 0077"],
-    )
-    try:
-        terminal.write_text("/testbed/private/data.txt", "private")
-
-        assert terminal.run(
-            'test "$(stat -c %a /testbed/private)" = 700 && '
-            'test "$(stat -c %a /testbed/private/data.txt)" = 600'
-        )[0]
-    finally:
-        terminal.close()
 
 
 @pytest.if_docker_running
