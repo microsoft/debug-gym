@@ -127,58 +127,12 @@ class Workspace:
                 f"Failed to write `{filepath}` because it is outside the workspace."
             )
 
-        def _run_or_raise(command: str):
-            success, output = self.terminal.run(
-                command, raises=False, strip_output=False
-            )
-            if not success:
-                message = output.strip() or "Unknown error"
-                raise WorkspaceWriteError(
-                    f"Failed to write `{filepath}`. Command output:\n{message}"
-                )
-
-        # create parent directories via the terminal if needed
-        _run_or_raise(f"mkdir -p {shlex.quote(str(abs_filepath.parent))}")
-
-        # Use terminal file-copy for large content to avoid slow command-based writes.
-        chunk_size = 32 * 1024  # 32kB
-        if len(content) > chunk_size:
-            relative_filepath = abs_filepath.relative_to(self.working_dir)
-            with tempfile.TemporaryDirectory() as tmp_dir:
-                staged_filepath = Path(tmp_dir) / relative_filepath
-                staged_filepath.parent.mkdir(parents=True, exist_ok=True)
-                staged_filepath.write_text(content, encoding="utf-8")
-                self.terminal.copy_content(tmp_dir, self.working_dir)
-            return
-
-        # Split smaller content in chunks of 32kB to avoid hitting command length limits.
-        first_chunk = content[:chunk_size]
-        rest = content[chunk_size:]
-
-        # In the following command we:
-        # - use a single-quoted heredoc (cat <<'nDEBUGGYM_EOF' ... nDEBUGGYM_EOF) so the heredoc body is taken literally (no shell expansion)
-        # - append a sentinel character DEBUGGYM_DEL inside the heredoc so we can detect/restore trailing newlines later
-        # - capture the heredoc output into shell variable CONTENT since command substitution strips trailing newlines
-        # - "${CONTENT%DEBUGGYM_DEL}" removes the trailing sentinel DEBUGGYM_DEL (restoring the original trailing-newline state)
-        # - echo -n writes the result without adding an extra newline
-        quoted_filepath = shlex.quote(str(abs_filepath))
-        cmd = (
-            "CONTENT=$(cat <<'DEBUGGYM_EOF'\n"
-            f"{first_chunk}DEBUGGYM_DEL\nDEBUGGYM_EOF\n); "
-            'echo -n "${CONTENT%DEBUGGYM_DEL}" > '
-            f"{quoted_filepath}"
-        )
-        _run_or_raise(cmd)
-
-        for i in range(0, len(rest), chunk_size):
-            chunk = rest[i : i + chunk_size]
-            cmd = (
-                "CONTENT=$(cat <<'DEBUGGYM_EOF'\n"
-                f"{chunk}DEBUGGYM_DEL\nDEBUGGYM_EOF\n); "
-                'echo -n "${CONTENT%DEBUGGYM_DEL}" >> '
-                f"{quoted_filepath}"
-            )
-            _run_or_raise(cmd)
+        relative_filepath = abs_filepath.relative_to(self.working_dir)
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            staged_filepath = Path(tmp_dir) / relative_filepath
+            staged_filepath.parent.mkdir(parents=True, exist_ok=True)
+            staged_filepath.write_text(content, encoding="utf-8")
+            self.terminal.copy_content(tmp_dir, self.working_dir)
 
     def directory_tree(self, root: str | Path = None, max_depth: int = 1):
         """List the directory tree using the `tree` command.
