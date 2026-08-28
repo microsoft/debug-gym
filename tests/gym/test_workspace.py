@@ -160,6 +160,17 @@ def test_write_file_exceeding_max_command_length(workspace):
     assert workspace.read_file("test.txt") == file_content_exceeding_max_command_length
 
 
+def test_write_file_does_not_execute_content(workspace):
+    side_effect = workspace.working_dir / "side-effect"
+    content = f"payload\nDEBUGGYM_EOF\n); touch {side_effect}\n#"
+
+    workspace.write_file("payload.txt", content)
+
+    assert workspace.read_file("payload.txt") == content
+    success, _ = workspace.terminal.run(f"test ! -e {side_effect}")
+    assert success
+
+
 def test_write_file_path_outside_workspace_relative(workspace):
     """Ensure path traversal attacks are blocked."""
     with pytest.raises(WorkspaceWriteError) as exc_info:
