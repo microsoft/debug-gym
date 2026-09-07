@@ -628,7 +628,8 @@ a:hover {
   margin-bottom: 0;
 }
 
-.content-type-project {
+.content-type-project,
+.content-type-paper {
   background: linear-gradient(135deg, rgba(92, 107, 255, 0.25) 0%, rgba(122, 86, 255, 0.35) 100%);
   color: var(--color-primary-dark);
 }

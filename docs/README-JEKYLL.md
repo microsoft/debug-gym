@@ -57,6 +57,33 @@ docs/
 
 ## Writing Content
 
+### Adding a Standalone Technical Report
+
+Reports can have their own homepage cards, separate from News and Blog Posts.
+Each card shows a Technical Report badge, the date, the title, an optional summary,
+and a direct paper link. No blog or project page is required.
+
+1. Copy the PDF into `docs/static/papers/`.
+2. Add an entry to `docs/_data/papers.yml` with a title, date, and link, plus an
+   optional description:
+
+```yaml
+- title: "Report title"
+  date: 2026-09-07
+  description: "A short summary of the report."
+  link: "/static/papers/your-report.pdf"
+```
+
+Use a site-relative path starting with `/` for a hosted PDF. The template applies
+`relative_url` so the link works locally and under the GitHub Pages `baseurl`.
+Full external URLs are also supported and are left unchanged.
+
+The entry appears in the homepage feed in reverse date order, after any entries
+marked `always_top: true`. Set `draft: true` to hide a report.
+
+Once the report is available on arXiv, the entry's `link` can be changed to its
+arXiv URL. Keep the hosted PDF available so existing direct links continue to work.
+
 ### Creating a New Project Page
 
 1. Create a new file in `_projects/` (e.g., `_projects/my-project.md`)
@@ -207,6 +234,18 @@ bundle exec jekyll build
 ```
 
 Output will be in `_site/` directory.
+
+### Homepage Rendering Tests
+
+After installing the site bundle and the repository's development dependencies,
+run these tests from the repository root:
+
+```bash
+python -m pytest -q -o asyncio_default_fixture_loop_scope=function tests/docs/test_index.py
+```
+
+They render the real Jekyll homepage to cover report cards, local and external
+paper links, feed ordering, draft visibility, and existing blog links.
 
 ## Key Features
 

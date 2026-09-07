@@ -97,6 +97,41 @@ title: "MSR Montréal - Froggy Team"
       {% endfor %}
     {% endif %}
 
+    {% if site.data.papers and site.data.papers.size > 0 %}
+      {% for paper in site.data.papers %}
+        {% if paper.draft %}
+          {% continue %}
+        {% endif %}
+        {% assign sort_key = paper.date | date: "%Y%m%d%H%M%S" %}
+        {% capture entry_markup %}
+          <div class="project-card">
+            <div class="project-card__meta-row">
+              <span class="content-type-badge content-type-paper">
+                <i class="fas fa-file-alt"></i> Technical Report
+              </span>
+              <span class="project-status status-published">{{ paper.date | date: "%B %Y" }}</span>
+            </div>
+            <h3 class="title is-3">{{ paper.title | escape }}</h3>
+            {% if paper.description %}
+            <p>{{ paper.description | escape }}</p>
+            {% endif %}
+            <div class="project-links">
+              <a href="{{ paper.link | relative_url | escape }}" class="button is-primary">
+                <span class="icon"><i class="fas fa-file-alt"></i></span>
+                <span>Read Technical Report</span>
+              </a>
+            </div>
+          </div>
+        {% endcapture %}
+        {% capture entry %}{{ sort_key }}::{{ entry_markup | strip }}{% endcapture %}
+        {% if paper.always_top %}
+          {% assign feed_featured = feed_featured | push: entry %}
+        {% else %}
+          {% assign feed_regular = feed_regular | push: entry %}
+        {% endif %}
+      {% endfor %}
+    {% endif %}
+
     {% if site.posts and site.posts.size > 0 %}
       {% for post in site.posts %}
         {% if post.draft %}
