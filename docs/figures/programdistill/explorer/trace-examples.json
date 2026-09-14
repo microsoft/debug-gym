@@ -1,0 +1,149 @@
+{
+  "version": 1,
+  "examples": [
+    {
+      "id": "create-list-and-card",
+      "appId": "vdevired_trello_clone",
+      "label": "Create a list and card",
+      "description": "Create the Release Queue list, then add the Approve rollout card.",
+      "name": "create_list_and_add_card",
+      "parent_trace": "create_board_and_rename_team",
+      "prerequisite": "Create and open the Release Control Board by replaying the prerequisite traces.",
+      "status": "validated_pass",
+      "action_trace": [
+        {"action": "click", "selector": "button:text-is(\"Add a list\")"},
+        {"action": "type", "selector": "[placeholder=\"Enter list title\"]", "text": "Release Queue"},
+        {"action": "click", "selector": "role=button[name=\"Add List\"]"},
+        {"action": "click", "selector": "role=button[name=\"Add card\"]"},
+        {"action": "type", "selector": "[placeholder=\"Enter card title...\"]", "text": "Approve rollout"},
+        {"action": "click", "selector": "role=button[name=\"Add\"]"}
+      ],
+      "expected_signals": {
+        "all_visible_text": ["Release Queue", "Approve rollout"],
+        "all_visible_text_sources": ["rendered_text", "rendered_text"],
+        "element_states": []
+      },
+      "media": {
+        "kind": "video",
+        "src": "media/vdevired_trello_clone__open_comment_for_editing__logic_only__cumulative-trace-d9e675aacb.mp4",
+        "poster": "media/vdevired_trello_clone__open_comment_for_editing__logic_only__cumulative-trace-d9e675aacb.png",
+        "bytes": 48472
+      },
+      "source": {
+        "schema": "minepatch.golden_behavior_trace.v2",
+        "sha256": "0172e08a9d896335109cf72f04b4911525bc1965711f4474aed4065624419443",
+        "path": "patching/harbor/tasks/full/vdevired_trello_clone__vdevired_trello_clone__open_comment_for_editing__logic_only__cumulative/tests/traces/create_list_and_add_card/create_list_and_add_card.json"
+      }
+    },
+    {
+      "id": "update-friday-availability",
+      "appId": "webdevsimplified_calendly_clone",
+      "label": "Save a Friday schedule",
+      "description": "Set the timezone to America/Mexico_City, update Friday availability, and save the schedule.",
+      "name": "update_timezone_and_friday_availability",
+      "parent_trace": "manual_login",
+      "prerequisite": "Log in through the prerequisite trace before opening Schedule.",
+      "status": "validated_pass",
+      "action_trace": [
+        {"action": "click", "selector": "role=link[name=\"Schedule\"]"},
+        {"action": "click", "selector": "role=combobox[name=\"Timezone\"]"},
+        {"action": "click", "selector": "role=option[name=\"America/Mexico_City (GMT-6)\"]"},
+        {"action": "type", "selector": "role=textbox[name=\"friday Start Time 1\"]", "text": "10:30"},
+        {"action": "type", "selector": "role=textbox[name=\"friday End Time 1\"]", "text": "14:30"},
+        {"action": "click", "selector": "role=button[name=\"Save\"]"}
+      ],
+      "expected_signals": {
+        "all_visible_text": [
+          "Schedule saved!",
+          "America/Mexico_City",
+          "(GMT-6)",
+          "friday Start Time 1: 10:30",
+          "friday End Time 1: 14:30"
+        ],
+        "all_visible_text_sources": ["rendered_text", "rendered_text", "rendered_text", "form_value", "form_value"],
+        "element_states": []
+      },
+      "media": {
+        "kind": "video",
+        "src": "media/webdevsimplified_calendly_clone__change_booking_time_to_7pm__logic_only__cumulative-trace-f4199bebc6.mp4",
+        "poster": "media/webdevsimplified_calendly_clone__change_booking_time_to_7pm__logic_only__cumulative-trace-f4199bebc6.png",
+        "bytes": 69207
+      },
+      "source": {
+        "schema": "minepatch.golden_behavior_trace.v2",
+        "sha256": "8fa4c09d9a544cbfed5de076eb5926c3cd8775220655d049759581ec708e3dcf",
+        "path": "patching/harbor/tasks/full/webdevsimplified_calendly_clone__webdevsimplified_calendly_clone__change_booking_time_to_7pm__logic_only__cumulative/tests/traces/update_timezone_and_friday_availability/update_timezone_and_friday_availability.json"
+      }
+    },
+    {
+      "id": "find-event-by-description",
+      "appId": "calendar_web",
+      "label": "Find an event by description",
+      "description": "Search for Pizza night, then open Family Dinner and check its description.",
+      "name": "search_and_view_event",
+      "parent_trace": null,
+      "prerequisite": "Start from the reset calendar with its seeded Family Dinner event.",
+      "status": "validated_pass",
+      "action_trace": [
+        {"action": "type", "selector": "[placeholder=\"Search\"]", "text": "Pizza night"},
+        {"action": "click", "selector": "div:text-is(\"Family Dinner\")"}
+      ],
+      "expected_signals": {
+        "all_visible_text": [
+          "Search Results",
+          "Search: Pizza night",
+          "Add title: Family Dinner",
+          "Add description: Pizza night",
+          "Save"
+        ],
+        "all_visible_text_sources": ["rendered_text", "form_value", "form_value", "form_value", "rendered_text"],
+        "element_states": []
+      },
+      "media": {
+        "kind": "video",
+        "src": "media/trace-calendar_web__search_and_view_event.mp4",
+        "poster": "media/trace-calendar_web__search_and_view_event.png",
+        "bytes": 56177,
+        "sha256": "24d2c84bdfe1a51a3b1340c0fe261d7bc66f4b42bffcb0fd335a2d230486eff2",
+        "posterSha256": "6aabc90171105c159ec9aa0f1ef6bfdbb3d98ea325dd608b310debea61090b9d"
+      },
+      "source": {
+        "schema": "minepatch.golden_behavior_trace.v2",
+        "sha256": "2126ed9f20afac5731d3b03e49cc160153bba0890b11ef1f4160c11c29963650",
+        "path": "patching/harbor/tasks/full/calendar_web__calendar_web__search_and_view_event__logic_and_ui/tests/traces/search_and_view_event/search_and_view_event.json"
+      }
+    },
+    {
+      "id": "delete-event-and-search",
+      "appId": "calendar_web",
+      "label": "Delete an event",
+      "description": "Delete Quarterly Offsite, then search for its title to confirm no results remain.",
+      "name": "delete_event_and_verify_absence",
+      "parent_trace": "move_event_to_family_calendar",
+      "prerequisite": "Replay the setup traces to move Quarterly Offsite to the Family calendar and leave its editor open.",
+      "status": "validated_pass",
+      "action_trace": [
+        {"action": "click", "selector": "[title=\"Delete\"]"},
+        {"action": "type", "selector": "[placeholder=\"Search\"]", "text": "Quarterly Offsite"}
+      ],
+      "expected_signals": {
+        "all_visible_text": ["No events found.", "Search: Quarterly Offsite"],
+        "all_visible_text_sources": ["rendered_text", "form_value"],
+        "element_states": []
+      },
+      "media": {
+        "kind": "video",
+        "src": "media/trace-calendar_web__delete_event_and_verify_absence.mp4",
+        "poster": "media/trace-calendar_web__delete_event_and_verify_absence.png",
+        "bytes": 32491,
+        "sha256": "37e86a466a546de0ea8d04cbc1697d41448050b68d41e8f869ac4c7c3db539fb",
+        "posterSha256": "7ce45f557e9756f9e6ba4990be6184692edd61b2c1dfebe0280226777701b5c3"
+      },
+      "source": {
+        "schema": "minepatch.golden_behavior_trace.v2",
+        "sha256": "06c36d98695eed7547231c798a295123a67c80bd1ed0b67116d3e0ae2501b04c",
+        "path": "patching/harbor/tasks/full/calendar_web__calendar_web__delete_event_and_verify_absence__logic_and_ui/tests/traces/delete_event_and_verify_absence/delete_event_and_verify_absence.json"
+      }
+    }
+  ]
+}
