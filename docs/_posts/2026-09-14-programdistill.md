@@ -124,23 +124,35 @@ Nine coding agents tackle **ProgramDistill-300**, a suite of 300 tasks across 26
 **Astra solves every depth-1 task, establishing a strong baseline for individual repair solvability. Yet success drops to 64.0% at depth 8, when multiple dependent behaviors must be restored together.** Every other agent retains less than half of its depth-1 performance at depth 8.
 
 <figure class="post-figure" markdown="0">
-  <a href="{{ '/figures/programdistill/repair-results-binary.png' | relative_url }}?v=20260914-results">
-    <img src="{{ '/figures/programdistill/repair-results-binary.png' | relative_url }}?v=20260914-results" alt="Partial reconstruction across nine coding agents. Overall success is 84.3% for Astra, 68.7% for Opus 5, and 60.7% for Sol. From depth 1 to 8, Astra falls from 100% to 64.0%, Opus from 96.0% to 32.0%, and Sol from 92.0% to 32.0%." loading="lazy">
+  <a href="{{ '/figures/programdistill/repair-results-binary.png' | relative_url }}?v=20260915-trajectory-cost">
+    <img src="{{ '/figures/programdistill/repair-results-binary.png' | relative_url }}?v=20260915-trajectory-cost" width="2981" height="840" alt="Partial reconstruction across nine coding agents, plotted against mean cost per trajectory in USD and restoration depth. Overall success is 84.3% for Astra, 68.7% for Opus 5, and 60.7% for Sol. From depth 1 to 8, Astra falls from 100% to 64.0%, Opus from 96.0% to 32.0%, and Sol from 92.0% to 32.0%." loading="lazy">
   </a>
-  <figcaption><strong>Figure 3.</strong> Mean binary score versus output-token price (left) and by restoration depth (right).</figcaption>
+  <figcaption><strong>Figure 3.</strong> Mean binary score versus mean cost per trajectory in USD (left) and by restoration depth (right).</figcaption>
 </figure>
 
 ### The strongest agent observes more and edits less
 
-Astra is distinctive for an observation-intensive, edit-light workflow. It performs substantially more reference and current-app observations than the other models, with the difference particularly pronounced for current-app observation, while making the fewest edit/write steps. It averages 96.3 current-app observations per trajectory, roughly twice Sol's 45.8, alongside only 9.9 edit/write steps. Its trajectories are thus characterized by extensive behavioral checking, especially of its own implementation, followed by comparatively selective code changes. More broadly, the strongest-performing model differs not only in repair accuracy but also in how it allocates effort across observation, validation, and editing.
+Astra is distinctive for an **observation-intensive, edit-light workflow**. It performs substantially more reference and current-app observations than the other models, with the difference particularly pronounced for current-app observation, while making the fewest edit/write steps. It averages **96.3 current-app observations** per trajectory, roughly twice Sol's 45.8, alongside **only 9.9 edit/write steps**. Its trajectories are thus characterized by extensive behavioral checking, especially of its own implementation, followed by comparatively selective code changes. More broadly, the strongest-performing model differs not only in repair accuracy but also in how it allocates effort across observation, validation, and editing.
+
+<figure class="post-figure" markdown="0">
+  <a href="{{ '/figures/programdistill/agent-behavior-binary.png' | relative_url }}">
+    <img src="{{ '/figures/programdistill/agent-behavior-binary.png' | relative_url }}" width="4745" height="916" alt="Across nine coding agents, Astra has the highest repair accuracy, the most reference and current-app observation steps, and the fewest edit/write steps." loading="lazy">
+  </a>
+  <figcaption><strong>Figure 4.</strong> Repair accuracy and observation, reading, and editing activity across agents.</figcaption>
+</figure>
 
 ### Deeper tasks receive less checking per behavior
 
-From depth 1 to 8, the code to restore grows from roughly **140 to 1,305 lines**, while reference traces grow from **10 to 108 actions**. Across the evaluated agents, reference observations per repair target fall from **34.60 to 8.46**, and current-app observations from **27.69 to 6.81**. Both fall by roughly 75%, while edit/write steps per target decline from 7.53 to 3.40.
+As restoration depth increases, reconstruction burden grows roughly linearly as agents must recover more interdependent behaviors along a prerequisite lineage. At depth 8, for example, **eight behaviors must be restored in sequence**, with later behaviors relying on state established by earlier ones.
 
-**As tasks deepen, agents devote disproportionately less effort to understanding and validating each required behavior.**
+From depth 1 to depth 8, the amount of code to restore grows by **more than 9&times;**, while the total number of actions across target behavior traces grows by **more than 10&times;**. Agent effort, however, does not keep pace. Although agents do more work overall, **observation and editing effort per repair target decline as tasks deepen**, with observation shrinking particularly sharply. Final patches also leave more of the masked implementation unrestored.
 
-The final patches also leave more implementation unrestored. Between depths 1 and 8, the mean share of unchanged target files rises from **12.4% to 23.3%**, and the share of mask-added stub lines still present rises from **11.1% to 24.6%**.
+<figure class="post-figure" markdown="0">
+  <a href="{{ '/figures/programdistill/depth-burden-vs-effort.png' | relative_url }}?v=20260915-behavior-traces">
+    <img src="{{ '/figures/programdistill/depth-burden-vs-effort.png' | relative_url }}?v=20260915-behavior-traces" width="3705" height="859" alt="As restoration depth increases, code and action counts across target behavior traces grow, observation and editing steps per behavior fall, and more target files and mask stubs remain unrestored." loading="lazy">
+  </a>
+  <figcaption><strong>Figure 5.</strong> Growing restoration burden, declining effort per behavior, and more implementation left unrestored.</figcaption>
+</figure>
 
 ### Example: How an agent completes a depth-8 repair
 
@@ -152,7 +164,7 @@ The repair takes **317 agent steps**. Rather than solving the task in a single p
   <a href="{{ '/figures/programdistill/trello-repair.png' | relative_url }}">
     <img src="{{ '/figures/programdistill/trello-repair.png' | relative_url }}" alt="A successful 317-step repair of the Trello clone alternates between observing the reference, editing code, and validating the current app." loading="lazy">
   </a>
-  <figcaption><strong>Figure 4.</strong> Claude Opus 5 completes a depth-8 repair through repeated reference observation, implementation, and validation.</figcaption>
+  <figcaption><strong>Figure 6.</strong> Claude Opus 5 completes a depth-8 repair through repeated reference observation, implementation, and validation.</figcaption>
 </figure>
 
 ## Full-Application Reconstruction
@@ -206,7 +218,7 @@ The interaction works, but the resulting state is wrong. The error remains becau
   <a href="{{ '/figures/programdistill/astra-trello-order.png' | relative_url }}">
     <img src="{{ '/figures/programdistill/astra-trello-order.png' | relative_url }}" alt="Full reconstruction failure in the Trello clone where the same card drop produces a different ordering from the reference." loading="lazy">
   </a>
-  <figcaption><strong>Figure 5.</strong> The reference and Astra's reconstructed application produce different card orders after the same drag interaction.</figcaption>
+  <figcaption><strong>Figure 7.</strong> The reference and Astra's reconstructed application produce different card orders after the same drag interaction.</figcaption>
 </figure>
 
 Full reconstruction also shows that more browser feedback alone is not enough. Claude Opus 5 receives substantially more browser-state feedback than Astra, yet recovers fewer behaviors. What matters is not only how much of the reference the agent inspects, but whether it identifies the right details, implements them faithfully, and rechecks the relevant workflow after making changes.

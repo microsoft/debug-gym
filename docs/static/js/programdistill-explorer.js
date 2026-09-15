@@ -233,18 +233,49 @@
     let cleanup = null;
     let trigger = null;
     let previousOverflow = '';
+    let previousScroll = { left: 0, top: 0 };
+    let closeTouch = null;
 
     function close(restoreFocus = true) {
       if (!dialog.open) return;
+      closeTouch = null;
       dialog.close();
       if (cleanup) cleanup();
       cleanup = null;
       body.replaceChildren();
       document.body.style.overflow = previousOverflow;
       if (restoreFocus && trigger && trigger.isConnected) trigger.focus({ preventScroll: true });
+      window.scrollTo({ ...previousScroll, behavior: 'instant' });
     }
 
-    closeButton.addEventListener('click', () => close());
+    // A post-pan tap can lose its compatibility click. Handle touch releases directly.
+    closeButton.addEventListener('pointerdown', (event) => {
+      closeTouch = event.pointerType === 'touch' && event.isPrimary
+        ? { id: event.pointerId, x: event.clientX, y: event.clientY } : null;
+      if (closeTouch) event.preventDefault();
+    });
+    closeButton.addEventListener('pointermove', (event) => {
+      if (closeTouch && event.pointerId === closeTouch.id &&
+        Math.hypot(event.clientX - closeTouch.x, event.clientY - closeTouch.y) > 10) closeTouch = null;
+    });
+    closeButton.addEventListener('pointercancel', () => { closeTouch = null; });
+    closeButton.addEventListener('lostpointercapture', () => { closeTouch = null; });
+    closeButton.addEventListener('pointerup', (event) => {
+      const touch = closeTouch;
+      closeTouch = null;
+      if (!touch || event.pointerId !== touch.id) return;
+      const bounds = closeButton.getBoundingClientRect();
+      if (event.clientX >= bounds.left && event.clientX <= bounds.right &&
+        event.clientY >= bounds.top && event.clientY <= bounds.bottom &&
+        Math.hypot(event.clientX - touch.x, event.clientY - touch.y) <= 10) {
+        event.preventDefault();
+        close();
+      }
+    });
+    closeButton.addEventListener('click', (event) => {
+      if (event.pointerType === 'touch') event.preventDefault();
+      else close();
+    });
     dialog.addEventListener('cancel', (event) => {
       event.preventDefault();
       close();
@@ -277,16 +308,125 @@
         category.textContent = options.category;
         category.hidden = !options.category;
         title.textContent = options.title;
+        heading.classList.toggle('pd-sr-only', Boolean(options.hideHeading));
         body.replaceChildren(options.body);
         cleanup = options.cleanup || null;
         trigger = options.trigger && options.trigger.isConnected ? options.trigger : originalTrigger;
         previousOverflow = document.body.style.overflow;
+        previousScroll = { left: window.scrollX, top: window.scrollY };
         document.body.style.overflow = 'hidden';
         dialog.showModal();
         body.scrollTop = 0;
         closeButton.focus({ preventScroll: true });
+        window.scrollTo({ ...previousScroll, behavior: 'instant' });
       }
     };
+  }
+
+  function initializeFigureZoom(root, prefix) {
+    const article = root.closest('article.blog-content');
+    if (!article || article.dataset.pdFigureZoom) return;
+    article.dataset.pdFigureZoom = 'true';
+    const dialog = createDialog(root, `${prefix}-figure`);
+
+    function isImageLink(link) {
+      return link && article.contains(link) && link.closest('.post-figure') &&
+        link.querySelector('img') && !link.hasAttribute('download') &&
+        ['http:', 'https:'].includes(link.protocol) && link.origin === location.origin &&
+        !link.username && !link.password && /\.(png|jpe?g|gif|webp|avif|svg)$/i.test(link.pathname);
+    }
+
+    function labelLinks() {
+      article.querySelectorAll('.post-figure a[href]').forEach((link) => {
+        if (!isImageLink(link)) return;
+        link.setAttribute('aria-haspopup', 'dialog');
+        link.setAttribute('aria-label', `Zoom image: ${link.querySelector('img').alt || 'Article figure'}`);
+      });
+    }
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', labelLinks, { once: true });
+    } else {
+      labelLinks();
+    }
+
+    // Delegate so figures after this async script (including multi-panel figures) work too.
+    article.addEventListener('click', (event) => {
+      if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey ||
+        event.shiftKey || event.altKey) return;
+      const link = event.target.closest('a[href]');
+      if (!isImageLink(link)) return;
+      const source = assetURL(link.href, new URL(document.baseURI));
+      event.preventDefault();
+      const original = link.querySelector('img');
+      const figure = link.closest('.post-figure');
+      const caption = figure.querySelector('figcaption');
+      const body = element('div', 'pd-figure-zoom');
+      const retry = button('pd-button-secondary', 'Retry image');
+      retry.hidden = true;
+      const feedback = element('p', 'pd-note', 'Loading image...');
+      feedback.setAttribute('role', 'status');
+      const viewport = element('div', 'pd-figure-viewport');
+      viewport.tabIndex = 0;
+      viewport.setAttribute('role', 'region');
+      viewport.setAttribute('aria-label', 'Enlarged figure. At actual size, scroll or swipe to pan.');
+      const image = element('img', 'pd-figure-image');
+      image.alt = original.alt;
+      image.draggable = false;
+      image.setAttribute('role', 'button');
+      image.setAttribute('aria-label', `Enlarge figure: ${original.alt}`);
+      image.setAttribute('aria-pressed', 'false');
+      image.onload = () => {
+        feedback.hidden = true;
+        retry.hidden = true;
+        image.setAttribute('aria-disabled', 'false');
+        image.tabIndex = 0;
+      };
+      image.onerror = () => {
+        feedback.textContent = 'Could not load the enlarged image. Retry or close to return to the article.';
+        feedback.hidden = false;
+        retry.hidden = false;
+        image.setAttribute('aria-disabled', 'true');
+        image.tabIndex = -1;
+      };
+      function loadImage() {
+        const retryHadFocus = document.activeElement === retry;
+        feedback.textContent = 'Loading image...';
+        feedback.hidden = false;
+        retry.hidden = true;
+        image.setAttribute('aria-disabled', 'true');
+        image.tabIndex = -1;
+        image.removeAttribute('src');
+        image.src = source;
+        if (retryHadFocus) viewport.focus({ preventScroll: true });
+      }
+      retry.addEventListener('click', loadImage);
+      function toggleSize() {
+        if (image.getAttribute('aria-disabled') === 'true') return;
+        const actualSize = viewport.classList.toggle('pd-figure-actual-size');
+        image.setAttribute('aria-pressed', String(actualSize));
+        image.setAttribute('aria-label', `${actualSize ? 'Fit' : 'Enlarge'} figure: ${original.alt}`);
+        viewport.scrollTop = 0;
+        viewport.scrollLeft = 0;
+      }
+      image.addEventListener('click', toggleSize);
+      image.addEventListener('keydown', (event) => {
+        if (event.key !== 'Enter' && event.key !== ' ') return;
+        event.preventDefault();
+        toggleSize();
+      });
+      viewport.append(image);
+      body.append(retry, feedback, viewport);
+      if (caption) body.append(element('p', 'pd-figure-caption', caption.textContent.trim()));
+      dialog.open({
+        title: 'Figure zoom', hideHeading: true, category: '', body, trigger: link,
+        cleanup: () => {
+          image.onload = null;
+          image.onerror = null;
+          image.removeAttribute('src');
+        }
+      });
+      loadImage();
+    });
   }
 
   function validateTraceExamples(data, url, sources) {
@@ -746,28 +886,67 @@
     return box;
   }
 
-  function codeBrowser(files, selectedPath) {
+  let codeBrowserId = 0;
+
+  function codeBrowser(files, selectedPath, onSelect = () => {}) {
     const box = element('div', 'pd-code-browser');
-    const label = element('label', 'pd-code-file');
-    label.append(element('span', 'pd-label', 'Implementation file'));
-    const select = element('select', 'pd-select');
-    files.forEach((file) => {
-      const option = element('option', '', file.path);
-      option.value = file.path;
-      select.append(option);
+    if (!files.length) {
+      box.append(element('p', 'pd-note', 'No changed files are available for this mask.'));
+      return box;
+    }
+    const prefix = `pd-code-${++codeBrowserId}`;
+    const sidebar = element('div', 'pd-code-sidebar');
+    sidebar.append(element('p', 'pd-label', `Changed files (${files.length})`));
+    const list = element('div', 'pd-code-files');
+    list.setAttribute('role', 'tablist');
+    list.setAttribute('aria-label', 'Changed implementation files');
+    list.setAttribute('aria-orientation', 'vertical');
+    const code = element('div', 'pd-code-content');
+    code.id = `${prefix}-diff`;
+    code.setAttribute('role', 'tabpanel');
+    code.tabIndex = 0;
+    const controls = files.map((file, index) => {
+      const control = button('pd-code-file', '');
+      const slash = file.path.lastIndexOf('/');
+      control.append(element('strong', '', file.path.slice(slash + 1)));
+      if (slash >= 0) control.append(element('span', 'pd-code-directory', file.path.slice(0, slash + 1)));
+      control.title = file.path;
+      control.dataset.path = file.path;
+      control.id = `${prefix}-file-${index}`;
+      control.setAttribute('role', 'tab');
+      control.setAttribute('aria-controls', code.id);
+      control.addEventListener('click', () => render(index));
+      control.addEventListener('keydown', (event) => {
+        let next;
+        if (event.key === 'ArrowDown') next = (index + 1) % files.length;
+        else if (event.key === 'ArrowUp') next = (index + files.length - 1) % files.length;
+        else if (event.key === 'Home') next = 0;
+        else if (event.key === 'End') next = files.length - 1;
+        else return;
+        event.preventDefault();
+        render(next);
+        controls[next].focus({ preventScroll: true });
+        controls[next].scrollIntoView({ block: 'nearest' });
+      });
+      list.append(control);
+      return control;
     });
-    if (selectedPath) select.value = selectedPath;
-    label.append(select);
-    const code = element('div');
-    function render() {
-      const file = files.find((entry) => entry.path === select.value);
+    function render(index) {
+      const file = files[index];
+      controls.forEach((control, position) => {
+        control.setAttribute('aria-selected', String(index === position));
+        control.tabIndex = index === position ? 0 : -1;
+      });
+      code.setAttribute('aria-labelledby', controls[index].id);
       code.replaceChildren(...(file.parts
         ? file.parts.map((part) => renderDiff(part.diff, part.feature))
         : [renderDiff(file.diff)]));
+      code.scrollTop = 0;
+      onSelect(file.path);
     }
-    select.addEventListener('change', render);
-    box.append(label, code);
-    render();
+    sidebar.append(list);
+    box.append(sidebar, code);
+    render(Math.max(0, files.findIndex((file) => file.path === selectedPath)));
     return box;
   }
 
@@ -1090,8 +1269,10 @@
     let player = null;
     let loading = false;
     const builderStates = new Map();
+    const selectedFiles = new Map();
     const dialog = createDialog(root, prefix);
     initializeTraceExamples(root, prefix);
+    initializeFigureZoom(root, prefix);
     const dashboardSoon = document.querySelector(`[data-pd-dashboard-soon="${root.id}"]`);
     if (dashboardSoon) {
       dashboardSoon.addEventListener('click', () => {
@@ -1165,8 +1346,19 @@
       body.dataset.trace = component.trace;
       body.append(element('p', 'pd-dialog-lead',
         'This is the implementation removal that turns the working feature into a repair task.'),
-      codeBrowser(component.diffFiles));
-      dialog.open({ title: `${behaviorLabel(node)}: code removed`, category: '', body, trigger });
+      browseCode(component.diffFiles, `${item.id}:mask:${component.id}`));
+      openCodeDialog({ title: `${behaviorLabel(node)}: code removed`, category: '', body, trigger });
+    }
+
+    function browseCode(files, key, targetFile) {
+      return codeBrowser(files, selectedFiles.get(key) || targetFile,
+        (path) => selectedFiles.set(key, path));
+    }
+
+    function openCodeDialog(options) {
+      dialog.open(options);
+      options.body.querySelector('.pd-code-file[aria-selected="true"]')
+        ?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
     }
 
     function openCombined(item, example, trigger) {
@@ -1176,11 +1368,11 @@
         'Draft combination: edits to shared files are shown per feature and may need conflict resolution.'));
       else if (example.depth > 1) body.append(element('p', 'pd-description',
         `${example.depth} feature masks combined into one patch using ${example.method === 'Agent-assisted merge' ? 'an agent-assisted' : 'a deterministic'} merge.`));
-      body.append(codeBrowser(example.diffFiles, example.targetFile));
+      body.append(browseCode(example.diffFiles, `${item.id}:combined:${example.traces.join(',')}`, example.targetFile));
       const build = button('pd-behavior-add', 'Build task');
       build.addEventListener('click', () => openTask(item, example, build));
       body.append(build);
-      dialog.open({ title: example.draft ? 'Mask combination (draft)' : example.depth > 1 ? 'Combined mask' : 'Code mask', category: '', body, trigger });
+      openCodeDialog({ title: example.draft ? 'Mask combination (draft)' : example.depth > 1 ? 'Combined mask' : 'Code mask', category: '', body, trigger });
     }
 
     function openTask(item, example, trigger) {
@@ -1237,7 +1429,7 @@
         description = element('p', 'pd-description', item.patch.binarySuccess
           ? `${item.patch.model} restores the complete ${item.depth}-feature task. Watch how it connects the reference behavior to code changes.`
           : `${item.patch.model} attempts the complete ${item.depth}-feature task, but does not restore the whole workflow.`);
-        player = createPlayer(item.patch.media, manifestURL, 'Agent replay', item.title);
+        player = createPlayer(item.patch.media, manifestURL, 'Agent replay', item.title, null, { controls: true });
         panel.append(description, player.element);
       }
       if (announce) live.textContent = `${item.title}. ${STAGE_NAMES[activeStage]} stage.`;
