@@ -1268,6 +1268,10 @@ a:hover {
   border-radius: var(--radius-lg) var(--radius-lg) 0 0;
 }
 
+.section-contact > .container {
+  width: 100%;
+}
+
 code {
   white-space: nowrap;
   background-color: rgba(92, 107, 255, 0.08);

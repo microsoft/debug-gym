@@ -185,3 +185,17 @@ def test_programdistill_keeps_its_interactive_assets_and_paper():
     ]:
         assert f'{attribute}="/debug-gym/{path}' in page
         assert (DOCS / path).is_file()
+
+
+def test_homepage_contact_section_uses_the_team_address():
+    homepage = render_page()
+    contact = re.search(
+        r'<section class="[^"]*\bsection-contact\b[^"]*">(.*?)</section>',
+        homepage,
+        re.S,
+    )
+
+    assert contact is not None
+    assert "Interested in collaborating or learning more" in contact.group(1)
+    assert "<code>froggy@microsoft.com</code>" in contact.group(1)
+    assert "debug-gym@microsoft.com" not in homepage

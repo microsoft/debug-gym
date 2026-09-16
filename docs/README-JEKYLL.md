@@ -218,6 +218,9 @@ All files should live in `static/images/`.
 - **Layouts**: Modify files in `_layouts/` to change page structure
 - **Navigation**: Edit `_includes/nav.html` to update the navbar
 - **Colors/Branding**: Update CSS variables in `custom.css`
+- **Homepage contact**: Edit `index.html`. The `.section-contact` styles in
+  `static/css/custom.css` give its container the available width while preserving
+  the desktop maximum and natural text wrapping on smaller screens.
 
 ## Building for Production
 
@@ -312,4 +315,4 @@ local WEBrick server.
 
 ## Questions?
 
-Contact: debug-gym@microsoft.com
+Contact: froggy@microsoft.com
