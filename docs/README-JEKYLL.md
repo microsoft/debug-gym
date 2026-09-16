@@ -5,9 +5,8 @@ This site is built with Jekyll, allowing you to write content in Markdown while 
 ## Setup
 
 ### Prerequisites
-- Ruby (2.6 or higher recommended)
-  - conda install conda-forge::ruby
-  - conda install -c conda-forge gcc_linux-64 gxx_linux-64 make openssl -y
+- Ruby as specified in `.ruby-version`
+- Compiler and build tools for native gem extensions
 - Bundler (`gem install bundler`)
 
 ### Installation
@@ -15,7 +14,8 @@ This site is built with Jekyll, allowing you to write content in Markdown while 
 1. Install dependencies (installs gems locally to avoid sudo prompts on macOS):
 ```bash
 cd docs
-bundle install --path vendor/bundle
+bundle config set --local path vendor/bundle
+bundle install
 ```
 
 2. Start the Jekyll development server:
@@ -29,31 +29,21 @@ bundle exec jekyll serve --port 4000
 
 ```
 docs/
-├── _config.yml           # Jekyll configuration
-├── _layouts/             # Page templates
-│   ├── default.html      # Base layout with nav
-│   ├── project.html      # Research project pages
-│   └── blog-post.html    # Blog post pages
-├── _data/                # Structured data used across pages (add your own files as needed)
-├── _includes/            # Reusable components
-│   └── nav.html          # Navigation bar
-├── _projects/            # Research project pages (Markdown)
-│   ├── debug-gym.md
-│   ├── bugpilot.md
-│   └── gistify.md
-├── _posts/               # Blog posts (Markdown)
-│   └── 2025-01-15-building-ai-debugging-agents.md
-│   └── 2025-10-22-bug-pilot.md
-│   └── 2025-10-28-gistify.md
-├── index.html            # Landing page (auto-generates from collections)
-├── static/               # CSS, JS, pdf
-└── figures/              # figures for post
-    ├── bug-pilot         # folder for figures
-    └── gistify           # folder for figures
-
-
-
++-- .ruby-version        # Ruby version for development and CI
++-- Gemfile              # Jekyll dependencies
++-- Gemfile.lock         # Locked gem versions
++-- _config.yml          # Site and collection configuration
++-- _data/               # News and standalone report cards
++-- _includes/           # Navigation and reusable components
++-- _layouts/            # Default, blog, and project templates
++-- _posts/              # Markdown blog posts
++-- figures/             # Blog figures and interactive example data
++-- static/              # Stylesheets, scripts, images, and pending papers
++-- index.html           # Auto-generated homepage feed
++-- README-JEKYLL.md      # Authoring and development guide
 ```
+
+The optional `_projects/` collection is available for new project pages.
 
 ## Writing Content
 
@@ -166,6 +156,10 @@ More content...
 
 3. The blog post will automatically appear on the index page!
 
+Posts with `published: false` are excluded from production builds. Use
+`--unpublished` only for local review, then remove that flag or set it to `true`
+before merging a post for publication.
+
 **Paper links:**
 
 Use `https://arxiv.org/pdf/<paper-id>` for all arXiv links, including paper buttons
@@ -229,8 +223,11 @@ All files should live in `static/images/`.
 
 For GitHub Pages:
 
-1. Push your changes to the repository
-2. GitHub Pages will automatically build and deploy
+1. Open a pull request against `gh-page`.
+2. After it is merged, GitHub Pages builds and deploys the branch's `/docs` folder.
+
+Feature-branch pushes do not publish the website. Keep this source directory and
+the `/debug-gym` base URL unchanged.
 
 For manual build:
 
@@ -242,15 +239,19 @@ Output will be in `_site/` directory.
 
 ### Homepage Rendering Tests
 
-After installing the site bundle and the repository's development dependencies,
-run these tests from the repository root:
+After installing the site bundle, use a Python virtual environment and run these
+commands from the repository root:
 
 ```bash
-python -m pytest -q -o asyncio_default_fixture_loop_scope=function tests/docs/test_index.py
+python -m pip install -r requirements-dev.txt
+python -m pytest -q
+python -m pre_commit run --all-files
 ```
 
 They render the real Jekyll homepage and blog pages to cover report cards, direct
 arXiv PDF links, hosted paper links, feed ordering, and draft visibility.
+Python is needed only for these development checks, not for building or deploying
+the website.
 
 ## Key Features
 
@@ -265,17 +266,25 @@ arXiv PDF links, hosted paper links, feed ordering, and draft visibility.
 
 ### Jekyll not found
 ```bash
-bundle install --path vendor/bundle
+bundle config set --local path vendor/bundle
+bundle install
 ```
 
 ### Port already in use
-```bash
-# Kill existing server
-lsof -ti:4000 | xargs kill
 
-# Or use a different port
+Stop your own preview with Ctrl+C, or use a different port:
+
+```bash
 bundle exec jekyll serve --port 4001
 ```
+
+### Videos stop early in a local preview
+
+Some WEBrick versions mishandle conditional byte-range requests, causing videos
+to stop even when the files are intact. In that case, build with
+`bundle exec jekyll build --watch` and serve the generated files with a
+range-capable HTTP server mounted at `/debug-gym/`. GitHub Pages does not use the
+local WEBrick server.
 
 ### Changes not showing
 - Hard refresh browser (Cmd+Shift+R on Mac)

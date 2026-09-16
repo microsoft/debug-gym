@@ -171,3 +171,17 @@ def test_arxiv_links_open_pdfs(page_url):
 
     assert links
     assert all(link.startswith("https://arxiv.org/pdf/") for link in links), links
+
+
+def test_programdistill_keeps_its_interactive_assets_and_paper():
+    page = render_page("/blog/2026/09/programdistill/")
+
+    assert 'id="programdistill-explorer"' in page
+    for attribute, path in [
+        ("src", "static/js/programdistill-explorer.js"),
+        ("href", "static/css/programdistill-explorer.css"),
+        ("data-src", "figures/programdistill/explorer/cases.json"),
+        ("href", "static/papers/ProgramDistill_arxiv.pdf"),
+    ]:
+        assert f'{attribute}="/debug-gym/{path}' in page
+        assert (DOCS / path).is_file()
