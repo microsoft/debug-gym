@@ -1,0 +1,57 @@
+<link rel="stylesheet" href="{{ '/static/css/programdistill-explorer.css' | relative_url }}?v=20260915-9">
+<section id="programdistill-explorer" class="pd-explorer" data-pd-explorer data-src="{{ '/figures/programdistill/explorer/cases.json' | relative_url }}" data-application-sources-src="{{ '/figures/programdistill/applications.json' | relative_url }}" aria-label="ProgramDistill case explorer" markdown="0">
+  <div class="pd-notice" data-pd-notice>
+    <p class="pd-notice-message" data-pd-message role="status">Loading interactive examples...</p>
+    <button class="pd-button pd-button-secondary" data-pd-retry type="button" hidden>Retry loading examples</button>
+    <noscript><p class="pd-note">Enable JavaScript to explore the cases. The pipeline explanation above is available without it.</p></noscript>
+  </div>
+
+  <div data-pd-content hidden>
+    <section class="pd-example-layer" aria-label="Choose an example">
+      <div class="pd-layer-heading">
+        <span class="pd-layer-number" aria-hidden="true">1</span>
+        <div>
+          <h4 class="pd-layer-title">Choose an application</h4>
+          <p class="pd-layer-description">Each application opens one recorded repair example with a different agent and task.</p>
+        </div>
+      </div>
+
+      <div class="pd-case-bar">
+        <div class="pd-picker">
+          <p class="pd-sr-only" data-pd-case-label>Applications</p>
+          <div class="pd-case-options" data-pd-case role="tablist"></div>
+        </div>
+        <div data-pd-app-source></div>
+      </div>
+    </section>
+
+    <section class="pd-workflow-layer" aria-label="Explore the workflow">
+      <div class="pd-layer-heading">
+        <span class="pd-layer-number" aria-hidden="true">2</span>
+        <div>
+          <h4 class="pd-layer-title">Explore the workflow</h4>
+          <p class="pd-layer-description">Move through how its behavior is mined, turned into a task, and repaired.</p>
+        </div>
+      </div>
+
+      <div class="pd-tabs" role="tablist" aria-label="Case pipeline stages">
+        <button class="pd-tab" data-pd-stage="mine" type="button" role="tab" aria-selected="true">
+          Mine &middot; Find working features
+        </button>
+        <button class="pd-tab" data-pd-stage="craft" type="button" role="tab" aria-selected="false" tabindex="-1">
+          Craft &middot; Build a task
+        </button>
+        <button class="pd-tab" data-pd-stage="patch" type="button" role="tab" aria-selected="false" tabindex="-1">
+          Patch &middot; Repair missing features
+        </button>
+      </div>
+
+      <div class="pd-panel" data-pd-panel="mine" role="tabpanel" tabindex="0"></div>
+      <div class="pd-panel" data-pd-panel="craft" role="tabpanel" tabindex="0" hidden></div>
+      <div class="pd-panel" data-pd-panel="patch" role="tabpanel" tabindex="0" hidden></div>
+    </section>
+  </div>
+
+  <p class="pd-sr-only" data-pd-live role="status" aria-live="polite" aria-atomic="true"></p>
+</section>
+<script src="{{ '/static/js/programdistill-explorer.js' | relative_url }}?v=20260915-9" async></script>

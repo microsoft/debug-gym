@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "provenance": "ProgramDistill manuscript, Appendix: The 26 applications in the ProgramDistill corpus.",
+  "applications": [
+    {"id": "actualbudget_actual", "label": "Actual Budget (open source)", "repository": "actualbudget/actual", "commit": "e0880f39", "kind": "open_source"},
+    {"id": "amruthpillai_reactive_resume", "label": "Reactive Resume (open source)", "repository": "amruthpillai/reactive-resume", "commit": "dcf1b28c", "kind": "open_source"},
+    {"id": "awsconsole_web", "label": "AWS Console-style benchmark app", "repository": "Task-Web/awsconsole_web", "commit": "794c1cc1", "kind": "benchmark"},
+    {"id": "baserow_baserow", "label": "Baserow (open source)", "repository": "baserow/baserow", "commit": "8d7c0111", "kind": "open_source"},
+    {"id": "basesite", "label": "BaseSite (benchmark app)", "repository": "Task-Web/basesite", "commit": "4c06e3d7", "kind": "benchmark"},
+    {"id": "budgetwise_web", "label": "BudgetWise (benchmark app)", "repository": "Task-Web/budgetwise_web", "commit": "bf3903f6", "kind": "benchmark"},
+    {"id": "calendar_web", "label": "Calendar (benchmark app)", "repository": "Task-Web/calendar_web", "commit": "6a7a8d1d", "kind": "benchmark"},
+    {"id": "careerlink_web", "label": "CareerLink (benchmark app)", "repository": "Task-Web/careerlink_web", "commit": "33352a1c", "kind": "benchmark"},
+    {"id": "cloudcrm_web", "label": "CloudCRM (benchmark app)", "repository": "Task-Web/cloudcrm_web", "commit": "1c7a1653", "kind": "benchmark"},
+    {"id": "eventix_web", "label": "Eventix (benchmark app)", "repository": "Task-Web/eventix_web", "commit": "f60c3463", "kind": "benchmark"},
+    {"id": "expenseflow_web", "label": "ExpenseFlow (benchmark app)", "repository": "Task-Web/expenseflow_web", "commit": "487fd168", "kind": "benchmark"},
+    {"id": "formcraft_web", "label": "FormCraft (benchmark app)", "repository": "Task-Web/formcraft_web", "commit": "5c20ecdf", "kind": "benchmark"},
+    {"id": "insurance_claim_web", "label": "Insurance Claim (benchmark app)", "repository": "Task-Web/insurance_claim_web", "commit": "720120c7", "kind": "benchmark"},
+    {"id": "knowankit_trello_clone", "label": "Trello clone (knowankit)", "repository": "knowankit/trello-clone", "commit": "19e9d64a", "kind": "clone"},
+    {"id": "mailhub_web", "label": "MailHub (benchmark app)", "repository": "Task-Web/mailhub_web", "commit": "4603ec38", "kind": "benchmark"},
+    {"id": "oldboyxx_jira_clone", "label": "Jira clone (oldboyxx)", "repository": "oldboyxx/jira_clone", "commit": "26a9e77b", "kind": "clone"},
+    {"id": "reviewsphere_web", "label": "ReviewSphere (benchmark app)", "repository": "Task-Web/reviewsphere_web", "commit": "8e4f9706", "kind": "benchmark"},
+    {"id": "streamview_web", "label": "StreamView (benchmark app)", "repository": "Task-Web/streamview_web", "commit": "ea965045", "kind": "benchmark"},
+    {"id": "teamchat_web", "label": "TeamChat (benchmark app)", "repository": "Task-Web/teamchat_web", "commit": "ed077b4d", "kind": "benchmark"},
+    {"id": "travelhub_ad_web", "label": "TravelHub (benchmark app)", "repository": "Task-Web/travelhub_ad_web", "commit": "b45dae8e", "kind": "benchmark"},
+    {"id": "trungvose_jira_clone_angular", "label": "Jira clone (trungvose)", "repository": "trungvose/jira-clone-angular", "commit": "20b50e9a", "kind": "clone"},
+    {"id": "vaultbank_web", "label": "VaultBank (benchmark app)", "repository": "Task-Web/vaultbank_web", "commit": "e9ebb7e4", "kind": "benchmark"},
+    {"id": "vdevired_trello_clone", "label": "Trello clone (vdevired)", "repository": "vdevired/trello-clone", "commit": "1a40f9e5", "kind": "clone"},
+    {"id": "visaapplication_web", "label": "Visa Application (benchmark app)", "repository": "Task-Web/visaapplication_web", "commit": "c0e14ed0", "kind": "benchmark"},
+    {"id": "wandb_web", "label": "W&B-style benchmark app", "repository": "Task-Web/wandb_web", "commit": "1c781220", "kind": "benchmark"},
+    {"id": "webdevsimplified_calendly_clone", "label": "Calendly clone (WebDevSimplified)", "repository": "WebDevSimplified/calendly-clone", "commit": "730c5f19", "kind": "clone"}
+  ]
+}

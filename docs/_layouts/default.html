@@ -11,6 +11,9 @@
   <meta name="twitter:card" content="summary_large_image">
   <meta name="keywords" content="{{ page.keywords | default: 'MSR Montréal, Froggy Team, research, AI, machine learning, debugging, code generation' }}">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  {% if page.explorer_manifest %}
+  <link rel="preload" href="{{ page.explorer_manifest | relative_url }}" as="fetch" type="application/json" crossorigin="anonymous">
+  {% endif %}
 
   <title>{{ page.title | default: site.title }}</title>
   <link rel="icon" type="image/x-icon" href="{{ '/static/images/favicon.ico' | relative_url }}">
