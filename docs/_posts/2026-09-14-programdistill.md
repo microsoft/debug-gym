@@ -2,7 +2,7 @@
 layout: blog-post
 title: "ProgramDistill: From Interactive Web Apps to Verifiable Reference-Guided SWE Tasks"
 date: 2026-09-14
-published: false
+published: true
 author: "Jeonghye Kim"
 reading_time: 9
 tags: ["Coding Agents", "Reference-Guided SWE", "Web Applications", "Synthetic Tasks", "Benchmark"]
