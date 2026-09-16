@@ -63,7 +63,8 @@ Reports can have their own homepage cards, separate from News and Blog Posts.
 Each card shows a Technical Report badge, the date, the title, an optional summary,
 and a direct paper link. No blog or project page is required.
 
-1. Copy the PDF into `docs/static/papers/`.
+1. Use the report's direct arXiv PDF URL if available. Otherwise, copy the PDF into
+   `docs/static/papers/`.
 2. Add an entry to `docs/_data/papers.yml` with a title, date, and link, plus an
    optional description:
 
@@ -71,18 +72,18 @@ and a direct paper link. No blog or project page is required.
 - title: "Report title"
   date: 2026-09-07
   description: "A short summary of the report."
-  link: "/static/papers/your-report.pdf"
+  link: "https://arxiv.org/pdf/your-paper-id"
 ```
 
-Use a site-relative path starting with `/` for a hosted PDF. The template applies
+For a hosted PDF, use `link: "/static/papers/your-report.pdf"`. The template applies
 `relative_url` so the link works locally and under the GitHub Pages `baseurl`.
 Full external URLs are also supported and are left unchanged.
 
 The entry appears in the homepage feed in reverse date order, after any entries
 marked `always_top: true`. Set `draft: true` to hide a report.
 
-Once the report is available on arXiv, the entry's `link` can be changed to its
-arXiv URL. Keep the hosted PDF available so existing direct links continue to work.
+Once the report is available on arXiv, update the entry's `link` to its PDF URL.
+Remove the redundant hosted PDF after updating all site references to it.
 
 ### Creating a New Project Page
 
@@ -100,7 +101,7 @@ authors: 'Author Name'
 email: "contact@example.com"
 affiliation: "Microsoft Research"
 github_url: "https://github.com/..."
-arxiv_url: "https://arxiv.org/abs/..."
+arxiv_url: "https://arxiv.org/pdf/..."
 team_logo: "/static/images/my-team-logo.png"  # Optional: shown below authors
 bibtex: |
   @article{...}
@@ -137,7 +138,7 @@ author: "Author Name"
 reading_time: 8
 tags: ["AI", "Debugging", "Research"]
 description: "A brief description"
-paper_url: "https://arxiv.org/abs/your-paper"
+paper_url: "https://arxiv.org/pdf/your-paper"
 # paper_local: "/static/papers/your-paper.pdf"
 authors:
   - name: "First Author"
@@ -167,9 +168,13 @@ More content...
 
 **Paper links:**
 
-- Use `paper_url` for any external link (arXiv, conference page, etc.).
+Use `https://arxiv.org/pdf/<paper-id>` for all arXiv links, including paper buttons
+and inline citations, so they open the PDF directly.
+
+- Use `arxiv_url` for arXiv links or `paper_url` for other external paper links.
 - To host a PDF locally, drop it in `docs/static/papers/` and reference it with `paper_local: "/static/papers/<file>.pdf"`.
-- Leave both fields blank (or set `paper_url: "#"`) to surface a disabled “Paper link coming soon” button.
+- Once an arXiv version is available, remove `paper_local` and the redundant PDF after updating any other references.
+- Set `paper_url: "#"` to show a disabled "Paper link coming soon" button; omit all paper-link fields to hide it.
 
 ### Team data (optional)
 
@@ -244,8 +249,8 @@ run these tests from the repository root:
 python -m pytest -q -o asyncio_default_fixture_loop_scope=function tests/docs/test_index.py
 ```
 
-They render the real Jekyll homepage to cover report cards, local and external
-paper links, feed ordering, draft visibility, and existing blog links.
+They render the real Jekyll homepage and blog pages to cover report cards, direct
+arXiv PDF links, hosted paper links, feed ordering, and draft visibility.
 
 ## Key Features
 

@@ -1,6 +1,8 @@
 # Paper Uploads
 
-Place PDF copies of papers referenced by blog posts or standalone report cards in this folder.
+Use this folder for papers that do not yet have a public arXiv version. Once one is
+available, switch the site's links to `https://arxiv.org/pdf/<paper-id>` and remove
+the redundant PDF after updating all references.
 
 For blog posts, use `paper_local: "/static/papers/your-report.pdf"` in the post's front matter.
 

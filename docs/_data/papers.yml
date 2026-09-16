@@ -1,4 +1,4 @@
 - title: "FrogNano: Training a 4B Coding Agent via Online Task Synthesis"
   date: 2026-09-07
   description: "We introduce FrogNano, a 4B coding agent post-trained exclusively with reinforcement learning on synthetic software engineering tasks. Adapting tasks to the agent's evolving capabilities enables competitive performance without distillation from larger models."
-  link: "/static/papers/frognano_technical_report.pdf"
+  link: "https://arxiv.org/pdf/2609.07925"

@@ -730,26 +730,26 @@ description: "We propose a simple method to unlock the value of failed agent tra
 
   <h3>Code Agent Training</h3>
 
-  <p>After SWE-agent <a href="https://arxiv.org/abs/2405.15793">[Yang et al., 2024]</a> introduced the Agent-Computer Interface (ACI) 
-    for repository-level code editing, SWE-RL <a href="https://arxiv.org/abs/2502.18449">[Wei et al., 2025]</a> trained coding agents 
-    using RL over real GitHub issue and PR histories. A wave of follow-up work—SWE-smith <a href="https://arxiv.org/abs/2504.21798">[Yang et al., 2025]</a> and SWE-Fixer <a href="https://arxiv.org/abs/2501.05040">[Xie et al., 2025]</a>—achieved strong results on SWE-bench by training on large-scale demonstration data via SFT. However, all of these approaches discard failed rollouts and train exclusively on successful trajectories.</p>
+  <p>After SWE-agent <a href="https://arxiv.org/pdf/2405.15793">[Yang et al., 2024]</a> introduced the Agent-Computer Interface (ACI)
+    for repository-level code editing, SWE-RL <a href="https://arxiv.org/pdf/2502.18449">[Wei et al., 2025]</a> trained coding agents
+    using RL over real GitHub issue and PR histories. A wave of follow-up work—SWE-smith <a href="https://arxiv.org/pdf/2504.21798">[Yang et al., 2025]</a> and SWE-Fixer <a href="https://arxiv.org/pdf/2501.05040">[Xie et al., 2025]</a>—achieved strong results on SWE-bench by training on large-scale demonstration data via SFT. However, all of these approaches discard failed rollouts and train exclusively on successful trajectories.</p>
 
   <h3>Learning from Negative Trajectories</h3>
 
-  <p><a href="https://arxiv.org/abs/2402.11651">Wang et al. [2024]</a> were among the first to show that failed trajectories 
+  <p><a href="https://arxiv.org/pdf/2402.11651">Wang et al. [2024]</a> were among the first to show that failed trajectories
     carry useful signal: simply prefixing training examples with a success/failure label yields large gains on math reasoning 
-    and QA tasks. <a href="https://arxiv.org/abs/2403.02502">Song et al. [2024]</a> proposed Trial and Error, 
+    and QA tasks. <a href="https://arxiv.org/pdf/2403.02502">Song et al. [2024]</a> proposed Trial and Error,
     building contrastive pairs from failure trajectories and training with DPO in an iterative loop. 
     <a href="https://arxiv.org/pdf/2310.20689">An et al. [2024]</a> explore whether LLMs can learn from mistakes (LEMA), 
     incorporating mistake-correction data pairs during fine-tuning. Taking this further, 
-    <a href="https://arxiv.org/abs/2504.13145">Lan et al. [2025]</a>, <a href="https://arxiv.org/abs/2605.15040">Peng et al. [2026]</a> 
+    <a href="https://arxiv.org/pdf/2504.13145">Lan et al. [2025]</a>, <a href="https://arxiv.org/pdf/2605.15040">Peng et al. [2026]</a>
     found that even expert failure trajectories contain helpful early steps—mistakes tend to occur only in the final few actions, 
-    meaning the bulk of a failed rollout is still informative and able to improve the policy of the models. <a href="https://arxiv.org/abs/2605.24517">Shrivastava et al. [2026]</a>
+    meaning the bulk of a failed rollout is still informative and able to improve the policy of the models. <a href="https://arxiv.org/pdf/2605.24517">Shrivastava et al. [2026]</a>
     also found that failed rollouts contain rich evidence about how the environment responds, which agents can learn from.</p>
 
   <h3>Learning from Feedback</h3>
 
-  <p>Beyond binary success/failure labels, a parallel line of work uses richer feedback as a training signal. RLTF <a href="https://arxiv.org/abs/2602.02482">[Song et al., 2026]</a> treats text feedback as an intermediate signal between sparse scalar rewards and expensive full demonstrations—richer than a binary label, yet cheaper to collect than complete expert trajectories. IXT <a href="https://arxiv.org/abs/2605.20285">[Cui et al., 2025]</a> annotates training data with natural language critiques via a thinking reward model, then prefix-conditions the model on this feedback, achieving up to 2.8× compute efficiency. RLCF <a href="https://arxiv.org/abs/2507.18624">[Viswanathan et al., 2025]</a> extracts instruction-specific checklists and scores each criterion individually to compute rewards for RL, outperforming standard alignment baselines. 
+  <p>Beyond binary success/failure labels, a parallel line of work uses richer feedback as a training signal. RLTF <a href="https://arxiv.org/pdf/2602.02482">[Song et al., 2026]</a> treats text feedback as an intermediate signal between sparse scalar rewards and expensive full demonstrations—richer than a binary label, yet cheaper to collect than complete expert trajectories. IXT <a href="https://arxiv.org/pdf/2605.20285">[Cui et al., 2025]</a> annotates training data with natural language critiques via a thinking reward model, then prefix-conditions the model on this feedback, achieving up to 2.8× compute efficiency. RLCF <a href="https://arxiv.org/pdf/2507.18624">[Viswanathan et al., 2025]</a> extracts instruction-specific checklists and scores each criterion individually to compute rewards for RL, outperforming standard alignment baselines.
     π-Distill <a href="https://arxiv.org/pdf/2602.04942">[Penaloza et al., 2026]</a> trains a privileged information-conditioned teacher and an unconditioned student jointly within the same model, transferring training-time privileged information to a policy that acts without it.
     Adding annotations to SFT data has also been shown to preserve the pretraining distribution and mitigate semantic mode collapse during fine-tuning <a href="https://arxiv.org/pdf/2605.09995">[Springer et al., 2025]</a> .
   </p>
@@ -781,23 +781,23 @@ description: "We propose a simple method to unlock the value of failed agent tra
 
   <ol class="references-list">
     <li>An, S. et al. <strong>Learning From Mistakes Makes LLM Better Reasoner.</strong> 2024. <a href="https://arxiv.org/pdf/2310.20689">arXiv:2310.20689</a></li>
-    <li>Song, Y. et al. <strong>Trial and Error: Exploration-Based Trajectory Optimization of LLM Agents.</strong> 2024. <a href="https://arxiv.org/abs/2403.02502">arXiv:2403.02502</a></li>
-    <li>Wang, R. et al. <strong>Learning From Failure: Integrating Negative Examples when Fine-tuning Large Language Models as Agents.</strong> 2024. <a href="https://arxiv.org/abs/2402.11651">arXiv:2402.11651</a></li>
-    <li>Yang, J. et al. <strong>SWE-agent: Agent-Computer Interfaces Enable Automated Software Engineering.</strong> 2024. <a href="https://arxiv.org/abs/2405.15793">arXiv:2405.15793</a></li>
-    <li>Cui, B. et al. <strong>Introspective X Training: Feedback Conditioning Improves Scaling Across all LLM Training Stages.</strong> 2025. <a href="https://arxiv.org/abs/2605.20285">arXiv:2605.20285</a></li>
-    <li>Lan, L. et al. <strong>Exploring Expert Failures Improves LLM Agent Tuning.</strong> 2025. <a href="https://arxiv.org/abs/2504.13145">arXiv:2504.13145</a></li>
-    <li id="ref-bugpilot">Sonwane, A. et al. <strong>BugPilot: Complex Bug Generation for Efficient Learning of SWE Skills.</strong> 2025. <a href="https://arxiv.org/abs/2510.19898">arXiv:2510.19898</a></li>
+    <li>Song, Y. et al. <strong>Trial and Error: Exploration-Based Trajectory Optimization of LLM Agents.</strong> 2024. <a href="https://arxiv.org/pdf/2403.02502">arXiv:2403.02502</a></li>
+    <li>Wang, R. et al. <strong>Learning From Failure: Integrating Negative Examples when Fine-tuning Large Language Models as Agents.</strong> 2024. <a href="https://arxiv.org/pdf/2402.11651">arXiv:2402.11651</a></li>
+    <li>Yang, J. et al. <strong>SWE-agent: Agent-Computer Interfaces Enable Automated Software Engineering.</strong> 2024. <a href="https://arxiv.org/pdf/2405.15793">arXiv:2405.15793</a></li>
+    <li>Cui, B. et al. <strong>Introspective X Training: Feedback Conditioning Improves Scaling Across all LLM Training Stages.</strong> 2025. <a href="https://arxiv.org/pdf/2605.20285">arXiv:2605.20285</a></li>
+    <li>Lan, L. et al. <strong>Exploring Expert Failures Improves LLM Agent Tuning.</strong> 2025. <a href="https://arxiv.org/pdf/2504.13145">arXiv:2504.13145</a></li>
+    <li id="ref-bugpilot">Sonwane, A. et al. <strong>BugPilot: Complex Bug Generation for Efficient Learning of SWE Skills.</strong> 2025. <a href="https://arxiv.org/pdf/2510.19898">arXiv:2510.19898</a></li>
     <li>Springer, J. M. et al. <strong>Annotations Mitigate Post-Training Mode Collapse.</strong> 2025. <a href="https://arxiv.org/pdf/2605.09995">arXiv:2605.09995</a></li>
-    <li>Viswanathan, V. et al. <strong>Checklists Are Better Than Reward Models For Aligning Language Models.</strong> 2025. <a href="https://arxiv.org/abs/2507.18624">arXiv:2507.18624</a></li>
-    <li>Wei, J. et al. <strong>SWE-RL: Advancing LLM Reasoning via Reinforcement Learning on Open Software Evolution.</strong> 2025. <a href="https://arxiv.org/abs/2502.18449">arXiv:2502.18449</a></li>
+    <li>Viswanathan, V. et al. <strong>Checklists Are Better Than Reward Models For Aligning Language Models.</strong> 2025. <a href="https://arxiv.org/pdf/2507.18624">arXiv:2507.18624</a></li>
+    <li>Wei, J. et al. <strong>SWE-RL: Advancing LLM Reasoning via Reinforcement Learning on Open Software Evolution.</strong> 2025. <a href="https://arxiv.org/pdf/2502.18449">arXiv:2502.18449</a></li>
     <li>Wichers, N. et al. <strong>Inoculation Prompting: Instructing LLMs to Misbehave at Train-Time Improves Test-Time Alignment.</strong> 2025. <a href="https://arxiv.org/pdf/2510.05024">arXiv:2510.05024</a></li>
-    <li>Xie, C. et al. <strong>SWE-Fixer: Training Open-Source LLMs for Effective and Efficient GitHub Issue Resolution.</strong> 2025. <a href="https://arxiv.org/abs/2501.05040">arXiv:2501.05040</a></li>
-    <li>Yang, J. et al. <strong>SWE-smith: Scaling Data for Software Engineering Agents.</strong> 2025. <a href="https://arxiv.org/abs/2504.21798">arXiv:2504.21798</a></li>
-    <li>Zeng, A. et al. <strong>Skywork-SWE: Unveiling Data Scaling Laws for Software Engineering Agents.</strong> 2025. <a href="https://arxiv.org/abs/2504.09269">arXiv:2504.09269</a></li>
+    <li>Xie, C. et al. <strong>SWE-Fixer: Training Open-Source LLMs for Effective and Efficient GitHub Issue Resolution.</strong> 2025. <a href="https://arxiv.org/pdf/2501.05040">arXiv:2501.05040</a></li>
+    <li>Yang, J. et al. <strong>SWE-smith: Scaling Data for Software Engineering Agents.</strong> 2025. <a href="https://arxiv.org/pdf/2504.21798">arXiv:2504.21798</a></li>
+    <li>Zeng, A. et al. <strong>Skywork-SWE: Unveiling Data Scaling Laws for Software Engineering Agents.</strong> 2025. <a href="https://arxiv.org/pdf/2504.09269">arXiv:2504.09269</a></li>
     <li>Penaloza, E. et al. <strong>Privileged Information Distillation for Language Models.</strong> 2026. <a href="https://arxiv.org/pdf/2602.04942">arXiv:2602.04942</a></li>
-    <li>Peng, B. et al. <strong>Orchard: An Open-Source Agentic Modeling Framework.</strong> 2026. <a href="https://arxiv.org/abs/2605.15040">arXiv:2605.15040</a></li>
-    <li>Shrivastava, V. et al. <strong>ECHO: Terminal Agents Learn World Models for Free.</strong> 2026. <a href="https://arxiv.org/abs/2605.24517">arXiv:2605.24517</a></li>
-    <li>Song, Y. et al. <strong>Expanding the Capabilities of Reinforcement Learning via Text Feedback.</strong> 2026. <a href="https://arxiv.org/abs/2602.02482">arXiv:2602.02482</a></li>
+    <li>Peng, B. et al. <strong>Orchard: An Open-Source Agentic Modeling Framework.</strong> 2026. <a href="https://arxiv.org/pdf/2605.15040">arXiv:2605.15040</a></li>
+    <li>Shrivastava, V. et al. <strong>ECHO: Terminal Agents Learn World Models for Free.</strong> 2026. <a href="https://arxiv.org/pdf/2605.24517">arXiv:2605.24517</a></li>
+    <li>Song, Y. et al. <strong>Expanding the Capabilities of Reinforcement Learning via Text Feedback.</strong> 2026. <a href="https://arxiv.org/pdf/2602.02482">arXiv:2602.02482</a></li>
     <li id="ref-claude4">Anthropic. <strong>Claude 4 System Card.</strong> 2025. <a href="https://www.anthropic.com/news/claude-4">anthropic.com/news/claude-4</a></li>
     <li id="ref-minimax">MiniMax. <strong>MiniMax-M2.5.</strong> 2025. <a href="https://github.com/MiniMax-AI/MiniMax-M2.5">github.com/MiniMax-AI/MiniMax-M2.5</a></li>
     <li>Microsoft AI. <strong>MAI-Thinking-1: Building a Hill-Climbing Machine.</strong> 2026. <a href="https://microsoft.ai/pdf/mai-thinking-1.pdf">microsoft.ai/pdf/mai-thinking-1.pdf</a></li>
