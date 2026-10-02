@@ -69,6 +69,12 @@ For a hosted PDF, use `link: "/static/papers/your-report.pdf"`. The template app
 `relative_url` so the link works locally and under the GitHub Pages `baseurl`.
 Full external URLs are also supported and are left unchanged.
 
+For the FrogNano release, optional `frognano_url` and `leaf_url` fields add
+**FrogNano-4B** (model weights) and **Leaf Harness** (harness and inference code)
+buttons alongside the report link. These use the same model and code button
+styles as the blog cards and open in a new tab. Omit either field to hide its
+button.
+
 The entry appears in the homepage feed in reverse date order, after any entries
 marked `always_top: true`. Set `draft: true` to hide a report.
 

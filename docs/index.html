@@ -103,6 +103,8 @@ title: "MSR Montréal - Froggy Team"
           {% continue %}
         {% endif %}
         {% assign sort_key = paper.date | date: "%Y%m%d%H%M%S" %}
+        {% assign frognano_url = paper.frognano_url | default: '' | strip %}
+        {% assign leaf_url = paper.leaf_url | default: '' | strip %}
         {% capture entry_markup %}
           <div class="project-card">
             <div class="project-card__meta-row">
@@ -120,6 +122,18 @@ title: "MSR Montréal - Froggy Team"
                 <span class="icon"><i class="fas fa-file-alt"></i></span>
                 <span>Read Technical Report</span>
               </a>
+              {% if frognano_url != '' %}
+              <a href="{{ frognano_url | relative_url | escape }}" target="_blank" rel="noopener noreferrer" class="button is-success">
+                <span class="icon"><i class="fas fa-frog" aria-hidden="true"></i></span>
+                <span>FrogNano-4B</span>
+              </a>
+              {% endif %}
+              {% if leaf_url != '' %}
+              <a href="{{ leaf_url | relative_url | escape }}" target="_blank" rel="noopener noreferrer" class="button is-dark">
+                <span class="icon"><i class="fab fa-github" aria-hidden="true"></i></span>
+                <span>Leaf Harness</span>
+              </a>
+              {% endif %}
             </div>
           </div>
         {% endcapture %}

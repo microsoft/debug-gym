@@ -54,7 +54,7 @@ puts pages.find { |page| page.url == options.fetch("page_url") }.output
 
 
 @pytest.mark.parametrize("baseurl", ["", "/debug-gym", "/preview"])
-def test_report_card_links_to_arxiv_pdf(baseurl):
+def test_frognano_card_links_to_paper_weights_and_harness(baseurl):
     homepage = render_page(baseurl=baseurl)
     cards = homepage.split('<div class="project-card">')[1:]
     report_cards = [card for card in cards if REPORT_TITLE in card]
@@ -70,8 +70,33 @@ def test_report_card_links_to_arxiv_pdf(baseurl):
         < card.index("<p>")
         < card.index('<div class="project-links">')
     )
-    assert card.count("<a ") == 1
+    assert card.count("<a ") == 3
     assert f'href="{REPORT_URL}"' in card
+    for label, url, style, icon in [
+        (
+            "FrogNano-4B",
+            "https://huggingface.co/microsoft/FrogNano-4B-2609",
+            "is-success",
+            "fas fa-frog",
+        ),
+        (
+            "Leaf Harness",
+            "https://github.com/microsoft/FrogNano",
+            "is-dark",
+            "fab fa-github",
+        ),
+    ]:
+        buttons = [
+            anchor
+            for anchor in re.findall(r"<a\b[^>]*>.*?</a>", card, re.S)
+            if f"<span>{label}</span>" in anchor
+        ]
+        assert len(buttons) == 1
+        assert f'href="{url}"' in buttons[0]
+        assert f'class="button {style}"' in buttons[0]
+        assert f'class="{icon}"' in buttons[0]
+        assert 'target="_blank"' in buttons[0]
+        assert 'rel="noopener noreferrer"' in buttons[0]
     assert not (DOCS / "static/papers/frognano_technical_report.pdf").exists()
     assert f'href="{baseurl}/blog/2026/08/negative-pi/"' in homepage
     assert "Apply Now" not in homepage
@@ -91,6 +116,14 @@ def test_report_card_still_supports_hosted_pdf(baseurl):
     )
 
     assert f'href="{baseurl}{LOCAL_REPORT_PATH}"' in homepage
+    card = next(
+        card
+        for card in homepage.split('<div class="project-card">')[1:]
+        if "Local technical report" in card
+    )
+    assert card.count("<a ") == 1
+    assert "<span>FrogNano-4B</span>" not in card
+    assert "<span>Leaf Harness</span>" not in card
 
 
 @pytest.mark.parametrize(
