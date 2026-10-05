@@ -47,6 +47,23 @@ The optional `_projects/` collection is available for new project pages.
 
 ## Writing Content
 
+### Linking to Homepage Cards
+
+Every news, technical report, blog post, and project card has a fragment anchor.
+Click a card's title to jump to and highlight it, then copy the browser URL (or
+right-click the title to copy its link). For example, share FrogNano with
+<https://microsoft.github.io/debug-gym/#frognano>.
+
+Set `anchor: frognano` in a news/report data entry or a post/project's front matter
+to choose a short, stable anchor. Use a unique, lowercase, hyphen-separated value
+across the homepage and keep it unchanged once shared. Without an explicit anchor,
+the site uses a type-prefixed slug: news/report titles (or the news date if there
+is no title), blog post IDs including their dates, and project slugs.
+
+Fragment links work without JavaScript, highlight the selected card, and leave
+space above it for the fixed navigation bar. Existing resource buttons still
+link directly to their destinations.
+
 ### Adding a Standalone Technical Report
 
 Reports can have their own homepage cards, separate from News and Blog Posts.

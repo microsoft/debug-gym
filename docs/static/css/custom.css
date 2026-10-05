@@ -540,6 +540,23 @@ a:hover {
   border: 1px solid rgba(92, 107, 255, 0.08);
   position: relative;
   overflow: hidden;
+  scroll-margin-top: 100px;
+}
+
+.project-card:target {
+  border-color: var(--color-primary);
+  outline: 2px solid var(--color-primary);
+  background: var(--color-surface-muted);
+}
+
+.project-card__permalink {
+  color: inherit;
+}
+
+.project-card__permalink:hover,
+.project-card__permalink:focus-visible {
+  color: var(--color-primary-dark);
+  text-decoration: underline;
 }
 
 .project-card__meta-row {
@@ -1285,6 +1302,10 @@ code {
 @media screen and (max-width: 768px) {
   body {
     padding-top: 112px;
+  }
+
+  .project-card {
+    scroll-margin-top: 170px;
   }
 
   .navbar-custom {

@@ -37,6 +37,18 @@ site = Jekyll::Site.new(config)
 site.reset
 site.read
 site.data["papers"] = options["papers"] if options.key?("papers")
+site.data["news"] = options["news"] if options.key?("news")
+options.fetch("projects", []).each_with_index do |data, index|
+  collection = site.collections.fetch("projects")
+  document = Jekyll::Document.new(
+    File.join(site.source, "_projects", "example-#{index}.md"),
+    site: site, collection: collection
+  )
+  document.data["date"] = Time.utc(2025, 1, 1)
+  document.data["slug"] = "example-#{index}"
+  document.data.merge!(data)
+  collection.docs << document
+end
 site.generate
 site.render
 pages = site.pages + site.posts.docs
@@ -56,7 +68,7 @@ puts pages.find { |page| page.url == options.fetch("page_url") }.output
 @pytest.mark.parametrize("baseurl", ["", "/debug-gym", "/preview"])
 def test_frognano_card_links_to_paper_weights_and_harness(baseurl):
     homepage = render_page(baseurl=baseurl)
-    cards = homepage.split('<div class="project-card">')[1:]
+    cards = re.split(r'<div class="project-card"[^>]*>', homepage)[1:]
     report_cards = [card for card in cards if REPORT_TITLE in card]
 
     assert len(report_cards) == 1
@@ -70,7 +82,7 @@ def test_frognano_card_links_to_paper_weights_and_harness(baseurl):
         < card.index("<p>")
         < card.index('<div class="project-links">')
     )
-    assert card.count("<a ") == 3
+    assert card.count('class="button ') == 3
     assert f'href="{REPORT_URL}"' in card
     for label, url, style, icon in [
         (
@@ -118,10 +130,10 @@ def test_report_card_still_supports_hosted_pdf(baseurl):
     assert f'href="{baseurl}{LOCAL_REPORT_PATH}"' in homepage
     card = next(
         card
-        for card in homepage.split('<div class="project-card">')[1:]
+        for card in re.split(r'<div class="project-card"[^>]*>', homepage)[1:]
         if "Local technical report" in card
     )
-    assert card.count("<a ") == 1
+    assert card.count('class="button ') == 1
     assert "<span>FrogNano-4B</span>" not in card
     assert "<span>Leaf Harness</span>" not in card
 
@@ -168,7 +180,7 @@ def test_report_links_and_feed_ordering():
             },
         ]
     )
-    cards = homepage.split('<div class="project-card">')[1:]
+    cards = re.split(r'<div class="project-card"[^>]*>', homepage)[1:]
 
     assert "Featured report" in cards[0]
     assert f'href="{arxiv_url}"' in cards[0]
@@ -184,6 +196,71 @@ def test_homepage_without_reports_keeps_existing_posts():
     assert "content-type-paper" not in homepage
     assert 'href="/debug-gym/blog/2026/08/negative-pi/"' in homepage
     assert "No updates yet" not in homepage
+
+
+@pytest.mark.parametrize("baseurl", ["", "/debug-gym", "/preview"])
+def test_homepage_cards_have_unique_linked_anchors(baseurl):
+    homepage = render_page(baseurl=baseurl)
+    cards = re.findall(
+        r'<div class="project-card" id="([^"]+)">(.*?)(?=<div class="project-card"|</section>)',
+        homepage,
+        re.S,
+    )
+    anchors = [anchor for anchor, _ in cards]
+
+    assert len(cards) == homepage.count('<div class="project-card"')
+    assert len(anchors) == len(set(anchors))
+    assert "frognano" in anchors
+    assert "post-blog-2025-10-bug-pilot" in anchors
+    for anchor, card in cards:
+        assert re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", anchor)
+        assert f'class="project-card__permalink" href="#{anchor}"' in card
+        assert card.index('class="project-card__permalink"') < card.index("</h3>")
+
+
+def test_anchors_cover_news_reports_and_projects():
+    homepage = render_page(
+        news=[
+            {"title": "Team News", "date": "2025-01-01"},
+            {
+                "title": "Custom news",
+                "title_html": "<code>Custom news</code>",
+                "anchor": "Hiring Update!",
+                "date": "2025-01-02",
+            },
+            {"date": "2025-01-03", "description": "Untitled news"},
+            {"title": "Hidden news", "anchor": "hidden-news", "draft": True},
+        ],
+        papers=[
+            {"title": "Example Report", "date": "2025-01-01", "link": REPORT_URL},
+            {
+                "title": "Hidden report",
+                "anchor": "hidden-report",
+                "draft": True,
+            },
+        ],
+        projects=[
+            {"title": "Example Project"},
+            {"title": "Custom project", "anchor": "custom-project"},
+            {"title": "Hidden project", "anchor": "hidden-project", "draft": True},
+        ],
+    )
+
+    for anchor in [
+        "news-team-news",
+        "hiring-update",
+        "news-2025-01-03",
+        "paper-example-report",
+        "project-example-0",
+        "custom-project",
+    ]:
+        assert homepage.count(f'id="{anchor}"') == 1
+        assert homepage.count(f'href="#{anchor}"') == 1
+    for anchor in ["hidden-news", "hidden-report", "hidden-project"]:
+        assert f'id="{anchor}"' not in homepage
+        assert f'href="#{anchor}"' not in homepage
+    assert "<code>Custom news</code>" in homepage
+    assert "<code>Example Project</code>" in homepage
 
 
 @pytest.mark.parametrize(
@@ -237,7 +314,7 @@ def test_programdistill_resource_buttons(baseurl):
     post_path = "/blog/2026/09/programdistill/"
     dashboard_path = post_path + "dashboard/"
     homepage = render_page(baseurl=baseurl)
-    cards = homepage.split('<div class="project-card">')[1:]
+    cards = re.split(r'<div class="project-card"[^>]*>', homepage)[1:]
     card = next(card for card in cards if f'href="{baseurl}{post_path}"' in card)
     post = render_page(post_path, baseurl=baseurl)
     hero = post.split('<section class="blog-hero">', 1)[1].split("</section>", 1)[0]
