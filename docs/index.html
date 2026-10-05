@@ -58,8 +58,10 @@ title: "MSR Montréal - Froggy Team"
         {% else %}
           {% assign sort_key = '00000000000000' %}
         {% endif %}
+        {% assign default_anchor = item.title | default: item.date | slugify | prepend: 'news-' %}
+        {% assign entry_anchor = item.anchor | default: default_anchor | slugify %}
         {% capture entry_markup %}
-          <div class="project-card">
+          <div class="project-card" id="{{ entry_anchor }}">
             <div class="project-card__meta-row">
               <span class="content-type-badge content-type-news">
                 <i class="fas fa-bullhorn"></i> News
@@ -69,11 +71,13 @@ title: "MSR Montréal - Froggy Team"
               {% endif %}
             </div>
             <h3 class="title is-3">
-              {% if item.title_html %}
-                {{ item.title_html }}
-              {% else %}
-                {{ item.title }}
-              {% endif %}
+              <a class="project-card__permalink" href="#{{ entry_anchor }}">
+                {% if item.title_html %}
+                  {{ item.title_html }}
+                {% else %}
+                  {{ item.title | default: 'News' }}
+                {% endif %}
+              </a>
             </h3>
             {% if item.description %}
             <p>{{ item.description }}</p>
@@ -105,15 +109,19 @@ title: "MSR Montréal - Froggy Team"
         {% assign sort_key = paper.date | date: "%Y%m%d%H%M%S" %}
         {% assign frognano_url = paper.frognano_url | default: '' | strip %}
         {% assign leaf_url = paper.leaf_url | default: '' | strip %}
+        {% assign default_anchor = paper.title | slugify | prepend: 'paper-' %}
+        {% assign entry_anchor = paper.anchor | default: default_anchor | slugify %}
         {% capture entry_markup %}
-          <div class="project-card">
+          <div class="project-card" id="{{ entry_anchor }}">
             <div class="project-card__meta-row">
               <span class="content-type-badge content-type-paper">
                 <i class="fas fa-file-alt"></i> Technical Report
               </span>
               <span class="project-status status-published">{{ paper.date | date: "%B %Y" }}</span>
             </div>
-            <h3 class="title is-3">{{ paper.title | escape }}</h3>
+            <h3 class="title is-3">
+              <a class="project-card__permalink" href="#{{ entry_anchor }}">{{ paper.title | escape }}</a>
+            </h3>
             {% if paper.description %}
             <p>{{ paper.description | escape }}</p>
             {% endif %}
@@ -154,15 +162,19 @@ title: "MSR Montréal - Froggy Team"
         {% assign sort_key = post.date | date: "%Y%m%d%H%M%S" %}
         {% assign leaderboard_url = post.leaderboard_url | default: '' | strip %}
         {% assign dataset_url = post.dataset_url | default: '' | strip %}
+        {% assign default_anchor = post.id | slugify | prepend: 'post-' %}
+        {% assign entry_anchor = post.anchor | default: default_anchor | slugify %}
         {% capture entry_markup %}
-          <div class="project-card">
+          <div class="project-card" id="{{ entry_anchor }}">
             <div class="project-card__meta-row">
               <span class="content-type-badge content-type-blog">
                 <i class="fas fa-newspaper"></i> Blog Post
               </span>
               <span class="project-status status-published">{{ post.date | date: "%B %Y" }}</span>
             </div>
-            <h3 class="title is-3">{{ post.title }}</h3>
+            <h3 class="title is-3">
+              <a class="project-card__permalink" href="#{{ entry_anchor }}">{{ post.title }}</a>
+            </h3>
             {% if post.description %}
             <p>{{ post.description }}</p>
             {% endif %}
@@ -231,8 +243,10 @@ title: "MSR Montréal - Froggy Team"
         {% else %}
           {% assign sort_key = '00000000000000' %}
         {% endif %}
+        {% assign default_anchor = project.slug | default: project.title | slugify | prepend: 'project-' %}
+        {% assign entry_anchor = project.anchor | default: default_anchor | slugify %}
         {% capture entry_markup %}
-          <div class="project-card">
+          <div class="project-card" id="{{ entry_anchor }}">
             <div class="project-card__meta-row">
               <span class="content-type-badge content-type-project">
                 <i class="fas fa-cube"></i> Project
@@ -244,11 +258,13 @@ title: "MSR Montréal - Froggy Team"
               {% endif %}
             </div>
             <h3 class="title is-3">
-              {% if project.title_html %}
-                {{ project.title_html }}
-              {% else %}
-                <code>{{ project.title }}</code>
-              {% endif %}
+              <a class="project-card__permalink" href="#{{ entry_anchor }}">
+                {% if project.title_html %}
+                  {{ project.title_html }}
+                {% else %}
+                  <code>{{ project.title }}</code>
+                {% endif %}
+              </a>
             </h3>
             <p>{{ project.description }}</p>
             <div class="project-links">
