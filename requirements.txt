@@ -1,4 +1,4 @@
-datasets==3.6.0
+datasets==5.0.1
 openai==1.99.9
 azure-identity==1.22.0
 tenacity==9.1.2
