@@ -2,6 +2,8 @@ import logging
 import tempfile
 from pathlib import Path
 
+from filelock import FileLock
+
 import debug_gym.gym.utils as utils
 from debug_gym.constants import DEBUG_GYM_CACHE_DIR
 from debug_gym.gym.entities import EvalOutput
@@ -22,39 +24,41 @@ def build_docker_image(logger: logging.Logger | None = None):
     import docker
 
     docker_client = docker.from_env(timeout=600)
-    try:
-        docker_client.images.get(DOCKER_MINI_NIGHTMARE_IMAGE_NAME)
-        return
-    except docker.errors.ImageNotFound:
-        pass
+    lock_file = DEBUG_GYM_CACHE_DIR / "mini_nightmare_image.lock"
+    with FileLock(str(lock_file)):
+        try:
+            docker_client.images.get(DOCKER_MINI_NIGHTMARE_IMAGE_NAME)
+            return
+        except docker.errors.ImageNotFound:
+            pass
 
-    logger.info(
-        f"Docker image {DOCKER_MINI_NIGHTMARE_IMAGE_NAME} not found. Building it..."
-    )
-
-    # Starts from the official Python 3.12 slim image
-    base_image = "python:3.12-slim"
-    # Then install git and the required Python packages
-    setup_commands = [
-        "apt update",
-        "apt install -y git tree",
-        "pip install pytest pandas",
-    ]
-    # Create a temporary Dockerfile
-    with tempfile.TemporaryDirectory() as build_dir:
-        dockerfile_path = Path(build_dir) / "Dockerfile"
-        with open(dockerfile_path, "w") as dockerfile:
-            dockerfile.write(f"FROM {base_image}\n")
-            for command in setup_commands:
-                dockerfile.write(f"RUN {command}\n")
-
-        # Build the Docker image using docker client
-        image, build_logs = docker_client.images.build(
-            path=str(build_dir),
-            dockerfile="Dockerfile",
-            tag=DOCKER_MINI_NIGHTMARE_IMAGE_NAME,
-            rm=True,
+        logger.info(
+            f"Docker image {DOCKER_MINI_NIGHTMARE_IMAGE_NAME} not found. Building it..."
         )
+
+        # Starts from the official Python 3.12 slim image
+        base_image = "python:3.12-slim"
+        # Then install git and the required Python packages
+        setup_commands = [
+            "apt update",
+            "apt install -y git tree",
+            "pip install pytest pandas",
+        ]
+        # Create a temporary Dockerfile
+        with tempfile.TemporaryDirectory() as build_dir:
+            dockerfile_path = Path(build_dir) / "Dockerfile"
+            with open(dockerfile_path, "w") as dockerfile:
+                dockerfile.write(f"FROM {base_image}\n")
+                for command in setup_commands:
+                    dockerfile.write(f"RUN {command}\n")
+
+            # Build the Docker image using docker client
+            image, build_logs = docker_client.images.build(
+                path=str(build_dir),
+                dockerfile="Dockerfile",
+                tag=DOCKER_MINI_NIGHTMARE_IMAGE_NAME,
+                rm=True,
+            )
 
     logger.info(f"Docker image {DOCKER_MINI_NIGHTMARE_IMAGE_NAME} built successfully.")
 

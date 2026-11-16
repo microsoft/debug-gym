@@ -1,8 +1,14 @@
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
+import docker
 import pytest
 
-from debug_gym.gym.envs.mini_nightmare import MiniNightmareEnv
+from debug_gym.constants import DEBUG_GYM_CACHE_DIR
+from debug_gym.gym.envs.mini_nightmare import (
+    DOCKER_MINI_NIGHTMARE_IMAGE_NAME,
+    MiniNightmareEnv,
+    build_docker_image,
+)
 from debug_gym.gym.terminals.docker import DockerTerminal
 from debug_gym.gym.tools.toolbox import Toolbox
 
@@ -27,6 +33,45 @@ def test_load_dataset(mini_nightmare_env):
 def test_build_docker_image(mock_build_docker_image):
     MiniNightmareEnv.load_dataset()
     mock_build_docker_image.assert_called_once()
+
+
+def test_build_docker_image_serializes_image_creation():
+    lock_held = False
+
+    class Lock:
+        def __init__(self, path):
+            assert path == str(DEBUG_GYM_CACHE_DIR / "mini_nightmare_image.lock")
+
+        def __enter__(self):
+            nonlocal lock_held
+            lock_held = True
+
+        def __exit__(self, *args):
+            nonlocal lock_held
+            lock_held = False
+
+    images = Mock()
+
+    def image_not_found(image_name):
+        assert lock_held
+        assert image_name == DOCKER_MINI_NIGHTMARE_IMAGE_NAME
+        raise docker.errors.ImageNotFound("image not found")
+
+    def build_image(**kwargs):
+        assert lock_held
+        assert kwargs["tag"] == DOCKER_MINI_NIGHTMARE_IMAGE_NAME
+        return Mock(), []
+
+    images.get.side_effect = image_not_found
+    images.build.side_effect = build_image
+    with (
+        patch("docker.from_env", return_value=Mock(images=images)),
+        patch("debug_gym.gym.envs.mini_nightmare.FileLock", Lock),
+    ):
+        build_docker_image()
+
+    images.get.assert_called_once_with(DOCKER_MINI_NIGHTMARE_IMAGE_NAME)
+    images.build.assert_called_once()
 
 
 def test_instructions(mini_nightmare_env):
