@@ -98,16 +98,54 @@ def test_setup_task(get_swe_smith_env):
 @pytest.if_docker_running
 def test_setup_terminal(get_swe_smith_env):
     env = get_swe_smith_env()
-    task_name = "john-kurkowski__tldextract.3d1bf184.combine_file__1vnuqpt4"
     env.reset()
-    _, git_logs = env.terminal.run("git log -n 4")
-    # For SWE-Smith the base commit is found in the branch associated to the
-    # instance id and is different from the one in the main branch.
-    assert f"Applying bug patch for {task_name}" in git_logs
 
-    _, git_diff = env.terminal.run("git show HEAD", strip_output=False)
-    git_diff = git_diff[git_diff.index("diff --git") :]
-    assert git_diff == env.bug_patch
+    # The bug patch is applied and committed.
+    success, _ = env.terminal.run(
+        f"git apply --reverse --check - <<'EOF'\n{env.bug_patch}\nEOF"
+    )
+    assert success
+    _, git_status = env.terminal.run("git status --porcelain")
+    assert git_status == ""
+
+    # The git history doesn't contain the original code, e.g. the agent can't
+    # undo the bug with `git checkout HEAD~1 -- .`.
+    _, nb_commits = env.terminal.run("git rev-list --all --count")
+    assert nb_commits == "1"
+    _, nb_commit_objects = env.terminal.run(
+        "git cat-file --batch-all-objects --batch-check | grep -c ' commit '"
+    )
+    assert nb_commit_objects == "1"
+    success, _ = env.terminal.run("git checkout HEAD~1 -- .")
+    assert not success
+
+
+@pytest.if_docker_running
+def test_setup_terminal_with_bug_patch_adding_a_file(get_swe_smith_env):
+    env = get_swe_smith_env()
+    new_file_patch = (
+        "diff --git a/new_file.py b/new_file.py\n"
+        "new file mode 100644\n"
+        "--- /dev/null\n"
+        "+++ b/new_file.py\n"
+        "@@ -0,0 +1 @@\n"
+        "+print('hello')\n"
+    )
+    env.task_data = dict(
+        env.task_data, patch=env.task_data["patch"].rstrip("\n") + "\n" + new_file_patch
+    )
+    env.reset()
+
+    # The added file is part of the initial commit.
+    _, tracked = env.terminal.run("git ls-files new_file.py")
+    assert tracked == "new_file.py"
+    _, git_status = env.terminal.run("git status --porcelain")
+    assert git_status == ""
+
+    # The gold patch removes it.
+    env.apply_gold_patch()
+    success, _ = env.terminal.run("test -e new_file.py")
+    assert not success
 
 
 @pytest.if_docker_running

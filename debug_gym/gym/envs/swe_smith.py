@@ -105,11 +105,37 @@ class SWESmithEnv(SWEBenchEnv):
     def setup_terminal(self):
         super().setup_terminal()
 
-        # Apply bug patch.
-        self.terminal.run(f"git apply - <<'EOF'\n{self.bug_patch}\nEOF", raises=True)
-        self.terminal.run(
-            f"git commit -am 'Applying bug patch for {self.task_name}' --no-verify"
+        # Apply bug patch, also to the index so files it adds are tracked. The
+        # index is refreshed first since `--index` compares the files' stat info.
+        # Note: `raises=True` doesn't cover timeouts, hence the extra checks.
+        success, output = self.terminal.run(
+            "git update-index -q --refresh && "
+            f"git apply --index - <<'EOF'\n{self.bug_patch}\nEOF",
+            raises=True,
         )
+        if not success:
+            raise RuntimeError(f"Failed to apply the bug patch:\n{output}")
+
+        # Start a new git history whose only commit is the buggy code. Committing
+        # the bug on top of the original code would let the agent restore the
+        # original code (i.e. the gold patch) with `git checkout HEAD~1 -- .`.
+        success, output = self.terminal.run(
+            [
+                "tracked_files=$(mktemp)",
+                'git ls-files -z > "$tracked_files"',
+                "rm -rf .git",
+                "git init -q -b main",
+                "git config user.name 'debug-gym'",
+                "git config user.email '<>'",
+                "git --literal-pathspecs add -f"
+                ' --pathspec-from-file="$tracked_files" --pathspec-file-nul',
+                'rm "$tracked_files"',
+                "git commit -qm 'Initial commit' --no-verify",
+            ],
+            raises=True,
+        )
+        if not success:
+            raise RuntimeError(f"Failed to reset the git history:\n{output}")
 
     def calculate_score(self, eval_output: EvalOutput) -> int:
         test_status_map = self.log_parser(eval_output.output)
