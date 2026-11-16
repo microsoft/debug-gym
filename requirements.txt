@@ -8,6 +8,7 @@ termcolor==3.1.0
 transformers==5.10.1
 tiktoken
 docker==7.1.0
+filelock==4.2.10
 swebench==4.0.3
 swesmith==0.0.4
 # swesmith requires sglang, but sglang>0.5.2 pulls in heavy runtime
