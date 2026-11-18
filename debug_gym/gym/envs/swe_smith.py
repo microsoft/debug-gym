@@ -4,12 +4,6 @@ from pathlib import Path
 import docker
 import yaml
 from datasets import load_dataset, load_from_disk
-from swesmith.build_repo.download_images import DOCKER_ORG, TAG
-from swesmith.constants import MAP_REPO_TO_SPECS
-from swesmith.harness.grading import TestStatus
-from swesmith.harness.log_parsers import MAP_REPO_TO_PARSER, parse_log_pytest
-from swesmith.harness.utils import get_test_command
-from swesmith.utils import get_repo_commit_from_image_name
 
 from debug_gym.constants import DEBUG_GYM_CACHE_DIR
 from debug_gym.gym.entities import EvalOutput
@@ -25,6 +19,18 @@ class SWESmithEnv(SWEBenchEnv):
     )
 
     def setup_task(self):
+        try:
+            from swesmith.build_repo.download_images import DOCKER_ORG, TAG
+            from swesmith.constants import MAP_REPO_TO_SPECS
+            from swesmith.harness.log_parsers import MAP_REPO_TO_PARSER, parse_log_pytest
+            from swesmith.harness.utils import get_test_command
+            from swesmith.utils import get_repo_commit_from_image_name
+        except ImportError as exc:
+            raise ImportError(
+                "SWE-Smith support requires installing requirements-swesmith.txt "
+                "and swesmith==0.0.4 without dependencies."
+            ) from exc
+
         self.base_commit = (
             self.task_data["base_commit"] if "base_commit" in self.task_data else "main"
         )
@@ -138,6 +144,8 @@ class SWESmithEnv(SWEBenchEnv):
             raise RuntimeError(f"Failed to reset the git history:\n{output}")
 
     def calculate_score(self, eval_output: EvalOutput) -> int:
+        from swesmith.harness.grading import TestStatus
+
         test_status_map = self.log_parser(eval_output.output)
         f2p_score = sum(
             1
@@ -229,6 +237,8 @@ class SWESmithEnv(SWEBenchEnv):
         )
 
         if prepull_images:
+            from swesmith.build_repo.download_images import DOCKER_ORG, TAG
+
             # Download all images needed for SWE-Smith.
             client = docker.from_env()
             tagged_image_names = set(

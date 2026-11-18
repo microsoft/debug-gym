@@ -1,0 +1,15 @@
+astor
+ghapi
+jupyter
+libcst
+litellm
+matplotlib
+modal
+pre-commit
+python-dotenv
+sparklines
+textual
+tqdm
+tree-sitter
+tree-sitter-go
+unidiff
