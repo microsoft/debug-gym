@@ -151,7 +151,9 @@ jobs:
       - name: Install dependencies
         run: |
           pip install --upgrade pip
-          pip install "debug-gym[dev]==${{ needs.get-latest-release.outputs.release-tag }}"
+          pip install -r requirements.txt
+          pip install pytest-asyncio pytest-cov pytest-xdist pytest-timeout pytest-env isort black Flask==3.1.3 Werkzeug==3.1.9
+          pip install --no-deps "debug-gym==${{ needs.get-latest-release.outputs.release-tag }}"
       - name: Test - PR - Fast
         env:
           DEBUG_GYM_DEBUG: 1

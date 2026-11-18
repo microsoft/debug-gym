@@ -37,7 +37,13 @@ runs:
         if [[ -z "${{ inputs.version }}" ]]; then
           pip install -e '.[dev]'
         else
-          pip install "debug-gym[dev]==${{ inputs.version }}"
+          pip install -r requirements.txt
+          pip install pytest-asyncio pytest-cov pytest-xdist pytest-timeout pytest-env isort black Flask==3.1.3 Werkzeug==3.1.9
+          pip install --no-deps "debug-gym==${{ inputs.version }}"
+        fi
+        if [[ "${{ inputs.name }}" == "swesmith" ]]; then
+          pip install -r requirements-swesmith.txt
+          pip install --no-deps swesmith==0.0.4
         fi
         df -h
     - name: Run tests

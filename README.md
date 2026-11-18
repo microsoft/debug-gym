@@ -27,6 +27,11 @@ To install development dependencies, run:
 
     pip install -e '.[dev]'
 
+SWE-Smith support is optional. From a repository checkout, install its dependencies and the package without its unused SGLang dependency:
+
+    pip install -r requirements-swesmith.txt
+    pip install --no-deps swesmith==0.0.4
+
 
 **Set your API information in llm.yaml**
 

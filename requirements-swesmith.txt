@@ -1,0 +1,17 @@
+# Install these in addition to requirements.txt. SWE-Smith's SGLang dependency
+# is intentionally omitted because debug-gym does not use its inference server.
+astor
+ghapi
+jupyter
+libcst
+litellm
+matplotlib
+modal
+pre-commit
+python-dotenv
+sparklines
+textual
+tqdm
+tree-sitter
+tree-sitter-go
+unidiff
