@@ -1,3 +1,5 @@
+# Install these in addition to requirements.txt. SWE-Smith's SGLang dependency
+# is intentionally omitted because debug-gym does not use its inference server.
 astor
 ghapi
 jupyter
