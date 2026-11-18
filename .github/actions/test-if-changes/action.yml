@@ -37,7 +37,7 @@ runs:
         if [[ -z "${{ inputs.version }}" ]]; then
           pip install -e '.[dev]'
         else
-          pip install -c requirements.txt "debug-gym[dev]==${{ inputs.version }}"
+          pip install -c <(grep '^sglang==' requirements.txt) "debug-gym[dev]==${{ inputs.version }}"
         fi
         df -h
     - name: Run tests
